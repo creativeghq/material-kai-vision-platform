@@ -11,7 +11,9 @@ const API_BASE = '/functions/v1';
 
 export const usersAPI = {
   async listUsers(limit = 50, offset = 0, search?: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const params = new URLSearchParams({
@@ -35,7 +37,9 @@ export const usersAPI = {
   },
 
   async getUser(userId: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-users-api/${userId}`, {
@@ -53,7 +57,9 @@ export const usersAPI = {
   },
 
   async updateUser(userId: string, updates: any) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-users-api/${userId}`, {
@@ -74,7 +80,9 @@ export const usersAPI = {
   },
 
   async deleteUser(userId: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-users-api/${userId}`, {
@@ -97,17 +105,22 @@ export const usersAPI = {
 
 export const stripeAPI = {
   async createCheckoutSession(planId: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const response = await fetch(`${API_BASE}/crm-stripe-api/subscriptions/create-checkout`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `${API_BASE}/crm-stripe-api/subscriptions/create-checkout`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ plan_id: planId }),
       },
-      body: JSON.stringify({ plan_id: planId }),
-    });
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -118,17 +131,22 @@ export const stripeAPI = {
   },
 
   async purchaseCredits(packageId: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const response = await fetch(`${API_BASE}/crm-stripe-api/credits/purchase`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `${API_BASE}/crm-stripe-api/credits/purchase`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ package_id: packageId }),
       },
-      body: JSON.stringify({ package_id: packageId }),
-    });
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -139,7 +157,9 @@ export const stripeAPI = {
   },
 
   async getSubscription() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-stripe-api/subscriptions`, {
@@ -157,7 +177,9 @@ export const stripeAPI = {
   },
 
   async getCredits() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-stripe-api/credits`, {
@@ -179,7 +201,9 @@ export const stripeAPI = {
 
 export const contactsAPI = {
   async createContact(contact: any) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-contacts-api`, {
@@ -200,7 +224,9 @@ export const contactsAPI = {
   },
 
   async listContacts(limit = 50, offset = 0) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const params = new URLSearchParams({
@@ -223,7 +249,9 @@ export const contactsAPI = {
   },
 
   async getContact(contactId: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
@@ -241,7 +269,9 @@ export const contactsAPI = {
   },
 
   async updateContact(contactId: string, updates: any) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
@@ -262,7 +292,9 @@ export const contactsAPI = {
   },
 
   async deleteContact(contactId: string) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
     const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
@@ -280,4 +312,3 @@ export const contactsAPI = {
     return response.json();
   },
 };
-

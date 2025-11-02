@@ -41,7 +41,7 @@ export enum ErrorDomain {
   MATERIAL_PROCESSING = 'MATERIAL_PROCESSING',
   AI_SERVICE = 'AI_SERVICE',
   FILE_PROCESSING = 'FILE_PROCESSING',
-  EXTERNAL_API = 'EXTERNAL_API'
+  EXTERNAL_API = 'EXTERNAL_API',
 }
 
 /**
@@ -130,9 +130,7 @@ export type Result<T, E extends BaseError = BaseError> =
  * }
  * ```
  */
-export type Option<T> =
-  | { some: true; value: T }
-  | { some: false };
+export type Option<T> = { some: true; value: T } | { some: false };
 
 // =============================================================================
 // RESULT HELPERS
@@ -211,7 +209,9 @@ export function none<T>(): Option<T> {
  * @param option - Option to check
  * @returns True if Option has value
  */
-export function isSome<T>(option: Option<T>): option is { some: true; value: T } {
+export function isSome<T>(
+  option: Option<T>,
+): option is { some: true; value: T } {
   return option.some;
 }
 

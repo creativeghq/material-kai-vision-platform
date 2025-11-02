@@ -67,13 +67,25 @@ export interface AccessibilityAnalysis {
   compliance_score: number;
   accessibility_features: string[];
   recommendations: string[];
-  barrier_free_paths: Array<{ start: { x: number; y: number }; end: { x: number; y: number }; width: number }>;
+  barrier_free_paths: Array<{
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+    width: number;
+  }>;
   ada_compliance: boolean;
 }
 
 export interface FlowOptimization {
-  traffic_patterns: Array<{ path: Array<{ x: number; y: number }>; frequency: number; purpose: string }>;
-  bottlenecks: Array<{ position: { x: number; y: number }; severity: number; recommendation: string }>;
+  traffic_patterns: Array<{
+    path: Array<{ x: number; y: number }>;
+    frequency: number;
+    purpose: string;
+  }>;
+  bottlenecks: Array<{
+    position: { x: number; y: number };
+    severity: number;
+    recommendation: string;
+  }>;
   efficiency_score: number;
   suggested_improvements: string[];
 }
@@ -92,7 +104,6 @@ export interface SpaceformerResult {
 }
 
 class SpaceformerAnalysisService {
-
   /**
    * Perform spatial analysis using Spaceformer AI
    */
@@ -108,11 +119,12 @@ class SpaceformerAnalysisService {
 
       if (!response.success || !response.data) {
         console.error('Spaceformer analysis error:', response.error);
-        throw new Error(`Spaceformer analysis failed: ${response.error || 'Unknown error'}`);
+        throw new Error(
+          `Spaceformer analysis failed: ${response.error || 'Unknown error'}`,
+        );
       }
 
       return data as SpaceformerResult;
-
     } catch (error) {
       console.error('Error in spaceformer analysis:', error);
       throw error;
@@ -123,12 +135,13 @@ class SpaceformerAnalysisService {
    * Get spatial analysis results by ID
    * Note: spatial_analysis table doesn't exist in current schema
    */
-  async getAnalysisResults(_analysisId: string): Promise<SpaceformerResult | null> {
+  async getAnalysisResults(
+    _analysisId: string,
+  ): Promise<SpaceformerResult | null> {
     try {
       // TODO: Implement when spatial_analysis table is available
       console.warn('spatial_analysis table not available in current schema');
       return null;
-
     } catch (error) {
       console.error('Error getting analysis results:', error);
       throw error;
@@ -144,7 +157,6 @@ class SpaceformerAnalysisService {
       // TODO: Implement when spatial_analysis table is available
       console.warn('spatial_analysis table not available in current schema');
       return [];
-
     } catch (error) {
       console.error('Error listing analyses:', error);
       throw error;
@@ -154,7 +166,10 @@ class SpaceformerAnalysisService {
   /**
    * Analyze space from NeRF reconstruction
    */
-  async analyzeFromNeRF(nerfId: string, roomType: string): Promise<SpaceformerResult> {
+  async analyzeFromNeRF(
+    nerfId: string,
+    roomType: string,
+  ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
       nerf_reconstruction_id: nerfId,
       room_type: roomType,

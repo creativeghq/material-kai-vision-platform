@@ -20,8 +20,8 @@ export interface StandardMivaaPayload {
   requestId?: string;
 
   // Resource identification (unified field names)
-  resourceUrl?: string;      // Replaces: documentId, fileUrl, url, image_data
-  resourceName?: string;     // Replaces: filename, document_name, name
+  resourceUrl?: string; // Replaces: documentId, fileUrl, url, image_data
+  resourceName?: string; // Replaces: filename, document_name, name
   resourceType?: 'pdf' | 'image' | 'text' | 'url';
 
   // Processing options
@@ -82,18 +82,23 @@ export const StandardMivaaPayloadSchema = z.object({
   resourceUrl: z.string().url().optional(),
   resourceName: z.string().optional(),
   resourceType: z.enum(['pdf', 'image', 'text', 'url']).optional(),
-  options: z.object({
-    extractionType: z.enum(['markdown', 'tables', 'images', 'all']).optional(),
-    outputFormat: z.enum(['json', 'text', 'html']).optional(),
-    analysisTypes: z.array(z.string()).optional(),
-    includeProperties: z.boolean().optional(),
-    includeComposition: z.boolean().optional(),
-    confidenceThreshold: z.number().min(0).max(1).optional(),
-    priority: z.enum(['low', 'normal', 'high']).optional(),
-    timeout: z.number().min(1000).max(300000).optional(),
-    language: z.string().optional(),
-    quality: z.enum(['standard', 'high']).optional(),
-  }).passthrough().optional(),
+  options: z
+    .object({
+      extractionType: z
+        .enum(['markdown', 'tables', 'images', 'all'])
+        .optional(),
+      outputFormat: z.enum(['json', 'text', 'html']).optional(),
+      analysisTypes: z.array(z.string()).optional(),
+      includeProperties: z.boolean().optional(),
+      includeComposition: z.boolean().optional(),
+      confidenceThreshold: z.number().min(0).max(1).optional(),
+      priority: z.enum(['low', 'normal', 'high']).optional(),
+      timeout: z.number().min(1000).max(300000).optional(),
+      language: z.string().optional(),
+      quality: z.enum(['standard', 'high']).optional(),
+    })
+    .passthrough()
+    .optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   tags: z.array(z.string()).optional(),
 });
@@ -105,36 +110,42 @@ export const StandardMivaaPayloadSchema = z.object({
 /**
  * Maps frontend actions to MIVAA service endpoints
  */
-export const MIVAA_ACTION_MAP: Record<string, { path: string; method: string }> = {
+export const MIVAA_ACTION_MAP: Record<
+  string,
+  { path: string; method: string }
+> = {
   // PDF Processing
-  'pdf_process_document': { path: '/api/documents/process-url', method: 'POST' },
-  'pdf_extract_markdown': { path: '/api/v1/extract/markdown', method: 'POST' },
-  'pdf_extract_tables': { path: '/api/v1/extract/tables', method: 'POST' },
-  'pdf_extract_images': { path: '/api/v1/extract/images', method: 'POST' },
+  pdf_process_document: { path: '/api/documents/process-url', method: 'POST' },
+  pdf_extract_markdown: { path: '/api/v1/extract/markdown', method: 'POST' },
+  pdf_extract_tables: { path: '/api/v1/extract/tables', method: 'POST' },
+  pdf_extract_images: { path: '/api/v1/extract/images', method: 'POST' },
 
   // Material Recognition
-  'material_recognition': { path: '/api/vision/analyze', method: 'POST' },
-  'llama_vision_analysis': { path: '/api/vision/llama-analyze', method: 'POST' },
+  material_recognition: { path: '/api/vision/analyze', method: 'POST' },
+  llama_vision_analysis: { path: '/api/vision/llama-analyze', method: 'POST' },
 
   // Embeddings
-  'generate_embedding': { path: '/api/embeddings/generate', method: 'POST' },
-  'generate_batch_embeddings': { path: '/api/embeddings/batch', method: 'POST' },
-  'clip_embedding_generation': { path: '/api/embeddings/clip-generate', method: 'POST' },
+  generate_embedding: { path: '/api/embeddings/generate', method: 'POST' },
+  generate_batch_embeddings: { path: '/api/embeddings/batch', method: 'POST' },
+  clip_embedding_generation: {
+    path: '/api/embeddings/clip-generate',
+    method: 'POST',
+  },
 
   // Search
-  'semantic_search': { path: '/api/search/semantic', method: 'POST' },
-  'vector_search': { path: '/api/search/vector', method: 'POST' },
-  'hybrid_search': { path: '/api/search/hybrid', method: 'POST' },
+  semantic_search: { path: '/api/search/semantic', method: 'POST' },
+  vector_search: { path: '/api/search/vector', method: 'POST' },
+  hybrid_search: { path: '/api/search/hybrid', method: 'POST' },
 
   // Chat & AI
-  'chat_completion': { path: '/api/chat/completions', method: 'POST' },
-  'contextual_response': { path: '/api/chat/contextual', method: 'POST' },
-  'semantic_analysis': { path: '/api/semantic-analysis', method: 'POST' },
-  'multimodal_analysis': { path: '/api/analyze/multimodal', method: 'POST' },
+  chat_completion: { path: '/api/chat/completions', method: 'POST' },
+  contextual_response: { path: '/api/chat/contextual', method: 'POST' },
+  semantic_analysis: { path: '/api/semantic-analysis', method: 'POST' },
+  multimodal_analysis: { path: '/api/analyze/multimodal', method: 'POST' },
 
   // Health & Status
-  'health_check': { path: '/health', method: 'GET' },
-  'service_status': { path: '/api/status', method: 'GET' },
+  health_check: { path: '/health', method: 'GET' },
+  service_status: { path: '/api/status', method: 'GET' },
 };
 
 // =============================================================================
@@ -148,7 +159,10 @@ export class MivaaPayloadTransformer {
   /**
    * Transform any legacy payload to standard format
    */
-  static transformToStandard(legacyPayload: any, action: string): StandardMivaaPayload {
+  static transformToStandard(
+    legacyPayload: any,
+    action: string,
+  ): StandardMivaaPayload {
     const standardPayload: StandardMivaaPayload = {
       action,
       requestId: legacyPayload.requestId || crypto.randomUUID(),
@@ -160,7 +174,9 @@ export class MivaaPayloadTransformer {
       standardPayload.resourceType = 'pdf';
     } else if (legacyPayload.fileUrl) {
       standardPayload.resourceUrl = legacyPayload.fileUrl;
-      standardPayload.resourceType = this.inferResourceType(legacyPayload.fileUrl);
+      standardPayload.resourceType = this.inferResourceType(
+        legacyPayload.fileUrl,
+      );
     } else if (legacyPayload.url) {
       standardPayload.resourceUrl = legacyPayload.url;
       standardPayload.resourceType = this.inferResourceType(legacyPayload.url);
@@ -208,7 +224,9 @@ export class MivaaPayloadTransformer {
         options: {
           extract_images: true,
           extract_tables: true,
-          timeout_seconds: options.timeout ? Math.floor(options.timeout / 1000) : 300,
+          timeout_seconds: options.timeout
+            ? Math.floor(options.timeout / 1000)
+            : 300,
           quality: options.quality || 'standard',
           language: options.language || 'auto',
           ...options,
@@ -241,23 +259,39 @@ export class MivaaPayloadTransformer {
     };
   }
 
-  private static inferResourceType(url: string): 'pdf' | 'image' | 'text' | 'url' {
+  private static inferResourceType(
+    url: string,
+  ): 'pdf' | 'image' | 'text' | 'url' {
     if (url.includes('.pdf') || url.includes('pdf')) return 'pdf';
-    if (url.includes('.jpg') || url.includes('.png') || url.includes('.jpeg') || url.includes('image')) return 'image';
+    if (
+      url.includes('.jpg') ||
+      url.includes('.png') ||
+      url.includes('.jpeg') ||
+      url.includes('image')
+    )
+      return 'image';
     if (url.startsWith('data:image/')) return 'image';
     return 'url';
   }
 
-  private static transformOptions(legacyPayload: any, _action: string): StandardMivaaPayload['options'] {
+  private static transformOptions(
+    legacyPayload: any,
+    _action: string,
+  ): StandardMivaaPayload['options'] {
     const options: StandardMivaaPayload['options'] = {};
 
     // Extract common options
-    if (legacyPayload.extractionType) options.extractionType = legacyPayload.extractionType;
-    if (legacyPayload.outputFormat) options.outputFormat = legacyPayload.outputFormat;
+    if (legacyPayload.extractionType)
+      options.extractionType = legacyPayload.extractionType;
+    if (legacyPayload.outputFormat)
+      options.outputFormat = legacyPayload.outputFormat;
     if (legacyPayload.analysis_options) {
-      options.includeProperties = legacyPayload.analysis_options.include_properties;
-      options.includeComposition = legacyPayload.analysis_options.include_composition;
-      options.confidenceThreshold = legacyPayload.analysis_options.confidence_threshold;
+      options.includeProperties =
+        legacyPayload.analysis_options.include_properties;
+      options.includeComposition =
+        legacyPayload.analysis_options.include_composition;
+      options.confidenceThreshold =
+        legacyPayload.analysis_options.confidence_threshold;
     }
 
     // Merge any existing options

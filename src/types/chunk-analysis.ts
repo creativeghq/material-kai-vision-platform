@@ -63,7 +63,12 @@ export interface ChunkClassificationUpdate {
 /**
  * Boundary Detection Types
  */
-export type BoundaryType = 'sentence' | 'paragraph' | 'section' | 'semantic' | 'weak';
+export type BoundaryType =
+  | 'sentence'
+  | 'paragraph'
+  | 'section'
+  | 'semantic'
+  | 'weak';
 
 export interface ChunkBoundary {
   id: string;
@@ -116,7 +121,11 @@ export interface ChunkBoundaryUpdate {
 /**
  * Validation Score Types
  */
-export type ValidationStatus = 'pending' | 'validated' | 'needs_review' | 'rejected';
+export type ValidationStatus =
+  | 'pending'
+  | 'validated'
+  | 'needs_review'
+  | 'rejected';
 
 export interface ValidationIssue {
   type: string;
@@ -230,4 +239,3 @@ export interface ValidationStats {
   avg_score: number;
   issues_count: number;
 }
-

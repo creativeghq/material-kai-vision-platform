@@ -84,20 +84,25 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
 
     console.log('🔍 Performing MIVAA semantic search for:', query);
 
-    const mivaaResponse = await apiService.callSupabaseFunction('mivaa-gateway', {
-      action: 'semantic_search',
-      payload: {
-        query: query.trim(),
-        limit: 20,
-        similarity_threshold: 0.6,
-        include_metadata: true,
-        search_type: 'semantic',
+    const mivaaResponse = await apiService.callSupabaseFunction(
+      'mivaa-gateway',
+      {
+        action: 'semantic_search',
+        payload: {
+          query: query.trim(),
+          limit: 20,
+          similarity_threshold: 0.6,
+          include_metadata: true,
+          search_type: 'semantic',
+        },
       },
-    });
+    );
 
     if (!mivaaResponse.success) {
       console.error('MIVAA semantic search failed:', mivaaResponse.error);
-      throw new Error(`Semantic search failed: ${mivaaResponse.error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Semantic search failed: ${mivaaResponse.error?.message || 'Unknown error'}`,
+      );
     }
 
     // Transform MIVAA response to SearchResult format
@@ -107,13 +112,16 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
     mivaaResults.forEach((item: any, index: number) => {
       results.push({
         id: `mivaa_${item.document_id || index}`,
-        title: item.metadata?.title || item.title || `Document ${item.document_id}`,
+        title:
+          item.metadata?.title || item.title || `Document ${item.document_id}`,
         content: item.content || item.text || item.content_snippet || '',
         type: item.type || 'document',
         category: item.category || item.metadata?.category || 'semantic',
         relevanceScore: item.score || item.similarity_score || 0.8,
         semanticScore: item.semantic_score || item.score || 0.8,
-        timestamp: new Date(item.metadata?.created_at || item.timestamp || Date.now()),
+        timestamp: new Date(
+          item.metadata?.created_at || item.timestamp || Date.now(),
+        ),
         metadata: {
           source: `mivaa/${item.document_id || item.id}`,
           fileType: item.metadata?.fileType || 'Document',
@@ -130,7 +138,6 @@ const searchDatabase = async (query: string): Promise<SearchResult[]> => {
 
     console.log(`✅ MIVAA semantic search returned ${results.length} results`);
     return results;
-
   } catch (error) {
     console.error('MIVAA semantic search error:', error);
     throw error;
@@ -163,70 +170,79 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
   });
 
   // Search execution
-  const executeSearch = useCallback(async (searchQuery: string, options?: SearchOptions) => {
-    if (!searchQuery.trim()) {
-      setResults([]);
-      return;
-    }
+  const executeSearch = useCallback(
+    async (searchQuery: string, options?: SearchOptions) => {
+      if (!searchQuery.trim()) {
+        setResults([]);
+        return;
+      }
 
-    setIsSearching(true);
-    setError(null);
+      setIsSearching(true);
+      setError(null);
 
-    try {
-      // Use the actual database search function
-      const searchResults = await searchDatabase(searchQuery);
+      try {
+        // Use the actual database search function
+        const searchResults = await searchDatabase(searchQuery);
 
-      // Apply filters to the database results
-      const filteredResults = searchResults.filter((result: SearchResult) => {
-        const matchesCategory = !options?.category || result.category === options.category;
-        const matchesFilters =
-          (filters.types.length === 0 || filters.types.includes(result.type)) &&
-          (filters.categories.length === 0 || filters.categories.includes(result.category)) &&
-          result.relevanceScore >= filters.minRelevance;
+        // Apply filters to the database results
+        const filteredResults = searchResults.filter((result: SearchResult) => {
+          const matchesCategory =
+            !options?.category || result.category === options.category;
+          const matchesFilters =
+            (filters.types.length === 0 ||
+              filters.types.includes(result.type)) &&
+            (filters.categories.length === 0 ||
+              filters.categories.includes(result.category)) &&
+            result.relevanceScore >= filters.minRelevance;
 
-        return matchesCategory && matchesFilters;
-      });
+          return matchesCategory && matchesFilters;
+        });
 
-      // Sort results
-      filteredResults.sort((a: SearchResult, b: SearchResult) => {
-        let comparison = 0;
-        switch (filters.sortBy) {
-          case 'relevance':
-            comparison = b.relevanceScore - a.relevanceScore;
-            break;
-          case 'semantic':
-            comparison = (b.semanticScore || 0) - (a.semanticScore || 0);
-            break;
-          case 'date':
-            comparison = b.timestamp.getTime() - a.timestamp.getTime();
-            break;
-          case 'title':
-            comparison = a.title.localeCompare(b.title);
-            break;
-        }
-        return filters.sortOrder === 'desc' ? comparison : -comparison;
-      });
+        // Sort results
+        filteredResults.sort((a: SearchResult, b: SearchResult) => {
+          let comparison = 0;
+          switch (filters.sortBy) {
+            case 'relevance':
+              comparison = b.relevanceScore - a.relevanceScore;
+              break;
+            case 'semantic':
+              comparison = (b.semanticScore || 0) - (a.semanticScore || 0);
+              break;
+            case 'date':
+              comparison = b.timestamp.getTime() - a.timestamp.getTime();
+              break;
+            case 'title':
+              comparison = a.title.localeCompare(b.title);
+              break;
+          }
+          return filters.sortOrder === 'desc' ? comparison : -comparison;
+        });
 
-      setResults(filteredResults.slice(0, maxResults));
-    } catch (err) {
-      setError('Search failed. Please try again.');
-      console.error('Search error:', err);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [filters, maxResults]);
+        setResults(filteredResults.slice(0, maxResults));
+      } catch (err) {
+        setError('Search failed. Please try again.');
+        console.error('Search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [filters, maxResults],
+  );
 
   // Handle filter changes
-  const handleFiltersChange = useCallback((newFilters: Partial<SearchFilters>) => {
-    const updatedFilters = { ...filters, ...newFilters };
-    setFilters(updatedFilters);
-    onFiltersChange?.(updatedFilters);
+  const handleFiltersChange = useCallback(
+    (newFilters: Partial<SearchFilters>) => {
+      const updatedFilters = { ...filters, ...newFilters };
+      setFilters(updatedFilters);
+      onFiltersChange?.(updatedFilters);
 
-    // Re-execute search with new filters
-    if (query.trim()) {
-      executeSearch(query);
-    }
-  }, [filters, query, executeSearch, onFiltersChange]);
+      // Re-execute search with new filters
+      if (query.trim()) {
+        executeSearch(query);
+      }
+    },
+    [filters, query, executeSearch, onFiltersChange],
+  );
 
   // Real-time search effect
   useEffect(() => {
@@ -274,7 +290,8 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
     <Card
       key={result.id}
       className="cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => onResultSelect?.(result)} onKeyDown={(e) => e.key === 'Enter' && onResultSelect?.(result)}
+      onClick={() => onResultSelect?.(result)}
+      onKeyDown={(e) => e.key === 'Enter' && onResultSelect?.(result)}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
@@ -312,7 +329,10 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             {result.highlights && result.highlights.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-3">
                 {result.highlights.slice(0, 3).map((highlight, index) => (
-                  <Badge key={index} className="text-xs bg-secondary text-secondary-foreground">
+                  <Badge
+                    key={index}
+                    className="text-xs bg-secondary text-secondary-foreground"
+                  >
                     {highlight}
                   </Badge>
                 ))}
@@ -322,9 +342,13 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             {/* Metadata */}
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="flex items-center gap-3">
-                <span>Relevance: {Math.round(result.relevanceScore * 100)}%</span>
+                <span>
+                  Relevance: {Math.round(result.relevanceScore * 100)}%
+                </span>
                 {result.semanticScore && (
-                  <span>Semantic: {Math.round(result.semanticScore * 100)}%</span>
+                  <span>
+                    Semantic: {Math.round(result.semanticScore * 100)}%
+                  </span>
                 )}
                 <span>{formatTimeAgo(result.timestamp)}</span>
               </div>
@@ -348,9 +372,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
 
   // Render list view
   const renderListView = () => (
-    <div className="space-y-3">
-      {results.map(renderResultCard)}
-    </div>
+    <div className="space-y-3">{results.map(renderResultCard)}</div>
   );
 
   return (
@@ -388,10 +410,12 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
               </Button>
               <Button
                 className="h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                onClick={() => handleFiltersChange({
-                  sortBy: filters.sortBy,
-                  sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc',
-                })}
+                onClick={() =>
+                  handleFiltersChange({
+                    sortBy: filters.sortBy,
+                    sortOrder: filters.sortOrder === 'desc' ? 'asc' : 'desc',
+                  })
+                }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleFiltersChange({
@@ -415,20 +439,24 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
           {enableViewToggle && (
             <div className="flex items-center gap-1">
               <Button
-                className={`h-8 px-3 text-sm ${viewMode === 'list'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
+                className={`h-8 px-3 text-sm ${
+                  viewMode === 'list'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
-                onClick={() => setViewMode('list')} onKeyDown={(e) => e.key === 'Enter' && setViewMode('list')}
+                onClick={() => setViewMode('list')}
+                onKeyDown={(e) => e.key === 'Enter' && setViewMode('list')}
               >
                 <List className="h-4 w-4" />
               </Button>
               <Button
-                className={`h-8 px-3 text-sm ${viewMode === 'grid'
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
+                className={`h-8 px-3 text-sm ${
+                  viewMode === 'grid'
+                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                    : 'border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
-                onClick={() => setViewMode('grid')} onKeyDown={(e) => e.key === 'Enter' && setViewMode('grid')}
+                onClick={() => setViewMode('grid')}
+                onKeyDown={(e) => e.key === 'Enter' && setViewMode('grid')}
               >
                 <Grid className="h-4 w-4" />
               </Button>
@@ -445,9 +473,7 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             {query && ` for "${query}"`}
           </span>
           {!isSearching && results.length > 0 && (
-            <span>
-              Search completed in ~{Math.random() * 0.5 + 0.2}s
-            </span>
+            <span>Search completed in ~{Math.random() * 0.5 + 0.2}s</span>
           )}
         </div>
       )}
@@ -460,7 +486,8 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
             {error}
             <Button
               className="ml-2 h-8 px-3 text-sm border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => executeSearch(query)} onKeyDown={(e) => e.key === 'Enter' && executeSearch(query)}
+              onClick={() => executeSearch(query)}
+              onKeyDown={(e) => e.key === 'Enter' && executeSearch(query)}
             >
               <RefreshCw className="h-4 w-4 mr-1" />
               Retry
@@ -473,7 +500,11 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
       {!isSearching && !error && (
         <>
           {results.length > 0 ? (
-            viewMode === 'grid' ? renderGridView() : renderListView()
+            viewMode === 'grid' ? (
+              renderGridView()
+            ) : (
+              renderListView()
+            )
           ) : query ? (
             <div className="text-center py-12">
               <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -502,7 +533,8 @@ export const SemanticSearch: React.FC<SemanticSearchProps> = ({
               <Sparkles className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">AI-Powered Search</h3>
               <p className="text-muted-foreground">
-                Search across documents, images, and data with semantic understanding
+                Search across documents, images, and data with semantic
+                understanding
               </p>
             </div>
           )}

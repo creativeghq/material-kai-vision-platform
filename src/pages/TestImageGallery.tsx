@@ -8,7 +8,13 @@
 import React, { useState } from 'react';
 import { ImageIcon, TestTube } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -19,11 +25,7 @@ const TestImageGallery: React.FC = () => {
   const [showGallery, setShowGallery] = useState(false);
 
   // Sample document IDs for testing (these would be real document IDs from your database)
-  const sampleDocumentIds = [
-    'sample-doc-1',
-    'sample-doc-2',
-    'sample-doc-3',
-  ];
+  const sampleDocumentIds = ['sample-doc-1', 'sample-doc-2', 'sample-doc-3'];
 
   const handleTestGallery = () => {
     if (documentId.trim()) {
@@ -37,7 +39,9 @@ const TestImageGallery: React.FC = () => {
         <TestTube className="h-8 w-8 text-blue-500" />
         <div>
           <h1 className="text-3xl font-bold">PDF Image Gallery Test</h1>
-          <p className="text-gray-600">Test the enhanced PDF image gallery component</p>
+          <p className="text-gray-600">
+            Test the enhanced PDF image gallery component
+          </p>
         </div>
       </div>
 
@@ -122,7 +126,8 @@ const TestImageGallery: React.FC = () => {
             <CardHeader>
               <CardTitle>Image Gallery for Document: {documentId}</CardTitle>
               <CardDescription>
-                This gallery shows all images extracted from the specified document
+                This gallery shows all images extracted from the specified
+                document
               </CardDescription>
             </CardHeader>
           </Card>
@@ -136,7 +141,12 @@ const TestImageGallery: React.FC = () => {
               console.log('Image selected:', image);
             }}
             onImageView={(image, allImages) => {
-              console.log('Image viewed:', image, 'Total images:', allImages.length);
+              console.log(
+                'Image viewed:',
+                image,
+                'Total images:',
+                allImages.length,
+              );
             }}
           />
         </div>
@@ -207,13 +217,15 @@ const TestImageGallery: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle>Usage Instructions</CardTitle>
-        </CardHeader><CardContent>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-4 text-sm">
             <div>
               <h4 className="font-medium mb-2">1. Testing with Real Data</h4>
               <p className="text-gray-600">
-                To test with real data, process a PDF document through the PDF Processing page.
-                After processing completes, use the job ID as the document ID in this test page.
+                To test with real data, process a PDF document through the PDF
+                Processing page. After processing completes, use the job ID as
+                the document ID in this test page.
               </p>
             </div>
 
@@ -225,14 +237,17 @@ const TestImageGallery: React.FC = () => {
               <ul className="list-disc list-inside mt-2 text-gray-600 space-y-1">
                 <li>PDF Upload Progress Modal (when processing completes)</li>
                 <li>Knowledge Base PDF Viewer (in the images section)</li>
-                <li>PDF Results Viewer (as a dedicated "Extracted Images" tab)</li>
+                <li>
+                  PDF Results Viewer (as a dedicated "Extracted Images" tab)
+                </li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-medium mb-2">3. Database Requirements</h4>
               <p className="text-gray-600">
-                The gallery requires the <code>document_images</code> table with the following structure:
+                The gallery requires the <code>document_images</code> table with
+                the following structure:
               </p>
               <ul className="list-disc list-inside mt-2 text-gray-600 space-y-1">
                 <li>id, document_id, image_url, image_type</li>

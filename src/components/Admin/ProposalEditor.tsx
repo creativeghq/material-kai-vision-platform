@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 
-import { ProposalsService, Proposal, ProposalItem } from '../../services/quote/ProposalsService';
-import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
+import {
+  ProposalsService,
+  Proposal,
+  ProposalItem,
+} from '../../services/quote/ProposalsService';
+import {
+  QuoteRequestService,
+  QuoteRequest,
+} from '../../services/quote/QuoteRequestService';
 
 interface ProposalEditorProps {
   quoteRequestId: string;
@@ -41,7 +48,8 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
       setQuoteRequest(request);
       setSubtotal(request.total_estimated || 0);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to load quote request';
+      const errorMsg =
+        err instanceof Error ? err.message : 'Failed to load quote request';
       setError(errorMsg);
       onError?.(errorMsg);
     } finally {
@@ -65,12 +73,15 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
 
       // Create proposal items from quote request items
       // @ts-expect-error - items property exists at runtime
-      const items: ProposalItem[] = (quoteRequest.items || []).map((item: unknown) => ({
-        product_id: (item as any).product_id,
-        quantity: (item as any).quantity || 1,
-        unit_price: (item as any).unit_price || 0,
-        total: ((item as any).unit_price || 0) * ((item as any).quantity || 1),
-      }));
+      const items: ProposalItem[] = (quoteRequest.items || []).map(
+        (item: unknown) => ({
+          product_id: (item as any).product_id,
+          quantity: (item as any).quantity || 1,
+          unit_price: (item as any).unit_price || 0,
+          total:
+            ((item as any).unit_price || 0) * ((item as any).quantity || 1),
+        }),
+      );
 
       const proposal = await proposalService.createProposal(
         quoteRequestId,
@@ -87,7 +98,8 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
       // Reset success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to save proposal';
+      const errorMsg =
+        err instanceof Error ? err.message : 'Failed to save proposal';
       setError(errorMsg);
       onError?.(errorMsg);
     } finally {
@@ -126,10 +138,21 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-bold mb-2">Quote Request Details</h3>
           <div className="text-sm space-y-1">
-            <p><strong>Request ID:</strong> {quoteRequest.id.slice(0, 8)}</p>
-            <p><strong>Items:</strong> {quoteRequest.items_count}</p>
-            <p><strong>Estimated Total:</strong> ${(quoteRequest.total_estimated || 0).toFixed(2)}</p>
-            {quoteRequest.notes && <p><strong>Notes:</strong> {quoteRequest.notes}</p>}
+            <p>
+              <strong>Request ID:</strong> {quoteRequest.id.slice(0, 8)}
+            </p>
+            <p>
+              <strong>Items:</strong> {quoteRequest.items_count}
+            </p>
+            <p>
+              <strong>Estimated Total:</strong> $
+              {(quoteRequest.total_estimated || 0).toFixed(2)}
+            </p>
+            {quoteRequest.notes && (
+              <p>
+                <strong>Notes:</strong> {quoteRequest.notes}
+              </p>
+            )}
           </div>
         </div>
 
@@ -227,4 +250,3 @@ export const ProposalEditor: React.FC<ProposalEditorProps> = ({
 };
 
 export default ProposalEditor;
-

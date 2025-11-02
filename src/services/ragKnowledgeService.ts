@@ -12,7 +12,10 @@ import { RAGSearchRequest, RAGSearchResult, RAGResponse } from '../types/rag';
 
 // Training interfaces from ragService.ts
 export interface TrainingRequest {
-  training_type: 'clip_finetuning' | 'material_classification' | 'embedding_optimization';
+  training_type:
+    | 'clip_finetuning'
+    | 'material_classification'
+    | 'embedding_optimization';
   model_base: string;
   dataset_export_options: {
     include_materials: boolean;
@@ -43,7 +46,6 @@ export interface TrainingResponse {
 }
 
 class RAGKnowledgeService {
-
   /**
    * Perform intelligent RAG search
    */
@@ -59,11 +61,12 @@ class RAGKnowledgeService {
 
       if (!response.success || !response.data) {
         console.error('RAG search error:', response.error);
-        throw new Error(`RAG search failed: ${response.error || 'Unknown error'}`);
+        throw new Error(
+          `RAG search failed: ${response.error || 'Unknown error'}`,
+        );
       }
 
       return response.data as RAGResponse;
-
     } catch (error) {
       console.error('Error in RAG search:', error);
       throw error;
@@ -73,7 +76,10 @@ class RAGKnowledgeService {
   /**
    * Search for materials with context
    */
-  async searchMaterials(query: string, includeContext: boolean = true): Promise<RAGResponse> {
+  async searchMaterials(
+    query: string,
+    includeContext: boolean = true,
+  ): Promise<RAGResponse> {
     return this.search({
       query,
       search_type: 'material',
@@ -86,7 +92,10 @@ class RAGKnowledgeService {
   /**
    * Search knowledge base
    */
-  async searchKnowledge(query: string, includeContext: boolean = true): Promise<RAGResponse> {
+  async searchKnowledge(
+    query: string,
+    includeContext: boolean = true,
+  ): Promise<RAGResponse> {
     return this.search({
       query,
       search_type: 'knowledge',
@@ -99,7 +108,10 @@ class RAGKnowledgeService {
   /**
    * Hybrid search across materials and knowledge
    */
-  async hybridSearch(query: string, includeContext: boolean = true): Promise<RAGResponse> {
+  async hybridSearch(
+    query: string,
+    includeContext: boolean = true,
+  ): Promise<RAGResponse> {
     return this.search({
       query,
       search_type: 'hybrid',
@@ -152,7 +164,6 @@ class RAGKnowledgeService {
       }
 
       return analytics?.map((a: unknown) => (a as any).query_text) || [];
-
     } catch (error) {
       console.error('Error getting search suggestions:', error);
       return [];
@@ -169,24 +180,23 @@ class RAGKnowledgeService {
     sessionId?: string,
   ): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('search_analytics')
-        .insert({
-          query_text: query,
-          total_results: results.length,
-          results_shown: Math.min(results.length, 10),
-          response_time_ms: processingTime,
-          avg_relevance_score: results.length > 0
-            ? results.reduce((sum, r) => sum + r.similarity_score, 0) / results.length
+      const { error } = await supabase.from('search_analytics').insert({
+        query_text: query,
+        total_results: results.length,
+        results_shown: Math.min(results.length, 10),
+        response_time_ms: processingTime,
+        avg_relevance_score:
+          results.length > 0
+            ? results.reduce((sum, r) => sum + r.similarity_score, 0) /
+              results.length
             : 0,
-          session_id: sessionId,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-        });
+        session_id: sessionId,
+        user_id: (await supabase.auth.getUser()).data.user?.id,
+      });
 
       if (error) {
         console.warn('Error tracking search analytics:', error);
       }
-
     } catch (error) {
       console.error('Error tracking search analytics:', error);
     }
@@ -215,7 +225,6 @@ class RAGKnowledgeService {
       if (error) {
         console.warn('Error rating search results:', error);
       }
-
     } catch (error) {
       console.error('Error rating search results:', error);
     }
@@ -232,7 +241,9 @@ class RAGKnowledgeService {
    * Real model training should be implemented in MIVAA backend if needed.
    */
   async startTraining(request: TrainingRequest): Promise<TrainingResponse> {
-    throw new Error('Model training feature is not yet implemented. The previous implementation returned mock data.');
+    throw new Error(
+      'Model training feature is not yet implemented. The previous implementation returned mock data.',
+    );
   }
 
   /**
@@ -308,7 +319,9 @@ class RAGKnowledgeService {
   /**
    * Get training job status
    */
-  async getTrainingStatus(jobType: string = 'model_training'): Promise<unknown[]> {
+  async getTrainingStatus(
+    jobType: string = 'model_training',
+  ): Promise<unknown[]> {
     const { data, error } = await supabase
       .from('processing_queue')
       .select('*')
@@ -331,24 +344,24 @@ class RAGKnowledgeService {
     embeddingType: 'clip' | 'efficientnet' | 'materialnet' = 'clip',
   ): Promise<void> {
     // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       throw new Error('Authentication required');
     }
 
     // This would typically be handled by a background job
     // For now, we'll create a processing queue entry
-    const { error } = await supabase
-      .from('processing_queue')
-      .insert({
-        user_id: user.id,
-        job_type: 'generate_embedding',
-        input_data: {
-          material_id: materialId,
-          embedding_type: embeddingType,
-        },
-        status: 'pending',
-      });
+    const { error } = await supabase.from('processing_queue').insert({
+      user_id: user.id,
+      job_type: 'generate_embedding',
+      input_data: {
+        material_id: materialId,
+        embedding_type: embeddingType,
+      },
+      status: 'pending',
+    });
 
     if (error) {
       throw new Error(`Failed to queue embedding generation: ${error.message}`);
@@ -358,7 +371,10 @@ class RAGKnowledgeService {
   /**
    * Quick material search with context generation (from ragService.ts)
    */
-  async quickSearch(query: string, includeContext: boolean = true): Promise<RAGResponse> {
+  async quickSearch(
+    query: string,
+    includeContext: boolean = true,
+  ): Promise<RAGResponse> {
     return this.search({
       query,
       search_type: 'hybrid',
@@ -371,12 +387,15 @@ class RAGKnowledgeService {
   /**
    * Knowledge base search (alias for searchKnowledge for compatibility)
    */
-  async searchKnowledgeBase(query: string, contentType?: string): Promise<RAGResponse> {
+  async searchKnowledgeBase(
+    query: string,
+    contentType?: string,
+  ): Promise<RAGResponse> {
     const response = await this.searchKnowledge(query, true);
 
     if (contentType) {
       response.results = response.results.filter(
-        result => (result.metadata as any)?.content_type === contentType,
+        (result) => (result.metadata as any)?.content_type === contentType,
       );
     }
 

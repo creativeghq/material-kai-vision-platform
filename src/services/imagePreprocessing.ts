@@ -8,15 +8,18 @@
 
 import { createHash } from 'crypto';
 
-import {
-  ValidationError,
-  errorLogger,
-} from '../core/errors';
+import { ValidationError, errorLogger } from '../core/errors';
 import { createErrorContext } from '../core/errors/utils';
 
 // Supported image formats and constraints
 export const IMAGE_CONFIG = {
-  SUPPORTED_FORMATS: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/bmp'] as const,
+  SUPPORTED_FORMATS: [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/bmp',
+  ] as const,
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
   MIN_DIMENSIONS: { width: 100, height: 100 },
   MAX_DIMENSIONS: { width: 4096, height: 4096 },
@@ -71,7 +74,6 @@ export interface ProcessedImageResult {
  * Handles all image validation, processing, and optimization tasks
  */
 export class ImagePreprocessingService {
-
   /**
    * Validate image data and extract metadata
    */
@@ -91,7 +93,9 @@ export class ImagePreprocessingService {
       let buffer: Buffer;
       if (typeof imageData === 'string') {
         // Handle base64 data URLs
-        const base64Match = imageData.match(/^data:image\/[a-zA-Z]+;base64,(.+)$/);
+        const base64Match = imageData.match(
+          /^data:image\/[a-zA-Z]+;base64,(.+)$/,
+        );
         if (base64Match && base64Match[1]) {
           buffer = Buffer.from(base64Match[1], 'base64');
         } else {
@@ -109,7 +113,9 @@ export class ImagePreprocessingService {
       }
 
       if (buffer.length > IMAGE_CONFIG.MAX_FILE_SIZE) {
-        result.errors.push(`Image size ${buffer.length} exceeds maximum allowed size ${IMAGE_CONFIG.MAX_FILE_SIZE}`);
+        result.errors.push(
+          `Image size ${buffer.length} exceeds maximum allowed size ${IMAGE_CONFIG.MAX_FILE_SIZE}`,
+        );
         result.isValid = false;
         return result;
       }
@@ -123,27 +129,41 @@ export class ImagePreprocessingService {
 
       // Format validation
       if (!this.isFormatSupported(metadata.format)) {
-        result.errors.push(`Unsupported image format: ${metadata.format}. Supported formats: ${IMAGE_CONFIG.SUPPORTED_FORMATS.join(', ')}`);
+        result.errors.push(
+          `Unsupported image format: ${metadata.format}. Supported formats: ${IMAGE_CONFIG.SUPPORTED_FORMATS.join(', ')}`,
+        );
         result.isValid = false;
       }
 
       // Dimension validation
-      if (metadata.width < IMAGE_CONFIG.MIN_DIMENSIONS.width ||
-          metadata.height < IMAGE_CONFIG.MIN_DIMENSIONS.height) {
-        result.errors.push(`Image dimensions ${metadata.width}x${metadata.height} are below minimum ${IMAGE_CONFIG.MIN_DIMENSIONS.width}x${IMAGE_CONFIG.MIN_DIMENSIONS.height}`);
+      if (
+        metadata.width < IMAGE_CONFIG.MIN_DIMENSIONS.width ||
+        metadata.height < IMAGE_CONFIG.MIN_DIMENSIONS.height
+      ) {
+        result.errors.push(
+          `Image dimensions ${metadata.width}x${metadata.height} are below minimum ${IMAGE_CONFIG.MIN_DIMENSIONS.width}x${IMAGE_CONFIG.MIN_DIMENSIONS.height}`,
+        );
         result.isValid = false;
       }
 
-      if (metadata.width > IMAGE_CONFIG.MAX_DIMENSIONS.width ||
-          metadata.height > IMAGE_CONFIG.MAX_DIMENSIONS.height) {
-        result.errors.push(`Image dimensions ${metadata.width}x${metadata.height} exceed maximum ${IMAGE_CONFIG.MAX_DIMENSIONS.width}x${IMAGE_CONFIG.MAX_DIMENSIONS.height}`);
+      if (
+        metadata.width > IMAGE_CONFIG.MAX_DIMENSIONS.width ||
+        metadata.height > IMAGE_CONFIG.MAX_DIMENSIONS.height
+      ) {
+        result.errors.push(
+          `Image dimensions ${metadata.width}x${metadata.height} exceed maximum ${IMAGE_CONFIG.MAX_DIMENSIONS.width}x${IMAGE_CONFIG.MAX_DIMENSIONS.height}`,
+        );
         result.isValid = false;
       }
 
       // Performance warnings
-      if (metadata.width > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width ||
-          metadata.height > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height) {
-        result.warnings.push(`Large image dimensions ${metadata.width}x${metadata.height} may impact processing performance. Consider resizing to ${IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width}x${IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height}`);
+      if (
+        metadata.width > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width ||
+        metadata.height > IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height
+      ) {
+        result.warnings.push(
+          `Large image dimensions ${metadata.width}x${metadata.height} may impact processing performance. Consider resizing to ${IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width}x${IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height}`,
+        );
       }
 
       // Security validation
@@ -167,10 +187,11 @@ export class ImagePreprocessingService {
       });
 
       return result;
-
     } catch (error) {
       result.isValid = false;
-      result.errors.push(`Image validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      result.errors.push(
+        `Image validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
 
       errorLogger.logError(error as Error, {
         service: 'ImagePreprocessingService',
@@ -211,24 +232,33 @@ export class ImagePreprocessingService {
       let requiresProcessing = false;
 
       // Check if resizing is needed
-      if (targetDimensions.width !== originalMetadata.width ||
-          targetDimensions.height !== originalMetadata.height) {
+      if (
+        targetDimensions.width !== originalMetadata.width ||
+        targetDimensions.height !== originalMetadata.height
+      ) {
         requiresProcessing = true;
-        optimizations.push(`Resized from ${originalMetadata.width}x${originalMetadata.height} to ${targetDimensions.width}x${targetDimensions.height}`);
+        optimizations.push(
+          `Resized from ${originalMetadata.width}x${originalMetadata.height} to ${targetDimensions.width}x${targetDimensions.height}`,
+        );
       }
 
       // Check if format conversion is needed
-      const targetFormat = options.format || this.getOptimalFormat(originalMetadata.format);
+      const targetFormat =
+        options.format || this.getOptimalFormat(originalMetadata.format);
       if (targetFormat !== this.normalizeFormat(originalMetadata.format)) {
         requiresProcessing = true;
-        optimizations.push(`Format conversion from ${originalMetadata.format} to ${targetFormat}`);
+        optimizations.push(
+          `Format conversion from ${originalMetadata.format} to ${targetFormat}`,
+        );
       }
 
       // Check if quality optimization is needed
       const targetQuality = options.quality || IMAGE_CONFIG.QUALITY_LEVELS.HIGH;
       if (targetQuality < 1.0) {
         requiresProcessing = true;
-        optimizations.push(`Quality optimization: ${Math.round(targetQuality * 100)}%`);
+        optimizations.push(
+          `Quality optimization: ${Math.round(targetQuality * 100)}%`,
+        );
       }
 
       // Apply processing if needed
@@ -256,7 +286,6 @@ export class ImagePreprocessingService {
         processingTime: Date.now() - startTime,
         optimizations,
       };
-
     } catch (error) {
       errorLogger.logError(error as Error, {
         service: 'ImagePreprocessingService',
@@ -269,16 +298,19 @@ export class ImagePreprocessingService {
 
       return {
         success: false,
-        originalMetadata: await this.extractImageMetadata(imageData).catch(() => ({
-          width: 0,
-          height: 0,
-          format: 'unknown',
-          size: imageData.length,
-        })),
+        originalMetadata: await this.extractImageMetadata(imageData).catch(
+          () => ({
+            width: 0,
+            height: 0,
+            format: 'unknown',
+            size: imageData.length,
+          }),
+        ),
         hash: createHash('sha256').update(imageData).digest('hex'),
         processingTime: Date.now() - startTime,
         optimizations: [],
-        error: error instanceof Error ? error.message : 'Image processing failed',
+        error:
+          error instanceof Error ? error.message : 'Image processing failed',
       };
     }
   }
@@ -286,7 +318,9 @@ export class ImagePreprocessingService {
   /**
    * Extract comprehensive image metadata
    */
-  private static async extractImageMetadata(buffer: Buffer): Promise<ImageMetadata> {
+  private static async extractImageMetadata(
+    buffer: Buffer,
+  ): Promise<ImageMetadata> {
     // Simple format detection based on file signatures
     const format = this.detectImageFormat(buffer);
 
@@ -307,23 +341,29 @@ export class ImagePreprocessingService {
    */
   private static detectImageFormat(buffer: Buffer): string {
     // JPEG
-    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
       return 'image/jpeg';
     }
 
     // PNG
-    if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) {
+    if (
+      buffer
+        .subarray(0, 8)
+        .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    ) {
       return 'image/png';
     }
 
     // WebP
-    if (buffer.subarray(0, 4).equals(Buffer.from('RIFF', 'ascii')) &&
-        buffer.subarray(8, 12).equals(Buffer.from('WEBP', 'ascii'))) {
+    if (
+      buffer.subarray(0, 4).equals(Buffer.from('RIFF', 'ascii')) &&
+      buffer.subarray(8, 12).equals(Buffer.from('WEBP', 'ascii'))
+    ) {
       return 'image/webp';
     }
 
     // BMP
-    if (buffer[0] === 0x42 && buffer[1] === 0x4D) {
+    if (buffer[0] === 0x42 && buffer[1] === 0x4d) {
       return 'image/bmp';
     }
 
@@ -333,7 +373,10 @@ export class ImagePreprocessingService {
   /**
    * Extract image width (simplified implementation)
    */
-  private static async extractWidth(buffer: Buffer, format: string): Promise<number> {
+  private static async extractWidth(
+    buffer: Buffer,
+    format: string,
+  ): Promise<number> {
     // This is a simplified implementation
     // In production, use a proper image library
     switch (format) {
@@ -350,7 +393,10 @@ export class ImagePreprocessingService {
   /**
    * Extract image height (simplified implementation)
    */
-  private static async extractHeight(buffer: Buffer, format: string): Promise<number> {
+  private static async extractHeight(
+    buffer: Buffer,
+    format: string,
+  ): Promise<number> {
     // This is a simplified implementation
     // In production, use a proper image library
     switch (format) {
@@ -368,7 +414,9 @@ export class ImagePreprocessingService {
    * Check if image format is supported
    */
   private static isFormatSupported(format: string): boolean {
-    return IMAGE_CONFIG.SUPPORTED_FORMATS.includes(format as unknown as typeof IMAGE_CONFIG.SUPPORTED_FORMATS[number]);
+    return IMAGE_CONFIG.SUPPORTED_FORMATS.includes(
+      format as unknown as (typeof IMAGE_CONFIG.SUPPORTED_FORMATS)[number],
+    );
   }
 
   /**
@@ -408,8 +456,10 @@ export class ImagePreprocessingService {
     originalHeight: number,
     options: ImageProcessingOptions,
   ): { width: number; height: number } {
-    let targetWidth = options.targetWidth || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width;
-    let targetHeight = options.targetHeight || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height;
+    let targetWidth =
+      options.targetWidth || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width;
+    let targetHeight =
+      options.targetHeight || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height;
 
     // Maintain aspect ratio if requested
     if (options.maintainAspectRatio !== false) {
@@ -434,7 +484,9 @@ export class ImagePreprocessingService {
   /**
    * Get optimal format for processing
    */
-  public static getOptimalFormat(originalFormat: string): 'jpeg' | 'png' | 'webp' {
+  public static getOptimalFormat(
+    originalFormat: string,
+  ): 'jpeg' | 'png' | 'webp' {
     // Prefer JPEG for photos (no transparency), PNG for graphics with transparency
     switch (originalFormat) {
       case 'image/png':
@@ -489,7 +541,11 @@ export class ImagePreprocessingService {
    * Batch validate multiple images
    */
   static async batchValidateImages(
-    images: Array<{ data: Buffer | string; id: string; source?: 'upload' | 'url' }>,
+    images: Array<{
+      data: Buffer | string;
+      id: string;
+      source?: 'upload' | 'url';
+    }>,
   ): Promise<Array<{ id: string; result: ImageValidationResult }>> {
     const results: Array<{ id: string; result: ImageValidationResult }> = [];
 
@@ -521,10 +577,16 @@ export class ImagePreprocessingService {
   /**
    * Extract image data from data URL
    */
-  static extractFromDataURL(dataURL: string): { buffer: Buffer; format: string } {
+  static extractFromDataURL(dataURL: string): {
+    buffer: Buffer;
+    format: string;
+  } {
     const match = dataURL.match(/^data:([^;]+);base64,(.+)$/);
     if (!match || !match[1] || !match[2]) {
-      throw new ValidationError('Invalid data URL format', createErrorContext('ImagePreprocessingService', 'extractFromDataURL'));
+      throw new ValidationError(
+        'Invalid data URL format',
+        createErrorContext('ImagePreprocessingService', 'extractFromDataURL'),
+      );
     }
 
     return {
@@ -551,11 +613,11 @@ export class ImageUtils {
     if (originalWidth > originalHeight) {
       return {
         width: Math.min(maxSize, originalWidth),
-        height: Math.round((Math.min(maxSize, originalWidth)) / aspectRatio),
+        height: Math.round(Math.min(maxSize, originalWidth) / aspectRatio),
       };
     } else {
       return {
-        width: Math.round((Math.min(maxSize, originalHeight)) * aspectRatio),
+        width: Math.round(Math.min(maxSize, originalHeight) * aspectRatio),
         height: Math.min(maxSize, originalHeight),
       };
     }
@@ -568,8 +630,10 @@ export class ImageUtils {
     metadata: ImageMetadata,
     options: ImageProcessingOptions = {},
   ): boolean {
-    const targetWidth = options.targetWidth || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width;
-    const targetHeight = options.targetHeight || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height;
+    const targetWidth =
+      options.targetWidth || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.width;
+    const targetHeight =
+      options.targetHeight || IMAGE_CONFIG.OPTIMAL_DIMENSIONS.height;
 
     // Check dimensions
     if (metadata.width > targetWidth || metadata.height > targetHeight) {
@@ -577,13 +641,19 @@ export class ImageUtils {
     }
 
     // Check format
-    const optimalFormat = ImagePreprocessingService.getOptimalFormat(metadata.format);
-    if (ImagePreprocessingService.normalizeFormat(metadata.format) !== optimalFormat) {
+    const optimalFormat = ImagePreprocessingService.getOptimalFormat(
+      metadata.format,
+    );
+    if (
+      ImagePreprocessingService.normalizeFormat(metadata.format) !==
+      optimalFormat
+    ) {
       return true;
     }
 
     // Check size
-    if (metadata.size > IMAGE_CONFIG.MAX_FILE_SIZE * 0.8) { // 80% threshold
+    if (metadata.size > IMAGE_CONFIG.MAX_FILE_SIZE * 0.8) {
+      // 80% threshold
       return true;
     }
 

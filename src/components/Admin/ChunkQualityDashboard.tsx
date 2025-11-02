@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -54,7 +60,9 @@ export const ChunkQualityDashboard: React.FC = () => {
   const fetchMetrics = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/metrics?days=30`);
+      const response = await fetch(
+        `${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/metrics?days=30`,
+      );
       if (!response.ok) throw new Error('Failed to fetch metrics');
       const data = await response.json();
       setMetrics(data);
@@ -74,7 +82,9 @@ export const ChunkQualityDashboard: React.FC = () => {
       const data = await response.json();
       setFlaggedChunks(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load flagged chunks');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load flagged chunks',
+      );
     }
   };
 
@@ -124,8 +134,12 @@ export const ChunkQualityDashboard: React.FC = () => {
     );
   }
 
-  const qualityPercentage = metrics ? (metrics.average_quality_score * 100).toFixed(1) : '0';
-  const totalDuplicatesPrevented = (metrics?.exact_duplicates_prevented || 0) + (metrics?.semantic_duplicates_prevented || 0);
+  const qualityPercentage = metrics
+    ? (metrics.average_quality_score * 100).toFixed(1)
+    : '0';
+  const totalDuplicatesPrevented =
+    (metrics?.exact_duplicates_prevented || 0) +
+    (metrics?.semantic_duplicates_prevented || 0);
 
   return (
     <div className="space-y-6">
@@ -137,7 +151,12 @@ export const ChunkQualityDashboard: React.FC = () => {
             Monitor chunk quality, deduplication, and validation metrics
           </p>
         </div>
-        <Button onClick={() => { fetchMetrics(); fetchFlaggedChunks(showReviewed); }}>
+        <Button
+          onClick={() => {
+            fetchMetrics();
+            fetchFlaggedChunks(showReviewed);
+          }}
+        >
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh
         </Button>
@@ -147,10 +166,14 @@ export const ChunkQualityDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Chunks</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Chunks
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.total_chunks.toLocaleString() || 0}</div>
+            <div className="text-2xl font-bold">
+              {metrics?.total_chunks.toLocaleString() || 0}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               Across {metrics?.total_documents || 0} documents
             </p>
@@ -159,7 +182,9 @@ export const ChunkQualityDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Average Quality</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Average Quality
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold flex items-center">
@@ -178,22 +203,31 @@ export const ChunkQualityDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Duplicates Prevented</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Duplicates Prevented
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalDuplicatesPrevented.toLocaleString()}</div>
+            <div className="text-2xl font-bold">
+              {totalDuplicatesPrevented.toLocaleString()}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {metrics?.exact_duplicates_prevented || 0} exact, {metrics?.semantic_duplicates_prevented || 0} semantic
+              {metrics?.exact_duplicates_prevented || 0} exact,{' '}
+              {metrics?.semantic_duplicates_prevented || 0} semantic
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Flagged for Review</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Flagged for Review
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.flagged_chunks_pending_review || 0}</div>
+            <div className="text-2xl font-bold">
+              {metrics?.flagged_chunks_pending_review || 0}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
               {metrics?.flagged_chunks_reviewed || 0} already reviewed
             </p>
@@ -214,32 +248,38 @@ export const ChunkQualityDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Quality Score Distribution</CardTitle>
-              <CardDescription>Distribution of chunk quality scores (last 30 days)</CardDescription>
+              <CardDescription>
+                Distribution of chunk quality scores (last 30 days)
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {metrics && Object.entries(metrics.quality_distribution).map(([range, count]) => {
-                  const total = metrics.total_chunks;
-                  const percentage = total > 0 ? (count / total) * 100 : 0;
-                  const isGood = range.startsWith('0.7') || range.startsWith('0.85');
+                {metrics &&
+                  Object.entries(metrics.quality_distribution).map(
+                    ([range, count]) => {
+                      const total = metrics.total_chunks;
+                      const percentage = total > 0 ? (count / total) * 100 : 0;
+                      const isGood =
+                        range.startsWith('0.7') || range.startsWith('0.85');
 
-                  return (
-                    <div key={range} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium">{range}</span>
-                        <span className="text-muted-foreground">
-                          {count} chunks ({percentage.toFixed(1)}%)
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-yellow-500'}`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                      return (
+                        <div key={range} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-medium">{range}</span>
+                            <span className="text-muted-foreground">
+                              {count} chunks ({percentage.toFixed(1)}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${isGood ? 'bg-green-500' : 'bg-yellow-500'}`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
               </div>
             </CardContent>
           </Card>
@@ -280,14 +320,20 @@ export const ChunkQualityDashboard: React.FC = () => {
                         </CardTitle>
                         <CardDescription>{chunk.flag_reason}</CardDescription>
                       </div>
-                      <Badge variant={chunk.quality_score >= 0.7 ? 'default' : 'destructive'}>
+                      <Badge
+                        variant={
+                          chunk.quality_score >= 0.7 ? 'default' : 'destructive'
+                        }
+                      >
                         Score: {(chunk.quality_score * 100).toFixed(0)}%
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="bg-gray-50 p-3 rounded text-sm">
-                      <p className="text-muted-foreground mb-1">Content Preview:</p>
+                      <p className="text-muted-foreground mb-1">
+                        Content Preview:
+                      </p>
                       <p className="line-clamp-2">{chunk.content_preview}</p>
                     </div>
 
@@ -321,7 +367,8 @@ export const ChunkQualityDashboard: React.FC = () => {
 
                     {chunk.reviewed && (
                       <div className="text-sm text-muted-foreground">
-                        Reviewed: {chunk.review_action} on {new Date(chunk.reviewed_at!).toLocaleDateString()}
+                        Reviewed: {chunk.review_action} on{' '}
+                        {new Date(chunk.reviewed_at!).toLocaleDateString()}
                       </div>
                     )}
                   </CardContent>
@@ -341,19 +388,27 @@ export const ChunkQualityDashboard: React.FC = () => {
               <CardContent className="space-y-2">
                 <div className="flex justify-between">
                   <span>Low Quality Rejected:</span>
-                  <span className="font-bold">{metrics?.low_quality_rejected || 0}</span>
+                  <span className="font-bold">
+                    {metrics?.low_quality_rejected || 0}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Exact Duplicates Prevented:</span>
-                  <span className="font-bold">{metrics?.exact_duplicates_prevented || 0}</span>
+                  <span className="font-bold">
+                    {metrics?.exact_duplicates_prevented || 0}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Semantic Duplicates Prevented:</span>
-                  <span className="font-bold">{metrics?.semantic_duplicates_prevented || 0}</span>
+                  <span className="font-bold">
+                    {metrics?.semantic_duplicates_prevented || 0}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Borderline Quality Flagged:</span>
-                  <span className="font-bold">{metrics?.borderline_quality_flagged || 0}</span>
+                  <span className="font-bold">
+                    {metrics?.borderline_quality_flagged || 0}
+                  </span>
                 </div>
               </CardContent>
             </Card>
@@ -387,4 +442,3 @@ export const ChunkQualityDashboard: React.FC = () => {
     </div>
   );
 };
-

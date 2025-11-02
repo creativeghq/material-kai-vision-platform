@@ -7,11 +7,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +95,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
   }, [selectedCategory]);
 
   useEffect(() => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       category: selectedCategory,
       ...initialData,
@@ -108,7 +118,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
   };
 
   const handleFieldChange = (fieldName: string, value: string) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [fieldName]: value,
     }));
@@ -116,8 +126,10 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
 
   const handleSave = async () => {
     // Validate required fields
-    const requiredFields = metadataFields.filter(field => field.is_required);
-    const missingFields = requiredFields.filter(field => !formData[field.field_name]);
+    const requiredFields = metadataFields.filter((field) => field.is_required);
+    const missingFields = requiredFields.filter(
+      (field) => !formData[field.field_name],
+    );
 
     if (!formData.name) {
       toast({
@@ -131,7 +143,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
     if (missingFields.length > 0) {
       toast({
         title: 'Validation Error',
-        description: `Please fill in required fields: ${missingFields.map(f => f.display_name).join(', ')}`,
+        description: `Please fill in required fields: ${missingFields.map((f) => f.display_name).join(', ')}`,
         variant: 'destructive',
       });
       return;
@@ -141,7 +153,7 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
     try {
       // Prepare metadata object
       const metadata: Record<string, string | number | boolean> = {};
-      metadataFields.forEach(field => {
+      metadataFields.forEach((field) => {
         const value = formData[field.field_name];
         if (value !== undefined && value !== '') {
           // Convert string values to appropriate types based on field type
@@ -180,19 +192,17 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
       } else {
         // Save material to materials_catalog table
         const { supabase } = await import('@/integrations/supabase/client');
-        const { error } = await supabase
-          .from('materials_catalog')
-          .insert({
-            name: materialData.name,
-            description: materialData.description || '',
-            category: materialData.category,
-            properties: materialData.properties,
-            chemical_composition: materialData.chemical_composition,
-            safety_data: materialData.safety_data,
-            standards: materialData.standards,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
+        const { error } = await supabase.from('materials_catalog').insert({
+          name: materialData.name,
+          description: materialData.description || '',
+          category: materialData.category,
+          properties: materialData.properties,
+          chemical_composition: materialData.chemical_composition,
+          safety_data: materialData.safety_data,
+          standards: materialData.standards,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
 
         if (error) throw error;
 
@@ -228,7 +238,9 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         return (
           <Input
             value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleFieldChange(field.field_name, e.target.value)
+            }
             placeholder={field.description}
           />
         );
@@ -238,7 +250,9 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
           <Input
             type="number"
             value={value}
-            onChange={(e) => handleFieldChange(field.field_name, e.target.value)}
+            onChange={(e) =>
+              handleFieldChange(field.field_name, e.target.value)
+            }
             placeholder={field.description}
           />
         );
@@ -247,13 +261,17 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
         return (
           <Select
             value={value}
-            onValueChange={(selectedValue: string) => handleFieldChange(field.field_name, selectedValue)}
+            onValueChange={(selectedValue: string) =>
+              handleFieldChange(field.field_name, selectedValue)
+            }
           >
             <SelectTrigger>
-              <SelectValue placeholder={`Select ${field.display_name.toLowerCase()}`} />
+              <SelectValue
+                placeholder={`Select ${field.display_name.toLowerCase()}`}
+              />
             </SelectTrigger>
             <SelectContent>
-              {field.dropdown_options?.map(option => (
+              {field.dropdown_options?.map((option) => (
                 <SelectItem key={option} value={option}>
                   {option}
                 </SelectItem>
@@ -267,7 +285,9 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
           <div className="flex items-center space-x-2">
             <Checkbox
               checked={value === 'true'}
-              onCheckedChange={(checked: boolean) => handleFieldChange(field.field_name, checked.toString())}
+              onCheckedChange={(checked: boolean) =>
+                handleFieldChange(field.field_name, checked.toString())
+              }
             />
             <Label>{field.description || 'Yes/No'}</Label>
           </div>
@@ -284,14 +304,18 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {value && value !== '' ? format(new Date(value), 'PPP') : 'Pick a date'}
+                {value && value !== ''
+                  ? format(new Date(value), 'PPP')
+                  : 'Pick a date'}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
                 selected={value ? new Date(value) : undefined}
-                onSelect={(date: Date | undefined) => handleFieldChange(field.field_name, date?.toISOString() || '')}
+                onSelect={(date: Date | undefined) =>
+                  handleFieldChange(field.field_name, date?.toISOString() || '')
+                }
                 initialFocus
               />
             </PopoverContent>
@@ -318,7 +342,8 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="w-5 h-5" />
-          Add New Material - {materialCategories.find(c => c.value === selectedCategory)?.label}
+          Add New Material -{' '}
+          {materialCategories.find((c) => c.value === selectedCategory)?.label}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -353,13 +378,15 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
             <Label htmlFor="category">Category</Label>
             <Select
               value={formData.category}
-              onValueChange={(value: string) => handleFieldChange('category', value)}
+              onValueChange={(value: string) =>
+                handleFieldChange('category', value)
+              }
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {materialCategories.map(category => (
+                {materialCategories.map((category) => (
                   <SelectItem key={category.value} value={category.value}>
                     {category.label}
                   </SelectItem>
@@ -377,10 +404,19 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {metadataFields.map((field) => (
                 <div key={field.id} className="space-y-2">
-                  <Label htmlFor={field.field_name} className="flex items-center gap-2">
+                  <Label
+                    htmlFor={field.field_name}
+                    className="flex items-center gap-2"
+                  >
                     {field.display_name}
-                    {field.is_required && <span className="text-destructive">*</span>}
-                    {field.is_global && <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs">Global</Badge>}
+                    {field.is_required && (
+                      <span className="text-destructive">*</span>
+                    )}
+                    {field.is_global && (
+                      <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs">
+                        Global
+                      </Badge>
+                    )}
                     {field.description && (
                       <Popover>
                         <PopoverTrigger asChild>
@@ -391,8 +427,12 @@ export const DynamicMaterialForm: React.FC<DynamicMaterialFormProps> = ({
                             <p className="text-sm">{field.description}</p>
                             {field.extraction_hints && (
                               <div>
-                                <p className="text-xs font-medium text-muted-foreground">AI Extraction Hints:</p>
-                                <p className="text-xs text-muted-foreground">{field.extraction_hints}</p>
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  AI Extraction Hints:
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {field.extraction_hints}
+                                </p>
                               </div>
                             )}
                           </div>

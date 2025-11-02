@@ -20,12 +20,9 @@ interface ProductDeleteConfirmationProps {
   onConfirm: (productId: string) => Promise<void>;
 }
 
-export const ProductDeleteConfirmation: React.FC<ProductDeleteConfirmationProps> = ({
-  open,
-  onOpenChange,
-  product,
-  onConfirm,
-}) => {
+export const ProductDeleteConfirmation: React.FC<
+  ProductDeleteConfirmationProps
+> = ({ open, onOpenChange, product, onConfirm }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
@@ -46,7 +43,8 @@ export const ProductDeleteConfirmation: React.FC<ProductDeleteConfirmationProps>
       console.error('Error deleting product:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete product',
+        description:
+          error instanceof Error ? error.message : 'Failed to delete product',
         variant: 'destructive',
       });
     } finally {
@@ -69,12 +67,14 @@ export const ProductDeleteConfirmation: React.FC<ProductDeleteConfirmationProps>
               Are you sure you want to delete <strong>{product.name}</strong>?
             </p>
             <p className="text-destructive">
-              This action cannot be undone. The product will be permanently removed from the database.
+              This action cannot be undone. The product will be permanently
+              removed from the database.
             </p>
             {product.sourceChunkIds && product.sourceChunkIds.length > 0 && (
               <p className="text-sm text-muted-foreground mt-2">
-                Note: This product is linked to {product.sourceChunkIds.length} chunk(s).
-                The chunks will not be deleted, but the product relationship will be removed.
+                Note: This product is linked to {product.sourceChunkIds.length}{' '}
+                chunk(s). The chunks will not be deleted, but the product
+                relationship will be removed.
               </p>
             )}
           </AlertDialogDescription>
@@ -100,4 +100,3 @@ export const ProductDeleteConfirmation: React.FC<ProductDeleteConfirmationProps>
     </AlertDialog>
   );
 };
-

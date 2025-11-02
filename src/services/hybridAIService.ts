@@ -52,7 +52,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   protected async doHealthCheck(): Promise<void> {
-    if (!this.PROVIDERS.some(p => p.available)) {
+    if (!this.PROVIDERS.some((p) => p.available)) {
       throw new Error('No AI providers available');
     }
   }
@@ -65,9 +65,9 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     const maxRetries = request.maxRetries ?? this.DEFAULT_MAX_RETRIES;
 
     // Sort providers by priority
-    const sortedProviders = this.PROVIDERS
-      .filter(p => p.available)
-      .sort((a, b) => a.priority - b.priority);
+    const sortedProviders = this.PROVIDERS.filter((p) => p.available).sort(
+      (a, b) => a.priority - b.priority,
+    );
 
     let bestResult: unknown = null;
     let bestScore = 0;
@@ -96,7 +96,10 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
         }
 
         // Validate the response
-        const validation = HybridAIService.validateResponse(result as Record<string, unknown>, request);
+        const validation = HybridAIService.validateResponse(
+          result as Record<string, unknown>,
+          request,
+        );
         const processingTime = Date.now() - attemptStart;
 
         attempts.push({
@@ -115,12 +118,15 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 
         // If score meets minimum threshold, we can stop
         if ((validation as any).score >= minimumScore) {
-          console.log(`${provider.name} met minimum score threshold: ${(validation as any).score}`);
+          console.log(
+            `${provider.name} met minimum score threshold: ${(validation as any).score}`,
+          );
           break;
         }
 
-        console.log(`${provider.name} score ${(validation as any).score} below threshold ${minimumScore}, trying next provider`);
-
+        console.log(
+          `${provider.name} score ${(validation as any).score} below threshold ${minimumScore}, trying next provider`,
+        );
       } catch (error) {
         const processingTime = Date.now() - attemptStart;
 
@@ -142,7 +148,8 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       return {
         success: true,
         data: bestResult,
-        provider: attempts.find(a => a.score === bestScore)?.provider || 'unknown',
+        provider:
+          attempts.find((a) => a.score === bestScore)?.provider || 'unknown',
         attempts,
         final_score: bestScore,
         validation: bestValidation,
@@ -162,18 +169,27 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   // Call hybrid analysis edge function
-  static async callHybridAnalysis(request: HybridRequest): Promise<HybridResponse> {
-    const response = await callMivaaGatewayDirect('hybrid_material_analysis', request);
+  static async callHybridAnalysis(
+    request: HybridRequest,
+  ): Promise<HybridResponse> {
+    const response = await callMivaaGatewayDirect(
+      'hybrid_material_analysis',
+      request,
+    );
 
     if (!response.success) {
-      throw new Error(`Hybrid analysis failed: ${response.error?.message || 'Unknown error'}`);
+      throw new Error(
+        `Hybrid analysis failed: ${response.error?.message || 'Unknown error'}`,
+      );
     }
 
     return response.data;
   }
 
   // MIVAA API calls (primary provider)
-  private static async callMIVAA(request: HybridRequest): Promise<HybridResponse> {
+  private static async callMIVAA(
+    request: HybridRequest,
+  ): Promise<HybridResponse> {
     // Note: Using Supabase MIVAA gateway instead of direct calls
 
     // Map request type to MIVAA action
@@ -181,7 +197,9 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     let mivaaAction: string;
     switch (request.type) {
       case 'material-analysis':
-        mivaaAction = request.imageUrl ? 'llama_vision_analysis' : 'chat_completion';
+        mivaaAction = request.imageUrl
+          ? 'llama_vision_analysis'
+          : 'chat_completion';
         break;
       case '3d-generation':
         mivaaAction = 'chat_completion';
@@ -216,7 +234,9 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     const response = await callMivaaGatewayDirect(mivaaAction, payload);
 
     if (!response.success) {
-      throw new Error(`MIVAA gateway error: ${response.error?.message || 'Unknown error'}`);
+      throw new Error(
+        `MIVAA gateway error: ${response.error?.message || 'Unknown error'}`,
+      );
     }
 
     const result = response.data;
@@ -228,16 +248,19 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     return {
       success: true,
       data: {
-        text: result.data.content || result.data.response || result.data.analysis,
+        text:
+          result.data.content || result.data.response || result.data.analysis,
         raw_response: result.data,
         action: mivaaAction,
       },
       provider: 'mivaa',
-      attempts: [{
-        provider: 'mivaa',
-        success: true,
-        processing_time_ms: 0,
-      }],
+      attempts: [
+        {
+          provider: 'mivaa',
+          success: true,
+          processing_time_ms: 0,
+        },
+      ],
       final_score: 0.9,
       validation: {},
       total_processing_time_ms: 0,
@@ -285,15 +308,25 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   }
 
   // Simple validation - server-side validation now handles comprehensive checks
-  private static validateResponse(result: Record<string, unknown>, _request: HybridRequest): any {
+  private static validateResponse(
+    result: Record<string, unknown>,
+    _request: HybridRequest,
+  ): any {
     // Basic validation for all request types - server now handles detailed validation
-    const hasContent = result && (result.text || result.raw_response || result.image_url || Object.keys(result).length > 0);
+    const hasContent =
+      result &&
+      (result.text ||
+        result.raw_response ||
+        result.image_url ||
+        Object.keys(result).length > 0);
     const hasError = result?.error || result?.status === 'error';
 
     return {
-      score: hasError ? 0.1 : (hasContent ? 0.9 : 0.3),
+      score: hasError ? 0.1 : hasContent ? 0.9 : 0.3,
       confidence: hasContent ? 0.8 : 0.2,
-      reasoning: hasContent ? 'Response contains content' : 'Response is empty or invalid',
+      reasoning: hasContent
+        ? 'Response contains content'
+        : 'Response is empty or invalid',
       issues: hasContent ? [] : ['Empty or invalid response'],
       suggestions: hasContent ? [] : ['Retry with different parameters'],
     };
@@ -322,9 +355,16 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
 /**
  * Call MIVAA Gateway directly using fetch to avoid CORS issues
  */
-async function callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
-  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+async function callMivaaGatewayDirect(
+  action: string,
+  payload: any,
+): Promise<any> {
+  const supabaseUrl =
+    (import.meta as any).env?.VITE_SUPABASE_URL ||
+    'https://bgbavxtjlbvgplozizxu.supabase.co';
+  const supabaseKey =
+    (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error('Supabase configuration not found');
@@ -336,7 +376,7 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
+        Authorization: `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -346,14 +386,18 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
     });
 
     if (!response.ok) {
-      throw new Error(`MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`);
+      throw new Error(
+        `MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`,
+      );
     }
 
     const data = await response.json();
 
     // Check for application-level errors
     if (!data.success && data.error) {
-      throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
+      throw new Error(
+        `MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`,
+      );
     }
 
     return data;
@@ -392,4 +436,8 @@ export const HybridAIServiceStatic = {
 };
 
 // Extend the class with static methods for backward compatibility
-(HybridAIService as unknown as { processRequest: typeof HybridAIServiceStatic.processRequest }).processRequest = HybridAIServiceStatic.processRequest;
+(
+  HybridAIService as unknown as {
+    processRequest: typeof HybridAIServiceStatic.processRequest;
+  }
+).processRequest = HybridAIServiceStatic.processRequest;

@@ -54,7 +54,11 @@ export interface SearchOptions {
 }
 
 // Database-driven search suggestions and history
-const fetchSearchSuggestions = async (query: string, categories: string[] = [], threshold: number = 0.7): Promise<SearchSuggestion[]> => {
+const fetchSearchSuggestions = async (
+  query: string,
+  categories: string[] = [],
+  threshold: number = 0.7,
+): Promise<SearchSuggestion[]> => {
   try {
     const suggestions: SearchSuggestion[] = [];
 
@@ -66,7 +70,8 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
       .limit(5);
 
     if (processingData) {
-      processingData.forEach((item: unknown) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      processingData.forEach((item: unknown) => {
+        // eslint-disable-line @typescript-eslint/no-explicit-any
         suggestions.push({
           id: `processing_${(item as any).id}`,
           text: `${(item as any).extraction_type} analysis`,
@@ -74,7 +79,11 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
           confidence: 0.85 + Math.random() * 0.15,
           category: 'analysis',
           metadata: {
-            relatedTerms: [(item as any).extraction_type, 'processing', 'analysis'],
+            relatedTerms: [
+              (item as any).extraction_type,
+              'processing',
+              'analysis',
+            ],
             source: 'processing_results',
           },
         });
@@ -89,7 +98,8 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
       .limit(3);
 
     if (materialsData) {
-      materialsData.forEach((item: unknown) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      materialsData.forEach((item: unknown) => {
+        // eslint-disable-line @typescript-eslint/no-explicit-any
         suggestions.push({
           id: `material_${(item as any).id}`,
           text: `${(item as any).name} materials`,
@@ -125,13 +135,15 @@ const fetchSearchSuggestions = async (query: string, categories: string[] = [], 
     }
 
     // Filter by categories if specified
-    const filtered = categories.length > 0
-      ? suggestions.filter(s => s.category && categories.includes(s.category))
-      : suggestions;
+    const filtered =
+      categories.length > 0
+        ? suggestions.filter(
+            (s) => s.category && categories.includes(s.category),
+          )
+        : suggestions;
 
     // Filter by confidence threshold
-    return filtered.filter(s => !s.confidence || s.confidence >= threshold);
-
+    return filtered.filter((s) => !s.confidence || s.confidence >= threshold);
   } catch (error) {
     console.error('Error fetching search suggestions:', error);
     return [];
@@ -176,9 +188,13 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
 
       try {
         // Simulate API call for semantic suggestions
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
-        const suggestions = await fetchSearchSuggestions(query, categories, semanticThreshold);
+        const suggestions = await fetchSearchSuggestions(
+          query,
+          categories,
+          semanticThreshold,
+        );
         setSuggestions(suggestions.slice(0, maxSuggestions));
       } catch (error) {
         console.error('Error fetching suggestions:', error);
@@ -225,7 +241,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       ...(options?.category && { category: options.category }),
     };
 
-    setHistory(prev => [historyItem, ...prev.slice(0, maxHistory - 1)]);
+    setHistory((prev) => [historyItem, ...prev.slice(0, maxHistory - 1)]);
     setIsOpen(false);
 
     // Execute search
@@ -279,11 +295,11 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => (prev + 1) % totalItems);
+        setSelectedIndex((prev) => (prev + 1) % totalItems);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setSelectedIndex(prev => prev <= 0 ? totalItems - 1 : prev - 1);
+        setSelectedIndex((prev) => (prev <= 0 ? totalItems - 1 : prev - 1));
         break;
       case 'Enter':
         e.preventDefault();
@@ -357,7 +373,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
     }
   };
 
-  const showDropdown = isOpen && (suggestions.length > 0 || (showHistory && history.length > 0));
+  const showDropdown =
+    isOpen && (suggestions.length > 0 || (showHistory && history.length > 0));
 
   return (
     <div className={cn('relative w-full', className)}>
@@ -445,7 +462,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                         </div>
                         {suggestion.confidence && (
                           <div className="text-xs text-muted-foreground">
-                            Confidence: {Math.round(suggestion.confidence * 100)}%
+                            Confidence:{' '}
+                            {Math.round(suggestion.confidence * 100)}%
                           </div>
                         )}
                       </div>
@@ -499,7 +517,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                             {item.query}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {item.resultCount} results • {formatTimeAgo(item.timestamp)}
+                            {item.resultCount} results •{' '}
+                            {formatTimeAgo(item.timestamp)}
                           </div>
                         </div>
                         {item.category && (
@@ -514,11 +533,13 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
               )}
 
               {/* Empty state */}
-              {suggestions.length === 0 && (!showHistory || history.length === 0) && value.trim() && (
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  No suggestions found. Press Enter to search.
-                </div>
-              )}
+              {suggestions.length === 0 &&
+                (!showHistory || history.length === 0) &&
+                value.trim() && (
+                  <div className="p-4 text-center text-sm text-muted-foreground">
+                    No suggestions found. Press Enter to search.
+                  </div>
+                )}
             </div>
           </CardContent>
         </Card>

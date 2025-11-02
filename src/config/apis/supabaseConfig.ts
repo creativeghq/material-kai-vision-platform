@@ -56,8 +56,6 @@ const crewai3DGenerationOutputSchema = z.union([
   }),
 ]);
 
-
-
 // Material Scraper function schema - UX validation only
 const materialScraperInputSchema = z.object({
   url: z.string().url('Please enter a valid URL'),
@@ -75,12 +73,14 @@ const materialScraperOutputSchema = z.union([
       url: z.string(),
       title: z.string().optional(),
       description: z.string().optional(),
-      images: z.array(z.object({
-        url: z.string(),
-        alt: z.string().optional(),
-        width: z.number().optional(),
-        height: z.number().optional(),
-      })),
+      images: z.array(
+        z.object({
+          url: z.string(),
+          alt: z.string().optional(),
+          width: z.number().optional(),
+          height: z.number().optional(),
+        }),
+      ),
       text_content: z.string().optional(),
       metadata: z.record(z.string(), z.any()),
     }),
@@ -98,11 +98,13 @@ const ocrProcessingInputSchema = z.object({
   image_url: z.string().url('Please enter a valid image URL'),
   language: z.string().optional(),
   output_format: z.string().optional(),
-  preprocessing: z.object({
-    enhance_contrast: z.boolean().optional(),
-    denoise: z.boolean().optional(),
-    deskew: z.boolean().optional(),
-  }).optional(),
+  preprocessing: z
+    .object({
+      enhance_contrast: z.boolean().optional(),
+      denoise: z.boolean().optional(),
+      deskew: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 const ocrProcessingOutputSchema = z.union([
@@ -165,7 +167,8 @@ export const supabaseConfig: SupabaseApiConfig = {
   type: 'supabase',
   baseUrl: 'https://bgbavxtjlbvgplozizxu.supabase.co',
   projectUrl: 'https://bgbavxtjlbvgplozizxu.supabase.co',
-  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg',
+  anonKey:
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg',
   timeout: 60000, // 1 minute default
   retryAttempts: 3,
   rateLimit: {
@@ -179,8 +182,6 @@ export const supabaseConfig: SupabaseApiConfig = {
       outputSchema: crewai3DGenerationOutputSchema,
       timeout: 300000, // 5 minutes for AI generation
     },
-
-
 
     'material-scraper': {
       inputSchema: materialScraperInputSchema,
@@ -212,18 +213,22 @@ export const supabaseConfig: SupabaseApiConfig = {
           analysis: z.object({
             layout: z.object({
               room_type: z.string(),
-              dimensions: z.object({
-                width: z.number(),
-                height: z.number(),
-                depth: z.number(),
-              }).optional(),
+              dimensions: z
+                .object({
+                  width: z.number(),
+                  height: z.number(),
+                  depth: z.number(),
+                })
+                .optional(),
               features: z.array(z.string()),
             }),
-            furniture: z.array(z.object({
-              type: z.string(),
-              position: z.object({ x: z.number(), y: z.number() }),
-              confidence: z.number(),
-            })),
+            furniture: z.array(
+              z.object({
+                type: z.string(),
+                position: z.object({ x: z.number(), y: z.number() }),
+                confidence: z.number(),
+              }),
+            ),
             style: z.object({
               primary_style: z.string(),
               color_palette: z.array(z.string()),
@@ -251,7 +256,10 @@ export class SupabaseConfigUtils {
   /**
    * Validate input parameters for a specific function
    */
-  public static validateFunctionInput(functionName: string, input: unknown): { success: boolean; error?: string; data?: unknown } {
+  public static validateFunctionInput(
+    functionName: string,
+    input: unknown,
+  ): { success: boolean; error?: string; data?: unknown } {
     const functionConfig = this.getFunctionConfig(functionName);
     if (!functionConfig) {
       return { success: false, error: `Function ${functionName} not found` };
@@ -264,7 +272,7 @@ export class SupabaseConfigUtils {
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: `Validation error: ${error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          error: `Validation error: ${error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         };
       }
       return { success: false, error: 'Unknown validation error' };
@@ -297,10 +305,14 @@ export class SupabaseConfigUtils {
   /**
    * Get authorization headers
    */
-  public static getAuthHeaders(useServiceRole: boolean = false): Record<string, string> {
-    const key = useServiceRole ? supabaseConfig.serviceRoleKey : supabaseConfig.anonKey;
+  public static getAuthHeaders(
+    useServiceRole: boolean = false,
+  ): Record<string, string> {
+    const key = useServiceRole
+      ? supabaseConfig.serviceRoleKey
+      : supabaseConfig.anonKey;
     return {
-      'Authorization': `Bearer ${key}`,
+      Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     };
   }

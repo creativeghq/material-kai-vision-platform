@@ -47,10 +47,14 @@ export interface LegacyMaterialCategories {
 
 export interface DynamicCategoriesResponse {
   success: boolean;
-  data: MaterialCategory[] | MaterialProperty[] | LegacyMaterialCategories | {
-    categories: MaterialCategory[];
-    properties: MaterialProperty[];
-  };
+  data:
+    | MaterialCategory[]
+    | MaterialProperty[]
+    | LegacyMaterialCategories
+    | {
+        categories: MaterialCategory[];
+        properties: MaterialProperty[];
+      };
   cached?: boolean;
   cacheAge?: number;
   error?: string;
@@ -78,25 +82,30 @@ class DynamicMaterialCategoriesService {
 
   public static getInstance(): DynamicMaterialCategoriesService {
     if (!DynamicMaterialCategoriesService.instance) {
-      DynamicMaterialCategoriesService.instance = new DynamicMaterialCategoriesService();
+      DynamicMaterialCategoriesService.instance =
+        new DynamicMaterialCategoriesService();
     }
     return DynamicMaterialCategoriesService.instance;
   }
 
   private isCacheValid(): boolean {
-    return this.cacheTimestamp !== null &&
-           (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION;
+    return (
+      this.cacheTimestamp !== null &&
+      Date.now() - this.cacheTimestamp < this.CACHE_DURATION
+    );
   }
 
-  private async makeRequest(endpoint: string = ''): Promise<DynamicCategoriesResponse> {
+  private async makeRequest(
+    endpoint: string = '',
+  ): Promise<DynamicCategoriesResponse> {
     const url = endpoint ? `${this.baseUrl}/${endpoint}` : this.baseUrl;
 
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.supabaseKey}`,
-        'apikey': this.supabaseKey,
+        Authorization: `Bearer ${this.supabaseKey}`,
+        apikey: this.supabaseKey,
       },
     });
 
@@ -195,8 +204,15 @@ class DynamicMaterialCategoriesService {
 
     try {
       const response = await this.makeRequest();
-      if (response.success && typeof response.data === 'object' && 'categories' in response.data) {
-        const data = response.data as { categories: MaterialCategory[]; properties: MaterialProperty[] };
+      if (
+        response.success &&
+        typeof response.data === 'object' &&
+        'categories' in response.data
+      ) {
+        const data = response.data as {
+          categories: MaterialCategory[];
+          properties: MaterialProperty[];
+        };
         this.categoriesCache = data.categories;
         this.propertiesCache = data.properties;
         this.cacheTimestamp = Date.now();
@@ -237,7 +253,7 @@ class DynamicMaterialCategoriesService {
    */
   public async getCategoryByKey(key: string): Promise<MaterialCategory | null> {
     const categories = await this.getCategories();
-    return categories.find(cat => cat.key === key) || null;
+    return categories.find((cat) => cat.key === key) || null;
   }
 
   /**
@@ -245,7 +261,7 @@ class DynamicMaterialCategoriesService {
    */
   public async getPropertyByKey(key: string): Promise<MaterialProperty | null> {
     const properties = await this.getProperties();
-    return properties.find(prop => prop.key === key) || null;
+    return properties.find((prop) => prop.key === key) || null;
   }
 
   /**
@@ -254,16 +270,18 @@ class DynamicMaterialCategoriesService {
   public async getExtractablePropertyKeys(): Promise<string[]> {
     const properties = await this.getProperties();
     return properties
-      .filter(prop => prop.isAiExtractable)
-      .map(prop => prop.key);
+      .filter((prop) => prop.isAiExtractable)
+      .map((prop) => prop.key);
   }
 
   /**
    * Get categories by display group
    */
-  public async getCategoriesByGroup(group: string): Promise<MaterialCategory[]> {
+  public async getCategoriesByGroup(
+    group: string,
+  ): Promise<MaterialCategory[]> {
     const categories = await this.getCategories();
-    return categories.filter(cat => cat.displayGroup === group);
+    return categories.filter((cat) => cat.displayGroup === group);
   }
 
   /**
@@ -271,12 +289,13 @@ class DynamicMaterialCategoriesService {
    */
   public async getPrimaryCategories(): Promise<MaterialCategory[]> {
     const categories = await this.getCategories();
-    return categories.filter(cat => cat.isPrimaryCategory);
+    return categories.filter((cat) => cat.isPrimaryCategory);
   }
 }
 
 // Export singleton instance
-export const dynamicMaterialCategoriesService = DynamicMaterialCategoriesService.getInstance();
+export const dynamicMaterialCategoriesService =
+  DynamicMaterialCategoriesService.getInstance();
 
 // Convenience functions for backward compatibility
 export async function getMaterialCategories(): Promise<MaterialCategory[]> {

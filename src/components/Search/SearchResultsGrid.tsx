@@ -40,7 +40,12 @@ export const SearchResultsGrid: React.FC<SearchResultsGridProps> = ({
 
   if (loading) {
     return (
-      <div className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4', className)}>
+      <div
+        className={cn(
+          'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4',
+          className,
+        )}
+      >
         {Array.from({ length: 8 }).map((_, index) => (
           <div key={index} className="animate-pulse">
             <div className="bg-gray-200 rounded-lg h-64 mb-4"></div>
@@ -74,14 +79,23 @@ export const SearchResultsGrid: React.FC<SearchResultsGridProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
-        <p className="text-gray-500">Try adjusting your search terms or filters</p>
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          No results found
+        </h3>
+        <p className="text-gray-500">
+          Try adjusting your search terms or filters
+        </p>
       </div>
     );
   }
 
   return (
-    <div className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4', className)}>
+    <div
+      className={cn(
+        'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4',
+        className,
+      )}
+    >
       {results.map((result) => (
         <div key={result.id} className="relative">
           {/* Selection checkbox */}

@@ -23,7 +23,15 @@ export type ValidationRuleType =
 /**
  * Validation Operator
  */
-export type ValidationOperator = 'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'not_contains' | 'matches_regex' | 'in_range';
+export type ValidationOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'greater_than'
+  | 'less_than'
+  | 'contains'
+  | 'not_contains'
+  | 'matches_regex'
+  | 'in_range';
 
 /**
  * Validation Severity
@@ -241,4 +249,3 @@ export interface Phase23Database {
     Update: ValidationResultUpdate;
   };
 }
-

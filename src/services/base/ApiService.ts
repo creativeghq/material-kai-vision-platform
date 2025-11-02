@@ -19,7 +19,10 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
 
   constructor(
     protected apiName: string,
-    protected environment: 'development' | 'production' | 'test' = 'development',
+    protected environment:
+      | 'development'
+      | 'production'
+      | 'test' = 'development',
   ) {
     const apiConfig = ApiConfigManager.getApiConfig<TConfig>(apiName);
     if (!apiConfig) {
@@ -39,9 +42,14 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
    * Get environment-specific settings
    */
   public getEnvironmentConfig(): { baseUrl: string; apiKey?: string } {
-    const envConfig = this.config.environment[this.environment as keyof typeof this.config.environment];
+    const envConfig =
+      this.config.environment[
+        this.environment as keyof typeof this.config.environment
+      ];
     if (!envConfig || typeof envConfig !== 'object') {
-      throw new Error(`Invalid environment configuration for ${this.environment}`);
+      throw new Error(
+        `Invalid environment configuration for ${this.environment}`,
+      );
     }
     return envConfig as { baseUrl: string; apiKey?: string };
   }
@@ -54,10 +62,12 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
       return schema.parse(params);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errorMessages = error.issues.map((err: z.ZodIssue) =>
-          `${err.path.join('.')}: ${err.message}`,
-        ).join(', ');
-        throw new Error(`Parameter validation failed for ${this.apiName}: ${errorMessages}`);
+        const errorMessages = error.issues
+          .map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`)
+          .join(', ');
+        throw new Error(
+          `Parameter validation failed for ${this.apiName}: ${errorMessages}`,
+        );
       }
       throw error;
     }
@@ -77,7 +87,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
 
     if (timeSinceLastCall < minInterval) {
       const waitTime = minInterval - timeSinceLastCall;
-      await new Promise(resolve => setTimeout(resolve, waitTime));
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
 
     this.rateLimitTracker.set(endpoint, Date.now());
@@ -94,8 +104,13 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
 
     if (error && typeof error === 'object' && 'response' in error) {
       // HTTP error response
-      const errorResponse = error.response as { status: number; data?: { message?: string }; statusText?: string };
-      errorMessage = errorResponse.data?.message || errorResponse.statusText || errorMessage;
+      const errorResponse = error.response as {
+        status: number;
+        data?: { message?: string };
+        statusText?: string;
+      };
+      errorMessage =
+        errorResponse.data?.message || errorResponse.statusText || errorMessage;
     } else if (error && typeof error === 'object' && 'message' in error) {
       // Network or other error
       errorMessage = (error as { message: string }).message;
@@ -153,7 +168,7 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
       method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
       timeout?: number;
       retries?: number;
-    }
+    },
   ): Promise<TResponse>;
 
   /**
@@ -205,7 +220,8 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
     });
 
     const rateLimitConfig = this.config.rateLimit;
-    const hasRateLimit = rateLimitConfig && rateLimitConfig.requestsPerMinute > 0;
+    const hasRateLimit =
+      rateLimitConfig && rateLimitConfig.requestsPerMinute > 0;
 
     return {
       apiName: this.apiName,
@@ -221,7 +237,9 @@ export abstract class ApiService<TConfig extends ApiConfig = ApiConfig> {
  * Specialized service for Replicate API
  */
 export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
-  constructor(environment: 'development' | 'production' | 'test' = 'development') {
+  constructor(
+    environment: 'development' | 'production' | 'test' = 'development',
+  ) {
     super('replicate', environment);
   }
 
@@ -243,7 +261,10 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
     }
 
     // Validate parameters against model schema
-    const validatedParams = this.validateParameters(modelConfig.inputSchema, params);
+    const validatedParams = this.validateParameters(
+      modelConfig.inputSchema,
+      params,
+    );
 
     // Check rate limiting
     await this.checkRateLimit(modelId);
@@ -274,7 +295,9 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
         });
 
         if (!response.ok) {
-          const errorText = await response.text().catch(() => response.statusText);
+          const errorText = await response
+            .text()
+            .catch(() => response.statusText);
           console.error(`❌ API Error (${response.status}):`, {
             model: modelId,
             status: response.status,
@@ -293,7 +316,6 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
           timestamp: new Date().toISOString(),
         });
         return result as TResponse;
-
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
@@ -314,7 +336,7 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
             nextAttempt: attempt + 2,
             timestamp: new Date().toISOString(),
           });
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
@@ -356,7 +378,9 @@ export class ReplicateApiService extends ApiService<ReplicateApiConfig> {
  * Specialized service for Supabase Edge Functions
  */
 export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
-  constructor(environment: 'development' | 'production' | 'test' = 'development') {
+  constructor(
+    environment: 'development' | 'production' | 'test' = 'development',
+  ) {
     super('supabase', environment);
   }
 
@@ -378,7 +402,10 @@ export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
     }
 
     // Validate parameters against function schema
-    const validatedParams = this.validateParameters(functionConfig.inputSchema, params);
+    const validatedParams = this.validateParameters(
+      functionConfig.inputSchema,
+      params,
+    );
 
     // Check rate limiting
     await this.checkRateLimit(functionName);
@@ -403,19 +430,21 @@ export class SupabaseApiService extends ApiService<SupabaseApiConfig> {
 
         const result = await response.json();
         return result as TResponse;
-
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error');
 
         if (attempt < retries) {
           // Linear backoff for Supabase
           const delay = (attempt + 1) * 2000;
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
 
-    this.handleApiError(lastError, `${functionName} after ${retries + 1} attempts`);
+    this.handleApiError(
+      lastError,
+      `${functionName} after ${retries + 1} attempts`,
+    );
   }
 }
 

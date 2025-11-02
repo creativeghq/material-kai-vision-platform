@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 
-import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
-import { ShoppingCartService, CartWithItems } from '../../services/shopping/ShoppingCartService';
+import {
+  QuoteRequestService,
+  QuoteRequest,
+} from '../../services/quote/QuoteRequestService';
+import {
+  ShoppingCartService,
+  CartWithItems,
+} from '../../services/shopping/ShoppingCartService';
 
 interface QuoteRequestFormProps {
   cartId: string;
@@ -34,7 +40,8 @@ export const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({
       const cartData = await cartService.getCart(cartId);
       setCart(cartData);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to load cart';
+      const errorMsg =
+        err instanceof Error ? err.message : 'Failed to load cart';
       setError(errorMsg);
       onError?.(errorMsg);
     }
@@ -67,7 +74,8 @@ export const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({
       // Reset success message after 3 seconds
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to submit quote request';
+      const errorMsg =
+        err instanceof Error ? err.message : 'Failed to submit quote request';
       setError(errorMsg);
       onError?.(errorMsg);
     } finally {
@@ -169,4 +177,3 @@ export const QuoteRequestForm: React.FC<QuoteRequestFormProps> = ({
 };
 
 export default QuoteRequestForm;
-

@@ -21,7 +21,11 @@ export class EntityRelationshipService {
   static async linkChunkToProduct(
     chunkId: string,
     productId: string,
-    relationshipType: 'source' | 'related' | 'component' | 'alternative' = 'source',
+    relationshipType:
+      | 'source'
+      | 'related'
+      | 'component'
+      | 'alternative' = 'source',
     relevanceScore: number = 1.0,
   ): Promise<ChunkProductRelationship> {
     const { data, error } = await supabase
@@ -48,7 +52,11 @@ export class EntityRelationshipService {
   static async linkChunkToImage(
     chunkId: string,
     imageId: string,
-    relationshipType: 'illustrates' | 'depicts' | 'related' | 'example' = 'illustrates',
+    relationshipType:
+      | 'illustrates'
+      | 'depicts'
+      | 'related'
+      | 'example' = 'illustrates',
     relevanceScore: number = 1.0,
   ): Promise<ChunkImageRelationship> {
     const { data, error } = await supabase
@@ -75,7 +83,11 @@ export class EntityRelationshipService {
   static async linkProductToImage(
     productId: string,
     imageId: string,
-    relationshipType: 'depicts' | 'illustrates' | 'variant' | 'related' = 'depicts',
+    relationshipType:
+      | 'depicts'
+      | 'illustrates'
+      | 'variant'
+      | 'related' = 'depicts',
     relevanceScore: number = 1.0,
   ): Promise<ProductImageRelationship> {
     const { data, error } = await supabase
@@ -99,7 +111,9 @@ export class EntityRelationshipService {
   /**
    * Get all products related to a chunk
    */
-  static async getChunkProducts(chunkId: string): Promise<ChunkProductRelationship[]> {
+  static async getChunkProducts(
+    chunkId: string,
+  ): Promise<ChunkProductRelationship[]> {
     const { data, error } = await supabase
       .from('chunk_product_relationships')
       .select('*')
@@ -113,7 +127,9 @@ export class EntityRelationshipService {
   /**
    * Get all images related to a chunk
    */
-  static async getChunkImages(chunkId: string): Promise<ChunkImageRelationship[]> {
+  static async getChunkImages(
+    chunkId: string,
+  ): Promise<ChunkImageRelationship[]> {
     const { data, error } = await supabase
       .from('chunk_image_relationships')
       .select('*')
@@ -127,7 +143,9 @@ export class EntityRelationshipService {
   /**
    * Get all images related to a product
    */
-  static async getProductImages(productId: string): Promise<ProductImageRelationship[]> {
+  static async getProductImages(
+    productId: string,
+  ): Promise<ProductImageRelationship[]> {
     const { data, error } = await supabase
       .from('product_image_relationships')
       .select('*')
@@ -141,7 +159,9 @@ export class EntityRelationshipService {
   /**
    * Get all chunks related to a product
    */
-  static async getProductChunks(productId: string): Promise<ChunkProductRelationship[]> {
+  static async getProductChunks(
+    productId: string,
+  ): Promise<ChunkProductRelationship[]> {
     const { data, error } = await supabase
       .from('chunk_product_relationships')
       .select('*')
@@ -155,7 +175,9 @@ export class EntityRelationshipService {
   /**
    * Get all chunks related to an image
    */
-  static async getImageChunks(imageId: string): Promise<ChunkImageRelationship[]> {
+  static async getImageChunks(
+    imageId: string,
+  ): Promise<ChunkImageRelationship[]> {
     const { data, error } = await supabase
       .from('chunk_image_relationships')
       .select('*')
@@ -169,7 +191,9 @@ export class EntityRelationshipService {
   /**
    * Get all products related to an image
    */
-  static async getImageProducts(imageId: string): Promise<ProductImageRelationship[]> {
+  static async getImageProducts(
+    imageId: string,
+  ): Promise<ProductImageRelationship[]> {
     const { data, error } = await supabase
       .from('product_image_relationships')
       .select('*')
@@ -183,7 +207,10 @@ export class EntityRelationshipService {
   /**
    * Remove relationship between chunk and product
    */
-  static async unlinkChunkFromProduct(chunkId: string, productId: string): Promise<void> {
+  static async unlinkChunkFromProduct(
+    chunkId: string,
+    productId: string,
+  ): Promise<void> {
     const { error } = await supabase
       .from('chunk_product_relationships')
       .delete()
@@ -196,7 +223,10 @@ export class EntityRelationshipService {
   /**
    * Remove relationship between chunk and image
    */
-  static async unlinkChunkFromImage(chunkId: string, imageId: string): Promise<void> {
+  static async unlinkChunkFromImage(
+    chunkId: string,
+    imageId: string,
+  ): Promise<void> {
     const { error } = await supabase
       .from('chunk_image_relationships')
       .delete()
@@ -209,7 +239,10 @@ export class EntityRelationshipService {
   /**
    * Remove relationship between product and image
    */
-  static async unlinkProductFromImage(productId: string, imageId: string): Promise<void> {
+  static async unlinkProductFromImage(
+    productId: string,
+    imageId: string,
+  ): Promise<void> {
     const { error } = await supabase
       .from('product_image_relationships')
       .delete()
@@ -271,9 +304,13 @@ export class EntityRelationshipService {
    * Batch link chunks to products
    */
   static async batchLinkChunksToProducts(
-    links: Array<{ chunkId: string; productId: string; relevanceScore?: number }>,
+    links: Array<{
+      chunkId: string;
+      productId: string;
+      relevanceScore?: number;
+    }>,
   ): Promise<void> {
-    const data = links.map(link => ({
+    const data = links.map((link) => ({
       chunk_id: link.chunkId,
       product_id: link.productId,
       relationship_type: 'source',
@@ -293,7 +330,7 @@ export class EntityRelationshipService {
   static async batchLinkChunksToImages(
     links: Array<{ chunkId: string; imageId: string; relevanceScore?: number }>,
   ): Promise<void> {
-    const data = links.map(link => ({
+    const data = links.map((link) => ({
       chunk_id: link.chunkId,
       image_id: link.imageId,
       relationship_type: 'illustrates',
@@ -311,9 +348,13 @@ export class EntityRelationshipService {
    * Batch link products to images
    */
   static async batchLinkProductsToImages(
-    links: Array<{ productId: string; imageId: string; relevanceScore?: number }>,
+    links: Array<{
+      productId: string;
+      imageId: string;
+      relevanceScore?: number;
+    }>,
   ): Promise<void> {
-    const data = links.map(link => ({
+    const data = links.map((link) => ({
       product_id: link.productId,
       image_id: link.imageId,
       relationship_type: 'depicts',
@@ -327,4 +368,3 @@ export class EntityRelationshipService {
     if (error) throw error;
   }
 }
-

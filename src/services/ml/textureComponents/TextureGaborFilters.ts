@@ -54,7 +54,8 @@ export class TextureGaborFilters {
    * Initialize Gabor filter bank with specified orientations and frequencies
    */
   private initializeFilterBank(): void {
-    const { filterCount, kernelSize, orientations, frequencies, phases } = this.config;
+    const { filterCount, kernelSize, orientations, frequencies, phases } =
+      this.config;
 
     this.filterBank = {
       filters: [],
@@ -67,7 +68,11 @@ export class TextureGaborFilters {
     // Generate Gabor filters for each orientation-frequency combination
     let filterIndex = 0;
     for (let i = 0; i < orientations.length && filterIndex < filterCount; i++) {
-      for (let j = 0; j < frequencies.length && filterIndex < filterCount; j++) {
+      for (
+        let j = 0;
+        j < frequencies.length && filterIndex < filterCount;
+        j++
+      ) {
         for (let k = 0; k < phases.length && filterIndex < filterCount; k++) {
           const filter = this.createGaborFilter(
             kernelSize,
@@ -173,18 +178,34 @@ export class TextureGaborFilters {
   ): Promise<TextureResponse> {
     try {
       // Convert to grayscale if multi-channel
-      const grayImage = channels > 1 ? this.convertToGrayscale(image, width, height, channels) : image;
+      const grayImage =
+        channels > 1
+          ? this.convertToGrayscale(image, width, height, channels)
+          : image;
 
       // Apply each filter in the bank
       const filterResponses: Float32Array[] = [];
       for (let i = 0; i < this.filterBank.filters.length; i++) {
-        const response = await this.applyFilter(grayImage, width, height, this.filterBank.filters[i]);
+        const response = await this.applyFilter(
+          grayImage,
+          width,
+          height,
+          this.filterBank.filters[i],
+        );
         filterResponses.push(response);
       }
 
       // Compute orientation and frequency maps
-      const orientationMap = this.computeOrientationMap(filterResponses, width, height);
-      const frequencyMap = this.computeFrequencyMap(filterResponses, width, height);
+      const orientationMap = this.computeOrientationMap(
+        filterResponses,
+        width,
+        height,
+      );
+      const frequencyMap = this.computeFrequencyMap(
+        filterResponses,
+        width,
+        height,
+      );
       const energyMap = this.computeEnergyMap(filterResponses, width, height);
 
       // Find dominant orientation and frequency
@@ -201,10 +222,11 @@ export class TextureGaborFilters {
         dominantFrequency,
         textureEnergy,
       };
-
     } catch (error) {
       console.error('Error applying Gabor filter bank:', error);
-      throw new Error(`Gabor filter processing failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Gabor filter processing failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -354,7 +376,11 @@ export class TextureGaborFilters {
           const response = Math.abs(responses[i][pixelIndex]);
           if (response > maxResponse) {
             maxResponse = response;
-            bestFrequency = frequencies[Math.floor(i / this.config.orientations.length) % frequencies.length];
+            bestFrequency =
+              frequencies[
+                Math.floor(i / this.config.orientations.length) %
+                  frequencies.length
+              ];
           }
         }
 
@@ -401,7 +427,10 @@ export class TextureGaborFilters {
 
     for (let i = 0; i < orientationMap.length; i++) {
       const orientation = Math.round(orientationMap[i]);
-      orientationCounts.set(orientation, (orientationCounts.get(orientation) || 0) + 1);
+      orientationCounts.set(
+        orientation,
+        (orientationCounts.get(orientation) || 0) + 1,
+      );
     }
 
     let maxCount = 0;
@@ -455,7 +484,10 @@ export class TextureGaborFilters {
   /**
    * Update filter parameters during training (if learnable)
    */
-  public updateParameters(gradients: Map<string, Float32Array>, learningRate: number = 0.001): void {
+  public updateParameters(
+    gradients: Map<string, Float32Array>,
+    learningRate: number = 0.001,
+  ): void {
     if (!this.config.learnable) {
       return;
     }
@@ -466,7 +498,10 @@ export class TextureGaborFilters {
       for (let i = 0; i < this.config.orientations.length; i++) {
         this.config.orientations[i] -= learningRate * orientationGradients[i];
         // Clamp to valid range [0, 180)
-        this.config.orientations[i] = Math.max(0, Math.min(179, this.config.orientations[i]));
+        this.config.orientations[i] = Math.max(
+          0,
+          Math.min(179, this.config.orientations[i]),
+        );
       }
     }
 
@@ -476,7 +511,10 @@ export class TextureGaborFilters {
       for (let i = 0; i < this.config.frequencies.length; i++) {
         this.config.frequencies[i] -= learningRate * frequencyGradients[i];
         // Clamp to valid range (0, 1]
-        this.config.frequencies[i] = Math.max(0.01, Math.min(1, this.config.frequencies[i]));
+        this.config.frequencies[i] = Math.max(
+          0.01,
+          Math.min(1, this.config.frequencies[i]),
+        );
       }
     }
 
@@ -508,9 +546,16 @@ export class TextureGaborFilters {
    * Load filter parameters from saved state
    */
   public importParameters(params: Record<string, unknown>): void {
-    this.config = { ...this.config, ...(params.config as Record<string, unknown>) };
-    this.filterBank.orientations = new Float32Array((params.filterBank as Record<string, unknown>).orientations as number[]);
-    this.filterBank.frequencies = new Float32Array((params.filterBank as Record<string, unknown>).frequencies as number[]);
+    this.config = {
+      ...this.config,
+      ...(params.config as Record<string, unknown>),
+    };
+    this.filterBank.orientations = new Float32Array(
+      (params.filterBank as Record<string, unknown>).orientations as number[],
+    );
+    this.filterBank.frequencies = new Float32Array(
+      (params.filterBank as Record<string, unknown>).frequencies as number[],
+    );
     this.initializeFilterBank();
   }
 }

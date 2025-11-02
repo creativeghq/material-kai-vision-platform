@@ -5,7 +5,12 @@
  * across the Material Kai Vision Platform. All services should import from here.
  */
 
-import { ProcessedTableData, ProcessedImageData, DocumentStructure, QualityMetrics } from '../services/mivaaToRagTransformer';
+import {
+  ProcessedTableData,
+  ProcessedImageData,
+  DocumentStructure,
+  QualityMetrics,
+} from '../services/mivaaToRagTransformer';
 
 /**
  * Document Chunk Interface

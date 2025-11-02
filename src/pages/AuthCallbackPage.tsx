@@ -18,7 +18,10 @@ export const AuthCallbackPage: React.FC = () => {
     const handleCallback = async () => {
       try {
         // Get the session from the URL hash
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
         if (sessionError) {
           throw sessionError;
@@ -91,12 +94,13 @@ export const AuthCallbackPage: React.FC = () => {
           }
 
           // Assign user to default workspace
-          const { data: defaultWorkspace, error: workspaceError } = await supabase
-            .from('workspaces')
-            .select('id')
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .single();
+          const { data: defaultWorkspace, error: workspaceError } =
+            await supabase
+              .from('workspaces')
+              .select('id')
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .single();
 
           if (defaultWorkspace && !workspaceError) {
             const { error: membershipError } = await supabase
@@ -110,9 +114,14 @@ export const AuthCallbackPage: React.FC = () => {
               });
 
             if (membershipError) {
-              console.error('Error creating workspace membership:', membershipError);
+              console.error(
+                'Error creating workspace membership:',
+                membershipError,
+              );
             } else {
-              console.log(`✅ User ${user.email} added to workspace ${defaultWorkspace.id}`);
+              console.log(
+                `✅ User ${user.email} added to workspace ${defaultWorkspace.id}`,
+              );
             }
           } else {
             console.warn('⚠️ No default workspace found for new user');
@@ -130,7 +139,8 @@ export const AuthCallbackPage: React.FC = () => {
         console.error('OAuth callback error:', error);
         toast({
           title: 'Authentication error',
-          description: error instanceof Error ? error.message : 'An error occurred',
+          description:
+            error instanceof Error ? error.message : 'An error occurred',
           variant: 'destructive',
         });
         navigate('/auth');
@@ -155,4 +165,3 @@ export const AuthCallbackPage: React.FC = () => {
 };
 
 export default AuthCallbackPage;
-

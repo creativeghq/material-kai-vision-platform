@@ -48,7 +48,9 @@ export const QualityMetricsCard: React.FC<QualityMetricsCardProps> = ({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Quality Score</span>
-            <span className={`text-2xl font-bold ${getScoreColor(averageScore)}`}>
+            <span
+              className={`text-2xl font-bold ${getScoreColor(averageScore)}`}
+            >
               {(averageScore * 100).toFixed(1)}%
             </span>
           </div>
@@ -64,7 +66,9 @@ export const QualityMetricsCard: React.FC<QualityMetricsCardProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="font-semibold">{valid}</span>
-              <span className="text-muted-foreground">({validPercentage.toFixed(1)}%)</span>
+              <span className="text-muted-foreground">
+                ({validPercentage.toFixed(1)}%)
+              </span>
             </div>
           </div>
 
@@ -75,7 +79,9 @@ export const QualityMetricsCard: React.FC<QualityMetricsCardProps> = ({
             </div>
             <div className="flex items-center gap-2">
               <span className="font-semibold">{invalid}</span>
-              <span className="text-muted-foreground">({invalidPercentage.toFixed(1)}%)</span>
+              <span className="text-muted-foreground">
+                ({invalidPercentage.toFixed(1)}%)
+              </span>
             </div>
           </div>
 
@@ -87,7 +93,9 @@ export const QualityMetricsCard: React.FC<QualityMetricsCardProps> = ({
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold">{needsReview}</span>
-                <span className="text-muted-foreground">({reviewPercentage.toFixed(1)}%)</span>
+                <span className="text-muted-foreground">
+                  ({reviewPercentage.toFixed(1)}%)
+                </span>
               </div>
             </div>
           )}
@@ -104,4 +112,3 @@ export const QualityMetricsCard: React.FC<QualityMetricsCardProps> = ({
     </Card>
   );
 };
-

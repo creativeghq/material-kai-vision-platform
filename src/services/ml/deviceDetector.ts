@@ -41,7 +41,9 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     const deviceInfo = await this.getDeviceInfo();
 
     if (!deviceInfo || !deviceInfo.optimalDevice) {
-      throw new Error('Device detection capabilities are not functioning properly');
+      throw new Error(
+        'Device detection capabilities are not functioning properly',
+      );
     }
 
     // Verify WebGPU detection if enabled
@@ -55,7 +57,10 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
       try {
         const gpu = (navigator as Record<string, unknown>).gpu;
-        if (gpu && typeof (gpu as Record<string, unknown>).requestAdapter === 'function') {
+        if (
+          gpu &&
+          typeof (gpu as Record<string, unknown>).requestAdapter === 'function'
+        ) {
           // Test adapter availability during initialization
           const adapter = await (gpu as any).requestAdapter();
           if (adapter && this.config.enableDeviceCapabilityCache) {
@@ -82,13 +87,20 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
 
   public getOptimalDevice(): DeviceType {
     // Check cache first if enabled
-    if (this.isCacheValid() && this.deviceCapabilityCache.has('optimal-device')) {
+    if (
+      this.isCacheValid() &&
+      this.deviceCapabilityCache.has('optimal-device')
+    ) {
       return this.deviceCapabilityCache.get('optimal-device') as DeviceType;
     }
 
     // Check for WebGPU availability, fallback to configured fallback device
     let optimalDevice: DeviceType;
-    if (this.config.enableWebGPUDetection && typeof navigator !== 'undefined' && 'gpu' in navigator) {
+    if (
+      this.config.enableWebGPUDetection &&
+      typeof navigator !== 'undefined' &&
+      'gpu' in navigator
+    ) {
       optimalDevice = 'webgpu';
     } else {
       optimalDevice = this.config.fallbackDevice;
@@ -105,7 +117,10 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
   public async checkWebGPUSupport(): Promise<boolean> {
     return this.executeOperation(async () => {
       // Check cache first if enabled
-      if (this.isCacheValid() && this.deviceCapabilityCache.has('webgpu-support')) {
+      if (
+        this.isCacheValid() &&
+        this.deviceCapabilityCache.has('webgpu-support')
+      ) {
         return this.deviceCapabilityCache.get('webgpu-support') as boolean;
       }
 
@@ -123,7 +138,10 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
 
       try {
         const gpu = (navigator as Record<string, unknown>).gpu;
-        if (gpu && typeof (gpu as Record<string, unknown>).requestAdapter === 'function') {
+        if (
+          gpu &&
+          typeof (gpu as Record<string, unknown>).requestAdapter === 'function'
+        ) {
           const adapter = await (gpu as any).requestAdapter();
           const result = !!adapter;
 
@@ -161,13 +179,21 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
   }> {
     return this.executeOperation(async () => {
       // Check cache first if enabled
-      if (this.isCacheValid() && this.deviceCapabilityCache.has('device-info-full')) {
-        return this.deviceCapabilityCache.get('device-info-full') as { supportsWebGPU: boolean; optimalDevice: DeviceType; userAgent: string; };
+      if (
+        this.isCacheValid() &&
+        this.deviceCapabilityCache.has('device-info-full')
+      ) {
+        return this.deviceCapabilityCache.get('device-info-full') as {
+          supportsWebGPU: boolean;
+          optimalDevice: DeviceType;
+          userAgent: string;
+        };
       }
 
       const supportsWebGPU = await this.checkWebGPUSupport();
       const optimalDevice = this.getOptimalDevice();
-      const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+      const userAgent =
+        typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
 
       const deviceInfo = {
         supportsWebGPU,
@@ -192,7 +218,8 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     return {
       supportsWebGPU: typeof navigator !== 'undefined' && 'gpu' in navigator,
       optimalDevice: this.getOptimalDevice(),
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      userAgent:
+        typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
     };
   }
 
@@ -201,7 +228,11 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
     this.lastCacheUpdate = 0;
   }
 
-  public getCacheStats(): { size: number; lastUpdate: number; isValid: boolean } {
+  public getCacheStats(): {
+    size: number;
+    lastUpdate: number;
+    isValid: boolean;
+  } {
     return {
       size: this.deviceCapabilityCache.size,
       lastUpdate: this.lastCacheUpdate,
@@ -210,7 +241,9 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
   }
 
   // Static factory method for standardized instantiation
-  public static createInstance(config?: Partial<DeviceDetectorServiceConfig>): DeviceDetectorService {
+  public static createInstance(
+    config?: Partial<DeviceDetectorServiceConfig>,
+  ): DeviceDetectorService {
     const defaultConfig: DeviceDetectorServiceConfig = {
       name: 'DeviceDetectorService',
       version: '1.0.0',

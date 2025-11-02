@@ -83,7 +83,6 @@ export interface OpenAIApiConfig extends BaseApiConfig {
   };
 }
 
-
 // Union type for all API configurations
 export type ApiConfig =
   | ReplicateApiConfig
@@ -108,7 +107,6 @@ export class ApiRegistry extends Singleton {
     this.registerApi(supabaseConfig);
     this.registerApi(huggingfaceConfig);
     this.registerApi(openaiConfig);
-
   }
 
   protected cleanup(): void {
@@ -120,7 +118,9 @@ export class ApiRegistry extends Singleton {
   private detectEnvironment(): keyof EnvironmentConfig {
     if (typeof window !== 'undefined') {
       // Browser environment
-      return window.location.hostname === 'localhost' ? 'development' : 'production';
+      return window.location.hostname === 'localhost'
+        ? 'development'
+        : 'production';
     } else {
       // Node.js environment
       return (process.env.NODE_ENV as keyof EnvironmentConfig) || 'development';
@@ -139,8 +139,6 @@ export class ApiRegistry extends Singleton {
    * Get a specific API configuration by type
    */
   public getApiConfigByType<T extends ApiConfig>(type: string): T | null {
-
-
     for (const config of Array.from(this.configs.values())) {
       // Normalize both strings for comparison to handle case sensitivity and whitespace
       const configType = config.type?.toLowerCase().trim();
@@ -152,12 +150,19 @@ export class ApiRegistry extends Singleton {
     }
 
     console.log(`❌ DEBUG: No config found for type "${type}"`);
-    console.log('❌ DEBUG: Available types:', Array.from(this.configs.values()).map(c => `"${c.type}"`));
+    console.log(
+      '❌ DEBUG: Available types:',
+      Array.from(this.configs.values()).map((c) => `"${c.type}"`),
+    );
 
     // Additional error handling: suggest similar types
-    const availableTypes = Array.from(this.configs.values()).map(c => c.type?.toLowerCase().trim());
+    const availableTypes = Array.from(this.configs.values()).map((c) =>
+      c.type?.toLowerCase().trim(),
+    );
     const searchTypeLower = type?.toLowerCase().trim();
-    const similarTypes = availableTypes.filter(t => t && t.includes(searchTypeLower));
+    const similarTypes = availableTypes.filter(
+      (t) => t && t.includes(searchTypeLower),
+    );
 
     if (similarTypes.length > 0) {
       console.log('💡 DEBUG: Did you mean one of these types?', similarTypes);
@@ -171,8 +176,9 @@ export class ApiRegistry extends Singleton {
   }
 
   public getConfigsByType<T extends ApiConfig>(type: string): T[] {
-    return Array.from(this.configs.values())
-      .filter(config => config.type === type) as T[];
+    return Array.from(this.configs.values()).filter(
+      (config) => config.type === type,
+    ) as T[];
   }
 
   public validateConfig(config: ApiConfig): boolean {
@@ -184,7 +190,9 @@ export class ApiRegistry extends Singleton {
 
       // Environment-specific validation
       if (config.environment !== this.environment) {
-        console.warn(`Config ${config.name} is for ${config.environment} but current environment is ${this.environment}`);
+        console.warn(
+          `Config ${config.name} is for ${config.environment} but current environment is ${this.environment}`,
+        );
       }
 
       return true;
@@ -201,25 +209,33 @@ export class ApiRegistry extends Singleton {
 
 // Utility functions for working with API configurations
 export class ApiConfigUtils {
-  public static createReplicateModelSchema(requiredParams: string[], optionalParams: string[] = []): z.ZodSchema {
+  public static createReplicateModelSchema(
+    requiredParams: string[],
+    optionalParams: string[] = [],
+  ): z.ZodSchema {
     const schemaObject: Record<string, z.ZodTypeAny> = {};
 
-    requiredParams.forEach(param => {
+    requiredParams.forEach((param) => {
       schemaObject[param] = z.any(); // Will be refined per model
     });
 
-    optionalParams.forEach(param => {
+    optionalParams.forEach((param) => {
       schemaObject[param] = z.any().optional();
     });
 
     return z.object(schemaObject);
   }
 
-  public static createSupabaseFunctionSchema(params: Record<string, z.ZodTypeAny>): z.ZodSchema {
+  public static createSupabaseFunctionSchema(
+    params: Record<string, z.ZodTypeAny>,
+  ): z.ZodSchema {
     return z.object(params);
   }
 
-  public static mergeConfigs<T extends ApiConfig>(base: Partial<T>, override: Partial<T>): Partial<T> {
+  public static mergeConfigs<T extends ApiConfig>(
+    base: Partial<T>,
+    override: Partial<T>,
+  ): Partial<T> {
     return {
       ...base,
       ...override,

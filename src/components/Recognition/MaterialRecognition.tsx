@@ -21,7 +21,7 @@ export const MaterialRecognition: React.FC = () => {
   const [progress, setProgress] = useState(0);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles]);
+    setFiles((prev) => [...prev, ...acceptedFiles]);
     setResults([]);
   }, []);
 
@@ -43,7 +43,7 @@ export const MaterialRecognition: React.FC = () => {
 
     // Simulate progress
     const progressInterval = setInterval(() => {
-      setProgress(prev => {
+      setProgress((prev) => {
         if (prev >= 90) {
           clearInterval(progressInterval);
           return 90;
@@ -93,7 +93,9 @@ export const MaterialRecognition: React.FC = () => {
         } else {
           console.error('MIVAA analysis failed:', response.error);
           // Don't create fake results - let user know the analysis failed
-          toast.error(`Analysis failed for ${file.name}: ${response.error?.message || 'Unknown error'}`);
+          toast.error(
+            `Analysis failed for ${file.name}: ${response.error?.message || 'Unknown error'}`,
+          );
           // Skip this file and continue with next one
           continue;
         }
@@ -104,11 +106,14 @@ export const MaterialRecognition: React.FC = () => {
       setResults(recognitionResults);
       setProgress(100);
 
-      toast.success(`Successfully analyzed ${recognitionResults.length} materials with MIVAA`);
-
+      toast.success(
+        `Successfully analyzed ${recognitionResults.length} materials with MIVAA`,
+      );
     } catch (error) {
       console.error('❌ MIVAA recognition failed:', error);
-      toast.error(error instanceof Error ? error.message : 'MIVAA recognition failed');
+      toast.error(
+        error instanceof Error ? error.message : 'MIVAA recognition failed',
+      );
     } finally {
       setIsProcessing(false);
       clearInterval(progressInterval);
@@ -122,7 +127,7 @@ export const MaterialRecognition: React.FC = () => {
   };
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -137,7 +142,8 @@ export const MaterialRecognition: React.FC = () => {
               Hybrid AI
             </Badge>
           </CardTitle>
-        </CardHeader><CardContent className="space-y-4">
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* File Upload Area */}
           <div
             {...getRootProps()}
@@ -156,7 +162,9 @@ export const MaterialRecognition: React.FC = () => {
                 <p className="text-sm text-muted-foreground mb-4">
                   or click to select files (JPEG, PNG, WebP)
                 </p>
-                <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground">Select Images</Button>
+                <Button className="border border-input bg-background hover:bg-accent hover:text-accent-foreground">
+                  Select Images
+                </Button>
               </div>
             )}
           </div>
@@ -173,7 +181,8 @@ export const MaterialRecognition: React.FC = () => {
                     if (e.key === 'Enter') {
                       clearFiles();
                     }
-                  }}>
+                  }}
+                >
                   Clear All
                 </Button>
               </div>
@@ -253,7 +262,8 @@ export const MaterialRecognition: React.FC = () => {
             <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950 rounded-lg">
               <CheckCircle className="w-5 h-5 text-green-600" />
               <span className="text-green-800 dark:text-green-200">
-                Recognition completed Found {results.length} material{results.length !== 1 ? 's' : ''}.
+                Recognition completed Found {results.length} material
+                {results.length !== 1 ? 's' : ''}.
               </span>
             </div>
           )}
@@ -261,9 +271,7 @@ export const MaterialRecognition: React.FC = () => {
       </Card>
 
       {/* Results */}
-      {results.length > 0 && (
-        <RecognitionResults results={results} />
-      )}
+      {results.length > 0 && <RecognitionResults results={results} />}
     </div>
   );
 };

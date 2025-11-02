@@ -16,19 +16,18 @@ const SearchHubPage: React.FC = () => {
       />
       <div className="p-6">
         <div className="max-w-6xl mx-auto space-y-6">
-
-        <MaterialAgentSearchInterface
-          onMaterialSelect={(materialId) => {
-            console.log('Material selected:', materialId);
-            window.location.href = `/catalog?material=${materialId}`;
-          }}
-          onNavigateToMoodboard={() => {
-            window.location.href = '/moodboard';
-          }}
-          onNavigateTo3D={() => {
-            window.location.href = '/3d';
-          }}
-        />
+          <MaterialAgentSearchInterface
+            onMaterialSelect={(materialId) => {
+              console.log('Material selected:', materialId);
+              window.location.href = `/catalog?material=${materialId}`;
+            }}
+            onNavigateToMoodboard={() => {
+              window.location.href = '/moodboard';
+            }}
+            onNavigateTo3D={() => {
+              window.location.href = '/3d';
+            }}
+          />
         </div>
       </div>
     </div>

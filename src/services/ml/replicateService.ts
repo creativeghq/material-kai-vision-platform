@@ -74,7 +74,8 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
 
   protected async doInitialize(): Promise<void> {
     // Try to get API key from config first, then from centralized config
-    this.apiKey = this.config.apiKey || await this.getApiKeyFromCentralizedConfig();
+    this.apiKey =
+      this.config.apiKey || (await this.getApiKeyFromCentralizedConfig());
 
     if (!this.apiKey) {
       throw new Error('Replicate API key not configured');
@@ -87,13 +88,16 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     }
 
     // Simple health check by testing the API endpoint
-    const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token ${this.apiKey}`,
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      `${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       throw new Error(`Replicate API health check failed: ${response.status}`);
@@ -106,13 +110,18 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       const replicateConfig = apiRegistry.getApiConfigByType('replicate');
 
       if (replicateConfig) {
-        const envConfig = (replicateConfig.environment as any)[this.config.environment];
+        const envConfig = (replicateConfig.environment as any)[
+          this.config.environment
+        ];
         return envConfig?.apiKey || null;
       }
 
       return null;
     } catch (error) {
-      console.warn('Could not get Replicate API key from centralized config:', error);
+      console.warn(
+        'Could not get Replicate API key from centralized config:',
+        error,
+      );
       return null;
     }
   }
@@ -125,7 +134,8 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       const startTime = Date.now();
 
       const prediction = await this.createPrediction({
-        version: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
+        version:
+          'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
         input: {
           image: imageUrl,
           prompt: 'SVBRDF material maps: albedo, normal, roughness, metallic',
@@ -186,13 +196,18 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
   /**
    * Generate high-quality material variations
    */
-  async generateMaterialVariations(imageUrl: string, count: number = 4): Promise<string[]> {
+  async generateMaterialVariations(
+    imageUrl: string,
+    count: number = 4,
+  ): Promise<string[]> {
     return this.executeOperation(async () => {
       const prediction = await this.createPrediction({
-        version: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
+        version:
+          'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
         input: {
           image: imageUrl,
-          prompt: 'high quality material texture variations, same material different lighting and angles',
+          prompt:
+            'high quality material texture variations, same material different lighting and angles',
           num_outputs: count,
           guidance_scale: 7.5,
           num_inference_steps: 30,
@@ -202,7 +217,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       const result = await this.waitForCompletion(prediction.id);
 
       if (result.status === 'failed') {
-        throw new Error(`Material variation generation failed: ${result.error}`);
+        throw new Error(
+          `Material variation generation failed: ${result.error}`,
+        );
       }
 
       return Array.isArray(result.output) ? result.output : [result.output];
@@ -215,7 +232,8 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
   async enhanceImageQuality(imageUrl: string): Promise<string> {
     return this.executeOperation(async () => {
       const prediction = await this.createPrediction({
-        version: 'tencentarc/gfpgan:9283608cc6b7be6b65a8e44983db012355fde4132009bf99d976b2f0896856a3',
+        version:
+          'tencentarc/gfpgan:9283608cc6b7be6b65a8e44983db012355fde4132009bf99d976b2f0896856a3',
         input: {
           img: imageUrl,
           version: 'v1.4',
@@ -239,7 +257,8 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
   async removeBackground(imageUrl: string): Promise<string> {
     return this.executeOperation(async () => {
       const prediction = await this.createPrediction({
-        version: 'cjwbw/rembg:fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003',
+        version:
+          'cjwbw/rembg:fb8af171cfa1616ddcf1242c093f9c46bcada5ad4cf6f2fbe8b81b330ec5c003',
         input: {
           image: imageUrl,
         },
@@ -258,7 +277,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
   /**
    * Analyze material properties using advanced models
    */
-  async analyzeMaterialProperties(imageUrl: string): Promise<MaterialProperties> {
+  async analyzeMaterialProperties(
+    imageUrl: string,
+  ): Promise<MaterialProperties> {
     return this.executeOperation(async () => {
       try {
         // Use a custom material analysis model (would need to be deployed to Replicate)
@@ -315,7 +336,11 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       }
 
       // Validate and transform parameters using static method
-      const validatedParams = ModelParameterValidator.validateAndTransformParameters(modelId, baseParams);
+      const validatedParams =
+        ModelParameterValidator.validateAndTransformParameters(
+          modelId,
+          baseParams,
+        );
 
       // Create prediction with model-specific version and parameters
       const prediction = await this.createPrediction({
@@ -330,7 +355,10 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       }
 
       // Track usage for interior design
-      this.usageTracker.set('interior-design', (this.usageTracker.get('interior-design') || 0) + 1);
+      this.usageTracker.set(
+        'interior-design',
+        (this.usageTracker.get('interior-design') || 0) + 1,
+      );
 
       return result.output as string | string[];
     }, 'generateInteriorDesign');
@@ -347,20 +375,29 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       speed?: 'fast' | 'balanced' | 'quality';
       type?: 'text-to-image' | 'image-to-image';
     } = {},
-  ): Promise<{ result: string | string[]; modelUsed: string; processingTime: number }> {
+  ): Promise<{
+    result: string | string[];
+    modelUsed: string;
+    processingTime: number;
+  }> {
     return this.executeOperation(async () => {
       const startTime = Date.now();
 
       // Select best model based on requirements
       const modelId = this.selectBestInteriorModel(requirements, !!imageUrl);
 
-      const result = await this.generateInteriorDesign(modelId, prompt, imageUrl, {
-        // Add requirement-based parameter adjustments
-        ...(requirements.speed === 'fast' && { num_inference_steps: 20 }),
-        ...(requirements.speed === 'quality' && { num_inference_steps: 50 }),
-        ...(requirements.style === 'luxury' && { guidance_scale: 8.5 }),
-        ...(requirements.style === 'minimalist' && { guidance_scale: 6.0 }),
-      });
+      const result = await this.generateInteriorDesign(
+        modelId,
+        prompt,
+        imageUrl,
+        {
+          // Add requirement-based parameter adjustments
+          ...(requirements.speed === 'fast' && { num_inference_steps: 20 }),
+          ...(requirements.speed === 'quality' && { num_inference_steps: 50 }),
+          ...(requirements.style === 'luxury' && { guidance_scale: 8.5 }),
+          ...(requirements.style === 'minimalist' && { guidance_scale: 6.0 }),
+        },
+      );
 
       return {
         result,
@@ -377,11 +414,32 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     testPrompt: string = 'modern living room with comfortable seating',
     imageUrl?: string,
   ): Promise<{
-    results: Record<string, { success: boolean; output?: unknown; error?: string; processingTime: number }>;
-    summary: { total: number; successful: number; failed: number; successRate: number };
+    results: Record<
+      string,
+      {
+        success: boolean;
+        output?: unknown;
+        error?: string;
+        processingTime: number;
+      }
+    >;
+    summary: {
+      total: number;
+      successful: number;
+      failed: number;
+      successRate: number;
+    };
   }> {
     return this.executeOperation(async () => {
-      const results: Record<string, { success: boolean; output?: unknown; error?: string; processingTime: number }> = {};
+      const results: Record<
+        string,
+        {
+          success: boolean;
+          output?: unknown;
+          error?: string;
+          processingTime: number;
+        }
+      > = {};
       const modelIds = Object.keys(INTERIOR_DESIGN_MODELS);
 
       console.log(`Testing ${modelIds.length} interior design models...`);
@@ -391,7 +449,11 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
         console.log(`Testing model: ${modelId}`);
 
         try {
-          const output = await this.generateInteriorDesign(modelId, testPrompt, imageUrl);
+          const output = await this.generateInteriorDesign(
+            modelId,
+            testPrompt,
+            imageUrl,
+          );
           results[modelId] = {
             success: true,
             output,
@@ -409,7 +471,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
       }
 
       // Calculate summary statistics
-      const successful = Object.values(results).filter((r: unknown) => (r as { success: boolean }).success).length;
+      const successful = Object.values(results).filter(
+        (r: unknown) => (r as { success: boolean }).success,
+      ).length;
       const failed = modelIds.length - successful;
       const successRate = Math.round((successful / modelIds.length) * 100);
 
@@ -420,7 +484,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
         successRate,
       };
 
-      console.log(`\nTest Summary: ${successful}/${modelIds.length} models successful (${successRate}%)`);
+      console.log(
+        `\nTest Summary: ${successful}/${modelIds.length} models successful (${successRate}%)`,
+      );
 
       return { results, summary };
     }, 'testAllInteriorModels');
@@ -438,26 +504,30 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     hasImage: boolean,
   ): string {
     // Filter models based on type requirement
-    const availableModels = Object.entries(INTERIOR_DESIGN_MODELS).filter(([_, config]) => {
-      if (requirements.type === 'image-to-image') {
-        return config.capabilities?.includes('image-to-image');
-      }
-      if (requirements.type === 'text-to-image') {
-        return config.capabilities?.includes('text-to-image');
-      }
-      // If no type specified, prefer image-to-image if image provided
-      if (hasImage) {
-        return config.capabilities?.includes('image-to-image');
-      }
-      return true;
-    });
+    const availableModels = Object.entries(INTERIOR_DESIGN_MODELS).filter(
+      ([_, config]) => {
+        if (requirements.type === 'image-to-image') {
+          return config.capabilities?.includes('image-to-image');
+        }
+        if (requirements.type === 'text-to-image') {
+          return config.capabilities?.includes('text-to-image');
+        }
+        // If no type specified, prefer image-to-image if image provided
+        if (hasImage) {
+          return config.capabilities?.includes('image-to-image');
+        }
+        return true;
+      },
+    );
 
     // If no models match requirements, fall back to working models
     if (availableModels.length === 0) {
-      const workingModels = Object.entries(INTERIOR_DESIGN_MODELS).filter(([_, config]) =>
-        config.status === 'working',
+      const workingModels = Object.entries(INTERIOR_DESIGN_MODELS).filter(
+        ([_, config]) => config.status === 'working',
       );
-      return workingModels.length > 0 ? workingModels[0][0] : 'julian-at/interiorly-gen1-dev';
+      return workingModels.length > 0
+        ? workingModels[0][0]
+        : 'julian-at/interiorly-gen1-dev';
     }
 
     // Prioritize by status (working > untested > failing)
@@ -470,8 +540,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
 
     // For speed requirements, prefer specific models
     if (requirements.speed === 'fast') {
-      const fastModel = sortedModels.find(([id]) =>
-        id.includes('comfyui') || id.includes('designer-architecture'),
+      const fastModel = sortedModels.find(
+        ([id]) =>
+          id.includes('comfyui') || id.includes('designer-architecture'),
       );
       if (fastModel) return fastModel[0];
     }
@@ -483,20 +554,26 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
   /**
    * Get available interior design models and their capabilities
    */
-  getInteriorDesignModels(): Record<string, {
-    name: string;
-    description: string;
-    capabilities: string[];
-    status: 'working' | 'failing' | 'untested';
-    lastTested?: string;
-  }> {
-    const models: Record<string, {
+  getInteriorDesignModels(): Record<
+    string,
+    {
       name: string;
       description: string;
       capabilities: string[];
       status: 'working' | 'failing' | 'untested';
       lastTested?: string;
-    }> = {};
+    }
+  > {
+    const models: Record<
+      string,
+      {
+        name: string;
+        description: string;
+        capabilities: string[];
+        status: 'working' | 'failing' | 'untested';
+        lastTested?: string;
+      }
+    > = {};
 
     for (const [modelId, config] of Object.entries(INTERIOR_DESIGN_MODELS)) {
       models[modelId] = {
@@ -520,7 +597,10 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     estimatedCost: number;
     averageProcessingTime: number;
   } {
-    const totalRequests = Array.from(this.usageTracker.values()).reduce((sum, count) => sum + count, 0);
+    const totalRequests = Array.from(this.usageTracker.values()).reduce(
+      (sum, count) => sum + count,
+      0,
+    );
     const requestsByType = Object.fromEntries(this.usageTracker);
 
     return {
@@ -536,66 +616,91 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
    */
   async cancelPrediction(predictionId: string): Promise<void> {
     return this.executeOperation(async () => {
-      const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions/${predictionId}/cancel`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Token ${this.apiKey}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions/${predictionId}/cancel`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Token ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error(`Failed to cancel prediction: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to cancel prediction: ${response.status} ${response.statusText}`,
+        );
       }
     }, 'cancelPrediction');
   }
 
   // Private helper methods
 
-  private async createPrediction(request: Record<string, unknown>): Promise<ReplicatePrediction> {
-    const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${this.apiKey}`,
-        'Content-Type': 'application/json',
+  private async createPrediction(
+    request: Record<string, unknown>,
+  ): Promise<ReplicatePrediction> {
+    const response = await fetch(
+      `${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
       },
-      body: JSON.stringify(request),
-    });
+    );
 
     if (!response.ok) {
-      throw new Error(`Replicate API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Replicate API error: ${response.status} ${response.statusText}`,
+      );
     }
 
     return await response.json();
   }
 
-  private async waitForCompletion(predictionId: string): Promise<ReplicatePrediction> {
+  private async waitForCompletion(
+    predictionId: string,
+  ): Promise<ReplicatePrediction> {
     const maxAttempts = this.config.maxRetries || 60; // 5 minutes with 5-second intervals
     const retryDelay = this.config.retryDelay || 5000;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const response = await fetch(`${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions/${predictionId}`, {
-        headers: {
-          'Authorization': `Token ${this.apiKey}`,
-          'Content-Type': 'application/json',
+      const response = await fetch(
+        `${this.config.baseUrl || 'https://api.replicate.com/v1'}/predictions/${predictionId}`,
+        {
+          headers: {
+            Authorization: `Token ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+      );
 
       if (!response.ok) {
-        throw new Error(`Failed to get prediction status: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to get prediction status: ${response.status} ${response.statusText}`,
+        );
       }
 
       const prediction: ReplicatePrediction = await response.json();
 
-      if (prediction.status === 'succeeded' || prediction.status === 'failed' || prediction.status === 'canceled') {
+      if (
+        prediction.status === 'succeeded' ||
+        prediction.status === 'failed' ||
+        prediction.status === 'canceled'
+      ) {
         return prediction;
       }
 
       // Wait before next attempt
-      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
     }
 
-    throw new Error(`Prediction ${predictionId} timed out after ${maxAttempts} attempts`);
+    throw new Error(
+      `Prediction ${predictionId} timed out after ${maxAttempts} attempts`,
+    );
   }
 
   private parseSVBRDFOutput(output: unknown): Partial<SVBRDFMaps> {
@@ -612,7 +717,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     return {};
   }
 
-  private async fallbackMaterialAnalysis(_imageUrl: string): Promise<MaterialProperties> {
+  private async fallbackMaterialAnalysis(
+    _imageUrl: string,
+  ): Promise<MaterialProperties> {
     // Fallback analysis with default values
     return {
       material_type: 'unknown',
@@ -629,7 +736,9 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
   /**
    * Create a standardized service instance
    */
-  static createInstance(config: Partial<ReplicateServiceConfig> = {}): ReplicateService {
+  static createInstance(
+    config: Partial<ReplicateServiceConfig> = {},
+  ): ReplicateService {
     const defaultConfig: ReplicateServiceConfig = {
       name: 'replicate-service',
       version: '1.0.0',

@@ -20,8 +20,6 @@ export const PDFProcessingMonitor: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-
-
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
@@ -48,7 +46,9 @@ export const PDFProcessingMonitor: React.FC = () => {
 
         setMetrics(data.metrics);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch metrics');
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch metrics',
+        );
       } finally {
         setLoading(false);
       }
@@ -91,7 +91,8 @@ export const PDFProcessingMonitor: React.FC = () => {
         <h3 className="font-bold text-red-900 mb-2">⚠️ Critical Issues</h3>
         {metrics.totalChunks > 0 && metrics.totalEmbeddings === 0 && (
           <p className="text-red-700">
-            ❌ No embeddings generated {metrics.totalChunks} chunks exist but 0 embeddings.
+            ❌ No embeddings generated {metrics.totalChunks} chunks exist but 0
+            embeddings.
             <br />
             <span className="text-sm">
               This indicates OPENAI_API_KEY is not set in MIVAA deployment.
@@ -100,7 +101,8 @@ export const PDFProcessingMonitor: React.FC = () => {
         )}
         {metrics.totalDocuments > 0 && metrics.totalImages === 0 && (
           <p className="text-red-700">
-            ❌ No images extracted {metrics.totalDocuments} documents processed but 0 images.
+            ❌ No images extracted {metrics.totalDocuments} documents processed
+            but 0 images.
             <br />
             <span className="text-sm">
               Check MIVAA image extraction service and logs.
@@ -111,9 +113,17 @@ export const PDFProcessingMonitor: React.FC = () => {
 
       {/* Overview Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <MetricCard label="Documents" value={metrics.totalDocuments} color="blue" />
+        <MetricCard
+          label="Documents"
+          value={metrics.totalDocuments}
+          color="blue"
+        />
         <MetricCard label="Chunks" value={metrics.totalChunks} color="green" />
-        <MetricCard label="Embeddings" value={metrics.totalEmbeddings} color="purple" />
+        <MetricCard
+          label="Embeddings"
+          value={metrics.totalEmbeddings}
+          color="purple"
+        />
         <MetricCard label="Images" value={metrics.totalImages} color="orange" />
       </div>
 
@@ -168,13 +178,18 @@ export const PDFProcessingMonitor: React.FC = () => {
         <h3 className="font-bold text-blue-900 mb-2">💡 Recommendations</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           {metrics.totalEmbeddings === 0 && metrics.totalChunks > 0 && (
-            <li>• Set OPENAI_API_KEY environment variable in MIVAA deployment</li>
+            <li>
+              • Set OPENAI_API_KEY environment variable in MIVAA deployment
+            </li>
           )}
           {metrics.totalImages === 0 && metrics.totalDocuments > 0 && (
             <li>• Check MIVAA PDF processor image extraction configuration</li>
           )}
           {metrics.averageProductsPerDocument < 5 && (
-            <li>• Product generation limit has been increased - reprocess documents</li>
+            <li>
+              • Product generation limit has been increased - reprocess
+              documents
+            </li>
           )}
         </ul>
       </div>
@@ -183,4 +198,3 @@ export const PDFProcessingMonitor: React.FC = () => {
 };
 
 export default PDFProcessingMonitor;
-

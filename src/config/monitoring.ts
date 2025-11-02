@@ -7,7 +7,9 @@
 import { MonitoringConfig } from '@/services/monitoring/monitoringService';
 
 export const monitoringConfig: MonitoringConfig = {
-  enabled: process.env.NODE_ENV === 'production' || process.env.VITE_ENABLE_MONITORING === 'true',
+  enabled:
+    process.env.NODE_ENV === 'production' ||
+    process.env.VITE_ENABLE_MONITORING === 'true',
   environment: process.env.NODE_ENV || 'development',
   version: '1.0.0', // Should come from package.json
   providers: {
@@ -27,7 +29,10 @@ export const monitoringConfig: MonitoringConfig = {
     customEndpoint: {
       url: process.env.VITE_MONITORING_ENDPOINT || '',
       apiKey: process.env.VITE_MONITORING_API_KEY || '',
-      enabled: Boolean(process.env.VITE_MONITORING_ENDPOINT && process.env.VITE_MONITORING_API_KEY),
+      enabled: Boolean(
+        process.env.VITE_MONITORING_ENDPOINT &&
+          process.env.VITE_MONITORING_API_KEY,
+      ),
     },
   },
 };

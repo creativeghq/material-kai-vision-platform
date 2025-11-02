@@ -45,7 +45,9 @@ class AnalyticsServiceImpl extends BaseService {
     super({
       name: 'AnalyticsService',
       version: '1.0.0',
-      environment: process.env.NODE_ENV as 'development' | 'production' | 'test' || 'development',
+      environment:
+        (process.env.NODE_ENV as 'development' | 'production' | 'test') ||
+        'development',
       enabled: true,
       timeout: 30000,
     });
@@ -71,17 +73,15 @@ class AnalyticsServiceImpl extends BaseService {
    */
   async trackEvent(event: AnalyticsEvent): Promise<void> {
     return this.executeOperation(async () => {
-      const { error } = await supabase
-        .from('analytics_events')
-        .insert([
-          {
-            event_type: event.event_type,
-            workspace_id: event.workspace_id,
-            user_id: event.user_id,
-            metadata: event.metadata,
-            created_at: event.timestamp,
-          },
-        ]);
+      const { error } = await supabase.from('analytics_events').insert([
+        {
+          event_type: event.event_type,
+          workspace_id: event.workspace_id,
+          user_id: event.user_id,
+          metadata: event.metadata,
+          created_at: event.timestamp,
+        },
+      ]);
 
       if (error) {
         throw new Error(`Failed to track event: ${error.message}`);
@@ -92,9 +92,14 @@ class AnalyticsServiceImpl extends BaseService {
   /**
    * Get analytics metrics for a workspace
    */
-  async getAnalyticsMetrics(workspaceId: string, days: number = 30): Promise<AnalyticsMetrics> {
+  async getAnalyticsMetrics(
+    workspaceId: string,
+    days: number = 30,
+  ): Promise<AnalyticsMetrics> {
     return this.executeOperation(async () => {
-      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const startDate = new Date(
+        Date.now() - days * 24 * 60 * 60 * 1000,
+      ).toISOString();
 
       // Get all events
       const { data: events, error } = await supabase
@@ -113,8 +118,9 @@ class AnalyticsServiceImpl extends BaseService {
       const userIds = new Set<string>();
       const sessionIds = new Set<string>();
 
-      (events || []).forEach(event => {
-        eventsByType[event.event_type] = (eventsByType[event.event_type] || 0) + 1;
+      (events || []).forEach((event) => {
+        eventsByType[event.event_type] =
+          (eventsByType[event.event_type] || 0) + 1;
 
         if (event.metadata?.error) {
           errorCount++;
@@ -146,10 +152,15 @@ class AnalyticsServiceImpl extends BaseService {
   /**
    * Get analytics report for a period
    */
-  async getReport(workspaceId: string, days: number = 30): Promise<AnalyticsReport> {
+  async getReport(
+    workspaceId: string,
+    days: number = 30,
+  ): Promise<AnalyticsReport> {
     return this.executeOperation(async () => {
       const metrics = await this.getAnalyticsMetrics(workspaceId, days);
-      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const startDate = new Date(
+        Date.now() - days * 24 * 60 * 60 * 1000,
+      ).toISOString();
 
       // Get events for trends
       const { data: events, error } = await supabase
@@ -171,7 +182,8 @@ class AnalyticsServiceImpl extends BaseService {
         .map(([eventType, count]) => ({
           event_type: eventType,
           count,
-          percentage: ((count as any) / ((metrics as any).total_events || 1)) * 100,
+          percentage:
+            ((count as any) / ((metrics as any).total_events || 1)) * 100,
         }))
         .sort((a, b) => (b.count as any) - (a.count as any))
         .slice(0, 10);
@@ -188,14 +200,19 @@ class AnalyticsServiceImpl extends BaseService {
   /**
    * Get user engagement metrics
    */
-  async getUserEngagement(workspaceId: string, days: number = 30): Promise<{
+  async getUserEngagement(
+    workspaceId: string,
+    days: number = 30,
+  ): Promise<{
     active_users: number;
     total_sessions: number;
     average_session_duration: number;
     returning_users: number;
   }> {
     return this.executeOperation(async () => {
-      const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const startDate = new Date(
+        Date.now() - days * 24 * 60 * 60 * 1000,
+      ).toISOString();
 
       const { data: events, error } = await supabase
         .from('analytics_events')
@@ -210,7 +227,7 @@ class AnalyticsServiceImpl extends BaseService {
       const userSessions = new Map<string, number>();
       const uniqueUsers = new Set<string>();
 
-      (events || []).forEach(event => {
+      (events || []).forEach((event) => {
         if (event.user_id) {
           uniqueUsers.add(event.user_id);
           const sessionId = event.metadata?.session_id as string;
@@ -223,9 +240,11 @@ class AnalyticsServiceImpl extends BaseService {
       return {
         active_users: uniqueUsers.size,
         total_sessions: userSessions.size,
-        average_session_duration: userSessions.size > 0
-          ? Array.from(userSessions.values()).reduce((a, b) => a + b, 0) / userSessions.size
-          : 0,
+        average_session_duration:
+          userSessions.size > 0
+            ? Array.from(userSessions.values()).reduce((a, b) => a + b, 0) /
+              userSessions.size
+            : 0,
         returning_users: Math.floor(uniqueUsers.size * 0.3), // Estimate
       };
     }, 'getUserEngagement');
@@ -237,8 +256,8 @@ class AnalyticsServiceImpl extends BaseService {
 
   private calculateAverageResponseTime(events: unknown[]): number {
     const responseTimes = events
-      .filter(e => (e as any).metadata?.response_time)
-      .map(e => (e as any).metadata.response_time as number);
+      .filter((e) => (e as any).metadata?.response_time)
+      .map((e) => (e as any).metadata.response_time as number);
 
     if (responseTimes.length === 0) return 0;
 
@@ -252,7 +271,7 @@ class AnalyticsServiceImpl extends BaseService {
   }> {
     const trendsByDate = new Map<string, { events: number; errors: number }>();
 
-    events.forEach(event => {
+    events.forEach((event) => {
       const date = new Date((event as any).created_at).toLocaleDateString();
       const current = trendsByDate.get(date) || { events: 0, errors: 0 };
 
@@ -275,4 +294,3 @@ class AnalyticsServiceImpl extends BaseService {
 }
 
 export const AnalyticsService = AnalyticsServiceImpl;
-

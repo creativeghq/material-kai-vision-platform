@@ -1,11 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { RefreshCw, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react';
+import {
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Zap,
+} from 'lucide-react';
 
 interface QueueJob {
   id: string;
@@ -31,7 +43,12 @@ interface AIAnalysisJob extends QueueJob {
 
 interface JobProgress {
   document_id: string;
-  stage: 'extraction' | 'image_processing' | 'chunking' | 'ai_analysis' | 'product_creation';
+  stage:
+    | 'extraction'
+    | 'image_processing'
+    | 'chunking'
+    | 'ai_analysis'
+    | 'product_creation';
   progress: number;
   total_items: number;
   completed_items: number;
@@ -112,13 +129,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         const aiQueue = aiData || [];
 
         const calculateQueueMetrics = (jobs: any[]) => {
-          const pending = jobs.filter(j => j.status === 'pending').length;
-          const processing = jobs.filter(j => j.status === 'processing').length;
-          const completed = jobs.filter(j => j.status === 'completed').length;
-          const failed = jobs.filter(j => j.status === 'failed').length;
+          const pending = jobs.filter((j) => j.status === 'pending').length;
+          const processing = jobs.filter(
+            (j) => j.status === 'processing',
+          ).length;
+          const completed = jobs.filter((j) => j.status === 'completed').length;
+          const failed = jobs.filter((j) => j.status === 'failed').length;
           const total = jobs.length;
 
-          const completedJobs = jobs.filter(j => j.status === 'completed');
+          const completedJobs = jobs.filter((j) => j.status === 'completed');
           const successRate = total > 0 ? (completed / total) * 100 : 0;
 
           let avgProcessingTime = 0;
@@ -143,12 +162,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         };
 
         const activeDocuments = new Set([
-          ...imageQueue.map(j => j.document_id),
-          ...aiQueue.map(j => j.document_id),
+          ...imageQueue.map((j) => j.document_id),
+          ...aiQueue.map((j) => j.document_id),
         ]).size;
 
-        const totalJobsProcessed = (imageQueue.filter(j => j.status === 'completed').length +
-          aiQueue.filter(j => j.status === 'completed').length);
+        const totalJobsProcessed =
+          imageQueue.filter((j) => j.status === 'completed').length +
+          aiQueue.filter((j) => j.status === 'completed').length;
 
         return {
           image_queue: calculateQueueMetrics(imageQueue),
@@ -161,7 +181,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       setMetrics(calculateMetrics());
       setLoading(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch queue data');
+      setError(
+        err instanceof Error ? err.message : 'Failed to fetch queue data',
+      );
       setLoading(false);
     }
   }, []);
@@ -260,7 +282,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Active Documents</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Active Documents
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{metrics.active_documents}</div>
@@ -270,30 +294,45 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Total Jobs Processed</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Total Jobs Processed
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.total_jobs_processed}</div>
+            <div className="text-3xl font-bold">
+              {metrics.total_jobs_processed}
+            </div>
             <p className="text-xs text-gray-500 mt-1">Completed successfully</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">Image Queue Success</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">
+              Image Queue Success
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.image_queue.success_rate.toFixed(1)}%</div>
-            <Progress value={metrics.image_queue.success_rate} className="mt-2" />
+            <div className="text-3xl font-bold">
+              {metrics.image_queue.success_rate.toFixed(1)}%
+            </div>
+            <Progress
+              value={metrics.image_queue.success_rate}
+              className="mt-2"
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">AI Queue Success</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">
+              AI Queue Success
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{metrics.ai_queue.success_rate.toFixed(1)}%</div>
+            <div className="text-3xl font-bold">
+              {metrics.ai_queue.success_rate.toFixed(1)}%
+            </div>
             <Progress value={metrics.ai_queue.success_rate} className="mt-2" />
           </CardContent>
         </Card>
@@ -319,23 +358,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-5 gap-4">
                 <div className="bg-yellow-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-700">{metrics.image_queue.pending}</div>
+                  <div className="text-2xl font-bold text-yellow-700">
+                    {metrics.image_queue.pending}
+                  </div>
                   <div className="text-sm text-yellow-600">Pending</div>
                 </div>
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-700">{metrics.image_queue.processing}</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {metrics.image_queue.processing}
+                  </div>
                   <div className="text-sm text-blue-600">Processing</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-700">{metrics.image_queue.completed}</div>
+                  <div className="text-2xl font-bold text-green-700">
+                    {metrics.image_queue.completed}
+                  </div>
                   <div className="text-sm text-green-600">Completed</div>
                 </div>
                 <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-red-700">{metrics.image_queue.failed}</div>
+                  <div className="text-2xl font-bold text-red-700">
+                    {metrics.image_queue.failed}
+                  </div>
                   <div className="text-sm text-red-600">Failed</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-700">{metrics.image_queue.total}</div>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {metrics.image_queue.total}
+                  </div>
                   <div className="text-sm text-purple-600">Total</div>
                 </div>
               </div>
@@ -346,11 +395,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   {imageJobs.length === 0 ? (
                     <p className="text-gray-500 text-sm">No jobs in queue</p>
                   ) : (
-                    imageJobs.slice(0, 20).map(job => (
-                      <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    imageJobs.slice(0, 20).map((job) => (
+                      <div
+                        key={job.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
                         <div className="flex-1">
-                          <div className="text-sm font-medium">{job.image_id}</div>
-                          <div className="text-xs text-gray-500">{formatDate(job.created_at)}</div>
+                          <div className="text-sm font-medium">
+                            {job.image_id}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(job.created_at)}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {job.retry_count > 0 && (
@@ -381,23 +437,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-5 gap-4">
                 <div className="bg-yellow-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-yellow-700">{metrics.ai_queue.pending}</div>
+                  <div className="text-2xl font-bold text-yellow-700">
+                    {metrics.ai_queue.pending}
+                  </div>
                   <div className="text-sm text-yellow-600">Pending</div>
                 </div>
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-700">{metrics.ai_queue.processing}</div>
+                  <div className="text-2xl font-bold text-blue-700">
+                    {metrics.ai_queue.processing}
+                  </div>
                   <div className="text-sm text-blue-600">Processing</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-700">{metrics.ai_queue.completed}</div>
+                  <div className="text-2xl font-bold text-green-700">
+                    {metrics.ai_queue.completed}
+                  </div>
                   <div className="text-sm text-green-600">Completed</div>
                 </div>
                 <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-red-700">{metrics.ai_queue.failed}</div>
+                  <div className="text-2xl font-bold text-red-700">
+                    {metrics.ai_queue.failed}
+                  </div>
                   <div className="text-sm text-red-600">Failed</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-700">{metrics.ai_queue.total}</div>
+                  <div className="text-2xl font-bold text-purple-700">
+                    {metrics.ai_queue.total}
+                  </div>
                   <div className="text-sm text-purple-600">Total</div>
                 </div>
               </div>
@@ -408,11 +474,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   {aiJobs.length === 0 ? (
                     <p className="text-gray-500 text-sm">No jobs in queue</p>
                   ) : (
-                    aiJobs.slice(0, 20).map(job => (
-                      <div key={job.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    aiJobs.slice(0, 20).map((job) => (
+                      <div
+                        key={job.id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
                         <div className="flex-1">
-                          <div className="text-sm font-medium">{job.analysis_type}</div>
-                          <div className="text-xs text-gray-500">{formatDate(job.created_at)}</div>
+                          <div className="text-sm font-medium">
+                            {job.analysis_type}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(job.created_at)}
+                          </div>
                         </div>
                         <div className="flex items-center gap-2">
                           {job.retry_count > 0 && (
@@ -435,27 +508,34 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Document Processing Progress</CardTitle>
-              <CardDescription>Real-time progress tracking for active documents</CardDescription>
+              <CardDescription>
+                Real-time progress tracking for active documents
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {progressData.length === 0 ? (
                   <p className="text-gray-500 text-sm">No active processing</p>
                 ) : (
-                  progressData.slice(0, 20).map(progress => (
-                    <div key={`${progress.document_id}-${progress.stage}`} className="space-y-2">
+                  progressData.slice(0, 20).map((progress) => (
+                    <div
+                      key={`${progress.document_id}-${progress.stage}`}
+                      className="space-y-2"
+                    >
                       <div className="flex justify-between items-center">
                         <div>
                           <div className="text-sm font-medium">
                             {progress.stage.replace(/_/g, ' ').toUpperCase()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Doc: {progress.document_id.slice(0, 8)}... | Updated:{' '}
-                            {formatDate(progress.updated_at)}
+                            Doc: {progress.document_id.slice(0, 8)}... |
+                            Updated: {formatDate(progress.updated_at)}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-bold">{progress.progress}%</div>
+                          <div className="text-lg font-bold">
+                            {progress.progress}%
+                          </div>
                           <div className="text-xs text-gray-500">
                             {progress.completed_items}/{progress.total_items}
                           </div>
@@ -472,7 +552,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       </Tabs>
 
       {/* Error Logs */}
-      {(imageJobs.some(j => j.status === 'failed') || aiJobs.some(j => j.status === 'failed')) && (
+      {(imageJobs.some((j) => j.status === 'failed') ||
+        aiJobs.some((j) => j.status === 'failed')) && (
         <Card className="border-red-200 bg-red-50">
           <CardHeader>
             <CardTitle className="text-red-900">⚠️ Failed Jobs</CardTitle>
@@ -480,12 +561,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           <CardContent>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {[...imageJobs, ...aiJobs]
-                .filter(j => j.status === 'failed')
+                .filter((j) => j.status === 'failed')
                 .slice(0, 10)
-                .map(job => (
-                  <div key={job.id} className="p-3 bg-white rounded-lg border border-red-200">
+                .map((job) => (
+                  <div
+                    key={job.id}
+                    className="p-3 bg-white rounded-lg border border-red-200"
+                  >
                     <div className="text-sm font-medium text-red-900">
-                      {job.id.slice(0, 8)}... - {job.error_message || 'Unknown error'}
+                      {job.id.slice(0, 8)}... -{' '}
+                      {job.error_message || 'Unknown error'}
                     </div>
                     <div className="text-xs text-red-700 mt-1">
                       Retries: {job.retry_count}/{job.max_retries}
@@ -499,4 +584,3 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     </div>
   );
 };
-

@@ -9,7 +9,11 @@ export interface MaterialRealtimeConfig {
 
 export interface MaterialChangePayload {
   eventType: 'INSERT' | 'UPDATE' | 'DELETE';
-  table: 'materials_catalog' | 'material_images' | 'material_metafield_values' | 'material_relationships';
+  table:
+    | 'materials_catalog'
+    | 'material_images'
+    | 'material_metafield_values'
+    | 'material_relationships';
   old?: unknown;
   new?: unknown;
   materialId?: string;
@@ -36,19 +40,23 @@ export class MaterialRealtimeService {
   private reconnectDelay: number = 1000;
 
   constructor(config: MaterialRealtimeConfig) {
-    this.supabase = (createClient as any)(config.supabaseUrl, config.supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-          heartbeatIntervalMs: 30000,
+    this.supabase = (createClient as any)(
+      config.supabaseUrl,
+      config.supabaseAnonKey,
+      {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true,
+        },
+        realtime: {
+          params: {
+            eventsPerSecond: 10,
+            heartbeatIntervalMs: 30000,
+          },
         },
       },
-    });
+    );
 
     // Set auth token if provided
     if (config.authToken) {
@@ -87,14 +95,18 @@ export class MaterialRealtimeService {
   private async handleReconnection(): Promise<void> {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       console.error('Material Realtime: Max reconnection attempts reached');
-      this.callbacks.onError?.(new Error('Failed to reconnect after maximum attempts'));
+      this.callbacks.onError?.(
+        new Error('Failed to reconnect after maximum attempts'),
+      );
       return;
     }
 
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1); // Exponential backoff
 
-    console.log(`Material Realtime: Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    console.log(
+      `Material Realtime: Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`,
+    );
 
     setTimeout(() => {
       this.connect();
@@ -115,13 +127,12 @@ export class MaterialRealtimeService {
       console.log('Material Realtime: Connecting to Supabase Realtime...');
 
       // Remove existing channels
-      this.channels.forEach(channel => {
+      this.channels.forEach((channel) => {
         this.supabase.removeChannel(channel);
       });
       this.channels.clear();
 
       await this.supabase.realtime.connect();
-
     } catch (error) {
       console.error('Material Realtime: Failed to connect:', error);
       this.callbacks.onError?.(error as Error);
@@ -134,7 +145,7 @@ export class MaterialRealtimeService {
       console.log('Material Realtime: Disconnecting...');
 
       // Unsubscribe from all channels
-      this.channels.forEach(channel => {
+      this.channels.forEach((channel) => {
         channel.unsubscribe();
       });
       this.channels.clear();
@@ -157,8 +168,12 @@ export class MaterialRealtimeService {
   }
 
   // Subscribe to materials catalog changes
-  public async subscribeToMaterialCatalogChanges(materialId?: string): Promise<void> {
-    const channelName = materialId ? `materials_catalog_${materialId}` : 'materials_catalog_all';
+  public async subscribeToMaterialCatalogChanges(
+    materialId?: string,
+  ): Promise<void> {
+    const channelName = materialId
+      ? `materials_catalog_${materialId}`
+      : 'materials_catalog_all';
 
     if (this.channels.has(channelName)) {
       console.log(`Material Realtime: Already subscribed to ${channelName}`);
@@ -193,18 +208,26 @@ export class MaterialRealtimeService {
     );
 
     subscription.subscribe((status: string) => {
-      console.log(`Material Realtime: Materials catalog subscription status: ${status}`);
+      console.log(
+        `Material Realtime: Materials catalog subscription status: ${status}`,
+      );
       if (status === 'SUBSCRIBED') {
         this.channels.set(channelName, channel);
       } else if (status === 'CHANNEL_ERROR') {
-        this.callbacks.onError?.(new Error(`Failed to subscribe to materials catalog: ${channelName}`));
+        this.callbacks.onError?.(
+          new Error(`Failed to subscribe to materials catalog: ${channelName}`),
+        );
       }
     });
   }
 
   // Subscribe to material images changes
-  public async subscribeToMaterialImagesChanges(materialId?: string): Promise<void> {
-    const channelName = materialId ? `material_images_${materialId}` : 'material_images_all';
+  public async subscribeToMaterialImagesChanges(
+    materialId?: string,
+  ): Promise<void> {
+    const channelName = materialId
+      ? `material_images_${materialId}`
+      : 'material_images_all';
 
     if (this.channels.has(channelName)) {
       console.log(`Material Realtime: Already subscribed to ${channelName}`);
@@ -213,42 +236,52 @@ export class MaterialRealtimeService {
 
     const channel = this.supabase.channel(channelName);
 
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'material_images',
-        ...(materialId && { filter: `material_id=eq.${materialId}` }),
-      },
-      (payload: any) => {
-        console.log('Material Realtime: Material images change:', payload);
-
-        const changePayload: MaterialChangePayload = {
-          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
           table: 'material_images',
-          old: payload.old,
-          new: payload.new,
-          materialId: payload.new?.material_id || payload.old?.material_id,
-          timestamp: new Date().toISOString(),
-        };
+          ...(materialId && { filter: `material_id=eq.${materialId}` }),
+        },
+        (payload: any) => {
+          console.log('Material Realtime: Material images change:', payload);
 
-        this.callbacks.onImageChange?.(changePayload);
-      },
-    ).subscribe((status: string) => {
-      console.log(`Material Realtime: Material images subscription status: ${status}`);
-      if (status === 'SUBSCRIBED') {
-        this.channels.set(channelName, channel);
-      } else if (status === 'CHANNEL_ERROR') {
-        this.callbacks.onError?.(new Error(`Failed to subscribe to material images: ${channelName}`));
-      }
-    });
+          const changePayload: MaterialChangePayload = {
+            eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+            table: 'material_images',
+            old: payload.old,
+            new: payload.new,
+            materialId: payload.new?.material_id || payload.old?.material_id,
+            timestamp: new Date().toISOString(),
+          };
+
+          this.callbacks.onImageChange?.(changePayload);
+        },
+      )
+      .subscribe((status: string) => {
+        console.log(
+          `Material Realtime: Material images subscription status: ${status}`,
+        );
+        if (status === 'SUBSCRIBED') {
+          this.channels.set(channelName, channel);
+        } else if (status === 'CHANNEL_ERROR') {
+          this.callbacks.onError?.(
+            new Error(`Failed to subscribe to material images: ${channelName}`),
+          );
+        }
+      });
   }
 
   // Subscribe to material metafield values changes
   // Subscribe to material relationships changes
-  public async subscribeToMaterialRelationshipChanges(materialId?: string): Promise<void> {
-    const channelName = materialId ? `material_relationships_${materialId}` : 'material_relationships_all';
+  public async subscribeToMaterialRelationshipChanges(
+    materialId?: string,
+  ): Promise<void> {
+    const channelName = materialId
+      ? `material_relationships_${materialId}`
+      : 'material_relationships_all';
 
     if (this.channels.has(channelName)) {
       console.log(`Material Realtime: Already subscribed to ${channelName}`);
@@ -261,41 +294,56 @@ export class MaterialRealtimeService {
       ? `parent_material_id=eq.${materialId} OR related_material_id=eq.${materialId}`
       : '';
 
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'material_relationships',
-        ...(filter && { filter }),
-      },
-      (payload: any) => {
-        console.log('Material Realtime: Material relationships change:', payload);
-
-        const changePayload: MaterialChangePayload = {
-          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+    channel
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
           table: 'material_relationships',
-          old: payload.old,
-          new: payload.new,
-          materialId: payload.new?.parent_material_id || payload.old?.parent_material_id,
-          timestamp: new Date().toISOString(),
-        };
+          ...(filter && { filter }),
+        },
+        (payload: any) => {
+          console.log(
+            'Material Realtime: Material relationships change:',
+            payload,
+          );
 
-        this.callbacks.onRelationshipChange?.(changePayload);
-      },
-    ).subscribe((status: string) => {
-      console.log(`Material Realtime: Material relationships subscription status: ${status}`);
-      if (status === 'SUBSCRIBED') {
-        this.channels.set(channelName, channel);
-      } else if (status === 'CHANNEL_ERROR') {
-        this.callbacks.onError?.(new Error(`Failed to subscribe to material relationships: ${channelName}`));
-      }
-    });
+          const changePayload: MaterialChangePayload = {
+            eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+            table: 'material_relationships',
+            old: payload.old,
+            new: payload.new,
+            materialId:
+              payload.new?.parent_material_id ||
+              payload.old?.parent_material_id,
+            timestamp: new Date().toISOString(),
+          };
+
+          this.callbacks.onRelationshipChange?.(changePayload);
+        },
+      )
+      .subscribe((status: string) => {
+        console.log(
+          `Material Realtime: Material relationships subscription status: ${status}`,
+        );
+        if (status === 'SUBSCRIBED') {
+          this.channels.set(channelName, channel);
+        } else if (status === 'CHANNEL_ERROR') {
+          this.callbacks.onError?.(
+            new Error(
+              `Failed to subscribe to material relationships: ${channelName}`,
+            ),
+          );
+        }
+      });
   }
 
   // Subscribe to specific material and all its related data
   public async subscribeToMaterial(materialId: string): Promise<void> {
-    console.log(`Material Realtime: Setting up comprehensive subscription for material: ${materialId}`);
+    console.log(
+      `Material Realtime: Setting up comprehensive subscription for material: ${materialId}`,
+    );
 
     await Promise.all([
       this.subscribeToMaterialCatalogChanges(materialId),
@@ -303,7 +351,9 @@ export class MaterialRealtimeService {
       this.subscribeToMaterialRelationshipChanges(materialId),
     ]);
 
-    console.log(`Material Realtime: Comprehensive subscription active for material: ${materialId}`);
+    console.log(
+      `Material Realtime: Comprehensive subscription active for material: ${materialId}`,
+    );
   }
 
   // Unsubscribe from specific material
@@ -315,7 +365,7 @@ export class MaterialRealtimeService {
       `material_relationships_${materialId}`,
     ];
 
-    channelsToRemove.forEach(channelName => {
+    channelsToRemove.forEach((channelName) => {
       const channel = this.channels.get(channelName);
       if (channel) {
         channel.unsubscribe();
@@ -420,17 +470,20 @@ export function useMaterialRealtime(
 
     // Auto-connect if enabled
     if (options.autoConnect !== false) {
-      realtimeService.connect().then(() => {
-        // Set up subscriptions
-        if (options.subscribeToAll) {
-          realtimeService.subscribeToAllMaterialChanges();
-        } else if (options.materialId) {
-          realtimeService.subscribeToMaterial(options.materialId);
-        }
-      }).catch(error => {
-        console.error('Material Realtime: Auto-connect failed:', error);
-        callbacks.onError?.(error);
-      });
+      realtimeService
+        .connect()
+        .then(() => {
+          // Set up subscriptions
+          if (options.subscribeToAll) {
+            realtimeService.subscribeToAllMaterialChanges();
+          } else if (options.materialId) {
+            realtimeService.subscribeToMaterial(options.materialId);
+          }
+        })
+        .catch((error) => {
+          console.error('Material Realtime: Auto-connect failed:', error);
+          callbacks.onError?.(error);
+        });
     }
 
     // Cleanup on unmount
@@ -453,19 +506,25 @@ export function useMaterialRealtime(
     }
   }, [service]);
 
-  const subscribeToMaterial = useCallback(async (materialId: string) => {
-    if (service) {
-      await service.subscribeToMaterial(materialId);
-      setConnectionStatus(service.getConnectionStatus());
-    }
-  }, [service]);
+  const subscribeToMaterial = useCallback(
+    async (materialId: string) => {
+      if (service) {
+        await service.subscribeToMaterial(materialId);
+        setConnectionStatus(service.getConnectionStatus());
+      }
+    },
+    [service],
+  );
 
-  const unsubscribeFromMaterial = useCallback(async (materialId: string) => {
-    if (service) {
-      await service.unsubscribeFromMaterial(materialId);
-      setConnectionStatus(service.getConnectionStatus());
-    }
-  }, [service]);
+  const unsubscribeFromMaterial = useCallback(
+    async (materialId: string) => {
+      if (service) {
+        await service.unsubscribeFromMaterial(materialId);
+        setConnectionStatus(service.getConnectionStatus());
+      }
+    },
+    [service],
+  );
 
   return {
     service,
@@ -539,7 +598,9 @@ export type MaterialRelationshipChange = {
 };
 
 // Helper function to create service instance
-export function createMaterialRealtimeService(config: MaterialRealtimeConfig): MaterialRealtimeService {
+export function createMaterialRealtimeService(
+  config: MaterialRealtimeConfig,
+): MaterialRealtimeService {
   return new MaterialRealtimeService(config);
 }
 

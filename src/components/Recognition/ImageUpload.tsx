@@ -26,37 +26,46 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
 
-    const files = Array.from(e.dataTransfer.files).filter(file =>
-      file.type.startsWith('image/'),
-    );
+      const files = Array.from(e.dataTransfer.files).filter((file) =>
+        file.type.startsWith('image/'),
+      );
 
-    if (files.length > 0) {
-      setSelectedFiles(files);
-      onImagesSelected(files);
-    }
-  }, [onImagesSelected]);
+      if (files.length > 0) {
+        setSelectedFiles(files);
+        onImagesSelected(files);
+      }
+    },
+    [onImagesSelected],
+  );
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).filter(file =>
-      file.type.startsWith('image/'),
-    );
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || []).filter((file) =>
+        file.type.startsWith('image/'),
+      );
 
-    if (files.length > 0) {
-      setSelectedFiles(files);
-      onImagesSelected(files);
-    }
-  }, [onImagesSelected]);
+      if (files.length > 0) {
+        setSelectedFiles(files);
+        onImagesSelected(files);
+      }
+    },
+    [onImagesSelected],
+  );
 
-  const removeFile = useCallback((index: number) => {
-    const newFiles = selectedFiles.filter((_, i) => i !== index);
-    setSelectedFiles(newFiles);
-    onImagesSelected(newFiles);
-  }, [selectedFiles, onImagesSelected]);
+  const removeFile = useCallback(
+    (index: number) => {
+      const newFiles = selectedFiles.filter((_, i) => i !== index);
+      setSelectedFiles(newFiles);
+      onImagesSelected(newFiles);
+    },
+    [selectedFiles, onImagesSelected],
+  );
 
   return (
     <Card>
@@ -81,13 +90,19 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
           {isProcessing ? (
             <div className="flex flex-col items-center">
               <Loader2 className="w-12 h-12 mx-auto mb-4 text-primary animate-spin" />
-              <h3 className="text-lg font-semibold mb-2">Processing Images...</h3>
-              <p className="text-muted-foreground">AI is analyzing your materials</p>
+              <h3 className="text-lg font-semibold mb-2">
+                Processing Images...
+              </h3>
+              <p className="text-muted-foreground">
+                AI is analyzing your materials
+              </p>
             </div>
           ) : (
             <div className="flex flex-col items-center">
               <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-semibold mb-2">Upload Material Images</h3>
+              <h3 className="text-lg font-semibold mb-2">
+                Upload Material Images
+              </h3>
               <p className="text-muted-foreground mb-4">
                 Drag and drop your images here, or click to select files
               </p>
@@ -111,7 +126,9 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         {/* Selected Files Preview */}
         {selectedFiles.length > 0 && (
           <div className="mt-6">
-            <h4 className="font-medium mb-3">Selected Images ({selectedFiles.length})</h4>
+            <h4 className="font-medium mb-3">
+              Selected Images ({selectedFiles.length})
+            </h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {selectedFiles.map((file, index) => (
                 <div key={index} className="relative group">

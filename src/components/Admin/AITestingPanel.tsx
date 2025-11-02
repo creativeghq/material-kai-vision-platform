@@ -65,13 +65,21 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
     return {
       success: rawResponse.success,
       data: {
-        response: rawResponse.data.response || rawResponse.data.content || 'Analysis completed',
-        analysis: rawResponse.data.analysis || rawResponse.data.analysis_summary,
+        response:
+          rawResponse.data.response ||
+          rawResponse.data.content ||
+          'Analysis completed',
+        analysis:
+          rawResponse.data.analysis || rawResponse.data.analysis_summary,
         recommendations: rawResponse.data.recommendations || [],
         materials: rawResponse.data.materials || [],
         entities: rawResponse.data.entities || [],
-        confidence: rawResponse.data.confidence || rawResponse.data.confidence_score || 0,
-        processingTime: rawResponse.data.processingTime || rawResponse.data.processing_time_ms || 0,
+        confidence:
+          rawResponse.data.confidence || rawResponse.data.confidence_score || 0,
+        processingTime:
+          rawResponse.data.processingTime ||
+          rawResponse.data.processing_time_ms ||
+          0,
         testType: rawResponse.data.testType || 'unknown',
         model: rawResponse.data.model || 'unknown',
       },
@@ -85,7 +93,10 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
     return {
       success: true,
       data: {
-        response: rawResponse.coordinated_result.content || rawResponse.coordinated_result.analysis || 'Analysis completed',
+        response:
+          rawResponse.coordinated_result.content ||
+          rawResponse.coordinated_result.analysis ||
+          'Analysis completed',
         analysis: rawResponse.coordination_summary,
         recommendations: rawResponse.coordinated_result.recommendations || [],
         materials: rawResponse.coordinated_result.materials || [],
@@ -130,7 +141,8 @@ const standardizeAIResponse = (rawResponse: any): UnifiedAITestResponse => {
   return {
     success: false,
     error: {
-      message: rawResponse.error_message || rawResponse.error || 'Unknown error',
+      message:
+        rawResponse.error_message || rawResponse.error || 'Unknown error',
       code: 'RESPONSE_PARSE_ERROR',
       details: rawResponse,
     },
@@ -195,27 +207,38 @@ interface SimilarityTestResult {
 
 export const AITestingPanel: React.FC = () => {
   const navigate = useNavigate();
-  const [testPrompt, setTestPrompt] = useState('Analyze this modern kitchen with marble countertops and stainless steel appliances');
+  const [testPrompt, setTestPrompt] = useState(
+    'Analyze this modern kitchen with marble countertops and stainless steel appliances',
+  );
   const [testImageUrl, setTestImageUrl] = useState('');
   const [testing, setTesting] = useState(false);
   const [results, setResults] = useState<TestResult[]>([]);
 
   // Multi-modal testing state
-  const [multiModalTestText, setMultiModalTestText] = useState('Sustainable bamboo flooring with natural wood grain texture');
+  const [multiModalTestText, setMultiModalTestText] = useState(
+    'Sustainable bamboo flooring with natural wood grain texture',
+  );
   const [multiModalTestImage, setMultiModalTestImage] = useState('');
-  const [multiModalResults, setMultiModalResults] = useState<MultiModalTestResult[]>([]);
+  const [multiModalResults, setMultiModalResults] = useState<
+    MultiModalTestResult[]
+  >([]);
   const [multiModalTesting, setMultiModalTesting] = useState(false);
 
   // Similarity search testing state
-  const [similarityQuery, setSimilarityQuery] = useState('waterproof ceramic tiles');
+  const [similarityQuery, setSimilarityQuery] = useState(
+    'waterproof ceramic tiles',
+  );
   const [similarityThreshold, setSimilarityThreshold] = useState(0.7);
-  const [similarityResults, setSimilarityResults] = useState<SimilarityTestResult | null>(null);
+  const [similarityResults, setSimilarityResults] =
+    useState<SimilarityTestResult | null>(null);
   const [similarityTesting, setSimilarityTesting] = useState(false);
 
   const { toast } = useToast();
 
   // Multi-modal analysis testing function
-  const testMultiModalAnalysis = async (testType: 'text_analysis' | 'image_analysis' | 'combined_analysis') => {
+  const testMultiModalAnalysis = async (
+    testType: 'text_analysis' | 'image_analysis' | 'combined_analysis',
+  ) => {
     if (testType === 'image_analysis' && !multiModalTestImage.trim()) {
       toast({
         title: 'Error',
@@ -234,10 +257,14 @@ export const AITestingPanel: React.FC = () => {
       return;
     }
 
-    if (testType === 'combined_analysis' && (!multiModalTestText.trim() || !multiModalTestImage.trim())) {
+    if (
+      testType === 'combined_analysis' &&
+      (!multiModalTestText.trim() || !multiModalTestImage.trim())
+    ) {
       toast({
         title: 'Error',
-        description: 'Please provide both text and image for combined analysis test',
+        description:
+          'Please provide both text and image for combined analysis test',
         variant: 'destructive',
       });
       return;
@@ -275,7 +302,9 @@ export const AITestingPanel: React.FC = () => {
       const standardizedResponse = standardizeAIResponse(result);
 
       if (!standardizedResponse.success) {
-        throw new Error(`Multi-modal analysis failed: ${standardizedResponse.error?.message || 'Unknown error'}`);
+        throw new Error(
+          `Multi-modal analysis failed: ${standardizedResponse.error?.message || 'Unknown error'}`,
+        );
       }
 
       const data = standardizedResponse.data;
@@ -286,7 +315,8 @@ export const AITestingPanel: React.FC = () => {
         test_type: testType,
         input_data: {
           text: testType !== 'image_analysis' ? multiModalTestText : undefined,
-          image_url: testType !== 'text_analysis' ? multiModalTestImage : undefined,
+          image_url:
+            testType !== 'text_analysis' ? multiModalTestImage : undefined,
           combined: testType === 'combined_analysis',
         },
         results: {
@@ -297,21 +327,21 @@ export const AITestingPanel: React.FC = () => {
             confidence: (entity as any).confidence || 0.8,
           })),
           materials: (data.materials as any) || [],
-          analysis_summary: data.response || data.analysis || 'Analysis completed successfully',
+          analysis_summary:
+            data.response || data.analysis || 'Analysis completed successfully',
           confidence_score: data.confidence || 0.8,
         },
         processing_time_ms: data.processingTime || 0,
         success: true,
       };
 
-      setMultiModalResults(prev => [...prev, testResult]);
+      setMultiModalResults((prev) => [...prev, testResult]);
 
       toast({
         title: 'Multi-Modal Test Completed',
         description: `${testType.replace('_', ' ')} completed with confidence: ${(testResult.results.confidence_score * 100).toFixed(1)}%`,
         variant: 'default',
       });
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Multi-modal test error:', error);
@@ -321,7 +351,8 @@ export const AITestingPanel: React.FC = () => {
         test_type: testType,
         input_data: {
           text: testType !== 'image_analysis' ? multiModalTestText : undefined,
-          image_url: testType !== 'text_analysis' ? multiModalTestImage : undefined,
+          image_url:
+            testType !== 'text_analysis' ? multiModalTestImage : undefined,
           combined: testType === 'combined_analysis',
         },
         results: {
@@ -332,11 +363,12 @@ export const AITestingPanel: React.FC = () => {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
 
-      setMultiModalResults(prev => [...prev, errorResult]);
+      setMultiModalResults((prev) => [...prev, errorResult]);
 
       toast({
         title: 'Multi-Modal Test Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description:
+          error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -372,7 +404,9 @@ export const AITestingPanel: React.FC = () => {
       });
 
       if (!result.success) {
-        throw new Error(`Similarity search failed: ${result.error?.message || 'Unknown error'}`);
+        throw new Error(
+          `Similarity search failed: ${result.error?.message || 'Unknown error'}`,
+        );
       }
 
       const data = result.data;
@@ -386,7 +420,12 @@ export const AITestingPanel: React.FC = () => {
           id: (item as any).id || crypto.randomUUID(),
           title: (item as any).title || (item as any).name || 'Untitled',
           similarity_score: (item as any).similarity_score || 0,
-          content_preview: ((item as any).content || (item as any).description || '').substring(0, 100) + '...',
+          content_preview:
+            (
+              (item as any).content ||
+              (item as any).description ||
+              ''
+            ).substring(0, 100) + '...',
         })),
         total_results: data.total_results || 0,
         processing_time_ms: data.processing_time_ms || 0,
@@ -400,7 +439,6 @@ export const AITestingPanel: React.FC = () => {
         description: `Found ${testResult.total_results} results in ${(testResult.processing_time_ms / 1000).toFixed(2)}s`,
         variant: 'default',
       });
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Similarity search test error:', error);
@@ -420,7 +458,8 @@ export const AITestingPanel: React.FC = () => {
 
       toast({
         title: 'Similarity Search Test Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description:
+          error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -443,7 +482,9 @@ export const AITestingPanel: React.FC = () => {
 
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User authentication required');
       }
@@ -463,21 +504,28 @@ export const AITestingPanel: React.FC = () => {
         .single();
 
       if (uploadError || !testFile) {
-        throw new Error(`Failed to create test file record: ${uploadError?.message || 'Unknown error'}`);
+        throw new Error(
+          `Failed to create test file record: ${uploadError?.message || 'Unknown error'}`,
+        );
       }
 
       // Test hybrid analysis
       const apiService = BrowserApiIntegrationService.getInstance();
-      const result = await apiService.callSupabaseFunction('hybrid-material-analysis', {
-        file_id: testFile.id,
-        analysis_type: 'comprehensive',
-        include_similar: false,
-        minimum_score: 0.5,
-        max_retries: 2,
-      });
+      const result = await apiService.callSupabaseFunction(
+        'hybrid-material-analysis',
+        {
+          file_id: testFile.id,
+          analysis_type: 'comprehensive',
+          include_similar: false,
+          minimum_score: 0.5,
+          max_retries: 2,
+        },
+      );
 
       if (!result.success) {
-        throw new Error(`Hybrid analysis failed: ${result.error?.message || 'Unknown error'}`);
+        throw new Error(
+          `Hybrid analysis failed: ${result.error?.message || 'Unknown error'}`,
+        );
       }
 
       const data = result.data;
@@ -486,15 +534,24 @@ export const AITestingPanel: React.FC = () => {
       const testResults: TestResult[] = [];
 
       if ((data as any).attempts) {
-        (data as any).attempts.forEach((attempt: { provider: string; score?: number; success: boolean; error?: string; response?: string; processing_time_ms?: number }) => {
-          testResults.push({
-            provider: attempt.provider,
-            score: attempt.score || 0,
-            success: attempt.success,
-            processing_time_ms: attempt.processing_time_ms || 0,
-            error: attempt.error,
-          });
-        });
+        (data as any).attempts.forEach(
+          (attempt: {
+            provider: string;
+            score?: number;
+            success: boolean;
+            error?: string;
+            response?: string;
+            processing_time_ms?: number;
+          }) => {
+            testResults.push({
+              provider: attempt.provider,
+              score: attempt.score || 0,
+              success: attempt.success,
+              processing_time_ms: attempt.processing_time_ms || 0,
+              error: attempt.error,
+            });
+          },
+        );
       }
 
       setResults(testResults);
@@ -502,20 +559,23 @@ export const AITestingPanel: React.FC = () => {
       // Note: Cleanup would normally delete from uploaded_files table
       // but since table doesn't exist in current schema, we skip this step
       // eslint-disable-next-line no-console
-      console.log('Test file cleanup skipped (uploaded_files table not in schema):', testFile.id);
+      console.log(
+        'Test file cleanup skipped (uploaded_files table not in schema):',
+        testFile.id,
+      );
 
       toast({
         title: 'Test Completed',
         description: `Analysis completed with score: ${(data as any).final_score?.toFixed(2) || 'N/A'}`,
         variant: 'default',
       });
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Test error:', error);
       toast({
         title: 'Test Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description:
+          error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -528,15 +588,20 @@ export const AITestingPanel: React.FC = () => {
 
     try {
       const apiService = BrowserApiIntegrationService.getInstance();
-      const result = await apiService.callSupabaseFunction('crewai-3d-generation', {
-        user_id: (await supabase.auth.getUser()).data.user?.id,
-        prompt: testPrompt,
-        room_type: 'living room',
-        style: 'modern',
-      });
+      const result = await apiService.callSupabaseFunction(
+        'crewai-3d-generation',
+        {
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          prompt: testPrompt,
+          room_type: 'living room',
+          style: 'modern',
+        },
+      );
 
       if (!result.success) {
-        throw new Error(`3D generation failed: ${result.error?.message || 'Unknown error'}`);
+        throw new Error(
+          `3D generation failed: ${result.error?.message || 'Unknown error'}`,
+        );
       }
 
       const data = result.data;
@@ -546,13 +611,13 @@ export const AITestingPanel: React.FC = () => {
         description: `Generation completed in ${((data as any)?.processing_time_ms / 1000).toFixed(2)}s`,
         variant: 'default',
       });
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('3D test error:', error);
       toast({
         title: '3D Test Failed',
-        description: error instanceof Error ? error.message : 'An unknown error occurred',
+        description:
+          error instanceof Error ? error.message : 'An unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -600,9 +665,12 @@ export const AITestingPanel: React.FC = () => {
             </div>
             <div className="h-6 w-px bg-border" />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">AI Testing Panel</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                AI Testing Panel
+              </h1>
               <p className="text-sm text-muted-foreground">
-                Test the hybrid AI system to generate analytics data and validate scoring
+                Test the hybrid AI system to generate analytics data and
+                validate scoring
               </p>
             </div>
           </div>
@@ -622,159 +690,189 @@ export const AITestingPanel: React.FC = () => {
           {/* Legacy Testing Tab */}
           <TabsContent value="legacy" className="space-y-6">
             <div className="grid md:grid-cols-2 gap-6">
-        {/* Material Analysis Test */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5" />
-              Material Analysis Test
-            </CardTitle>
-          </CardHeader><CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Test Image URL</label>
-              <Input
-                value={testImageUrl}
-                onChange={(e) => setTestImageUrl(e.target.value)}
-                placeholder="https://example.com/material-image.jpg"
-              />
-              <div className="mt-2">
-                <p className="text-xs text-muted-foreground mb-2">Sample URLs:</p>
-                {getSampleImageUrls().map((url, i) => (
+              {/* Material Analysis Test */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Brain className="h-5 w-5" />
+                    Material Analysis Test
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">
+                      Test Image URL
+                    </label>
+                    <Input
+                      value={testImageUrl}
+                      onChange={(e) => setTestImageUrl(e.target.value)}
+                      placeholder="https://example.com/material-image.jpg"
+                    />
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Sample URLs:
+                      </p>
+                      {getSampleImageUrls().map((url, i) => (
+                        <Button
+                          key={i}
+                          className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
+                          onClick={() => setTestImageUrl(url)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setTestImageUrl(url);
+                            }
+                          }}
+                        >
+                          Sample {i + 1}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
                   <Button
-                    key={i}
-                    className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
-                    onClick={() => setTestImageUrl(url)}
+                    onClick={testMaterialAnalysis}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        setTestImageUrl(url);
+                        testMaterialAnalysis();
                       }
                     }}
+                    disabled={testing || !testImageUrl}
+                    className="w-full"
                   >
-                    Sample {i + 1}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              onClick={testMaterialAnalysis}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  testMaterialAnalysis();
-                }
-              }}
-              disabled={testing || !testImageUrl}
-              className="w-full"
-            >
-              {testing ? (
-                <>
-                  <Activity className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <TestTube className="h-4 w-4 mr-2" />
-                  Test Material Analysis
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* 3D Generation Test */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              3D Generation Test
-            </CardTitle>
-          </CardHeader><CardContent className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Test Prompt</label>
-              <Textarea
-                value={testPrompt}
-                onChange={(e) => setTestPrompt(e.target.value)}
-                placeholder="Describe the interior design you want to generate"
-                rows={3}
-              />
-            </div>
-
-            <Button
-              onClick={test3DGeneration}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  test3DGeneration();
-                }
-              }}
-              disabled={testing || !testPrompt}
-              className="w-full"
-            >
-              {testing ? (
-                <>
-                  <Activity className="h-4 w-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <TestTube className="h-4 w-4 mr-2" />
-                  Test 3D Generation
-                </>
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Test Results */}
-      {results.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Test Results</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {results.map((result, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex items-center gap-3">
-                    {result.success ? (
-                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    {testing ? (
+                      <>
+                        <Activity className="h-4 w-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
                     ) : (
-                      <XCircle className="h-5 w-5 text-red-600" />
+                      <>
+                        <TestTube className="h-4 w-4 mr-2" />
+                        Test Material Analysis
+                      </>
                     )}
-                    <div>
-                      <div className="font-medium">{result.provider}</div>
-                      {result.error && (
-                        <div className="text-sm text-red-600">{result.error}</div>
-                      )}
-                    </div>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* 3D Generation Test */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5" />
+                    3D Generation Test
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Test Prompt</label>
+                    <Textarea
+                      value={testPrompt}
+                      onChange={(e) => setTestPrompt(e.target.value)}
+                      placeholder="Describe the interior design you want to generate"
+                      rows={3}
+                    />
                   </div>
-                  <div className="flex items-center gap-3">
-                    {result.success && (
-                      <Badge className={result.score >= 0.7 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}>
-                        Score: {result.score.toFixed(2)}
-                      </Badge>
+
+                  <Button
+                    onClick={test3DGeneration}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        test3DGeneration();
+                      }
+                    }}
+                    disabled={testing || !testPrompt}
+                    className="w-full"
+                  >
+                    {testing ? (
+                      <>
+                        <Activity className="h-4 w-4 mr-2 animate-spin" />
+                        Testing...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube className="h-4 w-4 mr-2" />
+                        Test 3D Generation
+                      </>
                     )}
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {(result.processing_time_ms / 1000).toFixed(2)}s
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
-      )}
+
+            {/* Test Results */}
+            {results.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Test Results</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {results.map((result, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 border rounded"
+                      >
+                        <div className="flex items-center gap-3">
+                          {result.success ? (
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <XCircle className="h-5 w-5 text-red-600" />
+                          )}
+                          <div>
+                            <div className="font-medium">{result.provider}</div>
+                            {result.error && (
+                              <div className="text-sm text-red-600">
+                                {result.error}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {result.success && (
+                            <Badge
+                              className={
+                                result.score >= 0.7
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-gray-200 text-gray-800'
+                              }
+                            >
+                              Score: {result.score.toFixed(2)}
+                            </Badge>
+                          )}
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {(result.processing_time_ms / 1000).toFixed(2)}s
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader>
                 <CardTitle>Legacy Test Instructions</CardTitle>
-              </CardHeader><CardContent>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2 text-sm">
-                  <p>• Use the <strong>Material Analysis Test</strong> to test hybrid OpenAI/Claude material recognition</p>
-                  <p>• Use the <strong>3D Generation Test</strong> to test interior design generation with prompt parsing</p>
-                  <p>• Test results will appear in the Admin Panel analytics after completion</p>
-                  <p>• The system will automatically score responses and choose the best AI provider</p>
+                  <p>
+                    • Use the <strong>Material Analysis Test</strong> to test
+                    hybrid OpenAI/Claude material recognition
+                  </p>
+                  <p>
+                    • Use the <strong>3D Generation Test</strong> to test
+                    interior design generation with prompt parsing
+                  </p>
+                  <p>
+                    • Test results will appear in the Admin Panel analytics
+                    after completion
+                  </p>
+                  <p>
+                    • The system will automatically score responses and choose
+                    the best AI provider
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -790,7 +888,8 @@ export const AITestingPanel: React.FC = () => {
                     <FileText className="h-5 w-5" />
                     Text Analysis
                   </CardTitle>
-                </CardHeader><CardContent className="space-y-4">
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
                     <label className="text-sm font-medium">Test Text</label>
                     <Textarea
@@ -832,30 +931,37 @@ export const AITestingPanel: React.FC = () => {
                     <Image className="h-5 w-5" />
                     Image Analysis
                   </CardTitle>
-                </CardHeader><CardContent className="space-y-4">
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium">Test Image URL</label>
+                    <label className="text-sm font-medium">
+                      Test Image URL
+                    </label>
                     <Input
                       value={multiModalTestImage}
                       onChange={(e) => setMultiModalTestImage(e.target.value)}
                       placeholder="https://example.com/material-image.jpg"
                     />
                     <div className="mt-2">
-                      <p className="text-xs text-muted-foreground mb-2">Sample URLs:</p>
-                      {getSampleImageUrls().slice(0, 2).map((url, i) => (
-                        <Button
-                          key={i}
-                          className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
-                          onClick={() => setMultiModalTestImage(url)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              setMultiModalTestImage(url);
-                            }
-                          }}
-                        >
-                          Sample {i + 1}
-                        </Button>
-                      ))}
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Sample URLs:
+                      </p>
+                      {getSampleImageUrls()
+                        .slice(0, 2)
+                        .map((url, i) => (
+                          <Button
+                            key={i}
+                            className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
+                            onClick={() => setMultiModalTestImage(url)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setMultiModalTestImage(url);
+                              }
+                            }}
+                          >
+                            Sample {i + 1}
+                          </Button>
+                        ))}
                     </div>
                   </div>
                   <Button
@@ -890,9 +996,11 @@ export const AITestingPanel: React.FC = () => {
                     <Layers className="h-5 w-5" />
                     Combined Analysis
                   </CardTitle>
-                </CardHeader><CardContent className="space-y-4">
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div className="text-sm text-muted-foreground">
-                    Uses both text and image inputs for comprehensive multi-modal analysis.
+                    Uses both text and image inputs for comprehensive
+                    multi-modal analysis.
                   </div>
                   <Button
                     onClick={() => testMultiModalAnalysis('combined_analysis')}
@@ -901,7 +1009,11 @@ export const AITestingPanel: React.FC = () => {
                         testMultiModalAnalysis('combined_analysis');
                       }
                     }}
-                    disabled={multiModalTesting || !multiModalTestText.trim() || !multiModalTestImage.trim()}
+                    disabled={
+                      multiModalTesting ||
+                      !multiModalTestText.trim() ||
+                      !multiModalTestImage.trim()
+                    }
                     className="w-full"
                   >
                     {multiModalTesting ? (
@@ -945,14 +1057,26 @@ export const AITestingPanel: React.FC = () => {
                                 {result.test_type.replace('_', ' ')}
                               </div>
                               {result.error && (
-                                <div className="text-sm text-red-600">{result.error}</div>
+                                <div className="text-sm text-red-600">
+                                  {result.error}
+                                </div>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
                             {result.success && (
-                              <Badge className={result.results.confidence_score >= 0.7 ? 'bg-green-600 text-white' : 'bg-yellow-600 text-white'}>
-                                Confidence: {(result.results.confidence_score * 100).toFixed(1)}%
+                              <Badge
+                                className={
+                                  result.results.confidence_score >= 0.7
+                                    ? 'bg-green-600 text-white'
+                                    : 'bg-yellow-600 text-white'
+                                }
+                              >
+                                Confidence:{' '}
+                                {(
+                                  result.results.confidence_score * 100
+                                ).toFixed(1)}
+                                %
                               </Badge>
                             )}
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -966,46 +1090,82 @@ export const AITestingPanel: React.FC = () => {
                           <div className="space-y-3">
                             {result.results.analysis_summary && (
                               <div>
-                                <div className="text-sm font-medium mb-1">Analysis Summary:</div>
-                                <div className="text-sm text-muted-foreground">{result.results.analysis_summary}</div>
-                              </div>
-                            )}
-
-                            {result.results.entities && result.results.entities.length > 0 && (
-                              <div>
-                                <div className="text-sm font-medium mb-2">Extracted Entities:</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {result.results.entities.slice(0, 5).map((entity, i) => (
-                                    <Badge key={i} variant="outline" className="text-xs">
-                                      {entity.text} ({(entity.confidence * 100).toFixed(0)}%)
-                                    </Badge>
-                                  ))}
-                                  {result.results.entities.length > 5 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{result.results.entities.length - 5} more
-                                    </Badge>
-                                  )}
+                                <div className="text-sm font-medium mb-1">
+                                  Analysis Summary:
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {result.results.analysis_summary}
                                 </div>
                               </div>
                             )}
 
-                            {result.results.materials && result.results.materials.length > 0 && (
-                              <div>
-                                <div className="text-sm font-medium mb-2">Detected Materials:</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {result.results.materials.slice(0, 3).map((material, i) => (
-                                    <Badge key={i} variant="secondary" className="text-xs">
-                                      {material.name} ({(material.confidence * 100).toFixed(0)}%)
-                                    </Badge>
-                                  ))}
-                                  {result.results.materials.length > 3 && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      +{result.results.materials.length - 3} more
-                                    </Badge>
-                                  )}
+                            {result.results.entities &&
+                              result.results.entities.length > 0 && (
+                                <div>
+                                  <div className="text-sm font-medium mb-2">
+                                    Extracted Entities:
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {result.results.entities
+                                      .slice(0, 5)
+                                      .map((entity, i) => (
+                                        <Badge
+                                          key={i}
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          {entity.text} (
+                                          {(entity.confidence * 100).toFixed(0)}
+                                          %)
+                                        </Badge>
+                                      ))}
+                                    {result.results.entities.length > 5 && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        +{result.results.entities.length - 5}{' '}
+                                        more
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              )}
+
+                            {result.results.materials &&
+                              result.results.materials.length > 0 && (
+                                <div>
+                                  <div className="text-sm font-medium mb-2">
+                                    Detected Materials:
+                                  </div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {result.results.materials
+                                      .slice(0, 3)
+                                      .map((material, i) => (
+                                        <Badge
+                                          key={i}
+                                          variant="secondary"
+                                          className="text-xs"
+                                        >
+                                          {material.name} (
+                                          {(material.confidence * 100).toFixed(
+                                            0,
+                                          )}
+                                          %)
+                                        </Badge>
+                                      ))}
+                                    {result.results.materials.length > 3 && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs"
+                                      >
+                                        +{result.results.materials.length - 3}{' '}
+                                        more
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                           </div>
                         )}
                       </div>
@@ -1024,7 +1184,8 @@ export const AITestingPanel: React.FC = () => {
                   <Search className="h-5 w-5" />
                   Vector Similarity Search Test
                 </CardTitle>
-              </CardHeader><CardContent className="space-y-4">
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div>
                   <label className="text-sm font-medium">Search Query</label>
                   <Input
@@ -1035,7 +1196,9 @@ export const AITestingPanel: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium">Similarity Threshold</label>
+                  <label className="text-sm font-medium">
+                    Similarity Threshold
+                  </label>
                   <div className="flex items-center gap-4 mt-2">
                     <input
                       type="range"
@@ -1043,7 +1206,9 @@ export const AITestingPanel: React.FC = () => {
                       max="0.95"
                       step="0.05"
                       value={similarityThreshold}
-                      onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                      onChange={(e) =>
+                        setSimilarityThreshold(parseFloat(e.target.value))
+                      }
                       className="flex-1"
                     />
                     <span className="text-sm font-mono w-12">
@@ -1051,7 +1216,8 @@ export const AITestingPanel: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    Higher threshold = more precise results, Lower threshold = broader results
+                    Higher threshold = more precise results, Lower threshold =
+                    broader results
                   </div>
                 </div>
 
@@ -1100,42 +1266,54 @@ export const AITestingPanel: React.FC = () => {
                             Query: "{similarityResults.query_text}"
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            Threshold: {(similarityResults.similarity_threshold * 100).toFixed(0)}%
+                            Threshold:{' '}
+                            {(
+                              similarityResults.similarity_threshold * 100
+                            ).toFixed(0)}
+                            %
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <Badge>
-                          {similarityResults.total_results} results
-                        </Badge>
+                        <Badge>{similarityResults.total_results} results</Badge>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Clock className="h-3 w-3" />
-                          {(similarityResults.processing_time_ms / 1000).toFixed(2)}s
+                          {(
+                            similarityResults.processing_time_ms / 1000
+                          ).toFixed(2)}
+                          s
                         </div>
                       </div>
                     </div>
 
-                    {similarityResults.success && similarityResults.results.length > 0 && (
-                      <div className="space-y-2">
-                        {similarityResults.results.map((result, index) => (
-                          <div key={index} className="border rounded p-3">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="font-medium">{result.title}</div>
-                              <Badge
-                                className={result.similarity_score >= 0.8 ? 'bg-green-600 text-white' :
-                                          result.similarity_score >= 0.6 ? 'bg-yellow-600 text-white' :
-                                          'bg-gray-600 text-white'}
-                              >
-                                {(result.similarity_score * 100).toFixed(1)}%
-                              </Badge>
+                    {similarityResults.success &&
+                      similarityResults.results.length > 0 && (
+                        <div className="space-y-2">
+                          {similarityResults.results.map((result, index) => (
+                            <div key={index} className="border rounded p-3">
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="font-medium">
+                                  {result.title}
+                                </div>
+                                <Badge
+                                  className={
+                                    result.similarity_score >= 0.8
+                                      ? 'bg-green-600 text-white'
+                                      : result.similarity_score >= 0.6
+                                        ? 'bg-yellow-600 text-white'
+                                        : 'bg-gray-600 text-white'
+                                  }
+                                >
+                                  {(result.similarity_score * 100).toFixed(1)}%
+                                </Badge>
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {result.content_preview}
+                              </div>
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {result.content_preview}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
 
                     {similarityResults.error && (
                       <div className="text-sm text-red-600 p-3 bg-red-50 rounded">
@@ -1156,10 +1334,14 @@ export const AITestingPanel: React.FC = () => {
                 <Card>
                   <CardHeader>
                     <CardTitle>Legacy Test Results</CardTitle>
-                  </CardHeader><CardContent>
+                  </CardHeader>
+                  <CardContent>
                     <div className="space-y-3">
                       {results.map((result, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 border rounded">
+                        <div
+                          key={index}
+                          className="flex items-center justify-between p-3 border rounded"
+                        >
                           <div className="flex items-center gap-3">
                             {result.success ? (
                               <CheckCircle className="h-5 w-5 text-green-600" />
@@ -1167,15 +1349,25 @@ export const AITestingPanel: React.FC = () => {
                               <XCircle className="h-5 w-5 text-red-600" />
                             )}
                             <div>
-                              <div className="font-medium">{result.provider}</div>
+                              <div className="font-medium">
+                                {result.provider}
+                              </div>
                               {result.error && (
-                                <div className="text-sm text-red-600">{result.error}</div>
+                                <div className="text-sm text-red-600">
+                                  {result.error}
+                                </div>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
                             {result.success && (
-                              <Badge className={result.score >= 0.7 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-800'}>
+                              <Badge
+                                className={
+                                  result.score >= 0.7
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-200 text-gray-800'
+                                }
+                              >
                                 Score: {result.score.toFixed(2)}
                               </Badge>
                             )}
@@ -1195,19 +1387,32 @@ export const AITestingPanel: React.FC = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Test Summary</CardTitle>
-                </CardHeader><CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="text-center p-4 border rounded">
-                      <div className="text-2xl font-bold text-blue-600">{results.length}</div>
-                      <div className="text-sm text-muted-foreground">Legacy Tests</div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {results.length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Legacy Tests
+                      </div>
                     </div>
                     <div className="text-center p-4 border rounded">
-                      <div className="text-2xl font-bold text-green-600">{multiModalResults.length}</div>
-                      <div className="text-sm text-muted-foreground">Multi-Modal Tests</div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {multiModalResults.length}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Multi-Modal Tests
+                      </div>
                     </div>
                     <div className="text-center p-4 border rounded">
-                      <div className="text-2xl font-bold text-purple-600">{similarityResults ? 1 : 0}</div>
-                      <div className="text-sm text-muted-foreground">Similarity Tests</div>
+                      <div className="text-2xl font-bold text-purple-600">
+                        {similarityResults ? 1 : 0}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Similarity Tests
+                      </div>
                     </div>
                   </div>
                 </CardContent>

@@ -19,7 +19,8 @@ export const heroConfig = {
   },
   title: 'Material Intelligence',
   subtitle: 'Agent Platform',
-  description: 'Transform your material workflows with AI-powered PDF knowledge extraction, intelligent search, and autonomous 3D design generation',
+  description:
+    'Transform your material workflows with AI-powered PDF knowledge extraction, intelligent search, and autonomous 3D design generation',
   actions: [
     {
       type: 'primary' as const,
@@ -40,7 +41,8 @@ export const heroConfig = {
 export const featuresConfig = {
   sectionHeader: {
     title: 'Intelligent Material Processing',
-    description: 'Harness the power of AI to revolutionize your material research and design workflows',
+    description:
+      'Harness the power of AI to revolutionize your material research and design workflows',
   },
   cards: [
     {
@@ -49,7 +51,8 @@ export const featuresConfig = {
       iconColor: 'primary' as const,
       badge: 'Core Engine',
       title: 'PDF Knowledge Extraction',
-      description: 'Advanced AI-powered document processing with intelligent material recognition and semantic understanding',
+      description:
+        'Advanced AI-powered document processing with intelligent material recognition and semantic understanding',
       action: {
         icon: Upload,
         text: 'Process Documents →',
@@ -63,7 +66,8 @@ export const featuresConfig = {
       iconColor: 'purple' as const,
       badge: 'AI Designer',
       title: '3D Generation Studio',
-      description: 'Generate photorealistic 3D designs with intelligent material suggestions and real-time optimization',
+      description:
+        'Generate photorealistic 3D designs with intelligent material suggestions and real-time optimization',
       action: {
         icon: Brain,
         text: 'Create Design →',
@@ -77,7 +81,8 @@ export const featuresConfig = {
       iconColor: 'orange' as const,
       badge: 'Collections',
       title: 'Smart MoodBoards',
-      description: 'Curate and organize materials with AI-powered recommendations and collaborative features',
+      description:
+        'Curate and organize materials with AI-powered recommendations and collaborative features',
       action: {
         icon: Star,
         text: 'Build Collection →',

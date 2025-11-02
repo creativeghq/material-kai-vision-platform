@@ -7,7 +7,6 @@ import {
   Key,
   Activity,
   Network,
-
   Copy,
   CheckCircle,
   XCircle,
@@ -17,21 +16,59 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { apiGatewayService, type ApiEndpoint, type InternalNetwork, type ApiKey, type RateLimitRule } from '@/services/apiGateway/apiGatewayService';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  apiGatewayService,
+  type ApiEndpoint,
+  type InternalNetwork,
+  type ApiKey,
+  type RateLimitRule,
+} from '@/services/apiGateway/apiGatewayService';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-
 
 export const ApiGatewayAdmin: React.FC = () => {
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
@@ -41,7 +78,9 @@ export const ApiGatewayAdmin: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
-  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(null);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpoint | null>(
+    null,
+  );
   const [endpointDetailsOpen, setEndpointDetailsOpen] = useState(false);
   const [responseExample, setResponseExample] = useState<string>('');
   const [, setSelectedApiKey] = useState<ApiKey | null>(null);
@@ -69,12 +108,13 @@ export const ApiGatewayAdmin: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [endpointsData, networksData, apiKeysData, rulesData] = await Promise.all([
-        apiGatewayService.getAllEndpoints(),
-        apiGatewayService.getAllInternalNetworks(),
-        apiGatewayService.getAllApiKeys(),
-        apiGatewayService.getAllRateLimitRules(),
-      ]);
+      const [endpointsData, networksData, apiKeysData, rulesData] =
+        await Promise.all([
+          apiGatewayService.getAllEndpoints(),
+          apiGatewayService.getAllInternalNetworks(),
+          apiGatewayService.getAllApiKeys(),
+          apiGatewayService.getAllRateLimitRules(),
+        ]);
 
       setEndpoints(endpointsData);
       setInternalNetworks(networksData);
@@ -88,41 +128,62 @@ export const ApiGatewayAdmin: React.FC = () => {
     }
   };
 
-  const toggleEndpointPublicAccess = async (endpointId: string, currentValue: boolean) => {
+  const toggleEndpointPublicAccess = async (
+    endpointId: string,
+    currentValue: boolean,
+  ) => {
     try {
-      await apiGatewayService.toggleEndpointPublicAccess(endpointId, !currentValue);
-      setEndpoints(prev =>
-        prev.map(ep =>
+      await apiGatewayService.toggleEndpointPublicAccess(
+        endpointId,
+        !currentValue,
+      );
+      setEndpoints((prev) =>
+        prev.map((ep) =>
           ep.id === endpointId ? { ...ep, is_public: !currentValue } : ep,
         ),
       );
-      toast.success(`Endpoint ${!currentValue ? 'enabled' : 'disabled'} for public access`);
+      toast.success(
+        `Endpoint ${!currentValue ? 'enabled' : 'disabled'} for public access`,
+      );
     } catch (error) {
       console.error('Error toggling endpoint access:', error);
       toast.error('Failed to update endpoint access');
     }
   };
 
-  const toggleEndpointInternalAccess = async (endpointId: string, currentValue: boolean) => {
+  const toggleEndpointInternalAccess = async (
+    endpointId: string,
+    currentValue: boolean,
+  ) => {
     try {
-      await apiGatewayService.toggleEndpointInternalAccess(endpointId, !currentValue);
-      setEndpoints(prev =>
-        prev.map(ep =>
+      await apiGatewayService.toggleEndpointInternalAccess(
+        endpointId,
+        !currentValue,
+      );
+      setEndpoints((prev) =>
+        prev.map((ep) =>
           ep.id === endpointId ? { ...ep, is_internal: !currentValue } : ep,
         ),
       );
-      toast.success(`Endpoint ${!currentValue ? 'enabled' : 'disabled'} for internal access`);
+      toast.success(
+        `Endpoint ${!currentValue ? 'enabled' : 'disabled'} for internal access`,
+      );
     } catch (error) {
       console.error('Error toggling internal access:', error);
       toast.error('Failed to update internal access');
     }
   };
 
-  const updateEndpointRateLimit = async (endpointId: string, newLimit: number) => {
+  const updateEndpointRateLimit = async (
+    endpointId: string,
+    newLimit: number,
+  ) => {
     try {
-      setEndpoints(prev =>
-        prev.map(ep =>
-          ep.id === endpointId ? { ...ep, rate_limit_per_minute: newLimit } : ep,
+      setEndpoints((prev) =>
+        prev.map((ep) =>
+          ep.id === endpointId
+            ? { ...ep, rate_limit_per_minute: newLimit }
+            : ep,
         ),
       );
       toast.success('Rate limit updated');
@@ -134,11 +195,13 @@ export const ApiGatewayAdmin: React.FC = () => {
 
   const updateGlobalRateLimit = async (category: string, newLimit: number) => {
     try {
-      setGlobalRateLimits(prev => ({
+      setGlobalRateLimits((prev) => ({
         ...prev,
         [category]: newLimit,
       }));
-      toast.success(`Global ${category} rate limit updated to ${newLimit} req/min`);
+      toast.success(
+        `Global ${category} rate limit updated to ${newLimit} req/min`,
+      );
     } catch (error) {
       console.error('Error updating global rate limit:', error);
       toast.error('Failed to update global rate limit');
@@ -161,14 +224,18 @@ export const ApiGatewayAdmin: React.FC = () => {
     toast.success('API key copied to clipboard');
   };
 
-  const filteredEndpoints = endpoints.filter(endpoint => {
-    const matchesSearch = endpoint.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         endpoint.description?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || endpoint.category === selectedCategory;
+  const filteredEndpoints = endpoints.filter((endpoint) => {
+    const matchesSearch =
+      endpoint.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      endpoint.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      selectedCategory === 'all' || endpoint.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = Array.from(new Set(endpoints.map(ep => ep.category))).sort();
+  const categories = Array.from(
+    new Set(endpoints.map((ep) => ep.category)),
+  ).sort();
 
   const loadResponseExample = async (path: string) => {
     // Try to get real response from the endpoint
@@ -191,28 +258,46 @@ export const ApiGatewayAdmin: React.FC = () => {
 
     // Fallback to schema-based examples if endpoint is not available
     const schemaExamples: Record<string, string> = {
-      '/api/materials': JSON.stringify({
-        data: 'Real materials data would be fetched from database',
-        success: true,
-        note: 'This is a schema example - real endpoint may be unavailable',
-      }, null, 2),
-      '/api/recognition': JSON.stringify({
-        data: 'Real recognition results would be returned',
-        success: true,
-        note: 'This is a schema example - real endpoint may be unavailable',
-      }, null, 2),
-      '/api/search': JSON.stringify({
-        data: 'Real search results would be returned',
-        success: true,
-        note: 'This is a schema example - real endpoint may be unavailable',
-      }, null, 2),
+      '/api/materials': JSON.stringify(
+        {
+          data: 'Real materials data would be fetched from database',
+          success: true,
+          note: 'This is a schema example - real endpoint may be unavailable',
+        },
+        null,
+        2,
+      ),
+      '/api/recognition': JSON.stringify(
+        {
+          data: 'Real recognition results would be returned',
+          success: true,
+          note: 'This is a schema example - real endpoint may be unavailable',
+        },
+        null,
+        2,
+      ),
+      '/api/search': JSON.stringify(
+        {
+          data: 'Real search results would be returned',
+          success: true,
+          note: 'This is a schema example - real endpoint may be unavailable',
+        },
+        null,
+        2,
+      ),
     };
 
-    const fallbackExample = schemaExamples[path] || JSON.stringify({
-      data: 'Real endpoint response would be shown here',
-      success: true,
-      note: 'This is a schema example - real endpoint may be unavailable',
-    }, null, 2);
+    const fallbackExample =
+      schemaExamples[path] ||
+      JSON.stringify(
+        {
+          data: 'Real endpoint response would be shown here',
+          success: true,
+          note: 'This is a schema example - real endpoint may be unavailable',
+        },
+        null,
+        2,
+      );
 
     setResponseExample(fallbackExample);
   };
@@ -276,12 +361,36 @@ export const ApiGatewayAdmin: React.FC = () => {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {Object.entries({
-                    authentication: { value: globalRateLimits.authentication, color: 'text-green-600', description: 'Login, register, tokens' },
-                    materials: { value: globalRateLimits.materials, color: 'text-blue-600', description: 'CRUD operations' },
-                    recognition: { value: globalRateLimits.recognition, color: 'text-orange-600', description: 'AI processing' },
-                    search: { value: globalRateLimits.search, color: 'text-purple-600', description: 'Vector & text search' },
-                    admin: { value: globalRateLimits.admin, color: 'text-red-600', description: 'Administrative ops' },
-                    analytics: { value: globalRateLimits.analytics, color: 'text-cyan-600', description: 'Event tracking' },
+                    authentication: {
+                      value: globalRateLimits.authentication,
+                      color: 'text-green-600',
+                      description: 'Login, register, tokens',
+                    },
+                    materials: {
+                      value: globalRateLimits.materials,
+                      color: 'text-blue-600',
+                      description: 'CRUD operations',
+                    },
+                    recognition: {
+                      value: globalRateLimits.recognition,
+                      color: 'text-orange-600',
+                      description: 'AI processing',
+                    },
+                    search: {
+                      value: globalRateLimits.search,
+                      color: 'text-purple-600',
+                      description: 'Vector & text search',
+                    },
+                    admin: {
+                      value: globalRateLimits.admin,
+                      color: 'text-red-600',
+                      description: 'Administrative ops',
+                    },
+                    analytics: {
+                      value: globalRateLimits.analytics,
+                      color: 'text-cyan-600',
+                      description: 'Event tracking',
+                    },
                   }).map(([category, config]) => (
                     <div key={category} className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between mb-2">
@@ -296,23 +405,36 @@ export const ApiGatewayAdmin: React.FC = () => {
                           </DialogTrigger>
                           <DialogContent>
                             <DialogHeader>
-                              <DialogTitle>Edit {category.charAt(0).toUpperCase() + category.slice(1)} Rate Limit</DialogTitle>
+                              <DialogTitle>
+                                Edit{' '}
+                                {category.charAt(0).toUpperCase() +
+                                  category.slice(1)}{' '}
+                                Rate Limit
+                              </DialogTitle>
                               <DialogDescription>
-                                Update the global rate limit for {category} endpoints
+                                Update the global rate limit for {category}{' '}
+                                endpoints
                               </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
                               <div>
-                                <Label htmlFor="rateLimit">Rate Limit (requests/minute)</Label>
+                                <Label htmlFor="rateLimit">
+                                  Rate Limit (requests/minute)
+                                </Label>
                                 <Input
                                   id="rateLimit"
                                   type="number"
                                   defaultValue={config.value}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
-                                      const newValue = parseInt((e.target as HTMLInputElement).value);
+                                      const newValue = parseInt(
+                                        (e.target as HTMLInputElement).value,
+                                      );
                                       if (!isNaN(newValue)) {
-                                        updateGlobalRateLimit(category, newValue);
+                                        updateGlobalRateLimit(
+                                          category,
+                                          newValue,
+                                        );
                                       }
                                     }
                                   }}
@@ -321,7 +443,9 @@ export const ApiGatewayAdmin: React.FC = () => {
                               </div>
                               <Button
                                 onClick={(e) => {
-                                  const input = (e.target as HTMLButtonElement).parentElement?.querySelector('input');
+                                  const input = (
+                                    e.target as HTMLButtonElement
+                                  ).parentElement?.querySelector('input');
                                   if (input) {
                                     const newValue = parseInt(input.value);
                                     if (!isNaN(newValue)) {
@@ -337,8 +461,12 @@ export const ApiGatewayAdmin: React.FC = () => {
                           </DialogContent>
                         </Dialog>
                       </div>
-                      <p className="text-2xl font-bold">{config.value} req/min</p>
-                      <p className="text-sm text-muted-foreground">{config.description}</p>
+                      <p className="text-2xl font-bold">
+                        {config.value} req/min
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {config.description}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -350,7 +478,8 @@ export const ApiGatewayAdmin: React.FC = () => {
               <CardHeader>
                 <CardTitle>API Endpoints</CardTitle>
                 <CardDescription>
-                  Configure individual endpoints, their rate limits, and public access costs
+                  Configure individual endpoints, their rate limits, and public
+                  access costs
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -365,13 +494,16 @@ export const ApiGatewayAdmin: React.FC = () => {
                       className="pl-10"
                     />
                   </div>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger className="w-48">
                       <SelectValue placeholder="Filter by category" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
-                      {categories.map(category => (
+                      {categories.map((category) => (
                         <SelectItem key={category} value={category}>
                           {category.charAt(0).toUpperCase() + category.slice(1)}
                         </SelectItem>
@@ -384,11 +516,17 @@ export const ApiGatewayAdmin: React.FC = () => {
                 {filteredEndpoints.length === 0 ? (
                   <div className="text-center py-8 border rounded-lg">
                     <Settings className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No API Endpoints Found</h3>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      No API Endpoints Found
+                    </h3>
                     <p className="text-muted-foreground mb-4">
-                      Click "Seed Default Endpoints" to populate with default API endpoints
+                      Click "Seed Default Endpoints" to populate with default
+                      API endpoints
                     </p>
-                    <Button onClick={seedDefaultEndpoints} className="border border-gray-300 px-4 py-2">
+                    <Button
+                      onClick={seedDefaultEndpoints}
+                      className="border border-gray-300 px-4 py-2"
+                    >
                       <Plus className="mr-2 h-4 w-4" />
                       Seed Default Endpoints
                     </Button>
@@ -421,10 +559,14 @@ export const ApiGatewayAdmin: React.FC = () => {
                               {endpoint.path}
                             </TableCell>
                             <TableCell>
-                              <Badge className="border border-gray-300 text-xs px-2 py-1">{endpoint.method}</Badge>
+                              <Badge className="border border-gray-300 text-xs px-2 py-1">
+                                {endpoint.method}
+                              </Badge>
                             </TableCell>
                             <TableCell>
-                              <Badge className="bg-gray-100 text-gray-800 text-xs px-2 py-1">{endpoint.category}</Badge>
+                              <Badge className="bg-gray-100 text-gray-800 text-xs px-2 py-1">
+                                {endpoint.category}
+                              </Badge>
                             </TableCell>
                             <TableCell className="max-w-xs truncate">
                               {endpoint.description || 'No description'}
@@ -437,18 +579,26 @@ export const ApiGatewayAdmin: React.FC = () => {
                                   onChange={(e) => {
                                     const newLimit = parseInt(e.target.value);
                                     if (!isNaN(newLimit)) {
-                                      updateEndpointRateLimit(endpoint.id, newLimit);
+                                      updateEndpointRateLimit(
+                                        endpoint.id,
+                                        newLimit,
+                                      );
                                     }
                                   }}
                                   onBlur={(e) => {
                                     const newLimit = parseInt(e.target.value);
                                     if (!isNaN(newLimit)) {
-                                      updateEndpointRateLimit(endpoint.id, newLimit);
+                                      updateEndpointRateLimit(
+                                        endpoint.id,
+                                        newLimit,
+                                      );
                                     }
                                   }}
                                   className="w-20 h-8"
                                 />
-                                <span className="text-xs text-muted-foreground">req/min</span>
+                                <span className="text-xs text-muted-foreground">
+                                  req/min
+                                </span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -465,7 +615,10 @@ export const ApiGatewayAdmin: React.FC = () => {
                                 <Switch
                                   checked={endpoint.is_public}
                                   onCheckedChange={() =>
-                                    toggleEndpointPublicAccess(endpoint.id, endpoint.is_public)
+                                    toggleEndpointPublicAccess(
+                                      endpoint.id,
+                                      endpoint.is_public,
+                                    )
                                   }
                                 />
                                 {endpoint.is_public ? (
@@ -480,7 +633,10 @@ export const ApiGatewayAdmin: React.FC = () => {
                                 <Switch
                                   checked={endpoint.is_internal}
                                   onCheckedChange={() =>
-                                    toggleEndpointInternalAccess(endpoint.id, endpoint.is_internal)
+                                    toggleEndpointInternalAccess(
+                                      endpoint.id,
+                                      endpoint.is_internal,
+                                    )
                                   }
                                 />
                                 {endpoint.is_internal ? (
@@ -513,7 +669,9 @@ export const ApiGatewayAdmin: React.FC = () => {
                 {apiKeys.length === 0 ? (
                   <div className="text-center py-8">
                     <Key className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <h3 className="mt-4 text-lg font-semibold">No API Keys Generated</h3>
+                    <h3 className="mt-4 text-lg font-semibold">
+                      No API Keys Generated
+                    </h3>
                     <p className="text-muted-foreground mb-4">
                       Generate API keys to enable external access to your APIs
                     </p>
@@ -526,7 +684,13 @@ export const ApiGatewayAdmin: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h4 className="font-medium">{apiKey.key_name}</h4>
-                              <Badge className={apiKey.is_active ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1' : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'}>
+                              <Badge
+                                className={
+                                  apiKey.is_active
+                                    ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1'
+                                    : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'
+                                }
+                              >
                                 {apiKey.is_active ? 'Active' : 'Revoked'}
                               </Badge>
                               {apiKey.rate_limit_override && (
@@ -543,25 +707,39 @@ export const ApiGatewayAdmin: React.FC = () => {
                             <div className="grid grid-cols-4 gap-4 mb-3">
                               <div className="text-center p-2 bg-muted rounded">
                                 <div className="text-lg font-semibold">0</div>
-                                <div className="text-xs text-muted-foreground">Total Calls</div>
+                                <div className="text-xs text-muted-foreground">
+                                  Total Calls
+                                </div>
                               </div>
                               <div className="text-center p-2 bg-muted rounded">
                                 <div className="text-lg font-semibold">0</div>
-                                <div className="text-xs text-muted-foreground">This Month</div>
+                                <div className="text-xs text-muted-foreground">
+                                  This Month
+                                </div>
                               </div>
                               <div className="text-center p-2 bg-muted rounded">
-                                <div className="text-lg font-semibold">$0.00</div>
-                                <div className="text-xs text-muted-foreground">Total Cost</div>
+                                <div className="text-lg font-semibold">
+                                  $0.00
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Total Cost
+                                </div>
                               </div>
                               <div className="text-center p-2 bg-muted rounded">
-                                <div className="text-lg font-semibold">Never</div>
-                                <div className="text-xs text-muted-foreground">Last Used</div>
+                                <div className="text-lg font-semibold">
+                                  Never
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Last Used
+                                </div>
                               </div>
                             </div>
 
                             <div className="text-xs text-muted-foreground">
-                              Created: {new Date(apiKey.created_at).toLocaleDateString()}
-                              {apiKey.expires_at && ` • Expires: ${new Date(apiKey.expires_at).toLocaleDateString()}`}
+                              Created:{' '}
+                              {new Date(apiKey.created_at).toLocaleDateString()}
+                              {apiKey.expires_at &&
+                                ` • Expires: ${new Date(apiKey.expires_at).toLocaleDateString()}`}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -577,9 +755,12 @@ export const ApiGatewayAdmin: React.FC = () => {
                               </SheetTrigger>
                               <SheetContent>
                                 <SheetHeader>
-                                  <SheetTitle>Custom Rate Limit Rules</SheetTitle>
+                                  <SheetTitle>
+                                    Custom Rate Limit Rules
+                                  </SheetTitle>
                                   <SheetDescription>
-                                    Configure specific rate limit rules for {apiKey.key_name}
+                                    Configure specific rate limit rules for{' '}
+                                    {apiKey.key_name}
                                   </SheetDescription>
                                 </SheetHeader>
                                 <div className="mt-6 space-y-4">
@@ -588,7 +769,9 @@ export const ApiGatewayAdmin: React.FC = () => {
                                     <Input
                                       type="number"
                                       placeholder="Enter custom rate limit"
-                                      defaultValue={apiKey.rate_limit_override || ''}
+                                      defaultValue={
+                                        apiKey.rate_limit_override || ''
+                                      }
                                     />
                                     <p className="text-xs text-muted-foreground">
                                       Leave empty to use global rate limits
@@ -599,11 +782,16 @@ export const ApiGatewayAdmin: React.FC = () => {
                                     <Label>Allowed Endpoints</Label>
                                     <div className="space-y-2 max-h-48 overflow-y-auto">
                                       {endpoints.map((endpoint) => (
-                                        <div key={endpoint.id} className="flex items-center space-x-2">
+                                        <div
+                                          key={endpoint.id}
+                                          className="flex items-center space-x-2"
+                                        >
                                           <input
                                             type="checkbox"
                                             id={`endpoint-${endpoint.id}`}
-                                            defaultChecked={apiKey.allowed_endpoints?.includes(endpoint.id)}
+                                            defaultChecked={apiKey.allowed_endpoints?.includes(
+                                              endpoint.id,
+                                            )}
                                             className="rounded"
                                           />
                                           <Label
@@ -621,7 +809,13 @@ export const ApiGatewayAdmin: React.FC = () => {
                                     <Label>Expiration Date</Label>
                                     <Input
                                       type="datetime-local"
-                                      defaultValue={apiKey.expires_at ? new Date(apiKey.expires_at).toISOString().slice(0, 16) : ''}
+                                      defaultValue={
+                                        apiKey.expires_at
+                                          ? new Date(apiKey.expires_at)
+                                              .toISOString()
+                                              .slice(0, 16)
+                                          : ''
+                                      }
                                     />
                                   </div>
 
@@ -666,34 +860,50 @@ export const ApiGatewayAdmin: React.FC = () => {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Total API Calls</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Total API Calls
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">+0% from last month</p>
+                  <p className="text-xs text-muted-foreground">
+                    +0% from last month
+                  </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Active API Keys</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Active API Keys
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{apiKeys.filter(k => k.is_active).length}</div>
-                  <p className="text-xs text-muted-foreground">Currently active</p>
+                  <div className="text-2xl font-bold">
+                    {apiKeys.filter((k) => k.is_active).length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Currently active
+                  </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Rate Limit Hits</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Rate Limit Hits
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">0</div>
-                  <p className="text-xs text-muted-foreground">Rate limit exceeded</p>
+                  <p className="text-xs text-muted-foreground">
+                    Rate limit exceeded
+                  </p>
                 </CardContent>
               </Card>
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium">Error Rate</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Error Rate
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">0%</div>
@@ -705,7 +915,9 @@ export const ApiGatewayAdmin: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Recent API Activity</CardTitle>
-                <CardDescription>Latest API requests and their status</CardDescription>
+                <CardDescription>
+                  Latest API requests and their status
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="text-center py-8 text-muted-foreground">
@@ -719,7 +931,10 @@ export const ApiGatewayAdmin: React.FC = () => {
 
         {/* Endpoint Details Modal */}
         <Sheet open={endpointDetailsOpen} onOpenChange={setEndpointDetailsOpen}>
-          <SheetContent className="w-[700px] sm:w-[800px]" side={'right' as const}>
+          <SheetContent
+            className="w-[700px] sm:w-[800px]"
+            side={'right' as const}
+          >
             <SheetHeader>
               <SheetTitle>API Endpoint Details</SheetTitle>
               <SheetDescription>
@@ -730,48 +945,83 @@ export const ApiGatewayAdmin: React.FC = () => {
               <div className="mt-6 space-y-6">
                 <div className="grid gap-4">
                   <div>
-                    <h4 className="font-medium text-sm text-muted-foreground">Endpoint Path</h4>
+                    <h4 className="font-medium text-sm text-muted-foreground">
+                      Endpoint Path
+                    </h4>
                     <p className="font-mono text-lg">{selectedEndpoint.path}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground">Method</h4>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1 mt-1">{selectedEndpoint.method}</Badge>
+                      <h4 className="font-medium text-sm text-muted-foreground">
+                        Method
+                      </h4>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1 mt-1">
+                        {selectedEndpoint.method}
+                      </Badge>
                     </div>
                     <div>
-                      <h4 className="font-medium text-sm text-muted-foreground">Category</h4>
-                      <Badge className="bg-gray-100 text-gray-800 text-xs px-2 py-1 mt-1">{selectedEndpoint.category}</Badge>
+                      <h4 className="font-medium text-sm text-muted-foreground">
+                        Category
+                      </h4>
+                      <Badge className="bg-gray-100 text-gray-800 text-xs px-2 py-1 mt-1">
+                        {selectedEndpoint.category}
+                      </Badge>
                     </div>
                   </div>
                   <div>
-                    <h4 className="font-medium text-sm text-muted-foreground">Description</h4>
-                    <p className="text-sm">{selectedEndpoint.description || 'No description available'}</p>
+                    <h4 className="font-medium text-sm text-muted-foreground">
+                      Description
+                    </h4>
+                    <p className="text-sm">
+                      {selectedEndpoint.description ||
+                        'No description available'}
+                    </p>
                   </div>
                 </div>
 
                 <div className="grid gap-4">
-                  <h3 className="text-lg font-semibold">Access Configuration</h3>
+                  <h3 className="text-lg font-semibold">
+                    Access Configuration
+                  </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Public Access</span>
-                        <Badge className={selectedEndpoint.is_public ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1' : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'}>
+                        <Badge
+                          className={
+                            selectedEndpoint.is_public
+                              ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1'
+                              : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'
+                          }
+                        >
                           {selectedEndpoint.is_public ? 'Enabled' : 'Disabled'}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {selectedEndpoint.is_public ? 'Available to external users' : 'Internal access only'}
+                        {selectedEndpoint.is_public
+                          ? 'Available to external users'
+                          : 'Internal access only'}
                       </p>
                     </div>
                     <div className="p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Internal Access</span>
-                        <Badge className={selectedEndpoint.is_internal ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1' : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'}>
-                          {selectedEndpoint.is_internal ? 'Enabled' : 'Disabled'}
+                        <Badge
+                          className={
+                            selectedEndpoint.is_internal
+                              ? 'bg-blue-100 text-blue-800 text-xs px-2 py-1'
+                              : 'bg-gray-100 text-gray-800 text-xs px-2 py-1'
+                          }
+                        >
+                          {selectedEndpoint.is_internal
+                            ? 'Enabled'
+                            : 'Disabled'}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {selectedEndpoint.is_internal ? 'Available to internal networks' : 'No internal access'}
+                        {selectedEndpoint.is_internal
+                          ? 'Available to internal networks'
+                          : 'No internal access'}
                       </p>
                     </div>
                   </div>
@@ -782,7 +1032,9 @@ export const ApiGatewayAdmin: React.FC = () => {
                   <div className="p-4 border rounded-lg">
                     <div className="flex items-center justify-between">
                       <span className="font-medium">Current Rate Limit</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">{selectedEndpoint.rate_limit_per_minute} req/min</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">
+                        {selectedEndpoint.rate_limit_per_minute} req/min
+                      </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
                       Maximum requests allowed per minute for this endpoint
@@ -793,7 +1045,9 @@ export const ApiGatewayAdmin: React.FC = () => {
                 <div className="grid gap-4">
                   <h3 className="text-lg font-semibold">Response Format</h3>
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <h4 className="font-medium text-sm mb-2">Expected Response</h4>
+                    <h4 className="font-medium text-sm mb-2">
+                      Expected Response
+                    </h4>
                     <pre className="text-sm text-muted-foreground whitespace-pre-wrap">
                       {responseExample}
                     </pre>
@@ -805,15 +1059,21 @@ export const ApiGatewayAdmin: React.FC = () => {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center p-3 border rounded-lg">
                       <div className="text-lg font-semibold">0</div>
-                      <div className="text-xs text-muted-foreground">Total Calls</div>
+                      <div className="text-xs text-muted-foreground">
+                        Total Calls
+                      </div>
                     </div>
                     <div className="text-center p-3 border rounded-lg">
                       <div className="text-lg font-semibold">0ms</div>
-                      <div className="text-xs text-muted-foreground">Avg Response Time</div>
+                      <div className="text-xs text-muted-foreground">
+                        Avg Response Time
+                      </div>
                     </div>
                     <div className="text-center p-3 border rounded-lg">
                       <div className="text-lg font-semibold">0%</div>
-                      <div className="text-xs text-muted-foreground">Error Rate</div>
+                      <div className="text-xs text-muted-foreground">
+                        Error Rate
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -46,9 +46,13 @@ export class SVBRDFExtractionAPI {
   /**
    * Start SVBRDF extraction from an image
    */
-  static async startExtraction(request: SVBRDFExtractionRequest): Promise<SVBRDFExtractionResult> {
+  static async startExtraction(
+    request: SVBRDFExtractionRequest,
+  ): Promise<SVBRDFExtractionResult> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -72,9 +76,13 @@ export class SVBRDFExtractionAPI {
   /**
    * Get user's SVBRDF extractions
    */
-  static async getUserExtractions(limit = 20): Promise<SVBRDFExtractionRecord[]> {
+  static async getUserExtractions(
+    limit = 20,
+  ): Promise<SVBRDFExtractionRecord[]> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -100,7 +108,9 @@ export class SVBRDFExtractionAPI {
   /**
    * Get specific SVBRDF extraction by ID
    */
-  static async getExtraction(id: string): Promise<SVBRDFExtractionRecord | null> {
+  static async getExtraction(
+    id: string,
+  ): Promise<SVBRDFExtractionRecord | null> {
     try {
       const { data, error } = await supabase
         .from('svbrdf_extractions')
@@ -122,9 +132,14 @@ export class SVBRDFExtractionAPI {
   /**
    * Upload image and start SVBRDF extraction
    */
-  static async uploadImageAndExtract(file: File, materialId?: string): Promise<SVBRDFExtractionResult> {
+  static async uploadImageAndExtract(
+    file: File,
+    materialId?: string,
+  ): Promise<SVBRDFExtractionResult> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -151,7 +166,6 @@ export class SVBRDFExtractionAPI {
         source_image_url: urlData.publicUrl,
         material_id: materialId,
       });
-
     } catch (error) {
       console.error('Error uploading image and starting extraction:', error);
       throw error;
@@ -163,16 +177,23 @@ export class SVBRDFExtractionAPI {
    */
   static async getExtractionAnalytics(_timeRange = '30 days') {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
       const { data, error } = await supabase
         .from('svbrdf_extractions')
-        .select('extraction_status, confidence_score, processing_time_ms, created_at, extracted_properties')
+        .select(
+          'extraction_status, confidence_score, processing_time_ms, created_at, extracted_properties',
+        )
         .eq('user_id', user.id)
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+        .gte(
+          'created_at',
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        );
 
       if (error) {
         throw error;
@@ -180,14 +201,31 @@ export class SVBRDFExtractionAPI {
 
       const analytics = {
         total_extractions: data.length,
-        successful_extractions: data.filter((e: unknown) => (e as any).extraction_status === 'completed').length,
-        failed_extractions: data.filter((e: unknown) => (e as any).extraction_status === 'failed').length,
-        average_processing_time: data
-          .filter((e: unknown) => (e as any).processing_time_ms)
-          .reduce((acc: any, e: any) => acc + ((e as any).processing_time_ms || 0), 0) / data.filter((e: unknown) => (e as any).processing_time_ms).length || 0,
-        average_confidence: data
-          .filter((e: unknown) => (e as any).confidence_score)
-          .reduce((acc: any, e: any) => acc + (((e as any).confidence_score || 0) as any), 0) / data.filter((e: unknown) => (e as any).confidence_score).length || 0,
+        successful_extractions: data.filter(
+          (e: unknown) => (e as any).extraction_status === 'completed',
+        ).length,
+        failed_extractions: data.filter(
+          (e: unknown) => (e as any).extraction_status === 'failed',
+        ).length,
+        average_processing_time:
+          data
+            .filter((e: unknown) => (e as any).processing_time_ms)
+            .reduce(
+              (acc: any, e: any) => acc + ((e as any).processing_time_ms || 0),
+              0,
+            ) /
+            data.filter((e: unknown) => (e as any).processing_time_ms).length ||
+          0,
+        average_confidence:
+          data
+            .filter((e: unknown) => (e as any).confidence_score)
+            .reduce(
+              (acc: any, e: any) =>
+                acc + (((e as any).confidence_score || 0) as any),
+              0,
+            ) /
+            data.filter((e: unknown) => (e as any).confidence_score).length ||
+          0,
         material_types: this.analyzeMaterialTypes(data),
         surface_categories: this.analyzeSurfaceCategories(data),
       };
@@ -202,9 +240,14 @@ export class SVBRDFExtractionAPI {
   /**
    * Link extraction to material in catalog
    */
-  static async linkToMaterial(extractionId: string, materialId: string): Promise<void> {
+  static async linkToMaterial(
+    extractionId: string,
+    materialId: string,
+  ): Promise<void> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -230,7 +273,11 @@ export class SVBRDFExtractionAPI {
   static async updateMaterialProperties(extractionId: string): Promise<void> {
     try {
       const extraction = await this.getExtraction(extractionId);
-      if (!extraction || !extraction.material_id || !extraction.extracted_properties) {
+      if (
+        !extraction ||
+        !extraction.material_id ||
+        !extraction.extracted_properties
+      ) {
         throw new Error('Extraction not found or missing material/properties');
       }
 
@@ -261,9 +308,11 @@ export class SVBRDFExtractionAPI {
     }
   }
 
-  private static analyzeMaterialTypes(data: SVBRDFExtractionRecord[]): Record<string, number> {
+  private static analyzeMaterialTypes(
+    data: SVBRDFExtractionRecord[],
+  ): Record<string, number> {
     const types: Record<string, number> = {};
-    data.forEach(extraction => {
+    data.forEach((extraction) => {
       if (extraction.extracted_properties?.material_type) {
         const type = extraction.extracted_properties.material_type;
         if (typeof type === 'string') {
@@ -274,9 +323,11 @@ export class SVBRDFExtractionAPI {
     return types;
   }
 
-  private static analyzeSurfaceCategories(data: SVBRDFExtractionRecord[]): Record<string, number> {
+  private static analyzeSurfaceCategories(
+    data: SVBRDFExtractionRecord[],
+  ): Record<string, number> {
     const categories: Record<string, number> = {};
-    data.forEach(extraction => {
+    data.forEach((extraction) => {
       if (extraction.extracted_properties?.surface_category) {
         const category = extraction.extracted_properties.surface_category;
         if (typeof category === 'string') {

@@ -2,10 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Loader2, ExternalLink, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-
 
 interface HTMLDocumentViewerProps {
   isOpen: boolean;
@@ -44,18 +48,25 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
       let htmlContent = knowledgeEntry.description || '';
 
       // Check if properties is an object and has html_content
-      if (knowledgeEntry.properties &&
-          typeof knowledgeEntry.properties === 'object' &&
-          !Array.isArray(knowledgeEntry.properties) &&
-          knowledgeEntry.properties !== null) {
+      if (
+        knowledgeEntry.properties &&
+        typeof knowledgeEntry.properties === 'object' &&
+        !Array.isArray(knowledgeEntry.properties) &&
+        knowledgeEntry.properties !== null
+      ) {
         const props = knowledgeEntry.properties as Record<string, unknown>;
-        htmlContent = (typeof props.html_content === 'string' ? props.html_content : htmlContent);
+        htmlContent =
+          typeof props.html_content === 'string'
+            ? props.html_content
+            : htmlContent;
       }
 
       setHtmlContent(htmlContent);
     } catch (err) {
       console.error('Error fetching HTML content:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load HTML document');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load HTML document',
+      );
       toast.error('Failed to load HTML document');
     } finally {
       setLoading(false);
@@ -66,7 +77,6 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
       fetchHTMLContent();
     }
   }, [isOpen, knowledgeEntryId, fetchHTMLContent]);
-
 
   const downloadHTML = () => {
     if (!htmlContent) return;
@@ -101,7 +111,8 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
             </DialogTitle>
             <div className="flex gap-2">
               <Button
-                onClick={openInNewTab} onKeyDown={(e) => e.key === 'Enter' && openInNewTab()}
+                onClick={openInNewTab}
+                onKeyDown={(e) => e.key === 'Enter' && openInNewTab()}
                 disabled={!htmlContent || loading}
                 className="text-xs"
               >
@@ -109,7 +120,8 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
                 Open in New Tab
               </Button>
               <Button
-                onClick={downloadHTML} onKeyDown={(e) => e.key === 'Enter' && downloadHTML()}
+                onClick={downloadHTML}
+                onKeyDown={(e) => e.key === 'Enter' && downloadHTML()}
                 disabled={!htmlContent || loading}
                 className="text-xs"
               >
@@ -131,10 +143,13 @@ export const HTMLDocumentViewer: React.FC<HTMLDocumentViewerProps> = ({
           ) : error ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <p className="text-red-600 font-medium">Error loading document</p>
+                <p className="text-red-600 font-medium">
+                  Error loading document
+                </p>
                 <p className="text-gray-500 text-sm mt-1">{error}</p>
                 <Button
-                  onClick={fetchHTMLContent} onKeyDown={(e) => e.key === 'Enter' && fetchHTMLContent()}
+                  onClick={fetchHTMLContent}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchHTMLContent()}
                   className="mt-3"
                 >
                   Try Again

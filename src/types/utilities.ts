@@ -40,10 +40,10 @@ export type DeepPartial<T> = {
   [P in keyof T]?: T[P] extends (infer U)[]
     ? DeepPartial<U>[]
     : T[P] extends readonly (infer U)[]
-    ? readonly DeepPartial<U>[]
-    : T[P] extends object
-    ? DeepPartial<T[P]>
-    : T[P];
+      ? readonly DeepPartial<U>[]
+      : T[P] extends object
+        ? DeepPartial<T[P]>
+        : T[P];
 };
 
 /**
@@ -61,10 +61,10 @@ export type DeepRequired<T> = {
   [P in keyof T]-?: T[P] extends (infer U)[]
     ? DeepRequired<U>[]
     : T[P] extends readonly (infer U)[]
-    ? readonly DeepRequired<U>[]
-    : T[P] extends object | undefined
-    ? DeepRequired<NonNullable<T[P]>>
-    : T[P];
+      ? readonly DeepRequired<U>[]
+      : T[P] extends object | undefined
+        ? DeepRequired<NonNullable<T[P]>>
+        : T[P];
 };
 
 /**
@@ -82,10 +82,10 @@ export type DeepReadonly<T> = {
   readonly [P in keyof T]: T[P] extends (infer U)[]
     ? readonly DeepReadonly<U>[]
     : T[P] extends readonly (infer U)[]
-    ? readonly DeepReadonly<U>[]
-    : T[P] extends object
-    ? DeepReadonly<T[P]>
-    : T[P];
+      ? readonly DeepReadonly<U>[]
+      : T[P] extends object
+        ? DeepReadonly<T[P]>
+        : T[P];
 };
 
 // =============================================================================
@@ -241,7 +241,10 @@ export function isNonEmptyArray<T>(array: T[]): array is NonEmptyArray<T> {
  * // Type is NonEmptyArray<Material>
  * ```
  */
-export function createNonEmptyArray<T>(first: T, ...rest: T[]): NonEmptyArray<T> {
+export function createNonEmptyArray<T>(
+  first: T,
+  ...rest: T[]
+): NonEmptyArray<T> {
   return [first, ...rest];
 }
 
@@ -282,13 +285,12 @@ export type MaybePromise<T> = T | Promise<T>;
  *
  * @template T - Function type
  */
-export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> = T extends (
-  ...args: unknown[]
-) => Promise<infer R>
-  ? R
-  : T extends (...args: unknown[]) => infer R
-  ? R
-  : never;
+export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> =
+  T extends (...args: unknown[]) => Promise<infer R>
+    ? R
+    : T extends (...args: unknown[]) => infer R
+      ? R
+      : never;
 
 /**
  * Makes specific properties optional while keeping others required.
@@ -306,7 +308,8 @@ export type ReturnTypeAsync<T extends (...args: unknown[]) => unknown> = T exten
  * type CreateUser = PartialBy<User, 'id'>; // id is optional, name and email required
  * ```
  */
-export type PartialBy<T, K extends keyof T> = StrictOmit<T, K> & Partial<StrictPick<T, K>>;
+export type PartialBy<T, K extends keyof T> = StrictOmit<T, K> &
+  Partial<StrictPick<T, K>>;
 
 /**
  * Makes specific properties required while keeping others as-is.
@@ -353,9 +356,10 @@ export type BrandedNumber<B> = Brand<number, B>;
 /**
  * Checks if type T is exactly type U (strict equality).
  */
-export type IsExact<T, U> = (<G>() => G extends T ? 1 : 2) extends <G>() => G extends U ? 1 : 2
-  ? true
-  : false;
+export type IsExact<T, U> =
+  (<G>() => G extends T ? 1 : 2) extends <G>() => G extends U ? 1 : 2
+    ? true
+    : false;
 
 /**
  * Checks if type T extends type U.
@@ -375,7 +379,8 @@ export type IsAny<T> = 0 extends 1 & T ? true : false;
 /**
  * Checks if type T is unknown.
  */
-export type IsUnknown<T> = IsAny<T> extends true ? false : unknown extends T ? true : false;
+export type IsUnknown<T> =
+  IsAny<T> extends true ? false : unknown extends T ? true : false;
 
 // =============================================================================
 // OBJECT UTILITIES
@@ -402,7 +407,10 @@ export type Union<A, B> = A | B | (A & B);
 /**
  * Removes properties with never values from a type.
  */
-export type OmitNever<T> = Pick<T, { [K in keyof T]: T[K] extends never ? never : K }[keyof T]>;
+export type OmitNever<T> = Pick<
+  T,
+  { [K in keyof T]: T[K] extends never ? never : K }[keyof T]
+>;
 
 /**
  * Makes all properties mutable (removes readonly).
@@ -439,7 +447,9 @@ export function validationSuccess<T>(data: T): ValidationResult<T> {
 /**
  * Helper to create a failed validation result.
  */
-export function validationFailure<E = string>(error: E): ValidationResult<never, E> {
+export function validationFailure<E = string>(
+  error: E,
+): ValidationResult<never, E> {
   return { success: false, error };
 }
 
@@ -473,14 +483,19 @@ export function isValidationSuccess<T, E>(
 /**
  * Type guard to check if a result is successful.
  */
-export function isOk<T, E>(result: Result<T, E>): result is { ok: true; value: T } {
+export function isOk<T, E>(
+  result: Result<T, E>,
+): result is { ok: true; value: T } {
   return result.ok;
 }
 
 /**
  * Asserts that a value is defined (not null or undefined).
  */
-export function assertDefined<T>(value: T | null | undefined, message?: string): asserts value is T {
+export function assertDefined<T>(
+  value: T | null | undefined,
+  message?: string,
+): asserts value is T {
   if (value === null || value === undefined) {
     throw new Error(message || 'Expected value to be defined');
   }
@@ -541,7 +556,10 @@ export type UncapitalizeString<S extends string> = Uncapitalize<S>;
 export type MaterialUpdate<T> = DeepPartial<T> & { id: string };
 
 /** Represents a creation payload (omits generated fields if they exist) */
-export type CreatePayload<T> = Omit<T, Extract<keyof T, 'id' | 'createdAt' | 'updatedAt'>>;
+export type CreatePayload<T> = Omit<
+  T,
+  Extract<keyof T, 'id' | 'createdAt' | 'updatedAt'>
+>;
 
 /** Represents API response data with metadata */
 export type WithMetadata<T> = T & {
@@ -612,7 +630,9 @@ export function apiSuccess<TData>(data: TData): ApiResponse<TData> {
 /**
  * Helper function to create a failed API response.
  */
-export function apiError<TError = string>(error: TError): ApiResponse<never, TError> {
+export function apiError<TError = string>(
+  error: TError,
+): ApiResponse<never, TError> {
   return { success: false, error };
 }
 
@@ -680,7 +700,10 @@ export interface PaginatedResponse<TItem> {
 /**
  * Paginated API response combining ApiResponse with PaginatedResponse.
  */
-export type PaginatedApiResponse<TItem, TError = string> = ApiResponse<PaginatedResponse<TItem>, TError>;
+export type PaginatedApiResponse<TItem, TError = string> = ApiResponse<
+  PaginatedResponse<TItem>,
+  TError
+>;
 
 // =============================================================================
 // FORM DATA UTILITIES
@@ -709,7 +732,10 @@ export type PaginatedApiResponse<TItem, TError = string> = ApiResponse<Paginated
  * };
  * ```
  */
-export interface FormData<TValues, TErrors = Partial<Record<keyof TValues, string>>> {
+export interface FormData<
+  TValues,
+  TErrors = Partial<Record<keyof TValues, string>>,
+> {
   /** Current form values */
   values: TValues;
   /** Validation errors for each field */
@@ -740,7 +766,15 @@ export interface FormField<TValue = unknown> {
   /** Field label for display */
   label: string;
   /** Field type for rendering */
-  type: 'text' | 'number' | 'email' | 'password' | 'select' | 'textarea' | 'checkbox' | 'radio';
+  type:
+    | 'text'
+    | 'number'
+    | 'email'
+    | 'password'
+    | 'select'
+    | 'textarea'
+    | 'checkbox'
+    | 'radio';
   /** Whether the field is required */
   required?: boolean;
   /** Placeholder text */
@@ -794,7 +828,7 @@ export interface FormField<TValue = unknown> {
  */
 export type Validator<TInput, TOutput = TInput> = (
   input: TInput,
-  ) => ValidationResult<TOutput>;
+) => ValidationResult<TOutput>;
 
 /**
  * Validation schema for complex objects with multiple fields.
@@ -859,7 +893,10 @@ export function composeValidators<T>(
  * };
  * ```
  */
-export interface EntityState<TEntity extends WithId<TId>, TId extends string | number = string> {
+export interface EntityState<
+  TEntity extends WithId<TId>,
+  TId extends string | number = string,
+> {
   /** Normalized entities by ID for O(1) lookups */
   entities: Record<TId, TEntity>;
   /** Ordered array of entity IDs */
@@ -877,7 +914,10 @@ export interface EntityState<TEntity extends WithId<TId>, TId extends string | n
 /**
  * Helper function to create an empty entity state.
  */
-export function createEntityState<TEntity extends WithId<TId>, TId extends string | number = string>(): EntityState<TEntity, TId> {
+export function createEntityState<
+  TEntity extends WithId<TId>,
+  TId extends string | number = string,
+>(): EntityState<TEntity, TId> {
   return {
     entities: {} as Record<TId, TEntity>,
     ids: [],
@@ -889,14 +929,17 @@ export function createEntityState<TEntity extends WithId<TId>, TId extends strin
 /**
  * Helper function to add entities to entity state.
  */
-export function addEntitiesToState<TEntity extends WithId<TId>, TId extends string | number = string>(
+export function addEntitiesToState<
+  TEntity extends WithId<TId>,
+  TId extends string | number = string,
+>(
   state: EntityState<TEntity, TId>,
   entities: TEntity[],
 ): EntityState<TEntity, TId> {
   const newEntities = { ...state.entities };
   const newIds = [...state.ids];
 
-  entities.forEach(entity => {
+  entities.forEach((entity) => {
     if (!newEntities[entity.id]) {
       newIds.push(entity.id);
     }
@@ -913,7 +956,10 @@ export function addEntitiesToState<TEntity extends WithId<TId>, TId extends stri
 /**
  * Helper function to update an entity in entity state.
  */
-export function updateEntityInState<TEntity extends WithId<TId>, TId extends string | number = string>(
+export function updateEntityInState<
+  TEntity extends WithId<TId>,
+  TId extends string | number = string,
+>(
   state: EntityState<TEntity, TId>,
   id: TId,
   updates: Partial<TEntity>,
@@ -935,13 +981,13 @@ export function updateEntityInState<TEntity extends WithId<TId>, TId extends str
 /**
  * Helper function to remove an entity from entity state.
  */
-export function removeEntityFromState<TEntity extends WithId<TId>, TId extends string | number = string>(
-  state: EntityState<TEntity, TId>,
-  id: TId,
-): EntityState<TEntity, TId> {
+export function removeEntityFromState<
+  TEntity extends WithId<TId>,
+  TId extends string | number = string,
+>(state: EntityState<TEntity, TId>, id: TId): EntityState<TEntity, TId> {
   const entities = { ...state.entities };
   delete entities[id];
-  const ids = state.ids.filter(entityId => entityId !== id);
+  const ids = state.ids.filter((entityId) => entityId !== id);
 
   return {
     ...state,
@@ -971,7 +1017,10 @@ export interface AsyncState<TData, TError = string> {
 /**
  * Helper to create initial async state.
  */
-export function createAsyncState<TData, TError = string>(): AsyncState<TData, TError> {
+export function createAsyncState<TData, TError = string>(): AsyncState<
+  TData,
+  TError
+> {
   return {
     data: null,
     loading: false,
@@ -983,7 +1032,10 @@ export function createAsyncState<TData, TError = string>(): AsyncState<TData, TE
 /**
  * Helper to create loading async state.
  */
-export function asyncLoading<TData, TError = string>(): AsyncState<TData, TError> {
+export function asyncLoading<TData, TError = string>(): AsyncState<
+  TData,
+  TError
+> {
   return {
     data: null,
     loading: true,
@@ -995,7 +1047,9 @@ export function asyncLoading<TData, TError = string>(): AsyncState<TData, TError
 /**
  * Helper to create success async state.
  */
-export function asyncSuccess<TData, TError = string>(data: TData): AsyncState<TData, TError> {
+export function asyncSuccess<TData, TError = string>(
+  data: TData,
+): AsyncState<TData, TError> {
   return {
     data,
     loading: false,
@@ -1007,7 +1061,9 @@ export function asyncSuccess<TData, TError = string>(data: TData): AsyncState<TD
 /**
  * Helper to create error async state.
  */
-export function asyncError<TData, TError = string>(error: TError): AsyncState<TData, TError> {
+export function asyncError<TData, TError = string>(
+  error: TError,
+): AsyncState<TData, TError> {
   return {
     data: null,
     loading: false,

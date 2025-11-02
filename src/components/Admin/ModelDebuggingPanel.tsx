@@ -13,10 +13,21 @@ import {
   Copy,
 } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
@@ -70,11 +81,13 @@ const ModelDebuggingPanel: React.FC = () => {
             model: 'adirik/interior-design',
             status: 'success',
             duration: 5.55,
-            imageUrl: 'https://replicate.delivery/xezq/BJkO9E29UeWrGiJaOfeus09teBJMoBo8GiieUwmQHAhnaxKoC/out.png',
+            imageUrl:
+              'https://replicate.delivery/xezq/BJkO9E29UeWrGiJaOfeus09teBJMoBo8GiieUwmQHAhnaxKoC/out.png',
             predictionId: 've6q56x78hrmc0cr2e59vccny0',
           },
         ],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'AI-powered interior design generation from room images',
       },
       {
@@ -83,7 +96,8 @@ const ModelDebuggingPanel: React.FC = () => {
         type: 'image-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'Interior design transformation using AI',
       },
       {
@@ -92,7 +106,8 @@ const ModelDebuggingPanel: React.FC = () => {
         type: 'image-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'ComfyUI-based interior remodeling system',
       },
       {
@@ -101,7 +116,8 @@ const ModelDebuggingPanel: React.FC = () => {
         type: 'image-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'Advanced interior generation development model',
       },
       {
@@ -110,7 +126,8 @@ const ModelDebuggingPanel: React.FC = () => {
         type: 'image-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'Second generation interior design model',
       },
       {
@@ -119,7 +136,8 @@ const ModelDebuggingPanel: React.FC = () => {
         type: 'image-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'SDXL-based interior design generation',
       },
       {
@@ -128,7 +146,8 @@ const ModelDebuggingPanel: React.FC = () => {
         type: 'text-to-image',
         status: 'untested',
         recentLogs: [],
-        versionHash: '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
+        versionHash:
+          '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
         description: 'Architectural design generation from text prompts',
       },
     ];
@@ -137,28 +156,40 @@ const ModelDebuggingPanel: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'working': return 'bg-green-500/20 text-green-600 border-green-200';
-      case 'failing': return 'bg-red-500/20 text-red-600 border-red-200';
-      case 'untested': return 'bg-yellow-500/20 text-yellow-600 border-yellow-200';
-      default: return 'bg-gray-500/20 text-gray-600 border-gray-200';
+      case 'working':
+        return 'bg-green-500/20 text-green-600 border-green-200';
+      case 'failing':
+        return 'bg-red-500/20 text-red-600 border-red-200';
+      case 'untested':
+        return 'bg-yellow-500/20 text-yellow-600 border-yellow-200';
+      default:
+        return 'bg-gray-500/20 text-gray-600 border-gray-200';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'working': return <CheckCircle className="h-4 w-4" />;
-      case 'failing': return <AlertCircle className="h-4 w-4" />;
-      case 'untested': return <Clock className="h-4 w-4" />;
-      default: return <Activity className="h-4 w-4" />;
+      case 'working':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'failing':
+        return <AlertCircle className="h-4 w-4" />;
+      case 'untested':
+        return <Clock className="h-4 w-4" />;
+      default:
+        return <Activity className="h-4 w-4" />;
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'text-to-image': return <FileText className="h-4 w-4" />;
-      case 'image-to-image': return <Image className="h-4 w-4" />;
-      case 'hybrid': return <Sparkles className="h-4 w-4" />;
-      default: return <Settings className="h-4 w-4" />;
+      case 'text-to-image':
+        return <FileText className="h-4 w-4" />;
+      case 'image-to-image':
+        return <Image className="h-4 w-4" />;
+      case 'hybrid':
+        return <Sparkles className="h-4 w-4" />;
+      default:
+        return <Settings className="h-4 w-4" />;
     }
   };
 
@@ -173,28 +204,30 @@ const ModelDebuggingPanel: React.FC = () => {
       });
 
       // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Update model status (this would be based on actual API response)
-      setModels(prev => prev.map(model =>
-        model.name === modelName
-          ? {
-              ...model,
-              status: 'working' as const,
-              lastTested: new Date().toISOString(),
-              recentLogs: [
-                {
-                  id: Date.now().toString(),
-                  timestamp: new Date().toISOString(),
-                  model: modelName,
-                  status: 'success' as const,
-                  duration: Math.random() * 10 + 3,
-                },
-                ...model.recentLogs.slice(0, 4),
-              ],
-            }
-          : model,
-      ));
+      setModels((prev) =>
+        prev.map((model) =>
+          model.name === modelName
+            ? {
+                ...model,
+                status: 'working' as const,
+                lastTested: new Date().toISOString(),
+                recentLogs: [
+                  {
+                    id: Date.now().toString(),
+                    timestamp: new Date().toISOString(),
+                    model: modelName,
+                    status: 'success' as const,
+                    duration: Math.random() * 10 + 3,
+                  },
+                  ...model.recentLogs.slice(0, 4),
+                ],
+              }
+            : model,
+        ),
+      );
 
       toast({
         title: 'Test Complete',
@@ -221,7 +254,7 @@ const ModelDebuggingPanel: React.FC = () => {
     // Simulate testing all models
     for (const model of models) {
       await testModel(model.name);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     setIsLoading(false);
@@ -235,9 +268,9 @@ const ModelDebuggingPanel: React.FC = () => {
     });
   };
 
-  const workingModels = models.filter(m => m.status === 'working').length;
-  const failingModels = models.filter(m => m.status === 'failing').length;
-  const untestedModels = models.filter(m => m.status === 'untested').length;
+  const workingModels = models.filter((m) => m.status === 'working').length;
+  const failingModels = models.filter((m) => m.status === 'failing').length;
+  const untestedModels = models.filter((m) => m.status === 'untested').length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -253,11 +286,14 @@ const ModelDebuggingPanel: React.FC = () => {
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex gap-2">
             <Button
-              onClick={testAllModels} onKeyDown={(e) => e.key === 'Enter' && testAllModels()}
+              onClick={testAllModels}
+              onKeyDown={(e) => e.key === 'Enter' && testAllModels()}
               disabled={isLoading}
               className="flex items-center gap-2"
             >
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+              />
               Test All Models
             </Button>
           </div>
@@ -267,7 +303,9 @@ const ModelDebuggingPanel: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Models</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Models
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{models.length}</div>
@@ -281,9 +319,14 @@ const ModelDebuggingPanel: React.FC = () => {
                 <CheckCircle className="h-4 w-4 text-green-600" />
                 Working
               </CardTitle>
-            </CardHeader><CardContent>
-              <div className="text-2xl font-bold text-green-600">{workingModels}</div>
-              <p className="text-xs text-muted-foreground">Operational models</p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {workingModels}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Operational models
+              </p>
             </CardContent>
           </Card>
 
@@ -293,9 +336,14 @@ const ModelDebuggingPanel: React.FC = () => {
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 Failing
               </CardTitle>
-            </CardHeader><CardContent>
-              <div className="text-2xl font-bold text-red-600">{failingModels}</div>
-              <p className="text-xs text-muted-foreground">Models with issues</p>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {failingModels}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Models with issues
+              </p>
             </CardContent>
           </Card>
 
@@ -305,8 +353,11 @@ const ModelDebuggingPanel: React.FC = () => {
                 <Clock className="h-4 w-4 text-yellow-600" />
                 Untested
               </CardTitle>
-            </CardHeader><CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{untestedModels}</div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">
+                {untestedModels}
+              </div>
               <p className="text-xs text-muted-foreground">Pending tests</p>
             </CardContent>
           </Card>
@@ -317,7 +368,8 @@ const ModelDebuggingPanel: React.FC = () => {
           <CardHeader>
             <CardTitle>Model Status & Debugging</CardTitle>
             <CardDescription>
-              Detailed status and debugging information for each 3D generation model
+              Detailed status and debugging information for each 3D generation
+              model
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -330,13 +382,17 @@ const ModelDebuggingPanel: React.FC = () => {
                         {getTypeIcon(model.type)}
                         <div className="text-left">
                           <div className="font-medium">{model.displayName}</div>
-                          <div className="text-sm text-muted-foreground">{model.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {model.name}
+                          </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge className={getStatusColor(model.status)}>
                           {getStatusIcon(model.status)}
-                          <span className="ml-1 capitalize">{model.status}</span>
+                          <span className="ml-1 capitalize">
+                            {model.status}
+                          </span>
                         </Badge>
                         <Badge className="border border-border bg-background text-foreground text-xs">
                           {model.type}
@@ -350,28 +406,44 @@ const ModelDebuggingPanel: React.FC = () => {
                         {/* Model Info */}
                         <div className="space-y-4">
                           <div>
-                            <h4 className="font-medium mb-2">Model Information</h4>
+                            <h4 className="font-medium mb-2">
+                              Model Information
+                            </h4>
                             <div className="space-y-2 text-sm">
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Description:</span>
-                                <span className="text-right max-w-xs">{model.description}</span>
+                                <span className="text-muted-foreground">
+                                  Description:
+                                </span>
+                                <span className="text-right max-w-xs">
+                                  {model.description}
+                                </span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Type:</span>
+                                <span className="text-muted-foreground">
+                                  Type:
+                                </span>
                                 <Badge className="border border-border bg-background text-foreground text-xs">
                                   {getTypeIcon(model.type)}
                                   <span className="ml-1">{model.type}</span>
                                 </Badge>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-muted-foreground">Version Hash:</span>
+                                <span className="text-muted-foreground">
+                                  Version Hash:
+                                </span>
                                 <div className="flex items-center gap-1">
                                   <code className="text-xs bg-muted px-1 rounded">
                                     {model.versionHash.slice(0, 8)}...
                                   </code>
                                   <Button
                                     className="bg-transparent hover:bg-accent hover:text-accent-foreground h-6 w-6 p-0"
-                                    onClick={() => copyToClipboard(model.versionHash)} onKeyDown={(e) => e.key === 'Enter' && copyToClipboard(model.versionHash)}
+                                    onClick={() =>
+                                      copyToClipboard(model.versionHash)
+                                    }
+                                    onKeyDown={(e) =>
+                                      e.key === 'Enter' &&
+                                      copyToClipboard(model.versionHash)
+                                    }
                                   >
                                     <Copy className="h-3 w-3" />
                                   </Button>
@@ -379,19 +451,31 @@ const ModelDebuggingPanel: React.FC = () => {
                               </div>
                               {model.lastTested && (
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Last Tested:</span>
-                                  <span>{new Date(model.lastTested).toLocaleString()}</span>
+                                  <span className="text-muted-foreground">
+                                    Last Tested:
+                                  </span>
+                                  <span>
+                                    {new Date(
+                                      model.lastTested,
+                                    ).toLocaleString()}
+                                  </span>
                                 </div>
                               )}
                               {model.successRate !== undefined && (
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Success Rate:</span>
-                                  <span className="text-green-600">{model.successRate}%</span>
+                                  <span className="text-muted-foreground">
+                                    Success Rate:
+                                  </span>
+                                  <span className="text-green-600">
+                                    {model.successRate}%
+                                  </span>
                                 </div>
                               )}
                               {model.avgDuration !== undefined && (
                                 <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Avg Duration:</span>
+                                  <span className="text-muted-foreground">
+                                    Avg Duration:
+                                  </span>
                                   <span>{model.avgDuration.toFixed(2)}s</span>
                                 </div>
                               )}
@@ -401,14 +485,23 @@ const ModelDebuggingPanel: React.FC = () => {
                           <div className="flex gap-2">
                             <Button
                               className="h-8 px-3 text-sm flex items-center gap-1"
-                              onClick={() => testModel(model.name)} onKeyDown={(e) => e.key === 'Enter' && testModel(model.name)}
+                              onClick={() => testModel(model.name)}
+                              onKeyDown={(e) =>
+                                e.key === 'Enter' && testModel(model.name)
+                              }
                               disabled={isLoading}
                             >
-                              <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+                              <RefreshCw
+                                className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`}
+                              />
                               Test Model
-                            </Button><Button
+                            </Button>
+                            <Button
                               className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1"
-                              onClick={() => copyToClipboard(model.name)} onKeyDown={(e) => e.key === 'Enter' && copyToClipboard(model.name)}
+                              onClick={() => copyToClipboard(model.name)}
+                              onKeyDown={(e) =>
+                                e.key === 'Enter' && copyToClipboard(model.name)
+                              }
                             >
                               <Copy className="h-3 w-3" />
                               Copy Name
@@ -422,7 +515,10 @@ const ModelDebuggingPanel: React.FC = () => {
                           {model.recentLogs.length > 0 ? (
                             <div className="space-y-2">
                               {model.recentLogs.slice(0, 3).map((log) => (
-                                <div key={log.id} className="border rounded-lg p-3 text-sm">
+                                <div
+                                  key={log.id}
+                                  className="border rounded-lg p-3 text-sm"
+                                >
                                   <div className="flex items-center justify-between mb-1">
                                     <Badge
                                       className={`text-xs ${log.status === 'success' ? 'bg-primary text-primary-foreground' : 'bg-destructive text-destructive-foreground'}`}
@@ -452,7 +548,12 @@ const ModelDebuggingPanel: React.FC = () => {
                                     <div className="mt-2">
                                       <Button
                                         className="border border-border bg-background text-foreground h-8 px-3 text-sm flex items-center gap-1 text-xs"
-                                        onClick={() => window.open(log.imageUrl, '_blank')} onKeyDown={(e) => e.key === 'Enter' && window.open()}
+                                        onClick={() =>
+                                          window.open(log.imageUrl, '_blank')
+                                        }
+                                        onKeyDown={(e) =>
+                                          e.key === 'Enter' && window.open()
+                                        }
                                         aria-label={`View generated image for ${log.model}`}
                                       >
                                         <ExternalLink className="h-3 w-3" />
@@ -508,7 +609,9 @@ const ModelDebuggingPanel: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <div className="text-sm font-medium">TypeScript Compilation</div>
+                <div className="text-sm font-medium">
+                  TypeScript Compilation
+                </div>
                 <Badge className="bg-green-500/20 text-green-600">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Passing

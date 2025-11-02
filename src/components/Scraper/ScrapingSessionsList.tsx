@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Globe, CheckCircle, XCircle, AlertCircle, Play, Trash2 } from 'lucide-react';
+import {
+  Clock,
+  Globe,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Play,
+  Trash2,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,10 +107,7 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
         .eq('session_id', sessionId);
 
       // Delete session
-      await supabase
-        .from('scraping_sessions')
-        .delete()
-        .eq('id', sessionId);
+      await supabase.from('scraping_sessions').delete().eq('id', sessionId);
 
       toast({
         title: 'Success',
@@ -161,7 +166,11 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Scraping Sessions</h2>
-        <Button onClick={onCreateNew} onKeyDown={(e) => e.key === 'Enter' && onCreateNew()} className="flex items-center gap-2">
+        <Button
+          onClick={onCreateNew}
+          onKeyDown={(e) => e.key === 'Enter' && onCreateNew()}
+          className="flex items-center gap-2"
+        >
           <Play className="h-4 w-4" />
           New Session
         </Button>
@@ -171,11 +180,17 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
         <Card>
           <CardContent className="p-8 text-center">
             <Globe className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No scraping sessions yet</h3>
+            <h3 className="text-lg font-semibold mb-2">
+              No scraping sessions yet
+            </h3>
             <p className="text-muted-foreground mb-4">
-              Create your first scraping session to start extracting materials from websites.
+              Create your first scraping session to start extracting materials
+              from websites.
             </p>
-            <Button onClick={onCreateNew} onKeyDown={(e) => e.key === 'Enter' && onCreateNew()}>
+            <Button
+              onClick={onCreateNew}
+              onKeyDown={(e) => e.key === 'Enter' && onCreateNew()}
+            >
               Create New Session
             </Button>
           </CardContent>
@@ -183,7 +198,10 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
       ) : (
         <div className="grid gap-4">
           {sessions.map((session) => (
-            <Card key={session.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={session.id}
+              className="hover:shadow-md transition-shadow"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -196,7 +214,9 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                         {session.status}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(session.created_at), {
+                          addSuffix: true,
+                        })}
                       </span>
                     </div>
                   </div>
@@ -231,9 +251,14 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                   <div>
                     <div className="flex justify-between text-sm mb-1">
                       <span>Progress</span>
-                      <span>{Math.round(session.progress_percentage || 0)}%</span>
+                      <span>
+                        {Math.round(session.progress_percentage || 0)}%
+                      </span>
                     </div>
-                    <Progress value={session.progress_percentage || 0} className="h-2" />
+                    <Progress
+                      value={session.progress_percentage || 0}
+                      className="h-2"
+                    />
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -243,15 +268,21 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
                     </div>
                     <div>
                       <p className="text-muted-foreground">Completed</p>
-                      <p className="font-semibold text-green-600">{session.completed_pages}</p>
+                      <p className="font-semibold text-green-600">
+                        {session.completed_pages}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Failed</p>
-                      <p className="font-semibold text-red-600">{session.failed_pages}</p>
+                      <p className="font-semibold text-red-600">
+                        {session.failed_pages}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Materials Found</p>
-                      <p className="font-semibold text-blue-600">{session.materials_processed || 0}</p>
+                      <p className="font-semibold text-blue-600">
+                        {session.materials_processed || 0}
+                      </p>
                     </div>
                   </div>
                 </div>

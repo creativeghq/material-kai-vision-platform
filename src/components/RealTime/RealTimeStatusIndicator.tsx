@@ -9,7 +9,12 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useWebSocket, UseWebSocketOptions } from '@/hooks/useWebSocket';
 import { WebSocketState } from '@/services/websocket/WebSocketManager';
 import { cn } from '@/lib/utils';
@@ -80,7 +85,9 @@ const getStatusConfig = (state: WebSocketState, error: string | null) => {
   }
 };
 
-export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
+export const RealTimeStatusIndicator: React.FC<
+  RealTimeStatusIndicatorProps
+> = ({
   url,
   className,
   showDetails = false,
@@ -96,7 +103,10 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
   const Icon = config.icon;
 
   const handleRetry = () => {
-    if (state === WebSocketState.FAILED || state === WebSocketState.DISCONNECTED) {
+    if (
+      state === WebSocketState.FAILED ||
+      state === WebSocketState.DISCONNECTED
+    ) {
       connect().catch(console.error);
     }
   };
@@ -141,12 +151,14 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              'p-2 rounded-full',
-              config.bgColor,
-              config.borderColor,
-              'border',
-            )}>
+            <div
+              className={cn(
+                'p-2 rounded-full',
+                config.bgColor,
+                config.borderColor,
+                'border',
+              )}
+            >
               <Icon
                 className={cn(
                   'h-5 w-5',
@@ -158,12 +170,19 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">{config.label}</span>
-                <Badge className={cn('text-xs',
-                  config.variant === 'default' && 'bg-primary text-primary-foreground',
-                  config.variant === 'secondary' && 'bg-secondary text-secondary-foreground',
-                  config.variant === 'destructive' && 'bg-destructive text-destructive-foreground',
-                  config.variant === 'outline' && 'border border-input bg-background',
-                )}>
+                <Badge
+                  className={cn(
+                    'text-xs',
+                    config.variant === 'default' &&
+                      'bg-primary text-primary-foreground',
+                    config.variant === 'secondary' &&
+                      'bg-secondary text-secondary-foreground',
+                    config.variant === 'destructive' &&
+                      'bg-destructive text-destructive-foreground',
+                    config.variant === 'outline' &&
+                      'border border-input bg-background',
+                  )}
+                >
                   Real-time
                 </Badge>
               </div>
@@ -173,7 +192,8 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
             </div>
           </div>
 
-          {(state === WebSocketState.FAILED || state === WebSocketState.DISCONNECTED) && (
+          {(state === WebSocketState.FAILED ||
+            state === WebSocketState.DISCONNECTED) && (
             <button
               onClick={handleRetry}
               onKeyDown={(e) => {
@@ -202,8 +222,12 @@ export const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = (
                 </span>
               </div>
               <div>
-                <span className="text-muted-foreground">Reconnect attempts:</span>
-                <span className="ml-2 font-medium">{stats.reconnectAttempts}</span>
+                <span className="text-muted-foreground">
+                  Reconnect attempts:
+                </span>
+                <span className="ml-2 font-medium">
+                  {stats.reconnectAttempts}
+                </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Queued messages:</span>

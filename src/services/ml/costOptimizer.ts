@@ -94,18 +94,22 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     super({ ...defaultConfig, ...config });
   }
 
-
-
-  static createInstance(config?: Partial<CostOptimizerServiceConfig>): CostOptimizer {
+  static createInstance(
+    config?: Partial<CostOptimizerServiceConfig>,
+  ): CostOptimizer {
     return new CostOptimizer(config);
   }
 
-
   protected async doInitialize(): Promise<void> {
     // Test Supabase connection
-    const { error } = await supabase.from('analytics_events').select('count').limit(1);
+    const { error } = await supabase
+      .from('analytics_events')
+      .select('count')
+      .limit(1);
     if (error) {
-      throw new Error(`Failed to connect to analytics database: ${error.message}`);
+      throw new Error(
+        `Failed to connect to analytics database: ${error.message}`,
+      );
     }
 
     // Initialize usage cache
@@ -115,18 +119,25 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
 
   protected async doHealthCheck(): Promise<void> {
     // Check Supabase connection
-    const { error } = await supabase.from('analytics_events').select('count').limit(1);
+    const { error } = await supabase
+      .from('analytics_events')
+      .select('count')
+      .limit(1);
     if (error) {
       throw new Error(`Analytics database connection failed: ${error.message}`);
     }
 
     // Check if budget configuration is valid
     if (this.config.monthlyBudget <= 0) {
-      throw new Error('Invalid budget configuration: monthly budget must be positive');
+      throw new Error(
+        'Invalid budget configuration: monthly budget must be positive',
+      );
     }
 
     if (this.config.warningThreshold >= this.config.emergencyThreshold) {
-      throw new Error('Invalid threshold configuration: warning threshold must be less than emergency threshold');
+      throw new Error(
+        'Invalid threshold configuration: warning threshold must be less than emergency threshold',
+      );
     }
   }
 
@@ -150,16 +161,23 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
         confidence: 0.6,
         estimatedCost: 0,
         estimatedTime: 5000,
-        reasoning: 'Budget nearly exhausted - using client-side processing only',
+        reasoning:
+          'Budget nearly exhausted - using client-side processing only',
       };
     }
 
     // Analyze optimal strategy
-    const strategies = await this.analyzeStrategies(fileSize, complexity, qualityRequirement);
-    const budgetConstrainedStrategies = strategies.filter(s => s.estimatedCost <= remainingBudget * 0.1);
+    const strategies = await this.analyzeStrategies(
+      fileSize,
+      complexity,
+      qualityRequirement,
+    );
+    const budgetConstrainedStrategies = strategies.filter(
+      (s) => s.estimatedCost <= remainingBudget * 0.1,
+    );
 
     if (budgetConstrainedStrategies.length === 0) {
-      return strategies.find(s => s.provider === 'client') || strategies[0];
+      return strategies.find((s) => s.provider === 'client') || strategies[0];
     }
 
     // Select based on user preference
@@ -177,12 +195,14 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       case 'balanced':
       default:
         return budgetConstrainedStrategies.reduce((best, current) => {
-          const currentScore = (current.confidence * 0.4) +
-                              ((1 - current.estimatedCost / remainingBudget) * 0.3) +
-                              ((1 - current.estimatedTime / 60000) * 0.3);
-          const bestScore = (best.confidence * 0.4) +
-                           ((1 - best.estimatedCost / remainingBudget) * 0.3) +
-                           ((1 - best.estimatedTime / 60000) * 0.3);
+          const currentScore =
+            current.confidence * 0.4 +
+            (1 - current.estimatedCost / remainingBudget) * 0.3 +
+            (1 - current.estimatedTime / 60000) * 0.3;
+          const bestScore =
+            best.confidence * 0.4 +
+            (1 - best.estimatedCost / remainingBudget) * 0.3 +
+            (1 - best.estimatedTime / 60000) * 0.3;
           return currentScore > bestScore ? current : best;
         });
     }
@@ -217,17 +237,19 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
 
     // Store in database for persistence
     try {
-      await supabase.from('analytics_events').insert([{
-        event_type: 'api_usage',
-        event_data: {
-          provider,
-          endpoint,
-          cost,
-          latency,
-          success,
-          timestamp: usage.timestamp,
+      await supabase.from('analytics_events').insert([
+        {
+          event_type: 'api_usage',
+          event_data: {
+            provider,
+            endpoint,
+            cost,
+            latency,
+            success,
+            timestamp: usage.timestamp,
+          },
         },
-      }]);
+      ]);
     } catch (error) {
       console.error('Failed to track usage in database:', error);
     }
@@ -255,45 +277,56 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
 
       if (error) {
         console.error('Failed to fetch usage data:', error);
-        return { totalCost: 0, requestCount: 0, byProvider: {}, dailySpend: [] };
+        return {
+          totalCost: 0,
+          requestCount: 0,
+          byProvider: {},
+          dailySpend: [],
+        };
       }
 
-      const usage = events?.reduce((acc: any, event: any) => {
-        const data = event.event_data as Record<string, unknown>;
-        const provider = (data.provider as string) || 'unknown';
-        const cost = (data.cost as number) || 0;
+      const usage = events?.reduce(
+        (acc: any, event: any) => {
+          const data = event.event_data as Record<string, unknown>;
+          const provider = (data.provider as string) || 'unknown';
+          const cost = (data.cost as number) || 0;
 
-        acc.totalCost += cost;
-        acc.requestCount += 1;
+          acc.totalCost += cost;
+          acc.requestCount += 1;
 
-        if (!acc.byProvider[provider]) {
-          acc.byProvider[provider] = { cost: 0, requests: 0 };
-        }
-        acc.byProvider[provider].cost += cost;
-        acc.byProvider[provider].requests += 1;
+          if (!acc.byProvider[provider]) {
+            acc.byProvider[provider] = { cost: 0, requests: 0 };
+          }
+          acc.byProvider[provider].cost += cost;
+          acc.byProvider[provider].requests += 1;
 
-        return acc;
-      }, {
-        totalCost: 0,
-        requestCount: 0,
-        byProvider: {} as Record<string, { cost: number; requests: number }>,
-        dailySpend: [] as { date: string; cost: number }[],
-      });
+          return acc;
+        },
+        {
+          totalCost: 0,
+          requestCount: 0,
+          byProvider: {} as Record<string, { cost: number; requests: number }>,
+          dailySpend: [] as { date: string; cost: number }[],
+        },
+      );
 
       // Calculate daily spend
-      const dailySpendMap = events?.reduce((acc: any, event: any) => {
-        const date = event.created_at.split('T')[0];
-        const cost = (event.event_data as Record<string, unknown>).cost as number || 0;
-        acc[date] = (acc[date] || 0) + cost;
-        return acc;
-      }, {} as Record<string, number>);
+      const dailySpendMap = events?.reduce(
+        (acc: any, event: any) => {
+          const date = event.created_at.split('T')[0];
+          const cost =
+            ((event.event_data as Record<string, unknown>).cost as number) || 0;
+          acc[date] = (acc[date] || 0) + cost;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       usage.dailySpend = Object.entries(dailySpendMap || {})
         .map(([date, cost]) => ({ date, cost }))
         .sort((a, b) => a.date.localeCompare(b.date));
 
       return usage;
-
     } catch (error) {
       console.error('Error calculating monthly usage:', error);
       return { totalCost: 0, requestCount: 0, byProvider: {}, dailySpend: [] };
@@ -307,11 +340,16 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
     const usage = await this.getCurrentMonthUsage();
     const alerts: BudgetAlert[] = [];
 
-    const budgetUsedPercentage = (usage.totalCost / this.config.monthlyBudget) * 100;
+    const budgetUsedPercentage =
+      (usage.totalCost / this.config.monthlyBudget) * 100;
     const remainingBudget = this.config.monthlyBudget - usage.totalCost;
 
     // Calculate projected spend based on daily average
-    const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+    const daysInMonth = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth() + 1,
+      0,
+    ).getDate();
     const currentDay = new Date().getDate();
     const averageDailySpend = usage.totalCost / currentDay;
     const projectedSpend = averageDailySpend * daysInMonth;
@@ -403,12 +441,16 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       const costPerRequest = stats.cost / stats.requests;
 
       if (provider === 'replicate' && costPerRequest > 0.1) {
-        recommendations.push('Consider using HuggingFace for simpler tasks instead of Replicate');
+        recommendations.push(
+          'Consider using HuggingFace for simpler tasks instead of Replicate',
+        );
         potentialSavings += stats.cost * 0.4;
       }
 
       if (provider === 'openai' && stats.requests > 100) {
-        recommendations.push('Implement caching for OpenAI requests to reduce costs');
+        recommendations.push(
+          'Implement caching for OpenAI requests to reduce costs',
+        );
         potentialSavings += stats.cost * 0.25;
       }
     }
@@ -419,8 +461,11 @@ export class CostOptimizer extends BaseService<CostOptimizerServiceConfig> {
       potentialSavings += usage.totalCost * 0.15;
     }
 
-    const budgetHealth = alerts.some(a => a.type === 'emergency') ? 'critical' :
-                        alerts.some(a => a.type === 'warning') ? 'warning' : 'good';
+    const budgetHealth = alerts.some((a) => a.type === 'emergency')
+      ? 'critical'
+      : alerts.some((a) => a.type === 'warning')
+        ? 'warning'
+        : 'good';
 
     return {
       recommendations,

@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
@@ -19,7 +25,9 @@ export const Designer3DPage: React.FC = () => {
   const [roomType, setRoomType] = useState('');
   const [style, setStyle] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedImages, setGeneratedImages] = useState<{url: string, modelName: string}[]>([]);
+  const [generatedImages, setGeneratedImages] = useState<
+    { url: string; modelName: string }[]
+  >([]);
   const [generationData, setGenerationData] = useState<unknown>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -35,9 +43,18 @@ export const Designer3DPage: React.FC = () => {
   // Check if user is admin
   React.useEffect(() => {
     const checkAdminRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await (supabase as unknown as { rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: unknown }> }).rpc('has_role', {
+        const { data } = await (
+          supabase as unknown as {
+            rpc: (
+              name: string,
+              params: Record<string, unknown>,
+            ) => Promise<{ data: unknown }>;
+          }
+        ).rpc('has_role', {
           _user_id: user.id,
           _role: 'admin',
         });
@@ -50,54 +67,115 @@ export const Designer3DPage: React.FC = () => {
 
   // Available AI models - unified list without artificial type separation
   const availableModels = [
-    { name: '🎨 Stable Diffusion XL Base 1.0', id: 'stabilityai/stable-diffusion-xl-base-1.0', provider: 'huggingface' },
-    { name: '⚡ FLUX-Schnell', id: 'black-forest-labs/flux-schnell', provider: 'replicate' },
-    { name: '🏠 Interior Design Model', id: 'stabilityai/stable-diffusion-2-1', provider: 'huggingface' },
-    { name: '🏗️ Designer Architecture', id: 'davisbrown/designer-architecture', provider: 'replicate' },
-    { name: '🎯 Interior Design AI', id: 'adirik/interior-design', provider: 'replicate' },
-    { name: '🏡 Interior AI', id: 'erayyavuz/interior-ai', provider: 'replicate' },
-    { name: '🎨 ComfyUI Interior Remodel', id: 'jschoormans/comfyui-interior-remodel', provider: 'replicate' },
-    { name: '🏛️ Interiorly Gen1 Dev', id: 'julian-at/interiorly-gen1-dev', provider: 'replicate' },
-    { name: '🏘️ Interior V2', id: 'jschoormans/interior-v2', provider: 'replicate' },
-    { name: '🚀 Interior Design SDXL', id: 'rocketdigitalai/interior-design-sdxl', provider: 'replicate' },
+    {
+      name: '🎨 Stable Diffusion XL Base 1.0',
+      id: 'stabilityai/stable-diffusion-xl-base-1.0',
+      provider: 'huggingface',
+    },
+    {
+      name: '⚡ FLUX-Schnell',
+      id: 'black-forest-labs/flux-schnell',
+      provider: 'replicate',
+    },
+    {
+      name: '🏠 Interior Design Model',
+      id: 'stabilityai/stable-diffusion-2-1',
+      provider: 'huggingface',
+    },
+    {
+      name: '🏗️ Designer Architecture',
+      id: 'davisbrown/designer-architecture',
+      provider: 'replicate',
+    },
+    {
+      name: '🎯 Interior Design AI',
+      id: 'adirik/interior-design',
+      provider: 'replicate',
+    },
+    {
+      name: '🏡 Interior AI',
+      id: 'erayyavuz/interior-ai',
+      provider: 'replicate',
+    },
+    {
+      name: '🎨 ComfyUI Interior Remodel',
+      id: 'jschoormans/comfyui-interior-remodel',
+      provider: 'replicate',
+    },
+    {
+      name: '🏛️ Interiorly Gen1 Dev',
+      id: 'julian-at/interiorly-gen1-dev',
+      provider: 'replicate',
+    },
+    {
+      name: '🏘️ Interior V2',
+      id: 'jschoormans/interior-v2',
+      provider: 'replicate',
+    },
+    {
+      name: '🚀 Interior Design SDXL',
+      id: 'rocketdigitalai/interior-design-sdxl',
+      provider: 'replicate',
+    },
   ];
 
   // All models are now available regardless of input type
   const filteredModels = availableModels;
 
   const roomTypes = [
-    'living room', 'kitchen', 'bedroom', 'bathroom', 'dining room',
-    'office', 'study', 'library', 'hallway', 'balcony',
+    'living room',
+    'kitchen',
+    'bedroom',
+    'bathroom',
+    'dining room',
+    'office',
+    'study',
+    'library',
+    'hallway',
+    'balcony',
   ];
 
   const styles = [
-    'modern', 'contemporary', 'minimalist', 'scandinavian', 'industrial',
-    'mid-century', 'traditional', 'rustic', 'mediterranean', 'art-deco',
+    'modern',
+    'contemporary',
+    'minimalist',
+    'scandinavian',
+    'industrial',
+    'mid-century',
+    'traditional',
+    'rustic',
+    'mediterranean',
+    'art-deco',
   ];
 
   const prefilledPrompts = [
     {
       name: 'Interior Room with Plants',
-      prompt: 'Interior room of the house with plants, a chair and candles, space to relax, soft lighting, pastel colors, style of ultrafine detail, high quality photo --ar 2:3 --v 5',
+      prompt:
+        'Interior room of the house with plants, a chair and candles, space to relax, soft lighting, pastel colors, style of ultrafine detail, high quality photo --ar 2:3 --v 5',
     },
     {
       name: 'Modern Living Room',
-      prompt: 'Modern living room with minimalist furniture, large windows, natural light, neutral colors, clean lines, high-end photography style --ar 16:9 --v 6',
+      prompt:
+        'Modern living room with minimalist furniture, large windows, natural light, neutral colors, clean lines, high-end photography style --ar 16:9 --v 6',
     },
     {
       name: 'Cozy Bedroom',
-      prompt: 'Cozy bedroom with warm lighting, soft textures, wooden furniture, books, comfortable bedding, intimate atmosphere --ar 4:5 --v 5',
+      prompt:
+        'Cozy bedroom with warm lighting, soft textures, wooden furniture, books, comfortable bedding, intimate atmosphere --ar 4:5 --v 5',
     },
     {
       name: 'Luxury Kitchen',
-      prompt: 'Luxury kitchen with marble countertops, stainless steel appliances, pendant lighting, island, high-end finishes, professional photography --ar 3:2 --v 6',
+      prompt:
+        'Luxury kitchen with marble countertops, stainless steel appliances, pendant lighting, island, high-end finishes, professional photography --ar 3:2 --v 6',
     },
   ];
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      if (file.size > 10 * 1024 * 1024) {
+        // 10MB limit
         toast({
           title: 'File Too Large',
           description: 'Please select an image smaller than 10MB.',
@@ -133,9 +211,9 @@ export const Designer3DPage: React.FC = () => {
       throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from('3d-models')
-      .getPublicUrl(filePath);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('3d-models').getPublicUrl(filePath);
 
     return publicUrl;
   };
@@ -147,7 +225,8 @@ export const Designer3DPage: React.FC = () => {
       // Prompt validation failed at entry check
       toast({
         title: 'Prompt Required',
-        description: 'Please enter a design prompt to generate your 3D interior.',
+        description:
+          'Please enter a design prompt to generate your 3D interior.',
         variant: 'destructive',
       });
       return;
@@ -237,7 +316,9 @@ export const Designer3DPage: React.FC = () => {
       }
 
       // Get current user for user_id field (required by backend)
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User authentication required');
       }
@@ -261,12 +342,19 @@ export const Designer3DPage: React.FC = () => {
       const apiService = BrowserApiIntegrationService.getInstance();
       // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: About to call API with request data');
-      const result = await apiService.callSupabaseFunction('crewai-3d-generation', requestData);
+      const result = await apiService.callSupabaseFunction(
+        'crewai-3d-generation',
+        requestData,
+      );
       // eslint-disable-next-line no-console
       console.log('Generation response received:', result);
 
       // Type assertion for the response data
-      const responseData = result.data as { generationId?: string; generation_status?: string; image_urls?: string[] } | null;
+      const responseData = result.data as {
+        generationId?: string;
+        generation_status?: string;
+        image_urls?: string[];
+      } | null;
 
       if (result.success && responseData?.generationId) {
         if (isAdmin) {
@@ -279,7 +367,8 @@ export const Designer3DPage: React.FC = () => {
           // Regular polling for non-admin users
           toast({
             title: 'Generation Started',
-            description: 'Your 3D interior is being generated. This may take a few minutes...',
+            description:
+              'Your 3D interior is being generated. This may take a few minutes...',
           });
           await pollForResults(responseData.generationId);
         }
@@ -291,7 +380,9 @@ export const Designer3DPage: React.FC = () => {
       console.error('Generation error:', error);
       toast({
         title: 'Generation Failed',
-        description: (error as Error).message || 'Failed to generate 3D interior. Please try again.',
+        description:
+          (error as Error).message ||
+          'Failed to generate 3D interior. Please try again.',
         variant: 'destructive',
       });
       setIsGenerating(false);
@@ -299,7 +390,8 @@ export const Designer3DPage: React.FC = () => {
     }
   };
 
-  const pollForResults = async (_generationId: string) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+  const pollForResults = async (_generationId: string) => {
+    // eslint-disable-line @typescript-eslint/no-unused-vars
     const maxAttempts = 60; // 5 minutes with 5-second intervals
     let attempts = 0;
 
@@ -321,18 +413,32 @@ export const Designer3DPage: React.FC = () => {
         console.log('Polling result:', data);
 
         // Type assertion for the polling data
-        const pollingData = data as { generation_status?: string; image_urls?: string[] } | null;
+        const pollingData = data as {
+          generation_status?: string;
+          image_urls?: string[];
+        } | null;
 
-        if (pollingData && pollingData.generation_status === 'completed' && pollingData.image_urls && pollingData.image_urls.length > 0) {
+        if (
+          pollingData &&
+          pollingData.generation_status === 'completed' &&
+          pollingData.image_urls &&
+          pollingData.image_urls.length > 0
+        ) {
           // Generation completed successfully
           // eslint-disable-next-line no-console
           console.log('🔍 DEBUG: Generation completed successfully');
           // eslint-disable-next-line no-console
           console.log('📊 Available models count:', filteredModels.length);
           // eslint-disable-next-line no-console
-          console.log('📊 Available models:', filteredModels.map((m, i) => `${i}: ${m.name}`));
+          console.log(
+            '📊 Available models:',
+            filteredModels.map((m, i) => `${i}: ${m.name}`),
+          );
           // eslint-disable-next-line no-console
-          console.log('🖼️ Received image URLs count:', pollingData.image_urls.length);
+          console.log(
+            '🖼️ Received image URLs count:',
+            pollingData.image_urls.length,
+          );
           // eslint-disable-next-line no-console
           console.log('🖼️ Received image URLs:', pollingData.image_urls);
           // eslint-disable-next-line no-console
@@ -341,54 +447,60 @@ export const Designer3DPage: React.FC = () => {
           // Robust image-to-model mapping that handles sparse results
           // The backend should ideally include model metadata with each result,
           // but for now we implement a robust mapping strategy
-          const imagesWithModels = pollingData.image_urls.map((url: string, index: number) => {
-            // Strategy 1: Try to extract model info from URL if available
-            let modelName = `Model ${index + 1}`;
-            let detectedModel = null;
+          const imagesWithModels = pollingData.image_urls.map(
+            (url: string, index: number) => {
+              // Strategy 1: Try to extract model info from URL if available
+              let modelName = `Model ${index + 1}`;
+              let detectedModel = null;
 
-            // Check if URL contains model identifier patterns
-            for (const model of filteredModels) {
-              if (url.includes(model.name.toLowerCase().replace(/\s+/g, '-')) ||
-                  url.includes(model.name.toLowerCase().replace(/\s+/g, '_'))) {
-                detectedModel = model;
-                modelName = model.name;
-                break;
+              // Check if URL contains model identifier patterns
+              for (const model of filteredModels) {
+                if (
+                  url.includes(model.name.toLowerCase().replace(/\s+/g, '-')) ||
+                  url.includes(model.name.toLowerCase().replace(/\s+/g, '_'))
+                ) {
+                  detectedModel = model;
+                  modelName = model.name;
+                  break;
+                }
               }
-            }
 
-            // Strategy 2: If no model detected from URL, use sequential mapping with validation
-            if (!detectedModel && index < filteredModels.length) {
-              // For sequential mapping, we need to account for potential gaps
-              // This assumes the backend returns results in the same order as requested
-              const candidateModel = filteredModels[index];
-              if (candidateModel) {
-                detectedModel = candidateModel;
-                modelName = candidateModel.name;
+              // Strategy 2: If no model detected from URL, use sequential mapping with validation
+              if (!detectedModel && index < filteredModels.length) {
+                // For sequential mapping, we need to account for potential gaps
+                // This assumes the backend returns results in the same order as requested
+                const candidateModel = filteredModels[index];
+                if (candidateModel) {
+                  detectedModel = candidateModel;
+                  modelName = candidateModel.name;
+                }
               }
-            }
 
-            // Strategy 3: Fallback - try to map based on successful results count
-            if (!detectedModel && filteredModels.length > 0) {
-              // If we have fewer results than models, try to map to available models
-              const modelIndex = Math.min(index, filteredModels.length - 1);
-              const fallbackModel = filteredModels[modelIndex];
-              if (fallbackModel) {
-                detectedModel = fallbackModel;
-                modelName = `${fallbackModel.name} (Result ${index + 1})`;
+              // Strategy 3: Fallback - try to map based on successful results count
+              if (!detectedModel && filteredModels.length > 0) {
+                // If we have fewer results than models, try to map to available models
+                const modelIndex = Math.min(index, filteredModels.length - 1);
+                const fallbackModel = filteredModels[modelIndex];
+                if (fallbackModel) {
+                  detectedModel = fallbackModel;
+                  modelName = `${fallbackModel.name} (Result ${index + 1})`;
+                }
               }
-            }
 
-            const result = {
-              url,
-              modelName,
-              modelId: detectedModel?.id || null,
-              resultIndex: index,
-            };
+              const result = {
+                url,
+                modelName,
+                modelId: detectedModel?.id || null,
+                resultIndex: index,
+              };
 
-            // eslint-disable-next-line no-console
-            console.log(`🔗 Robust mapping index ${index}: URL="${url}" -> Model="${result.modelName}" (ID: ${result.modelId})`);
-            return result;
-          });
+              // eslint-disable-next-line no-console
+              console.log(
+                `🔗 Robust mapping index ${index}: URL="${url}" -> Model="${result.modelName}" (ID: ${result.modelId})`,
+              );
+              return result;
+            },
+          );
 
           // Additional validation and logging
           // eslint-disable-next-line no-console
@@ -396,11 +508,17 @@ export const Designer3DPage: React.FC = () => {
           // eslint-disable-next-line no-console
           console.log(`📊 Total models requested: ${filteredModels.length}`);
           // eslint-disable-next-line no-console
-          console.log(`🖼️ Total results received: ${pollingData.image_urls?.length || 0}`);
+          console.log(
+            `🖼️ Total results received: ${pollingData.image_urls?.length || 0}`,
+          );
           // eslint-disable-next-line no-console
-          console.log(`✅ Successfully mapped: ${imagesWithModels.filter((img: unknown) => (img as { modelId?: string }).modelId).length}`);
+          console.log(
+            `✅ Successfully mapped: ${imagesWithModels.filter((img: unknown) => (img as { modelId?: string }).modelId).length}`,
+          );
           // eslint-disable-next-line no-console
-          console.log(`⚠️ Fallback mappings: ${imagesWithModels.filter((img: unknown) => !(img as { modelId?: string }).modelId).length}`);
+          console.log(
+            `⚠️ Fallback mappings: ${imagesWithModels.filter((img: unknown) => !(img as { modelId?: string }).modelId).length}`,
+          );
 
           // eslint-disable-next-line no-console
           console.log('✅ Final imagesWithModels mapping:', imagesWithModels);
@@ -418,7 +536,10 @@ export const Designer3DPage: React.FC = () => {
         }
 
         if (pollingData && pollingData.generation_status === 'failed') {
-          throw new Error((pollingData as { error_message?: string }).error_message || 'Generation failed');
+          throw new Error(
+            (pollingData as { error_message?: string }).error_message ||
+              'Generation failed',
+          );
         }
 
         // Still processing, continue polling
@@ -435,7 +556,8 @@ export const Designer3DPage: React.FC = () => {
         setIsUploading(false);
         toast({
           title: 'Generation Failed',
-          description: (error as Error).message || 'Generation failed during processing',
+          description:
+            (error as Error).message || 'Generation failed during processing',
           variant: 'destructive',
         });
       }
@@ -443,7 +565,6 @@ export const Designer3DPage: React.FC = () => {
 
     poll();
   };
-
 
   const handleImageClick = (index: number) => {
     setCurrentImageIndex(index);
@@ -453,7 +574,10 @@ export const Designer3DPage: React.FC = () => {
   const handleModalNavigate = (direction: 'prev' | 'next') => {
     if (direction === 'prev' && currentImageIndex > 0) {
       setCurrentImageIndex(currentImageIndex - 1);
-    } else if (direction === 'next' && currentImageIndex < generatedImages.length - 1) {
+    } else if (
+      direction === 'next' &&
+      currentImageIndex < generatedImages.length - 1
+    ) {
       setCurrentImageIndex(currentImageIndex + 1);
     }
   };
@@ -496,22 +620,24 @@ export const Designer3DPage: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-2">
               <Label htmlFor="prompt">Design Prompt</Label>
-              <Select onValueChange={(value: string) => {
-                // eslint-disable-next-line no-console
-                console.log('🔍 DEBUG: Preset selection changed:', {
-                  selectedValue: value,
-                  valueType: typeof value,
-                  valueLength: value?.length,
-                  currentPrompt: prompt,
-                  currentPromptType: typeof prompt,
-                });
-                setPrompt(value);
-                // eslint-disable-next-line no-console
-                console.log('🔍 DEBUG: After setPrompt from preset:', {
-                  newPromptValue: value,
-                  promptStateAfterSet: prompt, // Note: this might still show old value due to React batching
-                });
-              }}>
+              <Select
+                onValueChange={(value: string) => {
+                  // eslint-disable-next-line no-console
+                  console.log('🔍 DEBUG: Preset selection changed:', {
+                    selectedValue: value,
+                    valueType: typeof value,
+                    valueLength: value?.length,
+                    currentPrompt: prompt,
+                    currentPromptType: typeof prompt,
+                  });
+                  setPrompt(value);
+                  // eslint-disable-next-line no-console
+                  console.log('🔍 DEBUG: After setPrompt from preset:', {
+                    newPromptValue: value,
+                    promptStateAfterSet: prompt, // Note: this might still show old value due to React batching
+                  });
+                }}
+              >
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Choose a preset" />
                 </SelectTrigger>
@@ -591,7 +717,7 @@ export const Designer3DPage: React.FC = () => {
                   <SelectValue placeholder="Select room type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roomTypes.map(type => (
+                  {roomTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type.charAt(0).toUpperCase() + type.slice(1)}
                     </SelectItem>
@@ -607,9 +733,10 @@ export const Designer3DPage: React.FC = () => {
                   <SelectValue placeholder="Select style" />
                 </SelectTrigger>
                 <SelectContent>
-                  {styles.map(styleOption => (
+                  {styles.map((styleOption) => (
                     <SelectItem key={styleOption} value={styleOption}>
-                      {styleOption.charAt(0).toUpperCase() + styleOption.slice(1)}
+                      {styleOption.charAt(0).toUpperCase() +
+                        styleOption.slice(1)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -648,47 +775,52 @@ export const Designer3DPage: React.FC = () => {
           <CardHeader>
             <CardTitle>Generated Interior Designs</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Click on any image to view in full size and navigate between models
+              Click on any image to view in full size and navigate between
+              models
             </p>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {generatedImages.map((image, index) => (
                 <div key={index} className="space-y-2">
-                    <div
-                      className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                      onClick={() => handleImageClick(index)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleImageClick(index);
-                        }
+                  <div
+                    className="aspect-square overflow-hidden rounded-lg border bg-muted cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                    onClick={() => handleImageClick(index)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleImageClick(index);
+                      }
+                    }}
+                  >
+                    <img
+                      src={image.url}
+                      alt={`Interior design by ${image.modelName}`}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform"
+                      onLoad={() => {
+                        // eslint-disable-next-line no-console
+                        console.log(
+                          `✅ Image ${index + 1} loaded successfully:`,
+                          image.url,
+                        );
                       }}
-                    >
-                      <img
-                        src={image.url}
-                        alt={`Interior design by ${image.modelName}`}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform"
-                        onLoad={() => {
-                          // eslint-disable-next-line no-console
-                          console.log(`✅ Image ${index + 1} loaded successfully:`, image.url);
-                        }}
-                        onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                          // eslint-disable-next-line no-console
-                          console.error(`❌ Image ${index + 1} failed to load:`, {
-                            url: image.url,
-                            modelName: image.modelName,
-                            error: 'Failed to load image',
-                          });
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
+                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        // eslint-disable-next-line no-console
+                        console.error(`❌ Image ${index + 1} failed to load:`, {
+                          url: image.url,
+                          modelName: image.modelName,
+                          error: 'Failed to load image',
+                        });
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
                     <h4 className="font-medium text-sm truncate">
                       {image.modelName || `Model ${index + 1}`}
                     </h4>
                     <p className="text-xs text-muted-foreground">
-                      Modern interior with warm lighting and contemporary furniture
+                      Modern interior with warm lighting and contemporary
+                      furniture
                     </p>
                     <Button
                       onClick={() => handleDownload(index)}
@@ -702,9 +834,9 @@ export const Designer3DPage: React.FC = () => {
                       <Download className="h-3 w-3 mr-1" />
                       Download
                     </Button>
-                    </div>
                   </div>
-                ))}
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -720,7 +852,10 @@ export const Designer3DPage: React.FC = () => {
             </p>
           </CardHeader>
           <CardContent>
-            <ThreeJsViewer imageUrl={generatedImages[0]?.url || ''} className="h-96 rounded-lg border" />
+            <ThreeJsViewer
+              imageUrl={generatedImages[0]?.url || ''}
+              className="h-96 rounded-lg border"
+            />
           </CardContent>
         </Card>
       )}
@@ -736,20 +871,34 @@ export const Designer3DPage: React.FC = () => {
               <div>
                 <h4 className="font-medium mb-1">Parsed Request</h4>
                 <p className="text-muted-foreground">
-                  Room: {(generationData as { parsed_request?: { room_type?: string; style?: string } })?.parsed_request?.room_type || 'Auto-detected'}<br/>
-                  Style: {(generationData as { parsed_request?: { room_type?: string; style?: string } })?.parsed_request?.style || 'Auto-detected'}
+                  Room:{' '}
+                  {(
+                    generationData as {
+                      parsed_request?: { room_type?: string; style?: string };
+                    }
+                  )?.parsed_request?.room_type || 'Auto-detected'}
+                  <br />
+                  Style:{' '}
+                  {(
+                    generationData as {
+                      parsed_request?: { room_type?: string; style?: string };
+                    }
+                  )?.parsed_request?.style || 'Auto-detected'}
                 </p>
               </div>
               <div>
                 <h4 className="font-medium mb-1">Materials Used</h4>
                 <p className="text-muted-foreground">
-                  {(generationData as { matched_materials?: unknown[] })?.matched_materials?.length || 0} materials matched from catalog
+                  {(generationData as { matched_materials?: unknown[] })
+                    ?.matched_materials?.length || 0}{' '}
+                  materials matched from catalog
                 </p>
               </div>
               <div>
                 <h4 className="font-medium mb-1">Models Generated</h4>
                 <p className="text-muted-foreground">
-                  {generatedImages.length} of {filteredModels.length} models completed
+                  {generatedImages.length} of {filteredModels.length} models
+                  completed
                 </p>
               </div>
             </div>
@@ -774,61 +923,82 @@ export const Designer3DPage: React.FC = () => {
           generationId={currentGenerationId}
           onComplete={(images) => {
             // Robust image-to-model mapping that handles sparse results
-            const imagesWithModels = (images as string[]).map((url: string, index: number) => {
-              let modelName = `Model ${index + 1}`;
-              let modelId = '';
-              const resultIndex = index;
+            const imagesWithModels = (images as string[]).map(
+              (url: string, index: number) => {
+                let modelName = `Model ${index + 1}`;
+                let modelId = '';
+                const resultIndex = index;
 
-              // Strategy 1: Extract model info from URL patterns
-              const urlMatch = url.match(/model[_-](\w+)|(\w+)[_-]model/i);
-              if (urlMatch) {
-                const extractedId = urlMatch[1] || urlMatch[2];
-                const matchingModel = filteredModels.find(m =>
-                  (extractedId && m.id.toLowerCase().includes(extractedId.toLowerCase())) ||
-                  (extractedId && m.name.toLowerCase().includes(extractedId.toLowerCase())),
-                );
-                if (matchingModel) {
-                  modelName = matchingModel.name;
-                  modelId = matchingModel.id;
-                  // eslint-disable-next-line no-console
-                  console.log(`✅ Strategy 1 success: URL ${url} mapped to model ${modelName}`);
-                  return { url, modelName, modelId, resultIndex };
+                // Strategy 1: Extract model info from URL patterns
+                const urlMatch = url.match(/model[_-](\w+)|(\w+)[_-]model/i);
+                if (urlMatch) {
+                  const extractedId = urlMatch[1] || urlMatch[2];
+                  const matchingModel = filteredModels.find(
+                    (m) =>
+                      (extractedId &&
+                        m.id
+                          .toLowerCase()
+                          .includes(extractedId.toLowerCase())) ||
+                      (extractedId &&
+                        m.name
+                          .toLowerCase()
+                          .includes(extractedId.toLowerCase())),
+                  );
+                  if (matchingModel) {
+                    modelName = matchingModel.name;
+                    modelId = matchingModel.id;
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      `✅ Strategy 1 success: URL ${url} mapped to model ${modelName}`,
+                    );
+                    return { url, modelName, modelId, resultIndex };
+                  }
                 }
-              }
 
-              // Strategy 2: Sequential mapping with validation
-              if (index < filteredModels.length) {
-                const candidateModel = filteredModels[index];
-                if (candidateModel) {
-                  modelName = candidateModel.name;
-                  modelId = candidateModel.id;
-                  // eslint-disable-next-line no-console
-                  console.log(`✅ Strategy 2 success: Index ${index} mapped to model ${modelName}`);
-                  return { url, modelName, modelId, resultIndex };
+                // Strategy 2: Sequential mapping with validation
+                if (index < filteredModels.length) {
+                  const candidateModel = filteredModels[index];
+                  if (candidateModel) {
+                    modelName = candidateModel.name;
+                    modelId = candidateModel.id;
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      `✅ Strategy 2 success: Index ${index} mapped to model ${modelName}`,
+                    );
+                    return { url, modelName, modelId, resultIndex };
+                  }
                 }
-              }
 
-              // Strategy 3: Fallback mapping for remaining cases
-              const availableModel = filteredModels[index % filteredModels.length];
-              if (availableModel && filteredModels.length > 0) {
-                modelName = `${availableModel.name} (Result ${index + 1})`;
-                modelId = availableModel.id;
-                // eslint-disable-next-line no-console
-                console.log(`⚠️ Strategy 3 fallback: Index ${index} mapped to model ${modelName}`);
-              } else {
-                // eslint-disable-next-line no-console
-                console.log(`❌ No model mapping found for index ${index}, using fallback name`);
-              }
+                // Strategy 3: Fallback mapping for remaining cases
+                const availableModel =
+                  filteredModels[index % filteredModels.length];
+                if (availableModel && filteredModels.length > 0) {
+                  modelName = `${availableModel.name} (Result ${index + 1})`;
+                  modelId = availableModel.id;
+                  // eslint-disable-next-line no-console
+                  console.log(
+                    `⚠️ Strategy 3 fallback: Index ${index} mapped to model ${modelName}`,
+                  );
+                } else {
+                  // eslint-disable-next-line no-console
+                  console.log(
+                    `❌ No model mapping found for index ${index}, using fallback name`,
+                  );
+                }
 
-              return { url, modelName, modelId, resultIndex };
-            });
+                return { url, modelName, modelId, resultIndex };
+              },
+            );
 
             // eslint-disable-next-line no-console
             console.log('🎯 WorkflowModal mapping results:', {
               totalImages: images.length,
               totalModels: filteredModels.length,
               mappedResults: imagesWithModels.length,
-              mappings: imagesWithModels.map(img => ({ url: img.url, modelName: img.modelName })),
+              mappings: imagesWithModels.map((img) => ({
+                url: img.url,
+                modelName: img.modelName,
+              })),
             });
 
             setGeneratedImages(imagesWithModels);

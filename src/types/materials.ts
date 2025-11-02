@@ -106,66 +106,241 @@ export enum MaterialCategory {
   GLASS = 'glass',
   FABRIC = 'fabric',
   STONE = 'stone',
-  COMPOSITE = 'composite'
+  COMPOSITE = 'composite',
 }
 
 // Material categories with metadata for PDF extraction and processing
 export const MATERIAL_CATEGORIES = {
   WOOD: {
     name: 'Wood',
-    finish: ['natural', 'stained', 'painted', 'varnished', 'oiled', 'waxed', 'lacquered'],
+    finish: [
+      'natural',
+      'stained',
+      'painted',
+      'varnished',
+      'oiled',
+      'waxed',
+      'lacquered',
+    ],
     size: ['small', 'medium', 'large', 'custom', 'standard', 'plank', 'board'],
-    installationMethod: ['nailed', 'screwed', 'glued', 'interlocking', 'floating', 'stapled'],
-    application: ['interior', 'exterior', 'structural', 'decorative', 'flooring', 'furniture'],
+    installationMethod: [
+      'nailed',
+      'screwed',
+      'glued',
+      'interlocking',
+      'floating',
+      'stapled',
+    ],
+    application: [
+      'interior',
+      'exterior',
+      'structural',
+      'decorative',
+      'flooring',
+      'furniture',
+    ],
   },
   METAL: {
     name: 'Metal',
-    finish: ['brushed', 'polished', 'matte', 'anodized', 'galvanized', 'powder-coated', 'painted'],
+    finish: [
+      'brushed',
+      'polished',
+      'matte',
+      'anodized',
+      'galvanized',
+      'powder-coated',
+      'painted',
+    ],
     size: ['small', 'medium', 'large', 'custom', 'sheet', 'rod', 'tube'],
-    installationMethod: ['welded', 'bolted', 'screwed', 'riveted', 'clipped', 'magnetic'],
-    application: ['structural', 'decorative', 'industrial', 'architectural', 'mechanical', 'electrical'],
+    installationMethod: [
+      'welded',
+      'bolted',
+      'screwed',
+      'riveted',
+      'clipped',
+      'magnetic',
+    ],
+    application: [
+      'structural',
+      'decorative',
+      'industrial',
+      'architectural',
+      'mechanical',
+      'electrical',
+    ],
   },
   PLASTIC: {
     name: 'Plastic',
-    finish: ['smooth', 'textured', 'matte', 'glossy', 'transparent', 'translucent', 'opaque'],
+    finish: [
+      'smooth',
+      'textured',
+      'matte',
+      'glossy',
+      'transparent',
+      'translucent',
+      'opaque',
+    ],
     size: ['small', 'medium', 'large', 'custom', 'sheet', 'film', 'molded'],
-    installationMethod: ['adhesive', 'mechanical', 'heat-welded', 'ultrasonic', 'snap-fit', 'threaded'],
-    application: ['interior', 'exterior', 'packaging', 'automotive', 'medical', 'consumer'],
+    installationMethod: [
+      'adhesive',
+      'mechanical',
+      'heat-welded',
+      'ultrasonic',
+      'snap-fit',
+      'threaded',
+    ],
+    application: [
+      'interior',
+      'exterior',
+      'packaging',
+      'automotive',
+      'medical',
+      'consumer',
+    ],
   },
   CERAMIC: {
     name: 'Ceramic',
-    finish: ['glazed', 'unglazed', 'matte', 'glossy', 'textured', 'polished', 'natural'],
+    finish: [
+      'glazed',
+      'unglazed',
+      'matte',
+      'glossy',
+      'textured',
+      'polished',
+      'natural',
+    ],
     size: ['small', 'medium', 'large', 'tile', 'slab', 'custom', 'mosaic'],
-    installationMethod: ['adhesive', 'mortar', 'mechanical', 'grouted', 'dry-set', 'wet-set'],
-    application: ['interior', 'exterior', 'flooring', 'wall', 'countertop', 'decorative'],
+    installationMethod: [
+      'adhesive',
+      'mortar',
+      'mechanical',
+      'grouted',
+      'dry-set',
+      'wet-set',
+    ],
+    application: [
+      'interior',
+      'exterior',
+      'flooring',
+      'wall',
+      'countertop',
+      'decorative',
+    ],
   },
   GLASS: {
     name: 'Glass',
-    finish: ['clear', 'frosted', 'tinted', 'reflective', 'textured', 'laminated', 'tempered'],
+    finish: [
+      'clear',
+      'frosted',
+      'tinted',
+      'reflective',
+      'textured',
+      'laminated',
+      'tempered',
+    ],
     size: ['small', 'medium', 'large', 'custom', 'panel', 'sheet', 'block'],
-    installationMethod: ['framed', 'structural', 'adhesive', 'mechanical', 'glazed', 'curtain-wall'],
-    application: ['architectural', 'decorative', 'safety', 'insulating', 'solar', 'automotive'],
+    installationMethod: [
+      'framed',
+      'structural',
+      'adhesive',
+      'mechanical',
+      'glazed',
+      'curtain-wall',
+    ],
+    application: [
+      'architectural',
+      'decorative',
+      'safety',
+      'insulating',
+      'solar',
+      'automotive',
+    ],
   },
   FABRIC: {
     name: 'Fabric',
-    finish: ['natural', 'treated', 'waterproof', 'fire-resistant', 'stain-resistant', 'antimicrobial'],
+    finish: [
+      'natural',
+      'treated',
+      'waterproof',
+      'fire-resistant',
+      'stain-resistant',
+      'antimicrobial',
+    ],
     size: ['small', 'medium', 'large', 'roll', 'panel', 'custom', 'tile'],
-    installationMethod: ['adhesive', 'stapled', 'sewn', 'velcro', 'magnetic', 'tensioned'],
-    application: ['upholstery', 'drapery', 'wall-covering', 'acoustic', 'outdoor', 'industrial'],
+    installationMethod: [
+      'adhesive',
+      'stapled',
+      'sewn',
+      'velcro',
+      'magnetic',
+      'tensioned',
+    ],
+    application: [
+      'upholstery',
+      'drapery',
+      'wall-covering',
+      'acoustic',
+      'outdoor',
+      'industrial',
+    ],
   },
   STONE: {
     name: 'Stone',
-    finish: ['natural', 'polished', 'honed', 'brushed', 'flamed', 'sandblasted', 'tumbled'],
+    finish: [
+      'natural',
+      'polished',
+      'honed',
+      'brushed',
+      'flamed',
+      'sandblasted',
+      'tumbled',
+    ],
     size: ['small', 'medium', 'large', 'slab', 'tile', 'block', 'veneer'],
-    installationMethod: ['mortar', 'adhesive', 'mechanical', 'dry-stack', 'anchored', 'grouted'],
-    application: ['interior', 'exterior', 'structural', 'decorative', 'landscaping', 'countertop'],
+    installationMethod: [
+      'mortar',
+      'adhesive',
+      'mechanical',
+      'dry-stack',
+      'anchored',
+      'grouted',
+    ],
+    application: [
+      'interior',
+      'exterior',
+      'structural',
+      'decorative',
+      'landscaping',
+      'countertop',
+    ],
   },
   COMPOSITE: {
     name: 'Composite',
-    finish: ['smooth', 'textured', 'wood-grain', 'stone-look', 'metallic', 'matte', 'glossy'],
+    finish: [
+      'smooth',
+      'textured',
+      'wood-grain',
+      'stone-look',
+      'metallic',
+      'matte',
+      'glossy',
+    ],
     size: ['small', 'medium', 'large', 'custom', 'panel', 'plank', 'sheet'],
-    installationMethod: ['mechanical', 'adhesive', 'interlocking', 'clipped', 'screwed', 'snap-fit'],
-    application: ['interior', 'exterior', 'structural', 'decorative', 'marine', 'automotive'],
+    installationMethod: [
+      'mechanical',
+      'adhesive',
+      'interlocking',
+      'clipped',
+      'screwed',
+      'snap-fit',
+    ],
+    application: [
+      'interior',
+      'exterior',
+      'structural',
+      'decorative',
+      'marine',
+      'automotive',
+    ],
   },
 } as const;
 
@@ -180,7 +355,11 @@ import {
 } from '../services/dynamicMaterialCategoriesService';
 
 // Re-export types for convenience
-export type { DynamicMaterialCategory, DynamicMaterialProperty, LegacyMaterialCategories };
+export type {
+  DynamicMaterialCategory,
+  DynamicMaterialProperty,
+  LegacyMaterialCategories,
+};
 
 // Export the dynamic service instance
 export { dynamicMaterialCategoriesService };
@@ -201,32 +380,74 @@ export type LegacyCategoryData = {
 };
 
 // Dynamic functions that fetch from database instead of hardcoded values
-export async function getMaterialCategoriesAsync(): Promise<DynamicMaterialCategory[]> {
+export async function getMaterialCategoriesAsync(): Promise<
+  DynamicMaterialCategory[]
+> {
   return await getMaterialCategories();
 }
 
 export async function getAllMaterialFinishes(): Promise<string[]> {
   const properties = await getMaterialProperties();
-  const finishProperty = properties.find(prop => prop.key === 'finish');
-  return (finishProperty?.validationRules as any)?.examples || ['matte', 'glossy', 'satin', 'textured', 'smooth', 'brushed', 'polished'];
+  const finishProperty = properties.find((prop) => prop.key === 'finish');
+  return (
+    (finishProperty?.validationRules as any)?.examples || [
+      'matte',
+      'glossy',
+      'satin',
+      'textured',
+      'smooth',
+      'brushed',
+      'polished',
+    ]
+  );
 }
 
 export async function getAllMaterialSizes(): Promise<string[]> {
   const properties = await getMaterialProperties();
-  const sizeProperty = properties.find(prop => prop.key === 'size');
-  return (sizeProperty?.validationRules as any)?.examples || ['small', 'medium', 'large', 'custom', 'standard', 'oversized'];
+  const sizeProperty = properties.find((prop) => prop.key === 'size');
+  return (
+    (sizeProperty?.validationRules as any)?.examples || [
+      'small',
+      'medium',
+      'large',
+      'custom',
+      'standard',
+      'oversized',
+    ]
+  );
 }
 
 export async function getAllMaterialInstallationMethods(): Promise<string[]> {
   const properties = await getMaterialProperties();
-  const installProperty = properties.find(prop => prop.key === 'installation_method');
-  return (installProperty?.validationRules as any)?.examples || ['adhesive', 'mechanical', 'welded', 'screwed', 'nailed', 'clipped', 'interlocking'];
+  const installProperty = properties.find(
+    (prop) => prop.key === 'installation_method',
+  );
+  return (
+    (installProperty?.validationRules as any)?.examples || [
+      'adhesive',
+      'mechanical',
+      'welded',
+      'screwed',
+      'nailed',
+      'clipped',
+      'interlocking',
+    ]
+  );
 }
 
 export async function getAllMaterialApplications(): Promise<string[]> {
   const properties = await getMaterialProperties();
-  const appProperty = properties.find(prop => prop.key === 'application');
-  return (appProperty?.validationRules as any)?.examples || ['interior', 'exterior', 'industrial', 'decorative', 'structural', 'functional'];
+  const appProperty = properties.find((prop) => prop.key === 'application');
+  return (
+    (appProperty?.validationRules as any)?.examples || [
+      'interior',
+      'exterior',
+      'industrial',
+      'decorative',
+      'structural',
+      'functional',
+    ]
+  );
 }
 
 // User preferences for material selection
@@ -273,8 +494,6 @@ export interface MoodBoardItem {
   };
 }
 
-
-
 export interface MaterialData {
   material_id: string;
   svbrdf_params: Record<string, number>;
@@ -291,7 +510,6 @@ export interface SpatialFeature {
   properties: Record<string, unknown>;
   confidence: number;
 }
-
 
 export interface SpatialAnalysisData {
   room_type: string;
@@ -330,7 +548,7 @@ export enum ProcessingJobStatus {
   Pending = 'pending',
   Processing = 'processing',
   Completed = 'completed',
-  Failed = 'failed'
+  Failed = 'failed',
 }
 
 // File upload and processing types - Critical for Material Recognition API
@@ -403,8 +621,13 @@ export interface Repository<T extends { id: string }> {
 }
 
 // Mapped types for API transformations
-export type MaterialCreateRequest = Omit<Material, 'id' | 'createdAt' | 'updatedAt'>;
-export type MaterialUpdateRequest = Partial<Omit<Material, 'id' | 'createdAt' | 'updatedAt'>>;
+export type MaterialCreateRequest = Omit<
+  Material,
+  'id' | 'createdAt' | 'updatedAt'
+>;
+export type MaterialUpdateRequest = Partial<
+  Omit<Material, 'id' | 'createdAt' | 'updatedAt'>
+>;
 
 // Conditional types for better type inference
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
@@ -430,10 +653,13 @@ export type QueryResult<T> = {
 
 // Search and filter types with generics
 export type SearchFilters<T> = {
-  [K in keyof T]?: T[K] extends string ? string | string[]
-    : T[K] extends number ? { min?: number; max?: number } | number
-    : T[K] extends boolean ? boolean
-    : unknown;
+  [K in keyof T]?: T[K] extends string
+    ? string | string[]
+    : T[K] extends number
+      ? { min?: number; max?: number } | number
+      : T[K] extends boolean
+        ? boolean
+        : unknown;
 };
 
 export type SortOptions<T> = {

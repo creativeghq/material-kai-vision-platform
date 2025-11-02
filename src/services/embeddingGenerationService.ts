@@ -178,13 +178,16 @@ export class EmbeddingGenerationService extends EventEmitter {
     // Initialize batch queue
     this.batchQueue = [];
 
-    this.logger.info('EmbeddingGenerationService initialized with unified config', {
-      gatewayUrl: config.mivaa.gatewayUrl,
-      batchSize: config.batch.maxSize,
-      cacheEnabled: config.cache.enabled,
-      primaryModel: this.config.embedding.primary.name,
-      dimensions: this.config.embedding.primary.dimensions,
-    });
+    this.logger.info(
+      'EmbeddingGenerationService initialized with unified config',
+      {
+        gatewayUrl: config.mivaa.gatewayUrl,
+        batchSize: config.batch.maxSize,
+        cacheEnabled: config.cache.enabled,
+        primaryModel: this.config.embedding.primary.name,
+        dimensions: this.config.embedding.primary.dimensions,
+      },
+    );
   }
 
   /**
@@ -251,7 +254,7 @@ export class EmbeddingGenerationService extends EventEmitter {
       }
 
       // Generate embedding with retry logic using preprocessed text
-      const result = await this.generateWithRetry(preprocessedText) as any;
+      const result = (await this.generateWithRetry(preprocessedText)) as any;
 
       // Validate and normalize embedding
       const embeddingValidation = EmbeddingValidator.validateEmbedding(
@@ -260,10 +263,13 @@ export class EmbeddingGenerationService extends EventEmitter {
       );
 
       if (!embeddingValidation.valid) {
-        throw new Error(`Embedding validation failed: ${embeddingValidation.error}`);
+        throw new Error(
+          `Embedding validation failed: ${embeddingValidation.error}`,
+        );
       }
 
-      const finalEmbedding = embeddingValidation.normalized || result.data[0].embedding;
+      const finalEmbedding =
+        embeddingValidation.normalized || result.data[0].embedding;
 
       // Record rate limit usage
       this.rateLimiter.recordRequest(result.usage.total_tokens);
@@ -305,7 +311,6 @@ export class EmbeddingGenerationService extends EventEmitter {
 
       this.emit('embeddingGenerated', output);
       return output;
-
     } catch (error) {
       this.metrics.errors++;
       this.logger.error('Failed to generate embedding', {
@@ -322,10 +327,13 @@ export class EmbeddingGenerationService extends EventEmitter {
   /**
    * Generate embeddings for multiple inputs using batch processing
    */
-  async generateBatchEmbeddings(inputs: EmbeddingInput[]): Promise<BatchEmbeddingResult> {
+  async generateBatchEmbeddings(
+    inputs: EmbeddingInput[],
+  ): Promise<BatchEmbeddingResult> {
     const startTime = performance.now();
     const successful: EmbeddingOutput[] = [];
-    const failed: Array<{ id: string; error: string; input: EmbeddingInput }> = [];
+    const failed: Array<{ id: string; error: string; input: EmbeddingInput }> =
+      [];
     let totalTokens = 0;
     let cacheHits = 0;
 
@@ -417,7 +425,9 @@ export class EmbeddingGenerationService extends EventEmitter {
       ...this.metrics,
       cacheSize: this.cache.size,
       queueSize: this.batchQueue.length,
-      cacheHitRate: this.metrics.cacheHits / (this.metrics.cacheHits + this.metrics.cacheMisses) || 0,
+      cacheHitRate:
+        this.metrics.cacheHits /
+          (this.metrics.cacheHits + this.metrics.cacheMisses) || 0,
       errorRate: this.metrics.errors / this.metrics.totalRequests || 0,
     };
   }
@@ -472,7 +482,10 @@ export class EmbeddingGenerationService extends EventEmitter {
         }
 
         const currentRequests = requests.length;
-        const currentTokens = requests.reduce((sum, req) => sum + req.tokens, 0);
+        const currentTokens = requests.reduce(
+          (sum, req) => sum + req.tokens,
+          0,
+        );
 
         return (
           currentRequests < this.config.rateLimit.requestsPerMinute &&
@@ -487,7 +500,9 @@ export class EmbeddingGenerationService extends EventEmitter {
         const oneMinuteAgo = now - 60000;
 
         // Find the oldest request that would need to expire
-        const relevantRequests = requests.filter(req => req.timestamp >= oneMinuteAgo);
+        const relevantRequests = requests.filter(
+          (req) => req.timestamp >= oneMinuteAgo,
+        );
 
         if (relevantRequests.length === 0) return 0;
 
@@ -507,42 +522,51 @@ export class EmbeddingGenerationService extends EventEmitter {
 
     for (let attempt = 1; attempt <= this.config.retry.maxAttempts; attempt++) {
       try {
-        const response = await fetch(`${this.config.mivaa.gatewayUrl}/api/mivaa/gateway`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${this.config.mivaa.apiKey}`,
-            'Content-Type': 'application/json',
-            'User-Agent': 'Material-Kai-Vision-Platform-EmbeddingService/1.0',
-          },
-          body: JSON.stringify({
-            action: 'batch_embedding',
-            payload: {
-              texts: [text],
-              options: {
-                model: this.config.mivaa.model || 'clip',
-                normalize: true,
-                batch_size: 1,
-              },
+        const response = await fetch(
+          `${this.config.mivaa.gatewayUrl}/api/mivaa/gateway`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${this.config.mivaa.apiKey}`,
+              'Content-Type': 'application/json',
+              'User-Agent': 'Material-Kai-Vision-Platform-EmbeddingService/1.0',
             },
-          }),
-        });
+            body: JSON.stringify({
+              action: 'batch_embedding',
+              payload: {
+                texts: [text],
+                options: {
+                  model: this.config.mivaa.model || 'clip',
+                  normalize: true,
+                  batch_size: 1,
+                },
+              },
+            }),
+          },
+        );
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(`MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+          throw new Error(
+            `MIVAA gateway error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`,
+          );
         }
 
         const result = await response.json();
         if (!result.success) {
-          throw new Error(`MIVAA batch embedding error: ${result.error?.message || 'Unknown error'}`);
+          throw new Error(
+            `MIVAA batch embedding error: ${result.error?.message || 'Unknown error'}`,
+          );
         }
 
         // Transform MIVAA response to match expected format
         const embeddingData = result.data.embeddings?.[0] || result.data;
         return {
-          data: [{
-            embedding: embeddingData.embedding || embeddingData,
-          }],
+          data: [
+            {
+              embedding: embeddingData.embedding || embeddingData,
+            },
+          ],
           model: result.data.model || this.config.mivaa.model || 'mivaa-clip',
           usage: {
             prompt_tokens: Math.ceil(text.length / 4), // Estimate tokens
@@ -561,11 +585,14 @@ export class EmbeddingGenerationService extends EventEmitter {
           this.config.retry.maxDelay,
         );
 
-        this.logger.warn('MIVAA embedding generation attempt failed, retrying', {
-          attempt,
-          delay,
-          error: lastError.message,
-        });
+        this.logger.warn(
+          'MIVAA embedding generation attempt failed, retrying',
+          {
+            attempt,
+            delay,
+            error: lastError.message,
+          },
+        );
 
         await this.delay(delay);
       }
@@ -674,30 +701,29 @@ export class EmbeddingGenerationService extends EventEmitter {
 
     // Extract items to process
     const itemsToProcess = this.batchQueue.splice(0, this.config.batch.maxSize);
-    const inputs = itemsToProcess.map(item => item.input);
+    const inputs = itemsToProcess.map((item) => item.input);
 
     try {
       const result = await this.generateBatchEmbeddings(inputs);
 
       // Resolve successful items
-      result.successful.forEach(output => {
-        const item = itemsToProcess.find(i => i.input.id === output.id);
+      result.successful.forEach((output) => {
+        const item = itemsToProcess.find((i) => i.input.id === output.id);
         if (item) {
           item.resolve(output);
         }
       });
 
       // Reject failed items
-      result.failed.forEach(failure => {
-        const item = itemsToProcess.find(i => i.input.id === failure.id);
+      result.failed.forEach((failure) => {
+        const item = itemsToProcess.find((i) => i.input.id === failure.id);
         if (item) {
           item.reject(new Error(failure.error));
         }
       });
-
     } catch (error) {
       // Reject all items on batch failure
-      itemsToProcess.forEach(item => {
+      itemsToProcess.forEach((item) => {
         item.reject(error instanceof Error ? error : new Error(String(error)));
       });
     }
@@ -718,7 +744,9 @@ export class EmbeddingGenerationService extends EventEmitter {
   private updateAverageProcessingTime(processingTime: number): void {
     const totalRequests = this.metrics.totalRequests;
     this.metrics.averageProcessingTime =
-      (this.metrics.averageProcessingTime * (totalRequests - 1) + processingTime) / totalRequests;
+      (this.metrics.averageProcessingTime * (totalRequests - 1) +
+        processingTime) /
+      totalRequests;
   }
 
   /**
@@ -736,7 +764,7 @@ export class EmbeddingGenerationService extends EventEmitter {
    * Delay execution for specified milliseconds
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
@@ -746,7 +774,8 @@ export class EmbeddingGenerationService extends EventEmitter {
 export const defaultEmbeddingConfig: EmbeddingGenerationConfig = {
   embedding: DEFAULT_EMBEDDING_CONFIG,
   mivaa: {
-    gatewayUrl: process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
+    gatewayUrl:
+      process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
     apiKey: process.env.MIVAA_API_KEY || '',
     timeout: 30000,
     model: 'clip', // Default to CLIP for embeddings

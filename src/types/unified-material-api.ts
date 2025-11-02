@@ -136,12 +136,16 @@ export type MaterialResponse = MaterialApiResponse<Material>;
 /**
  * Response payload for material list operations
  */
-export type MaterialListResponse = MaterialApiResponse<PaginatedResponse<Material>>;
+export type MaterialListResponse = MaterialApiResponse<
+  PaginatedResponse<Material>
+>;
 
 /**
  * Request parameters for material search
  */
-export interface MaterialSearchRequest extends PaginationParams, MaterialFilterParams {
+export interface MaterialSearchRequest
+  extends PaginationParams,
+    MaterialFilterParams {
   /** Include functional metadata in response */
   includeFunctionalMetadata?: boolean;
   /** Include similar materials in response */
@@ -167,7 +171,14 @@ export interface MaterialMetafieldDefinition {
   /** Material categories this metafield applies to */
   applicableCategories: MaterialCategory[];
   /** Data type for the metafield value */
-  dataType: 'string' | 'number' | 'boolean' | 'date' | 'select' | 'multiselect' | 'json';
+  dataType:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'date'
+    | 'select'
+    | 'multiselect'
+    | 'json';
   /** Whether this metafield is required */
   required: boolean;
   /** Default value for the metafield */
@@ -434,12 +445,15 @@ export interface SetMaterialMetafieldsRequest {
 /**
  * Response for metafield operations
  */
-export type MetafieldResponse = MaterialApiResponse<MaterialMetafieldDefinition>;
+export type MetafieldResponse =
+  MaterialApiResponse<MaterialMetafieldDefinition>;
 
 /**
  * Response for metafield list operations
  */
-export type MetafieldListResponse = MaterialApiResponse<PaginatedResponse<MaterialMetafieldDefinition>>;
+export type MetafieldListResponse = MaterialApiResponse<
+  PaginatedResponse<MaterialMetafieldDefinition>
+>;
 
 // =============================================================================
 // Material Images API Types
@@ -460,7 +474,14 @@ export interface MaterialImage {
   /** Image description */
   description?: string;
   /** Image type/purpose */
-  type: 'primary' | 'texture' | 'sample' | 'installation' | 'application' | 'detail' | 'other';
+  type:
+    | 'primary'
+    | 'texture'
+    | 'sample'
+    | 'installation'
+    | 'application'
+    | 'detail'
+    | 'other';
   /** Display order for multiple images */
   displayOrder: number;
   /** Storage URLs for different sizes */
@@ -568,7 +589,14 @@ export interface MaterialRelationship {
   /** Target material ID */
   targetMaterialId: string;
   /** Type of relationship */
-  relationshipType: 'variant' | 'alternative' | 'component' | 'complement' | 'replacement' | 'similar' | 'custom';
+  relationshipType:
+    | 'variant'
+    | 'alternative'
+    | 'component'
+    | 'complement'
+    | 'replacement'
+    | 'similar'
+    | 'custom';
   /** Relationship strength (0-1) */
   strength: number;
   /** Custom relationship label (for 'custom' type) */
@@ -602,12 +630,15 @@ export interface CreateMaterialRelationshipRequest {
 /**
  * Response for relationship operations
  */
-export type MaterialRelationshipResponse = MaterialApiResponse<MaterialRelationship>;
+export type MaterialRelationshipResponse =
+  MaterialApiResponse<MaterialRelationship>;
 
 /**
  * Response for relationship list operations
  */
-export type MaterialRelationshipListResponse = MaterialApiResponse<MaterialRelationship[]>;
+export type MaterialRelationshipListResponse = MaterialApiResponse<
+  MaterialRelationship[]
+>;
 
 // =============================================================================
 // Unified Search API Types
@@ -650,7 +681,11 @@ export interface UnifiedSearchResult {
   /** Relevance score (0-1) */
   score: number;
   /** Result data */
-  data: Material | MaterialMetafieldDefinition | MaterialImage | MaterialRelationship;
+  data:
+    | Material
+    | MaterialMetafieldDefinition
+    | MaterialImage
+    | MaterialRelationship;
   /** Highlighted text snippets */
   highlights?: string[];
   /** Context information */
@@ -660,7 +695,9 @@ export interface UnifiedSearchResult {
 /**
  * Response for unified search operations
  */
-export type UnifiedSearchResponse = MaterialApiResponse<PaginatedResponse<UnifiedSearchResult>>;
+export type UnifiedSearchResponse = MaterialApiResponse<
+  PaginatedResponse<UnifiedSearchResult>
+>;
 
 // =============================================================================
 // Edge Function Response Types
@@ -727,7 +764,12 @@ export interface MaterialRealtimeEvent {
   /** Event type */
   type: 'INSERT' | 'UPDATE' | 'DELETE';
   /** Table/entity that changed */
-  table: 'materials' | 'material_metafield_definitions' | 'material_metafield_values' | 'material_images' | 'material_relationships';
+  table:
+    | 'materials'
+    | 'material_metafield_definitions'
+    | 'material_metafield_values'
+    | 'material_images'
+    | 'material_relationships';
   /** Changed record data */
   record: unknown;
   /** Previous record data (for updates) */
@@ -789,16 +831,19 @@ export interface ValidationSchema {
   /** Required fields */
   required?: string[];
   /** Field definitions */
-  properties?: Record<string, {
-    type: string;
-    format?: string;
-    minimum?: number;
-    maximum?: number;
-    minLength?: number;
-    maxLength?: number;
-    pattern?: string;
-    enum?: unknown[];
-  }>;
+  properties?: Record<
+    string,
+    {
+      type: string;
+      format?: string;
+      minimum?: number;
+      maximum?: number;
+      minLength?: number;
+      maxLength?: number;
+      pattern?: string;
+      enum?: unknown[];
+    }
+  >;
   /** Additional validation rules */
   additionalProperties?: boolean;
 }
@@ -830,7 +875,10 @@ export function isMaterialSearchResult(
  */
 export function isMetafieldSearchResult(
   result: UnifiedSearchResult,
-): result is UnifiedSearchResult & { type: 'metafield'; data: MaterialMetafieldDefinition } {
+): result is UnifiedSearchResult & {
+  type: 'metafield';
+  data: MaterialMetafieldDefinition;
+} {
   return result.type === 'metafield';
 }
 
@@ -848,6 +896,9 @@ export function isImageSearchResult(
  */
 export function isRelationshipSearchResult(
   result: UnifiedSearchResult,
-): result is UnifiedSearchResult & { type: 'relationship'; data: MaterialRelationship } {
+): result is UnifiedSearchResult & {
+  type: 'relationship';
+  data: MaterialRelationship;
+} {
   return result.type === 'relationship';
 }

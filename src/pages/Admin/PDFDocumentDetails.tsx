@@ -12,11 +12,24 @@ import {
   Loader2,
 } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -123,7 +136,10 @@ export const PDFDocumentDetails: React.FC = () => {
       <div className="p-6">
         <div className="text-center">
           <p className="text-muted-foreground">Document not found</p>
-          <Button onClick={() => navigate('/admin/knowledge-base')} className="mt-4">
+          <Button
+            onClick={() => navigate('/admin/knowledge-base')}
+            className="mt-4"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Knowledge Base
           </Button>
@@ -152,7 +168,11 @@ export const PDFDocumentDetails: React.FC = () => {
             </p>
           </div>
         </div>
-        <Badge variant={document.processing_status === 'completed' ? 'default' : 'secondary'}>
+        <Badge
+          variant={
+            document.processing_status === 'completed' ? 'default' : 'secondary'
+          }
+        >
           {document.processing_status}
         </Badge>
       </div>
@@ -203,7 +223,9 @@ export const PDFDocumentDetails: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{document.document_entities.length}</div>
+            <div className="text-2xl font-bold">
+              {document.document_entities.length}
+            </div>
           </CardContent>
         </Card>
 
@@ -215,7 +237,9 @@ export const PDFDocumentDetails: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{document.embeddings_count}</div>
+            <div className="text-2xl font-bold">
+              {document.embeddings_count}
+            </div>
           </CardContent>
         </Card>
 
@@ -287,24 +311,30 @@ export const PDFDocumentDetails: React.FC = () => {
                     <TableBody>
                       {document.products.map((product) => (
                         <TableRow key={product.id}>
-                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {product.name}
+                          </TableCell>
                           <TableCell className="max-w-md truncate">
                             {product.description || 'N/A'}
                           </TableCell>
                           <TableCell>
                             {product.metadata && (
                               <div className="flex flex-wrap gap-1">
-                                {Object.entries(product.metadata).slice(0, 3).map(([key, value]) => (
-                                  <Badge key={key} variant="outline" className="text-xs">
-                                    {key}: {String(value).substring(0, 20)}
-                                  </Badge>
-                                ))}
+                                {Object.entries(product.metadata)
+                                  .slice(0, 3)
+                                  .map(([key, value]) => (
+                                    <Badge
+                                      key={key}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {key}: {String(value).substring(0, 20)}
+                                    </Badge>
+                                  ))}
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            {product.page_range || 'N/A'}
-                          </TableCell>
+                          <TableCell>{product.page_range || 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -344,20 +374,30 @@ export const PDFDocumentDetails: React.FC = () => {
                       {document.chunks.map((chunk) => (
                         <TableRow key={chunk.id}>
                           <TableCell>
-                            <Badge variant="outline">{chunk.category || 'general'}</Badge>
+                            <Badge variant="outline">
+                              {chunk.category || 'general'}
+                            </Badge>
                           </TableCell>
                           <TableCell className="max-w-md">
-                            <p className="truncate">{chunk.content?.substring(0, 100)}...</p>
+                            <p className="truncate">
+                              {chunk.content?.substring(0, 100)}...
+                            </p>
                           </TableCell>
                           <TableCell>{chunk.page_number || 'N/A'}</TableCell>
                           <TableCell>
                             {chunk.metadata && (
                               <div className="flex flex-wrap gap-1">
-                                {Object.entries(chunk.metadata).slice(0, 2).map(([key, value]) => (
-                                  <Badge key={key} variant="secondary" className="text-xs">
-                                    {key}
-                                  </Badge>
-                                ))}
+                                {Object.entries(chunk.metadata)
+                                  .slice(0, 2)
+                                  .map(([key, value]) => (
+                                    <Badge
+                                      key={key}
+                                      variant="secondary"
+                                      className="text-xs"
+                                    >
+                                      {key}
+                                    </Badge>
+                                  ))}
                               </div>
                             )}
                           </TableCell>
@@ -399,7 +439,9 @@ export const PDFDocumentDetails: React.FC = () => {
                         )}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Badge variant="outline">{image.category || 'general'}</Badge>
+                            <Badge variant="outline">
+                              {image.category || 'general'}
+                            </Badge>
                             <span className="text-xs text-muted-foreground">
                               Page {image.page_number || 'N/A'}
                             </span>
@@ -411,11 +453,17 @@ export const PDFDocumentDetails: React.FC = () => {
                           )}
                           {image.metadata && (
                             <div className="flex flex-wrap gap-1">
-                              {Object.entries(image.metadata).slice(0, 3).map(([key, value]) => (
-                                <Badge key={key} variant="secondary" className="text-xs">
-                                  {key}: {String(value).substring(0, 15)}
-                                </Badge>
-                              ))}
+                              {Object.entries(image.metadata)
+                                .slice(0, 3)
+                                .map(([key, value]) => (
+                                  <Badge
+                                    key={key}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {key}: {String(value).substring(0, 15)}
+                                  </Badge>
+                                ))}
                             </div>
                           )}
                         </div>
@@ -434,7 +482,8 @@ export const PDFDocumentDetails: React.FC = () => {
             <CardHeader>
               <CardTitle>Document Entities</CardTitle>
               <CardDescription>
-                Certificates, logos, specifications, and other entities extracted
+                Certificates, logos, specifications, and other entities
+                extracted
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -460,14 +509,18 @@ export const PDFDocumentDetails: React.FC = () => {
                           <TableCell>
                             <Badge>{entity.entity_type}</Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{entity.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {entity.name}
+                          </TableCell>
                           <TableCell className="max-w-md truncate">
                             {entity.description || 'N/A'}
                           </TableCell>
                           <TableCell>
                             {entity.factory_name && (
                               <div className="space-y-1">
-                                <Badge variant="outline">{entity.factory_name}</Badge>
+                                <Badge variant="outline">
+                                  {entity.factory_name}
+                                </Badge>
                                 {entity.factory_group && (
                                   <Badge variant="secondary" className="ml-1">
                                     {entity.factory_group}
@@ -500,53 +553,78 @@ export const PDFDocumentDetails: React.FC = () => {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Document ID</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Document ID
+                    </p>
                     <p className="text-sm font-mono">{document.id}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Filename</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Filename
+                    </p>
                     <p className="text-sm">{document.filename}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Status</p>
-                    <Badge variant={document.processing_status === 'completed' ? 'default' : 'secondary'}>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Status
+                    </p>
+                    <Badge
+                      variant={
+                        document.processing_status === 'completed'
+                          ? 'default'
+                          : 'secondary'
+                      }
+                    >
                       {document.processing_status}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">Created At</p>
-                    <p className="text-sm">{new Date(document.created_at).toLocaleString()}</p>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Created At
+                    </p>
+                    <p className="text-sm">
+                      {new Date(document.created_at).toLocaleString()}
+                    </p>
                   </div>
                 </div>
 
-                {document.metadata && Object.keys(document.metadata).length > 0 && (
-                  <div className="mt-6">
-                    <p className="text-sm font-medium text-muted-foreground mb-3">
-                      Additional Metadata
-                    </p>
-                    <div className="bg-muted rounded-lg p-4">
-                      <pre className="text-xs overflow-x-auto">
-                        {JSON.stringify(document.metadata, null, 2)}
-                      </pre>
+                {document.metadata &&
+                  Object.keys(document.metadata).length > 0 && (
+                    <div className="mt-6">
+                      <p className="text-sm font-medium text-muted-foreground mb-3">
+                        Additional Metadata
+                      </p>
+                      <div className="bg-muted rounded-lg p-4">
+                        <pre className="text-xs overflow-x-auto">
+                          {JSON.stringify(document.metadata, null, 2)}
+                        </pre>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-600">{document.products.length}</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {document.products.length}
+                    </p>
                     <p className="text-sm text-muted-foreground">Products</p>
                   </div>
                   <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-600">{document.chunks.length}</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {document.chunks.length}
+                    </p>
                     <p className="text-sm text-muted-foreground">Chunks</p>
                   </div>
                   <div className="text-center p-4 bg-orange-50 rounded-lg">
-                    <p className="text-2xl font-bold text-orange-600">{document.images.length}</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {document.images.length}
+                    </p>
                     <p className="text-sm text-muted-foreground">Images</p>
                   </div>
                   <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-600">{document.embeddings_count}</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {document.embeddings_count}
+                    </p>
                     <p className="text-sm text-muted-foreground">Embeddings</p>
                   </div>
                 </div>
@@ -560,4 +638,3 @@ export const PDFDocumentDetails: React.FC = () => {
 };
 
 export default PDFDocumentDetails;
-

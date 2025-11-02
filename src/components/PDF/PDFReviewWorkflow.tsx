@@ -11,11 +11,23 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -124,10 +136,12 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 }) => {
   const { toast } = useToast();
   const [reviewedTiles, setReviewedTiles] = useState<ReviewedTile[]>(
-    tiles.map(tile => ({ ...tile, reviewed: false, approved: false })),
+    tiles.map((tile) => ({ ...tile, reviewed: false, approved: false })),
   );
   const [selectedTiles, setSelectedTiles] = useState<Set<string>>(new Set());
-  const [workflowActions, setWorkflowActions] = useState<Set<string>>(new Set());
+  const [workflowActions, setWorkflowActions] = useState<Set<string>>(
+    new Set(),
+  );
   const [processingWorkflow, setProcessingWorkflow] = useState(false);
   const [workflowProgress, setWorkflowProgress] = useState(0);
 
@@ -149,15 +163,13 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
   ];
 
   const updateTileReview = (tileId: string, updates: Partial<ReviewedTile>) => {
-    setReviewedTiles(prev =>
-      prev.map(tile =>
-        tile.id === tileId ? { ...tile, ...updates } : tile,
-      ),
+    setReviewedTiles((prev) =>
+      prev.map((tile) => (tile.id === tileId ? { ...tile, ...updates } : tile)),
     );
   };
 
   const toggleTileSelection = (tileId: string) => {
-    setSelectedTiles(prev => {
+    setSelectedTiles((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(tileId)) {
         newSet.delete(tileId);
@@ -170,13 +182,13 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
   const selectAllApproved = () => {
     const approvedTileIds = reviewedTiles
-      .filter(tile => tile.approved)
-      .map(tile => tile.id);
+      .filter((tile) => tile.approved)
+      .map((tile) => tile.id);
     setSelectedTiles(new Set(approvedTileIds));
   };
 
   const toggleWorkflowAction = (actionId: string) => {
-    setWorkflowActions(prev => {
+    setWorkflowActions((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(actionId)) {
         newSet.delete(actionId);
@@ -201,7 +213,9 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     setWorkflowProgress(0);
 
     try {
-      const selectedTileData = reviewedTiles.filter(tile => selectedTiles.has(tile.id));
+      const selectedTileData = reviewedTiles.filter((tile) =>
+        selectedTiles.has(tile.id),
+      );
       const workflowResults: WorkflowResults = {};
 
       let completed = 0;
@@ -209,7 +223,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
       // Execute each workflow action
       for (const actionId of Array.from(workflowActions)) {
-        const action = availableWorkflows.find(a => a.id === actionId);
+        const action = availableWorkflows.find((a) => a.id === actionId);
         if (!action) continue;
 
         console.log(`Executing workflow: ${action.label}`);
@@ -217,17 +231,20 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         try {
           switch (action.type) {
             case 'ai_analysis':
-              workflowResults.ai_analysis = await performAIAnalysis(selectedTileData);
+              workflowResults.ai_analysis =
+                await performAIAnalysis(selectedTileData);
               break;
 
-
             case 'image_generation':
-              workflowResults.image_generation = await generateMaterialImages(selectedTileData);
+              workflowResults.image_generation =
+                await generateMaterialImages(selectedTileData);
               break;
           }
         } catch (error) {
           console.error(`Error in ${action.label}:`, error);
-          workflowResults[action.id] = { error: error instanceof Error ? error.message : String(error) };
+          workflowResults[action.id] = {
+            error: error instanceof Error ? error.message : String(error),
+          };
         }
 
         completed++;
@@ -240,7 +257,6 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
       });
 
       onWorkflowComplete?.(workflowResults);
-
     } catch (error) {
       console.error('Workflow execution error:', error);
       toast({
@@ -254,23 +270,25 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
     }
   };
 
-
   const performAIAnalysis = async (tiles: ReviewedTile[]) => {
     const apiService = BrowserApiIntegrationService.getInstance();
-    const result = await apiService.callSupabaseFunction('hybrid-material-analysis', {
-      materials: tiles.map(tile => ({
-        id: tile.id,
-        text: tile.corrected_text || tile.extracted_text,
-        material_type: tile.corrected_material_type || tile.material_type,
-        structured_data: tile.structured_data,
-        image_url: tile.image_url,
-      })),
-    });
+    const result = await apiService.callSupabaseFunction(
+      'hybrid-material-analysis',
+      {
+        materials: tiles.map((tile) => ({
+          id: tile.id,
+          text: tile.corrected_text || tile.extracted_text,
+          material_type: tile.corrected_material_type || tile.material_type,
+          structured_data: tile.structured_data,
+          image_url: tile.image_url,
+        })),
+      },
+    );
 
-    if (!result.success) throw new Error(result.error?.message || 'AI analysis failed');
+    if (!result.success)
+      throw new Error(result.error?.message || 'AI analysis failed');
     return result.data;
   };
-
 
   const generateMaterialImages = async (tiles: ReviewedTile[]) => {
     const images: Array<{ tile_id: string; image_url: string }> = [];
@@ -282,13 +300,17 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
         Clean, professional material sample visualization, white background, detailed texture.`;
 
         const apiService = BrowserApiIntegrationService.getInstance();
-        const result = await apiService.callSupabaseFunction('generate-material-image', {
-          prompt,
-          material_type: tile.corrected_material_type || tile.material_type,
-          tile_id: tile.id,
-        });
+        const result = await apiService.callSupabaseFunction(
+          'generate-material-image',
+          {
+            prompt,
+            material_type: tile.corrected_material_type || tile.material_type,
+            tile_id: tile.id,
+          },
+        );
 
-        if (!result.success) throw new Error(result.error?.message || 'Image generation failed');
+        if (!result.success)
+          throw new Error(result.error?.message || 'Image generation failed');
 
         const imageUrl = result.data?.image_url;
         if (typeof imageUrl === 'string') {
@@ -308,8 +330,8 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
   const getReviewStats = () => {
     const total = reviewedTiles.length;
-    const reviewed = reviewedTiles.filter(t => t.reviewed).length;
-    const approved = reviewedTiles.filter(t => t.approved).length;
+    const reviewed = reviewedTiles.filter((t) => t.reviewed).length;
+    const approved = reviewedTiles.filter((t) => t.approved).length;
     return { total, reviewed, approved };
   };
 
@@ -333,16 +355,22 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                 {stats.approved} Approved
               </span>
             </div>
-          </CardTitle><CardDescription>
+          </CardTitle>
+          <CardDescription>
             Review extracted materials and route them through AI workflows
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex justify-between items-center">
             <span className="text-sm">Review Progress</span>
-            <span className="text-sm">{Math.round((stats.reviewed / stats.total) * 100)}%</span>
+            <span className="text-sm">
+              {Math.round((stats.reviewed / stats.total) * 100)}%
+            </span>
           </div>
-          <Progress value={(stats.reviewed / stats.total) * 100} className="mt-2" />
+          <Progress
+            value={(stats.reviewed / stats.total) * 100}
+            className="mt-2"
+          />
         </CardContent>
       </Card>
       <Tabs defaultValue="review" className="space-y-4">
@@ -362,14 +390,18 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                   selectAllApproved();
                 }
               }}
-              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5">
+              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
+            >
               Select All Approved
             </Button>
           </div>
 
           <div className="grid gap-4">
             {reviewedTiles.map((tile) => (
-              <Card key={tile.id} className={`transition-colors ${tile.approved ? 'border-green-200 bg-green-50/50' : ''}`}>
+              <Card
+                key={tile.id}
+                className={`transition-colors ${tile.approved ? 'border-green-200 bg-green-50/50' : ''}`}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -385,12 +417,19 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
                             Tile {tile.tile_index + 1}
                           </span>
-                          <Badge className={tile.material_detected ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                          <Badge
+                            className={
+                              tile.material_detected
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }
+                          >
                             {tile.corrected_material_type || tile.material_type}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1">
-                          Confidence: {Math.round((tile.material_confidence || 0) * 100)}%
+                          Confidence:{' '}
+                          {Math.round((tile.material_confidence || 0) * 100)}%
                         </p>
                       </div>
                     </div>
@@ -410,10 +449,18 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
                   <div className="space-y-3">
                     <div>
-                      <label className="text-sm font-medium">Material Type</label>
+                      <label className="text-sm font-medium">
+                        Material Type
+                      </label>
                       <Select
-                        value={tile.corrected_material_type || tile.material_type}
-                        onValueChange={(value: string) => updateTileReview(tile.id, { corrected_material_type: value })}
+                        value={
+                          tile.corrected_material_type || tile.material_type
+                        }
+                        onValueChange={(value: string) =>
+                          updateTileReview(tile.id, {
+                            corrected_material_type: value,
+                          })
+                        }
                       >
                         <SelectTrigger className="mt-1">
                           <SelectValue />
@@ -434,29 +481,44 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium">Extracted Text</label>
+                      <label className="text-sm font-medium">
+                        Extracted Text
+                      </label>
                       <Textarea
                         value={tile.corrected_text || tile.extracted_text}
-                        onChange={(e) => updateTileReview(tile.id, { corrected_text: e.target.value })}
+                        onChange={(e) =>
+                          updateTileReview(tile.id, {
+                            corrected_text: e.target.value,
+                          })
+                        }
                         className="mt-1"
                         rows={3}
                       />
                     </div>
 
-                    {tile.structured_data && Object.keys(tile.structured_data).length > 0 && (
-                      <div>
-                        <label className="text-sm font-medium">Structured Data</label>
-                        <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto max-h-32">
-                          {JSON.stringify(tile.structured_data, null, 2)}
-                        </pre>
-                      </div>
-                    )}
+                    {tile.structured_data &&
+                      Object.keys(tile.structured_data).length > 0 && (
+                        <div>
+                          <label className="text-sm font-medium">
+                            Structured Data
+                          </label>
+                          <pre className="text-xs bg-muted p-2 rounded mt-1 overflow-auto max-h-32">
+                            {JSON.stringify(tile.structured_data, null, 2)}
+                          </pre>
+                        </div>
+                      )}
 
                     <div>
-                      <label className="text-sm font-medium">Review Notes</label>
+                      <label className="text-sm font-medium">
+                        Review Notes
+                      </label>
                       <Textarea
                         value={tile.reviewer_notes || ''}
-                        onChange={(e) => updateTileReview(tile.id, { reviewer_notes: e.target.value })}
+                        onChange={(e) =>
+                          updateTileReview(tile.id, {
+                            reviewer_notes: e.target.value,
+                          })
+                        }
                         placeholder="Add review comments..."
                         className="mt-1"
                         rows={2}
@@ -467,10 +529,18 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                       <div className="flex gap-2">
                         <Button
                           className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
-                          onClick={() => updateTileReview(tile.id, { reviewed: true, approved: true })}
+                          onClick={() =>
+                            updateTileReview(tile.id, {
+                              reviewed: true,
+                              approved: true,
+                            })
+                          }
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              updateTileReview(tile.id, { reviewed: true, approved: true });
+                              updateTileReview(tile.id, {
+                                reviewed: true,
+                                approved: true,
+                              });
                             }
                           }}
                         >
@@ -479,10 +549,18 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                         </Button>
                         <Button
                           className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
-                          onClick={() => updateTileReview(tile.id, { reviewed: true, approved: false })}
+                          onClick={() =>
+                            updateTileReview(tile.id, {
+                              reviewed: true,
+                              approved: false,
+                            })
+                          }
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
-                              updateTileReview(tile.id, { reviewed: true, approved: false });
+                              updateTileReview(tile.id, {
+                                reviewed: true,
+                                approved: false,
+                              });
                             }
                           }}
                         >
@@ -500,7 +578,9 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
 
         <TabsContent value="workflow" className="space-y-4">
           <div>
-            <h3 className="text-lg font-semibold mb-4">Select Workflow Actions</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Select Workflow Actions
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {availableWorkflows.map((workflow) => (
                 <Card
@@ -519,7 +599,9 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                       {workflow.icon}
                       <div>
                         <h4 className="font-medium">{workflow.label}</h4>
-                        <p className="text-sm text-muted-foreground">{workflow.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {workflow.description}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -540,11 +622,15 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="font-medium">Selected Materials</p>
-                  <p className="text-muted-foreground">{selectedTiles.size} tiles</p>
+                  <p className="text-muted-foreground">
+                    {selectedTiles.size} tiles
+                  </p>
                 </div>
                 <div>
                   <p className="font-medium">Workflow Actions</p>
-                  <p className="text-muted-foreground">{workflowActions.size} actions</p>
+                  <p className="text-muted-foreground">
+                    {workflowActions.size} actions
+                  </p>
                 </div>
               </div>
 
@@ -566,7 +652,11 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                       executeWorkflow();
                     }
                   }}
-                  disabled={selectedTiles.size === 0 || workflowActions.size === 0 || processingWorkflow}
+                  disabled={
+                    selectedTiles.size === 0 ||
+                    workflowActions.size === 0 ||
+                    processingWorkflow
+                  }
                   className="flex-1"
                 >
                   <Sparkles className="h-4 w-4 mr-2" />

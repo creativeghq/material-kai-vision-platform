@@ -5,11 +5,28 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import { AlertTriangle } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -61,7 +78,9 @@ interface MetricsStats {
 }
 
 export const QualityMetricsDashboard: React.FC = () => {
-  const [retrievalMetrics, setRetrievalMetrics] = useState<RetrievalMetric[]>([]);
+  const [retrievalMetrics, setRetrievalMetrics] = useState<RetrievalMetric[]>(
+    [],
+  );
   const [responseMetrics, setResponseMetrics] = useState<ResponseMetric[]>([]);
   const [stats, setStats] = useState<MetricsStats>({
     avgPrecision: 0,
@@ -102,12 +121,26 @@ export const QualityMetricsDashboard: React.FC = () => {
 
       // Calculate statistics
       if (retrievalData && retrievalData.length > 0) {
-        const avgPrecision = retrievalData.reduce((sum: number, m: any) => sum + (m.precision || 0), 0) / retrievalData.length;
-        const avgRecall = retrievalData.reduce((sum: number, m: any) => sum + (m.recall || 0), 0) / retrievalData.length;
-        const avgMRR = retrievalData.reduce((sum: number, m: any) => sum + (m.mrr || 0), 0) / retrievalData.length;
-        const avgLatency = retrievalData.reduce((sum: number, m: any) => sum + (m.latency_ms || 0), 0) / retrievalData.length;
+        const avgPrecision =
+          retrievalData.reduce(
+            (sum: number, m: any) => sum + (m.precision || 0),
+            0,
+          ) / retrievalData.length;
+        const avgRecall =
+          retrievalData.reduce(
+            (sum: number, m: any) => sum + (m.recall || 0),
+            0,
+          ) / retrievalData.length;
+        const avgMRR =
+          retrievalData.reduce((sum: number, m: any) => sum + (m.mrr || 0), 0) /
+          retrievalData.length;
+        const avgLatency =
+          retrievalData.reduce(
+            (sum: number, m: any) => sum + (m.latency_ms || 0),
+            0,
+          ) / retrievalData.length;
 
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
           avgPrecision,
           avgRecall,
@@ -117,13 +150,33 @@ export const QualityMetricsDashboard: React.FC = () => {
       }
 
       if (responseData && responseData.length > 0) {
-        const avgCoherence = responseData.reduce((sum: number, m: any) => sum + (m.coherence_score || 0), 0) / responseData.length;
-        const avgHallucination = responseData.reduce((sum: number, m: any) => sum + (m.hallucination_score || 0), 0) / responseData.length;
-        const avgAttribution = responseData.reduce((sum: number, m: any) => sum + (m.source_attribution_score || 0), 0) / responseData.length;
-        const avgConsistency = responseData.reduce((sum: number, m: any) => sum + (m.factual_consistency_score || 0), 0) / responseData.length;
-        const avgResponseQuality = responseData.reduce((sum: number, m: any) => sum + (m.overall_quality_score || 0), 0) / responseData.length;
+        const avgCoherence =
+          responseData.reduce(
+            (sum: number, m: any) => sum + (m.coherence_score || 0),
+            0,
+          ) / responseData.length;
+        const avgHallucination =
+          responseData.reduce(
+            (sum: number, m: any) => sum + (m.hallucination_score || 0),
+            0,
+          ) / responseData.length;
+        const avgAttribution =
+          responseData.reduce(
+            (sum: number, m: any) => sum + (m.source_attribution_score || 0),
+            0,
+          ) / responseData.length;
+        const avgConsistency =
+          responseData.reduce(
+            (sum: number, m: any) => sum + (m.factual_consistency_score || 0),
+            0,
+          ) / responseData.length;
+        const avgResponseQuality =
+          responseData.reduce(
+            (sum: number, m: any) => sum + (m.overall_quality_score || 0),
+            0,
+          ) / responseData.length;
 
-        setStats(prev => ({
+        setStats((prev) => ({
           ...prev,
           avgCoherence,
           avgHallucination,
@@ -152,8 +205,10 @@ export const QualityMetricsDashboard: React.FC = () => {
   };
 
   const getQualityBadge = (score: number) => {
-    if (score >= 0.85) return <Badge className="bg-green-100 text-green-800">Excellent</Badge>;
-    if (score >= 0.7) return <Badge className="bg-yellow-100 text-yellow-800">Good</Badge>;
+    if (score >= 0.85)
+      return <Badge className="bg-green-100 text-green-800">Excellent</Badge>;
+    if (score >= 0.7)
+      return <Badge className="bg-yellow-100 text-yellow-800">Good</Badge>;
     return <Badge className="bg-red-100 text-red-800">Poor</Badge>;
   };
 
@@ -170,10 +225,14 @@ export const QualityMetricsDashboard: React.FC = () => {
             <CardTitle className="text-sm font-medium">Avg Precision</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getQualityColor(stats.avgPrecision)}`}>
+            <div
+              className={`text-2xl font-bold ${getQualityColor(stats.avgPrecision)}`}
+            >
               {(stats.avgPrecision * 100).toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Retrieval accuracy</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Retrieval accuracy
+            </p>
           </CardContent>
         </Card>
 
@@ -182,22 +241,32 @@ export const QualityMetricsDashboard: React.FC = () => {
             <CardTitle className="text-sm font-medium">Avg Recall</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getQualityColor(stats.avgRecall)}`}>
+            <div
+              className={`text-2xl font-bold ${getQualityColor(stats.avgRecall)}`}
+            >
               {(stats.avgRecall * 100).toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Retrieval completeness</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Retrieval completeness
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Avg Response Quality</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avg Response Quality
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getQualityColor(stats.avgResponseQuality)}`}>
+            <div
+              className={`text-2xl font-bold ${getQualityColor(stats.avgResponseQuality)}`}
+            >
               {(stats.avgResponseQuality * 100).toFixed(1)}%
             </div>
-            <p className="text-xs text-muted-foreground mt-1">LLM response quality</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              LLM response quality
+            </p>
           </CardContent>
         </Card>
 
@@ -206,8 +275,12 @@ export const QualityMetricsDashboard: React.FC = () => {
             <CardTitle className="text-sm font-medium">Avg Latency</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgLatency.toFixed(0)}ms</div>
-            <p className="text-xs text-muted-foreground mt-1">Search response time</p>
+            <div className="text-2xl font-bold">
+              {stats.avgLatency.toFixed(0)}ms
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Search response time
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -232,13 +305,18 @@ export const QualityMetricsDashboard: React.FC = () => {
               {retrievalMetrics.length === 0 ? (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>No retrieval metrics collected yet. Perform searches to generate data.</AlertDescription>
+                  <AlertDescription>
+                    No retrieval metrics collected yet. Perform searches to
+                    generate data.
+                  </AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <h4 className="font-semibold mb-2">Precision Distribution</h4>
+                      <h4 className="font-semibold mb-2">
+                        Precision Distribution
+                      </h4>
                       <RechartResponsiveContainer width="100%" height={200}>
                         <RechartBarChart data={retrievalMetrics.slice(0, 10)}>
                           <RechartCartesianGrid strokeDasharray="3 3" />
@@ -250,7 +328,9 @@ export const QualityMetricsDashboard: React.FC = () => {
                       </RechartResponsiveContainer>
                     </div>
                     <div>
-                      <h4 className="font-semibold mb-2">Recall Distribution</h4>
+                      <h4 className="font-semibold mb-2">
+                        Recall Distribution
+                      </h4>
                       <RechartResponsiveContainer width="100%" height={200}>
                         <RechartBarChart data={retrievalMetrics.slice(0, 10)}>
                           <RechartCartesianGrid strokeDasharray="3 3" />
@@ -280,7 +360,10 @@ export const QualityMetricsDashboard: React.FC = () => {
               {responseMetrics.length === 0 ? (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>No response metrics collected yet. Generate LLM responses to collect data.</AlertDescription>
+                  <AlertDescription>
+                    No response metrics collected yet. Generate LLM responses to
+                    collect data.
+                  </AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-4">
@@ -293,16 +376,26 @@ export const QualityMetricsDashboard: React.FC = () => {
                           <RechartXAxis dataKey="query" width={50} />
                           <RechartYAxis />
                           <RechartTooltip />
-                          <RechartBar dataKey="overall_quality_score" fill="#ffc658" />
+                          <RechartBar
+                            dataKey="overall_quality_score"
+                            fill="#ffc658"
+                          />
                         </RechartBarChart>
                       </RechartResponsiveContainer>
                     </div>
                     <div>
-                      <h4 className="font-semibold mb-2">Assessment Distribution</h4>
+                      <h4 className="font-semibold mb-2">
+                        Assessment Distribution
+                      </h4>
                       <div className="space-y-2">
                         {responseMetrics.map((metric) => (
-                          <div key={metric.id} className="flex justify-between items-center text-sm">
-                            <span className="truncate">{metric.query.substring(0, 30)}...</span>
+                          <div
+                            key={metric.id}
+                            className="flex justify-between items-center text-sm"
+                          >
+                            <span className="truncate">
+                              {metric.query.substring(0, 30)}...
+                            </span>
                             {getQualityBadge(metric.overall_quality_score)}
                           </div>
                         ))}
@@ -324,16 +417,30 @@ export const QualityMetricsDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold mb-2">Retrieval Quality Trend</h4>
+                  <h4 className="font-semibold mb-2">
+                    Retrieval Quality Trend
+                  </h4>
                   <RechartResponsiveContainer width="100%" height={250}>
-                    <RechartLineChart data={retrievalMetrics.slice(0, 20).reverse()}>
+                    <RechartLineChart
+                      data={retrievalMetrics.slice(0, 20).reverse()}
+                    >
                       <RechartCartesianGrid strokeDasharray="3 3" />
                       <RechartXAxis dataKey="created_at" />
                       <RechartYAxis />
                       <RechartTooltip />
                       <RechartLegend />
-                      <RechartLine type="monotone" dataKey="precision" stroke="#8884d8" name="Precision" />
-                      <RechartLine type="monotone" dataKey="recall" stroke="#82ca9d" name="Recall" />
+                      <RechartLine
+                        type="monotone"
+                        dataKey="precision"
+                        stroke="#8884d8"
+                        name="Precision"
+                      />
+                      <RechartLine
+                        type="monotone"
+                        dataKey="recall"
+                        stroke="#82ca9d"
+                        name="Recall"
+                      />
                     </RechartLineChart>
                   </RechartResponsiveContainer>
                 </div>
@@ -347,4 +454,3 @@ export const QualityMetricsDashboard: React.FC = () => {
 };
 
 export default QualityMetricsDashboard;
-

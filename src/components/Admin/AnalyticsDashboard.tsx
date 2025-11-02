@@ -27,7 +27,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-
 interface UsageAnalytics {
   total_searches: number;
   total_api_calls: number;
@@ -96,34 +95,50 @@ export const AnalyticsDashboard: React.FC = () => {
       if (apiError) throw apiError;
 
       // Filter and cast data to match expected types
-      const filteredSearchData = (searchData || []).filter((item: unknown) =>
-        (item as any).created_at &&
-        (item as any).event_type &&
-        (item as any).id,
-      ).map((item: unknown) => ({
-        id: (item as any).id,
-        query_text: ((item as any).event_data as Record<string, unknown>)?.query as string || 'Unknown query',
-        results_shown: ((item as any).event_data as Record<string, unknown>)?.results_count as number || 0,
-        clicks_count: ((item as any).event_data as Record<string, unknown>)?.clicks as number || 0,
-        satisfaction_rating: ((item as any).event_data as Record<string, unknown>)?.rating as number ?? 0,
-        response_time_ms: ((item as any).event_data as Record<string, unknown>)?.response_time as number || 0,
-        created_at: (item as any).created_at || new Date().toISOString(),
-        user_id: (item as any).user_id,
-        session_id: (item as any).session_id,
-      }));
+      const filteredSearchData = (searchData || [])
+        .filter(
+          (item: unknown) =>
+            (item as any).created_at &&
+            (item as any).event_type &&
+            (item as any).id,
+        )
+        .map((item: unknown) => ({
+          id: (item as any).id,
+          query_text:
+            (((item as any).event_data as Record<string, unknown>)
+              ?.query as string) || 'Unknown query',
+          results_shown:
+            (((item as any).event_data as Record<string, unknown>)
+              ?.results_count as number) || 0,
+          clicks_count:
+            (((item as any).event_data as Record<string, unknown>)
+              ?.clicks as number) || 0,
+          satisfaction_rating:
+            (((item as any).event_data as Record<string, unknown>)
+              ?.rating as number) ?? 0,
+          response_time_ms:
+            (((item as any).event_data as Record<string, unknown>)
+              ?.response_time as number) || 0,
+          created_at: (item as any).created_at || new Date().toISOString(),
+          user_id: (item as any).user_id,
+          session_id: (item as any).session_id,
+        }));
 
-      const filteredApiData = (apiData || []).filter((item: unknown) =>
-        (item as any).created_at &&
-        (item as any).id &&
-        (item as any).status_code !== null,
-      ).map((item: unknown) => ({
-        ...(item as any),
-        response_status: (item as any).status_code || 0,
-        response_time_ms: (item as any).response_time_ms || 0,
-        user_id: (item as any).api_key_id || 'anonymous',
-        endpoint_id: (item as any).endpoint || 'unknown',
-        user_agent: (item as any).user_agent || 'unknown',
-      }));
+      const filteredApiData = (apiData || [])
+        .filter(
+          (item: unknown) =>
+            (item as any).created_at &&
+            (item as any).id &&
+            (item as any).status_code !== null,
+        )
+        .map((item: unknown) => ({
+          ...(item as any),
+          response_status: (item as any).status_code || 0,
+          response_time_ms: (item as any).response_time_ms || 0,
+          user_id: (item as any).api_key_id || 'anonymous',
+          endpoint_id: (item as any).endpoint || 'unknown',
+          user_agent: (item as any).user_agent || 'unknown',
+        }));
 
       setSearchAnalytics(filteredSearchData);
       setApiUsage(filteredApiData);
@@ -132,10 +147,18 @@ export const AnalyticsDashboard: React.FC = () => {
       const totalSearches = searchData?.length || 0;
       const totalApiCalls = apiData?.length || 0;
       const uniqueUsers = new Set([
-        ...searchData?.map((s: unknown) => (s as any).user_id).filter(Boolean) || [],
-        ...apiData?.map((a: unknown) => (a as any).api_key_id).filter(Boolean) || [],
+        ...(searchData
+          ?.map((s: unknown) => (s as any).user_id)
+          .filter(Boolean) || []),
+        ...(apiData
+          ?.map((a: unknown) => (a as any).api_key_id)
+          .filter(Boolean) || []),
       ]).size;
-      const avgResponseTime = apiData?.reduce((sum: any, log: any) => sum + (log.response_time_ms || 0), 0) / Math.max(apiData?.length || 1, 1);
+      const avgResponseTime =
+        apiData?.reduce(
+          (sum: any, log: any) => sum + (log.response_time_ms || 0),
+          0,
+        ) / Math.max(apiData?.length || 1, 1);
 
       setAnalytics({
         total_searches: totalSearches,
@@ -143,7 +166,6 @@ export const AnalyticsDashboard: React.FC = () => {
         active_users: uniqueUsers,
         avg_response_time: Math.round(avgResponseTime),
       });
-
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -167,7 +189,13 @@ export const AnalyticsDashboard: React.FC = () => {
     return 'text-gray-600';
   };
 
-  const StatCard = ({ title, value, icon: Icon, description, trend }: {
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    description,
+    trend,
+  }: {
     title: string;
     value: string | number;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -184,8 +212,11 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">{description}</p>
           {trend !== undefined && (
-            <Badge className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-              {trend > 0 ? '+' : ''}{trend}%
+            <Badge
+              className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
+            >
+              {trend > 0 ? '+' : ''}
+              {trend}%
             </Badge>
           )}
         </div>
@@ -214,13 +245,16 @@ export const AnalyticsDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => navigate('/')} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
+                onClick={() => navigate('/')}
+                onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
                 className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
-              </Button><Button
-                onClick={() => navigate('/admin')} onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
+              </Button>
+              <Button
+                onClick={() => navigate('/admin')}
+                onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
                 className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -229,13 +263,19 @@ export const AnalyticsDashboard: React.FC = () => {
             </div>
             <div className="h-6 w-px bg-border" />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Analytics Dashboard
+              </h1>
               <p className="text-sm text-muted-foreground">
                 User behavior, search patterns, and API usage analytics
               </p>
             </div>
           </div>
-          <Button onClick={fetchAnalyticsData} onKeyDown={(e) => e.key === 'Enter' && fetchAnalyticsData()} disabled={loading}>
+          <Button
+            onClick={fetchAnalyticsData}
+            onKeyDown={(e) => e.key === 'Enter' && fetchAnalyticsData()}
+            disabled={loading}
+          >
             <Activity className="h-4 w-4 mr-2" />
             Refresh Data
           </Button>
@@ -288,7 +328,8 @@ export const AnalyticsDashboard: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Recent Search Queries</CardTitle>
-              </CardHeader><CardContent>
+              </CardHeader>
+              <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -299,14 +340,17 @@ export const AnalyticsDashboard: React.FC = () => {
                       <TableHead>Satisfaction</TableHead>
                       <TableHead>Time</TableHead>
                     </TableRow>
-                  </TableHeader><TableBody>
+                  </TableHeader>
+                  <TableBody>
                     {searchAnalytics.slice(0, 10).map((search) => (
                       <TableRow key={search.id}>
                         <TableCell className="font-medium max-w-xs truncate">
                           {search.query_text}
                         </TableCell>
                         <TableCell>
-                          <Badge className="border border-gray-300 bg-white text-gray-700">{search.results_shown}</Badge>
+                          <Badge className="border border-gray-300 bg-white text-gray-700">
+                            {search.results_shown}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
@@ -317,7 +361,13 @@ export const AnalyticsDashboard: React.FC = () => {
                         <TableCell>{search.response_time_ms}ms</TableCell>
                         <TableCell>
                           {search.satisfaction_rating ? (
-                            <Badge className={search.satisfaction_rating >= 4 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                            <Badge
+                              className={
+                                search.satisfaction_rating >= 4
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }
+                            >
                               {search.satisfaction_rating}/5
                             </Badge>
                           ) : (
@@ -359,7 +409,9 @@ export const AnalyticsDashboard: React.FC = () => {
                           {log.endpoint}
                         </TableCell>
                         <TableCell>
-                          <Badge className="border border-gray-300 bg-white text-gray-700">{log.method}</Badge>
+                          <Badge className="border border-gray-300 bg-white text-gray-700">
+                            {log.method}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <span className={getStatusColor(log.status_code)}>
@@ -369,11 +421,15 @@ export const AnalyticsDashboard: React.FC = () => {
                         <TableCell>{log.response_time_ms || 0}ms</TableCell>
                         <TableCell>
                           <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                            {log.api_key_id ? log.api_key_id.slice(0, 8) + '...' : 'Anonymous'}
+                            {log.api_key_id
+                              ? log.api_key_id.slice(0, 8) + '...'
+                              : 'Anonymous'}
                           </code>
                         </TableCell>
                         <TableCell>
-                          {log.created_at ? new Date(log.created_at).toLocaleString() : 'N/A'}
+                          {log.created_at
+                            ? new Date(log.created_at).toLocaleString()
+                            : 'N/A'}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -463,7 +519,9 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-sm">Daily searches</span>
-                      <Badge className="bg-green-100 text-green-800">+15%</Badge>
+                      <Badge className="bg-green-100 text-green-800">
+                        +15%
+                      </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">API usage</span>
@@ -471,7 +529,9 @@ export const AnalyticsDashboard: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm">User registrations</span>
-                      <Badge className="bg-purple-100 text-purple-800">+22%</Badge>
+                      <Badge className="bg-purple-100 text-purple-800">
+                        +22%
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -507,15 +567,21 @@ export const AnalyticsDashboard: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span>Material Recognition</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">1,247 uses</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">
+                        1,247 uses
+                      </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>3D Generation</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">892 uses</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">
+                        892 uses
+                      </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Mood Boards</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">634 uses</Badge>
+                      <Badge className="border border-gray-300 text-xs px-2 py-1">
+                        634 uses
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>

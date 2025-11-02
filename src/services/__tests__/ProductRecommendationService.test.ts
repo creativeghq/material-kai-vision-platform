@@ -30,7 +30,9 @@ jest.mock('@/integrations/supabase/client', () => {
         error: null,
       });
 
-      Object.defineProperty(chainable, Symbol.toStringTag, { value: 'Promise' });
+      Object.defineProperty(chainable, Symbol.toStringTag, {
+        value: 'Promise',
+      });
       chainable.then = (onFulfilled: any) => {
         const result = {
           data: [
@@ -69,7 +71,7 @@ jest.mock('../QualityDashboardService', () => {
     getQualityMetrics: jest.fn().mockResolvedValue({
       workspace_id: 'workspace-1',
       average_image_quality_score: 0.82,
-      average_enrichment_score: 0.80,
+      average_enrichment_score: 0.8,
       validation_pass_rate: 0.85,
       total_images_validated: 100,
       total_products_enriched: 50,
@@ -134,7 +136,7 @@ describe('ProductRecommendationService', () => {
         limit: 10,
       });
 
-      response.recommendations.forEach(rec => {
+      response.recommendations.forEach((rec) => {
         expect(rec.confidence_score).toBeGreaterThanOrEqual(0);
         expect(rec.confidence_score).toBeLessThanOrEqual(1);
       });
@@ -146,7 +148,7 @@ describe('ProductRecommendationService', () => {
         workspace_id: 'workspace-1',
       });
 
-      response.recommendations.forEach(rec => {
+      response.recommendations.forEach((rec) => {
         expect(rec.quality_metrics).toBeDefined();
         expect(rec.quality_metrics.image_quality).toBeDefined();
         expect(rec.quality_metrics.enrichment_quality).toBeDefined();
@@ -171,7 +173,7 @@ describe('ProductRecommendationService', () => {
         min_confidence: 0.8,
       });
 
-      response.recommendations.forEach(rec => {
+      response.recommendations.forEach((rec) => {
         expect(rec.confidence_score).toBeGreaterThanOrEqual(0.8);
       });
     });
@@ -198,7 +200,7 @@ describe('ProductRecommendationService', () => {
         5,
       );
 
-      recommendations.forEach(rec => {
+      recommendations.forEach((rec) => {
         expect(rec.reason).toBeDefined();
         expect(rec.reason.length).toBeGreaterThan(0);
       });
@@ -219,7 +221,10 @@ describe('ProductRecommendationService', () => {
   describe('getTrendingProducts', () => {
     it('should retrieve trending products', async () => {
       await service.initialize();
-      const recommendations = await service.getTrendingProducts('workspace-1', 10);
+      const recommendations = await service.getTrendingProducts(
+        'workspace-1',
+        10,
+      );
 
       expect(Array.isArray(recommendations)).toBe(true);
       expect(recommendations.length).toBeGreaterThanOrEqual(0);
@@ -227,9 +232,12 @@ describe('ProductRecommendationService', () => {
 
     it('should include metadata in trending products', async () => {
       await service.initialize();
-      const recommendations = await service.getTrendingProducts('workspace-1', 5);
+      const recommendations = await service.getTrendingProducts(
+        'workspace-1',
+        5,
+      );
 
-      recommendations.forEach(rec => {
+      recommendations.forEach((rec) => {
         expect(rec.metadata).toBeDefined();
         expect(typeof rec.metadata).toBe('object');
       });
@@ -237,7 +245,10 @@ describe('ProductRecommendationService', () => {
 
     it('should respect limit parameter', async () => {
       await service.initialize();
-      const recommendations = await service.getTrendingProducts('workspace-1', 2);
+      const recommendations = await service.getTrendingProducts(
+        'workspace-1',
+        2,
+      );
 
       expect(recommendations.length).toBeLessThanOrEqual(2);
     });
@@ -286,4 +297,3 @@ describe('ProductRecommendationService', () => {
     });
   });
 });
-

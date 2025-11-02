@@ -6,12 +6,20 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import {
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+} from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { QualityDashboardService, QualityDashboardData } from '@/services/QualityDashboardService';
+import {
+  QualityDashboardService,
+  QualityDashboardData,
+} from '@/services/QualityDashboardService';
 
 import { QualityMetricsCard } from './QualityMetricsCard';
 import { QualityTrendsChart } from './QualityTrendsChart';
@@ -43,7 +51,8 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
         setData(dashboardData);
         setLastUpdated(new Date());
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load quality data';
+        const message =
+          err instanceof Error ? err.message : 'Failed to load quality data';
         setError(message);
         console.error('Quality Dashboard error:', err);
       } finally {
@@ -100,8 +109,8 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
               metrics.quality_trend === 'improving'
                 ? 'default'
                 : metrics.quality_trend === 'declining'
-                ? 'destructive'
-                : 'secondary'
+                  ? 'destructive'
+                  : 'secondary'
             }
             className="mb-2"
           >
@@ -111,7 +120,8 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
             {metrics.quality_trend === 'declining' && (
               <TrendingDown className="w-3 h-3 mr-1" />
             )}
-            {metrics.quality_trend.charAt(0).toUpperCase() + metrics.quality_trend.slice(1)}
+            {metrics.quality_trend.charAt(0).toUpperCase() +
+              metrics.quality_trend.slice(1)}
           </Badge>
           <p className="text-sm text-muted-foreground">
             {lastUpdated?.toLocaleTimeString()}
@@ -123,7 +133,8 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
       <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20">
         <CardHeader>
           <CardTitle>Overall Quality Score</CardTitle>
-        </CardHeader><CardContent>
+        </CardHeader>
+        <CardContent>
           <div className="flex items-center justify-between">
             <div>
               <div className="text-5xl font-bold">
@@ -173,9 +184,7 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
       </div>
 
       {/* Trends Chart */}
-      {trends.length > 0 && (
-        <QualityTrendsChart trends={trends} />
-      )}
+      {trends.length > 0 && <QualityTrendsChart trends={trends} />}
 
       {/* Issues and Recommendations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -189,7 +198,7 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
           variant="outline"
           onClick={() => {
             setLoading(true);
-            service.getDashboardData(workspaceId).then(dashboardData => {
+            service.getDashboardData(workspaceId).then((dashboardData) => {
               setData(dashboardData);
               setLastUpdated(new Date());
               setLoading(false);
@@ -198,7 +207,7 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               setLoading(true);
-              service.getDashboardData(workspaceId).then(dashboardData => {
+              service.getDashboardData(workspaceId).then((dashboardData) => {
                 setData(dashboardData);
                 setLastUpdated(new Date());
                 setLoading(false);
@@ -213,4 +222,3 @@ export const QualityDashboard: React.FC<QualityDashboardProps> = ({
     </div>
   );
 };
-

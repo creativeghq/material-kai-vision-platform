@@ -7,7 +7,7 @@ export enum ErrorSeverity {
   LOW = 'low',
   MEDIUM = 'medium',
   HIGH = 'high',
-  CRITICAL = 'critical'
+  CRITICAL = 'critical',
 }
 
 export enum ErrorCategory {
@@ -20,7 +20,7 @@ export enum ErrorCategory {
   PROCESSING = 'processing',
   CONFIGURATION = 'configuration',
   EXTERNAL_SERVICE = 'external_service',
-  UNKNOWN = 'unknown'
+  UNKNOWN = 'unknown',
 }
 
 export interface ErrorContext {
@@ -97,11 +97,13 @@ export class AppError extends Error {
       severity: this.severity,
       context: this.context,
       stack: this.stack,
-      originalError: this.originalError ? {
-        name: this.originalError.name,
-        message: this.originalError.message,
-        stack: this.originalError.stack,
-      } : undefined,
+      originalError: this.originalError
+        ? {
+            name: this.originalError.name,
+            message: this.originalError.message,
+            stack: this.originalError.stack,
+          }
+        : undefined,
     };
   }
 
@@ -119,17 +121,24 @@ export class AppError extends Error {
   public getUserFriendlyMessage(): string {
     // Map technical errors to user-friendly messages
     const userFriendlyMessages: Record<string, string> = {
-      'NETWORK_ERROR': 'Connection issue. Please check your internet connection and try again.',
-      'API_RATE_LIMIT': 'Too many requests. Please wait a moment and try again.',
-      'VALIDATION_ERROR': 'Invalid input provided. Please check your data and try again.',
-      'AUTHENTICATION_ERROR': 'Authentication failed. Please log in again.',
-      'AUTHORIZATION_ERROR': 'You do not have permission to perform this action.',
-      'DATABASE_ERROR': 'Data storage issue. Please try again later.',
-      'EXTERNAL_SERVICE_ERROR': 'External service unavailable. Please try again later.',
-      'CONFIGURATION_ERROR': 'System configuration issue. Please contact support.',
+      NETWORK_ERROR:
+        'Connection issue. Please check your internet connection and try again.',
+      API_RATE_LIMIT: 'Too many requests. Please wait a moment and try again.',
+      VALIDATION_ERROR:
+        'Invalid input provided. Please check your data and try again.',
+      AUTHENTICATION_ERROR: 'Authentication failed. Please log in again.',
+      AUTHORIZATION_ERROR: 'You do not have permission to perform this action.',
+      DATABASE_ERROR: 'Data storage issue. Please try again later.',
+      EXTERNAL_SERVICE_ERROR:
+        'External service unavailable. Please try again later.',
+      CONFIGURATION_ERROR:
+        'System configuration issue. Please contact support.',
     };
 
-    return userFriendlyMessages[this.code] || 'An unexpected error occurred. Please try again or contact support.';
+    return (
+      userFriendlyMessages[this.code] ||
+      'An unexpected error occurred. Please try again or contact support.'
+    );
   }
 }
 
@@ -163,7 +172,12 @@ export class NetworkError extends AppError {
 }
 
 export class APIError extends AppError {
-  constructor(message: string, context: ErrorContext, originalError?: Error, code = 'API_ERROR') {
+  constructor(
+    message: string,
+    context: ErrorContext,
+    originalError?: Error,
+    code = 'API_ERROR',
+  ) {
     super({
       code,
       message,

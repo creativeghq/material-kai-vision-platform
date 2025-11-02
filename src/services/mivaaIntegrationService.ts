@@ -99,7 +99,9 @@ export class MivaaIntegrationService {
   /**
    * Validate and fix image URLs for accessibility
    */
-  async validateAndFixImageUrls(documentId: string): Promise<{ fixed: number; total: number; errors: string[] }> {
+  async validateAndFixImageUrls(
+    documentId: string,
+  ): Promise<{ fixed: number; total: number; errors: string[] }> {
     const errors: string[] = [];
     let fixed = 0;
     let total = 0;
@@ -127,11 +129,18 @@ export class MivaaIntegrationService {
         const currentUrl = image.image_url;
 
         // Check if URL is accessible or needs fixing
-        if (!currentUrl || currentUrl.startsWith('placeholder_') || currentUrl.startsWith('missing_storage_url_')) {
+        if (
+          !currentUrl ||
+          currentUrl.startsWith('placeholder_') ||
+          currentUrl.startsWith('missing_storage_url_')
+        ) {
           console.log(`🔧 Fixing image URL for image ${image.id}`);
 
           // Try to generate proper storage URL
-          const imageName = image.metadata?.image_filename || image.metadata?.filename || `image_${image.id}.png`;
+          const imageName =
+            image.metadata?.image_filename ||
+            image.metadata?.filename ||
+            `image_${image.id}.png`;
           const storagePath = `extracted/${documentId}/${imageName}`;
 
           const { data: urlData } = supabase.storage
@@ -153,10 +162,14 @@ export class MivaaIntegrationService {
               .eq('id', image.id);
 
             if (updateError) {
-              errors.push(`Failed to update image ${image.id}: ${updateError.message}`);
+              errors.push(
+                `Failed to update image ${image.id}: ${updateError.message}`,
+              );
             } else {
               fixed++;
-              console.log(`✅ Fixed URL for image ${image.id}: ${urlData.publicUrl}`);
+              console.log(
+                `✅ Fixed URL for image ${image.id}: ${urlData.publicUrl}`,
+              );
             }
           } else {
             errors.push(`Could not generate storage URL for image ${image.id}`);
@@ -166,7 +179,9 @@ export class MivaaIntegrationService {
 
       return { fixed, total, errors };
     } catch (error) {
-      errors.push(`Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      errors.push(
+        `Unexpected error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       return { fixed: 0, total, errors };
     }
   }
@@ -329,7 +344,11 @@ export class MivaaIntegrationService {
   ): Promise<MivaaResponse> {
     return this.callMivaaViaSupabase('material_recognition', {
       image_data: imageData,
-      analysis_types: options.analysisTypes ?? ['visual', 'spectral', 'chemical'],
+      analysis_types: options.analysisTypes ?? [
+        'visual',
+        'spectral',
+        'chemical',
+      ],
       include_properties: options.includeProperties ?? true,
       include_composition: options.includeComposition ?? true,
       confidence_threshold: options.confidenceThreshold ?? 0.8,
@@ -413,7 +432,11 @@ export class MivaaIntegrationService {
    */
   async analyzeImage(
     imageData: string,
-    options: { includeOCR?: boolean; includeObjects?: boolean; imageId?: string } = {},
+    options: {
+      includeOCR?: boolean;
+      includeObjects?: boolean;
+      imageId?: string;
+    } = {},
   ): Promise<MivaaResponse> {
     const analysisTypes = [];
     if (options.includeOCR !== false) analysisTypes.push('ocr');
@@ -438,11 +461,15 @@ export class MivaaIntegrationService {
     question: string,
     options: { maxContextChunks?: number } = {},
   ): Promise<MivaaResponse> {
-    return this.callMivaaEndpoint(`/api/documents/${documentId}/query`, 'POST', {
-      question,
-      max_context_chunks: options.maxContextChunks ?? 5,
-      include_sources: true,
-    });
+    return this.callMivaaEndpoint(
+      `/api/documents/${documentId}/query`,
+      'POST',
+      {
+        question,
+        max_context_chunks: options.maxContextChunks ?? 5,
+        include_sources: true,
+      },
+    );
   }
 
   /**
@@ -460,8 +487,12 @@ export class MivaaIntegrationService {
     options: MaterialAnalysisOptions = {},
   ): Promise<MivaaResponse> {
     return this.callMivaaEndpoint('/api/v1/images/analyze/batch', 'POST', {
-      image_ids: images.map(img => img.id),
-      analysis_types: options.analysisTypes ?? ['description', 'ocr', 'objects'],
+      image_ids: images.map((img) => img.id),
+      analysis_types: options.analysisTypes ?? [
+        'description',
+        'ocr',
+        'objects',
+      ],
       quality: 'standard',
       confidence_threshold: options.confidenceThreshold ?? 0.8,
       parallel_processing: true,
@@ -472,9 +503,16 @@ export class MivaaIntegrationService {
   /**
    * Call MIVAA Gateway directly using fetch to avoid CORS issues
    */
-  private async callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
-    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-    const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+  private async callMivaaGatewayDirect(
+    action: string,
+    payload: any,
+  ): Promise<any> {
+    const supabaseUrl =
+      (import.meta as any).env?.VITE_SUPABASE_URL ||
+      'https://bgbavxtjlbvgplozizxu.supabase.co';
+    const supabaseKey =
+      (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase configuration not found');
@@ -486,7 +524,7 @@ export class MivaaIntegrationService {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
+          Authorization: `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -496,14 +534,18 @@ export class MivaaIntegrationService {
       });
 
       if (!response.ok) {
-        throw new Error(`MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`);
+        throw new Error(
+          `MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
 
       // Check for application-level errors
       if (!data.success && data.error) {
-        throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
+        throw new Error(
+          `MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`,
+        );
       }
 
       return data;

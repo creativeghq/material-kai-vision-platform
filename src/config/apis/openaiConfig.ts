@@ -23,11 +23,13 @@ const embeddingInputSchema = z.object({
 // OpenAI embedding output schema
 const embeddingOutputSchema = z.object({
   object: z.literal('list'),
-  data: z.array(z.object({
-    object: z.literal('embedding'),
-    index: z.number().int(),
-    embedding: z.array(z.number()),
-  })),
+  data: z.array(
+    z.object({
+      object: z.literal('embedding'),
+      index: z.number().int(),
+      embedding: z.array(z.number()),
+    }),
+  ),
   model: z.string(),
   usage: z.object({
     prompt_tokens: z.number().int(),
@@ -78,7 +80,8 @@ export const openaiConfig: OpenAIApiConfig = {
         encoding_format: 'float',
         dimensions: 1536,
       },
-      description: 'OpenAI text-embedding-ada-002 model with 1536 dimensions - PLATFORM STANDARD',
+      description:
+        'OpenAI text-embedding-ada-002 model with 1536 dimensions - PLATFORM STANDARD',
       category: 'text-embedding',
       status: 'working',
       dimensions: 1536,
@@ -111,7 +114,8 @@ export const openaiConfig: OpenAIApiConfig = {
         encoding_format: 'float',
         dimensions: 768,
       },
-      description: 'OpenAI text-embedding-3-large model with 768 dimensions - high performance',
+      description:
+        'OpenAI text-embedding-3-large model with 768 dimensions - high performance',
       category: 'text-embedding',
       status: 'working',
       dimensions: 768,
@@ -128,7 +132,8 @@ export const openaiConfig: OpenAIApiConfig = {
         encoding_format: 'float',
         dimensions: 3072,
       },
-      description: 'OpenAI text-embedding-3-large model with full 3072 dimensions - maximum performance',
+      description:
+        'OpenAI text-embedding-3-large model with full 3072 dimensions - maximum performance',
       category: 'text-embedding',
       status: 'working',
       dimensions: 3072,

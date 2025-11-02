@@ -4,8 +4,6 @@ declare module '@tanstack/react-query' {
   export * from 'react-query';
 }
 
-
-
 // Removed Supabase declarations - using Edge Functions instead
 
 declare module 'three' {
@@ -49,8 +47,6 @@ declare module 'three' {
   export const Uint16BufferAttribute: unknown;
   export const Uint32BufferAttribute: unknown;
 }
-
-
 
 declare module '@react-three/drei' {
   import { ComponentType } from 'react';

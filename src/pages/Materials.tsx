@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { MaterialCatalogListing } from '@/components/Materials/MaterialCatalogListing';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +37,9 @@ export const MaterialsPage: React.FC = () => {
       setLoading(true);
 
       // Get current user and workspace
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: 'Authentication Required',
@@ -81,27 +89,29 @@ export const MaterialsPage: React.FC = () => {
       }
 
       // Transform products to Material format
-      const transformedMaterials: Material[] = (productsData || []).map((product) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description || '',
-        category: product.category_id || 'other',
-        properties: {
-          ...(product.properties || {}),
-        },
-        metadata: {
-          ...(product.metadata || {}),
-          finish: product.properties?.finish,
-          size: product.properties?.size,
-          installationMethod: product.properties?.installation_method,
-          application: product.properties?.application,
-        },
-        standards: [],
-        createdAt: product.created_at,
-        updatedAt: product.updated_at,
-        thumbnailUrl: product.metadata?.thumbnail_url,
-        imageUrl: product.metadata?.image_url,
-      }));
+      const transformedMaterials: Material[] = (productsData || []).map(
+        (product) => ({
+          id: product.id,
+          name: product.name,
+          description: product.description || '',
+          category: product.category_id || 'other',
+          properties: {
+            ...(product.properties || {}),
+          },
+          metadata: {
+            ...(product.metadata || {}),
+            finish: product.properties?.finish,
+            size: product.properties?.size,
+            installationMethod: product.properties?.installation_method,
+            application: product.properties?.application,
+          },
+          standards: [],
+          createdAt: product.created_at,
+          updatedAt: product.updated_at,
+          thumbnailUrl: product.metadata?.thumbnail_url,
+          imageUrl: product.metadata?.image_url,
+        }),
+      );
 
       setMaterials(transformedMaterials);
     } catch (error) {
@@ -142,7 +152,9 @@ export const MaterialsPage: React.FC = () => {
             <CardContent className="p-12">
               <div className="flex flex-col items-center justify-center gap-4">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-lg text-muted-foreground">Loading materials catalog...</p>
+                <p className="text-lg text-muted-foreground">
+                  Loading materials catalog...
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -182,13 +194,14 @@ export const MaterialsPage: React.FC = () => {
             <CardContent className="p-12">
               <div className="text-center">
                 <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">No Materials Found</h3>
+                <h3 className="text-xl font-semibold mb-2">
+                  No Materials Found
+                </h3>
                 <p className="text-muted-foreground mb-6">
-                  There are no materials in your catalog yet. Process PDFs or import materials to get started.
+                  There are no materials in your catalog yet. Process PDFs or
+                  import materials to get started.
                 </p>
-                <Button onClick={loadMaterials}>
-                  Refresh
-                </Button>
+                <Button onClick={loadMaterials}>Refresh</Button>
               </div>
             </CardContent>
           </Card>
@@ -211,4 +224,3 @@ export const MaterialsPage: React.FC = () => {
 };
 
 export default MaterialsPage;
-

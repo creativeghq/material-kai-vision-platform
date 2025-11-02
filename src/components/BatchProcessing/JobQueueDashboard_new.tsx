@@ -15,7 +15,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface JobItem {
@@ -110,7 +116,9 @@ export const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Jobs</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Total Jobs
+                  </p>
                   <p className="text-2xl font-bold">{stats.totalJobs}</p>
                 </div>
                 <FileText className="h-8 w-8 text-muted-foreground" />
@@ -122,8 +130,12 @@ export const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Running</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.runningJobs}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Running
+                  </p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {stats.runningJobs}
+                  </p>
                 </div>
                 <Activity className="h-8 w-8 text-blue-600" />
               </div>
@@ -134,8 +146,12 @@ export const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Throughput</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.throughputPerHour}/h</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Throughput
+                  </p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {stats.throughputPerHour}/h
+                  </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-600" />
               </div>
@@ -146,8 +162,12 @@ export const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Avg. Time</p>
-                  <p className="text-2xl font-bold">{formatDuration(stats.averageProcessingTime)}</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Avg. Time
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatDuration(stats.averageProcessingTime)}
+                  </p>
                 </div>
                 <Clock className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -197,7 +217,9 @@ export const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
                   onClick={onRefresh}
                   disabled={isLoading}
                 >
-                  <RotateCcw className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                  <RotateCcw
+                    className={`h-4 w-4 mr-1 ${isLoading ? 'animate-spin' : ''}`}
+                  />
                   Refresh
                 </Button>
               </div>
@@ -252,7 +274,10 @@ export const JobQueueDashboard: React.FC<JobQueueDashboardProps> = ({
               </div>
             ) : (
               jobs.map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div
+                  key={job.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <input
                       type="checkbox"

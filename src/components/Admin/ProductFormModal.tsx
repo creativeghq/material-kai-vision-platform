@@ -1,10 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, X, Plus, Trash2 } from 'lucide-react';
@@ -38,7 +51,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const [description, setDescription] = useState('');
   const [longDescription, setLongDescription] = useState('');
   const [category, setCategory] = useState('');
-  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>(
+    'draft',
+  );
   const [properties, setProperties] = useState<PropertyField[]>([]);
   const [specifications, setSpecifications] = useState<PropertyField[]>([]);
   const [metadata, setMetadata] = useState<PropertyField[]>([]);
@@ -99,12 +114,25 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   };
 
   const addProperty = (type: 'properties' | 'specifications' | 'metadata') => {
-    const setter = type === 'properties' ? setProperties : type === 'specifications' ? setSpecifications : setMetadata;
+    const setter =
+      type === 'properties'
+        ? setProperties
+        : type === 'specifications'
+          ? setSpecifications
+          : setMetadata;
     setter((prev) => [...prev, { key: '', value: '' }]);
   };
 
-  const removeProperty = (type: 'properties' | 'specifications' | 'metadata', index: number) => {
-    const setter = type === 'properties' ? setProperties : type === 'specifications' ? setSpecifications : setMetadata;
+  const removeProperty = (
+    type: 'properties' | 'specifications' | 'metadata',
+    index: number,
+  ) => {
+    const setter =
+      type === 'properties'
+        ? setProperties
+        : type === 'specifications'
+          ? setSpecifications
+          : setMetadata;
     setter((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -114,7 +142,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     field: 'key' | 'value',
     value: string,
   ) => {
-    const setter = type === 'properties' ? setProperties : type === 'specifications' ? setSpecifications : setMetadata;
+    const setter =
+      type === 'properties'
+        ? setProperties
+        : type === 'specifications'
+          ? setSpecifications
+          : setMetadata;
     setter((prev) =>
       prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
     );
@@ -136,33 +169,47 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     setLoading(true);
     try {
       // Convert arrays back to objects
-      const propertiesObj = properties.reduce((acc, { key, value }) => {
-        if (key.trim()) acc[key] = value;
-        return acc;
-      }, {} as Record<string, unknown>);
+      const propertiesObj = properties.reduce(
+        (acc, { key, value }) => {
+          if (key.trim()) acc[key] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
 
-      const specificationsObj = specifications.reduce((acc, { key, value }) => {
-        if (key.trim()) acc[key] = value;
-        return acc;
-      }, {} as Record<string, unknown>);
+      const specificationsObj = specifications.reduce(
+        (acc, { key, value }) => {
+          if (key.trim()) acc[key] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
 
-      const metadataObj = metadata.reduce((acc, { key, value }) => {
-        if (key.trim()) acc[key] = value;
-        return acc;
-      }, {} as Record<string, unknown>);
+      const metadataObj = metadata.reduce(
+        (acc, { key, value }) => {
+          if (key.trim()) acc[key] = value;
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
 
       const productData: Partial<Product> = {
         name: name.trim(),
         description: description.trim(),
         category: category.trim() || undefined,
-        properties: Object.keys(propertiesObj).length > 0 ? propertiesObj : undefined,
-        specifications: Object.keys(specificationsObj).length > 0 ? specificationsObj : undefined,
+        properties:
+          Object.keys(propertiesObj).length > 0 ? propertiesObj : undefined,
+        specifications:
+          Object.keys(specificationsObj).length > 0
+            ? specificationsObj
+            : undefined,
         metadata: Object.keys(metadataObj).length > 0 ? metadataObj : undefined,
         ...(mode === 'edit' && product?.id ? { id: product.id } : {}),
       };
 
       // Add long_description and status for backend
-      (productData as any).long_description = longDescription.trim() || undefined;
+      (productData as any).long_description =
+        longDescription.trim() || undefined;
       (productData as any).status = status;
 
       await onSave(productData);
@@ -178,7 +225,8 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       console.error('Error saving product:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to save product',
+        description:
+          error instanceof Error ? error.message : 'Failed to save product',
         variant: 'destructive',
       });
     } finally {
@@ -205,7 +253,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
         </Button>
       </div>
       {fields.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No {label.toLowerCase()} added yet</p>
+        <p className="text-xs text-muted-foreground">
+          No {label.toLowerCase()} added yet
+        </p>
       ) : (
         <div className="space-y-2">
           {fields.map((field, index) => (
@@ -213,13 +263,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
               <Input
                 placeholder="Key"
                 value={field.key}
-                onChange={(e) => updateProperty(type, index, 'key', e.target.value)}
+                onChange={(e) =>
+                  updateProperty(type, index, 'key', e.target.value)
+                }
                 className="flex-1"
               />
               <Input
                 placeholder="Value"
                 value={field.value}
-                onChange={(e) => updateProperty(type, index, 'value', e.target.value)}
+                onChange={(e) =>
+                  updateProperty(type, index, 'value', e.target.value)
+                }
                 className="flex-1"
               />
               <Button
@@ -242,7 +296,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'Create New Product' : `Edit Product: ${product?.name}`}
+            {mode === 'create'
+              ? 'Create New Product'
+              : `Edit Product: ${product?.name}`}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
@@ -277,7 +333,9 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
                 rows={2}
                 maxLength={150}
               />
-              <p className="text-xs text-muted-foreground">{description.length}/150 characters</p>
+              <p className="text-xs text-muted-foreground">
+                {description.length}/150 characters
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -304,7 +362,10 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 
               <div className="space-y-2">
                 <Label htmlFor="status">Status</Label>
-                <Select value={status} onValueChange={(value: any) => setStatus(value)}>
+                <Select
+                  value={status}
+                  onValueChange={(value: any) => setStatus(value)}
+                >
                   <SelectTrigger id="status">
                     <SelectValue />
                   </SelectTrigger>
@@ -322,7 +383,11 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {renderPropertyFields('properties', properties, 'Properties')}
 
           {/* Specifications */}
-          {renderPropertyFields('specifications', specifications, 'Specifications')}
+          {renderPropertyFields(
+            'specifications',
+            specifications,
+            'Specifications',
+          )}
 
           {/* Metadata */}
           {renderPropertyFields('metadata', metadata, 'Metadata')}
@@ -356,4 +421,3 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     </Dialog>
   );
 };
-

@@ -10,7 +10,9 @@ jest.mock('../embeddingGenerationService', () => {
   const mockService = {
     initialize: jest.fn().mockResolvedValue(undefined),
     generateEmbedding: jest.fn().mockResolvedValue(new Array(1536).fill(0.1)),
-    generateEmbeddings: jest.fn().mockResolvedValue([new Array(1536).fill(0.1)]),
+    generateEmbeddings: jest
+      .fn()
+      .mockResolvedValue([new Array(1536).fill(0.1)]),
     generateBatch: jest.fn().mockResolvedValue({
       successful: [],
       failed: [],
@@ -100,11 +102,7 @@ describe('BoundaryDetectionService', () => {
     });
 
     it('should identify paragraph boundaries', () => {
-      const type = (service as any).determineBoundaryType(
-        'Text\n',
-        0.6,
-        0.5,
-      );
+      const type = (service as any).determineBoundaryType('Text\n', 0.6, 0.5);
       expect(type).toBe('paragraph');
     });
 
@@ -118,27 +116,23 @@ describe('BoundaryDetectionService', () => {
     });
 
     it('should identify semantic boundaries', () => {
-      const type = (service as any).determineBoundaryType(
-        'Text',
-        0.5,
-        0.3,
-      );
+      const type = (service as any).determineBoundaryType('Text', 0.5, 0.3);
       expect(type).toBe('semantic');
     });
 
     it('should identify weak boundaries', () => {
-      const type = (service as any).determineBoundaryType(
-        'Text',
-        0.2,
-        0.8,
-      );
+      const type = (service as any).determineBoundaryType('Text', 0.2, 0.8);
       expect(type).toBe('weak');
     });
   });
 
   describe('isProductBoundary', () => {
     it('should identify product boundaries', () => {
-      const result = (service as any).isProductBoundary('Product text', 0.8, 0.3);
+      const result = (service as any).isProductBoundary(
+        'Product text',
+        0.8,
+        0.3,
+      );
       expect(result).toBe(true);
     });
 
@@ -254,7 +248,11 @@ describe('BoundaryDetectionService', () => {
 
   describe('generateReasoning', () => {
     it('should generate reasoning for strong boundaries', () => {
-      const reasoning = (service as any).generateReasoning(0.8, 'sentence', 0.3);
+      const reasoning = (service as any).generateReasoning(
+        0.8,
+        'sentence',
+        0.3,
+      );
       expect(reasoning).toContain('Strong boundary marker');
       expect(reasoning).toContain('Low semantic similarity');
     });
@@ -266,7 +264,11 @@ describe('BoundaryDetectionService', () => {
     });
 
     it('should generate reasoning for moderate boundaries', () => {
-      const reasoning = (service as any).generateReasoning(0.5, 'paragraph', 0.6);
+      const reasoning = (service as any).generateReasoning(
+        0.5,
+        'paragraph',
+        0.6,
+      );
       expect(reasoning).toContain('Moderate boundary marker');
     });
   });
@@ -298,4 +300,3 @@ describe('BoundaryDetectionService', () => {
     });
   });
 });
-

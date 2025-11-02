@@ -20,29 +20,38 @@ export interface BrowserApiConfig {
 
 export interface ReplicateConfig extends BrowserApiConfig {
   type: 'replicate';
-  models: Record<string, {
-    version: string;
-    description: string;
-    category: string;
-    defaultParams?: Record<string, unknown>;
-  }>;
+  models: Record<
+    string,
+    {
+      version: string;
+      description: string;
+      category: string;
+      defaultParams?: Record<string, unknown>;
+    }
+  >;
 }
 
 export interface HuggingFaceConfig extends BrowserApiConfig {
   type: 'huggingface';
-  models: Record<string, {
-    description: string;
-    category: string;
-    defaultParams?: Record<string, unknown>;
-  }>;
+  models: Record<
+    string,
+    {
+      description: string;
+      category: string;
+      defaultParams?: Record<string, unknown>;
+    }
+  >;
 }
 
 export interface SupabaseConfig extends BrowserApiConfig {
   type: 'supabase';
-  functions: Record<string, {
-    description: string;
-    category: string;
-  }>;
+  functions: Record<
+    string,
+    {
+      description: string;
+      category: string;
+    }
+  >;
 }
 
 // Browser-compatible API registry
@@ -146,7 +155,6 @@ export const browserSupabaseConfig: SupabaseConfig = {
       description: 'Material recognition and analysis',
       category: 'material-analysis',
     },
-
   },
 };
 
@@ -159,7 +167,9 @@ browserApiRegistry.registerApi(browserHuggingFaceConfig);
 browserApiRegistry.registerApi(browserSupabaseConfig);
 
 // Export utility functions
-export function getBrowserApiConfig(type: string): BrowserApiConfig | undefined {
+export function getBrowserApiConfig(
+  type: string,
+): BrowserApiConfig | undefined {
   return browserApiRegistry.getConfig(type);
 }
 

@@ -119,9 +119,13 @@ export class MaterialAgentOrchestratorAPI {
   /**
    * Execute a coordinated task using Material Agent Orchestrator
    */
-  static async executeTask(request: MaterialAgentTaskRequest): Promise<MaterialAgentResult> {
+  static async executeTask(
+    request: MaterialAgentTaskRequest,
+  ): Promise<MaterialAgentResult> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         const authError = new APIError(
           'User authentication required for Material Agent Orchestrator API access',
@@ -132,7 +136,10 @@ export class MaterialAgentOrchestratorAPI {
             timestamp: new Date().toISOString(),
           },
         );
-        errorLogger.logError(authError, { service: 'MaterialAgentOrchestratorAPI', method: 'executeTask' });
+        errorLogger.logError(authError, {
+          service: 'MaterialAgentOrchestratorAPI',
+          method: 'executeTask',
+        });
         throw authError;
       }
 
@@ -150,28 +157,37 @@ export class MaterialAgentOrchestratorAPI {
 
       // Add runtime validation for the response data
       if (!data) {
-        throw new ValidationError('No data received from Material Agent Orchestrator', {
-          operation: 'executeTask',
-          service: 'MaterialAgentOrchestratorAPI',
-          metadata: { endpoint: 'material-agent-orchestrator' },
-          timestamp: new Date().toISOString(),
-        });
+        throw new ValidationError(
+          'No data received from Material Agent Orchestrator',
+          {
+            operation: 'executeTask',
+            service: 'MaterialAgentOrchestratorAPI',
+            metadata: { endpoint: 'material-agent-orchestrator' },
+            timestamp: new Date().toISOString(),
+          },
+        );
       }
 
       // Validate the response structure
       const result = data as MaterialAgentResult;
-      if (typeof result.success !== 'boolean' || typeof result.task_id !== 'string') {
-        throw new ValidationError('Invalid response format from Material Agent Orchestrator', {
-          operation: 'executeTask',
-          service: 'MaterialAgentOrchestratorAPI',
-          metadata: {
-            endpoint: 'material-agent-orchestrator',
-            received: typeof result,
-            hasSuccess: 'success' in result,
-            hasTaskId: 'task_id' in result,
+      if (
+        typeof result.success !== 'boolean' ||
+        typeof result.task_id !== 'string'
+      ) {
+        throw new ValidationError(
+          'Invalid response format from Material Agent Orchestrator',
+          {
+            operation: 'executeTask',
+            service: 'MaterialAgentOrchestratorAPI',
+            metadata: {
+              endpoint: 'material-agent-orchestrator',
+              received: typeof result,
+              hasSuccess: 'success' in result,
+              hasTaskId: 'task_id' in result,
+            },
+            timestamp: new Date().toISOString(),
           },
-          timestamp: new Date().toISOString(),
-        });
+        );
       }
 
       // Validate coordinated_result if present
@@ -179,7 +195,10 @@ export class MaterialAgentOrchestratorAPI {
         const isValid = isAgentExecutionResult(result.coordinated_result.data);
 
         if (!isValid) {
-          console.warn('Invalid agent execution data structure:', result.coordinated_result.data);
+          console.warn(
+            'Invalid agent execution data structure:',
+            result.coordinated_result.data,
+          );
           // Don't throw - log warning but continue with response
         }
       }
@@ -192,8 +211,12 @@ export class MaterialAgentOrchestratorAPI {
       console.log('- service: string');
       console.log('- metadata?: Record<string, unknown>');
       console.log('- timestamp: string');
-      console.log('DEBUG: Additional context like "endpoint" should go in metadata field');
-      console.log('DEBUG: logDiagnostic functions are undefined and need to be removed');
+      console.log(
+        'DEBUG: Additional context like "endpoint" should go in metadata field',
+      );
+      console.log(
+        'DEBUG: logDiagnostic functions are undefined and need to be removed',
+      );
       console.error('Error executing Material Agent Orchestrator task:', error);
       throw error;
     }
@@ -226,7 +249,9 @@ export class MaterialAgentOrchestratorAPI {
    */
   static async getUserTasks(limit = 20) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -276,9 +301,13 @@ export class SpaceFormerAPI {
   /**
    * Analyze spatial context and generate layout suggestions
    */
-  static async analyzeSpatialContext(request: SpaceFormerRequest): Promise<SpaceFormerResult> {
+  static async analyzeSpatialContext(
+    request: SpaceFormerRequest,
+  ): Promise<SpaceFormerResult> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -307,7 +336,9 @@ export class SpaceFormerAPI {
    */
   static async getUserAnalyses(limit = 20) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -361,7 +392,9 @@ export class SpaceFormerAPI {
     userPreferences?: UserPreferences,
   ): Promise<SpaceFormerResult> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -396,7 +429,9 @@ export class IntegratedAIService {
     userPreferences: Record<string, unknown> = {},
   ) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -411,9 +446,11 @@ export class IntegratedAIService {
       if (images.length > 0) {
         const { SVBRDFExtractionAPI } = await import('./svbrdfExtractionAPI');
 
-        for (const image of images.slice(0, 3)) { // Limit to 3 for performance
+        for (const image of images.slice(0, 3)) {
+          // Limit to 3 for performance
           try {
-            const extraction = await SVBRDFExtractionAPI.uploadImageAndExtract(image);
+            const extraction =
+              await SVBRDFExtractionAPI.uploadImageAndExtract(image);
             if (extraction.success) {
               results.svbrdfExtractions.push(extraction);
             }
@@ -424,40 +461,38 @@ export class IntegratedAIService {
       }
 
       // Step 2: SpaceFormer Spatial Analysis
-      results.spatialAnalysis = await SpaceFormerAPI.analyzeRoomComplete(
+      results.spatialAnalysis = (await SpaceFormerAPI.analyzeRoomComplete(
         roomType,
-        results.svbrdfExtractions.map(e => e.extraction_id),
+        results.svbrdfExtractions.map((e) => e.extraction_id),
         userPreferences,
-      ) as any;
+      )) as any;
 
       // Step 3: Material Agent Orchestrator Coordination and Final Recommendations
-      results.crewaiCoordination = await MaterialAgentOrchestratorAPI.executeTask({
-        user_id: user.id,
-        task_type: 'comprehensive_design',
-        input_data: {
-          room_type: roomType,
-          material_data: results.svbrdfExtractions as any,
-          spatial_analysis: results.spatialAnalysis,
-          user_preferences: userPreferences,
-        },
-        priority: 1,
-      }) as any;
+      results.crewaiCoordination =
+        (await MaterialAgentOrchestratorAPI.executeTask({
+          user_id: user.id,
+          task_type: 'comprehensive_design',
+          input_data: {
+            room_type: roomType,
+            material_data: results.svbrdfExtractions as any,
+            spatial_analysis: results.spatialAnalysis,
+            user_preferences: userPreferences,
+          },
+          priority: 1,
+        })) as any;
 
       return results;
     } catch (error) {
-      const apiError = new APIError(
-        'Failed to generate complete design',
-        {
-          operation: 'generateCompleteDesign',
-          service: 'IntegratedAIService',
-          metadata: {
-            roomType,
-            imageCount: images.length,
-            originalError: error instanceof Error ? error.message : String(error),
-          },
-          timestamp: new Date().toISOString(),
+      const apiError = new APIError('Failed to generate complete design', {
+        operation: 'generateCompleteDesign',
+        service: 'IntegratedAIService',
+        metadata: {
+          roomType,
+          imageCount: images.length,
+          originalError: error instanceof Error ? error.message : String(error),
         },
-      );
+        timestamp: new Date().toISOString(),
+      });
 
       ErrorLogger.getInstance().logError(apiError);
       throw apiError;
@@ -491,7 +526,9 @@ export class IntegratedAIService {
    */
   static async getIntegratedAnalytics(_timeRange = '30 days') {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -503,9 +540,18 @@ export class IntegratedAIService {
       ]);
 
       return {
-        svbrdf_extractions: svbrdfStats.status === 'fulfilled' ? svbrdfStats.value.data?.length || 0 : 0,
-        spatial_analyses: spatialStats.status === 'fulfilled' ? spatialStats.value.data?.length || 0 : 0,
-        agent_tasks: taskStats.status === 'fulfilled' ? taskStats.value.data?.length || 0 : 0,
+        svbrdf_extractions:
+          svbrdfStats.status === 'fulfilled'
+            ? svbrdfStats.value.data?.length || 0
+            : 0,
+        spatial_analyses:
+          spatialStats.status === 'fulfilled'
+            ? spatialStats.value.data?.length || 0
+            : 0,
+        agent_tasks:
+          taskStats.status === 'fulfilled'
+            ? taskStats.value.data?.length || 0
+            : 0,
         integration_health: 'optimal', // Would be calculated based on success rates
       };
     } catch (error) {

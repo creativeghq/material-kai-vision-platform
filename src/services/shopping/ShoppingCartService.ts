@@ -135,11 +135,7 @@ export class ShoppingCartService {
       const response = await this.apiService.call<
         { cart_id: string; status: string },
         Cart
-      >(
-        'shopping-cart-api',
-        { cart_id: cartId, status },
-        { method: 'PUT' },
-      );
+      >('shopping-cart-api', { cart_id: cartId, status }, { method: 'PUT' });
 
       return response as unknown as Cart;
     } catch (error) {
@@ -153,7 +149,7 @@ export class ShoppingCartService {
    */
   calculateTotal(items: CartItem[]): number {
     return items.reduce((total, item) => {
-      return total + ((item.unit_price || 0) * item.quantity);
+      return total + (item.unit_price || 0) * item.quantity;
     }, 0);
   }
 
@@ -183,4 +179,3 @@ export class ShoppingCartService {
 }
 
 export default ShoppingCartService;
-

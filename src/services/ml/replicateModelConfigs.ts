@@ -199,7 +199,8 @@ export const INTERIOR_DESIGN_MODELS: Record<string, ModelConfig> = {
       negative_prompt: {
         type: 'string',
         required: true,
-        default: 'lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional, realistic',
+        default:
+          'lowres, watermark, banner, logo, watermark, contactinfo, text, deformed, blurry, blur, out of focus, out of frame, surreal, extra, ugly, upholstered walls, fabric walls, plush walls, mirror, mirrored, functional, realistic',
         description: 'Negative prompt to avoid unwanted elements',
       },
       guidance_scale: {
@@ -316,7 +317,10 @@ export class ModelParameterValidator {
     for (const [paramName, paramConfig] of Object.entries(config.parameters)) {
       const inputValue = inputParameters[paramName];
 
-      if (paramConfig.required && (inputValue === undefined || inputValue === null)) {
+      if (
+        paramConfig.required &&
+        (inputValue === undefined || inputValue === null)
+      ) {
         errors.push(`Required parameter '${paramName}' is missing`);
         continue;
       }
@@ -324,7 +328,11 @@ export class ModelParameterValidator {
       if (inputValue !== undefined && inputValue !== null) {
         // Validate and transform the parameter
         try {
-          validatedParams[paramName] = this.validateParameter(paramName, inputValue, paramConfig);
+          validatedParams[paramName] = this.validateParameter(
+            paramName,
+            inputValue,
+            paramConfig,
+          );
         } catch (error) {
           errors.push(`Parameter '${paramName}': ${(error as Error).message}`);
         }
@@ -413,7 +421,7 @@ export class ModelParameterValidator {
    */
   static getModelsByCategory(category: string): ModelConfig[] {
     return Object.values(INTERIOR_DESIGN_MODELS).filter(
-      model => model.category === category,
+      (model) => model.category === category,
     );
   }
 
@@ -422,7 +430,7 @@ export class ModelParameterValidator {
    */
   static getWorkingModels(): ModelConfig[] {
     return Object.values(INTERIOR_DESIGN_MODELS).filter(
-      model => model.status === 'working',
+      (model) => model.status === 'working',
     );
   }
 

@@ -2,14 +2,28 @@ import { useState, useEffect, useCallback } from 'react';
 import { Plus, Grid3X3, List, Palette } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { moodboardAPI, type CreateMoodBoardData } from '@/services/moodboardAPI';
+import {
+  moodboardAPI,
+  type CreateMoodBoardData,
+} from '@/services/moodboardAPI';
 import type { MoodBoard } from '@/types/materials';
 
 export const MoodBoardPage = () => {
@@ -60,7 +74,7 @@ export const MoodBoardPage = () => {
     setCreating(true);
     try {
       const board = await moodboardAPI.createMoodBoard(newMoodBoard);
-      setMoodboards(prev => [board, ...prev]);
+      setMoodboards((prev) => [board, ...prev]);
       setShowCreateDialog(false);
       setNewMoodBoard({
         title: '',
@@ -89,7 +103,7 @@ export const MoodBoardPage = () => {
 
     try {
       await moodboardAPI.deleteMoodBoard(id);
-      setMoodboards(prev => prev.filter(board => board.id !== id));
+      setMoodboards((prev) => prev.filter((board) => board.id !== id));
       toast({
         title: 'Success',
         description: `MoodBoard "${title}" deleted successfully`,
@@ -109,7 +123,9 @@ export const MoodBoardPage = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Loading your moodboards...</p>
+          <p className="mt-2 text-muted-foreground">
+            Loading your moodboards...
+          </p>
         </div>
       </div>
     );
@@ -190,11 +206,13 @@ export const MoodBoardPage = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className={
-          viewMode === 'grid'
-            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-            : 'space-y-4'
-        }>
+        <div
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+              : 'space-y-4'
+          }
+        >
           {moodboards.map((board) => (
             <Card
               key={board.id}
@@ -215,22 +233,27 @@ export const MoodBoardPage = () => {
                     </div>
                     <div className="flex gap-1 ml-2">
                       {board.isPublic ? (
-                        <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Public</span>
+                        <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
+                          Public
+                        </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Private</span>
+                        <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
+                          Private
+                        </span>
                       )}
                     </div>
                   </div>
-                </CardHeader><CardContent className="pt-0">
+                </CardHeader>
+                <CardContent className="pt-0">
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>{board.items?.length || 0} materials</span>
-                    <span>{new Date(board.createdAt).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(board.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
 
                   <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button className="flex-1">
-                      Open
-                    </Button>
+                    <Button className="flex-1">Open</Button>
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -262,13 +285,16 @@ export const MoodBoardPage = () => {
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">Title</Label><Input
+              <Label htmlFor="title">Title</Label>
+              <Input
                 id="title"
                 value={newMoodBoard.title}
-                onChange={(e) => setNewMoodBoard(prev => ({
-                  ...prev,
-                  title: e.target.value,
-                }))}
+                onChange={(e) =>
+                  setNewMoodBoard((prev) => ({
+                    ...prev,
+                    title: e.target.value,
+                  }))
+                }
                 placeholder="Enter moodboard title..."
               />
             </div>
@@ -278,10 +304,12 @@ export const MoodBoardPage = () => {
               <Textarea
                 id="description"
                 value={newMoodBoard.description}
-                onChange={(e) => setNewMoodBoard(prev => ({
-                  ...prev,
-                  description: e.target.value,
-                }))}
+                onChange={(e) =>
+                  setNewMoodBoard((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
                 placeholder="Describe your moodboard..."
                 rows={3}
               />
@@ -291,10 +319,12 @@ export const MoodBoardPage = () => {
               <Switch
                 id="public"
                 checked={newMoodBoard.is_public}
-                onCheckedChange={(checked: boolean) => setNewMoodBoard(prev => ({
-                  ...prev,
-                  is_public: checked,
-                }))}
+                onCheckedChange={(checked: boolean) =>
+                  setNewMoodBoard((prev) => ({
+                    ...prev,
+                    is_public: checked,
+                  }))
+                }
               />
               <Label htmlFor="public">Make this moodboard public</Label>
             </div>

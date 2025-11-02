@@ -59,7 +59,9 @@ export interface ServiceMetrics {
  * - Rate limiting
  * - Lifecycle management
  */
-export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig> extends Singleton {
+export abstract class BaseService<
+  TConfig extends ServiceConfig = ServiceConfig,
+> extends Singleton {
   protected config: TConfig;
   protected isInitialized: boolean = false;
   protected startTime: Date = new Date();
@@ -166,7 +168,8 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
    */
   public getMetrics(): ServiceMetrics {
     const uptime = Date.now() - this.startTime.getTime();
-    const averageLatency = this.requestCount > 0 ? this.latencySum / this.requestCount : 0;
+    const averageLatency =
+      this.requestCount > 0 ? this.latencySum / this.requestCount : 0;
 
     return {
       serviceName: this.config.name,
@@ -217,8 +220,11 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
    * Standard error handling
    */
   protected handleError(error: unknown, context: string): Error {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const serviceError = new Error(`${this.config.name} service error in ${context}: ${errorMessage}`);
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    const serviceError = new Error(
+      `${this.config.name} service error in ${context}: ${errorMessage}`,
+    );
 
     console.error(`Service ${this.config.name} error:`, {
       context,
@@ -233,7 +239,10 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
    * Rate limiting check
    */
   protected async checkRateLimit(operation: string): Promise<void> {
-    if (!this.config.rateLimit || this.config.rateLimit.requestsPerMinute <= 0) {
+    if (
+      !this.config.rateLimit ||
+      this.config.rateLimit.requestsPerMinute <= 0
+    ) {
       return;
     }
 
@@ -245,7 +254,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
     let requests = this.rateLimitTracker.get(operation) || [];
 
     // Remove requests outside the current window
-    requests = requests.filter(timestamp => now - timestamp < windowMs);
+    requests = requests.filter((timestamp) => now - timestamp < windowMs);
 
     // Check if we're at the limit
     if (requests.length >= maxRequests) {
@@ -253,7 +262,7 @@ export abstract class BaseService<TConfig extends ServiceConfig = ServiceConfig>
       const waitTime = windowMs - (now - oldestRequest);
 
       if (waitTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
 

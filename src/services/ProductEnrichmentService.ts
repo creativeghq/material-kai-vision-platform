@@ -71,7 +71,9 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
   /**
    * Enrich a single chunk with product data
    */
-  async enrichChunk(request: ProductEnrichmentRequest): Promise<ProductEnrichmentResponse> {
+  async enrichChunk(
+    request: ProductEnrichmentRequest,
+  ): Promise<ProductEnrichmentResponse> {
     return this.executeOperation(async () => {
       // Get chunk data
       const { data: chunkData, error: chunkError } = await supabase
@@ -89,12 +91,27 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
 
       // Extract product information
       const productName = this.extractProductName(request.chunk_content);
-      const productCategory = this.extractProductCategory(request.chunk_content);
-      const productDescription = this.extractProductDescription(request.chunk_content);
-      const metadata = rules.extract_metadata ? this.extractMetadata(request.chunk_content) : undefined;
-      const specifications = rules.extract_specifications ? this.extractSpecifications(request.chunk_content) : undefined;
-      const relatedProducts = rules.find_related_products ? this.findRelatedProducts(request.chunk_content, rules.max_related_products) : undefined;
-      const imageReferences = rules.link_images ? this.linkImages(request.related_images || []) : undefined;
+      const productCategory = this.extractProductCategory(
+        request.chunk_content,
+      );
+      const productDescription = this.extractProductDescription(
+        request.chunk_content,
+      );
+      const metadata = rules.extract_metadata
+        ? this.extractMetadata(request.chunk_content)
+        : undefined;
+      const specifications = rules.extract_specifications
+        ? this.extractSpecifications(request.chunk_content)
+        : undefined;
+      const relatedProducts = rules.find_related_products
+        ? this.findRelatedProducts(
+            request.chunk_content,
+            rules.max_related_products,
+          )
+        : undefined;
+      const imageReferences = rules.link_images
+        ? this.linkImages(request.related_images || [])
+        : undefined;
 
       // Calculate enrichment score
       const enrichmentScore = this.calculateEnrichmentScore(
@@ -106,7 +123,10 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
       );
 
       // Determine enrichment status
-      const enrichmentStatus = this.determineEnrichmentStatus(enrichmentScore, rules.min_confidence_score);
+      const enrichmentStatus = this.determineEnrichmentStatus(
+        enrichmentScore,
+        rules.min_confidence_score,
+      );
 
       // Create enrichment record
       const enrichmentInsert: ProductEnrichmentInsert = {
@@ -148,7 +168,9 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
   /**
    * Enrich multiple chunks
    */
-  async enrichChunks(request: BatchProductEnrichmentRequest): Promise<BatchProductEnrichmentResponse> {
+  async enrichChunks(
+    request: BatchProductEnrichmentRequest,
+  ): Promise<BatchProductEnrichmentResponse> {
     return this.executeOperation(async () => {
       // Get all chunks
       const { data: chunks, error: chunksError } = await supabase
@@ -202,7 +224,9 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
   /**
    * Get enrichments needing review
    */
-  async getEnrichmentsNeedingReview(workspaceId: string): Promise<ProductEnrichment[]> {
+  async getEnrichmentsNeedingReview(
+    workspaceId: string,
+  ): Promise<ProductEnrichment[]> {
     return this.executeOperation(async () => {
       const { data, error } = await supabase
         .from('product_enrichments')
@@ -212,7 +236,9 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
         .order('created_at', { ascending: false });
 
       if (error) {
-        throw new Error(`Failed to fetch enrichments needing review: ${error.message}`);
+        throw new Error(
+          `Failed to fetch enrichments needing review: ${error.message}`,
+        );
       }
 
       return (data || []) as ProductEnrichment[];
@@ -222,7 +248,9 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
   /**
    * Get enrichment statistics
    */
-  async getEnrichmentStats(workspaceId: string): Promise<ProductEnrichmentStats> {
+  async getEnrichmentStats(
+    workspaceId: string,
+  ): Promise<ProductEnrichmentStats> {
     return this.executeOperation(async () => {
       const { data, error } = await supabase
         .from('product_enrichments')
@@ -236,11 +264,21 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
       const enrichments = (data || []) as ProductEnrichment[];
       const stats: ProductEnrichmentStats = {
         total_enrichments: enrichments.length,
-        enriched_count: enrichments.filter(e => e.enrichment_status === 'enriched').length,
-        failed_count: enrichments.filter(e => e.enrichment_status === 'failed').length,
-        needs_review_count: enrichments.filter(e => e.enrichment_status === 'needs_review').length,
-        avg_confidence_score: enrichments.reduce((sum, e) => sum + (e.confidence_score || 0), 0) / enrichments.length || 0,
-        avg_enrichment_score: enrichments.reduce((sum, e) => sum + (e.enrichment_score || 0), 0) / enrichments.length || 0,
+        enriched_count: enrichments.filter(
+          (e) => e.enrichment_status === 'enriched',
+        ).length,
+        failed_count: enrichments.filter(
+          (e) => e.enrichment_status === 'failed',
+        ).length,
+        needs_review_count: enrichments.filter(
+          (e) => e.enrichment_status === 'needs_review',
+        ).length,
+        avg_confidence_score:
+          enrichments.reduce((sum, e) => sum + (e.confidence_score || 0), 0) /
+            enrichments.length || 0,
+        avg_enrichment_score:
+          enrichments.reduce((sum, e) => sum + (e.enrichment_score || 0), 0) /
+            enrichments.length || 0,
         categories_distribution: this.getCategoriesDistribution(enrichments),
         common_issues: this.getCommonIssues(enrichments),
       };
@@ -309,12 +347,18 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
     return specs.length > 0 ? specs : undefined;
   }
 
-  private findRelatedProducts(content: string, maxCount: number): string[] | undefined {
+  private findRelatedProducts(
+    content: string,
+    maxCount: number,
+  ): string[] | undefined {
     const products = [];
     const productPattern = /(?:also|related|similar)[\s:]*([^\n]+)/gi;
     let match;
 
-    while ((match = productPattern.exec(content)) && products.length < maxCount) {
+    while (
+      (match = productPattern.exec(content)) &&
+      products.length < maxCount
+    ) {
       products.push(match[1].trim());
     }
 
@@ -367,7 +411,10 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
     return maxScore > 0 ? Math.min(1, score / maxScore) : 0;
   }
 
-  private determineEnrichmentStatus(score: number, minScore: number): ProductEnrichmentStatus {
+  private determineEnrichmentStatus(
+    score: number,
+    minScore: number,
+  ): ProductEnrichmentStatus {
     if (score >= minScore) {
       return 'enriched';
     } else if (score >= minScore * 0.7) {
@@ -382,10 +429,12 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
     return match ? match[1].trim() : undefined;
   }
 
-  private getCategoriesDistribution(enrichments: ProductEnrichment[]): Record<string, number> {
+  private getCategoriesDistribution(
+    enrichments: ProductEnrichment[],
+  ): Record<string, number> {
     const distribution: Record<string, number> = {};
 
-    enrichments.forEach(e => {
+    enrichments.forEach((e) => {
       const category = e.product_category || 'other';
       distribution[category] = (distribution[category] || 0) + 1;
     });
@@ -400,8 +449,8 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
   }> {
     const issueMap = new Map<string, { count: number; severity: string }>();
 
-    enrichments.forEach(enrichment => {
-      enrichment.issues?.forEach(issue => {
+    enrichments.forEach((enrichment) => {
+      enrichment.issues?.forEach((issue) => {
         const key = issue.type;
         const existing = issueMap.get(key);
         issueMap.set(key, {
@@ -425,4 +474,3 @@ export class ProductEnrichmentService extends BaseService<ProductEnrichmentServi
  * Export singleton instance
  */
 export const productEnrichmentService = new ProductEnrichmentService();
-

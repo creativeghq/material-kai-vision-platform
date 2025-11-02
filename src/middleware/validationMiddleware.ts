@@ -42,7 +42,12 @@ export class ValidationError extends Error {
 
   constructor(
     message: string,
-    errors: Array<{ path: string; message: string; code: string; value?: string | number | boolean | null }>,
+    errors: Array<{
+      path: string;
+      message: string;
+      code: string;
+      value?: string | number | boolean | null;
+    }>,
     validationType: string,
     requestId?: string,
   ) {
@@ -76,7 +81,12 @@ interface ValidationOptions {
   skipOnEmpty?: boolean;
   logPerformance?: boolean;
   maxValidationTime?: number; // milliseconds
-  customErrorHandler?: (error: ValidationError, req: Request, res: Response, next: NextFunction) => void;
+  customErrorHandler?: (
+    error: ValidationError,
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ) => void;
 }
 
 /**
@@ -114,15 +124,20 @@ function logPerformanceMetrics(
   metrics: ValidationMetrics,
   requestId?: string,
 ) {
-  if (metrics.duration && metrics.duration > 25) { // Log if over half the limit
-    console.warn(`[Validation Performance] ${validationType} took ${metrics.duration.toFixed(2)}ms`, {
-      requestId,
-      validationType,
-      duration: metrics.duration,
-      memoryDelta: metrics.memoryAfter && metrics.memoryBefore
-        ? metrics.memoryAfter - metrics.memoryBefore
-        : undefined,
-    });
+  if (metrics.duration && metrics.duration > 25) {
+    // Log if over half the limit
+    console.warn(
+      `[Validation Performance] ${validationType} took ${metrics.duration.toFixed(2)}ms`,
+      {
+        requestId,
+        validationType,
+        duration: metrics.duration,
+        memoryDelta:
+          metrics.memoryAfter && metrics.memoryBefore
+            ? metrics.memoryAfter - metrics.memoryBefore
+            : undefined,
+      },
+    );
   }
 }
 
@@ -137,12 +152,16 @@ function createValidationMiddleware<T>(
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const requestId = req.headers['x-request-id'] as string || `req-${Date.now()}`;
+    const requestId =
+      (req.headers['x-request-id'] as string) || `req-${Date.now()}`;
     const metrics = startPerformanceTracking();
 
     try {
       // Skip validation if body is empty and skipOnEmpty is true
-      if (opts.skipOnEmpty && (!req.body || Object.keys(req.body).length === 0)) {
+      if (
+        opts.skipOnEmpty &&
+        (!req.body || Object.keys(req.body).length === 0)
+      ) {
         return next();
       }
 
@@ -153,12 +172,18 @@ function createValidationMiddleware<T>(
       endPerformanceTracking(metrics);
 
       // Check performance threshold
-      if (metrics.duration && metrics.duration > (opts.maxValidationTime || 50)) {
-        console.warn(`[Validation Timeout] ${validationType} exceeded time limit`, {
-          requestId,
-          duration: metrics.duration,
-          limit: opts.maxValidationTime,
-        });
+      if (
+        metrics.duration &&
+        metrics.duration > (opts.maxValidationTime || 50)
+      ) {
+        console.warn(
+          `[Validation Timeout] ${validationType} exceeded time limit`,
+          {
+            requestId,
+            duration: metrics.duration,
+            limit: opts.maxValidationTime,
+          },
+        );
       }
 
       // Log performance if enabled
@@ -171,7 +196,10 @@ function createValidationMiddleware<T>(
           path: error.path.join('.'),
           message: error.message,
           code: error.code,
-          value: error.path.length > 0 ? getNestedValue(req.body, error.path as (string | number)[]) : req.body,
+          value:
+            error.path.length > 0
+              ? getNestedValue(req.body, error.path as (string | number)[])
+              : req.body,
         }));
 
         const validationError = new ValidationError(
@@ -194,19 +222,24 @@ function createValidationMiddleware<T>(
     } catch (error) {
       endPerformanceTracking(metrics);
 
-      console.error(`[Validation Error] Unexpected error in ${validationType}`, {
-        requestId,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      console.error(
+        `[Validation Error] Unexpected error in ${validationType}`,
+        {
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      );
 
       const validationError = new ValidationError(
         `Internal validation error for ${validationType}`,
-        [{
-          path: 'internal',
-          message: 'An unexpected error occurred during validation',
-          code: 'internal_error',
-        }],
+        [
+          {
+            path: 'internal',
+            message: 'An unexpected error occurred during validation',
+            code: 'internal_error',
+          },
+        ],
         validationType,
         requestId,
       );
@@ -219,7 +252,10 @@ function createValidationMiddleware<T>(
 /**
  * Utility function to get nested value from object
  */
-function getNestedValue(obj: Record<string, unknown>, path: (string | number)[]): any {
+function getNestedValue(
+  obj: Record<string, unknown>,
+  path: (string | number)[],
+): any {
   return path.reduce((current: any, key) => {
     return current && typeof current === 'object' ? current[key] : undefined;
   }, obj);
@@ -228,7 +264,9 @@ function getNestedValue(obj: Record<string, unknown>, path: (string | number)[])
 /**
  * Middleware for validating MivaaDocument data
  */
-export const validateMivaaDocumentMiddleware = (options?: ValidationOptions) => {
+export const validateMivaaDocumentMiddleware = (
+  options?: ValidationOptions,
+) => {
   return createValidationMiddleware(
     MivaaDocumentSchema,
     'MivaaDocument',
@@ -239,7 +277,9 @@ export const validateMivaaDocumentMiddleware = (options?: ValidationOptions) => 
 /**
  * Middleware for validating partial MivaaDocument updates
  */
-export const validatePartialMivaaDocumentMiddleware = (options?: ValidationOptions) => {
+export const validatePartialMivaaDocumentMiddleware = (
+  options?: ValidationOptions,
+) => {
   return createValidationMiddleware(
     PartialMivaaDocumentSchema,
     'PartialMivaaDocument',
@@ -250,7 +290,9 @@ export const validatePartialMivaaDocumentMiddleware = (options?: ValidationOptio
 /**
  * Middleware for validating TransformationConfig data
  */
-export const validateTransformationConfigMiddleware = (options?: ValidationOptions) => {
+export const validateTransformationConfigMiddleware = (
+  options?: ValidationOptions,
+) => {
   return createValidationMiddleware(
     TransformationConfigSchema,
     'TransformationConfig',
@@ -261,7 +303,9 @@ export const validateTransformationConfigMiddleware = (options?: ValidationOptio
 /**
  * Middleware for validating partial TransformationConfig updates
  */
-export const validatePartialTransformationConfigMiddleware = (options?: ValidationOptions) => {
+export const validatePartialTransformationConfigMiddleware = (
+  options?: ValidationOptions,
+) => {
   return createValidationMiddleware(
     PartialTransformationConfigSchema,
     'PartialTransformationConfig',
@@ -272,7 +316,9 @@ export const validatePartialTransformationConfigMiddleware = (options?: Validati
 /**
  * Middleware for validating TransformationJobRequest data
  */
-export const validateTransformationJobRequestMiddleware = (options?: ValidationOptions) => {
+export const validateTransformationJobRequestMiddleware = (
+  options?: ValidationOptions,
+) => {
   return createValidationMiddleware(
     TransformationJobRequestSchema,
     'TransformationJobRequest',
@@ -283,11 +329,15 @@ export const validateTransformationJobRequestMiddleware = (options?: ValidationO
 /**
  * Middleware for validating query parameters
  */
-export const validateQueryParams = (schema: z.ZodSchema<unknown>, options?: ValidationOptions) => {
+export const validateQueryParams = (
+  schema: z.ZodSchema<unknown>,
+  options?: ValidationOptions,
+) => {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const requestId = req.headers['x-request-id'] as string || `req-${Date.now()}`;
+    const requestId =
+      (req.headers['x-request-id'] as string) || `req-${Date.now()}`;
     const metrics = startPerformanceTracking();
 
     try {
@@ -329,7 +379,8 @@ export const validateQueryParams = (schema: z.ZodSchema<unknown>, options?: Vali
 
       return res.status(500).json({
         error: 'Internal validation error',
-        message: 'An unexpected error occurred during query parameter validation',
+        message:
+          'An unexpected error occurred during query parameter validation',
         requestId,
         timestamp: new Date().toISOString(),
       });
@@ -340,11 +391,15 @@ export const validateQueryParams = (schema: z.ZodSchema<unknown>, options?: Vali
 /**
  * Middleware for validating URL parameters
  */
-export const validateUrlParams = (schema: z.ZodSchema<unknown>, options?: ValidationOptions) => {
+export const validateUrlParams = (
+  schema: z.ZodSchema<unknown>,
+  options?: ValidationOptions,
+) => {
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   return (req: Request, res: Response, next: NextFunction) => {
-    const requestId = req.headers['x-request-id'] as string || `req-${Date.now()}`;
+    const requestId =
+      (req.headers['x-request-id'] as string) || `req-${Date.now()}`;
     const metrics = startPerformanceTracking();
 
     try {
@@ -379,10 +434,13 @@ export const validateUrlParams = (schema: z.ZodSchema<unknown>, options?: Valida
     } catch (error) {
       endPerformanceTracking(metrics);
 
-      console.error('[Validation Error] Unexpected error in URL parameter validation', {
-        requestId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      console.error(
+        '[Validation Error] Unexpected error in URL parameter validation',
+        {
+          requestId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      );
 
       return res.status(500).json({
         error: 'Internal validation error',
@@ -430,7 +488,13 @@ export const validationErrorHandler = (
  * Type definitions for validated data
  */
 export interface ValidatedData {
-  [key: string]: string | number | boolean | null | ValidatedData | ValidatedData[];
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | null
+    | ValidatedData
+    | ValidatedData[];
 }
 
 export interface ValidatedQuery {

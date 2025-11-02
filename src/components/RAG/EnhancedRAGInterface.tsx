@@ -21,7 +21,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -29,20 +35,22 @@ import {
   EnhancedRAGService,
   type EnhancedRAGRequest,
   type EnhancedRAGResponse,
-
-
-
 } from '@/services/enhancedRAGService';
 
 interface EnhancedRAGInterfaceProps {
   onResultsFound?: (results: Record<string, unknown>[]) => void;
 }
 
-export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onResultsFound }) => {
+export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
+  onResultsFound,
+}) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<EnhancedRAGResponse | null>(null);
-  const [searchType, setSearchType] = useState<'comprehensive' | 'semantic' | 'hybrid' | 'perplexity'>('comprehensive');
+  const [searchResults, setSearchResults] =
+    useState<EnhancedRAGResponse | null>(null);
+  const [searchType, setSearchType] = useState<
+    'comprehensive' | 'semantic' | 'hybrid' | 'perplexity'
+  >('comprehensive');
   const [includeRealTime, setIncludeRealTime] = useState(true);
   const [maxResults, setMaxResults] = useState(10);
   const [context, setContext] = useState({
@@ -75,7 +83,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
   const loadQueryHistory = async () => {
     try {
       await EnhancedRAGService.getQueryHistory(10);
-
     } catch (error) {
       console.error('Error loading query history:', error);
     }
@@ -97,8 +104,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
         query: query.trim(),
         context: {
           ...(context.roomType && { roomType: context.roomType }),
-          ...(context.stylePreferences.length > 0 && { stylePreferences: context.stylePreferences }),
-          ...(context.materialCategories.length > 0 && { materialCategories: context.materialCategories }),
+          ...(context.stylePreferences.length > 0 && {
+            stylePreferences: context.stylePreferences,
+          }),
+          ...(context.materialCategories.length > 0 && {
+            materialCategories: context.materialCategories,
+          }),
         },
         searchType,
         maxResults,
@@ -128,7 +139,8 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
       console.error('Enhanced search error:', error);
       toast({
         title: 'Search Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description:
+          error instanceof Error ? error.message : 'Unknown error occurred',
         variant: 'destructive',
       });
     } finally {
@@ -136,14 +148,20 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
     }
   };
 
-  const handleFeedback = async (satisfaction: number, clickedResults: string[] = []) => {
+  const handleFeedback = async (
+    satisfaction: number,
+    clickedResults: string[] = [],
+  ) => {
     if (!searchResults) return;
 
     try {
-      await EnhancedRAGService.provideFeedback(searchResults.analytics.sessionId, {
-        satisfaction,
-        clickedResults,
-      });
+      await EnhancedRAGService.provideFeedback(
+        searchResults.analytics.sessionId,
+        {
+          satisfaction,
+          clickedResults,
+        },
+      );
 
       toast({
         title: 'Feedback Submitted',
@@ -162,11 +180,16 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
 
   const getIntentIcon = (intent: string) => {
     switch (intent) {
-      case 'search': return <Search className="h-4 w-4" />;
-      case 'compare': return <BarChart3 className="h-4 w-4" />;
-      case 'recommend': return <Lightbulb className="h-4 w-4" />;
-      case 'explain': return <BookOpen className="h-4 w-4" />;
-      default: return <Brain className="h-4 w-4" />;
+      case 'search':
+        return <Search className="h-4 w-4" />;
+      case 'compare':
+        return <BarChart3 className="h-4 w-4" />;
+      case 'recommend':
+        return <Lightbulb className="h-4 w-4" />;
+      case 'explain':
+        return <BookOpen className="h-4 w-4" />;
+      default:
+        return <Brain className="h-4 w-4" />;
     }
   };
 
@@ -178,9 +201,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
           <CardTitle className="flex items-center gap-2">
             <Brain className="h-5 w-5" />
             Enhanced RAG Knowledge Search
-            <span className="ml-auto inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">AI-Powered</span>
+            <span className="ml-auto inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
+              AI-Powered
+            </span>
           </CardTitle>
-        </CardHeader><CardContent className="space-y-4">
+        </CardHeader>
+        <CardContent className="space-y-4">
           {/* Main Search Input */}
           <div className="flex gap-2">
             <Input
@@ -212,22 +238,40 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="searchType">Search Type</Label>
-              <Select value={searchType} onValueChange={(value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity') => setSearchType(value)}>
+              <Select
+                value={searchType}
+                onValueChange={(
+                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity',
+                ) => setSearchType(value)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="comprehensive">🧠 Comprehensive (All Sources)</SelectItem>
-                  <SelectItem value="semantic">🔍 Semantic (Vector Search)</SelectItem>
-                  <SelectItem value="hybrid">⚡ Hybrid (Mixed Approach)</SelectItem>
-                  <SelectItem value="perplexity">🌐 Real-time (Perplexity)</SelectItem>
+                  <SelectItem value="comprehensive">
+                    🧠 Comprehensive (All Sources)
+                  </SelectItem>
+                  <SelectItem value="semantic">
+                    🔍 Semantic (Vector Search)
+                  </SelectItem>
+                  <SelectItem value="hybrid">
+                    ⚡ Hybrid (Mixed Approach)
+                  </SelectItem>
+                  <SelectItem value="perplexity">
+                    🌐 Real-time (Perplexity)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="maxResults">Max Results</Label>
-              <Select value={maxResults.toString()} onValueChange={(value: string) => setMaxResults(parseInt(value))}>
+              <Select
+                value={maxResults.toString()}
+                onValueChange={(value: string) =>
+                  setMaxResults(parseInt(value))
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -258,11 +302,14 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
           {/* Context Configuration */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
             <div className="space-y-2">
-              <Label htmlFor="roomType">Room Context</Label><Input
+              <Label htmlFor="roomType">Room Context</Label>
+              <Input
                 id="roomType"
                 placeholder="e.g., kitchen, bathroom"
                 value={context.roomType}
-                onChange={(e) => setContext(prev => ({ ...prev, roomType: e.target.value }))}
+                onChange={(e) =>
+                  setContext((prev) => ({ ...prev, roomType: e.target.value }))
+                }
               />
             </div>
 
@@ -274,7 +321,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                   if (e.key === 'Enter') {
                     const value = (e.target as HTMLInputElement).value.trim();
                     if (value && !context.stylePreferences.includes(value)) {
-                      setContext(prev => ({
+                      setContext((prev) => ({
                         ...prev,
                         stylePreferences: [...prev.stylePreferences, value],
                       }));
@@ -288,15 +335,21 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                   <Badge
                     key={i}
                     className="cursor-pointer"
-                    onClick={() => setContext(prev => ({
-                      ...prev,
-                      stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
-                    }))}
+                    onClick={() =>
+                      setContext((prev) => ({
+                        ...prev,
+                        stylePreferences: prev.stylePreferences.filter(
+                          (_, idx) => idx !== i,
+                        ),
+                      }))
+                    }
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        setContext(prev => ({
+                        setContext((prev) => ({
                           ...prev,
-                          stylePreferences: prev.stylePreferences.filter((_, idx) => idx !== i),
+                          stylePreferences: prev.stylePreferences.filter(
+                            (_, idx) => idx !== i,
+                          ),
                         }));
                       }
                     }}
@@ -308,13 +361,14 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             </div>
 
             <div className="space-y-2">
-              <Label>Material Categories</Label><Input
+              <Label>Material Categories</Label>
+              <Input
                 placeholder="e.g., flooring, countertops"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
                     const value = (e.target as HTMLInputElement).value.trim();
                     if (value && !context.materialCategories.includes(value)) {
-                      setContext(prev => ({
+                      setContext((prev) => ({
                         ...prev,
                         materialCategories: [...prev.materialCategories, value],
                       }));
@@ -328,15 +382,21 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                   <Badge
                     key={i}
                     className="cursor-pointer"
-                    onClick={() => setContext(prev => ({
-                      ...prev,
-                      materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
-                    }))}
+                    onClick={() =>
+                      setContext((prev) => ({
+                        ...prev,
+                        materialCategories: prev.materialCategories.filter(
+                          (_, idx) => idx !== i,
+                        ),
+                      }))
+                    }
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        setContext(prev => ({
+                        setContext((prev) => ({
                           ...prev,
-                          materialCategories: prev.materialCategories.filter((_, idx) => idx !== i),
+                          materialCategories: prev.materialCategories.filter(
+                            (_, idx) => idx !== i,
+                          ),
                         }));
                       }
                     }}
@@ -358,7 +418,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <CardTitle className="flex items-center gap-2">
                 {getIntentIcon(searchResults.queryIntent)}
                 Search Results
-                <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{searchResults.queryIntent}</span>
+                <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
+                  {searchResults.queryIntent}
+                </span>
               </CardTitle>
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
@@ -367,10 +429,16 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                 </span>
                 <span className="flex items-center gap-1">
                   <TrendingUp className="h-4 w-4" />
-                  Complexity: {(searchResults.semanticAnalysis.queryComplexity * 100).toFixed(0)}%
+                  Complexity:{' '}
+                  {(
+                    searchResults.semanticAnalysis.queryComplexity * 100
+                  ).toFixed(0)}
+                  %
                 </span>
                 {searchResults.analytics.cacheHit && (
-                  <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">Cached</span>
+                  <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                    Cached
+                  </span>
                 )}
               </div>
             </div>
@@ -378,15 +446,21 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             {/* Query Analysis */}
             <div className="space-y-2">
               <p className="text-sm">
-                <span className="font-medium">Processed Query:</span> {searchResults.processedQuery}
+                <span className="font-medium">Processed Query:</span>{' '}
+                {searchResults.processedQuery}
               </p>
 
               {/* Detected Entities */}
               <div className="flex flex-wrap gap-2">
-                {Object.entries(searchResults.semanticAnalysis.detectedEntities).map(([key, values]) => {
+                {Object.entries(
+                  searchResults.semanticAnalysis.detectedEntities,
+                ).map(([key, values]) => {
                   if (Array.isArray(values) && values.length > 0) {
                     return values.map((value, i) => (
-                      <span key={`${key}-${i}`} className="text-xs inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 font-medium text-gray-900 bg-gray-50">
+                      <span
+                        key={`${key}-${i}`}
+                        className="text-xs inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 font-medium text-gray-900 bg-gray-50"
+                      >
                         {key}: {value}
                       </span>
                     ));
@@ -396,43 +470,62 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               </div>
 
               {/* Suggested Refinements */}
-              {searchResults.semanticAnalysis.suggestedRefinements.length > 0 && (
+              {searchResults.semanticAnalysis.suggestedRefinements.length >
+                0 && (
                 <div className="flex flex-wrap gap-2">
-                  <span className="text-sm text-muted-foreground">Suggestions:</span>
-                  {searchResults.semanticAnalysis.suggestedRefinements.map((suggestion, i) => (
-                    <Button
-                      key={i}
-                      className="h-6 px-2 text-xs"
-                      onClick={() => setQuery(suggestion)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          setQuery(suggestion);
-                        }
-                      }}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
+                  <span className="text-sm text-muted-foreground">
+                    Suggestions:
+                  </span>
+                  {searchResults.semanticAnalysis.suggestedRefinements.map(
+                    (suggestion, i) => (
+                      <Button
+                        key={i}
+                        className="h-6 px-2 text-xs"
+                        onClick={() => setQuery(suggestion)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            setQuery(suggestion);
+                          }
+                        }}
+                      >
+                        {suggestion}
+                      </Button>
+                    ),
+                  )}
                 </div>
               )}
             </div>
-          </CardHeader><CardContent>
+          </CardHeader>
+          <CardContent>
             <Tabs defaultValue="knowledge" className="w-full">
               <TabsList className="grid grid-cols-4 w-full">
-                <TabsTrigger value="knowledge" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="knowledge"
+                  className="flex items-center gap-2"
+                >
                   <BookOpen className="h-4 w-4" />
                   Knowledge ({searchResults.results.knowledgeBase.length})
                 </TabsTrigger>
-                <TabsTrigger value="materials" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="materials"
+                  className="flex items-center gap-2"
+                >
                   <Package className="h-4 w-4" />
                   Materials ({searchResults.results.materialKnowledge.length})
                 </TabsTrigger>
-                <TabsTrigger value="recommendations" className="flex items-center gap-2">
+                <TabsTrigger
+                  value="recommendations"
+                  className="flex items-center gap-2"
+                >
                   <Lightbulb className="h-4 w-4" />
-                  Recommendations ({searchResults.results.recommendations.length})
+                  Recommendations (
+                  {searchResults.results.recommendations.length})
                 </TabsTrigger>
                 {searchResults.results.realTimeInfo && (
-                  <TabsTrigger value="realtime" className="flex items-center gap-2">
+                  <TabsTrigger
+                    value="realtime"
+                    className="flex items-center gap-2"
+                  >
                     <TrendingUp className="h-4 w-4" />
                     Real-time
                   </TabsTrigger>
@@ -455,7 +548,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                             <h3 className="font-semibold">{result.title}</h3>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${getConfidenceColor(result.relevanceScore)}`} />
+                            <div
+                              className={`w-2 h-2 rounded-full ${getConfidenceColor(result.relevanceScore)}`}
+                            />
                             <span className="text-sm text-muted-foreground">
                               {(result.relevanceScore * 100).toFixed(1)}%
                             </span>
@@ -465,25 +560,34 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                         <p className="text-sm text-muted-foreground mb-3">
                           {result.content.length > 300
                             ? `${result.content.substring(0, 300)}...`
-                            : result.content
-                          }
+                            : result.content}
                         </p>
 
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">{result.source}</span>
-                            {result.metadata?.tags && (
-                              (result.metadata as any).tags.slice(0, 3).map((tag: string, i: number) => (
-                                <span key={i} className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{tag}</span>
-                              ))
-                            )}
+                            <span className="inline-flex items-center rounded-md bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                              {result.source}
+                            </span>
+                            {result.metadata?.tags &&
+                              (result.metadata as any).tags
+                                .slice(0, 3)
+                                .map((tag: string, i: number) => (
+                                  <span
+                                    key={i}
+                                    className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
                           </div>
 
                           {/* PDF Link for additional details */}
                           {result.pdfUrl && (
                             <Button
                               className="flex items-center gap-1"
-                              onClick={() => window.open(result.pdfUrl, '_blank')}
+                              onClick={() =>
+                                window.open(result.pdfUrl, '_blank')
+                              }
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   window.open(result.pdfUrl, '_blank');
@@ -499,7 +603,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                           {!result.pdfUrl && result.sourceUrl && (
                             <Button
                               className="flex items-center gap-1"
-                              onClick={() => window.open(result.sourceUrl, '_blank')}
+                              onClick={() =>
+                                window.open(result.sourceUrl, '_blank')
+                              }
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   window.open(result.sourceUrl, '_blank');
@@ -524,29 +630,40 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                     No material knowledge found.
                   </p>
                 ) : (
-                  searchResults.results.materialKnowledge.map((result, index) => (
-                    <Card key={index} className="border-l-4 border-l-green-500">
-                      <CardContent className="pt-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <Package className="h-4 w-4" />
-                            <h3 className="font-semibold">{result.materialName}</h3>
-                            <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{result.extractionType}</span>
+                  searchResults.results.materialKnowledge.map(
+                    (result, index) => (
+                      <Card
+                        key={index}
+                        className="border-l-4 border-l-green-500"
+                      >
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4" />
+                              <h3 className="font-semibold">
+                                {result.materialName}
+                              </h3>
+                              <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
+                                {result.extractionType}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`w-2 h-2 rounded-full ${getConfidenceColor(result.confidence)}`}
+                              />
+                              <span className="text-sm text-muted-foreground">
+                                {(result.confidence * 100).toFixed(1)}%
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${getConfidenceColor(result.confidence)}`} />
-                            <span className="text-sm text-muted-foreground">
-                              {(result.confidence * 100).toFixed(1)}%
-                            </span>
-                          </div>
-                        </div>
 
-                        <p className="text-sm text-muted-foreground">
-                          {result.extractedKnowledge}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ))
+                          <p className="text-sm text-muted-foreground">
+                            {result.extractedKnowledge}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ),
+                  )
                 )}
               </TabsContent>
 
@@ -558,16 +675,23 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                   </p>
                 ) : (
                   searchResults.results.recommendations.map((rec, index) => (
-                    <Card key={index} className="border-l-4 border-l-purple-500">
+                    <Card
+                      key={index}
+                      className="border-l-4 border-l-purple-500"
+                    >
                       <CardContent className="pt-4">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Lightbulb className="h-4 w-4" />
                             <h3 className="font-semibold">{rec.title}</h3>
-                            <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">{rec.type}</span>
+                            <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
+                              {rec.type}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${getConfidenceColor(rec.score)}`} />
+                            <div
+                              className={`w-2 h-2 rounded-full ${getConfidenceColor(rec.score)}`}
+                            />
                             <span className="text-sm text-muted-foreground">
                               {(rec.score * 100).toFixed(1)}%
                             </span>
@@ -595,7 +719,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingUp className="h-5 w-5" />
                         <h3 className="font-semibold">Current Information</h3>
-                        <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">Live Data</span>
+                        <span className="inline-flex items-center rounded-md border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-900 bg-gray-50">
+                          Live Data
+                        </span>
                       </div>
 
                       <div className="prose prose-sm max-w-none">
@@ -604,24 +730,29 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
                         </p>
                       </div>
 
-                      {searchResults.results.realTimeInfo.relatedQuestions.length > 0 && (
+                      {searchResults.results.realTimeInfo.relatedQuestions
+                        .length > 0 && (
                         <div className="mt-4">
-                          <h4 className="text-sm font-medium mb-2">Related Questions:</h4>
+                          <h4 className="text-sm font-medium mb-2">
+                            Related Questions:
+                          </h4>
                           <div className="space-y-1">
-                            {searchResults.results.realTimeInfo.relatedQuestions.map((question, i) => (
-                              <Button
-                                key={i}
-                                className="h-auto p-2 text-left justify-start"
-                                onClick={() => setQuery(question)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    setQuery(question);
-                                  }
-                                }}
-                              >
-                                {question}
-                              </Button>
-                            ))}
+                            {searchResults.results.realTimeInfo.relatedQuestions.map(
+                              (question, i) => (
+                                <Button
+                                  key={i}
+                                  className="h-auto p-2 text-left justify-start"
+                                  onClick={() => setQuery(question)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      setQuery(question);
+                                    }
+                                  }}
+                                >
+                                  {question}
+                                </Button>
+                              ),
+                            )}
                           </div>
                         </div>
                       )}
@@ -634,7 +765,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             {/* Feedback Section */}
             <Separator className="my-6" />
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">How helpful were these results?</span>
+              <span className="text-sm text-muted-foreground">
+                How helpful were these results?
+              </span>
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => handleFeedback(5)}
@@ -671,8 +804,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Searches</p>
-                  <p className="text-2xl font-bold">{analytics.totalSearches ?? 0}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Total Searches
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {analytics.totalSearches ?? 0}
+                  </p>
                 </div>
                 <Search className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -683,8 +820,12 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
             <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Avg Satisfaction</p>
-                  <p className="text-2xl font-bold">{analytics.avgSatisfaction ?? 0}/5</p>
+                  <p className="text-sm text-muted-foreground">
+                    Avg Satisfaction
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {analytics.avgSatisfaction ?? 0}/5
+                  </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-muted-foreground" />
               </div>
@@ -696,7 +837,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({ onRe
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Avg Response</p>
-                  <p className="text-2xl font-bold">{analytics.avgResponseTime ?? 0}ms</p>
+                  <p className="text-2xl font-bold">
+                    {analytics.avgResponseTime ?? 0}ms
+                  </p>
                 </div>
                 <Clock className="h-8 w-8 text-muted-foreground" />
               </div>

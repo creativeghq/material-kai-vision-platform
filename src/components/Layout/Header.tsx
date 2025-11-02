@@ -17,7 +17,10 @@ interface HeaderProps {
   onSearchChange: (query: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) => {
+export const Header: React.FC<HeaderProps> = ({
+  searchQuery,
+  onSearchChange,
+}) => {
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -27,7 +30,7 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map(word => word[0])
+      .map((word) => word[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -84,7 +87,8 @@ export const Header: React.FC<HeaderProps> = ({ searchQuery, onSearchChange }) =
                     if (e.key === 'Enter') {
                       handleSignOut();
                     }
-                  }}>
+                  }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sign out</span>
                 </DropdownMenuItem>

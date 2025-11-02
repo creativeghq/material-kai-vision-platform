@@ -146,11 +146,14 @@ class MonitoringService {
   private setupGlobalErrorHandlers(): void {
     // Unhandled promise rejections
     window.addEventListener('unhandledrejection', (event) => {
-      this.captureError(new Error(event.reason?.message || 'Unhandled Promise Rejection'), {
-        level: 'error',
-        tags: { type: 'unhandled_rejection' },
-        extra: { reason: event.reason },
-      });
+      this.captureError(
+        new Error(event.reason?.message || 'Unhandled Promise Rejection'),
+        {
+          level: 'error',
+          tags: { type: 'unhandled_rejection' },
+          extra: { reason: event.reason },
+        },
+      );
     });
 
     // Global JavaScript errors
@@ -175,7 +178,9 @@ class MonitoringService {
     if ('performance' in window && 'getEntriesByType' in performance) {
       window.addEventListener('load', () => {
         setTimeout(() => {
-          const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+          const navigation = performance.getEntriesByType(
+            'navigation',
+          )[0] as PerformanceNavigationTiming;
           if (navigation) {
             this.capturePerformance({
               name: 'page_load',
@@ -183,7 +188,8 @@ class MonitoringService {
               startTime: navigation.fetchStart,
               endTime: navigation.loadEventEnd,
               metrics: {
-                domContentLoaded: navigation.domContentLoadedEventEnd - navigation.fetchStart,
+                domContentLoaded:
+                  navigation.domContentLoadedEventEnd - navigation.fetchStart,
                 firstPaint: this.getFirstPaint(),
                 firstContentfulPaint: this.getFirstContentfulPaint(),
               },
@@ -199,7 +205,9 @@ class MonitoringService {
    */
   private getFirstPaint(): number {
     const paintEntries = performance.getEntriesByType('paint');
-    const firstPaint = paintEntries.find(entry => entry.name === 'first-paint');
+    const firstPaint = paintEntries.find(
+      (entry) => entry.name === 'first-paint',
+    );
     return firstPaint ? firstPaint.startTime : 0;
   }
 
@@ -208,7 +216,9 @@ class MonitoringService {
    */
   private getFirstContentfulPaint(): number {
     const paintEntries = performance.getEntriesByType('paint');
-    const firstContentfulPaint = paintEntries.find(entry => entry.name === 'first-contentful-paint');
+    const firstContentfulPaint = paintEntries.find(
+      (entry) => entry.name === 'first-contentful-paint',
+    );
     return firstContentfulPaint ? firstContentfulPaint.startTime : 0;
   }
 
@@ -217,7 +227,12 @@ class MonitoringService {
    */
   public captureError(
     error: Error | string,
-    options: Partial<Omit<ErrorEvent, 'message' | 'timestamp' | 'errorId' | 'url' | 'userAgent'>> = {},
+    options: Partial<
+      Omit<
+        ErrorEvent,
+        'message' | 'timestamp' | 'errorId' | 'url' | 'userAgent'
+      >
+    > = {},
   ): string {
     if (!this.config.enabled) return '';
 
@@ -276,7 +291,11 @@ class MonitoringService {
   /**
    * Set user context
    */
-  public setUser(user: { id?: string; email?: string; username?: string }): void {
+  public setUser(user: {
+    id?: string;
+    email?: string;
+    username?: string;
+  }): void {
     this.config.userId = user.id;
 
     // Update user context in providers
@@ -286,7 +305,11 @@ class MonitoringService {
   /**
    * Add breadcrumb
    */
-  public addBreadcrumb(message: string, category: string, level: 'info' | 'warning' | 'error' = 'info'): void {
+  public addBreadcrumb(
+    message: string,
+    category: string,
+    level: 'info' | 'warning' | 'error' = 'info',
+  ): void {
     if (!this.config.enabled) return;
 
     console.log(`[${level.toUpperCase()}] ${category}: ${message}`);
@@ -297,7 +320,10 @@ class MonitoringService {
   /**
    * Send events to configured providers
    */
-  private sendToProviders(type: 'error' | 'performance' | 'user', event: any): void {
+  private sendToProviders(
+    type: 'error' | 'performance' | 'user',
+    event: any,
+  ): void {
     // Console logging for development
     if (this.config.environment === 'development') {
       console.log(`[Monitoring] ${type}:`, event);
@@ -333,7 +359,7 @@ class MonitoringService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${endpoint.apiKey}`,
+          Authorization: `Bearer ${endpoint.apiKey}`,
         },
         body: JSON.stringify({
           type,
@@ -368,7 +394,11 @@ class MonitoringService {
   /**
    * Get monitoring status
    */
-  public getStatus(): { initialized: boolean; enabled: boolean; config: MonitoringConfig } {
+  public getStatus(): {
+    initialized: boolean;
+    enabled: boolean;
+    config: MonitoringConfig;
+  } {
     return {
       initialized: this.isInitialized,
       enabled: this.config.enabled,

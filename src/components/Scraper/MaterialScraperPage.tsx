@@ -10,7 +10,8 @@ export const MaterialScraperPage = () => {
   useEffect(() => {
     toast({
       title: 'Scraper Updated',
-      description: 'The scraper has been upgraded with better controls and monitoring.',
+      description:
+        'The scraper has been upgraded with better controls and monitoring.',
     });
   }, [toast]);
 

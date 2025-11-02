@@ -1,9 +1,11 @@
 import React, { Suspense } from 'react';
 import { Canvas, useLoader } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Environment } from '@react-three/drei';
+import {
+  OrbitControls,
+  PerspectiveCamera,
+  Environment,
+} from '@react-three/drei';
 import { TextureLoader } from 'three';
-
-
 
 import { Card } from '@/components/ui/card';
 
@@ -14,10 +16,13 @@ interface ThreeJsViewerProps {
   className?: string;
 }
 
-const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+const NeRFModel: React.FC<{ modelUrl: string }> = ({ modelUrl: _modelUrl }) => {
+  // eslint-disable-line @typescript-eslint/no-unused-vars
   // In a real implementation, this would load and render the NeRF model
   // For now, we'll show an enhanced cube representing the 3D reconstruction
-  return React.createElement('mesh', { position: [0, 0, 0] },
+  return React.createElement(
+    'mesh',
+    { position: [0, 0, 0] },
     React.createElement('boxGeometry', { args: [2, 2, 2] }),
     React.createElement('meshStandardMaterial', {
       color: 'hsl(210 40% 98%)',
@@ -43,7 +48,8 @@ const Scene: React.FC<{
   imageUrl?: string;
   modelUrl?: string;
   meshUrl?: string;
-}> = ({ imageUrl, modelUrl, meshUrl: _meshUrl }) => { // eslint-disable-line @typescript-eslint/no-unused-vars
+}> = ({ imageUrl, modelUrl, meshUrl: _meshUrl }) => {
+  // eslint-disable-line @typescript-eslint/no-unused-vars
   return (
     <>
       <PerspectiveCamera makeDefault fov={75} position={[0, 0, 5]} />
@@ -51,8 +57,14 @@ const Scene: React.FC<{
 
       {/* Enhanced lighting for 3D models */}
       {React.createElement('ambientLight', { intensity: 0.6 })}
-      {React.createElement('directionalLight', { position: [10, 10, 5], intensity: 1.2 })}
-      {React.createElement('directionalLight', { position: [-10, -10, -5], intensity: 0.5 })}
+      {React.createElement('directionalLight', {
+        position: [10, 10, 5],
+        intensity: 1.2,
+      })}
+      {React.createElement('directionalLight', {
+        position: [-10, -10, -5],
+        intensity: 0.5,
+      })}
 
       {/* Render NeRF model if available */}
       {modelUrl ? (
@@ -61,16 +73,27 @@ const Scene: React.FC<{
         <ImageTexturedCube imageUrl={imageUrl} />
       ) : (
         /* Fallback placeholder */
-        React.createElement('mesh', { position: [0, 0, 0] },
+        React.createElement(
+          'mesh',
+          { position: [0, 0, 0] },
           React.createElement('boxGeometry', { args: [2, 2, 2] }),
-          React.createElement('meshStandardMaterial', { color: 'hsl(210 40% 98%)', wireframe: true }),
+          React.createElement('meshStandardMaterial', {
+            color: 'hsl(210 40% 98%)',
+            wireframe: true,
+          }),
         )
       )}
 
       {/* Floor plane */}
-      {React.createElement('mesh', { rotation: [-Math.PI / 2, 0, 0], position: [0, -2, 0] },
+      {React.createElement(
+        'mesh',
+        { rotation: [-Math.PI / 2, 0, 0], position: [0, -2, 0] },
         React.createElement('planeGeometry', { args: [10, 10] }),
-        React.createElement('meshStandardMaterial', { color: '#6B7280', transparent: true, opacity: 0.3 }),
+        React.createElement('meshStandardMaterial', {
+          color: '#6B7280',
+          transparent: true,
+          opacity: 0.3,
+        }),
       )}
 
       <OrbitControls enablePan enableZoom enableRotate />

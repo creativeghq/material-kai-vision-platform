@@ -30,10 +30,13 @@ interface SupabaseResponse<T = unknown> {
 
 interface SupabaseClient {
   functions: {
-    invoke(functionName: string, options?: {
-      body?: unknown;
-      headers?: Record<string, string>;
-    }): Promise<SupabaseResponse>;
+    invoke(
+      functionName: string,
+      options?: {
+        body?: unknown;
+        headers?: Record<string, string>;
+      },
+    ): Promise<SupabaseResponse>;
   };
 }
 
@@ -191,7 +194,6 @@ export class VisualSearchController {
         searchType: searchRequest.searchType,
         timestamp: new Date().toISOString(),
       });
-
     } catch (error: unknown) {
       // Search by image error
       res.status(500).json({
@@ -206,7 +208,10 @@ export class VisualSearchController {
    * Search by description endpoint
    * POST /api/visual-search/by-description
    */
-  public searchByDescription = async (req: Request, res: Response): Promise<void> => {
+  public searchByDescription = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       const requestData = req.body as SearchByDescriptionRequest;
 
@@ -270,7 +275,6 @@ export class VisualSearchController {
         searchType: searchRequest.searchType,
         timestamp: new Date().toISOString(),
       });
-
     } catch (error: unknown) {
       // Search by description error
       res.status(500).json({
@@ -311,7 +315,9 @@ export class VisualSearchController {
       const searchRequest = {
         searchType: 'hybrid',
         ...(requestData.image && { image: requestData.image }),
-        ...(requestData.description && { description: requestData.description }),
+        ...(requestData.description && {
+          description: requestData.description,
+        }),
         filters: requestData.filters || {},
         limit: requestData.limit || 20,
         fusion: requestData.fusion || {
@@ -351,7 +357,6 @@ export class VisualSearchController {
         searchType: 'hybrid',
         timestamp: new Date().toISOString(),
       });
-
     } catch (error: unknown) {
       // Hybrid search error
       res.status(500).json({
@@ -366,12 +371,18 @@ export class VisualSearchController {
    * Material property search endpoint
    * POST /api/visual-search/by-properties
    */
-  public searchByProperties = async (req: Request, res: Response): Promise<void> => {
+  public searchByProperties = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       const requestData = req.body as MaterialPropertySearchRequest;
 
       // Validate required fields
-      if (!requestData.properties || Object.keys(requestData.properties).length === 0) {
+      if (
+        !requestData.properties ||
+        Object.keys(requestData.properties).length === 0
+      ) {
         res.status(400).json({
           error: 'Material properties are required',
           code: 'MISSING_PROPERTIES',
@@ -425,7 +436,6 @@ export class VisualSearchController {
         searchType: 'properties',
         timestamp: new Date().toISOString(),
       });
-
     } catch (error: unknown) {
       // Search by properties error
       res.status(500).json({
@@ -440,9 +450,13 @@ export class VisualSearchController {
    * Search analytics endpoint
    * GET /api/visual-search/analytics
    */
-  public getSearchAnalytics = async (req: Request, res: Response): Promise<void> => {
+  public getSearchAnalytics = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
-      const requestData: SearchAnalyticsRequest = req.query as unknown as SearchAnalyticsRequest;
+      const requestData: SearchAnalyticsRequest =
+        req.query as unknown as SearchAnalyticsRequest;
 
       // Validate Supabase client
       if (!this.supabaseClient) {
@@ -458,7 +472,11 @@ export class VisualSearchController {
         action: 'analytics',
         searchId: requestData.searchId,
         timeRange: requestData.timeRange,
-        metrics: requestData.metrics || ['search_count', 'response_time', 'success_rate'],
+        metrics: requestData.metrics || [
+          'search_count',
+          'response_time',
+          'success_rate',
+        ],
       };
 
       // Call the Supabase unified material search function
@@ -489,7 +507,6 @@ export class VisualSearchController {
         data: data,
         timestamp: new Date().toISOString(),
       });
-
     } catch (error: unknown) {
       // Search analytics error
       res.status(500).json({

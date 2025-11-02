@@ -107,7 +107,10 @@ export class ServiceFactory {
   /**
    * Update service configuration
    */
-  public updateServiceConfig(name: string, updates: Partial<ServiceConfig>): void {
+  public updateServiceConfig(
+    name: string,
+    updates: Partial<ServiceConfig>,
+  ): void {
     const entry = this.registry.get(name);
     if (!entry) {
       throw new Error(`Service ${name} is not registered`);
@@ -232,7 +235,9 @@ export class ServiceFactory {
 
     const visit = (serviceName: string) => {
       if (visiting.has(serviceName)) {
-        throw new Error(`Circular dependency detected involving service: ${serviceName}`);
+        throw new Error(
+          `Circular dependency detected involving service: ${serviceName}`,
+        );
       }
 
       if (visited.has(serviceName)) {

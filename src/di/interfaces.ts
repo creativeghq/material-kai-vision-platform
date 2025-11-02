@@ -598,7 +598,7 @@ export interface IBatchProcessingService extends IBaseService, EventEmitter {
       priority?: 'low' | 'normal' | 'high';
       maxConcurrency?: number;
       timeoutMs?: number;
-    }
+    },
   ): Promise<string>; // Returns batch ID
 
   /**
@@ -781,7 +781,9 @@ export interface IDocumentIntegrationService extends IBaseService {
   /**
    * Process a document through the complete Mivaa -> RAG pipeline
    */
-  processDocument(request: IDocumentProcessingRequest): Promise<IDocumentProcessingResult>;
+  processDocument(
+    request: IDocumentProcessingRequest,
+  ): Promise<IDocumentProcessingResult>;
 
   /**
    * Get processing status by ID

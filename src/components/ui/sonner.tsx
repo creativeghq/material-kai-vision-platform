@@ -1,6 +1,6 @@
 import { Toaster as Sonner, toast } from 'sonner';
 
-type ToasterProps = React.ComponentProps<typeof Sonner>
+type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
   // Simple theme detection without next-themes dependency

@@ -97,7 +97,9 @@ class ApiGatewayService {
     return data;
   }
 
-  async createEndpoint(endpoint: Omit<ApiEndpoint, 'id' | 'created_at' | 'updated_at'>): Promise<ApiEndpoint> {
+  async createEndpoint(
+    endpoint: Omit<ApiEndpoint, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<ApiEndpoint> {
     const { data, error } = await supabase
       .from('api_endpoints')
       .insert(endpoint)
@@ -108,7 +110,10 @@ class ApiGatewayService {
     return data;
   }
 
-  async updateEndpoint(id: string, updates: Partial<ApiEndpoint>): Promise<ApiEndpoint> {
+  async updateEndpoint(
+    id: string,
+    updates: Partial<ApiEndpoint>,
+  ): Promise<ApiEndpoint> {
     const { data, error } = await supabase
       .from('api_endpoints')
       .update(updates)
@@ -129,11 +134,17 @@ class ApiGatewayService {
     if (error) throw error;
   }
 
-  async toggleEndpointPublicAccess(id: string, isPublic: boolean): Promise<ApiEndpoint> {
+  async toggleEndpointPublicAccess(
+    id: string,
+    isPublic: boolean,
+  ): Promise<ApiEndpoint> {
     return this.updateEndpoint(id, { is_public: isPublic });
   }
 
-  async toggleEndpointInternalAccess(id: string, isInternal: boolean): Promise<ApiEndpoint> {
+  async toggleEndpointInternalAccess(
+    id: string,
+    isInternal: boolean,
+  ): Promise<ApiEndpoint> {
     return this.updateEndpoint(id, { is_internal: isInternal });
   }
 
@@ -148,7 +159,9 @@ class ApiGatewayService {
     return data || [];
   }
 
-  async createInternalNetwork(network: Omit<InternalNetwork, 'id' | 'created_at' | 'updated_at'>): Promise<InternalNetwork> {
+  async createInternalNetwork(
+    network: Omit<InternalNetwork, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<InternalNetwork> {
     const { data, error } = await supabase
       .from('internal_networks')
       .insert(network)
@@ -159,7 +172,10 @@ class ApiGatewayService {
     return data;
   }
 
-  async updateInternalNetwork(id: string, updates: Partial<InternalNetwork>): Promise<InternalNetwork> {
+  async updateInternalNetwork(
+    id: string,
+    updates: Partial<InternalNetwork>,
+  ): Promise<InternalNetwork> {
     const { data, error } = await supabase
       .from('internal_networks')
       .update(updates)
@@ -202,11 +218,15 @@ class ApiGatewayService {
     return data || [];
   }
 
-  async generateApiKey(userId: string, keyName: string, options?: {
-    rateLimit?: number;
-    allowedEndpoints?: string[];
-    expiresAt?: string;
-  }): Promise<ApiKey> {
+  async generateApiKey(
+    userId: string,
+    keyName: string,
+    options?: {
+      rateLimit?: number;
+      allowedEndpoints?: string[];
+      expiresAt?: string;
+    },
+  ): Promise<ApiKey> {
     // Generate a secure API key
     const apiKey = `kai_${this.generateSecureKey(32)}`;
 
@@ -237,10 +257,7 @@ class ApiGatewayService {
   }
 
   async deleteApiKey(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('api_keys')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('api_keys').delete().eq('id', id);
 
     if (error) throw error;
   }
@@ -256,7 +273,9 @@ class ApiGatewayService {
     return (data || []) as RateLimitRule[];
   }
 
-  async createRateLimitRule(rule: Omit<RateLimitRule, 'id' | 'created_at' | 'updated_at'>): Promise<RateLimitRule> {
+  async createRateLimitRule(
+    rule: Omit<RateLimitRule, 'id' | 'created_at' | 'updated_at'>,
+  ): Promise<RateLimitRule> {
     const { data, error } = await supabase
       .from('rate_limit_rules')
       .insert(rule)
@@ -267,7 +286,10 @@ class ApiGatewayService {
     return data as RateLimitRule;
   }
 
-  async updateRateLimitRule(id: string, updates: Partial<RateLimitRule>): Promise<RateLimitRule> {
+  async updateRateLimitRule(
+    id: string,
+    updates: Partial<RateLimitRule>,
+  ): Promise<RateLimitRule> {
     const { data, error } = await supabase
       .from('rate_limit_rules')
       .update(updates)
@@ -346,22 +368,30 @@ class ApiGatewayService {
     });
 
     const totalRequests = logs.length;
-    const successfulRequests = logs.filter(log =>
-      log.response_status && log.response_status >= 200 && log.response_status < 400,
+    const successfulRequests = logs.filter(
+      (log) =>
+        log.response_status &&
+        log.response_status >= 200 &&
+        log.response_status < 400,
     ).length;
-    const rateLimitedRequests = logs.filter(log => log.rate_limit_exceeded).length;
+    const rateLimitedRequests = logs.filter(
+      (log) => log.rate_limit_exceeded,
+    ).length;
 
     const responseTimesFiltered = logs
-      .map(log => log.response_time_ms)
+      .map((log) => log.response_time_ms)
       .filter((time): time is number => time !== null && time !== undefined);
-    const avgResponseTime = responseTimesFiltered.length > 0
-      ? responseTimesFiltered.reduce((a, b) => a + b, 0) / responseTimesFiltered.length
-      : 0;
+    const avgResponseTime =
+      responseTimesFiltered.length > 0
+        ? responseTimesFiltered.reduce((a, b) => a + b, 0) /
+          responseTimesFiltered.length
+        : 0;
 
     // Calculate top endpoints
     const endpointCounts: Record<string, number> = {};
-    logs.forEach(log => {
-      endpointCounts[log.request_path] = (endpointCounts[log.request_path] || 0) + 1;
+    logs.forEach((log) => {
+      endpointCounts[log.request_path] =
+        (endpointCounts[log.request_path] || 0) + 1;
     });
     const topEndpoints = Object.entries(endpointCounts)
       .map(([path, count]) => ({ path, count }))
@@ -370,7 +400,7 @@ class ApiGatewayService {
 
     // Calculate requests by hour
     const hourCounts: Record<string, number> = {};
-    logs.forEach(log => {
+    logs.forEach((log) => {
       const hour = new Date(log.created_at).toISOString().substring(0, 13);
       hourCounts[hour] = (hourCounts[hour] || 0) + 1;
     });
@@ -390,20 +420,24 @@ class ApiGatewayService {
 
   // ============= Network Checking =============
   async isInternalIP(ipAddress: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .rpc('is_internal_ip', { ip_addr: ipAddress });
+    const { data, error } = await supabase.rpc('is_internal_ip', {
+      ip_addr: ipAddress,
+    });
 
     if (error) throw error;
     return data || false;
   }
 
-  async getRateLimit(endpointPath: string, ipAddress: string, userId?: string): Promise<number> {
-    const { data, error } = await supabase
-      .rpc('get_rate_limit', {
-        endpoint_path: endpointPath,
-        ip_addr: ipAddress,
-        user_id_param: userId,
-      });
+  async getRateLimit(
+    endpointPath: string,
+    ipAddress: string,
+    userId?: string,
+  ): Promise<number> {
+    const { data, error } = await supabase.rpc('get_rate_limit', {
+      endpoint_path: endpointPath,
+      ip_addr: ipAddress,
+      user_id_param: userId,
+    });
 
     if (error) throw error;
     return data || 30;
@@ -418,55 +452,220 @@ class ApiGatewayService {
         await this.createEndpoint(endpoint);
       } catch (_error) {
         // Skip if endpoint already exists
-        console.log(`Endpoint ${endpoint.path} already exists or failed to create`);
+        console.log(
+          `Endpoint ${endpoint.path} already exists or failed to create`,
+        );
       }
     }
   }
 
-  private async getDefaultEndpoints(): Promise<Omit<ApiEndpoint, 'id' | 'created_at' | 'updated_at'>[]> {
+  private async getDefaultEndpoints(): Promise<
+    Omit<ApiEndpoint, 'id' | 'created_at' | 'updated_at'>[]
+  > {
     // This would be based on your API documentation
     return [
       // Authentication APIs
-      { path: '/api/auth/login', method: 'POST', category: 'auth', description: 'User login', is_public: true, is_internal: true, rate_limit_per_minute: 20 },
-      { path: '/api/auth/register', method: 'POST', category: 'auth', description: 'User registration', is_public: true, is_internal: true, rate_limit_per_minute: 10 },
-      { path: '/api/auth/refresh-token', method: 'POST', category: 'auth', description: 'Refresh authentication token', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
+      {
+        path: '/api/auth/login',
+        method: 'POST',
+        category: 'auth',
+        description: 'User login',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 20,
+      },
+      {
+        path: '/api/auth/register',
+        method: 'POST',
+        category: 'auth',
+        description: 'User registration',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 10,
+      },
+      {
+        path: '/api/auth/refresh-token',
+        method: 'POST',
+        category: 'auth',
+        description: 'Refresh authentication token',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 60,
+      },
 
       // User Management APIs
-      { path: '/api/users/profile', method: 'GET', category: 'users', description: 'Get user profile', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
-      { path: '/api/users/profile', method: 'PUT', category: 'users', description: 'Update user profile', is_public: true, is_internal: true, rate_limit_per_minute: 10 },
+      {
+        path: '/api/users/profile',
+        method: 'GET',
+        category: 'users',
+        description: 'Get user profile',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 30,
+      },
+      {
+        path: '/api/users/profile',
+        method: 'PUT',
+        category: 'users',
+        description: 'Update user profile',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 10,
+      },
 
       // Material APIs
-      { path: '/api/materials', method: 'GET', category: 'materials', description: 'List materials', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
-      { path: '/api/materials/:id', method: 'GET', category: 'materials', description: 'Get material by ID', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
-      { path: '/api/materials', method: 'POST', category: 'materials', description: 'Create new material', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
-      { path: '/api/materials/:id', method: 'PUT', category: 'materials', description: 'Update material', is_public: true, is_internal: true, rate_limit_per_minute: 20 },
-      { path: '/api/materials/:id', method: 'DELETE', category: 'materials', description: 'Delete material', is_public: false, is_internal: true, rate_limit_per_minute: 10 },
+      {
+        path: '/api/materials',
+        method: 'GET',
+        category: 'materials',
+        description: 'List materials',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 60,
+      },
+      {
+        path: '/api/materials/:id',
+        method: 'GET',
+        category: 'materials',
+        description: 'Get material by ID',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 60,
+      },
+      {
+        path: '/api/materials',
+        method: 'POST',
+        category: 'materials',
+        description: 'Create new material',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 30,
+      },
+      {
+        path: '/api/materials/:id',
+        method: 'PUT',
+        category: 'materials',
+        description: 'Update material',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 20,
+      },
+      {
+        path: '/api/materials/:id',
+        method: 'DELETE',
+        category: 'materials',
+        description: 'Delete material',
+        is_public: false,
+        is_internal: true,
+        rate_limit_per_minute: 10,
+      },
 
       // Recognition APIs
-      { path: '/api/recognition', method: 'POST', category: 'recognition', description: 'Recognize material', is_public: true, is_internal: true, rate_limit_per_minute: 20 },
-      { path: '/api/recognition/batch', method: 'POST', category: 'recognition', description: 'Batch recognition', is_public: true, is_internal: true, rate_limit_per_minute: 5 },
+      {
+        path: '/api/recognition',
+        method: 'POST',
+        category: 'recognition',
+        description: 'Recognize material',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 20,
+      },
+      {
+        path: '/api/recognition/batch',
+        method: 'POST',
+        category: 'recognition',
+        description: 'Batch recognition',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 5,
+      },
 
       // Search APIs
-      { path: '/api/search', method: 'GET', category: 'search', description: 'Unified search', is_public: true, is_internal: true, rate_limit_per_minute: 60 },
-      { path: '/api/search/vector', method: 'POST', category: 'search', description: 'Vector similarity search', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
+      {
+        path: '/api/search',
+        method: 'GET',
+        category: 'search',
+        description: 'Unified search',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 60,
+      },
+      {
+        path: '/api/search/vector',
+        method: 'POST',
+        category: 'search',
+        description: 'Vector similarity search',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 30,
+      },
 
       // Analytics APIs
-      { path: '/api/analytics/events', method: 'POST', category: 'analytics', description: 'Track analytics event', is_public: true, is_internal: true, rate_limit_per_minute: 100 },
-      { path: '/api/analytics/events', method: 'GET', category: 'analytics', description: 'Get analytics events', is_public: false, is_internal: true, rate_limit_per_minute: 30 },
+      {
+        path: '/api/analytics/events',
+        method: 'POST',
+        category: 'analytics',
+        description: 'Track analytics event',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 100,
+      },
+      {
+        path: '/api/analytics/events',
+        method: 'GET',
+        category: 'analytics',
+        description: 'Get analytics events',
+        is_public: false,
+        is_internal: true,
+        rate_limit_per_minute: 30,
+      },
 
       // ML Service APIs
-      { path: '/api/ml/inference', method: 'POST', category: 'ml', description: 'Run model inference', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
-      { path: '/api/ml/embeddings', method: 'POST', category: 'ml', description: 'Generate embeddings', is_public: true, is_internal: true, rate_limit_per_minute: 30 },
+      {
+        path: '/api/ml/inference',
+        method: 'POST',
+        category: 'ml',
+        description: 'Run model inference',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 30,
+      },
+      {
+        path: '/api/ml/embeddings',
+        method: 'POST',
+        category: 'ml',
+        description: 'Generate embeddings',
+        is_public: true,
+        is_internal: true,
+        rate_limit_per_minute: 30,
+      },
 
       // Admin APIs
-      { path: '/api/admin/users', method: 'GET', category: 'admin', description: 'List all users (admin)', is_public: false, is_internal: true, rate_limit_per_minute: 20 },
-      { path: '/api/admin/settings', method: 'GET', category: 'admin', description: 'Get system settings', is_public: false, is_internal: true, rate_limit_per_minute: 10 },
+      {
+        path: '/api/admin/users',
+        method: 'GET',
+        category: 'admin',
+        description: 'List all users (admin)',
+        is_public: false,
+        is_internal: true,
+        rate_limit_per_minute: 20,
+      },
+      {
+        path: '/api/admin/settings',
+        method: 'GET',
+        category: 'admin',
+        description: 'Get system settings',
+        is_public: false,
+        is_internal: true,
+        rate_limit_per_minute: 10,
+      },
     ];
   }
 
   // ============= Utility Functions =============
   private generateSecureKey(length: number): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const chars =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
     for (let i = 0; i < length; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));

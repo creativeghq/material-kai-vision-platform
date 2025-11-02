@@ -104,7 +104,6 @@ export class ApiRoutes {
         handler: this.visualSearchController.healthCheck,
         middleware: [],
       },
-
     ];
   }
 
@@ -112,9 +111,10 @@ export class ApiRoutes {
    * Get route by method and path
    */
   public getRoute(method: string, path: string): Route | undefined {
-    return this.getRoutes().find(route =>
-      route.method === method.toUpperCase() &&
-      this.matchPath(route.path, path),
+    return this.getRoutes().find(
+      (route) =>
+        route.method === method.toUpperCase() &&
+        this.matchPath(route.path, path),
     );
   }
 
@@ -140,7 +140,10 @@ export class ApiRoutes {
   /**
    * Extract parameters from path
    */
-  public extractParams(routePath: string, requestPath: string): Record<string, string> {
+  public extractParams(
+    routePath: string,
+    requestPath: string,
+  ): Record<string, string> {
     const routeParts = routePath.split('/');
     const requestParts = requestPath.split('/');
     const params: Record<string, string> = {};

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-import { ShoppingCartService, CartWithItems, CartItem } from '../../services/shopping/ShoppingCartService';
+import {
+  ShoppingCartService,
+  CartWithItems,
+  CartItem,
+} from '../../services/shopping/ShoppingCartService';
 
 interface ShoppingCartProps {
   cartId: string;
@@ -71,9 +75,7 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
       <h2 className="text-2xl font-bold mb-4">Shopping Cart</h2>
 
       {items.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          Your cart is empty
-        </div>
+        <div className="text-center py-8 text-gray-500">Your cart is empty</div>
       ) : (
         <>
           <div className="overflow-x-auto mb-6">
@@ -164,4 +166,3 @@ export const ShoppingCart: React.FC<ShoppingCartProps> = ({
 };
 
 export default ShoppingCart;
-

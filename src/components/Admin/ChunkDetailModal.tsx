@@ -1,9 +1,22 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Hash, Calendar, Database, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import {
+  FileText,
+  Hash,
+  Calendar,
+  Database,
+  Image as ImageIcon,
+  Link as LinkIcon,
+} from 'lucide-react';
 
 interface DocumentChunk {
   id: string;
@@ -127,7 +140,9 @@ export const ChunkDetailModal: React.FC<ChunkDetailModalProps> = ({
 
               {chunk.metadata && Object.keys(chunk.metadata).length > 0 && (
                 <div>
-                  <p className="text-sm font-medium mb-2">Additional Metadata</p>
+                  <p className="text-sm font-medium mb-2">
+                    Additional Metadata
+                  </p>
                   <div className="bg-muted/50 rounded-lg p-3">
                     <pre className="text-xs whitespace-pre-wrap">
                       {JSON.stringify(chunk.metadata, null, 2)}
@@ -150,16 +165,26 @@ export const ChunkDetailModal: React.FC<ChunkDetailModalProps> = ({
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="border rounded-lg p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Type</p>
-                    <p className="text-sm mt-1">{embedding.embedding_type || 'text'}</p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Type
+                    </p>
+                    <p className="text-sm mt-1">
+                      {embedding.embedding_type || 'text'}
+                    </p>
                   </div>
                   <div className="border rounded-lg p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Model</p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Model
+                    </p>
                     <p className="text-sm mt-1">{embedding.model || 'N/A'}</p>
                   </div>
                   <div className="border rounded-lg p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Dimensions</p>
-                    <p className="text-sm mt-1">{embedding.dimensions || 'N/A'}</p>
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Dimensions
+                    </p>
+                    <p className="text-sm mt-1">
+                      {embedding.dimensions || 'N/A'}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -178,7 +203,10 @@ export const ChunkDetailModal: React.FC<ChunkDetailModalProps> = ({
               <CardContent>
                 <div className="grid grid-cols-3 gap-4">
                   {images.map((image) => (
-                    <div key={image.id} className="border rounded-lg overflow-hidden">
+                    <div
+                      key={image.id}
+                      className="border rounded-lg overflow-hidden"
+                    >
                       {image.image_url ? (
                         <img
                           src={image.image_url}
@@ -220,7 +248,10 @@ export const ChunkDetailModal: React.FC<ChunkDetailModalProps> = ({
               <CardContent>
                 <div className="space-y-3">
                   {relatedChunks.map((relatedChunk) => (
-                    <div key={relatedChunk.id} className="border rounded-lg p-3 hover:bg-muted/50 transition-colors">
+                    <div
+                      key={relatedChunk.id}
+                      className="border rounded-lg p-3 hover:bg-muted/50 transition-colors"
+                    >
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="outline" className="text-xs">
                           <Hash className="h-3 w-3 mr-1" />
@@ -259,7 +290,13 @@ export const ChunkDetailModal: React.FC<ChunkDetailModalProps> = ({
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Status:</span>
-                    <Badge variant={chunk.documents.processing_status === 'completed' ? 'default' : 'secondary'}>
+                    <Badge
+                      variant={
+                        chunk.documents.processing_status === 'completed'
+                          ? 'default'
+                          : 'secondary'
+                      }
+                    >
                       {chunk.documents.processing_status || 'unknown'}
                     </Badge>
                   </div>
@@ -278,4 +315,3 @@ export const ChunkDetailModal: React.FC<ChunkDetailModalProps> = ({
     </Dialog>
   );
 };
-

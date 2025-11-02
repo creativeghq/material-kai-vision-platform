@@ -7,8 +7,6 @@ declare module '*.module.css' {
   export default classes;
 }
 
-
-
 declare module '@supabase/supabase-js' {
   export const createClient: unknown;
   export const SupabaseClient: unknown;

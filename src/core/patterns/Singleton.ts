@@ -19,7 +19,9 @@ export abstract class Singleton {
    * Get the singleton instance for the specific class
    * @returns The singleton instance
    */
-  public static getInstance<T extends Singleton>(this: new (...args: unknown[]) => T): T {
+  public static getInstance<T extends Singleton>(
+    this: new (...args: unknown[]) => T,
+  ): T {
     const className = this.name;
 
     if (!Singleton.instances.has(className)) {

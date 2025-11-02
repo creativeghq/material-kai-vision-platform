@@ -43,13 +43,20 @@ export class ErrorLogger {
   /**
    * Log an error with full context
    */
-  public logError(error: AppError | Error, context?: Record<string, unknown>): void {
+  public logError(
+    error: AppError | Error,
+    context?: Record<string, unknown>,
+  ): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'error',
-      correlationId: error instanceof AppError ? error.correlationId : this.generateCorrelationId(),
+      correlationId:
+        error instanceof AppError
+          ? error.correlationId
+          : this.generateCorrelationId(),
       service: error instanceof AppError ? error.context.service : 'unknown',
-      operation: error instanceof AppError ? error.context.operation : 'unknown',
+      operation:
+        error instanceof AppError ? error.context.operation : 'unknown',
       message: error.message,
       metadata: context || undefined,
       error: {
@@ -71,7 +78,14 @@ export class ErrorLogger {
   /**
    * Log a warning with context
    */
-  public logWarning(message: string, context: { service: string; operation: string; metadata?: Record<string, unknown> }): void {
+  public logWarning(
+    message: string,
+    context: {
+      service: string;
+      operation: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'warn',
@@ -89,7 +103,14 @@ export class ErrorLogger {
   /**
    * Log an info message with context
    */
-  public logInfo(message: string, context: { service: string; operation: string; metadata?: Record<string, unknown> }): void {
+  public logInfo(
+    message: string,
+    context: {
+      service: string;
+      operation: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): void {
     const entry: LogEntry = {
       timestamp: new Date().toISOString(),
       level: 'info',
@@ -107,7 +128,14 @@ export class ErrorLogger {
   /**
    * Log a debug message with context
    */
-  public logDebug(message: string, context: { service: string; operation: string; metadata?: Record<string, unknown> }): void {
+  public logDebug(
+    message: string,
+    context: {
+      service: string;
+      operation: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): void {
     // Only log debug messages in development
     if (process.env.NODE_ENV === 'development') {
       const entry: LogEntry = {
@@ -136,14 +164,14 @@ export class ErrorLogger {
    * Get logs by correlation ID for tracing
    */
   public getLogsByCorrelationId(correlationId: string): LogEntry[] {
-    return this.logs.filter(log => log.correlationId === correlationId);
+    return this.logs.filter((log) => log.correlationId === correlationId);
   }
 
   /**
    * Get logs by service for service-specific debugging
    */
   public getLogsByService(service: string): LogEntry[] {
-    return this.logs.filter(log => log.service === service);
+    return this.logs.filter((log) => log.service === service);
   }
 
   /**

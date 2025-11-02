@@ -1,7 +1,12 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 
 interface ImageModalProps {
@@ -51,7 +56,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({
                     onClose();
                   }
                 }}
-                className="px-2 py-1 text-sm hover:bg-gray-100">
+                className="px-2 py-1 text-sm hover:bg-gray-100"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -108,7 +114,8 @@ export const ImageModal: React.FC<ImageModalProps> = ({
                   handleDownload();
                 }
               }}
-              className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
+              className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+            >
               <Download className="h-4 w-4 mr-2" />
               Download
             </Button>

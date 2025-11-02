@@ -33,7 +33,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -123,7 +129,6 @@ const AdminDashboard: React.FC = () => {
 
       // Load package status
       await loadPackageStatus();
-
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       setError('Failed to load dashboard data');
@@ -170,9 +175,10 @@ const AdminDashboard: React.FC = () => {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'error');
 
-      const errorRate = totalRequests > 0 ? ((errorCount || 0) / totalRequests) * 100 : 0;
+      const errorRate =
+        totalRequests > 0 ? ((errorCount || 0) / totalRequests) * 100 : 0;
 
-      setSystemMetrics(prev => ({
+      setSystemMetrics((prev) => ({
         ...prev,
         processedDocuments: processedDocs || 0,
         knowledgeEntries: knowledgeEntries || 0,
@@ -196,16 +202,17 @@ const AdminDashboard: React.FC = () => {
       if (error) throw error;
 
       // Transform workspaces into user-like objects for display
-      const userList: User[] = workspaces?.map((workspace: any, index: number) => ({
-        id: workspace.id,
-        name: workspace.name,
-        email: `admin@${workspace.name.toLowerCase().replace(/\s+/g, '')}.com`,
-        role: index === 0 ? 'Admin' : 'User',
-        status: 'Active',
-        lastLogin: workspace.updated_at ?
-          new Date(workspace.updated_at).toLocaleDateString() :
-          'Never',
-      })) || [];
+      const userList: User[] =
+        workspaces?.map((workspace: any, index: number) => ({
+          id: workspace.id,
+          name: workspace.name,
+          email: `admin@${workspace.name.toLowerCase().replace(/\s+/g, '')}.com`,
+          role: index === 0 ? 'Admin' : 'User',
+          status: 'Active',
+          lastLogin: workspace.updated_at
+            ? new Date(workspace.updated_at).toLocaleDateString()
+            : 'Never',
+        })) || [];
 
       setUsers(userList);
     } catch (err) {
@@ -225,23 +232,45 @@ const AdminDashboard: React.FC = () => {
 
       // Default configurations with some from workspace settings
       const defaultConfigs: Config[] = [
-        { key: 'max_upload_size', value: '100MB', category: 'File Processing', description: 'Maximum file size for uploads' },
-        { key: 'session_timeout', value: '30 minutes', category: 'Security', description: 'User session timeout duration' },
-        { key: 'api_rate_limit', value: '1000/hour', category: 'API', description: 'API requests per hour limit' },
-        { key: 'backup_frequency', value: 'Daily', category: 'System', description: 'Automated backup frequency' },
+        {
+          key: 'max_upload_size',
+          value: '100MB',
+          category: 'File Processing',
+          description: 'Maximum file size for uploads',
+        },
+        {
+          key: 'session_timeout',
+          value: '30 minutes',
+          category: 'Security',
+          description: 'User session timeout duration',
+        },
+        {
+          key: 'api_rate_limit',
+          value: '1000/hour',
+          category: 'API',
+          description: 'API requests per hour limit',
+        },
+        {
+          key: 'backup_frequency',
+          value: 'Daily',
+          category: 'System',
+          description: 'Automated backup frequency',
+        },
       ];
 
       // Add workspace-specific settings if available
       if (workspaces?.[0]?.settings) {
         const settings = workspaces[0].settings as unknown;
-        Object.entries(settings as Record<string, unknown>).forEach(([key, value]) => {
-          defaultConfigs.push({
-            key,
-            value: String(value),
-            category: 'Workspace',
-            description: `Workspace setting: ${key}`,
-          });
-        });
+        Object.entries(settings as Record<string, unknown>).forEach(
+          ([key, value]) => {
+            defaultConfigs.push({
+              key,
+              value: String(value),
+              category: 'Workspace',
+              description: `Workspace setting: ${key}`,
+            });
+          },
+        );
       }
 
       setConfigs(defaultConfigs);
@@ -249,10 +278,30 @@ const AdminDashboard: React.FC = () => {
       console.error('Error loading configurations:', err);
       // Set default configs on error
       setConfigs([
-        { key: 'max_upload_size', value: '100MB', category: 'File Processing', description: 'Maximum file size for uploads' },
-        { key: 'session_timeout', value: '30 minutes', category: 'Security', description: 'User session timeout duration' },
-        { key: 'api_rate_limit', value: '1000/hour', category: 'API', description: 'API requests per hour limit' },
-        { key: 'backup_frequency', value: 'Daily', category: 'System', description: 'Automated backup frequency' },
+        {
+          key: 'max_upload_size',
+          value: '100MB',
+          category: 'File Processing',
+          description: 'Maximum file size for uploads',
+        },
+        {
+          key: 'session_timeout',
+          value: '30 minutes',
+          category: 'Security',
+          description: 'User session timeout duration',
+        },
+        {
+          key: 'api_rate_limit',
+          value: '1000/hour',
+          category: 'API',
+          description: 'API requests per hour limit',
+        },
+        {
+          key: 'backup_frequency',
+          value: 'Daily',
+          category: 'System',
+          description: 'Automated backup frequency',
+        },
       ]);
     }
   };
@@ -260,11 +309,17 @@ const AdminDashboard: React.FC = () => {
   // Real-time updates for system metrics
   useEffect(() => {
     const interval = setInterval(() => {
-      setSystemMetrics(prev => ({
+      setSystemMetrics((prev) => ({
         ...prev,
         cpu: Math.max(10, Math.min(90, prev.cpu + (Math.random() - 0.5) * 10)),
-        memory: Math.max(20, Math.min(95, prev.memory + (Math.random() - 0.5) * 8)),
-        network: Math.max(0, Math.min(100, prev.network + (Math.random() - 0.5) * 20)),
+        memory: Math.max(
+          20,
+          Math.min(95, prev.memory + (Math.random() - 0.5) * 8),
+        ),
+        network: Math.max(
+          0,
+          Math.min(100, prev.network + (Math.random() - 0.5) * 20),
+        ),
       }));
     }, 3000);
 
@@ -283,12 +338,14 @@ const AdminDashboard: React.FC = () => {
 
   const handleConfigUpdate = async (key: string, newValue: string) => {
     try {
-      setConfigs(prev => prev.map(config =>
-        config.key === key ? { ...config, value: newValue } : config,
-      ));
+      setConfigs((prev) =>
+        prev.map((config) =>
+          config.key === key ? { ...config, value: newValue } : config,
+        ),
+      );
 
       // Update workspace settings in database if it's a workspace setting
-      const config = configs.find(c => c.key === key);
+      const config = configs.find((c) => c.key === key);
       if (config?.category === 'Workspace') {
         const { data: workspaces } = await supabase
           .from('workspaces')
@@ -296,8 +353,11 @@ const AdminDashboard: React.FC = () => {
           .limit(1);
 
         if (workspaces?.[0]) {
-          const currentSettings = workspaces[0].settings as unknown || {};
-          const updatedSettings = { ...(currentSettings as Record<string, unknown>), [key]: newValue };
+          const currentSettings = (workspaces[0].settings as unknown) || {};
+          const updatedSettings = {
+            ...(currentSettings as Record<string, unknown>),
+            [key]: newValue,
+          };
 
           await supabase
             .from('workspaces')
@@ -312,16 +372,18 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter((user: User) =>
-    user.name.toLowerCase().includes(userFilter.toLowerCase()) ||
-    user.email.toLowerCase().includes(userFilter.toLowerCase()) ||
-    user.role.toLowerCase().includes(userFilter.toLowerCase()),
+  const filteredUsers = users.filter(
+    (user: User) =>
+      user.name.toLowerCase().includes(userFilter.toLowerCase()) ||
+      user.email.toLowerCase().includes(userFilter.toLowerCase()) ||
+      user.role.toLowerCase().includes(userFilter.toLowerCase()),
   );
 
-  const filteredConfigs = configs.filter((config: Config) =>
-    config.key.toLowerCase().includes(configFilter.toLowerCase()) ||
-    config.category.toLowerCase().includes(configFilter.toLowerCase()) ||
-    config.description.toLowerCase().includes(configFilter.toLowerCase()),
+  const filteredConfigs = configs.filter(
+    (config: Config) =>
+      config.key.toLowerCase().includes(configFilter.toLowerCase()) ||
+      config.category.toLowerCase().includes(configFilter.toLowerCase()) ||
+      config.description.toLowerCase().includes(configFilter.toLowerCase()),
   );
 
   // Organize admin sections by category
@@ -329,7 +391,8 @@ const AdminDashboard: React.FC = () => {
     'Core Systems': [
       {
         title: 'PDF Knowledge Base',
-        description: 'View and manage processed PDF documents, chunks, and knowledge entries',
+        description:
+          'View and manage processed PDF documents, chunks, and knowledge entries',
         icon: DatabaseIcon,
         path: '/admin/knowledge-base',
         status: 'active',
@@ -337,7 +400,8 @@ const AdminDashboard: React.FC = () => {
       },
       {
         title: 'PDF Processing',
-        description: 'Upload and process new PDF documents for material knowledge extraction',
+        description:
+          'Upload and process new PDF documents for material knowledge extraction',
         icon: FileText,
         path: '/admin/pdf-processing',
         status: 'active',
@@ -347,7 +411,8 @@ const AdminDashboard: React.FC = () => {
     'AI & Intelligence': [
       {
         title: 'Search Hub',
-        description: 'Multi-modal search interface with text, image, and hybrid capabilities',
+        description:
+          'Multi-modal search interface with text, image, and hybrid capabilities',
         icon: Search,
         path: '/admin/search-hub',
         status: 'active',
@@ -417,7 +482,8 @@ const AdminDashboard: React.FC = () => {
     'System Monitoring': [
       {
         title: 'Async Job Queue Monitor',
-        description: 'Monitor image processing and AI analysis job queues in real-time',
+        description:
+          'Monitor image processing and AI analysis job queues in real-time',
         icon: Activity,
         path: '/admin/async-queue-monitor',
         status: 'active',
@@ -425,7 +491,8 @@ const AdminDashboard: React.FC = () => {
       },
       {
         title: 'PDF Processing Monitor',
-        description: 'Monitor PDF processing pipeline - embeddings, images, products, and metrics',
+        description:
+          'Monitor PDF processing pipeline - embeddings, images, products, and metrics',
         icon: Activity,
         path: '/admin/pdf-processing-monitor',
         status: 'active',
@@ -457,7 +524,8 @@ const AdminDashboard: React.FC = () => {
       },
       {
         title: 'MIVAA API Docs',
-        description: 'Access MIVAA service documentation and API specifications',
+        description:
+          'Access MIVAA service documentation and API specifications',
         icon: FileText,
         path: '/admin/mivaa-docs',
         status: 'active',
@@ -465,7 +533,8 @@ const AdminDashboard: React.FC = () => {
       },
       {
         title: 'Quality & Stability Metrics',
-        description: 'Monitor PDF chunk quality scoring and embedding stability analysis',
+        description:
+          'Monitor PDF chunk quality scoring and embedding stability analysis',
         icon: BarChart3,
         path: '/admin/quality-stability-metrics',
         status: 'active',
@@ -473,7 +542,8 @@ const AdminDashboard: React.FC = () => {
       },
       {
         title: 'Phase 3 Validation Metrics',
-        description: 'Monitor chunk relationships, retrieval quality, and response quality',
+        description:
+          'Monitor chunk relationships, retrieval quality, and response quality',
         icon: BarChart3,
         path: '/admin/phase3-metrics',
         status: 'active',
@@ -481,7 +551,8 @@ const AdminDashboard: React.FC = () => {
       },
       {
         title: 'Chunk Quality Dashboard',
-        description: 'Monitor chunk quality, deduplication, and validation metrics',
+        description:
+          'Monitor chunk quality, deduplication, and validation metrics',
         icon: BarChart3,
         path: '/admin/chunk-quality',
         status: 'active',
@@ -492,10 +563,14 @@ const AdminDashboard: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-500/20 text-green-600';
-      case 'processing': return 'bg-blue-500/20 text-blue-600';
-      case 'training': return 'bg-orange-500/20 text-orange-600';
-      default: return 'bg-gray-500/20 text-gray-600';
+      case 'active':
+        return 'bg-green-500/20 text-green-600';
+      case 'processing':
+        return 'bg-blue-500/20 text-blue-600';
+      case 'training':
+        return 'bg-orange-500/20 text-orange-600';
+      default:
+        return 'bg-gray-500/20 text-gray-600';
     }
   };
 
@@ -516,7 +591,8 @@ const AdminDashboard: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
-                onClick={() => navigate('/')} onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
+                onClick={() => navigate('/')}
+                onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
                 className="flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
               >
                 <Home className="h-4 w-4" />
@@ -525,7 +601,9 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div className="h-6 w-px bg-border" />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Admin Dashboard
+              </h1>
               <p className="text-sm text-muted-foreground">
                 System administration and management tools
               </p>
@@ -550,43 +628,49 @@ const AdminDashboard: React.FC = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-
-
             {/* Admin Sections by Category */}
             <div className="space-y-8">
               {Object.entries(adminSections).map(([category, sections]) => (
                 <div key={category}>
-                  <h2 className="text-2xl font-bold mb-4 text-gray-800">{category}</h2>
+                  <h2 className="text-2xl font-bold mb-4 text-gray-800">
+                    {category}
+                  </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {sections.map((section) => {
-                const Icon = section.icon;
-                return (
-                  <Card key={section.path} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <Icon className="h-8 w-8 text-primary" />
-                        <Badge className={getStatusColor(section.status)}>
-                          {section.status}
-                        </Badge>
-                      </div>
-                      <CardTitle className="text-lg">{section.title}</CardTitle>
-                      <CardDescription className="text-sm">
-                        {section.description}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-muted-foreground">
-                          {section.count}
-                        </span>
-                        <Button asChild className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
-                          <Link to={section.path}>
-                            Manage
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      const Icon = section.icon;
+                      return (
+                        <Card
+                          key={section.path}
+                          className="hover:shadow-md transition-shadow"
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <Icon className="h-8 w-8 text-primary" />
+                              <Badge className={getStatusColor(section.status)}>
+                                {section.status}
+                              </Badge>
+                            </div>
+                            <CardTitle className="text-lg">
+                              {section.title}
+                            </CardTitle>
+                            <CardDescription className="text-sm">
+                              {section.description}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">
+                                {section.count}
+                              </span>
+                              <Button
+                                asChild
+                                className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                              >
+                                <Link to={section.path}>Manage</Link>
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
                       );
                     })}
                   </div>
@@ -603,15 +687,21 @@ const AdminDashboard: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>PDF Documents</span>
-                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">156 Processed</Badge>
+                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                        156 Processed
+                      </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Knowledge Entries</span>
-                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">1,247 Active</Badge>
+                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                        1,247 Active
+                      </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Search Queries</span>
-                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">8,432 Total</Badge>
+                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                        8,432 Total
+                      </Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -636,14 +726,25 @@ const AdminDashboard: React.FC = () => {
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Button asChild className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
+                  <Button
+                    asChild
+                    className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                  >
                     <Link to="/admin/pdf-processing">Process New PDF</Link>
                   </Button>
-                  <Button asChild className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
+                  <Button
+                    asChild
+                    className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                  >
                     <Link to="/admin/search-hub">Test Search System</Link>
                   </Button>
-                  <Button asChild className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
-                    <Link to="/admin/3d-suggestions">Configure 3D Suggestions</Link>
+                  <Button
+                    asChild
+                    className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                  >
+                    <Link to="/admin/3d-suggestions">
+                      Configure 3D Suggestions
+                    </Link>
                   </Button>
                 </CardContent>
               </Card>
@@ -655,7 +756,9 @@ const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">CPU Usage</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    CPU Usage
+                  </CardTitle>
                   <Cpu className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -670,12 +773,16 @@ const AdminDashboard: React.FC = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Memory Usage</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Memory Usage
+                  </CardTitle>
                   <HardDrive className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    <span className={getMetricColor(systemMetrics.memory, 'memory')}>
+                    <span
+                      className={getMetricColor(systemMetrics.memory, 'memory')}
+                    >
                       {systemMetrics.memory.toFixed(1)}%
                     </span>
                   </div>
@@ -685,12 +792,16 @@ const AdminDashboard: React.FC = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Disk Usage</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Disk Usage
+                  </CardTitle>
                   <Server className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    <span className={getMetricColor(systemMetrics.disk, 'disk')}>
+                    <span
+                      className={getMetricColor(systemMetrics.disk, 'disk')}
+                    >
                       {systemMetrics.disk}%
                     </span>
                   </div>
@@ -700,11 +811,19 @@ const AdminDashboard: React.FC = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Network I/O</CardTitle>
+                  <CardTitle className="text-sm font-medium">
+                    Network I/O
+                  </CardTitle>
                   <Wifi className="h-4 w-4 text-muted-foreground" />
-                </CardHeader><CardContent>
+                </CardHeader>
+                <CardContent>
                   <div className="text-2xl font-bold">
-                    <span className={getMetricColor(systemMetrics.network, 'network')}>
+                    <span
+                      className={getMetricColor(
+                        systemMetrics.network,
+                        'network',
+                      )}
+                    >
                       {systemMetrics.network.toFixed(1)} MB/s
                     </span>
                   </div>
@@ -745,8 +864,14 @@ const AdminDashboard: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span>Error Rate</span>
-                    <Badge className={`px-2 py-1 border border-gray-300 bg-white ${systemMetrics.errorRate > 1 ? 'text-red-600' : 'text-green-600'}`}>
-                      {systemMetrics.errorRate > 1 ? <AlertTriangle className="h-3 w-3 mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                    <Badge
+                      className={`px-2 py-1 border border-gray-300 bg-white ${systemMetrics.errorRate > 1 ? 'text-red-600' : 'text-green-600'}`}
+                    >
+                      {systemMetrics.errorRate > 1 ? (
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                      ) : (
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                      )}
                       {systemMetrics.errorRate}%
                     </Badge>
                   </div>
@@ -821,10 +946,22 @@ const AdminDashboard: React.FC = () => {
               </Button>
               {selectedUsers.length > 0 && (
                 <div className="flex items-center gap-2">
-                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('activate')} onKeyDown={(e) => e.key === 'Enter' && handleBulkUserAction('activate')}>
+                  <Button
+                    className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    onClick={() => handleBulkUserAction('activate')}
+                    onKeyDown={(e) =>
+                      e.key === 'Enter' && handleBulkUserAction('activate')
+                    }
+                  >
                     Activate ({selectedUsers.length})
                   </Button>
-                  <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50" onClick={() => handleBulkUserAction('deactivate')} onKeyDown={(e) => e.key === 'Enter' && handleBulkUserAction('deactivate')}>
+                  <Button
+                    className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    onClick={() => handleBulkUserAction('deactivate')}
+                    onKeyDown={(e) =>
+                      e.key === 'Enter' && handleBulkUserAction('deactivate')
+                    }
+                  >
                     Deactivate ({selectedUsers.length})
                   </Button>
                 </div>
@@ -842,7 +979,9 @@ const AdminDashboard: React.FC = () => {
                             type="checkbox"
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedUsers(filteredUsers.map((u: User) => u.id));
+                                setSelectedUsers(
+                                  filteredUsers.map((u: User) => u.id),
+                                );
                               } else {
                                 setSelectedUsers([]);
                               }
@@ -858,7 +997,10 @@ const AdminDashboard: React.FC = () => {
                     </thead>
                     <tbody>
                       {filteredUsers.map((user: User) => (
-                        <tr key={user.id} className="border-b hover:bg-muted/50">
+                        <tr
+                          key={user.id}
+                          className="border-b hover:bg-muted/50"
+                        >
                           <td className="p-4">
                             <input
                               type="checkbox"
@@ -867,7 +1009,11 @@ const AdminDashboard: React.FC = () => {
                                 if (e.target.checked) {
                                   setSelectedUsers([...selectedUsers, user.id]);
                                 } else {
-                                  setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                                  setSelectedUsers(
+                                    selectedUsers.filter(
+                                      (id) => id !== user.id,
+                                    ),
+                                  );
                                 }
                               }}
                             />
@@ -875,27 +1021,66 @@ const AdminDashboard: React.FC = () => {
                           <td className="p-4">
                             <div>
                               <div className="font-medium">{user.name}</div>
-                              <div className="text-sm text-muted-foreground">{user.email}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {user.email}
+                              </div>
                             </div>
                           </td>
                           <td className="p-4">
-                            <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">{user.role}</Badge>
+                            <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                              {user.role}
+                            </Badge>
                           </td>
                           <td className="p-4">
-                            <Badge className={user.status === 'Active' ? 'bg-green-500/20 text-green-600' : 'bg-gray-500/20 text-gray-600'}>
+                            <Badge
+                              className={
+                                user.status === 'Active'
+                                  ? 'bg-green-500/20 text-green-600'
+                                  : 'bg-gray-500/20 text-gray-600'
+                              }
+                            >
                               {user.status}
                             </Badge>
                           </td>
-                          <td className="p-4 text-sm text-muted-foreground">{user.lastLogin}</td>
+                          <td className="p-4 text-sm text-muted-foreground">
+                            {user.lastLogin}
+                          </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('edit', user.id)} onKeyDown={(e) => e.key === 'Enter' && handleUserAction('edit', user.id)}>
+                              <Button
+                                className="px-2 py-1 text-sm hover:bg-gray-100"
+                                onClick={() =>
+                                  handleUserAction('edit', user.id)
+                                }
+                                onKeyDown={(e) =>
+                                  e.key === 'Enter' &&
+                                  handleUserAction('edit', user.id)
+                                }
+                              >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('view', user.id)} onKeyDown={(e) => e.key === 'Enter' && handleUserAction('view', user.id)}>
+                              <Button
+                                className="px-2 py-1 text-sm hover:bg-gray-100"
+                                onClick={() =>
+                                  handleUserAction('view', user.id)
+                                }
+                                onKeyDown={(e) =>
+                                  e.key === 'Enter' &&
+                                  handleUserAction('view', user.id)
+                                }
+                              >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button className="px-2 py-1 text-sm hover:bg-gray-100" onClick={() => handleUserAction('delete', user.id)} onKeyDown={(e) => e.key === 'Enter' && handleUserAction('delete', user.id)}>
+                              <Button
+                                className="px-2 py-1 text-sm hover:bg-gray-100"
+                                onClick={() =>
+                                  handleUserAction('delete', user.id)
+                                }
+                                onKeyDown={(e) =>
+                                  e.key === 'Enter' &&
+                                  handleUserAction('delete', user.id)
+                                }
+                              >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -962,11 +1147,15 @@ const AdminDashboard: React.FC = () => {
                           {config.description}
                         </p>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">Current Value:</span>
+                          <span className="text-sm font-medium">
+                            Current Value:
+                          </span>
                           <input
                             type="text"
                             value={config.value}
-                            onChange={(e) => handleConfigUpdate(config.key, e.target.value)}
+                            onChange={(e) =>
+                              handleConfigUpdate(config.key, e.target.value)
+                            }
                             className="px-2 py-1 border border-input rounded text-sm"
                           />
                         </div>

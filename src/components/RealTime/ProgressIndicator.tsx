@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { cn } from '@/lib/utils';
 
-
 export interface ProgressStep {
   id: string;
   name: string;
@@ -169,7 +168,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
 
   const { send, isConnected } = useWebSocket(websocketUrl, {
     onMessage: (message) => {
-      if (message.type === 'progress_update' && message.payload.id === progressId) {
+      if (
+        message.type === 'progress_update' &&
+        message.payload.id === progressId
+      ) {
         // Type-safe casting with validation
         const payload = message.payload as unknown;
         const newData = payload as ProgressData;
@@ -184,9 +186,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
         }
 
         if (newData.status === 'failed' && onError) {
-          const errorMessage = typeof newData.metadata?.error === 'string'
-            ? newData.metadata.error
-            : 'Process failed';
+          const errorMessage =
+            typeof newData.metadata?.error === 'string'
+              ? newData.metadata.error
+              : 'Process failed';
           onError(errorMessage);
         }
       }
@@ -269,10 +272,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={cn(
-              'p-2 rounded-full',
-              statusConfig.bgColor,
-            )}>
+            <div className={cn('p-2 rounded-full', statusConfig.bgColor)}>
               <StatusIcon
                 className={cn(
                   'h-5 w-5',
@@ -338,7 +338,8 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                   Resume
                 </Button>
               )}
-              {(progressData.status === 'running' || progressData.status === 'paused') && (
+              {(progressData.status === 'running' ||
+                progressData.status === 'paused') && (
                 <Button
                   className="px-3 py-1.5 text-sm bg-red-600 text-white hover:bg-red-700"
                   onClick={() => handleControl('cancel')}
@@ -356,7 +357,8 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
             </div>
           )}
         </div>
-      </CardHeader><CardContent className="space-y-4">
+      </CardHeader>
+      <CardContent className="space-y-4">
         {/* Overall Progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
@@ -385,23 +387,28 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
               <div>
                 <span className="text-muted-foreground">Started:</span>
                 <span className="ml-2 font-medium">
-                  {formatDistanceToNow(progressData.startTime, { addSuffix: true })}
+                  {formatDistanceToNow(progressData.startTime, {
+                    addSuffix: true,
+                  })}
                 </span>
               </div>
             )}
-            {estimatedRemaining !== null && progressData.status === 'running' && (
-              <div>
-                <span className="text-muted-foreground">Remaining:</span>
-                <span className="ml-2 font-medium">
-                  ~{formatDuration(estimatedRemaining)}
-                </span>
-              </div>
-            )}
+            {estimatedRemaining !== null &&
+              progressData.status === 'running' && (
+                <div>
+                  <span className="text-muted-foreground">Remaining:</span>
+                  <span className="ml-2 font-medium">
+                    ~{formatDuration(estimatedRemaining)}
+                  </span>
+                </div>
+              )}
             {progressData.endTime && (
               <div>
                 <span className="text-muted-foreground">Completed:</span>
                 <span className="ml-2 font-medium">
-                  {formatDistanceToNow(progressData.endTime, { addSuffix: true })}
+                  {formatDistanceToNow(progressData.endTime, {
+                    addSuffix: true,
+                  })}
                 </span>
               </div>
             )}
@@ -430,8 +437,10 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                     key={step.id}
                     className={cn(
                       'flex items-center gap-3 p-2 rounded-md border',
-                      step.status === 'in_progress' && 'bg-blue-50 border-blue-200',
-                      step.status === 'completed' && 'bg-green-50 border-green-200',
+                      step.status === 'in_progress' &&
+                        'bg-blue-50 border-blue-200',
+                      step.status === 'completed' &&
+                        'bg-green-50 border-green-200',
                       step.status === 'failed' && 'bg-red-50 border-red-200',
                     )}
                   >
@@ -460,7 +469,9 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                         <Progress value={step.progress} className="h-1 mt-1" />
                       )}
                       {step.error && (
-                        <p className="text-xs text-red-600 mt-1">{step.error}</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          {step.error}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -488,7 +499,10 @@ export const SimpleProgressBar: React.FC<{
 
   useWebSocket(websocketUrl, {
     onMessage: (message) => {
-      if (message.type === 'progress_update' && message.payload.id === progressId) {
+      if (
+        message.type === 'progress_update' &&
+        message.payload.id === progressId
+      ) {
         const payload = message.payload as unknown;
         const data = payload as ProgressData;
         setProgress(data.overallProgress);

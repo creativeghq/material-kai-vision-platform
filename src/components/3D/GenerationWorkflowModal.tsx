@@ -1,13 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Clock, Image, AlertCircle, ChevronDown, ChevronRight, Play, Pause, RotateCcw } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Image,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+  Play,
+  Pause,
+  RotateCcw,
+} from 'lucide-react';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface WorkflowStep {
   id: string;
@@ -28,12 +48,9 @@ interface GenerationWorkflowModalProps {
   onComplete: (images: unknown[]) => void;
 }
 
-export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = ({
-  isOpen,
-  onClose,
-  generationId,
-  onComplete,
-}) => {
+export const GenerationWorkflowModal: React.FC<
+  GenerationWorkflowModalProps
+> = ({ isOpen, onClose, generationId, onComplete }) => {
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [currentStep, setCurrentStep] = useState<string>('');
   const [overallProgress, setOverallProgress] = useState(0);
@@ -46,9 +63,13 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
 
   // Workflow control state
   const [isPaused, setIsPaused] = useState(false);
-  const [workflowMode, setWorkflowMode] = useState<'running' | 'paused' | 'ready'>('ready');
-  const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
-    'models': true,
+  const [workflowMode, setWorkflowMode] = useState<
+    'running' | 'paused' | 'ready'
+  >('ready');
+  const [expandedSections, setExpandedSections] = useState<{
+    [key: string]: boolean;
+  }>({
+    models: true,
     'api-response': false,
   });
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
@@ -64,9 +85,9 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     const dataWithPrompt = generationData as Record<string, unknown>;
     const hasRefImage = Boolean(
       dataWithPrompt.prompt &&
-      typeof dataWithPrompt.prompt === 'string' &&
-      !dataWithPrompt.prompt.includes('[NO_IMAGE]') &&
-      dataWithPrompt.prompt !== '[NO_IMAGE]',
+        typeof dataWithPrompt.prompt === 'string' &&
+        !dataWithPrompt.prompt.includes('[NO_IMAGE]') &&
+        dataWithPrompt.prompt !== '[NO_IMAGE]',
     );
 
     setHasReferenceImage(hasRefImage);
@@ -157,15 +178,20 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
         setPollingError(null);
 
         // Use Edge Function to get generation status
-        const response = await fetch(`/api/3d-generation-status/${generationId}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
+        const response = await fetch(
+          `/api/3d-generation-status/${generationId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
           },
-        });
+        );
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch generation status: ${response.statusText}`);
+          throw new Error(
+            `Failed to fetch generation status: ${response.statusText}`,
+          );
         }
 
         const result = await response.json();
@@ -189,8 +215,14 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           setApiResponse(data); // Store full API response for display
 
           // Parse workflow data from result_data
-          if (data.result_data && typeof data.result_data === 'object' && 'workflow_steps' in data.result_data) {
-            const workflowData = data.result_data as { workflow_steps?: Record<string, unknown>[] };
+          if (
+            data.result_data &&
+            typeof data.result_data === 'object' &&
+            'workflow_steps' in data.result_data
+          ) {
+            const workflowData = data.result_data as {
+              workflow_steps?: Record<string, unknown>[];
+            };
             if (workflowData.workflow_steps) {
               updateStepsFromData(workflowData.workflow_steps);
             }
@@ -214,11 +246,12 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             setWorkflowMode('running');
           }
         }
-
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Polling error:', error);
-        setPollingError(error instanceof Error ? error.message : 'Unknown polling error');
+        setPollingError(
+          error instanceof Error ? error.message : 'Unknown polling error',
+        );
       } finally {
         setIsPolling(false);
       }
@@ -235,12 +268,14 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const updateStepsFromData = (workflowSteps: unknown[]) => {
-    setSteps(prevSteps => {
+    setSteps((prevSteps) => {
       const updatedSteps = [...prevSteps];
 
-      workflowSteps.forEach(workflowStep => {
+      workflowSteps.forEach((workflowStep) => {
         const step = workflowStep as Record<string, unknown>;
-        const stepIndex = updatedSteps.findIndex(s => s.modelName === step.modelName);
+        const stepIndex = updatedSteps.findIndex(
+          (s) => s.modelName === step.modelName,
+        );
         if (stepIndex !== -1) {
           // Map 'completed' to 'success' to match the expected status type
           let mappedStatus = step.status as string;
@@ -253,23 +288,50 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             updatedSteps[stepIndex] = {
               id: currentStep.id,
               name: currentStep.name,
-              status: mappedStatus as 'pending' | 'running' | 'success' | 'failed' | 'skipped',
+              status: mappedStatus as
+                | 'pending'
+                | 'running'
+                | 'success'
+                | 'failed'
+                | 'skipped',
               modelName: currentStep.modelName,
-              ...(step.startTime ? { startTime: step.startTime as string } : currentStep.startTime ? { startTime: currentStep.startTime } : {}),
-              ...(step.endTime ? { endTime: step.endTime as string } : currentStep.endTime ? { endTime: currentStep.endTime } : {}),
-              ...(step.imageUrl ? { imageUrl: step.imageUrl as string } : currentStep.imageUrl ? { imageUrl: currentStep.imageUrl } : {}),
-              ...(step.errorMessage ? { errorMessage: step.errorMessage as string } : currentStep.errorMessage ? { errorMessage: currentStep.errorMessage } : {}),
-              ...(step.processingTimeMs ? { processingTimeMs: step.processingTimeMs as number } : currentStep.processingTimeMs ? { processingTimeMs: currentStep.processingTimeMs } : {}),
+              ...(step.startTime
+                ? { startTime: step.startTime as string }
+                : currentStep.startTime
+                  ? { startTime: currentStep.startTime }
+                  : {}),
+              ...(step.endTime
+                ? { endTime: step.endTime as string }
+                : currentStep.endTime
+                  ? { endTime: currentStep.endTime }
+                  : {}),
+              ...(step.imageUrl
+                ? { imageUrl: step.imageUrl as string }
+                : currentStep.imageUrl
+                  ? { imageUrl: currentStep.imageUrl }
+                  : {}),
+              ...(step.errorMessage
+                ? { errorMessage: step.errorMessage as string }
+                : currentStep.errorMessage
+                  ? { errorMessage: currentStep.errorMessage }
+                  : {}),
+              ...(step.processingTimeMs
+                ? { processingTimeMs: step.processingTimeMs as number }
+                : currentStep.processingTimeMs
+                  ? { processingTimeMs: currentStep.processingTimeMs }
+                  : {}),
             };
           }
         }
       });
 
       // Update current step and progress
-      const runningStep = updatedSteps.find(s => s.status === 'running');
+      const runningStep = updatedSteps.find((s) => s.status === 'running');
       setCurrentStep(runningStep?.name || '');
 
-      const completedSteps = updatedSteps.filter(s => s.status === 'success' || s.status === 'failed').length;
+      const completedSteps = updatedSteps.filter(
+        (s) => s.status === 'success' || s.status === 'failed',
+      ).length;
       const progress = (completedSteps / updatedSteps.length) * 100;
       setOverallProgress(progress);
 
@@ -288,7 +350,9 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       case 'skipped':
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       default:
-        return <div className="h-4 w-4 rounded-full border-2 border-gray-300" />;
+        return (
+          <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
+        );
     }
   };
 
@@ -303,7 +367,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       case 'skipped':
         return <Badge className="bg-yellow-100 text-yellow-700">Skipped</Badge>;
       default:
-        return <Badge className="border border-gray-300 text-gray-600">Pending</Badge>;
+        return (
+          <Badge className="border border-gray-300 text-gray-600">
+            Pending
+          </Badge>
+        );
     }
   };
 
@@ -324,10 +392,17 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
     setIsComplete(false);
     setShowCompletionDialog(false);
     // Reset all steps to pending
-    setSteps(prevSteps =>
-      prevSteps.map(step => {
+    setSteps((prevSteps) =>
+      prevSteps.map((step) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { startTime, endTime, imageUrl, errorMessage, processingTimeMs, ...baseStep } = step;
+        const {
+          startTime,
+          endTime,
+          imageUrl,
+          errorMessage,
+          processingTimeMs,
+          ...baseStep
+        } = step;
         return {
           ...baseStep,
           status: 'pending' as const,
@@ -339,7 +414,7 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
   };
 
   const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
+    setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
     }));
@@ -359,9 +434,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
       setPollingError(null);
 
       // Initialize steps immediately to prevent flashing
-      const hasRefImage = Boolean(generationData &&
-        typeof generationData === 'object' &&
-        'reference_image_url' in generationData);
+      const hasRefImage = Boolean(
+        generationData &&
+          typeof generationData === 'object' &&
+          'reference_image_url' in generationData,
+      );
       setHasReferenceImage(hasRefImage);
     }
   }, [isOpen, generationId]);
@@ -422,8 +499,20 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                 Restart
               </Button>
             </div>
-            <Badge className={workflowMode === 'running' ? 'bg-green-100 text-green-700' : workflowMode === 'paused' ? 'bg-yellow-100 text-yellow-700' : 'border border-gray-300 text-gray-600'}>
-              {workflowMode === 'running' ? 'Running' : workflowMode === 'paused' ? 'Paused' : 'Ready'}
+            <Badge
+              className={
+                workflowMode === 'running'
+                  ? 'bg-green-100 text-green-700'
+                  : workflowMode === 'paused'
+                    ? 'bg-yellow-100 text-yellow-700'
+                    : 'border border-gray-300 text-gray-600'
+              }
+            >
+              {workflowMode === 'running'
+                ? 'Running'
+                : workflowMode === 'paused'
+                  ? 'Paused'
+                  : 'Ready'}
             </Badge>
           </div>
 
@@ -436,7 +525,8 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             <Progress value={overallProgress} className="h-2" />
             {currentStep && (
               <p className="text-sm text-muted-foreground">
-                Currently processing: <span className="font-medium">{currentStep}</span>
+                Currently processing:{' '}
+                <span className="font-medium">{currentStep}</span>
               </p>
             )}
           </div>
@@ -445,69 +535,79 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           <ScrollArea className="h-[400px] pr-4">
             <div className="space-y-3">
               {/* Unified Models Section */}
-              {(<Collapsible
-                  open={Boolean(expandedSections['models']) ?? false}
-                  onOpenChange={() => toggleSection('models')}
-                >
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
-                  <div className="flex items-center gap-2">
-                    {expandedSections['models'] ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    <h4 className="font-medium text-sm text-muted-foreground">GENERATION MODELS</h4>
-                  </div>
-                  <Badge className="text-xs border border-gray-300 text-gray-600">
-                    {steps.length} models
-                  </Badge>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="mt-2">
-                  <div className="space-y-2">
-                    {steps.map((step) => (
-                      <Card key={step.id} className="ml-4">
-                        <CardContent className="p-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {getStatusIcon(step.status)}
-                              <div>
-                                <p className="font-medium text-sm">{step.name}</p>
-                                <p className="text-xs text-muted-foreground">{step.modelName}</p>
+              {
+                (
+                  <Collapsible
+                    open={Boolean(expandedSections['models']) ?? false}
+                    onOpenChange={() => toggleSection('models')}
+                  >
+                    <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
+                      <div className="flex items-center gap-2">
+                        {expandedSections['models'] ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        <h4 className="font-medium text-sm text-muted-foreground">
+                          GENERATION MODELS
+                        </h4>
+                      </div>
+                      <Badge className="text-xs border border-gray-300 text-gray-600">
+                        {steps.length} models
+                      </Badge>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2">
+                      <div className="space-y-2">
+                        {steps.map((step) => (
+                          <Card key={step.id} className="ml-4">
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  {getStatusIcon(step.status)}
+                                  <div>
+                                    <p className="font-medium text-sm">
+                                      {step.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {step.modelName}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {step.processingTimeMs && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {Math.round(step.processingTimeMs / 1000)}
+                                      s
+                                    </span>
+                                  )}
+                                  {getStatusBadge(step.status)}
+                                </div>
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {step.processingTimeMs && (
-                                <span className="text-xs text-muted-foreground">
-                                  {Math.round(step.processingTimeMs / 1000)}s
-                                </span>
+
+                              {step.imageUrl && (
+                                <div className="mt-2">
+                                  <img
+                                    src={step.imageUrl}
+                                    alt={`Generated by ${step.name}`}
+                                    className="w-full h-32 object-cover rounded border"
+                                  />
+                                </div>
                               )}
-                              {getStatusBadge(step.status)}
-                            </div>
-                          </div>
 
-                          {step.imageUrl && (
-                            <div className="mt-2">
-                              <img
-                                src={step.imageUrl}
-                                alt={`Generated by ${step.name}`}
-                                className="w-full h-32 object-cover rounded border"
-                              />
-                            </div>
-                          )}
-
-                          {step.errorMessage && (
-                            <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
-                              <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                              <span>{step.errorMessage}</span>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>) as any}
-
+                              {step.errorMessage && (
+                                <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700 flex items-start gap-2">
+                                  <AlertCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                                  <span>{step.errorMessage}</span>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ) as any
+              }
 
               {/* API Response Section */}
               {apiResponse && (
@@ -517,11 +617,14 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
                 >
                   <CollapsibleTrigger className="flex items-center justify-between w-full p-2 hover:bg-muted rounded border">
                     <div className="flex items-center gap-2">
-                      {expandedSections['api-response'] ?
-                        <ChevronDown className="h-4 w-4" /> :
+                      {expandedSections['api-response'] ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
                         <ChevronRight className="h-4 w-4" />
-                      }
-                      <h4 className="font-medium text-sm text-muted-foreground">API RESPONSE DATA</h4>
+                      )}
+                      <h4 className="font-medium text-sm text-muted-foreground">
+                        API RESPONSE DATA
+                      </h4>
                     </div>
                     <Badge className="text-xs border border-gray-300 text-gray-600">
                       {isPolling ? 'Updating...' : 'Live Data'}
@@ -553,7 +656,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
           <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded">
             <div className="flex items-center justify-between text-sm">
               <span>Reference Image:</span>
-              <span className={hasReferenceImage ? 'text-green-600' : 'text-gray-600'}>
+              <span
+                className={
+                  hasReferenceImage ? 'text-green-600' : 'text-gray-600'
+                }
+              >
                 {hasReferenceImage ? '✓ Provided' : '✗ Not provided'}
               </span>
             </div>
@@ -563,7 +670,11 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             </div>
             <div className="flex items-center justify-between text-sm mt-1">
               <span>Completed:</span>
-              <span>{steps.filter(s => s.status === 'success').length} successful, {steps.filter(s => s.status === 'failed').length} failed, {steps.filter(s => s.status === 'skipped').length} skipped</span>
+              <span>
+                {steps.filter((s) => s.status === 'success').length} successful,{' '}
+                {steps.filter((s) => s.status === 'failed').length} failed,{' '}
+                {steps.filter((s) => s.status === 'skipped').length} skipped
+              </span>
             </div>
           </div>
 
@@ -571,7 +682,9 @@ export const GenerationWorkflowModal: React.FC<GenerationWorkflowModalProps> = (
             <div className="text-center p-4 bg-green-50 border border-green-200 rounded">
               <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
               <p className="font-medium text-green-700">Generation Complete</p>
-              <p className="text-sm text-green-600">You can now close this modal to view the generated images.</p>
+              <p className="text-sm text-green-600">
+                You can now close this modal to view the generated images.
+              </p>
             </div>
           )}
         </div>

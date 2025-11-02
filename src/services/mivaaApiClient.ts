@@ -14,7 +14,8 @@
 import { supabase } from '@/integrations/supabase/client';
 
 // MIVAA API Configuration
-const MIVAA_API_URL = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+const MIVAA_API_URL =
+  import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
 
 /**
  * MIVAA API Response Types
@@ -41,7 +42,10 @@ export class MivaaApiClient {
    * Get Supabase auth token for MIVAA authentication
    */
   private async getAuthToken(): Promise<string> {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
 
     if (error || !session) {
       throw new Error('Not authenticated. Please sign in.');
@@ -64,7 +68,7 @@ export class MivaaApiClient {
       const response = await fetch(url, {
         ...options,
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
           ...options.headers,
         },
@@ -72,7 +76,11 @@ export class MivaaApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          errorData.error ||
+            errorData.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
@@ -104,7 +112,7 @@ export class MivaaApiClient {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           // Don't set Content-Type for FormData - browser sets it with boundary
         },
         body: formData,
@@ -112,7 +120,11 @@ export class MivaaApiClient {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          errorData.error ||
+            errorData.message ||
+            `HTTP ${response.status}: ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
@@ -472,4 +484,3 @@ export const mivaaApi = new MivaaApiClient();
 
 // Export default
 export default mivaaApi;
-

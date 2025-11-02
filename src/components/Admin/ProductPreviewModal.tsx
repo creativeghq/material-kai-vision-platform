@@ -1,9 +1,22 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Package, FileText, Image as ImageIcon, Database, Calendar, Tag } from 'lucide-react';
+import {
+  Package,
+  FileText,
+  Image as ImageIcon,
+  Database,
+  Calendar,
+  Tag,
+} from 'lucide-react';
 import type { Product } from '@/types/unified-material-api';
 
 interface ProductPreviewModalProps {
@@ -32,7 +45,11 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                 {product.description}
               </DialogDescription>
             </div>
-            <Badge variant={productAny.status === 'published' ? 'default' : 'secondary'}>
+            <Badge
+              variant={
+                productAny.status === 'published' ? 'default' : 'secondary'
+              }
+            >
               {productAny.status || 'draft'}
             </Badge>
           </div>
@@ -72,13 +89,17 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                       <Tag className="h-3 w-3" />
                       Category
                     </p>
-                    <p className="text-sm text-muted-foreground">{product.category}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {product.category}
+                    </p>
                   </div>
                 )}
                 {productAny.created_from_type && (
                   <div>
                     <p className="text-sm font-medium">Source Type</p>
-                    <p className="text-sm text-muted-foreground">{productAny.created_from_type}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {productAny.created_from_type}
+                    </p>
                   </div>
                 )}
                 <div>
@@ -116,7 +137,9 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(product.properties).map(([key, value]) => (
                     <div key={key} className="border rounded-lg p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">{key}</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase">
+                        {key}
+                      </p>
                       <p className="text-sm mt-1">{String(value)}</p>
                     </div>
                   ))}
@@ -126,26 +149,31 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
           )}
 
           {/* Specifications */}
-          {product.specifications && Object.keys(product.specifications).length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <FileText className="h-4 w-4" />
-                  Specifications
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.entries(product.specifications).map(([key, value]) => (
-                    <div key={key} className="border rounded-lg p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">{key}</p>
-                      <p className="text-sm mt-1">{String(value)}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {product.specifications &&
+            Object.keys(product.specifications).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileText className="h-4 w-4" />
+                    Specifications
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(product.specifications).map(
+                      ([key, value]) => (
+                        <div key={key} className="border rounded-lg p-3">
+                          <p className="text-xs font-medium text-muted-foreground uppercase">
+                            {key}
+                          </p>
+                          <p className="text-sm mt-1">{String(value)}</p>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {/* Metadata */}
           {product.metadata && Object.keys(product.metadata).length > 0 && (
@@ -160,7 +188,9 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(product.metadata).map(([key, value]) => (
                     <div key={key} className="border rounded-lg p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">{key}</p>
+                      <p className="text-xs font-medium text-muted-foreground uppercase">
+                        {key}
+                      </p>
                       <p className="text-sm mt-1">{String(value)}</p>
                     </div>
                   ))}
@@ -180,19 +210,25 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
             <CardContent className="space-y-3">
               <div className="grid grid-cols-3 gap-4">
                 <div className="border rounded-lg p-3">
-                  <p className="text-xs font-medium text-muted-foreground">Source Chunks</p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Source Chunks
+                  </p>
                   <p className="text-2xl font-bold mt-1">
                     {product.sourceChunkIds?.length || 0}
                   </p>
                 </div>
                 <div className="border rounded-lg p-3">
-                  <p className="text-xs font-medium text-muted-foreground">Related Images</p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Related Images
+                  </p>
                   <p className="text-2xl font-bold mt-1">
                     {product.relatedImageIds?.length || 0}
                   </p>
                 </div>
                 <div className="border rounded-lg p-3">
-                  <p className="text-xs font-medium text-muted-foreground">Metafield Values</p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Metafield Values
+                  </p>
                   <p className="text-2xl font-bold mt-1">
                     {product.metafieldValues?.length || 0}
                   </p>
@@ -204,7 +240,11 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                   <p className="text-sm font-medium mb-2">Source Chunk IDs:</p>
                   <div className="flex flex-wrap gap-2">
                     {product.sourceChunkIds.slice(0, 10).map((chunkId) => (
-                      <Badge key={chunkId} variant="outline" className="text-xs">
+                      <Badge
+                        key={chunkId}
+                        variant="outline"
+                        className="text-xs"
+                      >
                         {chunkId.substring(0, 8)}...
                       </Badge>
                     ))}
@@ -232,11 +272,15 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">Model:</span>
-                    <Badge variant="outline">{productAny.embedding_model}</Badge>
+                    <Badge variant="outline">
+                      {productAny.embedding_model}
+                    </Badge>
                   </div>
                   {productAny.embedding && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Embedding Generated:</span>
+                      <span className="text-sm font-medium">
+                        Embedding Generated:
+                      </span>
                       <Badge variant="default">Yes</Badge>
                     </div>
                   )}
@@ -249,4 +293,3 @@ export const ProductPreviewModal: React.FC<ProductPreviewModalProps> = ({
     </Dialog>
   );
 };
-

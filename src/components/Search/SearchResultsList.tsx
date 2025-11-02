@@ -19,7 +19,13 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -29,7 +35,13 @@ import { applyQualityBasedRanking } from '@/services/qualityBasedRankingService'
 import { SearchResultCard, SearchResult } from './SearchResultCard';
 
 // Types for sorting and filtering
-export type SortField = 'relevance' | 'semantic' | 'quality' | 'date' | 'title' | 'views';
+export type SortField =
+  | 'relevance'
+  | 'semantic'
+  | 'quality'
+  | 'date'
+  | 'title'
+  | 'views';
 export type SortOrder = 'asc' | 'desc';
 export type ViewMode = 'card' | 'list' | 'compact';
 export type FilterType = 'all' | 'document' | 'image' | 'data' | 'analysis';
@@ -93,7 +105,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedResults, setSelectedResults] = useState<Set<string>>(new Set());
+  const [selectedResults, setSelectedResults] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Filter and sort results
   const filteredAndSortedResults = useMemo(() => {
@@ -101,17 +115,18 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
     // Apply type filter
     if (filterType !== 'all') {
-      filtered = filtered.filter(result => result.type === filterType);
+      filtered = filtered.filter((result) => result.type === filterType);
     }
 
     // Apply search term filter
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(result =>
-        result.title.toLowerCase().includes(term) ||
-        result.description.toLowerCase().includes(term) ||
-        result.tags.some(tag => tag.toLowerCase().includes(term)) ||
-        result.author?.toLowerCase().includes(term),
+      filtered = filtered.filter(
+        (result) =>
+          result.title.toLowerCase().includes(term) ||
+          result.description.toLowerCase().includes(term) ||
+          result.tags.some((tag) => tag.toLowerCase().includes(term)) ||
+          result.author?.toLowerCase().includes(term),
       );
     }
 
@@ -134,7 +149,8 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
             comparison = (a.semanticScore || 0) - (b.semanticScore || 0);
             break;
           case 'date':
-            comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+            comparison =
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
             break;
           case 'title':
             comparison = a.title.localeCompare(b.title);
@@ -167,12 +183,12 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
     if (selectedResults.size === filteredAndSortedResults.length) {
       setSelectedResults(new Set());
     } else {
-      setSelectedResults(new Set(filteredAndSortedResults.map(r => r.id)));
+      setSelectedResults(new Set(filteredAndSortedResults.map((r) => r.id)));
     }
   };
 
   const handleBulkDownload = () => {
-    const selectedResultObjects = filteredAndSortedResults.filter(r =>
+    const selectedResultObjects = filteredAndSortedResults.filter((r) =>
       selectedResults.has(r.id),
     );
     onBulkDownload?.(selectedResultObjects);
@@ -188,7 +204,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
   const hasActiveFilters = filterType !== 'all' || searchTerm !== '';
 
   // Pagination
-  const totalPages = Math.ceil((totalCount || filteredAndSortedResults.length) / pageSize);
+  const totalPages = Math.ceil(
+    (totalCount || filteredAndSortedResults.length) / pageSize,
+  );
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedResults = filteredAndSortedResults.slice(startIndex, endIndex);
@@ -218,7 +236,8 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
           {hasActiveFilters && (
             <Button
-              onClick={clearFilters} onKeyDown={(e) => e.key === 'Enter' && clearFilters()}
+              onClick={clearFilters}
+              onKeyDown={(e) => e.key === 'Enter' && clearFilters()}
               className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 px-3 text-gray-500 hover:text-gray-700"
             >
               <X className="h-4 w-4 mr-1" />
@@ -233,8 +252,10 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
             <>
               <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 bg-secondary text-secondary-foreground hover:bg-secondary/80 mr-2">
                 {selectedResults.size} selected
-              </Badge><Button
-                onClick={handleBulkDownload} onKeyDown={(e) => e.key === 'Enter' && handleBulkDownload()}
+              </Badge>
+              <Button
+                onClick={handleBulkDownload}
+                onKeyDown={(e) => e.key === 'Enter' && handleBulkDownload()}
                 className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 mr-2"
               >
                 <Download className="h-4 w-4 mr-1" />
@@ -251,7 +272,10 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
               return (
                 <Button
                   key={option.value}
-                  onClick={() => setViewMode(option.value as ViewMode)} onKeyDown={(e) => e.key === 'Enter' && setViewMode(option.value as ViewMode)}
+                  onClick={() => setViewMode(option.value as ViewMode)}
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' && setViewMode(option.value as ViewMode)
+                  }
                   className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 rounded-none first:rounded-l-lg last:rounded-r-lg ${
                     viewMode === option.value
                       ? 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -281,11 +305,17 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           </div>
 
           {/* Type filter */}
-          <Select value={filterType} onValueChange={(value: string) => setFilterType(value as FilterType)}>
+          <Select
+            value={filterType}
+            onValueChange={(value: string) =>
+              setFilterType(value as FilterType)
+            }
+          >
             <SelectTrigger className="w-40">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue />
-            </SelectTrigger><SelectContent>
+            </SelectTrigger>
+            <SelectContent>
               {filterOptions.map((option) => {
                 const Icon = option.icon;
                 return (
@@ -303,7 +333,10 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
 
         <div className="flex items-center gap-2">
           {/* Sort controls */}
-          <Select value={sortField} onValueChange={(value: string) => setSortField(value as SortField)}>
+          <Select
+            value={sortField}
+            onValueChange={(value: string) => setSortField(value as SortField)}
+          >
             <SelectTrigger className="w-40">
               <SelectValue />
             </SelectTrigger>
@@ -323,7 +356,11 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           </Select>
 
           <Button
-            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} onKeyDown={(e) => e.key === 'Enter' && setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            onKeyDown={(e) =>
+              e.key === 'Enter' &&
+              setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+            }
             className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
           >
             {sortOrder === 'asc' ? (
@@ -344,12 +381,13 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
       ) : filteredAndSortedResults.length === 0 ? (
         <div className="text-center py-12">
           <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No results found</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            No results found
+          </h3>
           <p className="text-gray-500">
             {hasActiveFilters
               ? 'Try adjusting your filters or search terms'
-              : 'No search results to display'
-            }
+              : 'No search results to display'}
           </p>
         </div>
       ) : (
@@ -359,7 +397,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
             <div className="flex items-center gap-2 py-2 border-b">
               <input
                 type="checkbox"
-                checked={selectedResults.size === filteredAndSortedResults.length}
+                checked={
+                  selectedResults.size === filteredAndSortedResults.length
+                }
                 onChange={handleSelectAll}
                 className="rounded border-gray-300"
               />
@@ -370,11 +410,14 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           )}
 
           {/* Results grid/list */}
-          <div className={cn(
-            'space-y-4',
-            viewMode === 'card' && 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 space-y-0',
-            viewMode === 'compact' && 'space-y-2',
-          )}>
+          <div
+            className={cn(
+              'space-y-4',
+              viewMode === 'card' &&
+                'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 space-y-0',
+              viewMode === 'compact' && 'space-y-2',
+            )}
+          >
             {paginatedResults.map((result) => (
               <div key={result.id} className="relative">
                 {/* Selection checkbox for card view */}
@@ -383,7 +426,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     <input
                       type="checkbox"
                       checked={selectedResults.has(result.id)}
-                      onChange={(e) => handleSelectResult(result.id, e.target.checked)}
+                      onChange={(e) =>
+                        handleSelectResult(result.id, e.target.checked)
+                      }
                       className="rounded border-gray-300 bg-white shadow-sm"
                     />
                   </div>
@@ -395,7 +440,9 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     <input
                       type="checkbox"
                       checked={selectedResults.has(result.id)}
-                      onChange={(e) => handleSelectResult(result.id, e.target.checked)}
+                      onChange={(e) =>
+                        handleSelectResult(result.id, e.target.checked)
+                      }
                       className="mt-2 rounded border-gray-300"
                     />
                     <div className="flex-1">
@@ -431,13 +478,17 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-6">
               <div className="text-sm text-gray-500">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredAndSortedResults.length)} of{' '}
+                Showing {startIndex + 1} to{' '}
+                {Math.min(endIndex, filteredAndSortedResults.length)} of{' '}
                 {totalCount || filteredAndSortedResults.length} results
               </div>
 
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={() => onPageChange?.(currentPage - 1)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(currentPage - 1)}
+                  onClick={() => onPageChange?.(currentPage - 1)}
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' && onPageChange?.(currentPage - 1)
+                  }
                   disabled={currentPage === 1}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
                 >
@@ -450,7 +501,10 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     return (
                       <Button
                         key={page}
-                        onClick={() => onPageChange?.(page)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(page)}
+                        onClick={() => onPageChange?.(page)}
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && onPageChange?.(page)
+                        }
                         className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 w-8 h-8 p-0 ${
                           currentPage === page
                             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -466,7 +520,10 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                     <>
                       <span className="text-gray-400">...</span>
                       <Button
-                        onClick={() => onPageChange?.(totalPages)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(totalPages)}
+                        onClick={() => onPageChange?.(totalPages)}
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && onPageChange?.(totalPages)
+                        }
                         className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 w-8 h-8 p-0 ${
                           currentPage === totalPages
                             ? 'bg-primary text-primary-foreground hover:bg-primary/90'
@@ -480,7 +537,10 @@ export const SearchResultsList: React.FC<SearchResultsListProps> = ({
                 </div>
 
                 <Button
-                  onClick={() => onPageChange?.(currentPage + 1)} onKeyDown={(e) => e.key === 'Enter' && onPageChange?.(currentPage + 1)}
+                  onClick={() => onPageChange?.(currentPage + 1)}
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' && onPageChange?.(currentPage + 1)
+                  }
                   disabled={currentPage === totalPages}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
                 >

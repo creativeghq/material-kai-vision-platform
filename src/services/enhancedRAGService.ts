@@ -135,9 +135,13 @@ export class EnhancedRAGService {
   /**
    * Perform enhanced RAG search with ML-powered query understanding
    */
-  static async search(request: EnhancedRAGRequest): Promise<EnhancedRAGResponse> {
+  static async search(
+    request: EnhancedRAGRequest,
+  ): Promise<EnhancedRAGResponse> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       const response = await mivaaApi.searchSemantic({
         query: request.query,
@@ -165,7 +169,9 @@ export class EnhancedRAGService {
   /**
    * Get material knowledge extractions for a specific material
    */
-  static async getMaterialKnowledge(materialId: string): Promise<MaterialKnowledgeEntry[]> {
+  static async getMaterialKnowledge(
+    materialId: string,
+  ): Promise<MaterialKnowledgeEntry[]> {
     try {
       const { data, error } = await supabase
         .from('material_knowledge_extraction')
@@ -184,7 +190,8 @@ export class EnhancedRAGService {
         extractionType: (item as any).extraction_type,
         extractedKnowledge: (item as any).extracted_knowledge,
         confidence: (item as any).confidence_score,
-        extractionContext: ((item as any).extraction_context as Record<string, unknown>) || {},
+        extractionContext:
+          ((item as any).extraction_context as Record<string, unknown>) || {},
         sourceFields: (item as any).source_fields || [],
         validationStatus: (item as any).validation_status,
         validatedBy: (item as any).validated_by,
@@ -218,7 +225,9 @@ export class EnhancedRAGService {
     technicalComplexity?: number;
   }) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -231,7 +240,10 @@ export class EnhancedRAGService {
 
       let analysisData = null;
       if (!response.success) {
-        console.warn('Knowledge analysis failed, proceeding without ML enhancement:', response.error);
+        console.warn(
+          'Knowledge analysis failed, proceeding without ML enhancement:',
+          response.error,
+        );
       } else {
         analysisData = response.data;
       }
@@ -250,7 +262,8 @@ export class EnhancedRAGService {
           language: entry.language || 'en',
           reading_level: entry.readingLevel,
           technical_complexity: entry.technicalComplexity,
-          embedding_1536: analysisData?.openai_embedding || analysisData?.custom_embedding,
+          embedding_1536:
+            analysisData?.openai_embedding || analysisData?.custom_embedding,
           confidence_scores: analysisData?.confidence_scores,
           search_keywords: analysisData?.search_keywords,
           created_by: user.id,
@@ -277,7 +290,9 @@ export class EnhancedRAGService {
   /**
    * Get knowledge relationships for a specific entry
    */
-  static async getKnowledgeRelationships(entryId: string): Promise<KnowledgeRelationship[]> {
+  static async getKnowledgeRelationships(
+    entryId: string,
+  ): Promise<KnowledgeRelationship[]> {
     try {
       const { data, error } = await supabase
         .from('knowledge_relationships')
@@ -319,7 +334,9 @@ export class EnhancedRAGService {
    */
   static async getQueryHistory(limit = 20): Promise<QueryIntelligence[]> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -342,10 +359,14 @@ export class EnhancedRAGService {
         processedQuery: (item as any).processed_query,
         queryIntent: (item as any).query_intent,
         queryType: (item as any).query_type,
-        entitiesDetected: ((item as any).entities_detected as Record<string, unknown>) || {},
-        userContext: ((item as any).user_context as Record<string, unknown>) || {},
-        sessionContext: ((item as any).session_context as Record<string, unknown>) || {},
-        projectContext: ((item as any).project_context as Record<string, unknown>) || {},
+        entitiesDetected:
+          ((item as any).entities_detected as Record<string, unknown>) || {},
+        userContext:
+          ((item as any).user_context as Record<string, unknown>) || {},
+        sessionContext:
+          ((item as any).session_context as Record<string, unknown>) || {},
+        projectContext:
+          ((item as any).project_context as Record<string, unknown>) || {},
         resultsReturned: (item as any).results_returned,
         userSatisfaction: (item as any).user_satisfaction,
         clickedResults: (item as any).clicked_results || [],
@@ -362,14 +383,19 @@ export class EnhancedRAGService {
   /**
    * Provide feedback on search results
    */
-  static async provideFeedback(searchId: string, feedback: {
-    satisfaction: number; // 1-5 scale
-    clickedResults: string[];
-    followUpQuery?: string;
-    notes?: string;
-  }) {
+  static async provideFeedback(
+    searchId: string,
+    feedback: {
+      satisfaction: number; // 1-5 scale
+      clickedResults: string[];
+      followUpQuery?: string;
+      notes?: string;
+    },
+  ) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -389,14 +415,12 @@ export class EnhancedRAGService {
 
       // Store additional feedback if provided
       if (feedback.followUpQuery || feedback.notes) {
-        await supabase
-          .from('search_analytics')
-          .insert({
-            user_id: user.id,
-            query_text: feedback.followUpQuery || 'feedback',
-            satisfaction_rating: feedback.satisfaction,
-            // Additional analytics fields would be populated
-          });
+        await supabase.from('search_analytics').insert({
+          user_id: user.id,
+          query_text: feedback.followUpQuery || 'feedback',
+          satisfaction_rating: feedback.satisfaction,
+          // Additional analytics fields would be populated
+        });
       }
 
       return { success: true };
@@ -414,13 +438,17 @@ export class EnhancedRAGService {
    */
   static async getSearchAnalytics(timeRange = '30 days') {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
 
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - parseInt(timeRange.split(' ')[0]));
+      startDate.setDate(
+        startDate.getDate() - parseInt(timeRange.split(' ')[0]),
+      );
 
       const { data, error } = await supabase
         .from('search_analytics')
@@ -435,26 +463,37 @@ export class EnhancedRAGService {
 
       // Calculate insights
       const totalSearches = data.length;
-      const avgSatisfaction = data
-        .filter((s: unknown) => (s as any).satisfaction_rating)
-        .reduce((sum: number, s: any) => sum + (s as any).satisfaction_rating, 0) /
-        data.filter((s: unknown) => (s as any).satisfaction_rating).length || 0;
+      const avgSatisfaction =
+        data
+          .filter((s: unknown) => (s as any).satisfaction_rating)
+          .reduce(
+            (sum: number, s: any) => sum + (s as any).satisfaction_rating,
+            0,
+          ) /
+          data.filter((s: unknown) => (s as any).satisfaction_rating).length ||
+        0;
 
-      const avgResponseTime = data
-        .reduce((sum: number, s: any) => sum + ((s as any).response_time_ms || 0), 0) / data.length || 0;
+      const avgResponseTime =
+        data.reduce(
+          (sum: number, s: any) => sum + ((s as any).response_time_ms || 0),
+          0,
+        ) / data.length || 0;
 
-      const topQueries = data
-        .reduce((acc: any, search: any) => {
-          acc[(search as any).query_text] = (acc[(search as any).query_text] || 0) + 1;
+      const topQueries = data.reduce(
+        (acc: any, search: any) => {
+          acc[(search as any).query_text] =
+            (acc[(search as any).query_text] || 0) + 1;
           return acc;
-        }, {} as Record<string, number>);
+        },
+        {} as Record<string, number>,
+      );
 
       return {
         totalSearches,
         avgSatisfaction: Math.round(avgSatisfaction * 100) / 100,
         avgResponseTime: Math.round(avgResponseTime),
         topQueries: Object.entries(topQueries)
-          .sort(([,a], [,b]) => (b as number) - (a as number))
+          .sort(([, a], [, b]) => (b as number) - (a as number))
           .slice(0, 10)
           .map(([query, count]) => ({ query, count })),
         searchHistory: data.slice(0, 50), // Recent searches
@@ -470,9 +509,14 @@ export class EnhancedRAGService {
   /**
    * Extract knowledge from material descriptions and properties
    */
-  static async extractMaterialKnowledge(materialId: string, forceReextraction = false) {
+  static async extractMaterialKnowledge(
+    materialId: string,
+    forceReextraction = false,
+  ) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -483,12 +527,18 @@ export class EnhancedRAGService {
           .from('material_knowledge_extraction')
           .select('id')
           .eq('material_id', materialId)
-          .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // 7 days
+          .gte(
+            'created_at',
+            new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          ) // 7 days
           .limit(1);
 
         if (existingData && existingData.length > 0) {
           console.log('Material knowledge already extracted recently');
-          return { success: true, message: 'Knowledge already extracted recently' };
+          return {
+            success: true,
+            message: 'Knowledge already extracted recently',
+          };
         }
       }
 
@@ -517,9 +567,15 @@ export class EnhancedRAGService {
   /**
    * Validate extracted knowledge
    */
-  static async validateKnowledge(extractionId: string, isValid: boolean, notes?: string) {
+  static async validateKnowledge(
+    extractionId: string,
+    isValid: boolean,
+    notes?: string,
+  ) {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }

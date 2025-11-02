@@ -90,11 +90,7 @@ export class ProposalsService {
       const response = await this.apiService.call<
         { limit: number; offset: number },
         { data: Proposal[]; count: number }
-      >(
-        'proposals-api',
-        { limit, offset },
-        { method: 'GET' },
-      );
+      >('proposals-api', { limit, offset }, { method: 'GET' });
 
       return response as { data: Proposal[]; count: number };
     } catch (error) {
@@ -111,11 +107,7 @@ export class ProposalsService {
       const response = await this.apiService.call<
         { proposal_id: string },
         Proposal
-      >(
-        'proposals-api',
-        { proposal_id: proposalId },
-        { method: 'GET' },
-      );
+      >('proposals-api', { proposal_id: proposalId }, { method: 'GET' });
 
       return response as Proposal;
     } catch (error) {
@@ -171,11 +163,7 @@ export class ProposalsService {
       const response = await this.apiService.call<
         { proposal_id: string },
         Proposal
-      >(
-        'proposals-api',
-        { proposal_id: proposalId },
-        { method: 'PUT' },
-      );
+      >('proposals-api', { proposal_id: proposalId }, { method: 'PUT' });
 
       return response as Proposal;
     } catch (error) {
@@ -192,11 +180,7 @@ export class ProposalsService {
       const response = await this.apiService.call<
         { proposal_id: string },
         Proposal
-      >(
-        'proposals-api',
-        { proposal_id: proposalId },
-        { method: 'PUT' },
-      );
+      >('proposals-api', { proposal_id: proposalId }, { method: 'PUT' });
 
       return response as Proposal;
     } catch (error) {
@@ -208,7 +192,11 @@ export class ProposalsService {
   /**
    * Calculate total
    */
-  calculateTotal(subtotal: number, tax: number = 0, discount: number = 0): number {
+  calculateTotal(
+    subtotal: number,
+    tax: number = 0,
+    discount: number = 0,
+  ): number {
     return subtotal + tax - discount;
   }
 
@@ -248,4 +236,3 @@ export class ProposalsService {
 }
 
 export default ProposalsService;
-

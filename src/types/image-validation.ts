@@ -9,7 +9,11 @@
 /**
  * Image Validation Status Types
  */
-export type ImageValidationStatus = 'pending' | 'valid' | 'invalid' | 'needs_review';
+export type ImageValidationStatus =
+  | 'pending'
+  | 'valid'
+  | 'invalid'
+  | 'needs_review';
 
 /**
  * Image Quality Metrics
@@ -200,4 +204,3 @@ export interface Phase21Database {
     Update: ImageValidationUpdate;
   };
 }
-

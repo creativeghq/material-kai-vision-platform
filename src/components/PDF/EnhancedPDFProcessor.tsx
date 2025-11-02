@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
-
   Upload,
   AlertCircle,
   CheckCircle,
@@ -17,7 +16,13 @@ import {
 } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,19 +30,30 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 
 /**
  * Call MIVAA Gateway directly using fetch to avoid CORS issues
  */
-async function callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
+async function callMivaaGatewayDirect(
+  action: string,
+  payload: any,
+): Promise<any> {
   const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
   const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    throw new Error('CRITICAL: Supabase configuration missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.');
+    throw new Error(
+      'CRITICAL: Supabase configuration missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY environment variables.',
+    );
   }
 
   const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
@@ -46,7 +62,7 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
+        Authorization: `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -56,14 +72,18 @@ async function callMivaaGatewayDirect(action: string, payload: any): Promise<any
     });
 
     if (!response.ok) {
-      throw new Error(`MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`);
+      throw new Error(
+        `MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`,
+      );
     }
 
     const data = await response.json();
 
     // Check for application-level errors
     if (!data.success && data.error) {
-      throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
+      throw new Error(
+        `MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`,
+      );
     }
 
     return data;
@@ -128,8 +148,8 @@ function calculateLayoutPreservationQuality(chunks: PDFChunk[]): number {
   if (!chunks || chunks.length === 0) return 0.5;
 
   // Calculate based on chunk hierarchy and structure preservation
-  const hierarchyLevels = new Set(chunks.map(c => c.hierarchyLevel));
-  const chunkTypes = new Set(chunks.map(c => c.chunkType));
+  const hierarchyLevels = new Set(chunks.map((c) => c.hierarchyLevel));
+  const chunkTypes = new Set(chunks.map((c) => c.chunkType));
 
   // More hierarchy levels and chunk types = better layout preservation
   const hierarchyScore = Math.min(1.0, hierarchyLevels.size / 5);
@@ -142,16 +162,20 @@ function calculateChunkingQuality(chunks: PDFChunk[]): number {
   if (!chunks || chunks.length === 0) return 0.5;
 
   // Calculate based on chunk size consistency and boundaries
-  const sizes = chunks.map(c => c.text.length);
+  const sizes = chunks.map((c) => c.text.length);
   const avgSize = sizes.reduce((a, b) => a + b, 0) / sizes.length;
-  const variance = sizes.reduce((sum, size) => sum + Math.pow(size - avgSize, 2), 0) / sizes.length;
+  const variance =
+    sizes.reduce((sum, size) => sum + Math.pow(size - avgSize, 2), 0) /
+    sizes.length;
   const stdDev = Math.sqrt(variance);
 
   // Lower variance = better chunking quality
   const consistencyScore = Math.max(0, 1 - stdDev / avgSize);
 
   // Check for proper boundaries (sentences ending with punctuation)
-  const properBoundaries = chunks.filter(c => /[.!?]$/.test(c.text.trim())).length;
+  const properBoundaries = chunks.filter((c) =>
+    /[.!?]$/.test(c.text.trim()),
+  ).length;
   const boundaryScore = properBoundaries / chunks.length;
 
   return Math.round((consistencyScore * 0.5 + boundaryScore * 0.5) * 100) / 100;
@@ -161,8 +185,12 @@ function calculateImageMappingAccuracy(images: PDFImage[]): number {
   if (!images || images.length === 0) return 0.5;
 
   // Calculate based on image metadata completeness
-  const withMetadata = images.filter(img => img.metadata && Object.keys(img.metadata).length > 0).length;
-  const withPosition = images.filter(img => img.position && img.position.width > 0 && img.position.height > 0).length;
+  const withMetadata = images.filter(
+    (img) => img.metadata && Object.keys(img.metadata).length > 0,
+  ).length;
+  const withPosition = images.filter(
+    (img) => img.position && img.position.width > 0 && img.position.height > 0,
+  ).length;
 
   const metadataScore = withMetadata / images.length;
   const positionScore = withPosition / images.length;
@@ -170,13 +198,21 @@ function calculateImageMappingAccuracy(images: PDFImage[]): number {
   return Math.round((metadataScore * 0.5 + positionScore * 0.5) * 100) / 100;
 }
 
-function calculateOverallQuality(chunks: PDFChunk[], images: PDFImage[]): number {
+function calculateOverallQuality(
+  chunks: PDFChunk[],
+  images: PDFImage[],
+): number {
   const layoutScore = calculateLayoutPreservationQuality(chunks);
   const chunkingScore = calculateChunkingQuality(chunks);
   const imageMappingScore = calculateImageMappingAccuracy(images);
 
   // Weighted average of all quality metrics
-  return Math.round((layoutScore * 0.35 + chunkingScore * 0.35 + imageMappingScore * 0.30) * 100) / 100;
+  return (
+    Math.round(
+      (layoutScore * 0.35 + chunkingScore * 0.35 + imageMappingScore * 0.3) *
+        100,
+    ) / 100
+  );
 }
 
 interface PDFLayoutElement {
@@ -261,29 +297,34 @@ export function EnhancedPDFProcessor() {
   const [selectedJob, setSelectedJob] = useState<ProcessingJob | null>(null);
 
   // Helper function to update job status - defined first since other functions depend on it
-  const updateJobStatus = useCallback((
-    jobId: string,
-    status: ProcessingStatus['status'],
-    progress: number,
-    currentStep: string,
-    error?: string,
-  ) => {
-    setProcessingJobs(prev => prev.map(job => {
-      if (job.id === jobId) {
-        const updatedJob: ProcessingJob = {
-          ...job,
-          status,
-          progress,
-          currentStep,
-        };
-        if (error !== undefined) {
-          updatedJob.error = error;
-        }
-        return updatedJob;
-      }
-      return job;
-    }));
-  }, []);
+  const updateJobStatus = useCallback(
+    (
+      jobId: string,
+      status: ProcessingStatus['status'],
+      progress: number,
+      currentStep: string,
+      error?: string,
+    ) => {
+      setProcessingJobs((prev) =>
+        prev.map((job) => {
+          if (job.id === jobId) {
+            const updatedJob: ProcessingJob = {
+              ...job,
+              status,
+              progress,
+              currentStep,
+            };
+            if (error !== undefined) {
+              updatedJob.error = error;
+            }
+            return updatedJob;
+          }
+          return job;
+        }),
+      );
+    },
+    [],
+  );
 
   // Search function
   const handleSearch = useCallback(async () => {
@@ -310,15 +351,17 @@ export function EnhancedPDFProcessor() {
       const searchResults = data?.results || [];
 
       // Transform results to match expected format
-      const transformedResults = searchResults.map((result: any, index: number) => ({
-        id: result.id || `result-${index + 1}`,
-        text: result.content || result.text || 'No content available',
-        chunk_type: result.chunk_type || 'paragraph',
-        page_number: result.page_number || 1,
-        chunk_index: result.chunk_index || index,
-        similarity_score: result.similarity_score || result.score || 0.5,
-        metadata: result.metadata || { source: 'semantic_search' },
-      }));
+      const transformedResults = searchResults.map(
+        (result: any, index: number) => ({
+          id: result.id || `result-${index + 1}`,
+          text: result.content || result.text || 'No content available',
+          chunk_type: result.chunk_type || 'paragraph',
+          page_number: result.page_number || 1,
+          chunk_index: result.chunk_index || index,
+          similarity_score: result.similarity_score || result.score || 0.5,
+          metadata: result.metadata || { source: 'semantic_search' },
+        }),
+      );
 
       setSearchResults(transformedResults);
 
@@ -337,195 +380,254 @@ export function EnhancedPDFProcessor() {
   }, [searchQuery, toast]);
 
   // File processing function
-  const processFile = useCallback(async (file: File) => {
-    const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const processFile = useCallback(
+    async (file: File) => {
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    // Add to processing queue
-    const newJob: ProcessingJob = {
-      id: jobId,
-      filename: file.name,
-      status: 'pending',
-      progress: 0,
-      currentStep: 'Initializing...',
-      startTime: new Date(),
-    };
-
-    setProcessingJobs(prev => [...prev, newJob]);
-
-    try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Update status
-      updateJobStatus(jobId, 'processing', 10, 'Uploading file...');
-
-      // Upload file to storage
-      setUploadProgress(20);
-      const fileName = `${user.id}/${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('pdf-documents')
-        .upload(fileName, file);
-
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('pdf-documents')
-        .getPublicUrl(fileName);
-
-      setUploadProgress(40);
-      updateJobStatus(jobId, 'processing', 30, 'Processing PDF with MIVAA...');
-
-      // Process PDF using MIVAA integration service via direct call
-      const extractionResponse = await callMivaaGatewayDirect('pdf_process_document', {
-        documentId: publicUrl,
-        extractionType: 'all',
-        outputFormat: 'json',
-      });
-
-      if (!extractionResponse.success) {
-        throw new Error(`PDF extraction failed: ${extractionResponse.error?.message || 'Unknown error'}`);
-      }
-
-      const extractionResult = extractionResponse.data;
-
-      console.log('MIVAA extraction result:', extractionResult);
-
-      // Use the document ID from MIVAA response, fallback to generated ID
-      const documentId = extractionResult?.document_id || `${file.name.replace(/\.[^/.]+$/, '')}_${Date.now()}`;
-
-      if (!documentId) {
-        console.error('No document ID found in response:', extractionResult);
-        throw new Error('Document was not properly added to knowledge base. Please try again.');
-      }
-
-      console.log('Document successfully added to knowledge base with ID:', documentId);
-
-      updateJobStatus(jobId, 'processing', 50, 'Starting enhanced processing simulation...');
-
-      // Update job with document ID
-      setProcessingJobs(prev => prev.map(job =>
-        job.id === jobId ? { ...job, documentId } : job,
-      ));
-      // Show enhanced processing workflow
-      updateJobStatus(jobId, 'processing', 70, 'Applying enhanced processing features...');
-
-      // Processing time for enhanced features
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      updateJobStatus(jobId, 'processing', 90, 'Generating quality metrics...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Create results structure from MIVAA response
-      const mivaaResults = {
-        documentId,
-        chunks: extractionResult?.content?.chunks?.map((chunk: any, index: number) => ({
-          id: `chunk-${index}`,
-          documentId: documentId,
-          chunkIndex: index,
-          text: chunk.content || chunk.text || '',
-          htmlContent: `<p>${chunk.content || chunk.text || ''}</p>`,
-          chunkType: 'paragraph' as const,
-          hierarchyLevel: 1,
-          pageNumber: chunk.page_number || 1,
-          metadata: chunk.metadata || {},
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        })) || [
-          // Fallback chunk from markdown content if no chunks provided
-          {
-            id: 'chunk-0',
-            documentId: documentId,
-            chunkIndex: 0,
-            text: extractionResult?.content?.markdown_content || 'No content extracted',
-            htmlContent: `<p>${extractionResult?.content?.markdown_content || 'No content extracted'}</p>`,
-            chunkType: 'paragraph' as const,
-            hierarchyLevel: 1,
-            pageNumber: 1,
-            metadata: { source: 'mivaa_markdown' },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        ],
-        images: extractionResult?.content?.images || [],
-        layout: [], // MIVAA doesn't provide layout data yet
-        quality: {
-          id: 'quality-1',
-          documentId: documentId,
-          // Step 5: Calculate real quality scores based on actual data (not hardcoded 0.85, 0.90, 0.95)
-          layoutPreservation: calculateLayoutPreservationQuality(extractionResult?.content?.chunks || []),
-          chunkingQuality: calculateChunkingQuality(extractionResult?.content?.chunks || []),
-          imageMappingAccuracy: calculateImageMappingAccuracy(extractionResult?.content?.images || []),
-          overallQuality: calculateOverallQuality(
-            extractionResult?.content?.chunks || [],
-            extractionResult?.content?.images || [],
-          ),
-          statistics: {
-            totalChunks: extractionResult?.content?.chunks?.length || 1,
-            totalImages: extractionResult?.content?.images?.length || 0,
-            wordCount: extractionResult?.metrics?.word_count || 0,
-            pageCount: extractionResult?.metrics?.page_count || 0,
-          },
-          processingTimeMs: (extractionResult?.metrics?.processing_time_seconds || 0) * 1000,
-          createdAt: new Date().toISOString(),
-        },
-        summary: {
-          totalChunks: extractionResult?.content?.chunks?.length || 1,
-          totalImages: extractionResult?.content?.images?.length || 0,
-          totalPages: extractionResult?.metrics?.page_count || 1,
-          overallQuality: 0.85,
-          wordCount: extractionResult?.metrics?.word_count || 0,
-          processingTime: extractionResult?.metrics?.processing_time_seconds || 0,
-          author: extractionResult?.metadata?.author || null,
-          title: extractionResult?.metadata?.title || file.name,
-        },
+      // Add to processing queue
+      const newJob: ProcessingJob = {
+        id: jobId,
+        filename: file.name,
+        status: 'pending',
+        progress: 0,
+        currentStep: 'Initializing...',
+        startTime: new Date(),
       };
 
-      updateJobStatus(jobId, 'completed', 100, 'Enhanced processing completed successfully');
-      setProcessingJobs(prev => prev.map(job =>
-        job.id === jobId
-          ? { ...job, results: mivaaResults, endTime: new Date() }
-          : job,
-      ));
+      setProcessingJobs((prev) => [...prev, newJob]);
 
-      toast({
-        title: 'PDF Processing Complete',
-        description: `${file.name} has been processed and added to your knowledge base. You can now search through it or view the processing results in the Results tab.`,
-        duration: 5000,
-      });
+      try {
+        // Get current user
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
+        if (userError || !user) {
+          throw new Error('User not authenticated');
+        }
 
-    } catch (error) {
-      console.error('Enhanced PDF processing error:', error);
+        // Update status
+        updateJobStatus(jobId, 'processing', 10, 'Uploading file...');
 
-      updateJobStatus(
-        jobId,
-        'failed',
-        0,
-        'Processing failed',
-        error instanceof Error ? error.message : 'Unknown error',
-      );
+        // Upload file to storage
+        setUploadProgress(20);
+        const fileName = `${user.id}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('pdf-documents')
+          .upload(fileName, file);
 
-      toast({
-        title: 'Processing Failed',
-        description: `Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        variant: 'destructive',
-      });
-    } finally {
-      setUploadProgress(0);
-    }
-  }, [updateJobStatus, toast]);
+        if (uploadError) {
+          throw new Error(`Upload failed: ${uploadError.message}`);
+        }
+
+        // Get public URL
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('pdf-documents').getPublicUrl(fileName);
+
+        setUploadProgress(40);
+        updateJobStatus(
+          jobId,
+          'processing',
+          30,
+          'Processing PDF with MIVAA...',
+        );
+
+        // Process PDF using MIVAA integration service via direct call
+        const extractionResponse = await callMivaaGatewayDirect(
+          'pdf_process_document',
+          {
+            documentId: publicUrl,
+            extractionType: 'all',
+            outputFormat: 'json',
+          },
+        );
+
+        if (!extractionResponse.success) {
+          throw new Error(
+            `PDF extraction failed: ${extractionResponse.error?.message || 'Unknown error'}`,
+          );
+        }
+
+        const extractionResult = extractionResponse.data;
+
+        console.log('MIVAA extraction result:', extractionResult);
+
+        // Use the document ID from MIVAA response, fallback to generated ID
+        const documentId =
+          extractionResult?.document_id ||
+          `${file.name.replace(/\.[^/.]+$/, '')}_${Date.now()}`;
+
+        if (!documentId) {
+          console.error('No document ID found in response:', extractionResult);
+          throw new Error(
+            'Document was not properly added to knowledge base. Please try again.',
+          );
+        }
+
+        console.log(
+          'Document successfully added to knowledge base with ID:',
+          documentId,
+        );
+
+        updateJobStatus(
+          jobId,
+          'processing',
+          50,
+          'Starting enhanced processing simulation...',
+        );
+
+        // Update job with document ID
+        setProcessingJobs((prev) =>
+          prev.map((job) => (job.id === jobId ? { ...job, documentId } : job)),
+        );
+        // Show enhanced processing workflow
+        updateJobStatus(
+          jobId,
+          'processing',
+          70,
+          'Applying enhanced processing features...',
+        );
+
+        // Processing time for enhanced features
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        updateJobStatus(
+          jobId,
+          'processing',
+          90,
+          'Generating quality metrics...',
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Create results structure from MIVAA response
+        const mivaaResults = {
+          documentId,
+          chunks: extractionResult?.content?.chunks?.map(
+            (chunk: any, index: number) => ({
+              id: `chunk-${index}`,
+              documentId: documentId,
+              chunkIndex: index,
+              text: chunk.content || chunk.text || '',
+              htmlContent: `<p>${chunk.content || chunk.text || ''}</p>`,
+              chunkType: 'paragraph' as const,
+              hierarchyLevel: 1,
+              pageNumber: chunk.page_number || 1,
+              metadata: chunk.metadata || {},
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            }),
+          ) || [
+            // Fallback chunk from markdown content if no chunks provided
+            {
+              id: 'chunk-0',
+              documentId: documentId,
+              chunkIndex: 0,
+              text:
+                extractionResult?.content?.markdown_content ||
+                'No content extracted',
+              htmlContent: `<p>${extractionResult?.content?.markdown_content || 'No content extracted'}</p>`,
+              chunkType: 'paragraph' as const,
+              hierarchyLevel: 1,
+              pageNumber: 1,
+              metadata: { source: 'mivaa_markdown' },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            },
+          ],
+          images: extractionResult?.content?.images || [],
+          layout: [], // MIVAA doesn't provide layout data yet
+          quality: {
+            id: 'quality-1',
+            documentId: documentId,
+            // Step 5: Calculate real quality scores based on actual data (not hardcoded 0.85, 0.90, 0.95)
+            layoutPreservation: calculateLayoutPreservationQuality(
+              extractionResult?.content?.chunks || [],
+            ),
+            chunkingQuality: calculateChunkingQuality(
+              extractionResult?.content?.chunks || [],
+            ),
+            imageMappingAccuracy: calculateImageMappingAccuracy(
+              extractionResult?.content?.images || [],
+            ),
+            overallQuality: calculateOverallQuality(
+              extractionResult?.content?.chunks || [],
+              extractionResult?.content?.images || [],
+            ),
+            statistics: {
+              totalChunks: extractionResult?.content?.chunks?.length || 1,
+              totalImages: extractionResult?.content?.images?.length || 0,
+              wordCount: extractionResult?.metrics?.word_count || 0,
+              pageCount: extractionResult?.metrics?.page_count || 0,
+            },
+            processingTimeMs:
+              (extractionResult?.metrics?.processing_time_seconds || 0) * 1000,
+            createdAt: new Date().toISOString(),
+          },
+          summary: {
+            totalChunks: extractionResult?.content?.chunks?.length || 1,
+            totalImages: extractionResult?.content?.images?.length || 0,
+            totalPages: extractionResult?.metrics?.page_count || 1,
+            overallQuality: 0.85,
+            wordCount: extractionResult?.metrics?.word_count || 0,
+            processingTime:
+              extractionResult?.metrics?.processing_time_seconds || 0,
+            author: extractionResult?.metadata?.author || null,
+            title: extractionResult?.metadata?.title || file.name,
+          },
+        };
+
+        updateJobStatus(
+          jobId,
+          'completed',
+          100,
+          'Enhanced processing completed successfully',
+        );
+        setProcessingJobs((prev) =>
+          prev.map((job) =>
+            job.id === jobId
+              ? { ...job, results: mivaaResults, endTime: new Date() }
+              : job,
+          ),
+        );
+
+        toast({
+          title: 'PDF Processing Complete',
+          description: `${file.name} has been processed and added to your knowledge base. You can now search through it or view the processing results in the Results tab.`,
+          duration: 5000,
+        });
+      } catch (error) {
+        console.error('Enhanced PDF processing error:', error);
+
+        updateJobStatus(
+          jobId,
+          'failed',
+          0,
+          'Processing failed',
+          error instanceof Error ? error.message : 'Unknown error',
+        );
+
+        toast({
+          title: 'Processing Failed',
+          description: `Failed to process ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          variant: 'destructive',
+        });
+      } finally {
+        setUploadProgress(0);
+      }
+    },
+    [updateJobStatus, toast],
+  );
 
   // File drop handler
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    for (const file of acceptedFiles) {
-      await processFile(file);
-    }
-  }, [processFile]);
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      for (const file of acceptedFiles) {
+        await processFile(file);
+      }
+    },
+    [processFile],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -540,9 +642,12 @@ export function EnhancedPDFProcessor() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Enhanced PDF Processor</h2>
+        <h2 className="text-3xl font-bold tracking-tight">
+          Enhanced PDF Processor
+        </h2>
         <p className="text-muted-foreground">
-          Advanced PDF processing with layout analysis, image mapping, and intelligent chunking
+          Advanced PDF processing with layout analysis, image mapping, and
+          intelligent chunking
         </p>
       </div>
 
@@ -565,7 +670,8 @@ export function EnhancedPDFProcessor() {
                   Upload PDFs
                 </CardTitle>
                 <CardDescription>
-                  Drop PDF files here or click to select. Maximum 5 files, 50MB each.
+                  Drop PDF files here or click to select. Maximum 5 files, 50MB
+                  each.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -620,7 +726,7 @@ export function EnhancedPDFProcessor() {
                     id="layout-analysis"
                     checked={options.enableLayoutAnalysis || false}
                     onCheckedChange={(checked) =>
-                      setOptions(prev => ({
+                      setOptions((prev) => ({
                         ...prev,
                         enableLayoutAnalysis: checked === true,
                       }))
@@ -647,7 +753,7 @@ export function EnhancedPDFProcessor() {
                     id="image-mapping"
                     checked={options.enableImageMapping || false}
                     onCheckedChange={(checked) =>
-                      setOptions(prev => ({
+                      setOptions((prev) => ({
                         ...prev,
                         enableImageMapping: checked === true,
                       }))
@@ -672,7 +778,8 @@ export function EnhancedPDFProcessor() {
                 <Alert>
                   <Brain className="h-4 w-4" />
                   <AlertDescription>
-                    Enhanced processing provides superior quality but takes longer than standard processing.
+                    Enhanced processing provides superior quality but takes
+                    longer than standard processing.
                   </AlertDescription>
                 </Alert>
               </CardContent>
@@ -807,7 +914,8 @@ export function EnhancedPDFProcessor() {
                 Processing Results
               </CardTitle>
               <CardDescription>
-                View detailed results and quality metrics for processed documents
+                View detailed results and quality metrics for processed
+                documents
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -817,32 +925,46 @@ export function EnhancedPDFProcessor() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Document ID</div>
-                      <div className="text-sm text-muted-foreground">{selectedJob.results.documentId}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {selectedJob.results.documentId}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Quality Score</div>
                       <div className="text-sm text-muted-foreground">
-                        {Math.round(selectedJob.results.quality.overallQuality * 100)}%
+                        {Math.round(
+                          selectedJob.results.quality.overallQuality * 100,
+                        )}
+                        %
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Total Chunks</div>
-                      <div className="text-sm text-muted-foreground">{selectedJob.results.summary.totalChunks}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {selectedJob.results.summary.totalChunks}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Total Pages</div>
-                      <div className="text-sm text-muted-foreground">{selectedJob.results.summary.totalPages}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {selectedJob.results.summary.totalPages}
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <div className="text-sm font-medium">Sample Chunks</div>
                     <div className="space-y-2">
                       {selectedJob.results.chunks.slice(0, 3).map((chunk) => (
-                        <div key={chunk.id} className="border rounded p-3 text-sm">
+                        <div
+                          key={chunk.id}
+                          className="border rounded p-3 text-sm"
+                        >
                           <div className="font-medium mb-1">
                             {chunk.chunkType} - Page {chunk.pageNumber}
                           </div>
-                          <div className="text-muted-foreground">{chunk.text}</div>
+                          <div className="text-muted-foreground">
+                            {chunk.text}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -852,7 +974,8 @@ export function EnhancedPDFProcessor() {
                 <div className="text-center py-8">
                   <BarChart3 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">
-                    No results selected. Complete a processing job and click "View Results" to see detailed analysis.
+                    No results selected. Complete a processing job and click
+                    "View Results" to see detailed analysis.
                   </p>
                 </div>
               )}
@@ -883,7 +1006,9 @@ export function EnhancedPDFProcessor() {
                     <SelectContent>
                       <SelectItem value="fast">Fast (Lower Quality)</SelectItem>
                       <SelectItem value="balanced">Balanced</SelectItem>
-                      <SelectItem value="high">High Quality (Slower)</SelectItem>
+                      <SelectItem value="high">
+                        High Quality (Slower)
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -896,7 +1021,9 @@ export function EnhancedPDFProcessor() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="small">Small (256 tokens)</SelectItem>
-                      <SelectItem value="medium">Medium (512 tokens)</SelectItem>
+                      <SelectItem value="medium">
+                        Medium (512 tokens)
+                      </SelectItem>
                       <SelectItem value="large">Large (1024 tokens)</SelectItem>
                     </SelectContent>
                   </Select>
@@ -923,7 +1050,8 @@ export function EnhancedPDFProcessor() {
               <Alert>
                 <Brain className="h-4 w-4" />
                 <AlertDescription>
-                  These settings will be applied to future processing jobs. Existing jobs won't be affected.
+                  These settings will be applied to future processing jobs.
+                  Existing jobs won't be affected.
                 </AlertDescription>
               </Alert>
             </CardContent>

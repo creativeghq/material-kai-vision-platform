@@ -6,11 +6,7 @@
  */
 
 // Legacy API Configuration System
-import {
-  apiRegistry,
-  ApiConfig,
-  SupabaseApiConfig,
-} from './apiConfig';
+import { apiRegistry, ApiConfig, SupabaseApiConfig } from './apiConfig';
 import replicateConfig from './apis/replicateConfig';
 import supabaseConfig from './apis/supabaseConfig';
 import { huggingfaceConfig } from './apis/huggingfaceConfig';
@@ -35,7 +31,10 @@ export const initializeConfiguration = async (): Promise<AppConfig> => {
     initializeApiConfigurations();
 
     console.log('✅ Complete configuration system initialized successfully');
-    console.log('📊 Centralized config summary:', configFactory.getConfigSummary());
+    console.log(
+      '📊 Centralized config summary:',
+      configFactory.getConfigSummary(),
+    );
     console.log('🔌 API config summary:', ApiConfigManager.getConfigSummary());
 
     return globalConfig;
@@ -50,7 +49,9 @@ export const initializeConfiguration = async (): Promise<AppConfig> => {
  */
 export const getConfig = (): AppConfig => {
   if (!globalConfig) {
-    throw new Error('Configuration not initialized. Call initializeConfiguration() first.');
+    throw new Error(
+      'Configuration not initialized. Call initializeConfiguration() first.',
+    );
   }
   return globalConfig;
 };
@@ -138,9 +139,7 @@ export type {
 } from './apiConfig';
 
 // Export new centralized configuration types and factory
-export {
-  configFactory,
-};
+export { configFactory };
 export type { AppConfig };
 
 // Export types for external use
@@ -153,7 +152,10 @@ export class ConfigurationError extends Error {
   public readonly missingFields: string[];
 
   constructor(configType: string, missingFields: string[], message?: string) {
-    super(message || `Configuration error for ${configType}: missing fields ${missingFields.join(', ')}`);
+    super(
+      message ||
+        `Configuration error for ${configType}: missing fields ${missingFields.join(', ')}`,
+    );
     this.name = 'ConfigurationError';
     this.configType = configType;
     this.missingFields = missingFields;
@@ -172,7 +174,9 @@ export class ApiConfigManager {
   /**
    * Get a specific API configuration by type
    */
-  public static getApiConfigByType<T extends ApiConfig>(type: string): T | null {
+  public static getApiConfigByType<T extends ApiConfig>(
+    type: string,
+  ): T | null {
     const config = apiRegistry.getApiConfigByType<T>(type);
 
     if (!config) {
@@ -181,13 +185,16 @@ export class ApiConfigManager {
 
     // During build time, skip validation and return config with placeholders
     // Environment variables will be provided at runtime via GitHub/Vercel/Supabase
-    const isBuildTime = typeof window === 'undefined' && process.env.NODE_ENV !== 'production';
+    const isBuildTime =
+      typeof window === 'undefined' && process.env.NODE_ENV !== 'production';
 
     if (!isBuildTime) {
       // Validate configuration has required fields only at runtime
       const validation = this.validateConfigurationFields(config);
       if (!validation.isValid) {
-        console.warn(`Configuration for ${type} is missing required fields: ${validation.missingFields.join(', ')} - will be provided at runtime`);
+        console.warn(
+          `Configuration for ${type} is missing required fields: ${validation.missingFields.join(', ')} - will be provided at runtime`,
+        );
         // Don't throw error, just warn - allow the app to start
       }
     }
@@ -210,7 +217,7 @@ export class ApiConfigManager {
     const configs = apiRegistry.getAllConfigs();
     const isServerSide = typeof window === 'undefined';
 
-    configs.forEach(config => {
+    configs.forEach((config) => {
       // Only validate private API keys on server-side
       if (config.type === 'replicate' && isServerSide && !config.apiKey) {
         missing.push('REPLICATE_API_TOKEN');
@@ -251,7 +258,7 @@ export class ApiConfigManager {
     const configs = apiRegistry.getAllConfigs();
     const configsByType: Record<string, number> = {};
 
-    configs.forEach(config => {
+    configs.forEach((config) => {
       configsByType[config.type] = (configsByType[config.type] || 0) + 1;
     });
 
@@ -287,13 +294,16 @@ export class ApiConfigManager {
     // Type-specific validation
     // During build time (when process.env.NODE_ENV is not 'production' and window is undefined),
     // we allow missing API keys as they'll be provided at runtime via GitHub/Vercel/Supabase
-    const isBuildTime = typeof window === 'undefined' && process.env.NODE_ENV !== 'production';
+    const isBuildTime =
+      typeof window === 'undefined' && process.env.NODE_ENV !== 'production';
 
     switch (config.type) {
       case 'replicate':
         // Replicate configs need API key (server-side only, but not during build)
         if (typeof window === 'undefined' && !config.apiKey && !isBuildTime) {
-          errors.push('Missing Replicate API key (server-side) - will be provided at runtime');
+          errors.push(
+            'Missing Replicate API key (server-side) - will be provided at runtime',
+          );
           missingFields.push('apiKey');
         }
         break;
@@ -301,11 +311,15 @@ export class ApiConfigManager {
       case 'supabase':
         const supabaseConfig = config as SupabaseApiConfig;
         if (!supabaseConfig.projectUrl && !isBuildTime) {
-          errors.push('Missing Supabase project URL - will be provided at runtime');
+          errors.push(
+            'Missing Supabase project URL - will be provided at runtime',
+          );
           missingFields.push('projectUrl');
         }
         if (!supabaseConfig.anonKey && !isBuildTime) {
-          errors.push('Missing Supabase anonymous key - will be provided at runtime');
+          errors.push(
+            'Missing Supabase anonymous key - will be provided at runtime',
+          );
           missingFields.push('anonKey');
         }
         break;
@@ -313,7 +327,9 @@ export class ApiConfigManager {
       case 'huggingface':
         // HuggingFace configs need API key (server-side only, but not during build)
         if (typeof window === 'undefined' && !config.apiKey && !isBuildTime) {
-          errors.push('Missing HuggingFace API key (server-side) - will be provided at runtime');
+          errors.push(
+            'Missing HuggingFace API key (server-side) - will be provided at runtime',
+          );
           missingFields.push('apiKey');
         }
         break;
@@ -329,7 +345,9 @@ export class ApiConfigManager {
   /**
    * Get a safe configuration that won't throw errors
    */
-  public static getSafeApiConfigByType<T extends ApiConfig>(type: string): T | null {
+  public static getSafeApiConfigByType<T extends ApiConfig>(
+    type: string,
+  ): T | null {
     try {
       return this.getApiConfigByType<T>(type);
     } catch {
@@ -379,13 +397,19 @@ export const cleanupConfiguration = () => {
 
 // Auto-initialize when module is imported (can be disabled by setting DISABLE_AUTO_INIT=true)
 // Initialize in all environments except during testing
-if (process.env.NODE_ENV !== 'test' && process.env.DISABLE_AUTO_INIT !== 'true') {
+if (
+  process.env.NODE_ENV !== 'test' &&
+  process.env.DISABLE_AUTO_INIT !== 'true'
+) {
   // Initialize legacy API system immediately
   ApiConfigManager.initialize();
 
   // Initialize centralized system asynchronously
-  initializeConfiguration().catch(error => {
-    console.error('Failed to auto-initialize centralized configuration:', error);
+  initializeConfiguration().catch((error) => {
+    console.error(
+      'Failed to auto-initialize centralized configuration:',
+      error,
+    );
     console.log('Legacy API configuration system is still available');
   });
 }

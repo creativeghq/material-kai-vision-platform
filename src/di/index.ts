@@ -80,7 +80,6 @@ export type {
   ExternalDependenciesConfig,
 } from '../config/types.js';
 
-
 /**
  * Version information
  */

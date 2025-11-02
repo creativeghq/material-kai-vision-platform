@@ -43,7 +43,10 @@ export interface GatewayResponse {
 
 export class MivaaGatewayController {
   // Process incoming gateway request
-  public processRequest = async (req: Request, res: Response): Promise<void> => {
+  public processRequest = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     try {
       // This is a placeholder implementation. Replace with real gateway logic.
       const start = Date.now();
@@ -62,18 +65,28 @@ export class MivaaGatewayController {
         },
       };
 
-      if (typeof res?.status === 'function' && typeof res?.json === 'function') {
+      if (
+        typeof res?.status === 'function' &&
+        typeof res?.json === 'function'
+      ) {
         res.status(501).json(response);
       }
     } catch (error) {
-      if (typeof res?.status === 'function' && typeof res?.json === 'function') {
+      if (
+        typeof res?.status === 'function' &&
+        typeof res?.json === 'function'
+      ) {
         res.status(500).json({
           success: false,
           error: {
             code: 'GATEWAY_ERROR',
             message: error instanceof Error ? error.message : 'Unknown error',
           },
-          metadata: { timestamp: new Date().toISOString(), processingTime: 0, version: '1.0.0' },
+          metadata: {
+            timestamp: new Date().toISOString(),
+            processingTime: 0,
+            version: '1.0.0',
+          },
         } satisfies GatewayResponse);
       }
     }
@@ -90,11 +103,10 @@ export class MivaaGatewayController {
         processingTime: 0,
         version: '1.0.0',
       },
-  };
+    };
 
     if (typeof res?.status === 'function' && typeof res?.json === 'function') {
       res.status(200).json(response);
     }
   };
 }
-

@@ -38,7 +38,8 @@ export function getErrorFeedback(error: unknown): ErrorFeedback {
       title: 'Processing Timeout',
       message: 'The PDF processing took longer than expected.',
       details: 'This usually happens with very large or complex PDFs.',
-      suggestion: 'Try uploading a smaller PDF or contact support for assistance with large documents.',
+      suggestion:
+        'Try uploading a smaller PDF or contact support for assistance with large documents.',
       icon: 'warning',
       retryable: true,
     };
@@ -56,7 +57,11 @@ export function getErrorFeedback(error: unknown): ErrorFeedback {
   }
 
   // Authentication errors
-  if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('authentication')) {
+  if (
+    errorMessage.includes('401') ||
+    errorMessage.includes('Unauthorized') ||
+    errorMessage.includes('authentication')
+  ) {
     return {
       title: 'Authentication Failed',
       message: 'Your session has expired or authentication failed.',
@@ -81,18 +86,25 @@ export function getErrorFeedback(error: unknown): ErrorFeedback {
 
   // PDF-specific errors
   if (errorMessage.includes('PDF') || errorMessage.includes('pdf')) {
-    if (errorMessage.includes('corrupted') || errorMessage.includes('invalid')) {
+    if (
+      errorMessage.includes('corrupted') ||
+      errorMessage.includes('invalid')
+    ) {
       return {
         title: 'Invalid PDF File',
         message: 'The PDF file appears to be corrupted or invalid.',
         details: 'The file may be damaged or not a valid PDF.',
-        suggestion: 'Try opening the PDF in another application to verify it\'s valid.',
+        suggestion:
+          "Try opening the PDF in another application to verify it's valid.",
         icon: 'error',
         retryable: false,
       };
     }
 
-    if (errorMessage.includes('password') || errorMessage.includes('encrypted')) {
+    if (
+      errorMessage.includes('password') ||
+      errorMessage.includes('encrypted')
+    ) {
       return {
         title: 'Password-Protected PDF',
         message: 'This PDF is password-protected and cannot be processed.',
@@ -163,7 +175,8 @@ export function getSuccessFeedback(context: string): ErrorFeedback {
     },
     'pdf-processing': {
       title: 'PDF Processing Complete',
-      message: 'Your PDF has been successfully processed and added to the knowledge base.',
+      message:
+        'Your PDF has been successfully processed and added to the knowledge base.',
       details: 'You can now search through the content.',
       icon: 'info',
     },
@@ -181,11 +194,13 @@ export function getSuccessFeedback(context: string): ErrorFeedback {
     },
   };
 
-  return messages[context] || {
-    title: 'Success',
-    message: 'Operation completed successfully.',
-    icon: 'info',
-  };
+  return (
+    messages[context] || {
+      title: 'Success',
+      message: 'Operation completed successfully.',
+      icon: 'info',
+    }
+  );
 }
 
 /**
@@ -194,14 +209,20 @@ export function getSuccessFeedback(context: string): ErrorFeedback {
 export function categorizeError(error: unknown): ErrorCategory {
   const errorMessage = error instanceof Error ? error.message : String(error);
 
-  if (errorMessage.includes('timeout') || errorMessage.includes('504')) return ErrorCategory.TIMEOUT;
-  if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) return ErrorCategory.AUTHENTICATION;
-  if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) return ErrorCategory.AUTHORIZATION;
-  if (errorMessage.includes('validation') || errorMessage.includes('invalid')) return ErrorCategory.VALIDATION;
-  if (errorMessage.includes('Network') || errorMessage.includes('fetch')) return ErrorCategory.NETWORK;
-  if (errorMessage.includes('database') || errorMessage.includes('uuid')) return ErrorCategory.DATABASE;
-  if (errorMessage.includes('storage') || errorMessage.includes('bucket')) return ErrorCategory.STORAGE;
+  if (errorMessage.includes('timeout') || errorMessage.includes('504'))
+    return ErrorCategory.TIMEOUT;
+  if (errorMessage.includes('401') || errorMessage.includes('Unauthorized'))
+    return ErrorCategory.AUTHENTICATION;
+  if (errorMessage.includes('403') || errorMessage.includes('Forbidden'))
+    return ErrorCategory.AUTHORIZATION;
+  if (errorMessage.includes('validation') || errorMessage.includes('invalid'))
+    return ErrorCategory.VALIDATION;
+  if (errorMessage.includes('Network') || errorMessage.includes('fetch'))
+    return ErrorCategory.NETWORK;
+  if (errorMessage.includes('database') || errorMessage.includes('uuid'))
+    return ErrorCategory.DATABASE;
+  if (errorMessage.includes('storage') || errorMessage.includes('bucket'))
+    return ErrorCategory.STORAGE;
 
   return ErrorCategory.UNKNOWN;
 }
-

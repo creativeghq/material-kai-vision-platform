@@ -27,7 +27,9 @@ jest.mock('@/integrations/supabase/client', () => {
         const result = {
           data: [
             {
-              created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+              created_at: new Date(
+                Date.now() - 7 * 24 * 60 * 60 * 1000,
+              ).toISOString(),
               overall_quality_score: 0.75,
               average_image_quality_score: 0.8,
               average_enrichment_score: 0.7,
@@ -160,7 +162,9 @@ describe('QualityDashboardService', () => {
     it('should determine quality trend', async () => {
       const metrics = await service.getQualityMetrics('workspace-1');
 
-      expect(['improving', 'stable', 'declining']).toContain(metrics.quality_trend);
+      expect(['improving', 'stable', 'declining']).toContain(
+        metrics.quality_trend,
+      );
     });
   });
 
@@ -199,8 +203,12 @@ describe('QualityDashboardService', () => {
       if (issues.length > 0) {
         const issue = issues[0];
         expect(issue.id).toBeDefined();
-        expect(['image_validation', 'enrichment', 'validation_rule']).toContain(issue.type);
-        expect(['info', 'warning', 'error', 'critical']).toContain(issue.severity);
+        expect(['image_validation', 'enrichment', 'validation_rule']).toContain(
+          issue.type,
+        );
+        expect(['info', 'warning', 'error', 'critical']).toContain(
+          issue.severity,
+        );
         expect(issue.title).toBeDefined();
         expect(issue.description).toBeDefined();
         expect(issue.affected_count).toBeGreaterThanOrEqual(0);
@@ -231,7 +239,9 @@ describe('QualityDashboardService', () => {
       const data = await service.getDashboardData('workspace-1');
 
       expect(mockImageValidationService.getValidationStats).toHaveBeenCalled();
-      expect(mockProductEnrichmentService.getEnrichmentStats).toHaveBeenCalled();
+      expect(
+        mockProductEnrichmentService.getEnrichmentStats,
+      ).toHaveBeenCalled();
       expect(mockValidationRulesService.getValidationStats).toHaveBeenCalled();
     });
   });
@@ -263,4 +273,3 @@ describe('QualityDashboardService', () => {
     });
   });
 });
-

@@ -6,14 +6,16 @@
  */
 
 // Optional winston logger type - will be resolved at runtime
-export type Logger = {
-  error: (message: string, ...meta: unknown[]) => void;
-  warn: (message: string, ...meta: unknown[]) => void;
-  info: (message: string, ...meta: unknown[]) => void;
-  debug: (message: string, ...meta: unknown[]) => void;
-  verbose: (message: string, ...meta: unknown[]) => void;
-  silly: (message: string, ...meta: unknown[]) => void;
-} | undefined;
+export type Logger =
+  | {
+      error: (message: string, ...meta: unknown[]) => void;
+      warn: (message: string, ...meta: unknown[]) => void;
+      info: (message: string, ...meta: unknown[]) => void;
+      debug: (message: string, ...meta: unknown[]) => void;
+      verbose: (message: string, ...meta: unknown[]) => void;
+      silly: (message: string, ...meta: unknown[]) => void;
+    }
+  | undefined;
 
 /**
  * Service lifetime management options
@@ -24,18 +26,23 @@ export enum ServiceLifetime {
   /** New instance created for each resolution */
   Transient = 'transient',
   /** Single instance per scope (e.g., per request) */
-  Scoped = 'scoped'
+  Scoped = 'scoped',
 }
 
 /**
  * Service identifier - can be string, symbol, or constructor function
  */
-export type ServiceIdentifier<T = unknown> = string | symbol | (new (...args: unknown[]) => T);
+export type ServiceIdentifier<T = unknown> =
+  | string
+  | symbol
+  | (new (...args: unknown[]) => T);
 
 /**
  * Factory function for creating service instances
  */
-export type ServiceFactory<T = unknown> = (container: IServiceContainer) => T | Promise<T>;
+export type ServiceFactory<T = unknown> = (
+  container: IServiceContainer,
+) => T | Promise<T>;
 
 /**
  * Constructor type for services
@@ -126,7 +133,9 @@ export interface IServiceRegistrationBuilder<T> {
   /** Set service lifetime */
   withLifetime(lifetime: ServiceLifetime): IServiceRegistrationBuilder<T>;
   /** Add dependencies */
-  withDependencies(...dependencies: ServiceIdentifier[]): IServiceRegistrationBuilder<T>;
+  withDependencies(
+    ...dependencies: ServiceIdentifier[]
+  ): IServiceRegistrationBuilder<T>;
   /** Set configuration key */
   withConfig(configKey: string): IServiceRegistrationBuilder<T>;
   /** Mark as required service */
@@ -134,7 +143,9 @@ export interface IServiceRegistrationBuilder<T> {
   /** Add tags */
   withTags(...tags: string[]): IServiceRegistrationBuilder<T>;
   /** Add health check */
-  withHealthCheck(healthCheck: (instance: T) => boolean | Promise<boolean>): IServiceRegistrationBuilder<T>;
+  withHealthCheck(
+    healthCheck: (instance: T) => boolean | Promise<boolean>,
+  ): IServiceRegistrationBuilder<T>;
   /** Complete registration */
   register(): void;
 }
@@ -153,7 +164,7 @@ export interface IServiceContainer {
    */
   registerType<T>(
     identifier: ServiceIdentifier<T>,
-    implementation: ServiceConstructor<T>
+    implementation: ServiceConstructor<T>,
   ): IServiceRegistrationBuilder<T>;
 
   /**
@@ -161,7 +172,7 @@ export interface IServiceContainer {
    */
   registerFactory<T>(
     identifier: ServiceIdentifier<T>,
-    factory: ServiceFactory<T>
+    factory: ServiceFactory<T>,
   ): IServiceRegistrationBuilder<T>;
 
   /**
@@ -240,7 +251,10 @@ export interface IServiceContainerFactory {
   /**
    * Create a child container that inherits from a parent
    */
-  createChild(parent: IServiceContainer, options?: IContainerOptions): IServiceContainer;
+  createChild(
+    parent: IServiceContainer,
+    options?: IContainerOptions,
+  ): IServiceContainer;
 }
 
 /**
@@ -251,7 +265,10 @@ export class CircularDependencyError extends Error {
     public readonly dependencyChain: ServiceIdentifier[],
     message?: string,
   ) {
-    super(message || `Circular dependency detected: ${dependencyChain.map(d => d.toString()).join(' -> ')}`);
+    super(
+      message ||
+        `Circular dependency detected: ${dependencyChain.map((d) => d.toString()).join(' -> ')}`,
+    );
     this.name = 'CircularDependencyError';
   }
 }

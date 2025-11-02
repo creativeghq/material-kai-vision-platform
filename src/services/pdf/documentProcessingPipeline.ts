@@ -69,9 +69,9 @@ export class DocumentProcessingPipeline {
 
     try {
       // Build workspace context if enabled
-      const workspaceContext = workspaceAware ?
-        await this.buildWorkspaceContext(extractionResult.documentId) :
-        undefined;
+      const workspaceContext = workspaceAware
+        ? await this.buildWorkspaceContext(extractionResult.documentId)
+        : undefined;
 
       // Process markdown content
       if (extractionResult.data.markdown) {
@@ -84,7 +84,10 @@ export class DocumentProcessingPipeline {
       }
 
       // Process tables
-      if (extractionResult.data.tables && extractionResult.data.tables.length > 0) {
+      if (
+        extractionResult.data.tables &&
+        extractionResult.data.tables.length > 0
+      ) {
         const tableDocs = await this.processTableContent(
           extractionResult.data.tables,
           extractionResult.documentId,
@@ -94,7 +97,10 @@ export class DocumentProcessingPipeline {
       }
 
       // Process images
-      if (extractionResult.data.images && extractionResult.data.images.length > 0) {
+      if (
+        extractionResult.data.images &&
+        extractionResult.data.images.length > 0
+      ) {
         const imageDocs = await this.processImageContent(
           extractionResult.data.images,
           extractionResult.documentId,
@@ -104,7 +110,10 @@ export class DocumentProcessingPipeline {
       }
 
       // Generate summary
-      const summary = this.generateProcessingSummary(ragDocuments, Date.now() - startTime);
+      const summary = this.generateProcessingSummary(
+        ragDocuments,
+        Date.now() - startTime,
+      );
 
       return {
         documentId: extractionResult.documentId,
@@ -112,9 +121,10 @@ export class DocumentProcessingPipeline {
         summary,
         errors: errors.length > 0 ? errors : undefined,
       };
-
     } catch (error) {
-      errors.push(`Pipeline processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      errors.push(
+        `Pipeline processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
 
       return {
         documentId: extractionResult.documentId,
@@ -192,15 +202,17 @@ export class DocumentProcessingPipeline {
       // Convert CSV to structured text
       const structuredText = this.convertTableToStructuredText(table);
 
-      ragDocuments.push(this.createRagDocument(
-        `${documentId}_table_${table.id}`,
-        structuredText,
-        documentId,
-        'table',
-        table.pageNumber,
-        undefined,
-        workspaceContext,
-      ));
+      ragDocuments.push(
+        this.createRagDocument(
+          `${documentId}_table_${table.id}`,
+          structuredText,
+          documentId,
+          'table',
+          table.pageNumber,
+          undefined,
+          workspaceContext,
+        ),
+      );
     }
 
     return ragDocuments;
@@ -220,15 +232,17 @@ export class DocumentProcessingPipeline {
       // Create descriptive text for the image
       const imageDescription = this.generateImageDescription(image);
 
-      ragDocuments.push(this.createRagDocument(
-        `${documentId}_image_${image.id}`,
-        imageDescription,
-        documentId,
-        'image',
-        image.pageNumber,
-        undefined,
-        workspaceContext,
-      ));
+      ragDocuments.push(
+        this.createRagDocument(
+          `${documentId}_image_${image.id}`,
+          imageDescription,
+          documentId,
+          'image',
+          image.pageNumber,
+          undefined,
+          workspaceContext,
+        ),
+      );
     }
 
     return ragDocuments;
@@ -237,7 +251,9 @@ export class DocumentProcessingPipeline {
   /**
    * Build workspace context for processing
    */
-  private async buildWorkspaceContext(_documentId: string): Promise<WorkspaceContext> {
+  private async buildWorkspaceContext(
+    _documentId: string,
+  ): Promise<WorkspaceContext> {
     // This would typically integrate with workspace management systems
     // For now, return basic context
     return {
@@ -305,10 +321,10 @@ export class DocumentProcessingPipeline {
     // Split by sentences if configured
     let sentences: string[] = [];
     if (config.splitOnSentences) {
-      sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
     } else {
       // Split by paragraphs
-      sentences = text.split(/\n\s*\n/).filter(s => s.trim().length > 0);
+      sentences = text.split(/\n\s*\n/).filter((s) => s.trim().length > 0);
     }
 
     let currentChunk = '';
@@ -347,7 +363,7 @@ export class DocumentProcessingPipeline {
    * Convert table data to structured text
    */
   private convertTableToStructuredText(table: TableData): string {
-    const lines = table.csvData.split('\n').filter(line => line.trim());
+    const lines = table.csvData.split('\n').filter((line) => line.trim());
 
     if (lines.length === 0) {
       return `Table from page ${table.pageNumber} (empty)`;
@@ -365,8 +381,11 @@ export class DocumentProcessingPipeline {
 
     // Add table content in a readable format
     structuredText += 'Table Content:\n';
-    for (let i = 0; i < Math.min(lines.length, 10); i++) { // Limit to first 10 rows
-      const row = lines[i].split(',').map(cell => cell.trim().replace(/"/g, ''));
+    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+      // Limit to first 10 rows
+      const row = lines[i]
+        .split(',')
+        .map((cell) => cell.trim().replace(/"/g, ''));
       structuredText += `Row ${i + 1}: ${row.join(' | ')}\n`;
     }
 
@@ -388,9 +407,11 @@ export class DocumentProcessingPipeline {
     // Add basic image analysis
     const aspectRatio = image.width / image.height;
     if (aspectRatio > 2) {
-      description += 'Layout: Wide/landscape orientation, possibly a chart or diagram\n';
+      description +=
+        'Layout: Wide/landscape orientation, possibly a chart or diagram\n';
     } else if (aspectRatio < 0.5) {
-      description += 'Layout: Tall/portrait orientation, possibly a table or list\n';
+      description +=
+        'Layout: Tall/portrait orientation, possibly a table or list\n';
     } else {
       description += 'Layout: Square/balanced orientation\n';
     }
@@ -400,7 +421,8 @@ export class DocumentProcessingPipeline {
       description += `Additional metadata: ${JSON.stringify(image.metadata)}\n`;
     }
 
-    description += 'Note: This is an extracted image that may contain charts, diagrams, or other visual content relevant to the document.';
+    description +=
+      'Note: This is an extracted image that may contain charts, diagrams, or other visual content relevant to the document.';
 
     return description;
   }
@@ -412,9 +434,15 @@ export class DocumentProcessingPipeline {
     ragDocuments: RagDocument[],
     processingTime: number,
   ): ProcessingPipelineResult['summary'] {
-    const textChunks = ragDocuments.filter(doc => doc.metadata.type === 'text').length;
-    const tableChunks = ragDocuments.filter(doc => doc.metadata.type === 'table').length;
-    const imageChunks = ragDocuments.filter(doc => doc.metadata.type === 'image').length;
+    const textChunks = ragDocuments.filter(
+      (doc) => doc.metadata.type === 'text',
+    ).length;
+    const tableChunks = ragDocuments.filter(
+      (doc) => doc.metadata.type === 'table',
+    ).length;
+    const imageChunks = ragDocuments.filter(
+      (doc) => doc.metadata.type === 'image',
+    ).length;
 
     return {
       totalChunks: ragDocuments.length,
@@ -466,11 +494,13 @@ export class DocumentProcessingPipeline {
         type,
         pageNumber,
         chunkIndex,
-        workspace: workspaceContext ? {
-          projectId: workspaceContext.projectId,
-          userId: workspaceContext.userId,
-          tags: workspaceContext.tags,
-        } : undefined,
+        workspace: workspaceContext
+          ? {
+              projectId: workspaceContext.projectId,
+              userId: workspaceContext.userId,
+              tags: workspaceContext.tags,
+            }
+          : undefined,
       },
       workspace: workspaceContext?.projectId || 'default',
     };

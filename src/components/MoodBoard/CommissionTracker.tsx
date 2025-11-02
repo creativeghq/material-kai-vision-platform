@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-import { CommissionService, Commission, CommissionSummary } from '../../services/moodboard/CommissionService';
+import {
+  CommissionService,
+  Commission,
+  CommissionSummary,
+} from '../../services/moodboard/CommissionService';
 
 interface CommissionTrackerProps {
   onRefresh?: () => void;
@@ -13,7 +17,9 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
   const [summary, setSummary] = useState<CommissionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'paid'>(
+    'all',
+  );
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
 
   const commissionService = new CommissionService();
@@ -46,7 +52,9 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
       setCommissions(filtered);
       setSummary(result.totals);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load commissions');
+      setError(
+        err instanceof Error ? err.message : 'Failed to load commissions',
+      );
     } finally {
       setLoading(false);
     }
@@ -179,10 +187,14 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
                     {commission.commission_percentage}%
                   </td>
                   <td className="text-right p-3 font-bold">
-                    {commissionService.formatAmount(commission.commission_amount || 0)}
+                    {commissionService.formatAmount(
+                      commission.commission_amount || 0,
+                    )}
                   </td>
                   <td className="text-center p-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(commission.status)}`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(commission.status)}`}
+                    >
                       {commissionService.getStatusLabel(commission.status)}
                     </span>
                   </td>
@@ -216,4 +228,3 @@ export const CommissionTracker: React.FC<CommissionTrackerProps> = ({
 };
 
 export default CommissionTracker;
-

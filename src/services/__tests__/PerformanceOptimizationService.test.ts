@@ -15,7 +15,7 @@ jest.mock('../QualityDashboardService', () => {
     getQualityMetrics: jest.fn().mockResolvedValue({
       workspace_id: 'workspace-1',
       average_image_quality_score: 0.82,
-      average_enrichment_score: 0.80,
+      average_enrichment_score: 0.8,
       validation_pass_rate: 0.85,
     }),
     getHealth: jest.fn().mockResolvedValue({
@@ -114,7 +114,8 @@ describe('PerformanceOptimizationService', () => {
   describe('getOptimizationRecommendations', () => {
     it('should retrieve optimization recommendations', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
       expect(Array.isArray(recommendations)).toBe(true);
       expect(recommendations.length).toBeGreaterThanOrEqual(0);
@@ -122,12 +123,19 @@ describe('PerformanceOptimizationService', () => {
 
     it('should include recommendation details', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
-      recommendations.forEach(rec => {
+      recommendations.forEach((rec) => {
         expect(rec.id).toBeDefined();
         expect(rec.category).toBeDefined();
-        expect(['caching', 'indexing', 'query', 'resource', 'architecture']).toContain(rec.category);
+        expect([
+          'caching',
+          'indexing',
+          'query',
+          'resource',
+          'architecture',
+        ]).toContain(rec.category);
         expect(rec.priority).toBeDefined();
         expect(['low', 'medium', 'high', 'critical']).toContain(rec.priority);
         expect(rec.title).toBeDefined();
@@ -140,9 +148,12 @@ describe('PerformanceOptimizationService', () => {
 
     it('should prioritize critical issues', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
-      const criticalRecs = recommendations.filter(r => r.priority === 'critical');
+      const criticalRecs = recommendations.filter(
+        (r) => r.priority === 'critical',
+      );
       if (criticalRecs.length > 0) {
         expect(criticalRecs[0].priority).toBe('critical');
       }
@@ -150,9 +161,10 @@ describe('PerformanceOptimizationService', () => {
 
     it('should provide actionable recommendations', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
-      recommendations.forEach(rec => {
+      recommendations.forEach((rec) => {
         expect(rec.title.length).toBeGreaterThan(0);
         expect(rec.description.length).toBeGreaterThan(0);
       });
@@ -224,9 +236,13 @@ describe('PerformanceOptimizationService', () => {
       await service.initialize();
       const report = await service.getPerformanceReport('workspace-1');
 
-      const criticalCount = report.recommendations.filter(r => r.priority === 'critical').length;
+      const criticalCount = report.recommendations.filter(
+        (r) => r.priority === 'critical',
+      ).length;
       if (criticalCount > 0) {
-        expect(report.optimization_score).toBeLessThan(100 - criticalCount * 10);
+        expect(report.optimization_score).toBeLessThan(
+          100 - criticalCount * 10,
+        );
       }
     });
   });
@@ -234,9 +250,12 @@ describe('PerformanceOptimizationService', () => {
   describe('Recommendation Categories', () => {
     it('should include caching recommendations', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
-      const cachingRecs = recommendations.filter(r => r.category === 'caching');
+      const cachingRecs = recommendations.filter(
+        (r) => r.category === 'caching',
+      );
       if (cachingRecs.length > 0) {
         expect(cachingRecs[0].category).toBe('caching');
       }
@@ -244,9 +263,10 @@ describe('PerformanceOptimizationService', () => {
 
     it('should include query recommendations', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
-      const queryRecs = recommendations.filter(r => r.category === 'query');
+      const queryRecs = recommendations.filter((r) => r.category === 'query');
       if (queryRecs.length > 0) {
         expect(queryRecs[0].category).toBe('query');
       }
@@ -254,9 +274,12 @@ describe('PerformanceOptimizationService', () => {
 
     it('should include resource recommendations', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
-      const resourceRecs = recommendations.filter(r => r.category === 'resource');
+      const resourceRecs = recommendations.filter(
+        (r) => r.category === 'resource',
+      );
       if (resourceRecs.length > 0) {
         expect(resourceRecs[0].category).toBe('resource');
       }
@@ -274,7 +297,8 @@ describe('PerformanceOptimizationService', () => {
 
     it('should handle empty recommendations', async () => {
       await service.initialize();
-      const recommendations = await service.getOptimizationRecommendations('workspace-1');
+      const recommendations =
+        await service.getOptimizationRecommendations('workspace-1');
 
       expect(Array.isArray(recommendations)).toBe(true);
     });
@@ -299,4 +323,3 @@ describe('PerformanceOptimizationService', () => {
     });
   });
 });
-

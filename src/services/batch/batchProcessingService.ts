@@ -6,7 +6,13 @@ import { EventEmitter } from 'events';
 // import { MivaaEmbeddingIntegration } from '../mivaaEmbeddingIntegration';
 // import { ValidationIntegrationService } from '../validationIntegrationService';
 
-import { BatchJobQueue, BatchJob, JobResult, JobPriority, QueueConfig } from './batchJobQueue';
+import {
+  BatchJobQueue,
+  BatchJob,
+  JobResult,
+  JobPriority,
+  QueueConfig,
+} from './batchJobQueue';
 
 // Simple logger interface to avoid winston dependency
 interface Logger {
@@ -130,7 +136,14 @@ export interface BatchProcessingResult {
  */
 export interface BatchProgress {
   batchId: string;
-  stage: 'queued' | 'validating' | 'chunking' | 'embedding' | 'finalizing' | 'completed' | 'failed';
+  stage:
+    | 'queued'
+    | 'validating'
+    | 'chunking'
+    | 'embedding'
+    | 'finalizing'
+    | 'completed'
+    | 'failed';
   progress: number; // 0-100
   currentDocument?: number;
   totalDocuments?: number;
@@ -217,8 +230,6 @@ export class BatchProcessingService extends EventEmitter {
   private resourcePool: Map<string, unknown>;
   private isInitialized: boolean;
 
-
-
   constructor(
     _validationService: any, // ValidationIntegrationService - not currently used
     _chunkingService: any, // DocumentChunkingService - not currently used
@@ -281,7 +292,9 @@ export class BatchProcessingService extends EventEmitter {
       this.isInitialized = true;
       this.logger.info('Batch processing service initialized successfully');
     } catch (error) {
-      this.logger.error(`Failed to initialize batch processing service: ${error}`);
+      this.logger.error(
+        `Failed to initialize batch processing service: ${error}`,
+      );
       throw error;
     }
   }
@@ -311,7 +324,9 @@ export class BatchProcessingService extends EventEmitter {
     const batchId = options.batchId || this.generateBatchId();
     const priority = options.priority || 'normal';
 
-    this.logger.info(`Starting batch processing for ${documents.length} documents (batch: ${batchId})`);
+    this.logger.info(
+      `Starting batch processing for ${documents.length} documents (batch: ${batchId})`,
+    );
 
     // Initialize batch progress
     this.activeBatches.set(batchId, {
@@ -328,7 +343,10 @@ export class BatchProcessingService extends EventEmitter {
       const jobs: BatchJob[] = [];
 
       // 1. Validation job (if enabled)
-      if (options.enableValidation !== false && this.config.services.validation.enabled) {
+      if (
+        options.enableValidation !== false &&
+        this.config.services.validation.enabled
+      ) {
         jobs.push({
           id: `${batchId}_validation`,
           type: 'validation',
@@ -542,21 +560,6 @@ export class BatchProcessingService extends EventEmitter {
     });
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Handle job completion
    */
@@ -592,7 +595,10 @@ export class BatchProcessingService extends EventEmitter {
   /**
    * Update batch progress
    */
-  private updateBatchProgress(batchId: string, updates: Partial<BatchProgress>): void {
+  private updateBatchProgress(
+    batchId: string,
+    updates: Partial<BatchProgress>,
+  ): void {
     const current = this.activeBatches.get(batchId);
     if (current) {
       const updated = { ...current, ...updates };

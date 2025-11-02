@@ -6,7 +6,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export const Auth: React.FC = () => {
@@ -66,7 +72,9 @@ export const Auth: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Material Recognition AI</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            Material Recognition AI
+          </CardTitle>
           <CardDescription>
             Sign in to your account or create a new one
           </CardDescription>
@@ -93,7 +101,9 @@ export const Auth: React.FC = () => {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {isLoading && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
                     Send Reset Link
                   </Button>
                   <div className="text-center mt-4">
@@ -156,7 +166,9 @@ export const Auth: React.FC = () => {
                     </div>
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    {isLoading && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
                     Sign In
                   </Button>
                   <div className="text-center mt-4">
@@ -232,7 +244,9 @@ export const Auth: React.FC = () => {
                   </div>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {isLoading && (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  )}
                   Sign Up
                 </Button>
               </form>

@@ -44,16 +44,30 @@ export class CrossModalLearning {
 
   private initializeEncoders(): void {
     // Initialize modality-specific encoders
-    this.modalityEncoders.set('visual', new Float32Array(this.config.visualDim));
-    this.modalityEncoders.set('spectral', new Float32Array(this.config.spectralDim));
-    this.modalityEncoders.set('thermal', new Float32Array(this.config.thermalDim));
-    this.modalityEncoders.set('textual', new Float32Array(this.config.textualDim));
+    this.modalityEncoders.set(
+      'visual',
+      new Float32Array(this.config.visualDim),
+    );
+    this.modalityEncoders.set(
+      'spectral',
+      new Float32Array(this.config.spectralDim),
+    );
+    this.modalityEncoders.set(
+      'thermal',
+      new Float32Array(this.config.thermalDim),
+    );
+    this.modalityEncoders.set(
+      'textual',
+      new Float32Array(this.config.textualDim),
+    );
   }
 
   /**
    * Extract features from visual modality
    */
-  private async extractVisualFeatures(imageData: ImageData): Promise<Float32Array> {
+  private async extractVisualFeatures(
+    imageData: ImageData,
+  ): Promise<Float32Array> {
     const { width, height, data } = imageData;
     const features = new Float32Array(this.config.visualDim);
 
@@ -76,7 +90,9 @@ export class CrossModalLearning {
   /**
    * Extract features from spectral data
    */
-  private async extractSpectralFeatures(spectralData: Float32Array): Promise<Float32Array> {
+  private async extractSpectralFeatures(
+    spectralData: Float32Array,
+  ): Promise<Float32Array> {
     const features = new Float32Array(this.config.spectralDim);
 
     // Apply spectral analysis (simplified - in production use proper signal processing)
@@ -99,7 +115,9 @@ export class CrossModalLearning {
   /**
    * Extract features from thermal data
    */
-  private async extractThermalFeatures(thermalData: Float32Array): Promise<Float32Array> {
+  private async extractThermalFeatures(
+    thermalData: Float32Array,
+  ): Promise<Float32Array> {
     const features = new Float32Array(this.config.thermalDim);
 
     // Extract thermal patterns and gradients
@@ -108,8 +126,11 @@ export class CrossModalLearning {
     }
 
     // Add statistical features
-    const mean = thermalData.reduce((sum, val) => sum + val, 0) / thermalData.length;
-    const variance = thermalData.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / thermalData.length;
+    const mean =
+      thermalData.reduce((sum, val) => sum + val, 0) / thermalData.length;
+    const variance =
+      thermalData.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+      thermalData.length;
 
     if (features.length > 2) {
       features[features.length - 2] = mean;
@@ -129,15 +150,33 @@ export class CrossModalLearning {
     const words = text.toLowerCase().split(/\s+/);
     const wordFreq = new Map<string, number>();
 
-    words.forEach(word => {
+    words.forEach((word) => {
       wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
     });
 
     // Material-specific keywords
     const materialKeywords = [
-      'metal', 'plastic', 'wood', 'ceramic', 'glass', 'rubber', 'concrete',
-      'smooth', 'rough', 'textured', 'glossy', 'matte', 'transparent', 'opaque',
-      'hard', 'soft', 'flexible', 'rigid', 'dense', 'light', 'heavy',
+      'metal',
+      'plastic',
+      'wood',
+      'ceramic',
+      'glass',
+      'rubber',
+      'concrete',
+      'smooth',
+      'rough',
+      'textured',
+      'glossy',
+      'matte',
+      'transparent',
+      'opaque',
+      'hard',
+      'soft',
+      'flexible',
+      'rigid',
+      'dense',
+      'light',
+      'heavy',
     ];
 
     materialKeywords.forEach((keyword, index) => {
@@ -152,9 +191,10 @@ export class CrossModalLearning {
   /**
    * Apply cross-modal attention mechanism
    */
-  private applyCrossModalAttention(
-    modalFeatures: Map<string, Float32Array>,
-  ): { attentionWeights: Float32Array; weightedFeatures: Map<string, Float32Array> } {
+  private applyCrossModalAttention(modalFeatures: Map<string, Float32Array>): {
+    attentionWeights: Float32Array;
+    weightedFeatures: Map<string, Float32Array>;
+  } {
     const modalities = Array.from(modalFeatures.keys());
     const attentionWeights = new Float32Array(modalities.length);
     const weightedFeatures = new Map<string, Float32Array>();
@@ -181,7 +221,7 @@ export class CrossModalLearning {
     // Apply weights to features
     modalities.forEach((modality, index) => {
       const features = modalFeatures.get(modality)!;
-      const weighted = features.map(val => val * softmaxWeights[index]);
+      const weighted = features.map((val) => val * softmaxWeights[index]);
       weightedFeatures.set(modality, new Float32Array(weighted));
     });
 
@@ -191,15 +231,19 @@ export class CrossModalLearning {
   /**
    * Fuse multi-modal features
    */
-  private fuseFeatures(weightedFeatures: Map<string, Float32Array>): Float32Array {
+  private fuseFeatures(
+    weightedFeatures: Map<string, Float32Array>,
+  ): Float32Array {
     const fusedFeatures = new Float32Array(this.config.fusedDim);
     const modalities = Array.from(weightedFeatures.keys());
 
     // Concatenate and project features
     let offset = 0;
-    modalities.forEach(modality => {
+    modalities.forEach((modality) => {
       const features = weightedFeatures.get(modality)!;
-      const projectionSize = Math.floor(this.config.fusedDim / modalities.length);
+      const projectionSize = Math.floor(
+        this.config.fusedDim / modalities.length,
+      );
 
       for (let i = 0; i < Math.min(features.length, projectionSize); i++) {
         if (offset + i < fusedFeatures.length) {
@@ -215,40 +259,63 @@ export class CrossModalLearning {
   /**
    * Main cross-modal learning forward pass
    */
-  async processMultiModal(modalityData: ModalityData): Promise<CrossModalFeatures> {
+  async processMultiModal(
+    modalityData: ModalityData,
+  ): Promise<CrossModalFeatures> {
     const modalFeatures = new Map<string, Float32Array>();
 
     // Extract features from each available modality
     if (modalityData.visual) {
-      modalFeatures.set('visual', await this.extractVisualFeatures(modalityData.visual));
+      modalFeatures.set(
+        'visual',
+        await this.extractVisualFeatures(modalityData.visual),
+      );
     }
 
     if (modalityData.spectral) {
-      modalFeatures.set('spectral', await this.extractSpectralFeatures(modalityData.spectral));
+      modalFeatures.set(
+        'spectral',
+        await this.extractSpectralFeatures(modalityData.spectral),
+      );
     }
 
     if (modalityData.thermal) {
-      modalFeatures.set('thermal', await this.extractThermalFeatures(modalityData.thermal));
+      modalFeatures.set(
+        'thermal',
+        await this.extractThermalFeatures(modalityData.thermal),
+      );
     }
 
     if (modalityData.textual) {
-      modalFeatures.set('textual', await this.extractTextualFeatures(modalityData.textual));
+      modalFeatures.set(
+        'textual',
+        await this.extractTextualFeatures(modalityData.textual),
+      );
     }
 
     // Apply cross-modal attention
-    const { attentionWeights, weightedFeatures } = this.applyCrossModalAttention(modalFeatures);
+    const { attentionWeights, weightedFeatures } =
+      this.applyCrossModalAttention(modalFeatures);
 
     // Fuse weighted features
     const fusedFeatures = this.fuseFeatures(weightedFeatures);
 
     // Compute cross-modal similarity score
-    const crossModalSimilarity = this.computeCrossModalSimilarity(modalFeatures);
+    const crossModalSimilarity =
+      this.computeCrossModalSimilarity(modalFeatures);
 
     return {
-      visualFeatures: modalFeatures.get('visual') || new Float32Array(this.config.visualDim),
-      spectralFeatures: modalFeatures.get('spectral') || new Float32Array(this.config.spectralDim),
-      thermalFeatures: modalFeatures.get('thermal') || new Float32Array(this.config.thermalDim),
-      textualFeatures: modalFeatures.get('textual') || new Float32Array(this.config.textualDim),
+      visualFeatures:
+        modalFeatures.get('visual') || new Float32Array(this.config.visualDim),
+      spectralFeatures:
+        modalFeatures.get('spectral') ||
+        new Float32Array(this.config.spectralDim),
+      thermalFeatures:
+        modalFeatures.get('thermal') ||
+        new Float32Array(this.config.thermalDim),
+      textualFeatures:
+        modalFeatures.get('textual') ||
+        new Float32Array(this.config.textualDim),
       fusedFeatures,
       modalityWeights: attentionWeights,
       crossModalSimilarity,
@@ -258,7 +325,7 @@ export class CrossModalLearning {
   // Utility methods
   private normalizeFeatures(features: Float32Array): Float32Array {
     const norm = Math.sqrt(features.reduce((sum, val) => sum + val * val, 0));
-    return norm > 0 ? features.map(val => val / norm) : features;
+    return norm > 0 ? features.map((val) => val / norm) : features;
   }
 
   private computeCosineSimilarity(a: Float32Array, b: Float32Array): number {
@@ -279,12 +346,16 @@ export class CrossModalLearning {
 
   private applySoftmax(values: Float32Array): Float32Array {
     const maxVal = Math.max(...values);
-    const exponentials = values.map(val => Math.exp((val - maxVal) / this.config.temperatureScaling));
+    const exponentials = values.map((val) =>
+      Math.exp((val - maxVal) / this.config.temperatureScaling),
+    );
     const sum = exponentials.reduce((sum, val) => sum + val, 0);
-    return new Float32Array(exponentials.map(val => val / sum));
+    return new Float32Array(exponentials.map((val) => val / sum));
   }
 
-  private computeCrossModalSimilarity(modalFeatures: Map<string, Float32Array>): number {
+  private computeCrossModalSimilarity(
+    modalFeatures: Map<string, Float32Array>,
+  ): number {
     const modalities = Array.from(modalFeatures.values());
     if (modalities.length < 2) return 1.0;
 
@@ -293,7 +364,10 @@ export class CrossModalLearning {
 
     for (let i = 0; i < modalities.length; i++) {
       for (let j = i + 1; j < modalities.length; j++) {
-        totalSimilarity += this.computeCosineSimilarity(modalities[i], modalities[j]);
+        totalSimilarity += this.computeCosineSimilarity(
+          modalities[i],
+          modalities[j],
+        );
         pairCount++;
       }
     }
@@ -317,7 +391,21 @@ export class CrossModalLearning {
   }
 
   private estimateParameters(): number {
-    const { visualDim, spectralDim, thermalDim, textualDim, fusedDim, attentionHeads } = this.config;
-    return visualDim + spectralDim + thermalDim + textualDim + fusedDim + (attentionHeads * 4 * 4);
+    const {
+      visualDim,
+      spectralDim,
+      thermalDim,
+      textualDim,
+      fusedDim,
+      attentionHeads,
+    } = this.config;
+    return (
+      visualDim +
+      spectralDim +
+      thermalDim +
+      textualDim +
+      fusedDim +
+      attentionHeads * 4 * 4
+    );
   }
 }

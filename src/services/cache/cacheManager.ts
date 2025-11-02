@@ -92,7 +92,7 @@ export class CacheManager {
   clearAll(): void {
     console.log('🧹 Clearing all caches...');
 
-    Object.values(globalCaches).forEach(cache => {
+    Object.values(globalCaches).forEach((cache) => {
       cache.clear();
     });
 
@@ -109,7 +109,10 @@ export class CacheManager {
       results[name] = cache.cleanExpired();
     }
 
-    const totalCleaned = Object.values(results).reduce((sum: number, count: any) => sum + Number(count), 0);
+    const totalCleaned = Object.values(results).reduce(
+      (sum: number, count: any) => sum + Number(count),
+      0,
+    );
     if (Number(totalCleaned) > 0) {
       console.log(`🧹 Cleaned ${totalCleaned} expired cache entries`);
     }
@@ -135,7 +138,12 @@ export class CacheManager {
     };
 
     // Calculate totals
-    const cacheMetrics = [metrics.api, metrics.embeddings, metrics.ui, metrics.ml];
+    const cacheMetrics = [
+      metrics.api,
+      metrics.embeddings,
+      metrics.ui,
+      metrics.ml,
+    ];
 
     metrics.total.totalEntries = Object.values(globalCaches).reduce(
       (sum, cache) => sum + cache.size(),
@@ -155,10 +163,11 @@ export class CacheManager {
     // Calculate average hit rate weighted by requests
     if (metrics.total.totalRequests > 0) {
       const weightedHitRate = cacheMetrics.reduce(
-        (sum, metric) => sum + (metric.hitRate * metric.totalRequests),
+        (sum, metric) => sum + metric.hitRate * metric.totalRequests,
         0,
       );
-      metrics.total.averageHitRate = weightedHitRate / metrics.total.totalRequests;
+      metrics.total.averageHitRate =
+        weightedHitRate / metrics.total.totalRequests;
     }
 
     return metrics;
@@ -167,16 +176,23 @@ export class CacheManager {
   /**
    * Invalidate cache entries by pattern across all caches
    */
-  invalidatePattern(pattern: string): { [K in keyof typeof globalCaches]: number } {
+  invalidatePattern(pattern: string): {
+    [K in keyof typeof globalCaches]: number;
+  } {
     const results = {} as any;
 
     for (const [name, cache] of Object.entries(globalCaches)) {
       results[name] = cache.invalidatePattern(pattern);
     }
 
-    const totalInvalidated = Object.values(results).reduce((sum: number, count: any) => sum + Number(count), 0);
+    const totalInvalidated = Object.values(results).reduce(
+      (sum: number, count: any) => sum + Number(count),
+      0,
+    );
     if (Number(totalInvalidated) > 0) {
-      console.log(`🗑️ Invalidated ${totalInvalidated} cache entries matching pattern: ${pattern}`);
+      console.log(
+        `🗑️ Invalidated ${totalInvalidated} cache entries matching pattern: ${pattern}`,
+      );
     }
 
     return results;
@@ -198,7 +214,8 @@ export class CacheManager {
       issues.push('Low cache hit rate (< 50%)');
     }
 
-    if (metrics.total.totalMemoryUsage > 100 * 1024 * 1024) { // 100MB
+    if (metrics.total.totalMemoryUsage > 100 * 1024 * 1024) {
+      // 100MB
       issues.push('High memory usage (> 100MB)');
     }
 
@@ -229,11 +246,15 @@ export class CacheManager {
       const cacheMetrics = cache.getMetrics();
 
       if (cacheMetrics.hitRate < 0.3) {
-        console.log(`💡 Consider increasing TTL for ${name} cache (low hit rate: ${(cacheMetrics.hitRate * 100).toFixed(1)}%)`);
+        console.log(
+          `💡 Consider increasing TTL for ${name} cache (low hit rate: ${(cacheMetrics.hitRate * 100).toFixed(1)}%)`,
+        );
       }
 
       if (cacheMetrics.evictions > cacheMetrics.hits * 0.2) {
-        console.log(`💡 Consider increasing size for ${name} cache (high eviction rate)`);
+        console.log(
+          `💡 Consider increasing size for ${name} cache (high eviction rate)`,
+        );
       }
     });
 
@@ -248,7 +269,9 @@ export class CacheManager {
       this.cleanExpired();
     }, this.config.cleanupInterval);
 
-    console.log(`🕒 Auto-cleanup enabled (interval: ${this.config.cleanupInterval}ms)`);
+    console.log(
+      `🕒 Auto-cleanup enabled (interval: ${this.config.cleanupInterval}ms)`,
+    );
   }
 
   /**
@@ -269,7 +292,9 @@ export class CacheManager {
       }
     }, this.config.metricsInterval);
 
-    console.log(`📊 Metrics collection enabled (interval: ${this.config.metricsInterval}ms)`);
+    console.log(
+      `📊 Metrics collection enabled (interval: ${this.config.metricsInterval}ms)`,
+    );
   }
 }
 

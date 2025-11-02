@@ -34,7 +34,7 @@ export enum WebSocketState {
   CONNECTED = 'connected',
   DISCONNECTED = 'disconnected',
   RECONNECTING = 'reconnecting',
-  FAILED = 'failed'
+  FAILED = 'failed',
 }
 
 export class WebSocketManager {
@@ -134,7 +134,6 @@ export class WebSocketManager {
             reject(new Error('Failed to connect'));
           }
         };
-
       } catch (error) {
         this.clearConnectionTimer();
         reject(error);
@@ -225,7 +224,10 @@ export class WebSocketManager {
   }
 
   private scheduleReconnect(): void {
-    if (this.isManualClose || this.reconnectAttempts >= this.config.maxReconnectAttempts) {
+    if (
+      this.isManualClose ||
+      this.reconnectAttempts >= this.config.maxReconnectAttempts
+    ) {
       this.setState(WebSocketState.FAILED);
       if (this.handlers.onReconnectFailed) {
         this.handlers.onReconnectFailed();

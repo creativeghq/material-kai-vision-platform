@@ -65,7 +65,10 @@ export interface PDFProcessingWebSocketMessage {
 class PDFProcessingWebSocketService {
   private wsManager: WebSocketManager | null = null;
   private activeJobs: Map<string, PDFProcessingProgress> = new Map();
-  private subscribers: Map<string, Set<(progress: PDFProcessingProgress) => void>> = new Map();
+  private subscribers: Map<
+    string,
+    Set<(progress: PDFProcessingProgress) => void>
+  > = new Map();
 
   constructor() {
     this.initializeWebSocket();
@@ -77,7 +80,9 @@ class PDFProcessingWebSocketService {
       const wsUrl = process.env.NEXT_PUBLIC_WS_URL;
 
       if (!wsUrl) {
-        console.log('📡 WebSocket disabled - NEXT_PUBLIC_WS_URL not configured');
+        console.log(
+          '📡 WebSocket disabled - NEXT_PUBLIC_WS_URL not configured',
+        );
         return;
       }
 
@@ -122,7 +127,10 @@ class PDFProcessingWebSocketService {
   /**
    * Subscribe to progress updates for a specific job
    */
-  public subscribeToJob(jobId: string, callback: (progress: PDFProcessingProgress) => void): () => void {
+  public subscribeToJob(
+    jobId: string,
+    callback: (progress: PDFProcessingProgress) => void,
+  ): () => void {
     if (!this.subscribers.has(jobId)) {
       this.subscribers.set(jobId, new Set());
     }
@@ -167,7 +175,10 @@ class PDFProcessingWebSocketService {
   /**
    * Subscribe to a specific event type
    */
-  public subscribe(eventType: string, callback: (data: any) => void): () => void {
+  public subscribe(
+    eventType: string,
+    callback: (data: any) => void,
+  ): () => void {
     // Store subscription in a map for event-based subscriptions
     if (!this.subscribers.has(eventType)) {
       this.subscribers.set(eventType, new Set());
@@ -188,7 +199,11 @@ class PDFProcessingWebSocketService {
   /**
    * Start tracking a new PDF processing job
    */
-  public startJob(jobId: string, fileName: string, totalPages: number = 0): void {
+  public startJob(
+    jobId: string,
+    fileName: string,
+    totalPages: number = 0,
+  ): void {
     const progress: PDFProcessingProgress = {
       jobId,
       fileName,
@@ -228,12 +243,19 @@ class PDFProcessingWebSocketService {
     // Update overall status and progress
     progress.status = this.mapWorkflowStatus(workflowJob.status);
     const totalSteps = workflowJob.steps?.length || 0;
-    const currentIndex = typeof workflowJob.currentStepIndex === 'number' ? workflowJob.currentStepIndex : 0;
-    progress.overallProgress = totalSteps > 0 ? Math.round(((currentIndex + 1) / totalSteps) * 100) : 0;
-    progress.currentStep = workflowJob.steps?.[currentIndex]?.name || 'Processing';
+    const currentIndex =
+      typeof workflowJob.currentStepIndex === 'number'
+        ? workflowJob.currentStepIndex
+        : 0;
+    progress.overallProgress =
+      totalSteps > 0 ? Math.round(((currentIndex + 1) / totalSteps) * 100) : 0;
+    progress.currentStep =
+      workflowJob.steps?.[currentIndex]?.name || 'Processing';
 
     // Update steps
-    progress.steps = (workflowJob.steps || []).map(step => this.mapWorkflowStep(step));
+    progress.steps = (workflowJob.steps || []).map((step) =>
+      this.mapWorkflowStep(step),
+    );
 
     // Extract statistics from step metadata
     this.extractStatisticsFromSteps(progress, workflowJob.steps || []);
@@ -241,7 +263,8 @@ class PDFProcessingWebSocketService {
     // Update timing
     if (workflowJob.endTime) {
       progress.endTime = workflowJob.endTime;
-      progress.actualDuration = progress.endTime.getTime() - progress.startTime.getTime();
+      progress.actualDuration =
+        progress.endTime.getTime() - progress.startTime.getTime();
     }
 
     this.activeJobs.set(workflowJob.id, progress);
@@ -280,13 +303,17 @@ class PDFProcessingWebSocketService {
   /**
    * Complete job processing
    */
-  public completeJob(jobId: string, finalStatistics?: Partial<PDFProcessingProgress['statistics']>): void {
+  public completeJob(
+    jobId: string,
+    finalStatistics?: Partial<PDFProcessingProgress['statistics']>,
+  ): void {
     const progress = this.activeJobs.get(jobId);
     if (progress) {
       progress.status = 'completed';
       progress.overallProgress = 100;
       progress.endTime = new Date();
-      progress.actualDuration = progress.endTime.getTime() - progress.startTime.getTime();
+      progress.actualDuration =
+        progress.endTime.getTime() - progress.startTime.getTime();
 
       if (finalStatistics) {
         progress.statistics = { ...progress.statistics, ...finalStatistics };
@@ -295,10 +322,13 @@ class PDFProcessingWebSocketService {
       this.notifySubscribers(jobId, progress);
 
       // Clean up after 5 minutes
-      setTimeout(() => {
-        this.activeJobs.delete(jobId);
-        this.subscribers.delete(jobId);
-      }, 5 * 60 * 1000);
+      setTimeout(
+        () => {
+          this.activeJobs.delete(jobId);
+          this.subscribers.delete(jobId);
+        },
+        5 * 60 * 1000,
+      );
     }
   }
 
@@ -362,12 +392,18 @@ class PDFProcessingWebSocketService {
 
   private mapWorkflowStatus(status: string): PDFProcessingProgress['status'] {
     switch (status) {
-      case 'pending': return 'pending';
-      case 'running': return 'running';
-      case 'completed': return 'completed';
-      case 'failed': return 'failed';
-      case 'cancelled': return 'cancelled';
-      default: return 'pending';
+      case 'pending':
+        return 'pending';
+      case 'running':
+        return 'running';
+      case 'completed':
+        return 'completed';
+      case 'failed':
+        return 'failed';
+      case 'cancelled':
+        return 'cancelled';
+      default:
+        return 'pending';
     }
   }
 
@@ -376,23 +412,32 @@ class PDFProcessingWebSocketService {
       id: step.id,
       name: step.name,
       description: step.description || '',
-      status: step.status === 'pending' ? 'pending' :
-              step.status === 'running' ? 'running' :
-              step.status === 'completed' ? 'completed' :
-              step.status === 'failed' ? 'failed' : 'skipped',
+      status:
+        step.status === 'pending'
+          ? 'pending'
+          : step.status === 'running'
+            ? 'running'
+            : step.status === 'completed'
+              ? 'completed'
+              : step.status === 'failed'
+                ? 'failed'
+                : 'skipped',
       progress: step.progress || 0,
       startTime: step.metadata?.startTime as Date,
       endTime: step.metadata?.endTime as Date,
-      details: Array.isArray(step.details) ? step.details.map(d =>
-        typeof d === 'string' ? d : d.message,
-      ) : [],
+      details: Array.isArray(step.details)
+        ? step.details.map((d) => (typeof d === 'string' ? d : d.message))
+        : [],
       error: step.metadata?.error as string,
       metadata: step.metadata,
     };
   }
 
-  private extractStatisticsFromSteps(progress: PDFProcessingProgress, steps: WorkflowStep[]): void {
-    const mivaaStep = steps.find(s => s.id === 'mivaa-processing');
+  private extractStatisticsFromSteps(
+    progress: PDFProcessingProgress,
+    steps: WorkflowStep[],
+  ): void {
+    const mivaaStep = steps.find((s) => s.id === 'mivaa-processing');
     if (mivaaStep?.metadata) {
       const metadata = mivaaStep.metadata;
 
@@ -414,7 +459,10 @@ class PDFProcessingWebSocketService {
     }
   }
 
-  private updateJobProgress(jobId: string, data: Partial<PDFProcessingProgress>): void {
+  private updateJobProgress(
+    jobId: string,
+    data: Partial<PDFProcessingProgress>,
+  ): void {
     const progress = this.activeJobs.get(jobId);
     if (progress) {
       Object.assign(progress, data);
@@ -422,10 +470,13 @@ class PDFProcessingWebSocketService {
     }
   }
 
-  private notifySubscribers(jobId: string, progress: PDFProcessingProgress): void {
+  private notifySubscribers(
+    jobId: string,
+    progress: PDFProcessingProgress,
+  ): void {
     const subscribers = this.subscribers.get(jobId);
     if (subscribers) {
-      subscribers.forEach(callback => {
+      subscribers.forEach((callback) => {
         try {
           callback(progress);
         } catch (error) {
@@ -449,5 +500,6 @@ class PDFProcessingWebSocketService {
 }
 
 // Export singleton instance
-export const pdfProcessingWebSocketService = new PDFProcessingWebSocketService();
+export const pdfProcessingWebSocketService =
+  new PDFProcessingWebSocketService();
 export default pdfProcessingWebSocketService;

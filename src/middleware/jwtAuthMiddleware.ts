@@ -9,7 +9,8 @@ import { AuthContext } from '../api/controllers/consolidatedPDFController';
  */
 
 // Internal connection token for frontend-backend communication
-const INTERNAL_CONNECTION_TOKEN = 'Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s';
+const INTERNAL_CONNECTION_TOKEN =
+  'Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s';
 
 export interface JWTAuthOptions {
   allowApiKey?: boolean;
@@ -57,12 +58,19 @@ export class JWTAuthMiddleware {
 
     try {
       // Extract authorization header and internal token
-      const authHeader = request.headers.authorization || request.headers.Authorization;
-      const apiKeyHeader = request.headers['x-api-key'] || request.headers['X-API-Key'];
-      const internalTokenHeader = request.headers['x-internal-token'] || request.headers['X-Internal-Token'];
+      const authHeader =
+        request.headers.authorization || request.headers.Authorization;
+      const apiKeyHeader =
+        request.headers['x-api-key'] || request.headers['X-API-Key'];
+      const internalTokenHeader =
+        request.headers['x-internal-token'] ||
+        request.headers['X-Internal-Token'];
 
       // Check for internal connection token first (if allowed)
-      if (allowInternalToken && internalTokenHeader === INTERNAL_CONNECTION_TOKEN) {
+      if (
+        allowInternalToken &&
+        internalTokenHeader === INTERNAL_CONNECTION_TOKEN
+      ) {
         return {
           success: true,
           authContext: {
@@ -87,7 +95,10 @@ export class JWTAuthMiddleware {
 
       // Try JWT token authentication first
       if (authHeader) {
-        const jwtResult = await this.authenticateJWT(authHeader, requiredScopes);
+        const jwtResult = await this.authenticateJWT(
+          authHeader,
+          requiredScopes,
+        );
         if (jwtResult.success) {
           // Check workspace requirement
           if (workspaceRequired && !request.workspaceId) {
@@ -112,7 +123,10 @@ export class JWTAuthMiddleware {
 
       // Try API key authentication
       if (apiKeyHeader && allowApiKey) {
-        const apiKeyResult = await this.authenticateApiKey(apiKeyHeader, requiredScopes);
+        const apiKeyResult = await this.authenticateApiKey(
+          apiKeyHeader,
+          requiredScopes,
+        );
         if (apiKeyResult.success) {
           // Check workspace requirement
           if (workspaceRequired && !request.workspaceId) {
@@ -171,14 +185,18 @@ export class JWTAuthMiddleware {
           authContext: { isAuthenticated: false },
           error: {
             code: 'INVALID_TOKEN_FORMAT',
-            message: 'Invalid authorization header format. Expected: Bearer <token>',
+            message:
+              'Invalid authorization header format. Expected: Bearer <token>',
             statusCode: 401,
           },
         };
       }
 
       // Verify JWT token with Supabase
-      const { data: { user }, error } = await supabase.auth.getUser(token);
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(token);
 
       if (error || !user) {
         return {
@@ -199,8 +217,8 @@ export class JWTAuthMiddleware {
       // For now, assume all authenticated users are active
       // Check required scopes - since no user_profiles table, skip scope validation
       const userScopes: string[] = [];
-      const hasRequiredScopes = requiredScopes.every(scope =>
-        userScopes.includes(scope) || userScopes.includes('*'),
+      const hasRequiredScopes = requiredScopes.every(
+        (scope) => userScopes.includes(scope) || userScopes.includes('*'),
       );
 
       if (requiredScopes.length > 0 && !hasRequiredScopes) {
@@ -279,7 +297,10 @@ export class JWTAuthMiddleware {
       }
 
       // Check if API key has expired
-      if (apiKeyData.expires_at && new Date(apiKeyData.expires_at) < new Date()) {
+      if (
+        apiKeyData.expires_at &&
+        new Date(apiKeyData.expires_at) < new Date()
+      ) {
         return {
           success: false,
           authContext: { isAuthenticated: false },
@@ -293,8 +314,8 @@ export class JWTAuthMiddleware {
 
       // Check required scopes
       const apiKeyScopes = apiKeyData.allowed_endpoints || [];
-      const hasRequiredScopes = requiredScopes.every(scope =>
-        apiKeyScopes.includes(scope) || apiKeyScopes.includes('*'),
+      const hasRequiredScopes = requiredScopes.every(
+        (scope) => apiKeyScopes.includes(scope) || apiKeyScopes.includes('*'),
       );
 
       if (requiredScopes.length > 0 && !hasRequiredScopes) {
@@ -354,7 +375,10 @@ export class JWTAuthMiddleware {
   /**
    * Check endpoint access for API key
    */
-  static async checkEndpointAccess(apiKey: string, endpoint: string): Promise<boolean> {
+  static async checkEndpointAccess(
+    apiKey: string,
+    endpoint: string,
+  ): Promise<boolean> {
     try {
       const { data: apiKeyData, error } = await supabase
         .from('api_keys')
@@ -367,7 +391,10 @@ export class JWTAuthMiddleware {
       }
 
       // If no restrictions, allow all endpoints
-      if (!apiKeyData.allowed_endpoints || apiKeyData.allowed_endpoints.length === 0) {
+      if (
+        !apiKeyData.allowed_endpoints ||
+        apiKeyData.allowed_endpoints.length === 0
+      ) {
         return true;
       }
 
@@ -385,7 +412,10 @@ export class JWTAuthMiddleware {
    * Check workspace access for user
    * Verifies that the user is a member of the specified workspace
    */
-  static async checkWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
+  static async checkWorkspaceAccess(
+    userId: string,
+    workspaceId: string,
+  ): Promise<boolean> {
     try {
       const { data, error } = await supabase
         .from('workspace_members')
@@ -411,15 +441,21 @@ export class JWTAuthMiddleware {
    */
   static extractWorkspaceId(request: AuthenticatedRequest): string | undefined {
     // Try to get workspace ID from various sources
-    return (request.body?.workspaceId as string) ||
-           (request.headers['x-workspace-id'] as string) ||
-           (request.headers['X-Workspace-Id'] as string);
+    return (
+      (request.body?.workspaceId as string) ||
+      (request.headers['x-workspace-id'] as string) ||
+      (request.headers['X-Workspace-Id'] as string)
+    );
   }
 
   /**
    * Create authentication error response
    */
-  static createAuthErrorResponse(error: { code: string; message: string; statusCode: number }) {
+  static createAuthErrorResponse(error: {
+    code: string;
+    message: string;
+    statusCode: number;
+  }) {
     return {
       success: false,
       error: error.message,

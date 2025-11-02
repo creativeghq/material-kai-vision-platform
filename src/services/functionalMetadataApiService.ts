@@ -1,6 +1,10 @@
 import { FunctionalMetadata } from '@/types/materials';
 
-import { MivaaIntegrationService, type PdfExtractionRequest, type ExtractionResult } from './pdf/mivaaIntegrationService';
+import {
+  MivaaIntegrationService,
+  type PdfExtractionRequest,
+  type ExtractionResult,
+} from './pdf/mivaaIntegrationService';
 
 /**
  * Enhanced extraction request interface for functional metadata
@@ -169,7 +173,8 @@ export class FunctionalMetadataApiService {
 
       // Call enhanced images endpoint with functional metadata
       const response = await this.callEnhancedImagesEndpoint(enhancedRequest, {
-        includeFunctionalMetadata: request.options.includeFunctionalMetadata ?? true,
+        includeFunctionalMetadata:
+          request.options.includeFunctionalMetadata ?? true,
         confidenceThreshold: request.options.confidenceThreshold ?? 0.5,
       });
 
@@ -184,8 +189,12 @@ export class FunctionalMetadataApiService {
         extractionType: 'images_with_functional_metadata',
         data: {
           images: this.transformImageData(response.images),
-          ...(transformedFunctionalMetadata && { functionalMetadata: transformedFunctionalMetadata }),
-          ...(response.functional_properties && { rawFunctionalData: response.functional_properties }),
+          ...(transformedFunctionalMetadata && {
+            functionalMetadata: transformedFunctionalMetadata,
+          }),
+          ...(response.functional_properties && {
+            rawFunctionalData: response.functional_properties,
+          }),
           ...(response.summary && { extractionSummary: response.summary }),
         },
         processingTime: response.metadata?.processing_time || 0,
@@ -193,7 +202,10 @@ export class FunctionalMetadataApiService {
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error during functional metadata extraction';
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Unknown error during functional metadata extraction';
 
       return {
         documentId: request.documentId,
@@ -222,33 +234,41 @@ export class FunctionalMetadataApiService {
       queryParams.set('include_functional_metadata', 'true');
     }
     if (functionalOptions.confidenceThreshold !== 0.5) {
-      queryParams.set('confidence_threshold', functionalOptions.confidenceThreshold.toString());
+      queryParams.set(
+        'confidence_threshold',
+        functionalOptions.confidenceThreshold.toString(),
+      );
     }
 
     const endpoint = `/extract/images${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
 
     // Use the existing makeRequest method through reflection/composition
     // Note: This requires accessing the private makeRequest method
-    const response = await ((this.mivaaService as unknown as Record<string, unknown>).makeRequest as any)(endpoint, {
+    const response = (await (
+      (this.mivaaService as unknown as Record<string, unknown>)
+        .makeRequest as any
+    )(endpoint, {
       method: 'POST',
       body: JSON.stringify({
         file_path: request.documentId,
         options: request.options,
       }),
-    }) as any;
+    })) as any;
 
     if (!(response as any).ok) {
-      throw new Error(`Enhanced images extraction failed: ${(response as any).status} ${(response as any).statusText}`);
+      throw new Error(
+        `Enhanced images extraction failed: ${(response as any).status} ${(response as any).statusText}`,
+      );
     }
 
-    return await response.json() as FunctionalMetadataResponse;
+    return (await response.json()) as FunctionalMetadataResponse;
   }
 
   /**
    * Transform raw image data to standard format
    */
   private transformImageData(images: FunctionalMetadataResponse['images']) {
-    return images.map(img => ({
+    return images.map((img) => ({
       id: `img-${img.page_number}-${img.image_index}`,
       pageNumber: img.page_number,
       imageBuffer: Buffer.from(img.image_data, 'base64'),
@@ -295,15 +315,18 @@ export class FunctionalMetadataApiService {
     // Transform mechanical properties
     if (rawData.mechanical_properties) {
       functionalMetadata.mechanicalPropertiesExtended = {
-        mechanicalCertifications: rawData.mechanical_properties.highlights || [],
+        mechanicalCertifications:
+          rawData.mechanical_properties.highlights || [],
       };
     }
 
     // Transform thermal properties
     if (rawData.thermal_properties) {
       functionalMetadata.thermalProperties = {
-        radiantHeatingCompatible: rawData.thermal_properties.highlights?.some(h =>
-          h.toLowerCase().includes('radiant') || h.toLowerCase().includes('heating'),
+        radiantHeatingCompatible: rawData.thermal_properties.highlights?.some(
+          (h) =>
+            h.toLowerCase().includes('radiant') ||
+            h.toLowerCase().includes('heating'),
         ),
       };
     }
@@ -311,16 +334,20 @@ export class FunctionalMetadataApiService {
     // Transform water resistance
     if (rawData.water_moisture_resistance) {
       functionalMetadata.waterMoistureResistance = {
-        moistureCertifications: rawData.water_moisture_resistance.highlights || [],
+        moistureCertifications:
+          rawData.water_moisture_resistance.highlights || [],
       };
     }
 
     // Transform chemical resistance
     if (rawData.chemical_hygiene_resistance) {
       functionalMetadata.chemicalHygieneResistance = {
-        chemicalCertifications: rawData.chemical_hygiene_resistance.highlights || [],
-        foodSafeCertified: rawData.chemical_hygiene_resistance.highlights?.some(h =>
-          h.toLowerCase().includes('food') || h.toLowerCase().includes('safe'),
+        chemicalCertifications:
+          rawData.chemical_hygiene_resistance.highlights || [],
+        foodSafeCertified: rawData.chemical_hygiene_resistance.highlights?.some(
+          (h) =>
+            h.toLowerCase().includes('food') ||
+            h.toLowerCase().includes('safe'),
         ),
       };
     }
@@ -336,7 +363,8 @@ export class FunctionalMetadataApiService {
     if (rawData.environmental_sustainability) {
       functionalMetadata.environmentalSustainability = {
         ecoLabels: {
-          otherCertifications: rawData.environmental_sustainability.highlights || [],
+          otherCertifications:
+            rawData.environmental_sustainability.highlights || [],
         },
       };
     }
@@ -374,8 +402,12 @@ export class FunctionalMetadataApiService {
       const result = await this.extractWithFunctionalMetadata(request);
 
       return {
-        ...(result.data.functionalMetadata && { functionalMetadata: result.data.functionalMetadata }),
-        ...(result.data.extractionSummary && { extractionSummary: result.data.extractionSummary }),
+        ...(result.data.functionalMetadata && {
+          functionalMetadata: result.data.functionalMetadata,
+        }),
+        ...(result.data.extractionSummary && {
+          extractionSummary: result.data.extractionSummary,
+        }),
         processingTime: Date.now() - startTime,
         ...(result.errors && { errors: result.errors }),
       };
@@ -409,7 +441,10 @@ export class FunctionalMetadataApiService {
     } catch (error) {
       return {
         available: false,
-        reason: error instanceof Error ? error.message : 'Unknown availability check error',
+        reason:
+          error instanceof Error
+            ? error.message
+            : 'Unknown availability check error',
       };
     }
   }

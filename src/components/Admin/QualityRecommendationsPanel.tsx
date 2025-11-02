@@ -14,10 +14,12 @@ interface QualityRecommendationsPanelProps {
   recommendations: string[];
 }
 
-export const QualityRecommendationsPanel: React.FC<QualityRecommendationsPanelProps> = ({
-  recommendations,
-}) => {
-  const [completedItems, setCompletedItems] = React.useState<Set<number>>(new Set());
+export const QualityRecommendationsPanel: React.FC<
+  QualityRecommendationsPanelProps
+> = ({ recommendations }) => {
+  const [completedItems, setCompletedItems] = React.useState<Set<number>>(
+    new Set(),
+  );
 
   const toggleCompleted = (index: number) => {
     const newCompleted = new Set(completedItems);
@@ -40,7 +42,9 @@ export const QualityRecommendationsPanel: React.FC<QualityRecommendationsPanelPr
       <CardContent>
         {recommendations.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">All quality metrics are optimal</p>
+            <p className="text-muted-foreground">
+              All quality metrics are optimal
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -54,7 +58,8 @@ export const QualityRecommendationsPanel: React.FC<QualityRecommendationsPanelPr
                 }`}
               >
                 <button
-                  onClick={() => toggleCompleted(index)} onKeyDown={(e) => e.key === 'Enter' && toggleCompleted(index)}
+                  onClick={() => toggleCompleted(index)}
+                  onKeyDown={(e) => e.key === 'Enter' && toggleCompleted(index)}
                   className="mt-1 flex-shrink-0"
                 >
                   <CheckCircle
@@ -100,4 +105,3 @@ export const QualityRecommendationsPanel: React.FC<QualityRecommendationsPanelPr
     </Card>
   );
 };
-

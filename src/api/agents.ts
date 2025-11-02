@@ -41,7 +41,8 @@ const agentConfigs: AgentConfig[] = [
       agent: 'Research Agent',
       role: 'Senior Research Analyst',
       goal: 'Conduct comprehensive research and analysis on materials and products',
-      backstory: 'Expert researcher with deep knowledge of materials science and product analysis',
+      backstory:
+        'Expert researcher with deep knowledge of materials science and product analysis',
       tools: ['search', 'scrape', 'analyze'],
     },
   },
@@ -54,7 +55,8 @@ const agentConfigs: AgentConfig[] = [
       agent: 'MIVAA Search Agent',
       role: 'Material Search Specialist',
       goal: 'Help users find and discover materials based on their requirements',
-      backstory: 'Specialized in material database search and intelligent recommendations',
+      backstory:
+        'Specialized in material database search and intelligent recommendations',
       tools: ['search', 'recommend'],
     },
   },
@@ -64,16 +66,14 @@ const agentConfigs: AgentConfig[] = [
  * Get accessible agents for a user role
  */
 export function getAccessibleAgents(userRole: string): AgentConfig[] {
-  return agentConfigs.filter(agent =>
-    agent.allowedRoles.includes(userRole)
-  );
+  return agentConfigs.filter((agent) => agent.allowedRoles.includes(userRole));
 }
 
 /**
  * Get a specific agent by ID
  */
 export function getAgentById(agentId: string): AgentConfig | undefined {
-  return agentConfigs.find(agent => agent.agentId === agentId);
+  return agentConfigs.find((agent) => agent.agentId === agentId);
 }
 
 /**
@@ -111,7 +111,9 @@ interface ExecuteAgentResponse {
 /**
  * Execute an agent using PraisonAI
  */
-export async function executeAgent(params: ExecuteAgentParams): Promise<ExecuteAgentResponse> {
+export async function executeAgent(
+  params: ExecuteAgentParams,
+): Promise<ExecuteAgentResponse> {
   const startTime = Date.now();
 
   try {
@@ -171,7 +173,7 @@ export async function executeAgent(params: ExecuteAgentParams): Promise<ExecuteA
  */
 export async function executeAgentStream(
   params: ExecuteAgentParams,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
 ): Promise<ExecuteAgentResponse> {
   const startTime = Date.now();
 
@@ -230,4 +232,3 @@ export async function executeAgentStream(
 
 // Export all agent functions for use in the platform
 export { AgentConfig, ExecuteAgentParams, ExecuteAgentResponse };
-

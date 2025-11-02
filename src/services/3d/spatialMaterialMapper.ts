@@ -36,7 +36,6 @@ interface RoomDimensions {
   };
 }
 
-
 interface SpatialAnalysisResult {
   id: string;
   roomType: string;
@@ -97,7 +96,10 @@ export class SpatialMaterialMapper {
     }
   }
 
-  private async processPointCloudAsync(analysisId: string, pointCloudData: SpatialPoint[]): Promise<void> {
+  private async processPointCloudAsync(
+    analysisId: string,
+    pointCloudData: SpatialPoint[],
+  ): Promise<void> {
     try {
       // Segment surfaces from point cloud
       const surfaces = await this.segmentSurfaces(pointCloudData);
@@ -106,8 +108,11 @@ export class SpatialMaterialMapper {
       const materialMappings: MaterialMapping[] = [];
 
       for (const surface of surfaces) {
-        const materialFeatures = await this.extractMaterialFeatures(surface.points);
-        const matchedMaterial = await this.matchMaterialFromFeatures(materialFeatures);
+        const materialFeatures = await this.extractMaterialFeatures(
+          surface.points,
+        );
+        const matchedMaterial =
+          await this.matchMaterialFromFeatures(materialFeatures);
 
         if (matchedMaterial) {
           materialMappings.push({
@@ -136,8 +141,9 @@ export class SpatialMaterialMapper {
         })
         .eq('id', analysisId);
 
-      console.log(`Completed spatial analysis ${analysisId} with ${materialMappings.length} material mappings`);
-
+      console.log(
+        `Completed spatial analysis ${analysisId} with ${materialMappings.length} material mappings`,
+      );
     } catch (error) {
       console.error('Error processing point cloud:', error);
 
@@ -152,13 +158,15 @@ export class SpatialMaterialMapper {
     }
   }
 
-  private calculateRoomDimensions(pointCloudData: SpatialPoint[]): RoomDimensions {
-    const minX = Math.min(...pointCloudData.map(p => p.x));
-    const maxX = Math.max(...pointCloudData.map(p => p.x));
-    const minY = Math.min(...pointCloudData.map(p => p.y));
-    const maxY = Math.max(...pointCloudData.map(p => p.y));
-    const minZ = Math.min(...pointCloudData.map(p => p.z));
-    const maxZ = Math.max(...pointCloudData.map(p => p.z));
+  private calculateRoomDimensions(
+    pointCloudData: SpatialPoint[],
+  ): RoomDimensions {
+    const minX = Math.min(...pointCloudData.map((p) => p.x));
+    const maxX = Math.max(...pointCloudData.map((p) => p.x));
+    const minY = Math.min(...pointCloudData.map((p) => p.y));
+    const maxY = Math.max(...pointCloudData.map((p) => p.y));
+    const minZ = Math.min(...pointCloudData.map((p) => p.z));
+    const maxZ = Math.max(...pointCloudData.map((p) => p.z));
 
     return {
       width: maxX - minX,
@@ -178,7 +186,8 @@ export class SpatialMaterialMapper {
     geometricComplexity: number;
   } {
     // Extract key spatial features from point cloud
-    const density = pointCloudData.length / this.calculateVolume(pointCloudData);
+    const density =
+      pointCloudData.length / this.calculateVolume(pointCloudData);
 
     return {
       pointCount: pointCloudData.length,
@@ -188,14 +197,16 @@ export class SpatialMaterialMapper {
     };
   }
 
-  private async segmentSurfaces(pointCloudData: SpatialPoint[]): Promise<Array<{
-    id: string;
-    type: 'wall' | 'floor' | 'ceiling' | 'furniture';
-    points: SpatialPoint[];
-    area: number;
-    bounds: { min: SpatialPoint; max: SpatialPoint };
-    normal: [number, number, number];
-  }>> {
+  private async segmentSurfaces(pointCloudData: SpatialPoint[]): Promise<
+    Array<{
+      id: string;
+      type: 'wall' | 'floor' | 'ceiling' | 'furniture';
+      points: SpatialPoint[];
+      area: number;
+      bounds: { min: SpatialPoint; max: SpatialPoint };
+      normal: [number, number, number];
+    }>
+  > {
     // Implement surface segmentation algorithm
     const surfaces: Array<{
       id: string;
@@ -207,9 +218,9 @@ export class SpatialMaterialMapper {
     }> = [];
 
     // Group points by height for floor/ceiling detection
-    const floorPoints = pointCloudData.filter(p => p.y < -1.5);
-    const ceilingPoints = pointCloudData.filter(p => p.y > 1.5);
-    const wallPoints = pointCloudData.filter(p => p.y >= -1.5 && p.y <= 1.5);
+    const floorPoints = pointCloudData.filter((p) => p.y < -1.5);
+    const ceilingPoints = pointCloudData.filter((p) => p.y > 1.5);
+    const wallPoints = pointCloudData.filter((p) => p.y >= -1.5 && p.y <= 1.5);
 
     if (floorPoints.length > 100) {
       surfaces.push({
@@ -249,7 +260,9 @@ export class SpatialMaterialMapper {
     return surfaces;
   }
 
-  private async extractMaterialFeatures(surfacePoints: SpatialPoint[]): Promise<{
+  private async extractMaterialFeatures(
+    surfacePoints: SpatialPoint[],
+  ): Promise<{
     averageColor: [number, number, number];
     textureFeatures: {
       roughness: number;
@@ -258,12 +271,15 @@ export class SpatialMaterialMapper {
     };
   }> {
     // Calculate average color
-    const colors = surfacePoints.filter(p => p.color).map(p => p.color);
-    const averageColor: [number, number, number] = colors.length > 0 ? [
-      colors.reduce((sum, c) => sum + c[0], 0) / colors.length,
-      colors.reduce((sum, c) => sum + c[1], 0) / colors.length,
-      colors.reduce((sum, c) => sum + c[2], 0) / colors.length,
-    ] : [128, 128, 128];
+    const colors = surfacePoints.filter((p) => p.color).map((p) => p.color);
+    const averageColor: [number, number, number] =
+      colors.length > 0
+        ? [
+            colors.reduce((sum, c) => sum + c[0], 0) / colors.length,
+            colors.reduce((sum, c) => sum + c[1], 0) / colors.length,
+            colors.reduce((sum, c) => sum + c[2], 0) / colors.length,
+          ]
+        : [128, 128, 128];
 
     // Analyze texture features
     const roughness = this.calculateRoughness(surfacePoints);
@@ -300,7 +316,10 @@ export class SpatialMaterialMapper {
       let maxConfidence = 0;
 
       for (const material of materials || []) {
-        const confidence = this.calculateMaterialMatchConfidence(features, material);
+        const confidence = this.calculateMaterialMatchConfidence(
+          features,
+          material,
+        );
         if (confidence > maxConfidence && confidence > 0.6) {
           maxConfidence = confidence;
           bestMatch = { id: material.id, confidence };
@@ -334,25 +353,45 @@ export class SpatialMaterialMapper {
     let factors = 0;
 
     // Color matching
-    if (material.metadata?.color && features.averageColor && typeof material.metadata.color === 'string') {
-      const colorMatch = this.calculateColorSimilarity(features.averageColor, material.metadata.color);
+    if (
+      material.metadata?.color &&
+      features.averageColor &&
+      typeof material.metadata.color === 'string'
+    ) {
+      const colorMatch = this.calculateColorSimilarity(
+        features.averageColor,
+        material.metadata.color,
+      );
       confidence += colorMatch * 0.4;
       factors += 0.4;
     }
 
     // Texture matching
-    if (material.properties && typeof material.properties === 'object' && material.properties !== null) {
+    if (
+      material.properties &&
+      typeof material.properties === 'object' &&
+      material.properties !== null
+    ) {
       const props = material.properties as Record<string, unknown>;
-      if (typeof props.roughness === 'number' && features.textureFeatures.roughness !== undefined) {
-        const roughnessMatch = 1 - Math.abs(props.roughness - features.textureFeatures.roughness);
+      if (
+        typeof props.roughness === 'number' &&
+        features.textureFeatures.roughness !== undefined
+      ) {
+        const roughnessMatch =
+          1 - Math.abs(props.roughness - features.textureFeatures.roughness);
         confidence += roughnessMatch * 0.3;
         factors += 0.3;
       }
     }
 
     // Pattern matching
-    if (material.metadata?.pattern && features.textureFeatures.pattern && typeof material.metadata.pattern === 'string') {
-      const patternMatch = material.metadata.pattern === features.textureFeatures.pattern ? 1 : 0;
+    if (
+      material.metadata?.pattern &&
+      features.textureFeatures.pattern &&
+      typeof material.metadata.pattern === 'string'
+    ) {
+      const patternMatch =
+        material.metadata.pattern === features.textureFeatures.pattern ? 1 : 0;
       confidence += patternMatch * 0.3;
       factors += 0.3;
     }
@@ -363,13 +402,15 @@ export class SpatialMaterialMapper {
   // Helper methods
   private calculateVolume(points: SpatialPoint[]): number {
     const bounds = this.calculateBounds(points);
-    return (bounds.max.x - bounds.min.x) *
-           (bounds.max.y - bounds.min.y) *
-           (bounds.max.z - bounds.min.z);
+    return (
+      (bounds.max.x - bounds.min.x) *
+      (bounds.max.y - bounds.min.y) *
+      (bounds.max.z - bounds.min.z)
+    );
   }
 
   private calculateColorVariance(points: SpatialPoint[]): number {
-    const colors = points.filter(p => p.color).map(p => p.color);
+    const colors = points.filter((p) => p.color).map((p) => p.color);
     if (colors.length === 0) return 0;
 
     const avgColor = [
@@ -378,15 +419,16 @@ export class SpatialMaterialMapper {
       colors.reduce((sum, c) => sum + c[2], 0) / colors.length,
     ];
 
-    const variance = colors.reduce((sum, color) => {
-      if (!color || color.length < 3) return sum;
-      const diff = Math.sqrt(
-        Math.pow((color[0] || 0) - (avgColor[0] || 0), 2) +
-        Math.pow((color[1] || 0) - (avgColor[1] || 0), 2) +
-        Math.pow((color[2] || 0) - (avgColor[2] || 0), 2),
-      );
-      return sum + diff;
-    }, 0) / colors.length;
+    const variance =
+      colors.reduce((sum, color) => {
+        if (!color || color.length < 3) return sum;
+        const diff = Math.sqrt(
+          Math.pow((color[0] || 0) - (avgColor[0] || 0), 2) +
+            Math.pow((color[1] || 0) - (avgColor[1] || 0), 2) +
+            Math.pow((color[2] || 0) - (avgColor[2] || 0), 2),
+        );
+        return sum + diff;
+      }, 0) / colors.length;
 
     return variance;
   }
@@ -407,21 +449,24 @@ export class SpatialMaterialMapper {
     return (bounds.max.x - bounds.min.x) * (bounds.max.z - bounds.min.z);
   }
 
-  private calculateBounds(points: SpatialPoint[]): { min: SpatialPoint; max: SpatialPoint } {
+  private calculateBounds(points: SpatialPoint[]): {
+    min: SpatialPoint;
+    max: SpatialPoint;
+  } {
     if (points.length === 0) {
       return { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
     }
 
     return {
       min: {
-        x: Math.min(...points.map(p => p.x)),
-        y: Math.min(...points.map(p => p.y)),
-        z: Math.min(...points.map(p => p.z)),
+        x: Math.min(...points.map((p) => p.x)),
+        y: Math.min(...points.map((p) => p.y)),
+        z: Math.min(...points.map((p) => p.z)),
       },
       max: {
-        x: Math.max(...points.map(p => p.x)),
-        y: Math.max(...points.map(p => p.y)),
-        z: Math.max(...points.map(p => p.z)),
+        x: Math.max(...points.map((p) => p.x)),
+        y: Math.max(...points.map((p) => p.y)),
+        z: Math.max(...points.map((p) => p.z)),
       },
     };
   }
@@ -448,16 +493,18 @@ export class SpatialMaterialMapper {
 
         const distance = Math.sqrt(
           Math.pow(currentPoint.x - otherPoint.x, 2) +
-          Math.pow(currentPoint.z - otherPoint.z, 2),
+            Math.pow(currentPoint.z - otherPoint.z, 2),
         );
 
-        if (distance < 0.5) { // 50cm clustering threshold
+        if (distance < 0.5) {
+          // 50cm clustering threshold
           cluster.push(otherPoint);
           visited.add(j);
         }
       }
 
-      if (cluster.length > 50) { // Minimum cluster size
+      if (cluster.length > 50) {
+        // Minimum cluster size
         clusters.push(cluster);
       }
     }
@@ -465,7 +512,9 @@ export class SpatialMaterialMapper {
     return clusters;
   }
 
-  private calculateSurfaceNormal(points: SpatialPoint[]): [number, number, number] {
+  private calculateSurfaceNormal(
+    points: SpatialPoint[],
+  ): [number, number, number] {
     // Calculate surface normal using first three points
     if (points.length < 3) return [0, 0, 1];
 
@@ -484,9 +533,13 @@ export class SpatialMaterialMapper {
       z: v1.x * v2.y - v1.y * v2.x,
     };
 
-    const length = Math.sqrt(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+    const length = Math.sqrt(
+      normal.x * normal.x + normal.y * normal.y + normal.z * normal.z,
+    );
 
-    return length > 0 ? [normal.x / length, normal.y / length, normal.z / length] : [0, 0, 1];
+    return length > 0
+      ? [normal.x / length, normal.y / length, normal.z / length]
+      : [0, 0, 1];
   }
 
   private calculateRoughness(points: SpatialPoint[]): number {
@@ -494,17 +547,22 @@ export class SpatialMaterialMapper {
     if (points.length < 10) return 0.5;
 
     const avgY = points.reduce((sum, p) => sum + p.y, 0) / points.length;
-    const variance = points.reduce((sum, p) => sum + Math.pow(p.y - avgY, 2), 0) / points.length;
+    const variance =
+      points.reduce((sum, p) => sum + Math.pow(p.y - avgY, 2), 0) /
+      points.length;
 
     return Math.min(Math.sqrt(variance) * 10, 1); // Normalize to 0-1
   }
 
   private calculateReflectance(points: SpatialPoint[]): number {
     // Calculate reflectance based on intensity values
-    const intensities = points.filter(p => p.intensity !== undefined).map(p => p.intensity);
+    const intensities = points
+      .filter((p) => p.intensity !== undefined)
+      .map((p) => p.intensity);
     if (intensities.length === 0) return 0.5;
 
-    const avgIntensity = intensities.reduce((sum, i) => sum + i, 0) / intensities.length;
+    const avgIntensity =
+      intensities.reduce((sum, i) => sum + i, 0) / intensities.length;
     return Math.min(avgIntensity / 255, 1); // Normalize to 0-1
   }
 
@@ -518,7 +576,10 @@ export class SpatialMaterialMapper {
     return 'patterned';
   }
 
-  private calculateColorSimilarity(color1: [number, number, number], color2: string): number {
+  private calculateColorSimilarity(
+    color1: [number, number, number],
+    color2: string,
+  ): number {
     // Convert color2 from string to RGB if needed
     // This is a simplified implementation
     const rgbColor2 = this.parseColorString(color2);
@@ -526,8 +587,8 @@ export class SpatialMaterialMapper {
 
     const distance = Math.sqrt(
       Math.pow(color1[0] - rgbColor2[0], 2) +
-      Math.pow(color1[1] - rgbColor2[1], 2) +
-      Math.pow(color1[2] - rgbColor2[2], 2),
+        Math.pow(color1[1] - rgbColor2[1], 2) +
+        Math.pow(color1[2] - rgbColor2[2], 2),
     );
 
     // Convert distance to similarity (0-1)
@@ -537,14 +598,14 @@ export class SpatialMaterialMapper {
   private parseColorString(colorStr: string): [number, number, number] | null {
     // Simple color parsing - extend as needed
     const colorMap: Record<string, [number, number, number]> = {
-      'white': [255, 255, 255],
-      'black': [0, 0, 0],
-      'gray': [128, 128, 128],
-      'red': [255, 0, 0],
-      'green': [0, 255, 0],
-      'blue': [0, 0, 255],
-      'brown': [165, 42, 42],
-      'beige': [245, 245, 220],
+      white: [255, 255, 255],
+      black: [0, 0, 0],
+      gray: [128, 128, 128],
+      red: [255, 0, 0],
+      green: [0, 255, 0],
+      blue: [0, 0, 255],
+      brown: [165, 42, 42],
+      beige: [245, 245, 220],
     };
 
     return colorMap[colorStr.toLowerCase()] || [128, 128, 128];
@@ -553,13 +614,16 @@ export class SpatialMaterialMapper {
   private calculateOverallConfidence(mappings: MaterialMapping[]): number {
     if (mappings.length === 0) return 0;
 
-    const avgConfidence = mappings.reduce((sum, m) => sum + m.confidence, 0) / mappings.length;
+    const avgConfidence =
+      mappings.reduce((sum, m) => sum + m.confidence, 0) / mappings.length;
     const coverageBonus = Math.min(mappings.length / 5, 0.2); // Bonus for covering more surfaces
 
     return Math.min(avgConfidence + coverageBonus, 1);
   }
 
-  async getSpatialAnalysisResult(analysisId: string): Promise<SpatialAnalysisResult | null> {
+  async getSpatialAnalysisResult(
+    analysisId: string,
+  ): Promise<SpatialAnalysisResult | null> {
     try {
       const { data, error } = await supabase
         .from('generation_3d')
@@ -572,9 +636,10 @@ export class SpatialMaterialMapper {
       // Parse the output_data JSON to extract spatial analysis information
       let outputData: Record<string, unknown> = {};
       try {
-        outputData = typeof data.output_data === 'string'
-          ? JSON.parse(data.output_data)
-          : (data.output_data as Record<string, unknown>) || {};
+        outputData =
+          typeof data.output_data === 'string'
+            ? JSON.parse(data.output_data)
+            : (data.output_data as Record<string, unknown>) || {};
       } catch (parseError) {
         console.warn('Failed to parse output_data:', parseError);
       }
@@ -582,9 +647,10 @@ export class SpatialMaterialMapper {
       // Parse input_data for room information
       let inputData: Record<string, unknown> = {};
       try {
-        inputData = typeof data.input_data === 'string'
-          ? JSON.parse(data.input_data)
-          : (data.input_data as Record<string, unknown>) || {};
+        inputData =
+          typeof data.input_data === 'string'
+            ? JSON.parse(data.input_data)
+            : (data.input_data as Record<string, unknown>) || {};
       } catch (parseError) {
         console.warn('Failed to parse input_data:', parseError);
       }
@@ -593,21 +659,43 @@ export class SpatialMaterialMapper {
         id: data.id,
         roomType: String(inputData.room_type || 'unknown'),
         roomDimensions: {
-          width: Number((inputData.room_dimensions as Record<string, unknown>)?.width || 0),
-          height: Number((inputData.room_dimensions as Record<string, unknown>)?.height || 0),
-          depth: Number((inputData.room_dimensions as Record<string, unknown>)?.depth || 0),
+          width: Number(
+            (inputData.room_dimensions as Record<string, unknown>)?.width || 0,
+          ),
+          height: Number(
+            (inputData.room_dimensions as Record<string, unknown>)?.height || 0,
+          ),
+          depth: Number(
+            (inputData.room_dimensions as Record<string, unknown>)?.depth || 0,
+          ),
         },
-        materialMappings: ((outputData.material_placements as Record<string, unknown>)?.mappings as MaterialMapping[]) || [],
+        materialMappings:
+          ((outputData.material_placements as Record<string, unknown>)
+            ?.mappings as MaterialMapping[]) || [],
         spatialFeatures: {
-          surfaces: ((outputData.spatial_features as Record<string, unknown>)?.surfaces as Array<{
-            id: string;
-            type: 'wall' | 'floor' | 'ceiling' | 'furniture';
-            area: number;
-            normal: [number, number, number];
-          }>) || [],
+          surfaces:
+            ((outputData.spatial_features as Record<string, unknown>)
+              ?.surfaces as Array<{
+              id: string;
+              type: 'wall' | 'floor' | 'ceiling' | 'furniture';
+              area: number;
+              normal: [number, number, number];
+            }>) || [],
           lighting: {
-            sources: ((outputData.spatial_features as Record<string, unknown>)?.lighting as Record<string, unknown>)?.sources as Array<{ position: SpatialPoint; intensity: number }> || [],
-            ambientLevel: Number(((outputData.spatial_features as Record<string, unknown>)?.lighting as Record<string, unknown>)?.ambientLevel || 0),
+            sources:
+              ((
+                (outputData.spatial_features as Record<string, unknown>)
+                  ?.lighting as Record<string, unknown>
+              )?.sources as Array<{
+                position: SpatialPoint;
+                intensity: number;
+              }>) || [],
+            ambientLevel: Number(
+              (
+                (outputData.spatial_features as Record<string, unknown>)
+                  ?.lighting as Record<string, unknown>
+              )?.ambientLevel || 0,
+            ),
           },
         },
         confidence: Number(outputData.confidence_score || 0),

@@ -102,7 +102,13 @@ describe('ChunkAnalysisService', () => {
     });
 
     it('should support all boundary types', () => {
-      const boundaryTypes = ['sentence', 'paragraph', 'section', 'semantic', 'weak'];
+      const boundaryTypes = [
+        'sentence',
+        'paragraph',
+        'section',
+        'semantic',
+        'weak',
+      ];
 
       for (const type of boundaryTypes) {
         const data: ChunkBoundaryInsert = {
@@ -253,4 +259,3 @@ describe('ChunkAnalysisService', () => {
     });
   });
 });
-

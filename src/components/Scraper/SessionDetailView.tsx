@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Play, Pause, RefreshCw, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertTriangle,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,10 +113,13 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
 
       // Start processing by calling our new processing logic
       const apiService = BrowserApiIntegrationService.getInstance();
-      const result = await apiService.callSupabaseFunction('scrape-session-manager', {
-        sessionId: sessionId,
-        action: 'start',
-      });
+      const result = await apiService.callSupabaseFunction(
+        'scrape-session-manager',
+        {
+          sessionId: sessionId,
+          action: 'start',
+        },
+      );
 
       if (!result.success) {
         throw new Error(result.error?.message || 'Failed to start scraping');
@@ -121,7 +133,8 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       console.error('Error starting processing:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to start scraping',
+        description:
+          error instanceof Error ? error.message : 'Failed to start scraping',
         variant: 'destructive',
       });
     } finally {
@@ -169,7 +182,11 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
       <div className="text-center p-8">
         <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold mb-2">Session not found</h3>
-        <Button onClick={onBack} onKeyDown={(e) => e.key === 'Enter' && onBack()} className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        <Button
+          onClick={onBack}
+          onKeyDown={(e) => e.key === 'Enter' && onBack()}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+        >
           Go Back
         </Button>
       </div>
@@ -198,7 +215,11 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={onBack} onKeyDown={(e) => e.key === 'Enter' && onBack()}>
+        <Button
+          className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+          onClick={onBack}
+          onKeyDown={(e) => e.key === 'Enter' && onBack()}
+        >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Sessions
         </Button>
@@ -211,13 +232,22 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
         </div>
         <div className="flex gap-2">
           {canStart && (
-            <Button onClick={startProcessing} onKeyDown={(e) => e.key === 'Enter' && startProcessing()} disabled={processing}>
+            <Button
+              onClick={startProcessing}
+              onKeyDown={(e) => e.key === 'Enter' && startProcessing()}
+              disabled={processing}
+            >
               <Play className="h-4 w-4 mr-2" />
               {session.status === 'paused' ? 'Resume' : 'Start'}
             </Button>
           )}
           {canPause && (
-            <Button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3" onClick={pauseProcessing} onKeyDown={(e) => e.key === 'Enter' && pauseProcessing()} disabled={processing}>
+            <Button
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+              onClick={pauseProcessing}
+              onKeyDown={(e) => e.key === 'Enter' && pauseProcessing()}
+              disabled={processing}
+            >
               <Pause className="h-4 w-4 mr-2" />
               Pause
             </Button>
@@ -239,7 +269,9 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             <div>
               <p className="text-sm text-muted-foreground">Created</p>
               <p className="font-semibold">
-                {formatDistanceToNow(new Date(session.created_at), { addSuffix: true })}
+                {formatDistanceToNow(new Date(session.created_at), {
+                  addSuffix: true,
+                })}
               </p>
             </div>
             <div>
@@ -259,24 +291,35 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
               <span>Overall Progress</span>
               <span>{Math.round(session.progress_percentage || 0)}%</span>
             </div>
-            <Progress value={session.progress_percentage || 0} className="h-3" />
+            <Progress
+              value={session.progress_percentage || 0}
+              className="h-3"
+            />
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
             <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <p className="text-2xl font-bold text-blue-600">{session.total_pages}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {session.total_pages}
+              </p>
               <p className="text-sm text-blue-600">Total Pages</p>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
-              <p className="text-2xl font-bold text-green-600">{session.completed_pages}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {session.completed_pages}
+              </p>
               <p className="text-sm text-green-600">Completed</p>
             </div>
             <div className="text-center p-3 bg-red-50 rounded-lg">
-              <p className="text-2xl font-bold text-red-600">{session.failed_pages}</p>
+              <p className="text-2xl font-bold text-red-600">
+                {session.failed_pages}
+              </p>
               <p className="text-sm text-red-600">Failed</p>
             </div>
             <div className="text-center p-3 bg-purple-50 rounded-lg">
-              <p className="text-2xl font-bold text-purple-600">{session.materials_processed || 0}</p>
+              <p className="text-2xl font-bold text-purple-600">
+                {session.materials_processed || 0}
+              </p>
               <p className="text-sm text-purple-600">Materials Found</p>
             </div>
           </div>

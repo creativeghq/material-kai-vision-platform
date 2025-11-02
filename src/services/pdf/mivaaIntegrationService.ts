@@ -177,7 +177,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   protected async doHealthCheck(): Promise<void> {
     const mivaaHealth = await this.healthCheck();
     if (!mivaaHealth.isHealthy) {
-      throw new Error(`Mivaa service health check failed: ${mivaaHealth.error}`);
+      throw new Error(
+        `Mivaa service health check failed: ${mivaaHealth.error}`,
+      );
     }
   }
 
@@ -187,7 +189,10 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   async healthCheck(): Promise<{ isHealthy: boolean; error?: string }> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.config.defaultTimeout);
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        this.config.defaultTimeout,
+      );
 
       // Use the gateway health endpoint instead of direct MIVAA call
       const response = await fetch('/api/mivaa/health', {
@@ -216,7 +221,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Extract markdown content from PDF
    */
-  async extractMarkdown(request: PdfExtractionRequest): Promise<MivaaMarkdownResponse> {
+  async extractMarkdown(
+    request: PdfExtractionRequest,
+  ): Promise<MivaaMarkdownResponse> {
     const response = await this.makeRequest('/extract/markdown', {
       method: 'POST',
       body: JSON.stringify({
@@ -226,7 +233,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     });
 
     if (!response.ok) {
-      throw new Error(`Markdown extraction failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Markdown extraction failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     return await response.json();
@@ -235,7 +244,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Extract tables from PDF
    */
-  async extractTables(request: PdfExtractionRequest): Promise<MivaaTablesResponse> {
+  async extractTables(
+    request: PdfExtractionRequest,
+  ): Promise<MivaaTablesResponse> {
     const response = await this.makeRequest('/extract/tables', {
       method: 'POST',
       body: JSON.stringify({
@@ -245,7 +256,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     });
 
     if (!response.ok) {
-      throw new Error(`Tables extraction failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Tables extraction failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     return await response.json();
@@ -254,7 +267,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Extract images from PDF
    */
-  async extractImages(request: PdfExtractionRequest): Promise<MivaaImagesResponse> {
+  async extractImages(
+    request: PdfExtractionRequest,
+  ): Promise<MivaaImagesResponse> {
     const response = await this.makeRequest('/extract/images', {
       method: 'POST',
       body: JSON.stringify({
@@ -264,7 +279,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     });
 
     if (!response.ok) {
-      throw new Error(`Images extraction failed: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Images extraction failed: ${response.status} ${response.statusText}`,
+      );
     }
 
     return await response.json();
@@ -290,13 +307,15 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Make HTTP request to MIVAA service through gateway with retry logic
    */
-  private async makeRequest(endpoint: string, options: RequestInit, retries = 3): Promise<Response> {
+  private async makeRequest(
+    endpoint: string,
+    options: RequestInit,
+    retries = 3,
+  ): Promise<Response> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-
-
 
         // Determine the action based on endpoint
         let action = 'extract_text';
@@ -305,7 +324,10 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         else if (endpoint.includes('images')) action = 'pdf_extract_images';
         else if (endpoint.includes('process')) action = 'pdf_process_document';
 
-        const response = await this.callMivaaGatewayDirect(action, options.body ? JSON.parse(options.body as string) : {});
+        const response = await this.callMivaaGatewayDirect(
+          action,
+          options.body ? JSON.parse(options.body as string) : {},
+        );
 
         clearTimeout(timeoutId);
 
@@ -318,7 +340,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
             text: async () => JSON.stringify(response.data),
           } as Response;
         } else {
-          throw new Error(`MIVAA request failed: ${response.error?.message || 'Unknown error'}`);
+          throw new Error(
+            `MIVAA request failed: ${response.error?.message || 'Unknown error'}`,
+          );
         }
       } catch (error) {
         if (attempt === retries) {
@@ -326,7 +350,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         }
 
         // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.pow(2, attempt) * 1000),
+        );
       }
     }
 
@@ -356,10 +382,15 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         case 'tables': {
           const response = await this.extractTables(request);
           extractedData = {
-            tables: response.tables.map(table => {
+            tables: response.tables.map((table) => {
               // Parse CSV data to extract metadata
-              const csvLines = table.csv_data.split('\n').filter(line => line.trim());
-              const headers = csvLines.length > 0 ? csvLines[0].split(',').map(h => h.trim()) : [];
+              const csvLines = table.csv_data
+                .split('\n')
+                .filter((line) => line.trim());
+              const headers =
+                csvLines.length > 0
+                  ? csvLines[0].split(',').map((h) => h.trim())
+                  : [];
               const rowCount = csvLines.length;
               const columnCount = headers.length;
 
@@ -387,19 +418,28 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
               // Generate description using MIVAA semantic analysis if enabled
               if (request.options.generateDescriptions) {
                 try {
-                  const analysisResponse = await this.mivaaClient.request('/api/semantic-analysis', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                      image_data: image.image_data,
-                      analysis_type: 'description',
-                    }),
-                  });
+                  const analysisResponse = await this.mivaaClient.request(
+                    '/api/semantic-analysis',
+                    {
+                      method: 'POST',
+                      body: JSON.stringify({
+                        image_data: image.image_data,
+                        analysis_type: 'description',
+                      }),
+                    },
+                  );
 
-                  if (analysisResponse.success && analysisResponse.data?.analysis) {
+                  if (
+                    analysisResponse.success &&
+                    analysisResponse.data?.analysis
+                  ) {
                     description = analysisResponse.data.analysis;
                   }
                 } catch (error) {
-                  console.warn(`Failed to generate description for image on page ${image.page_number}:`, error);
+                  console.warn(
+                    `Failed to generate description for image on page ${image.page_number}:`,
+                    error,
+                  );
                   description = `Image from page ${image.page_number}`;
                 }
               } else {
@@ -429,7 +469,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
           const response = await this.extractAll(request);
           extractedData = {
             markdown: response.markdown.markdown,
-            tables: response.tables.tables.map(table => ({
+            tables: response.tables.tables.map((table) => ({
               id: `table_${table.table_index}`,
               pageNumber: table.page_number,
               csvData: table.csv_data,
@@ -437,7 +477,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
               columnCount: 0,
               headers: [],
             })),
-            images: response.images.images.map(image => ({
+            images: response.images.images.map((image) => ({
               id: `image_${image.page_number}`,
               pageNumber: image.page_number,
               base64Data: image.image_data,
@@ -452,7 +492,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
           break;
         }
         default:
-          throw new Error(`Unsupported extraction type: ${request.options.extractionType}`);
+          throw new Error(
+            `Unsupported extraction type: ${request.options.extractionType}`,
+          );
       }
 
       return {
@@ -462,7 +504,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         ...(warnings.length > 0 && { warnings }),
       };
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : 'Unknown extraction error');
+      errors.push(
+        error instanceof Error ? error.message : 'Unknown extraction error',
+      );
       return {
         success: false,
         data: {},
@@ -474,7 +518,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Extract content from PDF document
    */
-  public async extractFromPdf(request: PdfExtractionRequest): Promise<ExtractionResult> {
+  public async extractFromPdf(
+    request: PdfExtractionRequest,
+  ): Promise<ExtractionResult> {
     return this.executeOperation(async () => {
       const startTime = Date.now();
 
@@ -497,7 +543,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         },
         processingTime: Date.now() - startTime,
         ...(extractionResult.errors && { errors: extractionResult.errors }),
-        ...(extractionResult.warnings && { warnings: extractionResult.warnings }),
+        ...(extractionResult.warnings && {
+          warnings: extractionResult.warnings,
+        }),
       };
 
       return standardizedResult;
@@ -507,13 +555,17 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Process document through the complete pipeline for RAG integration
    */
-  public async processForRag(request: PdfExtractionRequest): Promise<ProcessingPipelineResult> {
+  public async processForRag(
+    request: PdfExtractionRequest,
+  ): Promise<ProcessingPipelineResult> {
     return this.executeOperation(async () => {
       // First extract content
       const extractionResult = await this.extractFromPdf(request);
 
       if (extractionResult.status === 'failed') {
-        throw new Error(`PDF extraction failed: ${extractionResult.errors?.join(', ')}`);
+        throw new Error(
+          `PDF extraction failed: ${extractionResult.errors?.join(', ')}`,
+        );
       }
 
       // Process through RAG pipeline
@@ -529,7 +581,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Batch process multiple documents
    */
-  public async batchProcess(requests: PdfExtractionRequest[]): Promise<ProcessingPipelineResult[]> {
+  public async batchProcess(
+    requests: PdfExtractionRequest[],
+  ): Promise<ProcessingPipelineResult[]> {
     return this.executeOperation(async () => {
       const results: ProcessingPipelineResult[] = [];
       const batchSize = this.config.batchSize || 5;
@@ -537,7 +591,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       // Process in batches to avoid overwhelming the service
       for (let i = 0; i < requests.length; i += batchSize) {
         const batch = requests.slice(i, i + batchSize);
-        const batchPromises = batch.map(request => this.processForRag(request));
+        const batchPromises = batch.map((request) =>
+          this.processForRag(request),
+        );
         const batchResults = await Promise.allSettled(batchPromises);
 
         batchResults.forEach((result, index) => {
@@ -580,7 +636,9 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       });
 
       if (!response.ok) {
-        throw new Error(`Status check failed: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Status check failed: ${response.status} ${response.statusText}`,
+        );
       }
 
       return await response.json();
@@ -605,14 +663,18 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
 
     const validTypes = ['markdown', 'tables', 'images', 'all'];
     if (!validTypes.includes(request.options.extractionType)) {
-      throw new Error(`Invalid extraction type. Must be one of: ${validTypes.join(', ')}`);
+      throw new Error(
+        `Invalid extraction type. Must be one of: ${validTypes.join(', ')}`,
+      );
     }
 
     // Validate page range if provided
     if (request.options.pageRange) {
       const { start, end } = request.options.pageRange;
       if (start && end && start > end) {
-        throw new Error('Invalid page range: start page cannot be greater than end page');
+        throw new Error(
+          'Invalid page range: start page cannot be greater than end page',
+        );
       }
     }
   }
@@ -620,9 +682,16 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
   /**
    * Call MIVAA Gateway directly using fetch to avoid CORS issues
    */
-  private async callMivaaGatewayDirect(action: string, payload: any): Promise<any> {
-    const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-    const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+  private async callMivaaGatewayDirect(
+    action: string,
+    payload: any,
+  ): Promise<any> {
+    const supabaseUrl =
+      (import.meta as any).env?.VITE_SUPABASE_URL ||
+      'https://bgbavxtjlbvgplozizxu.supabase.co';
+    const supabaseKey =
+      (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase configuration not found');
@@ -634,7 +703,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
+          Authorization: `Bearer ${supabaseKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -644,14 +713,18 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
       });
 
       if (!response.ok) {
-        throw new Error(`MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`);
+        throw new Error(
+          `MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`,
+        );
       }
 
       const data = await response.json();
 
       // Check for application-level errors
       if (!data.success && data.error) {
-        throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
+        throw new Error(
+          `MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`,
+        );
       }
 
       return data;
@@ -661,7 +734,6 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
     }
   }
 }
-
 
 // Export default configuration
 export const defaultMivaaConfig: MivaaIntegrationConfig = {

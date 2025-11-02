@@ -210,11 +210,9 @@ interface MaterialAgentSearchInterfaceProps {
   onNavigateTo3D?: () => void;
 }
 
-export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterfaceProps> = ({
-  onMaterialSelect,
-  onNavigateToMoodboard,
-  onNavigateTo3D,
-}) => {
+export const MaterialAgentSearchInterface: React.FC<
+  MaterialAgentSearchInterfaceProps
+> = ({ onMaterialSelect, onNavigateToMoodboard, onNavigateTo3D }) => {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -234,27 +232,34 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     useVisualSearch: true,
     enableVisualSearch: true,
   });
-  const [searchMode, setSearchMode] = useState<'text' | 'visual' | 'hybrid' | 'similarity'>('text');
-  const [visualSearchResults, setVisualSearchResults] = useState<VisualSearchResults | null>(null);
-  const [similaritySearchResults, setSimilaritySearchResults] = useState<SimilaritySearchResults | null>(null);
+  const [searchMode, setSearchMode] = useState<
+    'text' | 'visual' | 'hybrid' | 'similarity'
+  >('text');
+  const [visualSearchResults, setVisualSearchResults] =
+    useState<VisualSearchResults | null>(null);
+  const [similaritySearchResults, setSimilaritySearchResults] =
+    useState<SimilaritySearchResults | null>(null);
   const [similarityThreshold, setSimilarityThreshold] = useState(0.7);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Initialize with welcome message
-    setMessages([{
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: "👋 Hello I'm your AI material research assistant powered by Material Agent Orchestrator. I can help you:\n\n• Search and analyze materials from our PDF knowledge base\n• Find materials based on specific properties or applications\n• Generate design suggestions and 3D concepts\n• Cross-reference materials with projects and mood boards\n\nWhat would you like to explore today?",
-      timestamp: new Date(),
-      suggestions: [
-        'Find sustainable materials for modern interiors',
-        'Search for acoustic materials with high performance',
-        'Show me trending colors and textures for 2024',
-        'Find materials suitable for outdoor applications',
-      ],
-    }]);
+    setMessages([
+      {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content:
+          "👋 Hello I'm your AI material research assistant powered by Material Agent Orchestrator. I can help you:\n\n• Search and analyze materials from our PDF knowledge base\n• Find materials based on specific properties or applications\n• Generate design suggestions and 3D concepts\n• Cross-reference materials with projects and mood boards\n\nWhat would you like to explore today?",
+        timestamp: new Date(),
+        suggestions: [
+          'Find sustainable materials for modern interiors',
+          'Search for acoustic materials with high performance',
+          'Show me trending colors and textures for 2024',
+          'Find materials suitable for outdoor applications',
+        ],
+      },
+    ]);
   }, []);
 
   useEffect(() => {
@@ -266,10 +271,18 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
     const files = event.target.files;
     if (!files) return;
 
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach((file) => {
       // Validate file type and size
       const maxSize = 10 * 1024 * 1024; // 10MB
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain', 'text/csv'];
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/pdf',
+        'text/plain',
+        'text/csv',
+      ];
 
       if (file.size > maxSize) {
         toast({
@@ -302,11 +315,11 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         const reader = new FileReader();
         reader.onload = (e) => {
           newFile.preview = e.target?.result as string;
-          setAttachedFiles(prev => [...prev, newFile]);
+          setAttachedFiles((prev) => [...prev, newFile]);
         };
         reader.readAsDataURL(file);
       } else {
-        setAttachedFiles(prev => [...prev, newFile]);
+        setAttachedFiles((prev) => [...prev, newFile]);
       }
     });
 
@@ -317,12 +330,12 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
   };
 
   const removeAttachedFile = (fileId: string) => {
-    setAttachedFiles(prev => {
-      const fileToRemove = prev.find(f => f.id === fileId);
+    setAttachedFiles((prev) => {
+      const fileToRemove = prev.find((f) => f.id === fileId);
       if (fileToRemove?.url) {
         URL.revokeObjectURL(fileToRemove.url);
       }
-      return prev.filter(f => f.id !== fileId);
+      return prev.filter((f) => f.id !== fileId);
     });
   };
 
@@ -337,13 +350,15 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       ...(attachedFiles.length > 0 && { attachments: [...attachedFiles] }),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
       // Check authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         throw new Error('Please sign in to use the AI assistant');
       }
@@ -352,7 +367,12 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       // eslint-disable-next-line no-console
       console.log('=== Enhanced Material Agent Integration ===');
       // eslint-disable-next-line no-console
-      console.log('1. File attachments:', attachedFiles.length > 0 ? `${attachedFiles.length} files attached` : 'No files');
+      console.log(
+        '1. File attachments:',
+        attachedFiles.length > 0
+          ? `${attachedFiles.length} files attached`
+          : 'No files',
+      );
       // eslint-disable-next-line no-console
       console.log('2. Hybrid model config:', hybridConfig);
       // eslint-disable-next-line no-console
@@ -362,7 +382,10 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       // eslint-disable-next-line no-console
       console.log('5. Session context:', sessionId);
       // eslint-disable-next-line no-console
-      console.log('6. User input:', { length: input.length, hasAttachments: attachedFiles.length > 0 });
+      console.log('6. User input:', {
+        length: input.length,
+        hasAttachments: attachedFiles.length > 0,
+      });
       // eslint-disable-next-line no-console
       console.log('=====================================');
 
@@ -378,7 +401,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           useVisualSearch: hybridConfig.useVisualSearch,
         },
         hybridModelConfig: hybridConfig,
-        attachments: attachedFiles.map(file => ({
+        attachments: attachedFiles.map((file) => ({
           id: file.id,
           name: file.name,
           type: file.type,
@@ -407,21 +430,27 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
 
           if (ragResponse.success && ragResponse.results) {
             ragResults = {
-              knowledgeResults: (ragResponse.results.knowledgeBase || []).map(kb => ({
-                id: kb.id,
-                title: kb.title,
-                content: kb.content.substring(0, 500) + '...', // Truncate for context
-                relevanceScore: kb.relevanceScore,
-                source: kb.source,
-              })),
-              materialResults: (ragResponse.results.materialKnowledge || []).map(mk => ({
+              knowledgeResults: (ragResponse.results.knowledgeBase || []).map(
+                (kb) => ({
+                  id: kb.id,
+                  title: kb.title,
+                  content: kb.content.substring(0, 500) + '...', // Truncate for context
+                  relevanceScore: kb.relevanceScore,
+                  source: kb.source,
+                }),
+              ),
+              materialResults: (
+                ragResponse.results.materialKnowledge || []
+              ).map((mk) => ({
                 id: mk.materialId,
                 title: mk.materialName,
                 content: mk.extractedKnowledge,
                 relevanceScore: mk.relevanceScore,
                 source: 'material_knowledge',
               })),
-              totalResults: (ragResponse.results.knowledgeBase || []).length + (ragResponse.results.materialKnowledge || []).length,
+              totalResults:
+                (ragResponse.results.knowledgeBase || []).length +
+                (ragResponse.results.materialKnowledge || []).length,
               searchTime: ragResponse.performance?.totalTime || 0,
             };
             // eslint-disable-next-line no-console
@@ -437,72 +466,112 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
 
       // If Visual Search is enabled and images are attached, perform visual search
       let visualSearchResults: VisualSearchResults | null = null;
-      if (hybridConfig.useVisualSearch && attachedFiles.some(file => file.type.startsWith('image/'))) {
+      if (
+        hybridConfig.useVisualSearch &&
+        attachedFiles.some((file) => file.type.startsWith('image/'))
+      ) {
         try {
           // eslint-disable-next-line no-console
           console.log('👁️ Performing visual search...');
-          const imageFiles = attachedFiles.filter(file => file.type.startsWith('image/'));
+          const imageFiles = attachedFiles.filter((file) =>
+            file.type.startsWith('image/'),
+          );
 
           for (const imageFile of imageFiles) {
             try {
               // Call the visual search API endpoint
               const apiService = BrowserApiIntegrationService.getInstance();
-              const visualResponse = await apiService.callSupabaseFunction('visual-search', {
-                user_id: session.user.id,
-                search_type: input.trim() ? 'hybrid' : 'visual', // Hybrid if text + image, pure visual if just image
-                query_text: input.trim() || 'Find similar materials',
-                image_data: {
-                  name: imageFile.name,
-                  type: imageFile.type,
-                  url: imageFile.url,
-                  preview: imageFile.preview,
+              const visualResponse = await apiService.callSupabaseFunction(
+                'visual-search',
+                {
+                  user_id: session.user.id,
+                  search_type: input.trim() ? 'hybrid' : 'visual', // Hybrid if text + image, pure visual if just image
+                  query_text: input.trim() || 'Find similar materials',
+                  image_data: {
+                    name: imageFile.name,
+                    type: imageFile.type,
+                    url: imageFile.url,
+                    preview: imageFile.preview,
+                  },
+                  search_filters: {},
+                  similarity_threshold: 0.75,
+                  max_results: 20,
+                  session_id: sessionId,
                 },
-                search_filters: {},
-                similarity_threshold: 0.75,
-                max_results: 20,
-                session_id: sessionId,
-              });
+              );
 
               // ✅ Handle standardized visual search response format
               if (visualResponse.success && visualResponse.data) {
                 const responseData = visualResponse.data as any;
 
                 // Handle both new standardized format and legacy format
-                const matches = responseData.matches || responseData.results || [];
-                const searchId = responseData.query_id || responseData.search_id || crypto.randomUUID();
-                const executionTime = responseData.search_statistics?.search_time_ms || responseData.search_execution_time_ms || 0;
+                const matches =
+                  responseData.matches || responseData.results || [];
+                const searchId =
+                  responseData.query_id ||
+                  responseData.search_id ||
+                  crypto.randomUUID();
+                const executionTime =
+                  responseData.search_statistics?.search_time_ms ||
+                  responseData.search_execution_time_ms ||
+                  0;
 
                 if (matches.length > 0) {
                   visualSearchResults = {
                     searchId: searchId,
                     matches: matches.map((result: unknown) => ({
-                      id: (result as any).material_id || (result as any).id || crypto.randomUUID(),
-                      name: (result as any).material_name || (result as any).name || 'Unknown Material',
-                      description: (result as any).description || (result as any).material_data?.description || 'No description available',
+                      id:
+                        (result as any).material_id ||
+                        (result as any).id ||
+                        crypto.randomUUID(),
+                      name:
+                        (result as any).material_name ||
+                        (result as any).name ||
+                        'Unknown Material',
+                      description:
+                        (result as any).description ||
+                        (result as any).material_data?.description ||
+                        'No description available',
                       similarity_score: (result as any).similarity_score || 0.8,
                       llama_analysis: (result as any).llama_analysis || {},
                       visual_features: (result as any).visual_features || {},
-                      thumbnail_url: (result as any).thumbnail_url || (result as any).image_url || '',
+                      thumbnail_url:
+                        (result as any).thumbnail_url ||
+                        (result as any).image_url ||
+                        '',
                     })),
                     search_execution_time_ms: executionTime,
                     total_results: matches.length,
-                    query_analysis: responseData.query_analysis || responseData.query_metadata || {},
+                    query_analysis:
+                      responseData.query_analysis ||
+                      responseData.query_metadata ||
+                      {},
                   };
                   // eslint-disable-next-line no-console
-                  console.log('✅ Visual search completed:', visualSearchResults);
-                  enhancedContext.visualSearchResults = visualSearchResults || null;
+                  console.log(
+                    '✅ Visual search completed:',
+                    visualSearchResults,
+                  );
+                  enhancedContext.visualSearchResults =
+                    visualSearchResults || null;
                   setVisualSearchResults(visualSearchResults);
                   break; // Use first image for now
                 }
               }
             } catch (imageError) {
               // eslint-disable-next-line no-console
-              console.warn(`⚠️ Visual search failed for ${imageFile.name}:`, imageError);
+              console.warn(
+                `⚠️ Visual search failed for ${imageFile.name}:`,
+                imageError,
+              );
             }
           }
         } catch (visualError) {
           // eslint-disable-next-line no-console
-          console.warn('⚠️ Visual search failed, continuing without:', visualError);
+          console.warn(
+            '⚠️ Visual search failed, continuing without:',
+            visualError,
+          );
         }
       }
 
@@ -513,42 +582,58 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           // eslint-disable-next-line no-console
           console.log('🔍 Performing vector similarity search...');
           const apiService = BrowserApiIntegrationService.getInstance();
-          const similarityResponse = await apiService.callSupabaseFunction('mivaa-gateway', {
-            action: 'vector_similarity_search',
-            payload: {
-              query_text: input.trim(),
-              similarity_threshold: similarityThreshold,
-              limit: 20,
-              include_metadata: true,
-              search_type: 'semantic',
+          const similarityResponse = await apiService.callSupabaseFunction(
+            'mivaa-gateway',
+            {
+              action: 'vector_similarity_search',
+              payload: {
+                query_text: input.trim(),
+                similarity_threshold: similarityThreshold,
+                limit: 20,
+                include_metadata: true,
+                search_type: 'semantic',
+              },
             },
-          });
+          );
 
           if (similarityResponse.success && similarityResponse.data?.results) {
             similaritySearchResults = {
               searchId: crypto.randomUUID(),
-              results: similarityResponse.data.results.map((result: unknown) => ({
-                id: (result as any).id || crypto.randomUUID(),
-                title: (result as any).title || (result as any).name || 'Untitled',
-                content: (result as any).content || (result as any).description || '',
-                similarity_score: (result as any).similarity_score || 0,
-                metadata: (result as any).metadata || {},
-                document_type: (result as any).document_type || 'material',
-                source: (result as any).source || 'vector_search',
-              })),
-              processing_time_ms: similarityResponse.data.processing_time_ms || 0,
+              results: similarityResponse.data.results.map(
+                (result: unknown) => ({
+                  id: (result as any).id || crypto.randomUUID(),
+                  title:
+                    (result as any).title || (result as any).name || 'Untitled',
+                  content:
+                    (result as any).content ||
+                    (result as any).description ||
+                    '',
+                  similarity_score: (result as any).similarity_score || 0,
+                  metadata: (result as any).metadata || {},
+                  document_type: (result as any).document_type || 'material',
+                  source: (result as any).source || 'vector_search',
+                }),
+              ),
+              processing_time_ms:
+                similarityResponse.data.processing_time_ms || 0,
               total_results: similarityResponse.data.results.length,
               search_type: 'semantic',
               threshold_used: similarityThreshold,
             };
             // eslint-disable-next-line no-console
-            console.log('✅ Vector similarity search completed:', similaritySearchResults);
+            console.log(
+              '✅ Vector similarity search completed:',
+              similaritySearchResults,
+            );
             enhancedContext.similaritySearchResults = similaritySearchResults;
             setSimilaritySearchResults(similaritySearchResults);
           }
         } catch (similarityError) {
           // eslint-disable-next-line no-console
-          console.warn('⚠️ Vector similarity search failed, continuing without:', similarityError);
+          console.warn(
+            '⚠️ Vector similarity search failed, continuing without:',
+            similarityError,
+          );
         }
       }
 
@@ -556,14 +641,22 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       let data: APIResponse | null = null;
       let error: string | null = null;
 
-      if (hybridConfig.enableRAG && hybridConfig.primary && hybridConfig.fallback) {
+      if (
+        hybridConfig.enableRAG &&
+        hybridConfig.primary &&
+        hybridConfig.fallback
+      ) {
         // eslint-disable-next-line no-console
         console.log('🔄 Using Hybrid AI Service...');
         try {
           // Use HybridAIService for enhanced AI processing
-          const hybridResponse = await (HybridAIService as unknown as {
-            processRequest: (params: Record<string, unknown>) => Promise<HybridAIResponse>;
-          }).processRequest({
+          const hybridResponse = await (
+            HybridAIService as unknown as {
+              processRequest: (
+                params: Record<string, unknown>,
+              ) => Promise<HybridAIResponse>;
+            }
+          ).processRequest({
             prompt: input,
             model: hybridConfig.primary,
             type: 'general',
@@ -575,15 +668,19 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             // Convert hybrid response to standard format
             data = {
               success: true,
-              response: hybridResponse.data || 'Processed using hybrid AI models',
-              coordination_summary: 'Processed using hybrid AI models with fallback support',
+              response:
+                hybridResponse.data || 'Processed using hybrid AI models',
+              coordination_summary:
+                'Processed using hybrid AI models with fallback support',
               coordinated_result: {
-                content: hybridResponse.data || 'Processed using hybrid AI models',
+                content:
+                  hybridResponse.data || 'Processed using hybrid AI models',
                 recommendations: [],
                 materials: [],
               },
               task_id: crypto.randomUUID(),
-              total_processing_time_ms: hybridResponse.total_processing_time_ms || 0,
+              total_processing_time_ms:
+                hybridResponse.total_processing_time_ms || 0,
               overall_confidence: hybridResponse.final_score || 0.7,
               agent_executions: hybridResponse.attempts || [],
             };
@@ -593,10 +690,38 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           }
         } catch (hybridError) {
           // eslint-disable-next-line no-console
-          console.warn('⚠️ Hybrid AI failed, falling back to standard Material Agent:', hybridError);
+          console.warn(
+            '⚠️ Hybrid AI failed, falling back to standard Material Agent:',
+            hybridError,
+          );
           // Fallback to standard Material Agent
           const apiService = BrowserApiIntegrationService.getInstance();
-          const response = await apiService.callSupabaseFunction('material-agent-orchestrator', {
+          const response = await apiService.callSupabaseFunction(
+            'material-agent-orchestrator',
+            {
+              user_id: session.user.id,
+              task_type: 'comprehensive_design',
+              input_data: {
+                query: input,
+                sessionId: sessionId,
+                context: enhancedContext,
+                hybridConfig: hybridConfig,
+                attachments:
+                  attachedFiles.length > 0 ? attachedFiles : undefined,
+              },
+            },
+          );
+          data = response.data as APIResponse;
+          error = response.error?.message || null;
+        }
+      } else {
+        // eslint-disable-next-line no-console
+        console.log('🤖 Using standard Material Agent...');
+        // Use standard Material Agent endpoint
+        const apiService = BrowserApiIntegrationService.getInstance();
+        const response = await apiService.callSupabaseFunction(
+          'material-agent-orchestrator',
+          {
             user_id: session.user.id,
             task_type: 'comprehensive_design',
             input_data: {
@@ -606,26 +731,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               hybridConfig: hybridConfig,
               attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
             },
-          });
-          data = response.data as APIResponse;
-          error = response.error?.message || null;
-        }
-      } else {
-        // eslint-disable-next-line no-console
-        console.log('🤖 Using standard Material Agent...');
-        // Use standard Material Agent endpoint
-        const apiService = BrowserApiIntegrationService.getInstance();
-        const response = await apiService.callSupabaseFunction('material-agent-orchestrator', {
-          user_id: session.user.id,
-          task_type: 'comprehensive_design',
-          input_data: {
-            query: input,
-            sessionId: sessionId,
-            context: enhancedContext,
-            hybridConfig: hybridConfig,
-            attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
           },
-        });
+        );
         data = response.data as APIResponse;
         error = response.error?.message || null;
       }
@@ -637,14 +744,22 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       }
 
       if (!data || !data.success) {
-        throw new Error(data?.error_message || data?.error || 'AI processing failed');
+        throw new Error(
+          data?.error_message || data?.error || 'AI processing failed',
+        );
       }
 
       // Transform Material Agent response to expected format
       const transformedData = {
         success: true,
-        response: data.coordinated_result?.content || data.coordinated_result?.analysis || String(data.coordinated_result) || 'Analysis completed successfully',
-        thinking: data.coordination_summary || 'Task processed through Material Agent coordination',
+        response:
+          data.coordinated_result?.content ||
+          data.coordinated_result?.analysis ||
+          String(data.coordinated_result) ||
+          'Analysis completed successfully',
+        thinking:
+          data.coordination_summary ||
+          'Task processed through Material Agent coordination',
         suggestions: data.coordinated_result?.recommendations || [],
         materials: data.coordinated_result?.materials || [],
         metadata: {
@@ -666,19 +781,28 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
           // eslint-disable-next-line no-console
           console.log('🎨 Attempting 3D generation...');
           // Check if the response contains design-related keywords that would benefit from 3D generation
-          const designKeywords = ['interior', 'room', 'space', 'design', 'layout', 'furniture', 'decor'];
+          const designKeywords = [
+            'interior',
+            'room',
+            'space',
+            'design',
+            'layout',
+            'furniture',
+            'decor',
+          ];
           const responseText = String(data.response || '');
-          const containsDesignContent = designKeywords.some(keyword =>
+          const containsDesignContent = designKeywords.some((keyword) =>
             responseText.toLowerCase().includes(keyword),
           );
 
           if (containsDesignContent) {
-            const generationResult = await MaterialAgent3DGenerationAPI.generate3D({
-              prompt: input,
-              room_type: 'general', // Could be extracted from context
-              style: 'modern', // Could be made configurable
-              specific_materials: [], // Could be extracted from attachments or context
-            });
+            const generationResult =
+              await MaterialAgent3DGenerationAPI.generate3D({
+                prompt: input,
+                room_type: 'general', // Could be extracted from context
+                style: 'modern', // Could be made configurable
+                specific_materials: [], // Could be extracted from attachments or context
+              });
 
             if (generationResult.success) {
               enhanced3DContent = {
@@ -703,13 +827,16 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: transformedData.response || 'I processed your request successfully.',
+        content:
+          transformedData.response || 'I processed your request successfully.',
         timestamp: new Date(),
         thinking: String(transformedData.thinking || ''),
         suggestions: transformedData.suggestions || [],
         materials: transformedData.materials || [],
         metadata: {
-          ...(transformedData.metadata?.taskId && { taskId: transformedData.metadata.taskId }),
+          ...(transformedData.metadata?.taskId && {
+            taskId: transformedData.metadata.taskId,
+          }),
           processingTime: transformedData.metadata?.processingTime,
           overallConfidence: transformedData.metadata?.overallConfidence,
           agentCount: transformedData.metadata?.agentCount,
@@ -721,7 +848,7 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         },
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
 
       // Clear attached files after successful send
       setAttachedFiles([]);
@@ -732,7 +859,6 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         description: `Found ${(data.coordinated_result?.materials || []).length} relevant materials`,
         duration: 3000,
       });
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Error sending message:', error);
@@ -744,11 +870,12 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
         timestamp: new Date(),
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
 
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to get AI response',
+        description:
+          error instanceof Error ? error.message : 'Failed to get AI response',
         variant: 'destructive',
       });
     } finally {
@@ -827,8 +954,8 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                         message.role === 'user'
                           ? 'bg-primary text-primary-foreground'
                           : message.role === 'system'
-                          ? 'bg-destructive/10 text-destructive border border-destructive/20'
-                          : 'bg-muted'
+                            ? 'bg-destructive/10 text-destructive border border-destructive/20'
+                            : 'bg-muted'
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{message.content}</p>
@@ -847,29 +974,75 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                     </div>
 
                     {/* Response Quality Metrics */}
-                    {message.responseQuality && message.responseQuality.overall_quality_score !== undefined && (
-                      <div className="text-xs space-y-1 p-2 bg-background/50 rounded border border-border/50">
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">Response Quality</span>
-                          <Badge
-                            variant={
-                              message.responseQuality.overall_quality_score >= 0.85 ? 'default' :
-                              message.responseQuality.overall_quality_score >= 0.7 ? 'secondary' :
-                              'destructive'
-                            }
-                            className="text-xs"
-                          >
-                            {(message.responseQuality.overall_quality_score * 100).toFixed(0)}%
-                          </Badge>
+                    {message.responseQuality &&
+                      message.responseQuality.overall_quality_score !==
+                        undefined && (
+                        <div className="text-xs space-y-1 p-2 bg-background/50 rounded border border-border/50">
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">
+                              Response Quality
+                            </span>
+                            <Badge
+                              variant={
+                                message.responseQuality.overall_quality_score >=
+                                0.85
+                                  ? 'default'
+                                  : message.responseQuality
+                                        .overall_quality_score >= 0.7
+                                    ? 'secondary'
+                                    : 'destructive'
+                              }
+                              className="text-xs"
+                            >
+                              {(
+                                message.responseQuality.overall_quality_score *
+                                100
+                              ).toFixed(0)}
+                              %
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-muted-foreground">
+                            <div>
+                              Coherence:{' '}
+                              {(message.responseQuality.coherence_score
+                                ? message.responseQuality.coherence_score * 100
+                                : 0
+                              ).toFixed(0)}
+                              %
+                            </div>
+                            <div>
+                              Attribution:{' '}
+                              {(message.responseQuality.source_attribution_score
+                                ? message.responseQuality
+                                    .source_attribution_score * 100
+                                : 0
+                              ).toFixed(0)}
+                              %
+                            </div>
+                            <div>
+                              Hallucination:{' '}
+                              {(message.responseQuality.hallucination_score
+                                ? (1 -
+                                    message.responseQuality
+                                      .hallucination_score) *
+                                  100
+                                : 0
+                              ).toFixed(0)}
+                              %
+                            </div>
+                            <div>
+                              Consistency:{' '}
+                              {(message.responseQuality
+                                .factual_consistency_score
+                                ? message.responseQuality
+                                    .factual_consistency_score * 100
+                                : 0
+                              ).toFixed(0)}
+                              %
+                            </div>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-muted-foreground">
-                          <div>Coherence: {(message.responseQuality.coherence_score ? message.responseQuality.coherence_score * 100 : 0).toFixed(0)}%</div>
-                          <div>Attribution: {(message.responseQuality.source_attribution_score ? message.responseQuality.source_attribution_score * 100 : 0).toFixed(0)}%</div>
-                          <div>Hallucination: {(message.responseQuality.hallucination_score ? (1 - message.responseQuality.hallucination_score) * 100 : 0).toFixed(0)}%</div>
-                          <div>Consistency: {(message.responseQuality.factual_consistency_score ? message.responseQuality.factual_consistency_score * 100 : 0).toFixed(0)}%</div>
-                        </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Material Results */}
                     {message.materials && message.materials.length > 0 && (
@@ -879,23 +1052,27 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                           Found Materials ({message.materials.length})
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {message.materials.slice(0, 4).map((material, idx) => (
-                            <div
-                              key={idx}
-                              onClick={() => handleMaterialClick(material)}
-                              className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="font-medium text-sm">{material.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {material.description}
+                          {message.materials
+                            .slice(0, 4)
+                            .map((material, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => handleMaterialClick(material)}
+                                className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="font-medium text-sm">
+                                  {material.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {material.description}
+                                </div>
+                                {material.category && (
+                                  <Badge className="mt-1 text-xs border border-border bg-background text-foreground">
+                                    {material.category}
+                                  </Badge>
+                                )}
                               </div>
-                              {material.category && (
-                                <Badge className="mt-1 text-xs border border-border bg-background text-foreground">
-                                  {material.category}
-                                </Badge>
-                              )}
-                            </div>
-                          ))}
+                            ))}
                         </div>
                         {message.materials.length > 4 && (
                           <div className="text-xs text-muted-foreground">
@@ -905,104 +1082,138 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                       </div>
                     )}
                     {/* Visual Search Results */}
-                    {visualSearchResults && visualSearchResults.matches.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Eye className="h-3 w-3" />
-                          Visual Search Results ({visualSearchResults.total_results} found)
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {visualSearchResults.matches.slice(0, 6).map((match) => (
-                            <div
-                              key={match.id}
-                              onClick={() => handleMaterialClick({
-                                id: match.id,
-                                name: match.name,
-                                description: match.description || 'No description available',
-                                relevanceScore: match.similarity_score,
-                                source: 'visual_search',
-                              })}
-                              className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
-                            >
-                              {match.thumbnail_url && (
-                                <img
-                                  src={match.thumbnail_url}
-                                  alt={match.name}
-                                  className="w-full h-16 object-cover rounded mb-1"
-                                />
-                              )}
-                              <div className="font-medium text-sm">{match.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                {match.description}
-                              </div>
-                              <div className="flex items-center gap-1 mt-1">
-                                <Badge className="text-xs border border-blue-200 bg-blue-50 text-blue-700">
-                                  <Eye className="h-2 w-2 mr-1" />
-                                  {Math.round(match.similarity_score * 100)}% visual match
-                                </Badge>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {visualSearchResults.matches.length > 6 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{visualSearchResults.matches.length - 6} more visual matches found
+                    {visualSearchResults &&
+                      visualSearchResults.matches.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Eye className="h-3 w-3" />
+                            Visual Search Results (
+                            {visualSearchResults.total_results} found)
                           </div>
-                        )}
-                        <div className="text-xs text-muted-foreground">
-                          Visual search completed in {visualSearchResults.search_execution_time_ms}ms
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {visualSearchResults.matches
+                              .slice(0, 6)
+                              .map((match) => (
+                                <div
+                                  key={match.id}
+                                  onClick={() =>
+                                    handleMaterialClick({
+                                      id: match.id,
+                                      name: match.name,
+                                      description:
+                                        match.description ||
+                                        'No description available',
+                                      relevanceScore: match.similarity_score,
+                                      source: 'visual_search',
+                                    })
+                                  }
+                                  className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                                >
+                                  {match.thumbnail_url && (
+                                    <img
+                                      src={match.thumbnail_url}
+                                      alt={match.name}
+                                      className="w-full h-16 object-cover rounded mb-1"
+                                    />
+                                  )}
+                                  <div className="font-medium text-sm">
+                                    {match.name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {match.description}
+                                  </div>
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <Badge className="text-xs border border-blue-200 bg-blue-50 text-blue-700">
+                                      <Eye className="h-2 w-2 mr-1" />
+                                      {Math.round(match.similarity_score * 100)}
+                                      % visual match
+                                    </Badge>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                          {visualSearchResults.matches.length > 6 && (
+                            <div className="text-xs text-muted-foreground">
+                              +{visualSearchResults.matches.length - 6} more
+                              visual matches found
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            Visual search completed in{' '}
+                            {visualSearchResults.search_execution_time_ms}ms
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Similarity Search Results */}
-                    {similaritySearchResults && similaritySearchResults.results.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Search className="h-3 w-3" />
-                          Vector Similarity Results ({similaritySearchResults.total_results} found, {(similaritySearchResults.threshold_used * 100).toFixed(0)}% threshold)
-                        </div>
-                        <div className="grid grid-cols-1 gap-2">
-                          {similaritySearchResults.results.slice(0, 5).map((result) => (
-                            <div
-                              key={result.id}
-                              onClick={() => handleMaterialClick({
-                                id: result.id,
-                                name: result.title,
-                                description: result.content,
-                                relevanceScore: result.similarity_score,
-                                source: 'similarity_search',
-                              })}
-                              className="p-3 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="font-medium text-sm">{result.title}</div>
-                              <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                                {result.content.substring(0, 150)}...
-                              </div>
-                              <div className="flex items-center justify-between mt-2">
-                                <Badge className="text-xs border border-green-200 bg-green-50 text-green-700">
-                                  <Search className="h-2 w-2 mr-1" />
-                                  {Math.round(result.similarity_score * 100)}% similarity
-                                </Badge>
-                                {result.document_type && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {result.document_type}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        {similaritySearchResults.results.length > 5 && (
-                          <div className="text-xs text-muted-foreground">
-                            +{similaritySearchResults.results.length - 5} more similarity matches found
+                    {similaritySearchResults &&
+                      similaritySearchResults.results.length > 0 && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Search className="h-3 w-3" />
+                            Vector Similarity Results (
+                            {similaritySearchResults.total_results} found,{' '}
+                            {(
+                              similaritySearchResults.threshold_used * 100
+                            ).toFixed(0)}
+                            % threshold)
                           </div>
-                        )}
-                        <div className="text-xs text-muted-foreground">
-                          Similarity search completed in {similaritySearchResults.processing_time_ms}ms using {similaritySearchResults.search_type} search
+                          <div className="grid grid-cols-1 gap-2">
+                            {similaritySearchResults.results
+                              .slice(0, 5)
+                              .map((result) => (
+                                <div
+                                  key={result.id}
+                                  onClick={() =>
+                                    handleMaterialClick({
+                                      id: result.id,
+                                      name: result.title,
+                                      description: result.content,
+                                      relevanceScore: result.similarity_score,
+                                      source: 'similarity_search',
+                                    })
+                                  }
+                                  className="p-3 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                                >
+                                  <div className="font-medium text-sm">
+                                    {result.title}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                                    {result.content.substring(0, 150)}...
+                                  </div>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <Badge className="text-xs border border-green-200 bg-green-50 text-green-700">
+                                      <Search className="h-2 w-2 mr-1" />
+                                      {Math.round(
+                                        result.similarity_score * 100,
+                                      )}
+                                      % similarity
+                                    </Badge>
+                                    {result.document_type && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        {result.document_type}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                          {similaritySearchResults.results.length > 5 && (
+                            <div className="text-xs text-muted-foreground">
+                              +{similaritySearchResults.results.length - 5} more
+                              similarity matches found
+                            </div>
+                          )}
+                          <div className="text-xs text-muted-foreground">
+                            Similarity search completed in{' '}
+                            {similaritySearchResults.processing_time_ms}ms using{' '}
+                            {similaritySearchResults.search_type} search
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* Suggestions */}
                     {message.suggestions && message.suggestions.length > 0 && (
@@ -1015,8 +1226,6 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                           {message.suggestions.map((suggestion, idx) => (
                             <Button
                               key={idx}
-
-
                               onClick={() => handleSuggestionClick(suggestion)}
                               className="text-xs h-7"
                             >
@@ -1062,7 +1271,10 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
             {attachedFiles.length > 0 && (
               <div className="flex flex-wrap gap-2 p-2 bg-muted rounded-md">
                 {attachedFiles.map((file) => (
-                  <div key={file.id} className="flex items-center gap-2 bg-background rounded px-2 py-1 text-sm">
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-2 bg-background rounded px-2 py-1 text-sm"
+                  >
                     {file.type.startsWith('image/') ? (
                       <FileImage className="h-3 w-3" />
                     ) : (
@@ -1098,10 +1310,20 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
 
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <label className="block text-muted-foreground mb-1">Primary Model</label>
+                    <label className="block text-muted-foreground mb-1">
+                      Primary Model
+                    </label>
                     <select
                       value={hybridConfig.primary}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, primary: e.target.value as 'openai' | 'claude' | 'vertex' }))}
+                      onChange={(e) =>
+                        setHybridConfig((prev) => ({
+                          ...prev,
+                          primary: e.target.value as
+                            | 'openai'
+                            | 'claude'
+                            | 'vertex',
+                        }))
+                      }
                       className="w-full p-1 rounded border bg-background"
                     >
                       <option value="openai">OpenAI GPT</option>
@@ -1111,10 +1333,20 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                   </div>
 
                   <div>
-                    <label className="block text-muted-foreground mb-1">Fallback Model</label>
+                    <label className="block text-muted-foreground mb-1">
+                      Fallback Model
+                    </label>
                     <select
                       value={hybridConfig.fallback}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, fallback: e.target.value as 'openai' | 'claude' | 'vertex' }))}
+                      onChange={(e) =>
+                        setHybridConfig((prev) => ({
+                          ...prev,
+                          fallback: e.target.value as
+                            | 'openai'
+                            | 'claude'
+                            | 'vertex',
+                        }))
+                      }
                       className="w-full p-1 rounded border bg-background"
                     >
                       <option value="openai">OpenAI GPT</option>
@@ -1133,7 +1365,12 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                       max="1"
                       step="0.1"
                       value={hybridConfig.temperature}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
+                      onChange={(e) =>
+                        setHybridConfig((prev) => ({
+                          ...prev,
+                          temperature: parseFloat(e.target.value),
+                        }))
+                      }
                       className="w-full"
                     />
                   </div>
@@ -1143,10 +1380,18 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                       type="checkbox"
                       id="enable-rag"
                       checked={hybridConfig.enableRAG}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, enableRAG: e.target.checked }))}
+                      onChange={(e) =>
+                        setHybridConfig((prev) => ({
+                          ...prev,
+                          enableRAG: e.target.checked,
+                        }))
+                      }
                       className="rounded"
                     />
-                    <label htmlFor="enable-rag" className="text-muted-foreground">
+                    <label
+                      htmlFor="enable-rag"
+                      className="text-muted-foreground"
+                    >
                       Enable Knowledge Base Search
                     </label>
                   </div>
@@ -1156,10 +1401,18 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
                       type="checkbox"
                       id="enable-3d"
                       checked={hybridConfig.enable3DGeneration}
-                      onChange={(e) => setHybridConfig(prev => ({ ...prev, enable3DGeneration: e.target.checked }))}
+                      onChange={(e) =>
+                        setHybridConfig((prev) => ({
+                          ...prev,
+                          enable3DGeneration: e.target.checked,
+                        }))
+                      }
                       className="rounded"
                     />
-                    <label htmlFor="enable-3d" className="text-muted-foreground">
+                    <label
+                      htmlFor="enable-3d"
+                      className="text-muted-foreground"
+                    >
                       Enable 3D Generation
                     </label>
                   </div>
@@ -1169,7 +1422,9 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
 
             {/* Search Mode Controls */}
             <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-              <span className="text-sm font-medium text-muted-foreground">Search Mode:</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                Search Mode:
+              </span>
               <div className="flex gap-1">
                 <Button
                   variant={searchMode === 'text' ? 'default' : 'outline'}
@@ -1204,14 +1459,18 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               {/* Similarity Threshold Control */}
               {searchMode === 'similarity' && (
                 <div className="flex items-center gap-2 ml-4">
-                  <span className="text-sm text-muted-foreground">Threshold:</span>
+                  <span className="text-sm text-muted-foreground">
+                    Threshold:
+                  </span>
                   <input
                     type="range"
                     min="0.5"
                     max="0.95"
                     step="0.05"
                     value={similarityThreshold}
-                    onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                    onChange={(e) =>
+                      setSimilarityThreshold(parseFloat(e.target.value))
+                    }
                     className="w-20"
                   />
                   <span className="text-sm font-mono w-10">
@@ -1235,8 +1494,6 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               {/* File Attachment Button */}
               <Button
                 type="button"
-
-
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
                 title="Attach files"
@@ -1247,8 +1504,6 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
               {/* Settings Button */}
               <Button
                 type="button"
-
-
                 onClick={() => setShowSettings(!showSettings)}
                 disabled={isLoading}
                 title="AI Settings"
@@ -1290,25 +1545,18 @@ export const MaterialAgentSearchInterface: React.FC<MaterialAgentSearchInterface
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Button
-
-          onClick={onNavigateToMoodboard}
-          className="justify-start gap-2"
-        >
+        <Button onClick={onNavigateToMoodboard} className="justify-start gap-2">
           <Search className="h-4 w-4" />
           Browse Mood Boards
         </Button>
-        <Button
-
-          onClick={onNavigateTo3D}
-          className="justify-start gap-2"
-        >
+        <Button onClick={onNavigateTo3D} className="justify-start gap-2">
           <Sparkles className="h-4 w-4" />
           3D Generation
         </Button>
         <Button
-
-          onClick={() => handleSuggestionClick('Show me the latest material trends')}
+          onClick={() =>
+            handleSuggestionClick('Show me the latest material trends')
+          }
           className="justify-start gap-2"
         >
           <Lightbulb className="h-4 w-4" />

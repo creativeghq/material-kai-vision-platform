@@ -9,7 +9,11 @@
 /**
  * Product Enrichment Status Types
  */
-export type ProductEnrichmentStatus = 'pending' | 'enriched' | 'failed' | 'needs_review';
+export type ProductEnrichmentStatus =
+  | 'pending'
+  | 'enriched'
+  | 'failed'
+  | 'needs_review';
 
 /**
  * Product Category
@@ -262,4 +266,3 @@ export interface Phase22Database {
     Update: ProductEnrichmentUpdate;
   };
 }
-

@@ -19,7 +19,13 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -40,7 +46,9 @@ interface EnhancedProgressMonitorProps {
   className?: string;
 }
 
-export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = ({
+export const EnhancedProgressMonitor: React.FC<
+  EnhancedProgressMonitorProps
+> = ({
   jobId,
   onComplete,
   onError,
@@ -97,8 +105,6 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
     }
   };
 
-
-
   const getStepStatusIcon = (status: PDFProcessingStep['status']) => {
     switch (status) {
       case 'running':
@@ -134,7 +140,9 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
         <CardContent className="p-6">
           <div className="flex items-center justify-center space-x-2">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm text-gray-600">Connecting to progress monitor...</span>
+            <span className="text-sm text-gray-600">
+              Connecting to progress monitor...
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -150,7 +158,9 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-sm font-medium">{progress.fileName}</span>
-                <span className="text-xs text-gray-500">{Math.round(progress.overallProgress)}%</span>
+                <span className="text-xs text-gray-500">
+                  {Math.round(progress.overallProgress)}%
+                </span>
               </div>
               <Progress value={progress.overallProgress} className="h-2" />
             </div>
@@ -169,15 +179,20 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
             <div>
               <CardTitle className="text-lg">{progress.fileName}</CardTitle>
               <CardDescription>
-                {progress.currentStep} • Started {formatDistanceToNow(progress.startTime)} ago
+                {progress.currentStep} • Started{' '}
+                {formatDistanceToNow(progress.startTime)} ago
               </CardDescription>
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Badge variant={progress.status === 'completed' ? 'default' : 'secondary'}>
-              {progress.status.charAt(0).toUpperCase() + progress.status.slice(1)}
+            <Badge
+              variant={
+                progress.status === 'completed' ? 'default' : 'secondary'
+              }
+            >
+              {progress.status.charAt(0).toUpperCase() +
+                progress.status.slice(1)}
             </Badge>
-
           </div>
         </div>
       </CardHeader>
@@ -187,7 +202,9 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Overall Progress</span>
-            <span className="text-sm text-gray-600">{Math.round(progress.overallProgress)}%</span>
+            <span className="text-sm text-gray-600">
+              {Math.round(progress.overallProgress)}%
+            </span>
           </div>
           <Progress value={progress.overallProgress} className="h-3" />
         </div>
@@ -198,28 +215,36 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
             <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
               <FileText className="h-4 w-4 text-blue-500" />
               <div>
-                <div className="text-sm font-medium">{progress.statistics.chunksCreated}</div>
+                <div className="text-sm font-medium">
+                  {progress.statistics.chunksCreated}
+                </div>
                 <div className="text-xs text-gray-600">Chunks</div>
               </div>
             </div>
             <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
               <Image className="h-4 w-4 text-green-500" />
               <div>
-                <div className="text-sm font-medium">{progress.statistics.imagesExtracted}</div>
+                <div className="text-sm font-medium">
+                  {progress.statistics.imagesExtracted}
+                </div>
                 <div className="text-xs text-gray-600">Images</div>
               </div>
             </div>
             <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
               <Database className="h-4 w-4 text-purple-500" />
               <div>
-                <div className="text-sm font-medium">{progress.statistics.kbEntriesSaved}</div>
+                <div className="text-sm font-medium">
+                  {progress.statistics.kbEntriesSaved}
+                </div>
                 <div className="text-xs text-gray-600">KB Entries</div>
               </div>
             </div>
             <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
               <Tag className="h-4 w-4 text-orange-500" />
               <div>
-                <div className="text-sm font-medium">{progress.statistics.categoriesExtracted}</div>
+                <div className="text-sm font-medium">
+                  {progress.statistics.categoriesExtracted}
+                </div>
                 <div className="text-xs text-gray-600">Categories</div>
               </div>
             </div>
@@ -238,67 +263,107 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{step.name}</span>
                       <span className="text-xs text-gray-500">
-                        {step.status === 'completed' ? '100%' :
-                         step.status === 'running' ? `${Math.round(step.progress || 0)}%` :
-                         step.status === 'failed' ? '0%' : '0%'}
+                        {step.status === 'completed'
+                          ? '100%'
+                          : step.status === 'running'
+                            ? `${Math.round(step.progress || 0)}%`
+                            : step.status === 'failed'
+                              ? '0%'
+                              : '0%'}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-600">{step.description}</div>
+                    <div className="text-xs text-gray-600">
+                      {step.description}
+                    </div>
 
                     {/* Real-time counts for MIVAA processing */}
-                    {step.id === 'mivaa-processing' && step.status === 'running' && step.details && (
-                      <div className="text-xs text-gray-500 mt-1 space-y-1">
-                        {(() => {
-                          // Extract counts from step details
-                          const details = Array.isArray(step.details) ? step.details : [];
-                          const chunksMatch = details.find(d => typeof d === 'string' && d.includes('Chunks Generated:'));
-                          const imagesMatch = details.find(d => typeof d === 'string' && d.includes('Images Extracted:'));
-                          const pagesMatch = details.find(d => typeof d === 'string' && d.includes('Pages:'));
+                    {step.id === 'mivaa-processing' &&
+                      step.status === 'running' &&
+                      step.details && (
+                        <div className="text-xs text-gray-500 mt-1 space-y-1">
+                          {(() => {
+                            // Extract counts from step details
+                            const details = Array.isArray(step.details)
+                              ? step.details
+                              : [];
+                            const chunksMatch = details.find(
+                              (d) =>
+                                typeof d === 'string' &&
+                                d.includes('Chunks Generated:'),
+                            );
+                            const imagesMatch = details.find(
+                              (d) =>
+                                typeof d === 'string' &&
+                                d.includes('Images Extracted:'),
+                            );
+                            const pagesMatch = details.find(
+                              (d) =>
+                                typeof d === 'string' && d.includes('Pages:'),
+                            );
 
-                          const chunks = chunksMatch ? chunksMatch.match(/(\d+)/)?.[1] || '0' : '0';
-                          const images = imagesMatch ? imagesMatch.match(/(\d+)/)?.[1] || '0' : '0';
-                          const pages = pagesMatch ? pagesMatch.match(/(\d+)\/(\d+)/)?.[0] || '0/0' : '0/0';
+                            const chunks = chunksMatch
+                              ? chunksMatch.match(/(\d+)/)?.[1] || '0'
+                              : '0';
+                            const images = imagesMatch
+                              ? imagesMatch.match(/(\d+)/)?.[1] || '0'
+                              : '0';
+                            const pages = pagesMatch
+                              ? pagesMatch.match(/(\d+)\/(\d+)/)?.[0] || '0/0'
+                              : '0/0';
 
-                          return (
-                            <div className="flex gap-4 text-xs">
-                              <span>📄 Pages: {pages}</span>
-                              <span>📝 Chunks: {chunks}</span>
-                              <span>🖼️ Images: {images}</span>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
+                            return (
+                              <div className="flex gap-4 text-xs">
+                                <span>📄 Pages: {pages}</span>
+                                <span>📝 Chunks: {chunks}</span>
+                                <span>🖼️ Images: {images}</span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                   </div>
                 </div>
 
                 {(step.status === 'running' || step.status === 'completed') && (
                   <Progress
-                    value={step.status === 'completed' ? 100 : (step.progress || 0)}
+                    value={
+                      step.status === 'completed' ? 100 : step.progress || 0
+                    }
                     className="h-1 ml-6"
                   />
                 )}
 
                 {/* Substeps */}
-                {step.substeps && step.substeps.length > 0 && step.status === 'running' && (
-                  <div className="ml-6 space-y-1">
-                    {step.substeps.map((substep, subIndex) => (
-                      <div key={subIndex} className="flex items-center space-x-2 text-xs">
-                        {getStepStatusIcon(substep.status)}
-                        <span className={cn(
-                          substep.status === 'completed' ? 'text-green-600' :
-                          substep.status === 'running' ? 'text-blue-600' :
-                          'text-gray-500',
-                        )}>
-                          {substep.name}
-                        </span>
-                        {substep.progress > 0 && (
-                          <span className="text-gray-400">({Math.round(substep.progress)}%)</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {step.substeps &&
+                  step.substeps.length > 0 &&
+                  step.status === 'running' && (
+                    <div className="ml-6 space-y-1">
+                      {step.substeps.map((substep, subIndex) => (
+                        <div
+                          key={subIndex}
+                          className="flex items-center space-x-2 text-xs"
+                        >
+                          {getStepStatusIcon(substep.status)}
+                          <span
+                            className={cn(
+                              substep.status === 'completed'
+                                ? 'text-green-600'
+                                : substep.status === 'running'
+                                  ? 'text-blue-600'
+                                  : 'text-gray-500',
+                            )}
+                          >
+                            {substep.name}
+                          </span>
+                          {substep.progress > 0 && (
+                            <span className="text-gray-400">
+                              ({Math.round(substep.progress)}%)
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                 {/* Step Details */}
                 {step.details.length > 0 && (
@@ -311,7 +376,9 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
                   </div>
                 )}
 
-                {index < progress.steps.length - 1 && <Separator className="ml-6" />}
+                {index < progress.steps.length - 1 && (
+                  <Separator className="ml-6" />
+                )}
               </div>
             ))}
           </div>
@@ -322,11 +389,16 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
           <div className="space-y-2">
             <h4 className="text-sm font-medium text-red-600">Errors</h4>
             {progress.errors.map((error, index) => (
-              <div key={index} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div
+                key={index}
+                className="p-3 bg-red-50 border border-red-200 rounded-lg"
+              >
                 <div className="flex items-start space-x-2">
                   <AlertCircle className="h-4 w-4 text-red-500 mt-0.5" />
                   <div>
-                    <div className="text-sm font-medium text-red-800">{error.step}</div>
+                    <div className="text-sm font-medium text-red-800">
+                      {error.step}
+                    </div>
                     <div className="text-xs text-red-600">{error.message}</div>
                     <div className="text-xs text-red-500 mt-1">
                       {formatDistanceToNow(error.timestamp)} ago
@@ -346,7 +418,9 @@ export const EnhancedProgressMonitor: React.FC<EnhancedProgressMonitorProps> = (
                 <span>Duration: {formatDuration(progress.actualDuration)}</span>
               )}
               {progress.estimatedDuration && !progress.actualDuration && (
-                <span>Estimated: {formatDuration(progress.estimatedDuration)}</span>
+                <span>
+                  Estimated: {formatDuration(progress.estimatedDuration)}
+                </span>
               )}
             </div>
             <div className="flex items-center space-x-1">

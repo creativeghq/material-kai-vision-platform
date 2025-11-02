@@ -1,8 +1,15 @@
 import { z } from 'zod';
 
-import { MivaaIntegrationService, PdfExtractionRequest, defaultMivaaConfig } from '../../services/pdf/mivaaIntegrationService';
+import {
+  MivaaIntegrationService,
+  PdfExtractionRequest,
+  defaultMivaaConfig,
+} from '../../services/pdf/mivaaIntegrationService';
 import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
-import { JWTAuthMiddleware, AuthenticatedRequest } from '../../middleware/jwtAuthMiddleware';
+import {
+  JWTAuthMiddleware,
+  AuthenticatedRequest,
+} from '../../middleware/jwtAuthMiddleware';
 import { supabase } from '../../integrations/supabase/client';
 import { mivaaApi } from '../../services/mivaaApiClient';
 
@@ -34,7 +41,14 @@ export interface AuthContext {
 /**
  * Job status and processing types
  */
-export type JobStatus = 'pending' | 'processing' | 'extracting' | 'transforming' | 'rag-integrating' | 'completed' | 'failed';
+export type JobStatus =
+  | 'pending'
+  | 'processing'
+  | 'extracting'
+  | 'transforming'
+  | 'rag-integrating'
+  | 'completed'
+  | 'failed';
 
 export interface ProcessingJob {
   id: string;
@@ -166,45 +180,56 @@ const UnifiedPdfProcessingRequestSchema = z.object({
   options: z.object({
     extractionType: z.enum(['markdown', 'tables', 'images', 'all']),
     enableRAGIntegration: z.boolean().optional(),
-    pageRange: z.object({
-      start: z.number().int().positive().optional(),
-      end: z.number().int().positive().optional(),
-    }).optional(),
-    chunkingOptions: z.object({
-      maxChunkSize: z.number().int().positive().max(8000).optional(),
-      overlapSize: z.number().int().min(0).max(500).optional(),
-    }).optional(),
-    embeddingOptions: z.object({
-      model: z.string().optional(),
-      dimensions: z.number().int().positive().optional(),
-    }).optional(),
+    pageRange: z
+      .object({
+        start: z.number().int().positive().optional(),
+        end: z.number().int().positive().optional(),
+      })
+      .optional(),
+    chunkingOptions: z
+      .object({
+        maxChunkSize: z.number().int().positive().max(8000).optional(),
+        overlapSize: z.number().int().min(0).max(500).optional(),
+      })
+      .optional(),
+    embeddingOptions: z
+      .object({
+        model: z.string().optional(),
+        dimensions: z.number().int().positive().optional(),
+      })
+      .optional(),
     outputFormat: z.enum(['json', 'zip']).optional(),
     workspaceAware: z.boolean().optional(),
   }),
-  metadata: z.object({
-    filename: z.string().optional(),
-    source: z.enum(['upload', 'url', 'workspace']).optional(),
-    tags: z.array(z.string()).optional(),
-    priority: z.enum(['low', 'normal', 'high']).optional(),
-    workspace: z.object({
-      projectId: z.string().optional(),
-      userId: z.string().optional(),
+  metadata: z
+    .object({
+      filename: z.string().optional(),
+      source: z.enum(['upload', 'url', 'workspace']).optional(),
       tags: z.array(z.string()).optional(),
-    }).optional(),
-  }).optional(),
+      priority: z.enum(['low', 'normal', 'high']).optional(),
+      workspace: z
+        .object({
+          projectId: z.string().optional(),
+          userId: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 const DocumentSearchRequestSchema = z.object({
   workspaceId: z.string().min(1, 'Workspace ID is required'),
   query: z.string().min(1, 'Search query is required'),
-  options: z.object({
-    limit: z.number().int().positive().max(100).optional(),
-    threshold: z.number().min(0).max(1).optional(),
-    includeMetadata: z.boolean().optional(),
-    filterByTags: z.array(z.string()).optional(),
-  }).optional(),
+  options: z
+    .object({
+      limit: z.number().int().positive().max(100).optional(),
+      threshold: z.number().min(0).max(1).optional(),
+      includeMetadata: z.boolean().optional(),
+      filterByTags: z.array(z.string()).optional(),
+    })
+    .optional(),
 });
-
 
 /**
  * Authentication helper functions
@@ -214,7 +239,9 @@ export class AuthenticationHelper {
    * Authenticate request using JWT middleware
    * Supports both JWT tokens and API keys
    */
-  static async authenticateRequest(request: AuthenticatedRequest): Promise<AuthContext> {
+  static async authenticateRequest(
+    request: AuthenticatedRequest,
+  ): Promise<AuthContext> {
     try {
       const authResult = await JWTAuthMiddleware.authenticate(request, {
         allowApiKey: true,
@@ -236,12 +263,19 @@ export class AuthenticationHelper {
    * Check endpoint access for authenticated request
    * Uses JWT middleware for API key endpoint validation
    */
-  static async checkEndpointAccess(request: AuthenticatedRequest, endpoint: string): Promise<boolean> {
+  static async checkEndpointAccess(
+    request: AuthenticatedRequest,
+    endpoint: string,
+  ): Promise<boolean> {
     try {
       // If using API key, check endpoint access
-      const apiKey = request.headers['x-api-key'] || request.headers['X-API-Key'];
+      const apiKey =
+        request.headers['x-api-key'] || request.headers['X-API-Key'];
       if (apiKey) {
-        return await JWTAuthMiddleware.checkEndpointAccess(apiKey as string, endpoint);
+        return await JWTAuthMiddleware.checkEndpointAccess(
+          apiKey as string,
+          endpoint,
+        );
       }
 
       // JWT tokens have full access by default
@@ -260,7 +294,11 @@ export class RateLimitHelper {
   /**
    * Check rate limit for endpoint and user/IP
    */
-  static async checkRateLimit(endpoint: string, clientIP: string, userId?: string): Promise<{
+  static async checkRateLimit(
+    endpoint: string,
+    clientIP: string,
+    userId?: string,
+  ): Promise<{
     allowed: boolean;
     limit: number;
     remaining: number;
@@ -268,7 +306,11 @@ export class RateLimitHelper {
   }> {
     try {
       // Get rate limit for this endpoint
-      const rateLimit = await apiGatewayService.getRateLimit(endpoint, clientIP, userId);
+      const rateLimit = await apiGatewayService.getRateLimit(
+        endpoint,
+        clientIP,
+        userId,
+      );
 
       // Query recent requests from database
       const oneMinuteAgo = new Date(Date.now() - 60000);
@@ -277,7 +319,9 @@ export class RateLimitHelper {
         .select('id')
         .eq('request_path', endpoint)
         .gte('created_at', oneMinuteAgo.toISOString())
-        .or(`ip_address.eq.${clientIP}${userId ? `,user_id.eq.${userId}` : ''}`);
+        .or(
+          `ip_address.eq.${clientIP}${userId ? `,user_id.eq.${userId}` : ''}`,
+        );
 
       if (error) {
         // Rate limit check error - allow on error to avoid blocking legitimate requests
@@ -322,25 +366,21 @@ export class RateLimitHelper {
     rateLimitExceeded?: boolean,
   ): Promise<void> {
     try {
-      await supabase
-        .from('api_usage_logs')
-        .insert({
-          user_id: userId ?? null,
-          ip_address: clientIP,
-          request_method: method,
-          request_path: endpoint,
-          response_status: responseStatus ?? null,
-          response_time_ms: responseTime ?? null,
-          is_internal_request: await apiGatewayService.isInternalIP(clientIP),
-          rate_limit_exceeded: rateLimitExceeded ?? false,
-        });
+      await supabase.from('api_usage_logs').insert({
+        user_id: userId ?? null,
+        ip_address: clientIP,
+        request_method: method,
+        request_path: endpoint,
+        response_status: responseStatus ?? null,
+        response_time_ms: responseTime ?? null,
+        is_internal_request: await apiGatewayService.isInternalIP(clientIP),
+        rate_limit_exceeded: rateLimitExceeded ?? false,
+      });
     } catch (_error) {
       // Failed to log API usage - continue without logging
     }
   }
 }
-
-
 
 /**
  * Consolidated PDF Controller Class
@@ -436,7 +476,8 @@ export class ConsolidatedPDFController {
       }
 
       // Validate request
-      const validationResult = UnifiedPdfProcessingRequestSchema.safeParse(request);
+      const validationResult =
+        UnifiedPdfProcessingRequestSchema.safeParse(request);
       if (!validationResult.success) {
         return {
           success: false,
@@ -449,7 +490,10 @@ export class ConsolidatedPDFController {
 
       // Check workspace access if workspace is specified
       if (request.workspaceId) {
-        const hasAccess = await this.checkWorkspaceAccess(authContext.user.id, request.workspaceId);
+        const hasAccess = await this.checkWorkspaceAccess(
+          authContext.user.id,
+          request.workspaceId,
+        );
         if (!hasAccess) {
           return {
             success: false,
@@ -467,12 +511,21 @@ export class ConsolidatedPDFController {
           extractionType: validationResult.data.options.extractionType || 'all',
           ...(validationResult.data.options.pageRange && {
             pageRange: {
-              ...(validationResult.data.options.pageRange.start !== undefined && { start: validationResult.data.options.pageRange.start }),
-              ...(validationResult.data.options.pageRange.end !== undefined && { end: validationResult.data.options.pageRange.end }),
+              ...(validationResult.data.options.pageRange.start !==
+                undefined && {
+                start: validationResult.data.options.pageRange.start,
+              }),
+              ...(validationResult.data.options.pageRange.end !== undefined && {
+                end: validationResult.data.options.pageRange.end,
+              }),
             },
           }),
-          ...(validationResult.data.options.outputFormat && { outputFormat: validationResult.data.options.outputFormat }),
-          ...(validationResult.data.options.workspaceAware !== undefined && { workspaceAware: validationResult.data.options.workspaceAware }),
+          ...(validationResult.data.options.outputFormat && {
+            outputFormat: validationResult.data.options.outputFormat,
+          }),
+          ...(validationResult.data.options.workspaceAware !== undefined && {
+            workspaceAware: validationResult.data.options.workspaceAware,
+          }),
         },
         file: await this.fileToBuffer(file),
         metadata: {
@@ -483,9 +536,15 @@ export class ConsolidatedPDFController {
           source: 'upload' as const,
           ...(validationResult.data.metadata?.workspace && {
             workspace: {
-              ...(validationResult.data.metadata.workspace.projectId && { projectId: validationResult.data.metadata.workspace.projectId }),
-              ...(validationResult.data.metadata.workspace.userId && { userId: validationResult.data.metadata.workspace.userId }),
-              ...(validationResult.data.metadata.workspace.tags && { tags: validationResult.data.metadata.workspace.tags }),
+              ...(validationResult.data.metadata.workspace.projectId && {
+                projectId: validationResult.data.metadata.workspace.projectId,
+              }),
+              ...(validationResult.data.metadata.workspace.userId && {
+                userId: validationResult.data.metadata.workspace.userId,
+              }),
+              ...(validationResult.data.metadata.workspace.tags && {
+                tags: validationResult.data.metadata.workspace.tags,
+              }),
             },
           }),
           ...(validationResult.data.metadata?.tags && {
@@ -505,7 +564,7 @@ export class ConsolidatedPDFController {
             userId: authContext.user.id,
             ...extractionRequest.metadata?.workspace,
           },
-  };
+        };
       }
 
       // Determine processing type based on options
@@ -548,7 +607,7 @@ export class ConsolidatedPDFController {
             ...extractionRequest.options,
             include_functional_metadata: true,
           },
-  };
+        };
 
         let jobId: string | undefined;
         let job: ProcessingJob | undefined;
@@ -575,15 +634,20 @@ export class ConsolidatedPDFController {
           }
 
           // Attempt functional metadata extraction
-          result = await this.mivaaService.extractFromPdf(functionalMetadataRequest);
+          result = await this.mivaaService.extractFromPdf(
+            functionalMetadataRequest,
+          );
 
           // Validate functional metadata response
           if (!result || typeof result !== 'object') {
-            throw new Error('Invalid response from MIVAA functional metadata service');
+            throw new Error(
+              'Invalid response from MIVAA functional metadata service',
+            );
           }
 
           // Check if functional metadata was actually extracted
-          const hasValidFunctionalMetadata = (result.data as any)?.functional_properties &&
+          const hasValidFunctionalMetadata =
+            (result.data as any)?.functional_properties &&
             Object.keys((result.data as any).functional_properties).length > 0;
 
           if (!hasValidFunctionalMetadata) {
@@ -607,7 +671,6 @@ export class ConsolidatedPDFController {
             this.activeJobs.set(jobId, job);
             result = { ...result, jobId };
           }
-
         } catch (functionalMetadataError) {
           // Functional metadata extraction failed
 
@@ -616,7 +679,10 @@ export class ConsolidatedPDFController {
             job.status = 'failed';
             job.error = {
               stage: 'functional_metadata_extraction',
-              message: functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown functional metadata error',
+              message:
+                functionalMetadataError instanceof Error
+                  ? functionalMetadataError.message
+                  : 'Unknown functional metadata error',
               code: 'FUNCTIONAL_METADATA_ERROR',
             };
             job.updatedAt = new Date();
@@ -624,19 +690,27 @@ export class ConsolidatedPDFController {
           }
 
           // Check if this is a critical failure or if we can fall back to standard extraction
-          const isCriticalError = functionalMetadataError instanceof Error &&
-            (functionalMetadataError.message.includes('MIVAA service unavailable') ||
-             functionalMetadataError.message.includes('Authentication failed') ||
-             functionalMetadataError.message.includes('Network timeout'));
+          const isCriticalError =
+            functionalMetadataError instanceof Error &&
+            (functionalMetadataError.message.includes(
+              'MIVAA service unavailable',
+            ) ||
+              functionalMetadataError.message.includes(
+                'Authentication failed',
+              ) ||
+              functionalMetadataError.message.includes('Network timeout'));
 
           if (isCriticalError) {
             // Critical error - return failure
-            throw new Error(`Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}`);
+            throw new Error(
+              `Functional metadata extraction failed: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}`,
+            );
           } else {
             // Non-critical error - fall back to standard extraction
 
             try {
-              result = await this.mivaaService.extractFromPdf(extractionRequest);
+              result =
+                await this.mivaaService.extractFromPdf(extractionRequest);
               result = {
                 ...result,
                 status: 'partial',
@@ -657,7 +731,9 @@ export class ConsolidatedPDFController {
               }
             } catch (fallbackError) {
               // Both functional metadata and standard extraction failed
-              throw new Error(`Both functional metadata and standard extraction failed. Functional metadata error: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`);
+              throw new Error(
+                `Both functional metadata and standard extraction failed. Functional metadata error: ${functionalMetadataError instanceof Error ? functionalMetadataError.message : 'Unknown error'}. Standard extraction error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown error'}`,
+              );
             }
           }
         }
@@ -698,7 +774,9 @@ export class ConsolidatedPDFController {
         success: false,
         error: 'PDF processing failed',
         code: 'PROCESSING_ERROR',
-        data: { message: _error instanceof Error ? _error.message : 'Unknown error' },
+        data: {
+          message: _error instanceof Error ? _error.message : 'Unknown error',
+        },
         timestamp: new Date().toISOString(),
       };
     }
@@ -737,7 +815,10 @@ export class ConsolidatedPDFController {
 
       // Check workspace access
       if (job.workspaceId) {
-        const hasAccess = await this.checkWorkspaceAccess(authContext.user.id, job.workspaceId);
+        const hasAccess = await this.checkWorkspaceAccess(
+          authContext.user.id,
+          job.workspaceId,
+        );
         if (!hasAccess) {
           return {
             success: false,
@@ -749,18 +830,34 @@ export class ConsolidatedPDFController {
       }
 
       // Calculate progress
-      const allStages = ['pending', 'processing', 'extracting', 'transforming', 'rag-integrating', 'completed'];
+      const allStages = [
+        'pending',
+        'processing',
+        'extracting',
+        'transforming',
+        'rag-integrating',
+        'completed',
+      ];
       const currentStageIndex = allStages.indexOf(job.status);
-      const completedStages = allStages.slice(0, Math.max(0, currentStageIndex));
-      const percentage = job.status === 'completed' ? 100 :
-                        job.status === 'failed' ? 0 :
-                        Math.round((currentStageIndex / (allStages.length - 1)) * 100);
+      const completedStages = allStages.slice(
+        0,
+        Math.max(0, currentStageIndex),
+      );
+      const percentage =
+        job.status === 'completed'
+          ? 100
+          : job.status === 'failed'
+            ? 0
+            : Math.round((currentStageIndex / (allStages.length - 1)) * 100);
 
       const statusResponse: WorkflowStatusResponse = {
         jobId: job.id,
-        status: job.status === 'extracting' || job.status === 'transforming' || job.status === 'rag-integrating'
-          ? 'processing'
-          : job.status as 'pending' | 'processing' | 'completed' | 'failed',
+        status:
+          job.status === 'extracting' ||
+          job.status === 'transforming' ||
+          job.status === 'rag-integrating'
+            ? 'processing'
+            : (job.status as 'pending' | 'processing' | 'completed' | 'failed'),
         progress: {
           currentStage: job.status,
           completedStages,
@@ -863,7 +960,10 @@ export class ConsolidatedPDFController {
       }
 
       // Check workspace access
-      const hasAccess = await this.checkWorkspaceAccess(authContext.user.id, request.workspaceId || '');
+      const hasAccess = await this.checkWorkspaceAccess(
+        authContext.user.id,
+        request.workspaceId || '',
+      );
       if (!hasAccess) {
         return {
           success: false,
@@ -898,8 +998,10 @@ export class ConsolidatedPDFController {
           similarity: result.similarity || result.score || 0,
           metadata: {
             filename: result.metadata?.filename || 'unknown',
-            pageNumber: result.metadata?.page_number || result.metadata?.pageNumber || 0,
-            chunkIndex: result.metadata?.chunk_index || result.metadata?.chunkIndex || 0,
+            pageNumber:
+              result.metadata?.page_number || result.metadata?.pageNumber || 0,
+            chunkIndex:
+              result.metadata?.chunk_index || result.metadata?.chunkIndex || 0,
             tags: result.metadata?.tags || [],
           },
         })),
@@ -989,7 +1091,10 @@ export class ConsolidatedPDFController {
         results.push(...batchResults);
 
         // If failFast is enabled and any request failed, stop processing
-        if (options.batchOptions?.failFast && batchResults.some(r => !r.result.success)) {
+        if (
+          options.batchOptions?.failFast &&
+          batchResults.some((r) => !r.result.success)
+        ) {
           break;
         }
       }
@@ -1051,15 +1156,23 @@ export class ConsolidatedPDFController {
       }
 
       // Calculate real metrics from active jobs
-      const completedJobs = Array.from(this.activeJobs.values()).filter(job => job.status === 'completed');
-      const failedJobs = Array.from(this.activeJobs.values()).filter(job => job.status === 'failed');
+      const completedJobs = Array.from(this.activeJobs.values()).filter(
+        (job) => job.status === 'completed',
+      );
+      const failedJobs = Array.from(this.activeJobs.values()).filter(
+        (job) => job.status === 'failed',
+      );
 
       // Calculate average processing time from completed jobs
       let averageProcessingTime = 0;
       if (completedJobs.length > 0) {
         const totalTime = completedJobs.reduce((sum, job) => {
           if (job.completedAt && job.startedAt) {
-            return sum + (new Date(job.completedAt).getTime() - new Date(job.startedAt).getTime());
+            return (
+              sum +
+              (new Date(job.completedAt).getTime() -
+                new Date(job.startedAt).getTime())
+            );
           }
           return sum;
         }, 0);
@@ -1073,7 +1186,7 @@ export class ConsolidatedPDFController {
         .eq('user_id', authContext.user.id)
         .order('created_at', { ascending: false })
         .limit(100);
-      const jobMetrics = (jobMetricsRaw as Array<{ status: string }> | null);
+      const jobMetrics = jobMetricsRaw as Array<{ status: string }> | null;
 
       const metrics = {
         activeJobs: this.activeJobs.size,
@@ -1083,9 +1196,15 @@ export class ConsolidatedPDFController {
         systemHealth: failedJobs.length === 0 ? 'healthy' : 'degraded',
         databaseMetrics: {
           totalJobs: jobMetrics?.length || 0,
-          successRate: jobMetrics ? ((jobMetrics.filter(j => j.status === 'completed').length / jobMetrics.length) * 100).toFixed(2) : 'N/A',
+          successRate: jobMetrics
+            ? (
+                (jobMetrics.filter((j) => j.status === 'completed').length /
+                  jobMetrics.length) *
+                100
+              ).toFixed(2)
+            : 'N/A',
         },
-  };
+      };
 
       return {
         success: true,
@@ -1106,7 +1225,10 @@ export class ConsolidatedPDFController {
   /**
    * Private helper methods
    */
-  private async checkWorkspaceAccess(userId: string, workspaceId: string): Promise<boolean> {
+  private async checkWorkspaceAccess(
+    userId: string,
+    workspaceId: string,
+  ): Promise<boolean> {
     try {
       const { data, error } = await supabase
         .from('workspace_permissions')
@@ -1116,7 +1238,8 @@ export class ConsolidatedPDFController {
         .eq('is_active', true)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = no rows returned
         // Error checking workspace access
         return false;
       }
@@ -1143,20 +1266,18 @@ export class ConsolidatedPDFController {
     metadata?: unknown;
   }): Promise<void> {
     try {
-      await supabase
-        .from('processing_jobs')
-        .insert({
-          job_id: jobData.jobId,
-          document_id: jobData.documentId,
-          workspace_id: jobData.workspaceId,
-          user_id: jobData.userId,
-          job_type: jobData.jobType,
-          status: 'pending',
-          filename: jobData.filename,
-          file_size: jobData.fileSize,
-          options: jobData.options,
-          metadata: jobData.metadata,
-        });
+      await supabase.from('processing_jobs').insert({
+        job_id: jobData.jobId,
+        document_id: jobData.documentId,
+        workspace_id: jobData.workspaceId,
+        user_id: jobData.userId,
+        job_type: jobData.jobType,
+        status: 'pending',
+        filename: jobData.filename,
+        file_size: jobData.fileSize,
+        options: jobData.options,
+        metadata: jobData.metadata,
+      });
     } catch (_error) {
       // Failed to create processing job
     }
@@ -1165,13 +1286,16 @@ export class ConsolidatedPDFController {
   /**
    * Update processing job status
    */
-  private async updateProcessingJob(jobId: string, updates: {
-    status?: string;
-    results?: unknown;
-    error_details?: unknown;
-    started_at?: string;
-    completed_at?: string;
-  }): Promise<void> {
+  private async updateProcessingJob(
+    jobId: string,
+    updates: {
+      status?: string;
+      results?: unknown;
+      error_details?: unknown;
+      started_at?: string;
+      completed_at?: string;
+    },
+  ): Promise<void> {
     try {
       const updateData: any = { ...updates };
 
@@ -1183,8 +1307,6 @@ export class ConsolidatedPDFController {
       // Failed to update processing job
     }
   }
-
-
 
   private generateJobId(): string {
     return `job_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;

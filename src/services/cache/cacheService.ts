@@ -283,9 +283,10 @@ export class CacheService {
    * Update hit rate metric
    */
   private updateHitRate(): void {
-    this.metrics.hitRate = this.metrics.totalRequests > 0
-      ? this.metrics.hits / this.metrics.totalRequests
-      : 0;
+    this.metrics.hitRate =
+      this.metrics.totalRequests > 0
+        ? this.metrics.hits / this.metrics.totalRequests
+        : 0;
   }
 
   /**

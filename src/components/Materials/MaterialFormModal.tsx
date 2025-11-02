@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
 import { Package } from 'lucide-react';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 
 import { DynamicMaterialForm, MaterialData } from './DynamicMaterialForm';
@@ -52,13 +63,18 @@ export const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="category-select">First, select a material category:</Label>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <Label htmlFor="category-select">
+              First, select a material category:
+            </Label>
+            <Select
+              value={selectedCategory}
+              onValueChange={setSelectedCategory}
+            >
               <SelectTrigger id="category-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {materialCategories.map(category => (
+                {materialCategories.map((category) => (
                   <SelectItem key={category.value} value={category.value}>
                     {category.label}
                   </SelectItem>

@@ -131,7 +131,11 @@ export class BatchJobQueue extends EventEmitter {
   private readonly processingJobs: Set<string> = new Set();
   private readonly deadLetterQueue: BatchJob[] = [];
   private readonly metrics: QueueMetrics;
-  private readonly jobHistory: Array<{ timestamp: number; event: string; jobId: string }> = [];
+  private readonly jobHistory: Array<{
+    timestamp: number;
+    event: string;
+    jobId: string;
+  }> = [];
 
   private isProcessing = false;
   private processingInterval: NodeJS.Timeout | null = null;
@@ -223,7 +227,8 @@ export class BatchJobQueue extends EventEmitter {
       id: jobId,
       type,
       priority: options.priority || this.config.defaultPriority,
-      status: options.scheduledAt && options.scheduledAt > now ? 'pending' : 'queued',
+      status:
+        options.scheduledAt && options.scheduledAt > now ? 'pending' : 'queued',
       payload,
       metadata: {
         workspaceId: options.workspaceId,
@@ -271,7 +276,9 @@ export class BatchJobQueue extends EventEmitter {
    * Get jobs by status
    */
   getJobsByStatus(status: JobStatus): BatchJob[] {
-    return Array.from(this.jobs.values()).filter(job => job.status === status);
+    return Array.from(this.jobs.values()).filter(
+      (job) => job.status === status,
+    );
   }
 
   /**
@@ -279,7 +286,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   getJobsByWorkspace(workspaceId: string): BatchJob[] {
     return Array.from(this.jobs.values()).filter(
-      job => job.metadata.workspaceId === workspaceId,
+      (job) => job.metadata.workspaceId === workspaceId,
     );
   }
 
@@ -354,7 +361,9 @@ export class BatchJobQueue extends EventEmitter {
 
     for (const [jobId, job] of this.jobs.entries()) {
       if (
-        (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') &&
+        (job.status === 'completed' ||
+          job.status === 'failed' ||
+          job.status === 'cancelled') &&
         job.metadata.updatedAt < cutoff
       ) {
         this.jobs.delete(jobId);
@@ -364,7 +373,7 @@ export class BatchJobQueue extends EventEmitter {
 
     // Clean job history
     const historyIndex = this.jobHistory.findIndex(
-      entry => entry.timestamp > Date.now() - olderThanMs,
+      (entry) => entry.timestamp > Date.now() - olderThanMs,
     );
     if (historyIndex > 0) {
       this.jobHistory.splice(0, historyIndex);
@@ -397,7 +406,7 @@ export class BatchJobQueue extends EventEmitter {
     const start = Date.now();
 
     while (this.processingJobs.size > 0 && Date.now() - start < timeout) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     this.emit('shutdown', {
@@ -441,7 +450,10 @@ export class BatchJobQueue extends EventEmitter {
 
     const processor = this.processors.get(job.type);
     if (!processor) {
-      this.handleJobError(job, new Error(`No processor registered for job type: ${job.type}`));
+      this.handleJobError(
+        job,
+        new Error(`No processor registered for job type: ${job.type}`),
+      );
       return;
     }
 
@@ -484,7 +496,6 @@ export class BatchJobQueue extends EventEmitter {
       this.updateMetrics();
       this.recordEvent('job_completed', jobId);
       this.emit('jobCompleted', job, jobResult);
-
     } catch (error) {
       this.handleJobError(job, error as Error);
     }
@@ -523,7 +534,9 @@ export class BatchJobQueue extends EventEmitter {
         this.deadLetterQueue.push(job);
 
         // Limit dead letter queue size
-        while (this.deadLetterQueue.length > this.config.deadLetterQueue.maxSize) {
+        while (
+          this.deadLetterQueue.length > this.config.deadLetterQueue.maxSize
+        ) {
           this.deadLetterQueue.shift();
         }
       }
@@ -550,9 +563,13 @@ export class BatchJobQueue extends EventEmitter {
    * Calculate retry delay with exponential backoff and jitter
    */
   private calculateRetryDelay(attempt: number): number {
-    const { baseDelay, maxDelay, backoffMultiplier, jitterEnabled } = this.config.retryPolicy;
+    const { baseDelay, maxDelay, backoffMultiplier, jitterEnabled } =
+      this.config.retryPolicy;
 
-    let delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt - 1), maxDelay);
+    let delay = Math.min(
+      baseDelay * Math.pow(backoffMultiplier, attempt - 1),
+      maxDelay,
+    );
 
     if (jitterEnabled) {
       delay = delay * (0.5 + Math.random() * 0.5); // Add 0-50% jitter
@@ -606,7 +623,7 @@ export class BatchJobQueue extends EventEmitter {
    * Check if job dependencies are met
    */
   private areDependenciesMet(dependencies: string[]): boolean {
-    return dependencies.every(depId => {
+    return dependencies.every((depId) => {
       const depJob = this.jobs.get(depId);
       return depJob && depJob.status === 'completed';
     });
@@ -638,7 +655,10 @@ export class BatchJobQueue extends EventEmitter {
   /**
    * Generate unique job ID
    */
-  private generateJobId(type: string, payload: Record<string, unknown>): string {
+  private generateJobId(
+    type: string,
+    payload: Record<string, unknown>,
+  ): string {
     const timestamp = Date.now();
     const hash = createHash('md5')
       .update(JSON.stringify({ type, payload, timestamp }))
@@ -655,10 +675,14 @@ export class BatchJobQueue extends EventEmitter {
     const jobs = Array.from(this.jobs.values());
 
     this.metrics.totalJobs = jobs.length;
-    this.metrics.pendingJobs = jobs.filter(j => j.status === 'pending').length;
+    this.metrics.pendingJobs = jobs.filter(
+      (j) => j.status === 'pending',
+    ).length;
     this.metrics.processingJobs = this.processingJobs.size;
-    this.metrics.completedJobs = jobs.filter(j => j.status === 'completed').length;
-    this.metrics.failedJobs = jobs.filter(j => j.status === 'failed').length;
+    this.metrics.completedJobs = jobs.filter(
+      (j) => j.status === 'completed',
+    ).length;
+    this.metrics.failedJobs = jobs.filter((j) => j.status === 'failed').length;
     this.metrics.deadLetterJobs = this.deadLetterQueue.length;
     this.metrics.queueSize = this.getTotalQueueSize();
     this.metrics.concurrentJobs = this.processingJobs.size;
@@ -666,23 +690,34 @@ export class BatchJobQueue extends EventEmitter {
     this.metrics.lastUpdated = new Date();
 
     // Calculate average processing time
-    const completedJobs = jobs.filter(j => j.status === 'completed' && j.metadata.actualDuration);
+    const completedJobs = jobs.filter(
+      (j) => j.status === 'completed' && j.metadata.actualDuration,
+    );
     if (completedJobs.length > 0) {
-      this.metrics.averageProcessingTime = completedJobs.reduce(
-        (sum, job) => sum + (job.metadata.actualDuration || 0), 0,
-      ) / completedJobs.length;
+      this.metrics.averageProcessingTime =
+        completedJobs.reduce(
+          (sum, job) => sum + (job.metadata.actualDuration || 0),
+          0,
+        ) / completedJobs.length;
     }
 
     // Calculate throughput and error rate
     const oneMinuteAgo = Date.now() - 60000;
-    const recentEvents = this.jobHistory.filter(e => e.timestamp > oneMinuteAgo);
-    const completedInLastMinute = recentEvents.filter(e => e.event === 'job_completed').length;
-    const failedInLastMinute = recentEvents.filter(e => e.event === 'job_dead_letter').length;
+    const recentEvents = this.jobHistory.filter(
+      (e) => e.timestamp > oneMinuteAgo,
+    );
+    const completedInLastMinute = recentEvents.filter(
+      (e) => e.event === 'job_completed',
+    ).length;
+    const failedInLastMinute = recentEvents.filter(
+      (e) => e.event === 'job_dead_letter',
+    ).length;
 
     this.metrics.throughputPerMinute = completedInLastMinute;
-    this.metrics.errorRate = completedInLastMinute + failedInLastMinute > 0
-      ? failedInLastMinute / (completedInLastMinute + failedInLastMinute)
-      : 0;
+    this.metrics.errorRate =
+      completedInLastMinute + failedInLastMinute > 0
+        ? failedInLastMinute / (completedInLastMinute + failedInLastMinute)
+        : 0;
   }
 
   /**
@@ -690,7 +725,8 @@ export class BatchJobQueue extends EventEmitter {
    */
   private getTotalQueueSize(): number {
     return Array.from(this.priorityQueues.values()).reduce(
-      (total, queue) => total + queue.length, 0,
+      (total, queue) => total + queue.length,
+      0,
     );
   }
 
@@ -738,7 +774,7 @@ export class BatchJobQueue extends EventEmitter {
    */
   private async persistState(): Promise<void> {
     try {
-      const jobs = Array.from(this.jobs.values()).map(job => ({
+      const jobs = Array.from(this.jobs.values()).map((job) => ({
         id: job.id,
         type: job.type,
         status: job.status,
@@ -811,9 +847,15 @@ export class BatchJobQueue extends EventEmitter {
               ...job.data.metadata,
               createdAt: new Date(job.data.metadata.createdAt),
               updatedAt: new Date(job.data.metadata.updatedAt),
-              scheduledAt: job.data.metadata.scheduledAt ? new Date(job.data.metadata.scheduledAt) : undefined,
-              startedAt: job.data.metadata.startedAt ? new Date(job.data.metadata.startedAt) : undefined,
-              completedAt: job.data.metadata.completedAt ? new Date(job.data.metadata.completedAt) : undefined,
+              scheduledAt: job.data.metadata.scheduledAt
+                ? new Date(job.data.metadata.scheduledAt)
+                : undefined,
+              startedAt: job.data.metadata.startedAt
+                ? new Date(job.data.metadata.startedAt)
+                : undefined,
+              completedAt: job.data.metadata.completedAt
+                ? new Date(job.data.metadata.completedAt)
+                : undefined,
             },
             dependencies: job.data.dependencies,
             tags: job.data.tags,

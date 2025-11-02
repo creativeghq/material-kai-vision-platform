@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 
-import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
-import { ProposalsService, Proposal } from '../../services/quote/ProposalsService';
+import {
+  QuoteRequestService,
+  QuoteRequest,
+} from '../../services/quote/QuoteRequestService';
+import {
+  ProposalsService,
+  Proposal,
+} from '../../services/quote/ProposalsService';
 
 interface QuoteStatusTrackerProps {
   userId?: string;
@@ -16,7 +22,9 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedRequest, setSelectedRequest] = useState<QuoteRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<QuoteRequest | null>(
+    null,
+  );
 
   const quoteService = new QuoteRequestService();
   const proposalService = new ProposalsService();
@@ -48,10 +56,12 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
   const handleAcceptProposal = async (proposal: Proposal) => {
     try {
       const updated = await proposalService.acceptProposal(proposal.id);
-      setProposals(proposals.map(p => p.id === updated.id ? updated : p));
+      setProposals(proposals.map((p) => (p.id === updated.id ? updated : p)));
       onProposalAccepted?.(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to accept proposal');
+      setError(
+        err instanceof Error ? err.message : 'Failed to accept proposal',
+      );
     }
   };
 
@@ -99,12 +109,19 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
               {quoteRequests.map((request) => (
                 <div
                   key={request.id}
-                  onClick={() => setSelectedRequest(request)} onKeyDown={(e) => e.key === 'Enter' && setSelectedRequest(request)}
+                  onClick={() => setSelectedRequest(request)}
+                  onKeyDown={(e) =>
+                    e.key === 'Enter' && setSelectedRequest(request)
+                  }
                   className="p-4 border rounded-lg cursor-pointer hover:bg-gray-50"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="font-medium">Request #{request.id.slice(0, 8)}</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
+                    <span className="font-medium">
+                      Request #{request.id.slice(0, 8)}
+                    </span>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}
+                    >
                       {quoteService.getStatusLabel(request.status)}
                     </span>
                   </div>
@@ -134,19 +151,28 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
                   className="p-4 border rounded-lg bg-white"
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="font-medium">Proposal #{proposal.id.slice(0, 8)}</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(proposal.status)}`}>
+                    <span className="font-medium">
+                      Proposal #{proposal.id.slice(0, 8)}
+                    </span>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(proposal.status)}`}
+                    >
                       {proposalService.getStatusLabel(proposal.status)}
                     </span>
                   </div>
                   <div className="text-sm text-gray-600 mb-3">
                     <p>Subtotal: ${(proposal.subtotal || 0).toFixed(2)}</p>
                     <p>Tax: ${(proposal.tax || 0).toFixed(2)}</p>
-                    <p className="font-bold">Total: ${(proposal.total || 0).toFixed(2)}</p>
+                    <p className="font-bold">
+                      Total: ${(proposal.total || 0).toFixed(2)}
+                    </p>
                   </div>
                   {proposal.status === 'sent' && (
                     <button
-                      onClick={() => handleAcceptProposal(proposal)} onKeyDown={(e) => e.key === 'Enter' && handleAcceptProposal(proposal)}
+                      onClick={() => handleAcceptProposal(proposal)}
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && handleAcceptProposal(proposal)
+                      }
                       className="w-full bg-green-600 text-white py-2 px-3 rounded hover:bg-green-700 text-sm font-medium"
                     >
                       Accept Proposal
@@ -169,18 +195,34 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
         <div className="mt-6 p-4 border rounded-lg bg-gray-50">
           <h3 className="font-bold mb-2">Request Details</h3>
           <div className="text-sm space-y-1">
-            <p><strong>ID:</strong> {selectedRequest.id}</p>
-            <p><strong>Status:</strong> {quoteService.getStatusLabel(selectedRequest.status)}</p>
-            <p><strong>Items:</strong> {selectedRequest.items_count}</p>
-            <p><strong>Total:</strong> ${(selectedRequest.total_estimated || 0).toFixed(2)}</p>
-            <p><strong>Notes:</strong> {selectedRequest.notes || 'None'}</p>
-            <p><strong>Created:</strong> {new Date(selectedRequest.created_at).toLocaleString()}</p>
+            <p>
+              <strong>ID:</strong> {selectedRequest.id}
+            </p>
+            <p>
+              <strong>Status:</strong>{' '}
+              {quoteService.getStatusLabel(selectedRequest.status)}
+            </p>
+            <p>
+              <strong>Items:</strong> {selectedRequest.items_count}
+            </p>
+            <p>
+              <strong>Total:</strong> $
+              {(selectedRequest.total_estimated || 0).toFixed(2)}
+            </p>
+            <p>
+              <strong>Notes:</strong> {selectedRequest.notes || 'None'}
+            </p>
+            <p>
+              <strong>Created:</strong>{' '}
+              {new Date(selectedRequest.created_at).toLocaleString()}
+            </p>
           </div>
         </div>
       )}
 
       <button
-        onClick={loadData} onKeyDown={(e) => e.key === 'Enter' && loadData()}
+        onClick={loadData}
+        onKeyDown={(e) => e.key === 'Enter' && loadData()}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >
         Refresh
@@ -190,4 +232,3 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
 };
 
 export default QuoteStatusTracker;
-

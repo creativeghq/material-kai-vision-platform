@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Check } from 'lucide-react';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { moodboardAPI } from '@/services/moodboardAPI';
@@ -64,7 +75,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
         material_id: material.id,
       });
 
-      const selectedBoard = moodboards.find(b => b.id === selectedBoardId);
+      const selectedBoard = moodboards.find((b) => b.id === selectedBoardId);
       toast({
         title: 'Success',
         description: `Added "${material.name}" to "${selectedBoard?.title}"`,
@@ -73,9 +84,10 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
       resetState();
     } catch (error: unknown) {
       console.error('Error adding to board:', error);
-      const errorMessage = error instanceof Error && error.message?.includes('duplicate')
-        ? 'This material is already in the selected moodboard'
-        : 'Failed to add material to moodboard';
+      const errorMessage =
+        error instanceof Error && error.message?.includes('duplicate')
+          ? 'This material is already in the selected moodboard'
+          : 'Failed to add material to moodboard';
 
       toast({
         title: 'Error',
@@ -176,17 +188,22 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                 </div>
               ) : (
                 <>
-                  <Select value={selectedBoardId} onValueChange={setSelectedBoardId}>
+                  <Select
+                    value={selectedBoardId}
+                    onValueChange={setSelectedBoardId}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a moodboard..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {moodboards.map(board => (
+                      {moodboards.map((board) => (
                         <SelectItem key={board.id} value={board.id}>
                           <div className="flex items-center gap-2">
                             <span>{board.title}</span>
                             {board.isPublic && (
-                              <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">Public</span>
+                              <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
+                                Public
+                              </span>
                             )}
                           </div>
                         </SelectItem>
@@ -217,10 +234,7 @@ export const AddToBoardModal: React.FC<AddToBoardModalProps> = ({
                 <Separator className="flex-1" />
               </div>
 
-              <Button
-                onClick={() => setShowCreateNew(true)}
-                className="w-full"
-              >
+              <Button onClick={() => setShowCreateNew(true)} className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
                 Create New MoodBoard
               </Button>

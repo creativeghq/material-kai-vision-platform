@@ -84,7 +84,9 @@ export const DEFAULT_EMBEDDING_CONFIG: UnifiedEmbeddingConfig = {
 export class TextPreprocessor {
   private config: UnifiedEmbeddingConfig['textPreprocessing'];
 
-  constructor(config: UnifiedEmbeddingConfig['textPreprocessing'] = DEFAULT_EMBEDDING_CONFIG.textPreprocessing) {
+  constructor(
+    config: UnifiedEmbeddingConfig['textPreprocessing'] = DEFAULT_EMBEDDING_CONFIG.textPreprocessing,
+  ) {
     this.config = config;
   }
 
@@ -130,7 +132,11 @@ export class TextPreprocessor {
         return text.substring(text.length - limit);
       case 'middle':
         const halfLimit = Math.floor(limit / 2);
-        return text.substring(0, halfLimit) + '...' + text.substring(text.length - halfLimit);
+        return (
+          text.substring(0, halfLimit) +
+          '...' +
+          text.substring(text.length - halfLimit)
+        );
       default:
         return text.substring(0, limit);
     }
@@ -153,11 +159,17 @@ export class TextPreprocessor {
     }
 
     if (text.length < DEFAULT_EMBEDDING_CONFIG.validation.minTextLength) {
-      return { valid: false, error: `Text too short (minimum ${DEFAULT_EMBEDDING_CONFIG.validation.minTextLength} characters)` };
+      return {
+        valid: false,
+        error: `Text too short (minimum ${DEFAULT_EMBEDDING_CONFIG.validation.minTextLength} characters)`,
+      };
     }
 
     if (text.length > DEFAULT_EMBEDDING_CONFIG.validation.maxTextLength) {
-      return { valid: false, error: `Text too long (maximum ${DEFAULT_EMBEDDING_CONFIG.validation.maxTextLength} characters)` };
+      return {
+        valid: false,
+        error: `Text too long (maximum ${DEFAULT_EMBEDDING_CONFIG.validation.maxTextLength} characters)`,
+      };
     }
 
     return { valid: true };
@@ -171,15 +183,23 @@ export class EmbeddingValidator {
   /**
    * Validate embedding dimensions
    */
-  static validateDimensions(embedding: number[], expectedDimensions: number): boolean {
+  static validateDimensions(
+    embedding: number[],
+    expectedDimensions: number,
+  ): boolean {
     return embedding.length === expectedDimensions;
   }
 
   /**
    * Validate embedding normalization
    */
-  static validateNormalization(embedding: number[], tolerance: number = 0.01): boolean {
-    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+  static validateNormalization(
+    embedding: number[],
+    tolerance: number = 0.01,
+  ): boolean {
+    const magnitude = Math.sqrt(
+      embedding.reduce((sum, val) => sum + val * val, 0),
+    );
     return Math.abs(magnitude - 1.0) < tolerance;
   }
 
@@ -187,9 +207,11 @@ export class EmbeddingValidator {
    * Normalize embedding vector
    */
   static normalizeEmbedding(embedding: number[]): number[] {
-    const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0));
+    const magnitude = Math.sqrt(
+      embedding.reduce((sum, val) => sum + val * val, 0),
+    );
     if (magnitude === 0) return embedding;
-    return embedding.map(val => val / magnitude);
+    return embedding.map((val) => val / magnitude);
   }
 
   /**
@@ -208,8 +230,11 @@ export class EmbeddingValidator {
     }
 
     // Check for invalid values
-    if (embedding.some(val => !isFinite(val))) {
-      return { valid: false, error: 'Embedding contains invalid values (NaN or Infinity)' };
+    if (embedding.some((val) => !isFinite(val))) {
+      return {
+        valid: false,
+        error: 'Embedding contains invalid values (NaN or Infinity)',
+      };
     }
 
     // Normalize if required
@@ -231,16 +256,26 @@ export class EmbeddingCacheKey {
   /**
    * Generate cache key based on content and model
    */
-  static generate(text: string, modelName: string, strategy: 'content-hash' | 'content-model-hash' = 'content-model-hash'): string {
+  static generate(
+    text: string,
+    modelName: string,
+    strategy: 'content-hash' | 'content-model-hash' = 'content-model-hash',
+  ): string {
     const crypto = require('crypto');
 
     switch (strategy) {
       case 'content-hash':
         return crypto.createHash('sha256').update(text).digest('hex');
       case 'content-model-hash':
-        return crypto.createHash('sha256').update(`${modelName}:${text}`).digest('hex');
+        return crypto
+          .createHash('sha256')
+          .update(`${modelName}:${text}`)
+          .digest('hex');
       default:
-        return crypto.createHash('sha256').update(`${modelName}:${text}`).digest('hex');
+        return crypto
+          .createHash('sha256')
+          .update(`${modelName}:${text}`)
+          .digest('hex');
     }
   }
 }

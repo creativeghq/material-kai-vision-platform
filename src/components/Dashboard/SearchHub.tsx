@@ -47,19 +47,22 @@ export const SearchHub: React.FC<SearchHubProps> = ({
     'Recycled content',
   ]);
 
-  const handleQuickAction = useCallback((action: string, data?: string) => {
-    switch (action) {
-      case 'moodboard':
-        onNavigateToMoodboard?.();
-        break;
-      case '3d':
-        onNavigateTo3D?.();
-        break;
-      case 'material':
-        onMaterialSelect?.(data || '');
-        break;
-    }
-  }, [onMaterialSelect, onNavigateToMoodboard, onNavigateTo3D]);
+  const handleQuickAction = useCallback(
+    (action: string, data?: string) => {
+      switch (action) {
+        case 'moodboard':
+          onNavigateToMoodboard?.();
+          break;
+        case '3d':
+          onNavigateTo3D?.();
+          break;
+        case 'material':
+          onMaterialSelect?.(data || '');
+          break;
+      }
+    },
+    [onMaterialSelect, onNavigateToMoodboard, onNavigateTo3D],
+  );
 
   return (
     <div className="space-y-6">
@@ -80,14 +83,17 @@ export const SearchHub: React.FC<SearchHubProps> = ({
               <Clock className="h-5 w-5" />
               Recent Searches
             </CardTitle>
-          </CardHeader><CardContent className="space-y-2">
+          </CardHeader>
+          <CardContent className="space-y-2">
             {recentSearches.map((search, index) => (
               <div
                 key={index}
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer group"
                 onClick={() => {
                   // Auto-fill search with recent query
-                  const searchInput = document.querySelector('input[placeholder*="Search materials"]') as HTMLInputElement;
+                  const searchInput = document.querySelector(
+                    'input[placeholder*="Search materials"]',
+                  ) as HTMLInputElement;
                   if (searchInput) {
                     searchInput.value = search;
                     searchInput.focus();
@@ -96,7 +102,9 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     // Auto-fill search with recent query
-                    const searchInput = document.querySelector('input[placeholder*="Search materials"]') as HTMLInputElement;
+                    const searchInput = document.querySelector(
+                      'input[placeholder*="Search materials"]',
+                    ) as HTMLInputElement;
                     if (searchInput) {
                       searchInput.value = search;
                       searchInput.focus();
@@ -158,7 +166,9 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                 className="flex items-center justify-between p-2 rounded hover:bg-muted/50 cursor-pointer group"
                 onClick={() => {
                   // Auto-fill search with trending query
-                  const searchInput = document.querySelector('input[placeholder*="Search materials"]') as HTMLInputElement;
+                  const searchInput = document.querySelector(
+                    'input[placeholder*="Search materials"]',
+                  ) as HTMLInputElement;
                   if (searchInput) {
                     searchInput.value = query;
                     searchInput.focus();
@@ -167,7 +177,9 @@ export const SearchHub: React.FC<SearchHubProps> = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     // Auto-fill search with trending query
-                    const searchInput = document.querySelector('input[placeholder*="Search materials"]') as HTMLInputElement;
+                    const searchInput = document.querySelector(
+                      'input[placeholder*="Search materials"]',
+                    ) as HTMLInputElement;
                     if (searchInput) {
                       searchInput.value = query;
                       searchInput.focus();

@@ -50,11 +50,7 @@ export class CommissionService {
           count: number;
           totals: CommissionSummary;
         }
-      >(
-        'moodboard-quote-api',
-        { limit, offset },
-        { method: 'GET' },
-      );
+      >('moodboard-quote-api', { limit, offset }, { method: 'GET' });
 
       return response;
     } catch (error) {
@@ -133,13 +129,16 @@ export class CommissionService {
    * Filter commissions by status
    */
   filterByStatus(commissions: Commission[], status: string): Commission[] {
-    return commissions.filter(c => c.status === status);
+    return commissions.filter((c) => c.status === status);
   }
 
   /**
    * Sort commissions by date
    */
-  sortByDate(commissions: Commission[], ascending: boolean = false): Commission[] {
+  sortByDate(
+    commissions: Commission[],
+    ascending: boolean = false,
+  ): Commission[] {
     return [...commissions].sort((a, b) => {
       const dateA = new Date(a.created_at).getTime();
       const dateB = new Date(b.created_at).getTime();
@@ -150,7 +149,10 @@ export class CommissionService {
   /**
    * Sort commissions by amount
    */
-  sortByAmount(commissions: Commission[], ascending: boolean = false): Commission[] {
+  sortByAmount(
+    commissions: Commission[],
+    ascending: boolean = false,
+  ): Commission[] {
     return [...commissions].sort((a, b) => {
       const amountA = a.commission_amount || 0;
       const amountB = b.commission_amount || 0;
@@ -160,4 +162,3 @@ export class CommissionService {
 }
 
 export default CommissionService;
-

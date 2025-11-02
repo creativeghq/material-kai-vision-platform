@@ -61,7 +61,11 @@ export interface HumanReviewTask {
   id: string;
   entityId: string;
   entityType: 'product' | 'chunk' | 'image';
-  reviewType: 'quality_validation' | 'completeness_check' | 'content_verification' | 'embedding_validation';
+  reviewType:
+    | 'quality_validation'
+    | 'completeness_check'
+    | 'content_verification'
+    | 'embedding_validation';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'pending' | 'in_progress' | 'completed' | 'rejected' | 'escalated';
   assignedTo?: string;
@@ -128,14 +132,16 @@ export class QualityControlService {
       // Get product data with quality scores
       const { data: product, error: productError } = await supabase
         .from('products')
-        .select(`
+        .select(
+          `
           id, name, description, long_description, specifications, metadata,
           quality_score, confidence_score, completeness_score, quality_metrics,
           quality_assessment,
           text_embedding_1536, visual_clip_embedding_512, multimodal_fusion_embedding_2048,
           color_embedding_256, texture_embedding_256, application_embedding_512,
           embedding_metadata
-        `)
+        `,
+        )
         .eq('id', productId)
         .single();
 
@@ -149,25 +155,35 @@ export class QualityControlService {
         confidence_score: product.confidence_score || 0,
         completeness_score: product.completeness_score || 0,
         embedding_coverage: this.calculateEmbeddingCoverage(product),
-        embedding_confidence: this.calculateEmbeddingConfidence(product.embedding_metadata),
+        embedding_confidence: this.calculateEmbeddingConfidence(
+          product.embedding_metadata,
+        ),
       };
 
       // Calculate overall score (weighted average)
-      const overallScore = (
+      const overallScore =
         qualityMetrics.quality_score * 0.3 +
         qualityMetrics.confidence_score * 0.2 +
         qualityMetrics.completeness_score * 0.25 +
         qualityMetrics.embedding_coverage * 0.15 +
-        qualityMetrics.embedding_confidence * 0.1
-      );
+        qualityMetrics.embedding_confidence * 0.1;
 
       // Check against thresholds
-      const issues = this.identifyQualityIssues(qualityMetrics, finalConfig.thresholds);
-      const passesThresholds = issues.filter(issue => issue.severity === 'high' || issue.severity === 'critical').length === 0;
+      const issues = this.identifyQualityIssues(
+        qualityMetrics,
+        finalConfig.thresholds,
+      );
+      const passesThresholds =
+        issues.filter(
+          (issue) => issue.severity === 'high' || issue.severity === 'critical',
+        ).length === 0;
       const needsHumanReview = !passesThresholds || overallScore < 0.7;
 
       // Generate recommendations
-      const recommendations = this.generateRecommendations(issues, qualityMetrics);
+      const recommendations = this.generateRecommendations(
+        issues,
+        qualityMetrics,
+      );
 
       const assessment: QualityAssessment = {
         entityId: productId,
@@ -189,9 +205,10 @@ export class QualityControlService {
         await this.createHumanReviewTask(assessment, finalConfig);
       }
 
-      console.log(`✅ Product quality assessment complete: ${overallScore.toFixed(2)} (${needsHumanReview ? 'needs review' : 'passed'})`);
+      console.log(
+        `✅ Product quality assessment complete: ${overallScore.toFixed(2)} (${needsHumanReview ? 'needs review' : 'passed'})`,
+      );
       return assessment;
-
     } catch (error) {
       console.error('❌ Product quality assessment failed:', error);
       throw error;
@@ -213,11 +230,13 @@ export class QualityControlService {
       // Get chunk data with quality scores
       const { data: chunk, error: chunkError } = await supabase
         .from('document_vectors')
-        .select(`
+        .select(
+          `
           chunk_id, content, metadata, page_number,
           coherence_score, quality_score, boundary_quality, semantic_completeness,
           text_embedding_1536, visual_clip_embedding_512, embedding_metadata
-        `)
+        `,
+        )
         .eq('chunk_id', chunkId)
         .single();
 
@@ -235,20 +254,30 @@ export class QualityControlService {
       };
 
       // Calculate overall score
-      const overallScore = (
+      const overallScore =
         qualityMetrics.coherence_score * 0.3 +
         qualityMetrics.quality_score * 0.25 +
         qualityMetrics.boundary_quality * 0.25 +
-        qualityMetrics.semantic_completeness * 0.2
-      );
+        qualityMetrics.semantic_completeness * 0.2;
 
       // Check against thresholds
-      const issues = this.identifyChunkQualityIssues(qualityMetrics, finalConfig.thresholds);
-      const passesThresholds = issues.filter(issue => issue.severity === 'high' || issue.severity === 'critical').length === 0;
-      const needsHumanReview = !passesThresholds || overallScore < finalConfig.thresholds.minChunkCoherenceScore;
+      const issues = this.identifyChunkQualityIssues(
+        qualityMetrics,
+        finalConfig.thresholds,
+      );
+      const passesThresholds =
+        issues.filter(
+          (issue) => issue.severity === 'high' || issue.severity === 'critical',
+        ).length === 0;
+      const needsHumanReview =
+        !passesThresholds ||
+        overallScore < finalConfig.thresholds.minChunkCoherenceScore;
 
       // Generate recommendations
-      const recommendations = this.generateChunkRecommendations(issues, qualityMetrics);
+      const recommendations = this.generateChunkRecommendations(
+        issues,
+        qualityMetrics,
+      );
 
       const assessment: QualityAssessment = {
         entityId: chunkId,
@@ -270,9 +299,10 @@ export class QualityControlService {
         await this.createHumanReviewTask(assessment, finalConfig);
       }
 
-      console.log(`✅ Chunk quality assessment complete: ${overallScore.toFixed(2)} (${needsHumanReview ? 'needs review' : 'passed'})`);
+      console.log(
+        `✅ Chunk quality assessment complete: ${overallScore.toFixed(2)} (${needsHumanReview ? 'needs review' : 'passed'})`,
+      );
       return assessment;
-
     } catch (error) {
       console.error('❌ Chunk quality assessment failed:', error);
       throw error;
@@ -294,11 +324,13 @@ export class QualityControlService {
       // Get image data with validation results
       const { data: image, error: imageError } = await supabase
         .from('document_images')
-        .select(`
+        .select(
+          `
           id, filename, file_size, dimensions, metadata,
           visual_clip_embedding_512, color_embedding_256, texture_embedding_256,
           embedding_metadata
-        `)
+        `,
+        )
         .eq('id', imageId)
         .single();
 
@@ -324,22 +356,32 @@ export class QualityControlService {
       };
 
       // Calculate overall score
-      const overallScore = (
+      const overallScore =
         qualityMetrics.quality_score * 0.3 +
         qualityMetrics.relevance_score * 0.25 +
         qualityMetrics.ocr_confidence * 0.2 +
         qualityMetrics.embedding_coverage * 0.15 +
         qualityMetrics.format_valid * 0.05 +
-        qualityMetrics.dimensions_valid * 0.05
-      );
+        qualityMetrics.dimensions_valid * 0.05;
 
       // Check against thresholds
-      const issues = this.identifyImageQualityIssues(qualityMetrics, finalConfig.thresholds);
-      const passesThresholds = issues.filter(issue => issue.severity === 'high' || issue.severity === 'critical').length === 0;
-      const needsHumanReview = !passesThresholds || overallScore < finalConfig.thresholds.minImageQualityScore;
+      const issues = this.identifyImageQualityIssues(
+        qualityMetrics,
+        finalConfig.thresholds,
+      );
+      const passesThresholds =
+        issues.filter(
+          (issue) => issue.severity === 'high' || issue.severity === 'critical',
+        ).length === 0;
+      const needsHumanReview =
+        !passesThresholds ||
+        overallScore < finalConfig.thresholds.minImageQualityScore;
 
       // Generate recommendations
-      const recommendations = this.generateImageRecommendations(issues, qualityMetrics);
+      const recommendations = this.generateImageRecommendations(
+        issues,
+        qualityMetrics,
+      );
 
       const assessment: QualityAssessment = {
         entityId: imageId,
@@ -361,9 +403,10 @@ export class QualityControlService {
         await this.createHumanReviewTask(assessment, finalConfig);
       }
 
-      console.log(`✅ Image quality assessment complete: ${overallScore.toFixed(2)} (${needsHumanReview ? 'needs review' : 'passed'})`);
+      console.log(
+        `✅ Image quality assessment complete: ${overallScore.toFixed(2)} (${needsHumanReview ? 'needs review' : 'passed'})`,
+      );
       return assessment;
-
     } catch (error) {
       console.error('❌ Image quality assessment failed:', error);
       throw error;
@@ -391,7 +434,9 @@ export class QualityControlService {
       throw new Error('Batch processing is disabled');
     }
 
-    console.log(`🔍 Starting batch quality assessment for ${entities.length} entities...`);
+    console.log(
+      `🔍 Starting batch quality assessment for ${entities.length} entities...`,
+    );
 
     const assessments: QualityAssessment[] = [];
     let passed = 0;
@@ -431,18 +476,23 @@ export class QualityControlService {
 
           return assessment;
         } catch (error) {
-          console.error(`❌ Failed to assess ${entity.type} ${entity.id}:`, error);
+          console.error(
+            `❌ Failed to assess ${entity.type} ${entity.id}:`,
+            error,
+          );
           failed++;
           return null;
         }
       });
 
       const batchResults = await Promise.all(batchPromises);
-      assessments.push(...batchResults.filter(Boolean) as QualityAssessment[]);
+      assessments.push(
+        ...(batchResults.filter(Boolean) as QualityAssessment[]),
+      );
 
       // Add delay between batches to prevent rate limiting
       if (i + batchSize < entities.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
@@ -453,7 +503,9 @@ export class QualityControlService {
       failed,
     };
 
-    console.log(`✅ Batch quality assessment complete: ${passed} passed, ${needsReview} need review, ${failed} failed`);
+    console.log(
+      `✅ Batch quality assessment complete: ${passed} passed, ${needsReview} need review, ${failed} failed`,
+    );
     return { assessments, summary };
   }
 
@@ -472,7 +524,9 @@ export class QualityControlService {
       'application_embedding_512',
     ];
 
-    const presentEmbeddings = embeddingTypes.filter(type => product[type] && product[type].length > 0);
+    const presentEmbeddings = embeddingTypes.filter(
+      (type) => product[type] && product[type].length > 0,
+    );
     return presentEmbeddings.length / embeddingTypes.length;
   }
 
@@ -484,12 +538,17 @@ export class QualityControlService {
       return 0;
     }
 
-    const confidenceScores = Object.values(embeddingMetadata.confidence_scores) as number[];
+    const confidenceScores = Object.values(
+      embeddingMetadata.confidence_scores,
+    ) as number[];
     if (confidenceScores.length === 0) {
       return 0;
     }
 
-    return confidenceScores.reduce((sum, score) => sum + score, 0) / confidenceScores.length;
+    return (
+      confidenceScores.reduce((sum, score) => sum + score, 0) /
+      confidenceScores.length
+    );
   }
 
   /**
@@ -502,7 +561,9 @@ export class QualityControlService {
       'texture_embedding_256',
     ];
 
-    const presentEmbeddings = embeddingTypes.filter(type => image[type] && image[type].length > 0);
+    const presentEmbeddings = embeddingTypes.filter(
+      (type) => image[type] && image[type].length > 0,
+    );
     return presentEmbeddings.length / embeddingTypes.length;
   }
 
@@ -529,7 +590,9 @@ export class QualityControlService {
     }
 
     // Check confidence score
-    if (qualityMetrics.confidence_score < thresholds.minProductConfidenceScore) {
+    if (
+      qualityMetrics.confidence_score < thresholds.minProductConfidenceScore
+    ) {
       issues.push({
         type: 'confidence',
         severity: qualityMetrics.confidence_score < 0.4 ? 'high' : 'medium',
@@ -542,7 +605,9 @@ export class QualityControlService {
     }
 
     // Check completeness score
-    if (qualityMetrics.completeness_score < thresholds.minProductCompletenessScore) {
+    if (
+      qualityMetrics.completeness_score < thresholds.minProductCompletenessScore
+    ) {
       issues.push({
         type: 'completeness',
         severity: qualityMetrics.completeness_score < 0.6 ? 'high' : 'medium',
@@ -568,7 +633,9 @@ export class QualityControlService {
     }
 
     // Check embedding confidence
-    if (qualityMetrics.embedding_confidence < thresholds.minEmbeddingConfidence) {
+    if (
+      qualityMetrics.embedding_confidence < thresholds.minEmbeddingConfidence
+    ) {
       issues.push({
         type: 'embedding',
         severity: qualityMetrics.embedding_confidence < 0.5 ? 'high' : 'medium',
@@ -619,10 +686,14 @@ export class QualityControlService {
     }
 
     // Check semantic completeness
-    if (qualityMetrics.semantic_completeness < thresholds.minChunkSemanticCompleteness) {
+    if (
+      qualityMetrics.semantic_completeness <
+      thresholds.minChunkSemanticCompleteness
+    ) {
       issues.push({
         type: 'completeness',
-        severity: qualityMetrics.semantic_completeness < 0.5 ? 'high' : 'medium',
+        severity:
+          qualityMetrics.semantic_completeness < 0.5 ? 'high' : 'medium',
         description: 'Chunk semantic completeness is below threshold',
         metric: 'semantic_completeness',
         currentValue: qualityMetrics.semantic_completeness,
@@ -695,36 +766,56 @@ export class QualityControlService {
     const recommendations: string[] = [];
 
     // Quality-specific recommendations
-    const qualityIssues = issues.filter(issue => issue.type === 'quality');
+    const qualityIssues = issues.filter((issue) => issue.type === 'quality');
     if (qualityIssues.length > 0) {
-      recommendations.push('Review and improve product name and description quality');
-      recommendations.push('Ensure product specifications are complete and accurate');
+      recommendations.push(
+        'Review and improve product name and description quality',
+      );
+      recommendations.push(
+        'Ensure product specifications are complete and accurate',
+      );
     }
 
     // Completeness recommendations
-    const completenessIssues = issues.filter(issue => issue.type === 'completeness');
+    const completenessIssues = issues.filter(
+      (issue) => issue.type === 'completeness',
+    );
     if (completenessIssues.length > 0) {
-      recommendations.push('Add missing product information (description, specifications, metadata)');
+      recommendations.push(
+        'Add missing product information (description, specifications, metadata)',
+      );
       recommendations.push('Verify all required fields are populated');
     }
 
     // Embedding recommendations
-    const embeddingIssues = issues.filter(issue => issue.type === 'embedding');
+    const embeddingIssues = issues.filter(
+      (issue) => issue.type === 'embedding',
+    );
     if (embeddingIssues.length > 0) {
-      recommendations.push('Generate missing embedding types for better search capabilities');
-      recommendations.push('Re-process embeddings with higher quality settings');
+      recommendations.push(
+        'Generate missing embedding types for better search capabilities',
+      );
+      recommendations.push(
+        'Re-process embeddings with higher quality settings',
+      );
     }
 
     // Confidence recommendations
-    const confidenceIssues = issues.filter(issue => issue.type === 'confidence');
+    const confidenceIssues = issues.filter(
+      (issue) => issue.type === 'confidence',
+    );
     if (confidenceIssues.length > 0) {
       recommendations.push('Review AI-generated content for accuracy');
-      recommendations.push('Consider manual verification of low-confidence items');
+      recommendations.push(
+        'Consider manual verification of low-confidence items',
+      );
     }
 
     // General recommendations based on overall score
     if (qualityMetrics.quality_score && qualityMetrics.quality_score < 0.6) {
-      recommendations.push('Consider re-processing this item with updated AI models');
+      recommendations.push(
+        'Consider re-processing this item with updated AI models',
+      );
     }
 
     return recommendations;
@@ -740,19 +831,23 @@ export class QualityControlService {
     const recommendations: string[] = [];
 
     // Coherence recommendations
-    if (issues.some(issue => issue.metric === 'coherence_score')) {
-      recommendations.push('Review chunk boundaries for better semantic coherence');
+    if (issues.some((issue) => issue.metric === 'coherence_score')) {
+      recommendations.push(
+        'Review chunk boundaries for better semantic coherence',
+      );
       recommendations.push('Consider re-chunking with different parameters');
     }
 
     // Boundary quality recommendations
-    if (issues.some(issue => issue.metric === 'boundary_quality')) {
-      recommendations.push('Adjust chunking strategy to improve boundary detection');
+    if (issues.some((issue) => issue.metric === 'boundary_quality')) {
+      recommendations.push(
+        'Adjust chunking strategy to improve boundary detection',
+      );
       recommendations.push('Use layout-aware chunking for better boundaries');
     }
 
     // Semantic completeness recommendations
-    if (issues.some(issue => issue.metric === 'semantic_completeness')) {
+    if (issues.some((issue) => issue.metric === 'semantic_completeness')) {
       recommendations.push('Ensure chunks contain complete semantic units');
       recommendations.push('Review chunk size and overlap parameters');
     }
@@ -770,21 +865,23 @@ export class QualityControlService {
     const recommendations: string[] = [];
 
     // Quality recommendations
-    if (issues.some(issue => issue.metric === 'quality_score')) {
+    if (issues.some((issue) => issue.metric === 'quality_score')) {
       recommendations.push('Consider using higher resolution images');
       recommendations.push('Improve image clarity and contrast');
     }
 
     // Relevance recommendations
-    if (issues.some(issue => issue.metric === 'relevance_score')) {
+    if (issues.some((issue) => issue.metric === 'relevance_score')) {
       recommendations.push('Verify image relevance to associated content');
       recommendations.push('Consider replacing with more relevant images');
     }
 
     // OCR recommendations
-    if (issues.some(issue => issue.metric === 'ocr_confidence')) {
+    if (issues.some((issue) => issue.metric === 'ocr_confidence')) {
       recommendations.push('Improve image text clarity for better OCR results');
-      recommendations.push('Consider manual text extraction for critical content');
+      recommendations.push(
+        'Consider manual text extraction for critical content',
+      );
     }
 
     return recommendations;
@@ -793,11 +890,12 @@ export class QualityControlService {
   /**
    * Store quality assessment in database
    */
-  private static async storeQualityAssessment(assessment: QualityAssessment): Promise<void> {
+  private static async storeQualityAssessment(
+    assessment: QualityAssessment,
+  ): Promise<void> {
     try {
-      const { error } = await supabase
-        .from('quality_assessments')
-        .insert([{
+      const { error } = await supabase.from('quality_assessments').insert([
+        {
           entity_id: assessment.entityId,
           entity_type: assessment.entityType,
           overall_score: assessment.overallScore,
@@ -807,7 +905,8 @@ export class QualityControlService {
           issues: assessment.issues,
           recommendations: assessment.recommendations,
           assessment_timestamp: assessment.assessmentTimestamp,
-        }]);
+        },
+      ]);
 
       if (error) {
         console.error('❌ Failed to store quality assessment:', error);
@@ -827,8 +926,12 @@ export class QualityControlService {
   ): Promise<HumanReviewTask> {
     try {
       // Determine priority based on issues severity
-      const criticalIssues = assessment.issues.filter(issue => issue.severity === 'critical').length;
-      const highIssues = assessment.issues.filter(issue => issue.severity === 'high').length;
+      const criticalIssues = assessment.issues.filter(
+        (issue) => issue.severity === 'critical',
+      ).length;
+      const highIssues = assessment.issues.filter(
+        (issue) => issue.severity === 'high',
+      ).length;
 
       let priority: 'low' | 'medium' | 'high' | 'urgent';
       if (criticalIssues > 0) {
@@ -842,12 +945,20 @@ export class QualityControlService {
       }
 
       // Determine review type based on issues
-      let reviewType: 'quality_validation' | 'completeness_check' | 'content_verification' | 'embedding_validation';
-      if (assessment.issues.some(issue => issue.type === 'embedding')) {
+      let reviewType:
+        | 'quality_validation'
+        | 'completeness_check'
+        | 'content_verification'
+        | 'embedding_validation';
+      if (assessment.issues.some((issue) => issue.type === 'embedding')) {
         reviewType = 'embedding_validation';
-      } else if (assessment.issues.some(issue => issue.type === 'completeness')) {
+      } else if (
+        assessment.issues.some((issue) => issue.type === 'completeness')
+      ) {
         reviewType = 'completeness_check';
-      } else if (assessment.issues.some(issue => issue.type === 'validation')) {
+      } else if (
+        assessment.issues.some((issue) => issue.type === 'validation')
+      ) {
         reviewType = 'content_verification';
       } else {
         reviewType = 'quality_validation';
@@ -866,9 +977,8 @@ export class QualityControlService {
       };
 
       // Store in database
-      const { error } = await supabase
-        .from('human_review_tasks')
-        .insert([{
+      const { error } = await supabase.from('human_review_tasks').insert([
+        {
           id: reviewTask.id,
           entity_id: reviewTask.entityId,
           entity_type: reviewTask.entityType,
@@ -878,15 +988,17 @@ export class QualityControlService {
           quality_assessment: reviewTask.qualityAssessment,
           created_at: reviewTask.createdAt,
           updated_at: reviewTask.updatedAt,
-        }]);
+        },
+      ]);
 
       if (error) {
         throw new Error(`Failed to create human review task: ${error.message}`);
       }
 
-      console.log(`📋 Created human review task ${reviewTask.id} for ${assessment.entityType} ${assessment.entityId} (priority: ${priority})`);
+      console.log(
+        `📋 Created human review task ${reviewTask.id} for ${assessment.entityType} ${assessment.entityId} (priority: ${priority})`,
+      );
       return reviewTask;
-
     } catch (error) {
       console.error('❌ Failed to create human review task:', error);
       throw error;
@@ -935,7 +1047,7 @@ export class QualityControlService {
         throw new Error(`Failed to fetch review tasks: ${error.message}`);
       }
 
-      return (data || []).map(task => ({
+      return (data || []).map((task) => ({
         id: task.id,
         entityId: task.entity_id,
         entityType: task.entity_type,
@@ -950,7 +1062,6 @@ export class QualityControlService {
         updatedAt: task.updated_at,
         completedAt: task.completed_at,
       }));
-
     } catch (error) {
       console.error('❌ Failed to get pending review tasks:', error);
       throw error;
@@ -985,8 +1096,9 @@ export class QualityControlService {
         throw new Error(`Failed to complete review task: ${error.message}`);
       }
 
-      console.log(`✅ Completed review task ${taskId} with decision: ${decision}`);
-
+      console.log(
+        `✅ Completed review task ${taskId} with decision: ${decision}`,
+      );
     } catch (error) {
       console.error('❌ Failed to complete review task:', error);
       throw error;
@@ -1035,15 +1147,21 @@ export class QualityControlService {
       // Calculate statistics
       const assessmentStats = {
         total: assessments?.length || 0,
-        passed: assessments?.filter(a => a.passes_thresholds).length || 0,
-        needsReview: assessments?.filter(a => a.needs_human_review).length || 0,
-        failed: assessments?.filter(a => !a.passes_thresholds && !a.needs_human_review).length || 0,
+        passed: assessments?.filter((a) => a.passes_thresholds).length || 0,
+        needsReview:
+          assessments?.filter((a) => a.needs_human_review).length || 0,
+        failed:
+          assessments?.filter(
+            (a) => !a.passes_thresholds && !a.needs_human_review,
+          ).length || 0,
       };
 
       const reviewTaskStats = {
-        pending: reviewTasks?.filter(t => t.status === 'pending').length || 0,
-        completed: reviewTasks?.filter(t => t.status === 'completed').length || 0,
-        escalated: reviewTasks?.filter(t => t.status === 'escalated').length || 0,
+        pending: reviewTasks?.filter((t) => t.status === 'pending').length || 0,
+        completed:
+          reviewTasks?.filter((t) => t.status === 'completed').length || 0,
+        escalated:
+          reviewTasks?.filter((t) => t.status === 'escalated').length || 0,
         avgCompletionTime: this.calculateAvgCompletionTime(reviewTasks || []),
       };
 
@@ -1058,7 +1176,6 @@ export class QualityControlService {
         reviewTasks: reviewTaskStats,
         qualityTrends,
       };
-
     } catch (error) {
       console.error('❌ Failed to get quality control stats:', error);
       throw error;
@@ -1088,8 +1205,11 @@ export class QualityControlService {
   }
 
   private static calculateAvgCompletionTime(reviewTasks: unknown[]): number {
-    const completedTasks = reviewTasks.filter(task =>
-      (task as any).status === 'completed' && (task as any).created_at && (task as any).completed_at,
+    const completedTasks = reviewTasks.filter(
+      (task) =>
+        (task as any).status === 'completed' &&
+        (task as any).created_at &&
+        (task as any).completed_at,
     );
 
     if (completedTasks.length === 0) {
@@ -1111,7 +1231,11 @@ export class QualityControlService {
       return 0;
     }
 
-    const totalScore = assessments.reduce((sum, assessment) => (sum as any) + (((assessment as any).overall_score || 0) as any), 0);
+    const totalScore = assessments.reduce(
+      (sum, assessment) =>
+        (sum as any) + (((assessment as any).overall_score || 0) as any),
+      0,
+    );
     return Math.round(((totalScore as any) / assessments.length) * 100) / 100;
   }
 
@@ -1120,18 +1244,24 @@ export class QualityControlService {
     if (assessments.length < 2) return 0;
 
     const firstScore = (assessments[0] as any)?.overall_score || 0;
-    const lastScore = (assessments[assessments.length - 1] as any)?.overall_score || 0;
+    const lastScore =
+      (assessments[assessments.length - 1] as any)?.overall_score || 0;
 
     if (firstScore === 0) return 0;
 
     return Math.round(((lastScore - firstScore) / firstScore) * 100) / 100;
   }
 
-  private static aggregateIssueTypes(assessments: unknown[]): Record<string, number> {
+  private static aggregateIssueTypes(
+    assessments: unknown[],
+  ): Record<string, number> {
     const issueTypes: Record<string, number> = {};
 
-    assessments.forEach(assessment => {
-      if ((assessment as any).issues && Array.isArray((assessment as any).issues)) {
+    assessments.forEach((assessment) => {
+      if (
+        (assessment as any).issues &&
+        Array.isArray((assessment as any).issues)
+      ) {
         ((assessment as any).issues as any[]).forEach((issue: any) => {
           issueTypes[issue.type] = (issueTypes[issue.type] || 0) + 1;
         });

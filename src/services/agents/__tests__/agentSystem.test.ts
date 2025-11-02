@@ -10,19 +10,34 @@ import { agentManager } from '../agentManager';
 describe('Agent Role-Based Access Control', () => {
   describe('Agent Access Control', () => {
     it('should allow admin to access research agent', () => {
-      const canAccess = agentAccessControl.canAccessAgent('research-agent', 'admin');
+      const canAccess = agentAccessControl.canAccessAgent(
+        'research-agent',
+        'admin',
+      );
       expect(canAccess).toBe(true);
     });
 
     it('should deny member access to research agent', () => {
-      const canAccess = agentAccessControl.canAccessAgent('research-agent', 'member');
+      const canAccess = agentAccessControl.canAccessAgent(
+        'research-agent',
+        'member',
+      );
       expect(canAccess).toBe(false);
     });
 
     it('should allow all roles to access mivaa search agent', () => {
-      const adminAccess = agentAccessControl.canAccessAgent('mivaa-search-agent', 'admin');
-      const memberAccess = agentAccessControl.canAccessAgent('mivaa-search-agent', 'member');
-      const ownerAccess = agentAccessControl.canAccessAgent('mivaa-search-agent', 'owner');
+      const adminAccess = agentAccessControl.canAccessAgent(
+        'mivaa-search-agent',
+        'admin',
+      );
+      const memberAccess = agentAccessControl.canAccessAgent(
+        'mivaa-search-agent',
+        'member',
+      );
+      const ownerAccess = agentAccessControl.canAccessAgent(
+        'mivaa-search-agent',
+        'owner',
+      );
 
       expect(adminAccess).toBe(true);
       expect(memberAccess).toBe(true);
@@ -40,18 +55,30 @@ describe('Agent Role-Based Access Control', () => {
 
   describe('Tool Access Control', () => {
     it('should allow admin to access data-extraction tool', () => {
-      const canAccess = toolAccessControl.canAccessTool('data-extraction', 'admin');
+      const canAccess = toolAccessControl.canAccessTool(
+        'data-extraction',
+        'admin',
+      );
       expect(canAccess).toBe(true);
     });
 
     it('should deny member access to data-extraction tool', () => {
-      const canAccess = toolAccessControl.canAccessTool('data-extraction', 'member');
+      const canAccess = toolAccessControl.canAccessTool(
+        'data-extraction',
+        'member',
+      );
       expect(canAccess).toBe(false);
     });
 
     it('should allow all roles to access mivaa-search tool', () => {
-      const adminAccess = toolAccessControl.canAccessTool('mivaa-search', 'admin');
-      const memberAccess = toolAccessControl.canAccessTool('mivaa-search', 'member');
+      const adminAccess = toolAccessControl.canAccessTool(
+        'mivaa-search',
+        'admin',
+      );
+      const memberAccess = toolAccessControl.canAccessTool(
+        'mivaa-search',
+        'member',
+      );
 
       expect(adminAccess).toBe(true);
       expect(memberAccess).toBe(true);
@@ -229,9 +256,8 @@ describe('Agent Role-Based Access Control', () => {
       const toolALogs = toolAccessControl.getExecutionLogs('tool-a');
       const toolBLogs = toolAccessControl.getExecutionLogs('tool-b');
 
-      expect(toolALogs.every(log => log.toolId === 'tool-a')).toBe(true);
-      expect(toolBLogs.every(log => log.toolId === 'tool-b')).toBe(true);
+      expect(toolALogs.every((log) => log.toolId === 'tool-a')).toBe(true);
+      expect(toolBLogs.every((log) => log.toolId === 'tool-b')).toBe(true);
     });
   });
 });
-

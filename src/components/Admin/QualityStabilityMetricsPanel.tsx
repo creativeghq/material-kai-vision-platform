@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  RefreshCw,
-} from 'lucide-react';
-
+import { RefreshCw } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -55,7 +52,6 @@ interface DocumentMetrics {
 }
 
 const QualityStabilityMetricsPanel: React.FC = () => {
-
   const { toast } = useToast();
   const [documents, setDocuments] = useState<DocumentMetrics[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +82,9 @@ const QualityStabilityMetricsPanel: React.FC = () => {
         // Get stability metrics
         const { data: stabilityMetricsData } = await supabase
           .from('embedding_stability_metrics')
-          .select('stability_score, consistency_score, variance_score, anomaly_detected')
+          .select(
+            'stability_score, consistency_score, variance_score, anomaly_detected',
+          )
           .eq('document_id', doc.id);
 
         if (qualityChunks && qualityChunks.length > 0) {
@@ -94,19 +92,30 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             .map((c: unknown) => (c as any).coherence_score)
             .filter((s: unknown) => s !== null) as number[];
 
-          const assessments = qualityChunks.map((c: unknown) => (c as any).quality_assessment);
+          const assessments = qualityChunks.map(
+            (c: unknown) => (c as any).quality_assessment,
+          );
 
           const qualityMetrics: QualityMetrics = {
             total_chunks: qualityChunks.length,
             chunks_with_scores: scores.length,
-            average_score: scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0,
+            average_score:
+              scores.length > 0
+                ? scores.reduce((a, b) => a + b, 0) / scores.length
+                : 0,
             min_score: scores.length > 0 ? Math.min(...scores) : 0,
             max_score: scores.length > 0 ? Math.max(...scores) : 0,
-            excellent_count: assessments.filter((a: unknown) => a === 'Excellent').length,
-            very_good_count: assessments.filter((a: unknown) => a === 'Very Good').length,
+            excellent_count: assessments.filter(
+              (a: unknown) => a === 'Excellent',
+            ).length,
+            very_good_count: assessments.filter(
+              (a: unknown) => a === 'Very Good',
+            ).length,
             good_count: assessments.filter((a: unknown) => a === 'Good').length,
             fair_count: assessments.filter((a: unknown) => a === 'Fair').length,
-            acceptable_count: assessments.filter((a: unknown) => a === 'Acceptable').length,
+            acceptable_count: assessments.filter(
+              (a: unknown) => a === 'Acceptable',
+            ).length,
             poor_count: assessments.filter((a: unknown) => a === 'Poor').length,
           };
 
@@ -119,27 +128,44 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             anomaly_rate: 0,
           };
 
-          if (stabilityMetricsData && Array.isArray(stabilityMetricsData) && stabilityMetricsData.length > 0) {
-            const stabilityScores = stabilityMetricsData.map((m: any) => m.stability_score);
-            const consistencyScores = stabilityMetricsData.map((m: any) => m.consistency_score);
-            const varianceScores = stabilityMetricsData.map((m: any) => m.variance_score);
-            const anomalies = stabilityMetricsData.filter((m: any) => m.anomaly_detected).length;
+          if (
+            stabilityMetricsData &&
+            Array.isArray(stabilityMetricsData) &&
+            stabilityMetricsData.length > 0
+          ) {
+            const stabilityScores = stabilityMetricsData.map(
+              (m: any) => m.stability_score,
+            );
+            const consistencyScores = stabilityMetricsData.map(
+              (m: any) => m.consistency_score,
+            );
+            const varianceScores = stabilityMetricsData.map(
+              (m: any) => m.variance_score,
+            );
+            const anomalies = stabilityMetricsData.filter(
+              (m: any) => m.anomaly_detected,
+            ).length;
 
             stabilityMetricsResult = {
               total_chunks: stabilityMetricsData.length,
-              average_stability: stabilityScores.reduce((a: number, b: number) => a + b, 0) / stabilityScores.length,
-              average_consistency: consistencyScores.reduce((a: number, b: number) => a + b, 0) / consistencyScores.length,
-              average_variance: varianceScores.reduce((a: number, b: number) => a + b, 0) / varianceScores.length,
+              average_stability:
+                stabilityScores.reduce((a: number, b: number) => a + b, 0) /
+                stabilityScores.length,
+              average_consistency:
+                consistencyScores.reduce((a: number, b: number) => a + b, 0) /
+                consistencyScores.length,
+              average_variance:
+                varianceScores.reduce((a: number, b: number) => a + b, 0) /
+                varianceScores.length,
               anomalies_detected: anomalies,
               anomaly_rate: anomalies / stabilityMetricsData.length,
             };
           }
 
-          const overallHealth = (
+          const overallHealth =
             qualityMetrics.average_score * 0.4 +
             stabilityMetricsResult.average_stability * 0.35 +
-            stabilityMetricsResult.average_consistency * 0.25
-          );
+            stabilityMetricsResult.average_consistency * 0.25;
 
           metricsData.push({
             document_id: doc.id,
@@ -174,7 +200,8 @@ const QualityStabilityMetricsPanel: React.FC = () => {
     if (score >= 0.85) return <Badge className="bg-green-600">Excellent</Badge>;
     if (score >= 0.75) return <Badge className="bg-green-500">Very Good</Badge>;
     if (score >= 0.65) return <Badge className="bg-blue-500">Good</Badge>;
-    if (score >= 0.50) return <Badge className="bg-yellow-500">Acceptable</Badge>;
+    if (score >= 0.5)
+      return <Badge className="bg-yellow-500">Acceptable</Badge>;
     return <Badge className="bg-red-500">Needs Improvement</Badge>;
   };
 
@@ -183,7 +210,8 @@ const QualityStabilityMetricsPanel: React.FC = () => {
     if (score >= 0.8) return <Badge className="bg-green-500">Very Good</Badge>;
     if (score >= 0.7) return <Badge className="bg-blue-500">Good</Badge>;
     if (score >= 0.6) return <Badge className="bg-yellow-500">Fair</Badge>;
-    if (score >= 0.5) return <Badge className="bg-orange-500">Acceptable</Badge>;
+    if (score >= 0.5)
+      return <Badge className="bg-orange-500">Acceptable</Badge>;
     return <Badge className="bg-red-500">Poor</Badge>;
   };
 
@@ -202,11 +230,14 @@ const QualityStabilityMetricsPanel: React.FC = () => {
         {/* Refresh Button */}
         <div className="flex justify-end">
           <Button
-            onClick={fetchMetrics} onKeyDown={(e) => e.key === 'Enter' && fetchMetrics()}
+            onClick={fetchMetrics}
+            onKeyDown={(e) => e.key === 'Enter' && fetchMetrics()}
             disabled={refreshing}
             className="gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
+            />
             {refreshing ? 'Refreshing...' : 'Refresh Metrics'}
           </Button>
         </div>
@@ -216,7 +247,9 @@ const QualityStabilityMetricsPanel: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Documents Analyzed</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Documents Analyzed
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{documents.length}</div>
@@ -225,33 +258,60 @@ const QualityStabilityMetricsPanel: React.FC = () => {
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Avg Quality Score</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Avg Quality Score
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {((documents.reduce((sum, d) => sum + d.quality_metrics.average_score, 0) / documents.length) * 100).toFixed(1)}%
+                  {(
+                    (documents.reduce(
+                      (sum, d) => sum + d.quality_metrics.average_score,
+                      0,
+                    ) /
+                      documents.length) *
+                    100
+                  ).toFixed(1)}
+                  %
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Avg Stability</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Avg Stability
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {((documents.reduce((sum, d) => sum + d.stability_metrics.average_stability, 0) / documents.length) * 100).toFixed(1)}%
+                  {(
+                    (documents.reduce(
+                      (sum, d) => sum + d.stability_metrics.average_stability,
+                      0,
+                    ) /
+                      documents.length) *
+                    100
+                  ).toFixed(1)}
+                  %
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Platform Health</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Platform Health
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {((documents.reduce((sum, d) => sum + d.overall_health, 0) / documents.length) * 100).toFixed(1)}%
+                  {(
+                    (documents.reduce((sum, d) => sum + d.overall_health, 0) /
+                      documents.length) *
+                    100
+                  ).toFixed(1)}
+                  %
                 </div>
               </CardContent>
             </Card>
@@ -267,7 +327,9 @@ const QualityStabilityMetricsPanel: React.FC = () => {
             {loading ? (
               <div className="text-center py-8">Loading metrics...</div>
             ) : documents.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No documents with metrics found</div>
+              <div className="text-center py-8 text-muted-foreground">
+                No documents with metrics found
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -284,23 +346,44 @@ const QualityStabilityMetricsPanel: React.FC = () => {
                   <TableBody>
                     {documents.map((doc) => (
                       <TableRow key={doc.document_id}>
-                        <TableCell className="font-medium">{doc.document_name}</TableCell>
+                        <TableCell className="font-medium">
+                          {doc.document_name}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <span>{(doc.quality_metrics.average_score * 100).toFixed(1)}%</span>
+                            <span>
+                              {(
+                                doc.quality_metrics.average_score * 100
+                              ).toFixed(1)}
+                              %
+                            </span>
                             {getScoreBadge(doc.quality_metrics.average_score)}
                           </div>
                         </TableCell>
-                        <TableCell>{(doc.stability_metrics.average_stability * 100).toFixed(1)}%</TableCell>
-                        <TableCell>{(doc.stability_metrics.average_consistency * 100).toFixed(1)}%</TableCell>
+                        <TableCell>
+                          {(
+                            doc.stability_metrics.average_stability * 100
+                          ).toFixed(1)}
+                          %
+                        </TableCell>
+                        <TableCell>
+                          {(
+                            doc.stability_metrics.average_consistency * 100
+                          ).toFixed(1)}
+                          %
+                        </TableCell>
                         <TableCell>
                           {doc.stability_metrics.anomalies_detected > 0 ? (
-                            <Badge className="bg-red-500">{doc.stability_metrics.anomalies_detected}</Badge>
+                            <Badge className="bg-red-500">
+                              {doc.stability_metrics.anomalies_detected}
+                            </Badge>
                           ) : (
                             <Badge className="bg-green-500">0</Badge>
                           )}
                         </TableCell>
-                        <TableCell>{getHealthBadge(doc.overall_health)}</TableCell>
+                        <TableCell>
+                          {getHealthBadge(doc.overall_health)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -322,39 +405,101 @@ const QualityStabilityMetricsPanel: React.FC = () => {
               {documents.map((doc) => (
                 <Card key={doc.document_id}>
                   <CardHeader>
-                    <CardTitle className="text-base">{doc.document_name} - Quality Breakdown</CardTitle>
+                    <CardTitle className="text-base">
+                      {doc.document_name} - Quality Breakdown
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
-                        <div className="text-sm font-medium mb-2">Excellent</div>
-                        <Progress value={(doc.quality_metrics.excellent_count / doc.quality_metrics.total_chunks) * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{doc.quality_metrics.excellent_count} chunks</div>
+                        <div className="text-sm font-medium mb-2">
+                          Excellent
+                        </div>
+                        <Progress
+                          value={
+                            (doc.quality_metrics.excellent_count /
+                              doc.quality_metrics.total_chunks) *
+                            100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {doc.quality_metrics.excellent_count} chunks
+                        </div>
                       </div>
                       <div>
-                        <div className="text-sm font-medium mb-2">Very Good</div>
-                        <Progress value={(doc.quality_metrics.very_good_count / doc.quality_metrics.total_chunks) * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{doc.quality_metrics.very_good_count} chunks</div>
+                        <div className="text-sm font-medium mb-2">
+                          Very Good
+                        </div>
+                        <Progress
+                          value={
+                            (doc.quality_metrics.very_good_count /
+                              doc.quality_metrics.total_chunks) *
+                            100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {doc.quality_metrics.very_good_count} chunks
+                        </div>
                       </div>
                       <div>
                         <div className="text-sm font-medium mb-2">Good</div>
-                        <Progress value={(doc.quality_metrics.good_count / doc.quality_metrics.total_chunks) * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{doc.quality_metrics.good_count} chunks</div>
+                        <Progress
+                          value={
+                            (doc.quality_metrics.good_count /
+                              doc.quality_metrics.total_chunks) *
+                            100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {doc.quality_metrics.good_count} chunks
+                        </div>
                       </div>
                       <div>
                         <div className="text-sm font-medium mb-2">Fair</div>
-                        <Progress value={(doc.quality_metrics.fair_count / doc.quality_metrics.total_chunks) * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{doc.quality_metrics.fair_count} chunks</div>
+                        <Progress
+                          value={
+                            (doc.quality_metrics.fair_count /
+                              doc.quality_metrics.total_chunks) *
+                            100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {doc.quality_metrics.fair_count} chunks
+                        </div>
                       </div>
                       <div>
-                        <div className="text-sm font-medium mb-2">Acceptable</div>
-                        <Progress value={(doc.quality_metrics.acceptable_count / doc.quality_metrics.total_chunks) * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{doc.quality_metrics.acceptable_count} chunks</div>
+                        <div className="text-sm font-medium mb-2">
+                          Acceptable
+                        </div>
+                        <Progress
+                          value={
+                            (doc.quality_metrics.acceptable_count /
+                              doc.quality_metrics.total_chunks) *
+                            100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {doc.quality_metrics.acceptable_count} chunks
+                        </div>
                       </div>
                       <div>
                         <div className="text-sm font-medium mb-2">Poor</div>
-                        <Progress value={(doc.quality_metrics.poor_count / doc.quality_metrics.total_chunks) * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{doc.quality_metrics.poor_count} chunks</div>
+                        <Progress
+                          value={
+                            (doc.quality_metrics.poor_count /
+                              doc.quality_metrics.total_chunks) *
+                            100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {doc.quality_metrics.poor_count} chunks
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -366,29 +511,74 @@ const QualityStabilityMetricsPanel: React.FC = () => {
               {documents.map((doc) => (
                 <Card key={doc.document_id}>
                   <CardHeader>
-                    <CardTitle className="text-base">{doc.document_name} - Stability Metrics</CardTitle>
+                    <CardTitle className="text-base">
+                      {doc.document_name} - Stability Metrics
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
-                        <div className="text-sm font-medium mb-2">Stability Score</div>
-                        <Progress value={doc.stability_metrics.average_stability * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{(doc.stability_metrics.average_stability * 100).toFixed(1)}%</div>
+                        <div className="text-sm font-medium mb-2">
+                          Stability Score
+                        </div>
+                        <Progress
+                          value={doc.stability_metrics.average_stability * 100}
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {(
+                            doc.stability_metrics.average_stability * 100
+                          ).toFixed(1)}
+                          %
+                        </div>
                       </div>
                       <div>
-                        <div className="text-sm font-medium mb-2">Consistency Score</div>
-                        <Progress value={doc.stability_metrics.average_consistency * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{(doc.stability_metrics.average_consistency * 100).toFixed(1)}%</div>
+                        <div className="text-sm font-medium mb-2">
+                          Consistency Score
+                        </div>
+                        <Progress
+                          value={
+                            doc.stability_metrics.average_consistency * 100
+                          }
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {(
+                            doc.stability_metrics.average_consistency * 100
+                          ).toFixed(1)}
+                          %
+                        </div>
                       </div>
                       <div>
-                        <div className="text-sm font-medium mb-2">Variance Score</div>
-                        <Progress value={doc.stability_metrics.average_variance * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{(doc.stability_metrics.average_variance * 100).toFixed(1)}%</div>
+                        <div className="text-sm font-medium mb-2">
+                          Variance Score
+                        </div>
+                        <Progress
+                          value={doc.stability_metrics.average_variance * 100}
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {(
+                            doc.stability_metrics.average_variance * 100
+                          ).toFixed(1)}
+                          %
+                        </div>
                       </div>
                       <div>
-                        <div className="text-sm font-medium mb-2">Anomaly Rate</div>
-                        <Progress value={doc.stability_metrics.anomaly_rate * 100} className="h-2" />
-                        <div className="text-xs text-muted-foreground mt-1">{(doc.stability_metrics.anomaly_rate * 100).toFixed(1)}% ({doc.stability_metrics.anomalies_detected} anomalies)</div>
+                        <div className="text-sm font-medium mb-2">
+                          Anomaly Rate
+                        </div>
+                        <Progress
+                          value={doc.stability_metrics.anomaly_rate * 100}
+                          className="h-2"
+                        />
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {(doc.stability_metrics.anomaly_rate * 100).toFixed(
+                            1,
+                          )}
+                          % ({doc.stability_metrics.anomalies_detected}{' '}
+                          anomalies)
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -403,4 +593,3 @@ const QualityStabilityMetricsPanel: React.FC = () => {
 };
 
 export default QualityStabilityMetricsPanel;
-

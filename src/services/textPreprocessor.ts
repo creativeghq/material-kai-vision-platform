@@ -5,7 +5,10 @@
  * in the Material Kai Vision Platform to ensure embedding consistency.
  */
 
-import { textPreprocessor, DEFAULT_EMBEDDING_CONFIG } from '../config/embeddingConfig';
+import {
+  textPreprocessor,
+  DEFAULT_EMBEDDING_CONFIG,
+} from '../config/embeddingConfig';
 
 export interface TextChunk {
   id: string;
@@ -131,7 +134,11 @@ export class UnifiedTextPreprocessor {
       let chunkText = text.substring(currentPosition, endPosition);
 
       // Try to break at sentence boundaries if preserveStructure is enabled
-      if (options.preserveStructure && options.splitOnSentences && endPosition < text.length) {
+      if (
+        options.preserveStructure &&
+        options.splitOnSentences &&
+        endPosition < text.length
+      ) {
         const sentenceBreak = this.findSentenceBreak(chunkText);
         if (sentenceBreak > options.minChunkSize) {
           chunkText = chunkText.substring(0, sentenceBreak);
@@ -139,7 +146,11 @@ export class UnifiedTextPreprocessor {
       }
 
       // Try to break at paragraph boundaries
-      if (options.preserveStructure && options.splitOnParagraphs && endPosition < text.length) {
+      if (
+        options.preserveStructure &&
+        options.splitOnParagraphs &&
+        endPosition < text.length
+      ) {
         const paragraphBreak = this.findParagraphBreak(chunkText);
         if (paragraphBreak > options.minChunkSize) {
           chunkText = chunkText.substring(0, paragraphBreak);
@@ -170,7 +181,7 @@ export class UnifiedTextPreprocessor {
     }
 
     // Update total chunks count
-    chunks.forEach(chunk => {
+    chunks.forEach((chunk) => {
       chunk.metadata.totalChunks = chunks.length;
     });
 
@@ -234,7 +245,9 @@ export class UnifiedTextPreprocessor {
     let preprocessed = textPreprocessor.normalize(query);
 
     // For queries, don't truncate as aggressively
-    if (preprocessed.length > DEFAULT_EMBEDDING_CONFIG.textPreprocessing.maxLength) {
+    if (
+      preprocessed.length > DEFAULT_EMBEDDING_CONFIG.textPreprocessing.maxLength
+    ) {
       preprocessed = textPreprocessor.truncate(preprocessed, 2000); // Allow longer queries
     }
 
@@ -290,14 +303,23 @@ export class UnifiedTextPreprocessor {
     averageChunkSize: number;
     overlapEfficiency: number;
   } {
-    const compressionRatio = result.metadata.preprocessedLength / result.metadata.originalLength;
-    const averageChunkSize = result.chunks.length > 0
-      ? result.chunks.reduce((sum, chunk) => sum + chunk.metadata.preprocessedLength, 0) / result.chunks.length
-      : 0;
+    const compressionRatio =
+      result.metadata.preprocessedLength / result.metadata.originalLength;
+    const averageChunkSize =
+      result.chunks.length > 0
+        ? result.chunks.reduce(
+            (sum, chunk) => sum + chunk.metadata.preprocessedLength,
+            0,
+          ) / result.chunks.length
+        : 0;
 
     // Calculate overlap efficiency (how much text is duplicated due to overlap)
-    const totalChunkLength = result.chunks.reduce((sum, chunk) => sum + chunk.metadata.preprocessedLength, 0);
-    const overlapEfficiency = result.metadata.preprocessedLength / totalChunkLength;
+    const totalChunkLength = result.chunks.reduce(
+      (sum, chunk) => sum + chunk.metadata.preprocessedLength,
+      0,
+    );
+    const overlapEfficiency =
+      result.metadata.preprocessedLength / totalChunkLength;
 
     return {
       compressionRatio,

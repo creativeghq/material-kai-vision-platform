@@ -71,7 +71,10 @@ export async function healthCheck(): Promise<HealthStatus> {
 
   // Check database connectivity
   try {
-    const { error } = await supabase.from('materials_catalog').select('id').limit(1);
+    const { error } = await supabase
+      .from('materials_catalog')
+      .select('id')
+      .limit(1);
     if (!error) {
       checks.database = 'healthy';
       details.database = 'Connected successfully';
@@ -136,7 +139,10 @@ export async function readinessCheck(): Promise<ReadinessStatus> {
 
   // Check database readiness
   try {
-    const { error } = await supabase.from('materials_catalog').select('id').limit(1);
+    const { error } = await supabase
+      .from('materials_catalog')
+      .select('id')
+      .limit(1);
     if (!error) {
       checks.database = true;
       details.database = 'Database is ready';
@@ -148,12 +154,11 @@ export async function readinessCheck(): Promise<ReadinessStatus> {
   }
 
   // Check configuration
-  const requiredEnvVars = [
-    'SUPABASE_URL',
-    'SUPABASE_ANON_KEY',
-  ];
+  const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
 
-  const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+  const missingEnvVars = requiredEnvVars.filter(
+    (envVar) => !process.env[envVar],
+  );
   if (missingEnvVars.length === 0) {
     checks.configuration = true;
     details.configuration = 'All required environment variables are set';
@@ -182,8 +187,12 @@ export function createHealthEndpoint() {
   return async (_req: Request, res: ExpressResponse) => {
     try {
       const health = await healthCheck();
-      const statusCode = health.status === 'healthy' ? 200 :
-                        health.status === 'degraded' ? 200 : 503;
+      const statusCode =
+        health.status === 'healthy'
+          ? 200
+          : health.status === 'degraded'
+            ? 200
+            : 503;
 
       res.status(statusCode).json(health);
     } catch (error) {
@@ -222,8 +231,12 @@ export function createReadinessEndpoint() {
 export async function handleHealthRequest(): Promise<Response> {
   try {
     const health = await healthCheck();
-    const statusCode = health.status === 'healthy' ? 200 :
-                      health.status === 'degraded' ? 200 : 503;
+    const statusCode =
+      health.status === 'healthy'
+        ? 200
+        : health.status === 'degraded'
+          ? 200
+          : 503;
 
     return new Response(JSON.stringify(health), {
       status: statusCode,
@@ -233,17 +246,20 @@ export async function handleHealthRequest(): Promise<Response> {
       },
     });
   } catch (error) {
-    return new Response(JSON.stringify({
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }), {
-      status: 503,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
+    return new Response(
+      JSON.stringify({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }),
+      {
+        status: 503,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
       },
-    });
+    );
   }
 }
 
@@ -263,16 +279,19 @@ export async function handleReadinessRequest(): Promise<Response> {
       },
     });
   } catch (error) {
-    return new Response(JSON.stringify({
-      ready: false,
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }), {
-      status: 503,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
+    return new Response(
+      JSON.stringify({
+        ready: false,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }),
+      {
+        status: 503,
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+        },
       },
-    });
+    );
   }
 }

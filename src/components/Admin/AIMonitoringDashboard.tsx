@@ -10,9 +10,21 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,7 +39,21 @@ import {
   RefreshCw,
   Download,
 } from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface AIMetricsSummary {
   total_calls: number;
@@ -71,7 +97,14 @@ interface AIMetricsResponse {
   recent_calls: any[];
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
+const COLORS = [
+  '#0088FE',
+  '#00C49F',
+  '#FFBB28',
+  '#FF8042',
+  '#8884D8',
+  '#82CA9D',
+];
 
 export const AIMonitoringDashboard: React.FC = () => {
   const [timePeriod, setTimePeriod] = useState<string>('24h');
@@ -181,7 +214,9 @@ export const AIMonitoringDashboard: React.FC = () => {
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${autoRefresh ? 'animate-spin' : ''}`}
+            />
             Auto Refresh
           </Button>
           <Button variant="outline" size="sm" onClick={fetchMetrics}>
@@ -199,7 +234,9 @@ export const AIMonitoringDashboard: React.FC = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCost(metrics.summary.total_cost)}</div>
+            <div className="text-2xl font-bold">
+              {formatCost(metrics.summary.total_cost)}
+            </div>
             <p className="text-xs text-muted-foreground">
               {formatNumber(metrics.summary.total_calls)} AI calls
             </p>
@@ -208,7 +245,9 @@ export const AIMonitoringDashboard: React.FC = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avg Confidence
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -268,20 +307,32 @@ export const AIMonitoringDashboard: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Model Statistics</CardTitle>
-                <CardDescription>Cost and performance by AI model</CardDescription>
+                <CardDescription>
+                  Cost and performance by AI model
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {metrics.model_usage.map((model, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
                       <div className="flex-1">
                         <div className="font-medium">{model.model}</div>
                         <div className="text-sm text-muted-foreground">
-                          {formatNumber(model.call_count)} calls • {formatCost(model.total_cost)}
+                          {formatNumber(model.call_count)} calls •{' '}
+                          {formatCost(model.total_cost)}
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge variant={model.average_confidence > 0.8 ? 'default' : 'secondary'}>
+                        <Badge
+                          variant={
+                            model.average_confidence > 0.8
+                              ? 'default'
+                              : 'secondary'
+                          }
+                        >
                           {formatPercentage(model.average_confidence)}
                         </Badge>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -310,10 +361,15 @@ export const AIMonitoringDashboard: React.FC = () => {
                       cx="50%"
                       cy="50%"
                       outerRadius={100}
-                      label={(entry) => `${entry.model}: ${formatCost(entry.total_cost)}`}
+                      label={(entry) =>
+                        `${entry.model}: ${formatCost(entry.total_cost)}`
+                      }
                     >
                       {metrics.model_usage.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value: number) => formatCost(value)} />
@@ -335,13 +391,28 @@ export const AIMonitoringDashboard: React.FC = () => {
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={metrics.task_breakdown}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="task" angle={-45} textAnchor="end" height={100} />
+                  <XAxis
+                    dataKey="task"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                  />
                   <YAxis yAxisId="left" />
                   <YAxis yAxisId="right" orientation="right" />
                   <Tooltip />
                   <Legend />
-                  <Bar yAxisId="left" dataKey="total_cost" fill="#8884d8" name="Cost ($)" />
-                  <Bar yAxisId="right" dataKey="call_count" fill="#82ca9d" name="Calls" />
+                  <Bar
+                    yAxisId="left"
+                    dataKey="total_cost"
+                    fill="#8884d8"
+                    name="Cost ($)"
+                  />
+                  <Bar
+                    yAxisId="right"
+                    dataKey="call_count"
+                    fill="#82ca9d"
+                    name="Calls"
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -353,7 +424,9 @@ export const AIMonitoringDashboard: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>Confidence Score Distribution</CardTitle>
-              <CardDescription>Quality distribution across all AI calls</CardDescription>
+              <CardDescription>
+                Quality distribution across all AI calls
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -380,17 +453,23 @@ export const AIMonitoringDashboard: React.FC = () => {
             <CardContent>
               <div className="space-y-2">
                 {metrics.recent_calls.map((call, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-3 border rounded-lg text-sm">
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-3 border rounded-lg text-sm"
+                  >
                     <div className="flex-1">
                       <div className="font-medium">{call.task}</div>
                       <div className="text-xs text-muted-foreground">
-                        {call.model} • {new Date(call.timestamp).toLocaleString()}
+                        {call.model} •{' '}
+                        {new Date(call.timestamp).toLocaleString()}
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
                         <div>{formatCost(call.cost || 0)}</div>
-                        <div className="text-xs text-muted-foreground">{call.latency_ms}ms</div>
+                        <div className="text-xs text-muted-foreground">
+                          {call.latency_ms}ms
+                        </div>
                       </div>
                       {call.action === 'use_ai_result' ? (
                         <CheckCircle className="h-5 w-5 text-green-500" />
@@ -410,4 +489,3 @@ export const AIMonitoringDashboard: React.FC = () => {
 };
 
 export default AIMonitoringDashboard;
-

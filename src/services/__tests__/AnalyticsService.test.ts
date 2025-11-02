@@ -18,7 +18,9 @@ jest.mock('@/integrations/supabase/client', () => {
     if (table === 'analytics_events') {
       chainable.insert = jest.fn().mockReturnThis();
 
-      Object.defineProperty(chainable, Symbol.toStringTag, { value: 'Promise' });
+      Object.defineProperty(chainable, Symbol.toStringTag, {
+        value: 'Promise',
+      });
       chainable.then = (onFulfilled: any) => {
         const result = {
           data: [
@@ -127,7 +129,10 @@ describe('AnalyticsService', () => {
   describe('getMetrics', () => {
     it('should retrieve analytics metrics', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect(metrics).toBeDefined();
       expect((metrics as any).total_events).toBeGreaterThanOrEqual(0);
@@ -139,18 +144,24 @@ describe('AnalyticsService', () => {
 
     it('should calculate events by type', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect(typeof (metrics as any).events_by_type).toBe('object');
-      Object.values((metrics as any).events_by_type || {}).forEach(count => {
+      Object.values((metrics as any).events_by_type || {}).forEach((count) => {
         expect(typeof count).toBe('number');
-        expect((count as any)).toBeGreaterThanOrEqual(0);
+        expect(count as any).toBeGreaterThanOrEqual(0);
       });
     });
 
     it('should calculate error rate', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect((metrics as any).error_rate).toBeGreaterThanOrEqual(0);
       expect((metrics as any).error_rate).toBeLessThanOrEqual(1);
@@ -158,21 +169,30 @@ describe('AnalyticsService', () => {
 
     it('should count unique users', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect((metrics as any).user_count).toBeGreaterThanOrEqual(0);
     });
 
     it('should count sessions', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect((metrics as any).session_count).toBeGreaterThanOrEqual(0);
     });
 
     it('should calculate average response time', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect((metrics as any).average_response_time).toBeGreaterThanOrEqual(0);
     });
@@ -203,7 +223,7 @@ describe('AnalyticsService', () => {
       const report = await service.getReport('workspace-1', 30);
 
       expect(Array.isArray(report.trends)).toBe(true);
-      report.trends.forEach(trend => {
+      report.trends.forEach((trend) => {
         expect(trend.date).toBeDefined();
         expect(trend.event_count).toBeGreaterThanOrEqual(0);
         expect(trend.error_count).toBeGreaterThanOrEqual(0);
@@ -215,7 +235,7 @@ describe('AnalyticsService', () => {
       const report = await service.getReport('workspace-1', 30);
 
       expect(Array.isArray(report.top_events)).toBe(true);
-      report.top_events.forEach(event => {
+      report.top_events.forEach((event) => {
         expect(event.event_type).toBeDefined();
         expect(event.count).toBeGreaterThan(0);
         expect(event.percentage).toBeGreaterThan(0);
@@ -228,7 +248,9 @@ describe('AnalyticsService', () => {
       const report = await service.getReport('workspace-1', 30);
 
       for (let i = 1; i < report.top_events.length; i++) {
-        expect(report.top_events[i - 1].count).toBeGreaterThanOrEqual(report.top_events[i].count);
+        expect(report.top_events[i - 1].count).toBeGreaterThanOrEqual(
+          report.top_events[i].count,
+        );
       }
     });
   });
@@ -281,7 +303,10 @@ describe('AnalyticsService', () => {
   describe('Error Handling', () => {
     it('should handle missing workspace gracefully', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('non-existent', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'non-existent',
+        30,
+      );
 
       expect(metrics).toBeDefined();
       expect((metrics as any).total_events).toBeGreaterThanOrEqual(0);
@@ -289,7 +314,10 @@ describe('AnalyticsService', () => {
 
     it('should handle zero events', async () => {
       await service.initialize();
-      const metrics = await (service as any).getAnalyticsMetrics('workspace-1', 30);
+      const metrics = await (service as any).getAnalyticsMetrics(
+        'workspace-1',
+        30,
+      );
 
       expect((metrics as any).error_rate).toBeGreaterThanOrEqual(0);
       expect((metrics as any).error_rate).toBeLessThanOrEqual(1);
@@ -319,4 +347,3 @@ describe('AnalyticsService', () => {
     });
   });
 });
-

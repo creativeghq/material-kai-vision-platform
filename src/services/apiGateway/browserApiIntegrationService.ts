@@ -45,7 +45,8 @@ export class BrowserApiIntegrationService {
 
   public static getInstance(): BrowserApiIntegrationService {
     if (!BrowserApiIntegrationService.instance) {
-      BrowserApiIntegrationService.instance = new BrowserApiIntegrationService();
+      BrowserApiIntegrationService.instance =
+        new BrowserApiIntegrationService();
     }
     return BrowserApiIntegrationService.instance;
   }
@@ -151,9 +152,10 @@ export class BrowserApiIntegrationService {
     height?: number;
   }): Promise<StandardizedApiResponse> {
     // Try Replicate first (usually better quality)
-    const replicateModels = browserApiClientFactory.getAvailableModels('replicate');
-    const interiorModel = replicateModels.find(model =>
-      model.includes('interior') || model.includes('design'),
+    const replicateModels =
+      browserApiClientFactory.getAvailableModels('replicate');
+    const interiorModel = replicateModels.find(
+      (model) => model.includes('interior') || model.includes('design'),
     );
 
     if (interiorModel) {
@@ -168,7 +170,8 @@ export class BrowserApiIntegrationService {
     }
 
     // Fallback to Hugging Face
-    const huggingfaceModels = browserApiClientFactory.getAvailableModels('huggingface');
+    const huggingfaceModels =
+      browserApiClientFactory.getAvailableModels('huggingface');
     const fallbackModel = huggingfaceModels[0]; // Use first available model
 
     if (fallbackModel) {
@@ -194,7 +197,9 @@ export class BrowserApiIntegrationService {
   /**
    * Material recognition using MIVAA service via Supabase Edge Function
    */
-  public async recognizeMaterial(imageFile: File): Promise<StandardizedApiResponse> {
+  public async recognizeMaterial(
+    imageFile: File,
+  ): Promise<StandardizedApiResponse> {
     try {
       // Convert file to base64 for transmission
       const base64Image = await this.fileToBase64(imageFile);
@@ -214,7 +219,8 @@ export class BrowserApiIntegrationService {
       return {
         success: false,
         error: {
-          message: error instanceof Error ? error.message : 'Failed to process image',
+          message:
+            error instanceof Error ? error.message : 'Failed to process image',
           code: 'IMAGE_PROCESSING_ERROR',
           details: error instanceof Error ? { stack: error.stack } : undefined,
           retryable: true,
@@ -231,11 +237,14 @@ export class BrowserApiIntegrationService {
   /**
    * Enhanced RAG search using MIVAA service via Supabase Edge Function
    */
-  public async performEnhancedSearch(query: string, options: {
-    includeImages?: boolean;
-    includeMaterials?: boolean;
-    limit?: number;
-  } = {}): Promise<StandardizedApiResponse> {
+  public async performEnhancedSearch(
+    query: string,
+    options: {
+      includeImages?: boolean;
+      includeMaterials?: boolean;
+      limit?: number;
+    } = {},
+  ): Promise<StandardizedApiResponse> {
     return this.callSupabaseFunction('mivaa-gateway', {
       action: 'semantic_search',
       payload: {
@@ -291,7 +300,8 @@ export class BrowserApiIntegrationService {
     }
 
     // Add quality enhancers
-    enhancedPrompt += ', high quality, professional interior design, well-lit, detailed';
+    enhancedPrompt +=
+      ', high quality, professional interior design, well-lit, detailed';
 
     return enhancedPrompt;
   }
@@ -312,4 +322,5 @@ export class BrowserApiIntegrationService {
 }
 
 // Export singleton instance
-export const browserApiIntegrationService = BrowserApiIntegrationService.getInstance();
+export const browserApiIntegrationService =
+  BrowserApiIntegrationService.getInstance();

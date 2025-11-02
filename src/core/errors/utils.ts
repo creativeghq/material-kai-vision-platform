@@ -3,7 +3,17 @@
  * Common patterns and helpers for error handling across the application
  */
 
-import { AppError, ErrorContext, ErrorCategory, ErrorSeverity, APIError, NetworkError, ValidationError, DatabaseError, ExternalServiceError } from './AppError';
+import {
+  AppError,
+  ErrorContext,
+  ErrorCategory,
+  ErrorSeverity,
+  APIError,
+  NetworkError,
+  ValidationError,
+  DatabaseError,
+  ExternalServiceError,
+} from './AppError';
 import { errorLogger } from './ErrorLogger';
 
 /**
@@ -46,16 +56,18 @@ export async function withErrorHandling<T>(
 
     return result;
   } catch (error) {
-    const appError = error instanceof AppError
-      ? error
-      : new AppError({
-          code: 'OPERATION_ERROR',
-          message: `Operation failed: ${context.operation}`,
-          category: ErrorCategory.PROCESSING,
-          severity: ErrorSeverity.HIGH,
-          context,
-          originalError: error instanceof Error ? error : new Error(String(error)),
-        });
+    const appError =
+      error instanceof AppError
+        ? error
+        : new AppError({
+            code: 'OPERATION_ERROR',
+            message: `Operation failed: ${context.operation}`,
+            category: ErrorCategory.PROCESSING,
+            severity: ErrorSeverity.HIGH,
+            context,
+            originalError:
+              error instanceof Error ? error : new Error(String(error)),
+          });
 
     errorLogger.logError(appError);
     throw appError;
@@ -74,7 +86,9 @@ export function handleAPIError(
 
   // Type guard to check if error has response property
   if (error && typeof error === 'object' && 'response' in error) {
-    const errorWithResponse = error as { response: { status: number; statusText?: string; data?: unknown } };
+    const errorWithResponse = error as {
+      response: { status: number; statusText?: string; data?: unknown };
+    };
     // HTTP error response
     const status = errorWithResponse.response.status;
     const statusText = errorWithResponse.response.statusText || 'Unknown Error';
@@ -167,8 +181,14 @@ export function handleNetworkError(
         ...context.metadata,
         retryAttempt,
         networkError: true,
-        errorCode: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
-        errorType: error && typeof error === 'object' && 'type' in error ? error.type : undefined,
+        errorCode:
+          error && typeof error === 'object' && 'code' in error
+            ? error.code
+            : undefined,
+        errorType:
+          error && typeof error === 'object' && 'type' in error
+            ? error.type
+            : undefined,
       },
     },
     error instanceof Error ? error : new Error(String(error)),
@@ -187,18 +207,15 @@ export function handleValidationError(
   field?: string,
   value?: unknown,
 ): never {
-  const validationError = new ValidationError(
-    message,
-    {
-      ...context,
-      metadata: {
-        ...context.metadata,
-        field,
-        value: typeof value === 'object' ? JSON.stringify(value) : value,
-        validationError: true,
-      },
+  const validationError = new ValidationError(message, {
+    ...context,
+    metadata: {
+      ...context.metadata,
+      field,
+      value: typeof value === 'object' ? JSON.stringify(value) : value,
+      validationError: true,
     },
-  );
+  });
 
   errorLogger.logError(validationError);
   throw validationError;
@@ -222,8 +239,14 @@ export function handleDatabaseError(
         query,
         params,
         databaseError: true,
-        errorCode: error && typeof error === 'object' && 'code' in error ? error.code : undefined,
-        errorDetail: error && typeof error === 'object' && 'detail' in error ? error.detail : undefined,
+        errorCode:
+          error && typeof error === 'object' && 'code' in error
+            ? error.code
+            : undefined,
+        errorDetail:
+          error && typeof error === 'object' && 'detail' in error
+            ? error.detail
+            : undefined,
       },
     },
     error instanceof Error ? error : new Error(String(error)),
@@ -251,7 +274,15 @@ export function handleExternalServiceError(
         serviceName,
         endpoint,
         externalServiceError: true,
-        serviceResponse: error && typeof error === 'object' && 'response' in error && error.response && typeof error.response === 'object' && 'data' in error.response ? error.response.data : undefined,
+        serviceResponse:
+          error &&
+          typeof error === 'object' &&
+          'response' in error &&
+          error.response &&
+          typeof error.response === 'object' &&
+          'data' in error.response
+            ? error.response.data
+            : undefined,
       },
     },
     error instanceof Error ? error : new Error(String(error)),
@@ -283,9 +314,11 @@ export function getErrorMessage(error: unknown): string {
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof AppError) {
     // Don't retry validation errors or authentication errors
-    if (error.category === ErrorCategory.VALIDATION ||
-        error.category === ErrorCategory.AUTHENTICATION ||
-        error.category === ErrorCategory.AUTHORIZATION) {
+    if (
+      error.category === ErrorCategory.VALIDATION ||
+      error.category === ErrorCategory.AUTHENTICATION ||
+      error.category === ErrorCategory.AUTHORIZATION
+    ) {
       return false;
     }
 
@@ -296,9 +329,11 @@ export function isRetryableError(error: unknown): boolean {
 
     if (error instanceof APIError) {
       // Retry rate limits and server errors, but not client errors
-      return error.code === 'API_RATE_LIMIT' ||
-             error.code === 'API_SERVER_ERROR' ||
-             error.code === 'API_NETWORK_ERROR';
+      return (
+        error.code === 'API_RATE_LIMIT' ||
+        error.code === 'API_SERVER_ERROR' ||
+        error.code === 'API_NETWORK_ERROR'
+      );
     }
 
     // Retry external service errors
@@ -329,7 +364,8 @@ export function createErrorResponse(error: unknown) {
   return {
     error: {
       code: 'INTERNAL_ERROR',
-      message: 'An unexpected error occurred. Please try again or contact support.',
+      message:
+        'An unexpected error occurred. Please try again or contact support.',
       correlationId: `fallback_${Date.now()}`,
       timestamp: new Date().toISOString(),
     },

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-import { MoodboardProductsService, MoodboardProduct } from '../../services/moodboard/MoodboardProductsService';
+import {
+  MoodboardProductsService,
+  MoodboardProduct,
+} from '../../services/moodboard/MoodboardProductsService';
 
 interface MoodboardProductSelectorProps {
   moodboardId: string;
@@ -8,11 +11,9 @@ interface MoodboardProductSelectorProps {
   onProductRemoved?: (productId: string) => void;
 }
 
-export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> = ({
-  moodboardId,
-  onProductAdded,
-  onProductRemoved,
-}) => {
+export const MoodboardProductSelector: React.FC<
+  MoodboardProductSelectorProps
+> = ({ moodboardId, onProductAdded, onProductRemoved }) => {
   const [products, setProducts] = useState<MoodboardProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +78,7 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
   const handleRemoveProduct = async (productId: string) => {
     try {
       await moodboardService.removeProduct(moodboardId, productId);
-      setProducts(products.filter(p => p.product_id !== productId));
+      setProducts(products.filter((p) => p.product_id !== productId));
       onProductRemoved?.(productId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove product');
@@ -99,7 +100,10 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
       )}
 
       {/* Add Product Form */}
-      <form onSubmit={handleAddProduct} className="mb-6 p-4 bg-gray-50 rounded-lg border">
+      <form
+        onSubmit={handleAddProduct}
+        className="mb-6 p-4 bg-gray-50 rounded-lg border"
+      >
         <h3 className="font-bold mb-3">Add Product</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
@@ -134,7 +138,9 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Notes (Optional)</label>
+            <label className="block text-sm font-medium mb-1">
+              Notes (Optional)
+            </label>
             <input
               type="text"
               value={notes}
@@ -156,7 +162,9 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
 
       {/* Products List */}
       <div>
-        <h3 className="font-bold mb-3">Products in Moodboard ({products.length})</h3>
+        <h3 className="font-bold mb-3">
+          Products in Moodboard ({products.length})
+        </h3>
 
         {products.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
@@ -177,7 +185,11 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
                     </p>
                   </div>
                   <button
-                    onClick={() => handleRemoveProduct(product.product_id)} onKeyDown={(e) => e.key === 'Enter' && handleRemoveProduct(product.product_id)}
+                    onClick={() => handleRemoveProduct(product.product_id)}
+                    onKeyDown={(e) =>
+                      e.key === 'Enter' &&
+                      handleRemoveProduct(product.product_id)
+                    }
                     className="text-red-600 hover:text-red-800 font-medium text-sm"
                   >
                     Remove
@@ -200,7 +212,8 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
       </div>
 
       <button
-        onClick={loadProducts} onKeyDown={(e) => e.key === 'Enter' && loadProducts()}
+        onClick={loadProducts}
+        onKeyDown={(e) => e.key === 'Enter' && loadProducts()}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >
         Refresh
@@ -210,4 +223,3 @@ export const MoodboardProductSelector: React.FC<MoodboardProductSelectorProps> =
 };
 
 export default MoodboardProductSelector;
-

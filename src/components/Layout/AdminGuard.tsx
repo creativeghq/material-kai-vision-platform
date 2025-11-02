@@ -3,7 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, ArrowLeft } from 'lucide-react';
 
 import { useUserRole } from '@/hooks/useUserRole';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 interface AdminGuardProps {
@@ -27,12 +33,19 @@ export const AdminGuard: React.FC<AdminGuardProps> = ({
               <Shield className="w-6 h-6 text-red-600" />
             </div>
             <CardTitle className="text-xl">Access Restricted</CardTitle>
-            <CardDescription>This page is only available to administrators.</CardDescription>
+            <CardDescription>
+              This page is only available to administrators.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-center text-sm text-muted-foreground">
-              <p>Your current role: <span className="font-medium capitalize">{role}</span></p>
-              <p>Required role: <span className="font-medium">Admin</span></p>
+              <p>
+                Your current role:{' '}
+                <span className="font-medium capitalize">{role}</span>
+              </p>
+              <p>
+                Required role: <span className="font-medium">Admin</span>
+              </p>
             </div>
             <Button
               onClick={() => navigate(fallbackPath)}

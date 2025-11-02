@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Home,
-  Palette,
-  Settings,
-  Box,
-  Search,
-} from 'lucide-react';
+import { Home, Palette, Settings, Box, Search } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';

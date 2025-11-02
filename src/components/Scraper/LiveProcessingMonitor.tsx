@@ -24,7 +24,9 @@ interface ProcessingStats {
   }>;
 }
 
-export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ sessionId }) => {
+export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({
+  sessionId,
+}) => {
   const [stats, setStats] = useState<ProcessingStats>({
     currentPageUrl: null,
     pagesPerMinute: 0,
@@ -69,33 +71,40 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
       const now = new Date();
       const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
 
-      const recentCompletions = pages.filter((page: any) =>
-        page.completed_at && new Date(page.completed_at) > last5Minutes,
+      const recentCompletions = pages.filter(
+        (page: any) =>
+          page.completed_at && new Date(page.completed_at) > last5Minutes,
       );
 
       const pagesPerMinute = recentCompletions.length;
-      const completedPages = pages.filter((page: any) => page.status === 'completed');
-      const avgProcessingTime = completedPages.length > 0
-        ? completedPages.reduce((sum: any, page: any) => {
-            if (page.completed_at && page.started_at) {
-              const processingTime = new Date(page.completed_at).getTime() - new Date(page.started_at).getTime();
-              return sum + processingTime;
-            }
-            return sum;
-          }, 0) / completedPages.length
-        : 0;
+      const completedPages = pages.filter(
+        (page: any) => page.status === 'completed',
+      );
+      const avgProcessingTime =
+        completedPages.length > 0
+          ? completedPages.reduce((sum: any, page: any) => {
+              if (page.completed_at && page.started_at) {
+                const processingTime =
+                  new Date(page.completed_at).getTime() -
+                  new Date(page.started_at).getTime();
+                return sum + processingTime;
+              }
+              return sum;
+            }, 0) / completedPages.length
+          : 0;
 
       // Estimate time remaining
       let estimatedTimeRemaining = 'Calculating...';
       if (session) {
-        const remainingPages = (session.total_pages || 0) - (session.completed_pages || 0);
-        const estimatedMinutes = pagesPerMinute > 0
-          ? Math.ceil(remainingPages / pagesPerMinute)
-          : 0;
+        const remainingPages =
+          (session.total_pages || 0) - (session.completed_pages || 0);
+        const estimatedMinutes =
+          pagesPerMinute > 0 ? Math.ceil(remainingPages / pagesPerMinute) : 0;
 
-        estimatedTimeRemaining = estimatedMinutes > 0
-          ? `~${estimatedMinutes} minutes`
-          : 'Calculating...';
+        estimatedTimeRemaining =
+          estimatedMinutes > 0
+            ? `~${estimatedMinutes} minutes`
+            : 'Calculating...';
       }
 
       // Format recent activity
@@ -103,9 +112,11 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         url: page.url || 'Unknown URL',
         status: page.status || 'unknown',
         materialsFound: page.materials_found || 0,
-        processingTime: page.completed_at && page.started_at
-          ? new Date(page.completed_at).getTime() - new Date(page.started_at).getTime()
-          : 0,
+        processingTime:
+          page.completed_at && page.started_at
+            ? new Date(page.completed_at).getTime() -
+              new Date(page.started_at).getTime()
+            : 0,
         timestamp: page.completed_at || page.created_at || '',
       }));
 
@@ -116,7 +127,6 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
         estimatedTimeRemaining,
         recentActivity,
       });
-
     } catch (error) {
       console.error('Error loading processing stats:', error);
       // Set fallback stats on error
@@ -230,7 +240,9 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
               <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
               <span className="font-semibold">Currently Processing:</span>
             </div>
-            <p className="text-sm text-blue-600 truncate">{stats.currentPageUrl}</p>
+            <p className="text-sm text-blue-600 truncate">
+              {stats.currentPageUrl}
+            </p>
           </div>
         )}
 
@@ -248,11 +260,16 @@ export const LiveProcessingMonitor: React.FC<LiveProcessingMonitorProps> = ({ se
           ) : (
             <div className="space-y-2">
               {stats.recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center justify-between p-2 bg-white rounded border">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-2 bg-white rounded border"
+                >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">{activity.url}</p>
                     <p className="text-xs text-gray-500">
-                      {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(activity.timestamp), {
+                        addSuffix: true,
+                      })}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

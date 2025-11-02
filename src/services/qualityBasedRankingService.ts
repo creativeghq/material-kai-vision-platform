@@ -15,10 +15,10 @@ import { SearchResult } from '@/components/Search/SearchResultCard';
 import Anthropic from '@anthropic-ai/sdk';
 
 export interface RankingWeights {
-  relevance: number;      // Weight for relevance score (default: 0.4)
-  quality: number;        // Weight for quality metrics (default: 0.3)
-  semantic: number;       // Weight for semantic score (default: 0.2)
-  recency: number;        // Weight for recency (default: 0.1)
+  relevance: number; // Weight for relevance score (default: 0.4)
+  quality: number; // Weight for quality metrics (default: 0.3)
+  semantic: number; // Weight for semantic score (default: 0.2)
+  recency: number; // Weight for recency (default: 0.1)
 }
 
 const DEFAULT_WEIGHTS: RankingWeights = {
@@ -66,7 +66,7 @@ function calculateQualityScore(result: SearchResult): number {
   // MRR: 20% weight (normalized to 0-1 range)
   const normalizedMRR = Math.min(mrr / 1.0, 1.0); // MRR typically 0-1
 
-  return (precision * 0.5) + (recall * 0.3) + (normalizedMRR * 0.2);
+  return precision * 0.5 + recall * 0.3 + normalizedMRR * 0.2;
 }
 
 /**
@@ -80,7 +80,7 @@ function calculateRecencyScore(createdAt: string): number {
   // Decay function: newer documents score higher
   // After 30 days, score is 0.5
   // After 90 days, score is 0.1
-  return Math.max(0.1, 1 - (ageInDays / 90));
+  return Math.max(0.1, 1 - ageInDays / 90);
 }
 
 /**
@@ -96,7 +96,8 @@ function calculateRankingScore(
   const recencyScore = calculateRecencyScore(result.createdAt);
 
   // Normalize weights to sum to 1
-  const totalWeight = weights.relevance + weights.quality + weights.semantic + weights.recency;
+  const totalWeight =
+    weights.relevance + weights.quality + weights.semantic + weights.recency;
   const normalizedWeights = {
     relevance: weights.relevance / totalWeight,
     quality: weights.quality / totalWeight,
@@ -106,10 +107,10 @@ function calculateRankingScore(
 
   // Calculate weighted score
   const combinedScore =
-    (relevanceScore * normalizedWeights.relevance) +
-    (qualityScore * normalizedWeights.quality) +
-    (semanticScore * normalizedWeights.semantic) +
-    (recencyScore * normalizedWeights.recency);
+    relevanceScore * normalizedWeights.relevance +
+    qualityScore * normalizedWeights.quality +
+    semanticScore * normalizedWeights.semantic +
+    recencyScore * normalizedWeights.recency;
 
   return combinedScore;
 }
@@ -122,7 +123,7 @@ export function rankResultsByQuality(
   weights?: RankingWeights,
 ): SearchResult[] {
   // Calculate ranking score for each result
-  const scoredResults = results.map(result => ({
+  const scoredResults = results.map((result) => ({
     result,
     rankingScore: calculateRankingScore(result, weights),
   }));
@@ -148,7 +149,7 @@ export function applyQualityBasedRanking(
   }
 
   // Check if any results have quality metrics
-  const hasQualityMetrics = results.some(r => r.qualityMetrics);
+  const hasQualityMetrics = results.some((r) => r.qualityMetrics);
 
   if (!hasQualityMetrics) {
     // No quality metrics available, use relevance-based ranking
@@ -202,7 +203,9 @@ Quality Metrics:
  *
  * Cost: ~$3/1M tokens (Claude Sonnet)
  */
-export async function aiReRanking(request: AIReRankingRequest): Promise<AIReRankingResponse> {
+export async function aiReRanking(
+  request: AIReRankingRequest,
+): Promise<AIReRankingResponse> {
   const startTime = Date.now();
   const model = request.model || 'claude-sonnet-4-5';
 
@@ -237,7 +240,7 @@ Task:
 1. Re-rank these results based on semantic relevance to the query
 2. Consider: query intent, semantic similarity, context, and quality metrics
 3. Return a JSON array of result indices in order of relevance (most relevant first)
-${request.includeExplanations ? '4. Provide a brief explanation for each result\'s ranking' : ''}
+${request.includeExplanations ? "4. Provide a brief explanation for each result's ranking" : ''}
 
 Response format:
 {
@@ -247,13 +250,18 @@ Response format:
 
     // Call Claude Sonnet
     const response = await anthropic.messages.create({
-      model: model === 'claude-sonnet-4-5' ? 'claude-sonnet-4-20250514' : 'claude-4-5-haiku-20250514',
+      model:
+        model === 'claude-sonnet-4-5'
+          ? 'claude-sonnet-4-20250514'
+          : 'claude-4-5-haiku-20250514',
       max_tokens: 4096,
       temperature: 0.1,
-      messages: [{
-        role: 'user',
-        content: prompt,
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
     });
 
     // Parse response
@@ -264,13 +272,15 @@ Response format:
 
     const aiResponse = JSON.parse(content.text);
     const rankedIndices = aiResponse.rankedIndices as number[];
-    const explanations = aiResponse.explanations as Record<string, string> | undefined;
+    const explanations = aiResponse.explanations as
+      | Record<string, string>
+      | undefined;
 
     // Re-order results based on AI ranking
     const maxResults = request.maxResults || request.results.length;
     const rerankedResults = rankedIndices
       .slice(0, maxResults)
-      .map(index => request.results[index])
+      .map((index) => request.results[index])
       .filter(Boolean);
 
     // Calculate cost (approximate)
@@ -286,13 +296,15 @@ Response format:
       model,
       cost,
     };
-
   } catch (error) {
     console.error('AI re-ranking failed:', error);
 
     // Fallback to quality-based ranking
     return {
-      rerankedResults: rankResultsByQuality(request.results).slice(0, request.maxResults || request.results.length),
+      rerankedResults: rankResultsByQuality(request.results).slice(
+        0,
+        request.maxResults || request.results.length,
+      ),
       processingTimeMs: Date.now() - startTime,
       model: 'fallback-quality-based',
       cost: 0,
@@ -367,4 +379,3 @@ export default {
   aiReRanking,
   hybridReRanking,
 };
-

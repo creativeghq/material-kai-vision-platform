@@ -61,9 +61,13 @@ export interface Generation3DRecord {
 
 export class MaterialAgent3DGenerationAPI {
   // Generate 3D interior design using Material Agent Orchestrator
-  static async generate3D(request: Generation3DRequest): Promise<Generation3DResult> {
+  static async generate3D(
+    request: Generation3DRequest,
+  ): Promise<Generation3DResult> {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -76,21 +80,26 @@ export class MaterialAgent3DGenerationAPI {
         specific_materials: request.specific_materials,
       });
 
-      const { data, error } = await supabase.functions.invoke('crewai-3d-generation', {
-        body: {
-          user_id: user.id,
-          prompt: request.prompt,
-          room_type: request.room_type,
-          style: request.style,
-          specific_materials: request.specific_materials,
+      const { data, error } = await supabase.functions.invoke(
+        'crewai-3d-generation',
+        {
+          body: {
+            user_id: user.id,
+            prompt: request.prompt,
+            room_type: request.room_type,
+            style: request.style,
+            specific_materials: request.specific_materials,
+          },
         },
-      });
+      );
 
       console.log('Edge function response:', { data, error });
 
       if (error) {
         console.error('Supabase functions error:', error);
-        throw new Error(`Failed to send a request to the Edge Function: ${error.message}`);
+        throw new Error(
+          `Failed to send a request to the Edge Function: ${error.message}`,
+        );
       }
 
       // Check if the response indicates an error
@@ -151,7 +160,9 @@ export class MaterialAgent3DGenerationAPI {
   // Get analytics for 3D generations
   static async getGenerationAnalytics(_timeRange = '30 days') {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -161,7 +172,10 @@ export class MaterialAgent3DGenerationAPI {
         .select('event_data, created_at')
         .eq('user_id', user.id)
         .eq('event_type', '3d_generation_completed')
-        .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .gte(
+          'created_at',
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        )
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -187,19 +201,20 @@ export class MaterialAgent3DGenerationAPI {
 
         // Processing time
         if (eventData.processing_time_ms) {
-          totalProcessingTime += (eventData.processing_time_ms as number);
+          totalProcessingTime += eventData.processing_time_ms as number;
         }
 
         // Quality score
         if (eventData.quality_score) {
-          totalQualityScore += (eventData.quality_score as number);
+          totalQualityScore += eventData.quality_score as number;
           qualityCount++;
         }
 
         // Room types
         if (eventData.room_type) {
           analytics.popular_room_types[eventData.room_type as string] =
-            (analytics.popular_room_types[eventData.room_type as string] || 0) + 1;
+            (analytics.popular_room_types[eventData.room_type as string] || 0) +
+            1;
         }
 
         // Styles
@@ -209,10 +224,12 @@ export class MaterialAgent3DGenerationAPI {
         }
       });
 
-      analytics.avg_processing_time = analytics.total_generations > 0 ?
-        totalProcessingTime / analytics.total_generations : 0;
-      analytics.avg_quality_score = qualityCount > 0 ?
-        totalQualityScore / qualityCount : 0;
+      analytics.avg_processing_time =
+        analytics.total_generations > 0
+          ? totalProcessingTime / analytics.total_generations
+          : 0;
+      analytics.avg_quality_score =
+        qualityCount > 0 ? totalQualityScore / qualityCount : 0;
 
       return analytics;
     } catch (error) {
@@ -222,7 +239,11 @@ export class MaterialAgent3DGenerationAPI {
   }
 
   // Search generations by criteria
-  static async searchGenerations(query: string, roomType?: string, style?: string) {
+  static async searchGenerations(
+    query: string,
+    roomType?: string,
+    style?: string,
+  ) {
     try {
       let queryBuilder = supabase
         .from('generation_3d')
@@ -230,7 +251,9 @@ export class MaterialAgent3DGenerationAPI {
         .order('created_at', { ascending: false });
 
       if (query) {
-        queryBuilder = queryBuilder.or(`prompt.ilike.%${query}%,materials_used.cs.{${query}}`);
+        queryBuilder = queryBuilder.or(
+          `prompt.ilike.%${query}%,materials_used.cs.{${query}}`,
+        );
       }
 
       if (roomType) {

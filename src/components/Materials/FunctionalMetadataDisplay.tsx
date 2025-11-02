@@ -13,9 +13,7 @@ import {
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  FunctionalMetadata,
-} from '@/types/materials';
+import { FunctionalMetadata } from '@/types/materials';
 
 interface FunctionalMetadataDisplayProps {
   /** Functional metadata to display */
@@ -30,11 +28,9 @@ interface FunctionalMetadataDisplayProps {
  * Component for displaying comprehensive functional metadata for materials
  * Organized by the 9 functional metadata categories
  */
-export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps> = ({
-  functionalMetadata,
-  compact = false,
-  onCategoryClick,
-}) => {
+export const FunctionalMetadataDisplay: React.FC<
+  FunctionalMetadataDisplayProps
+> = ({ functionalMetadata, compact = false, onCategoryClick }) => {
   // Helper function to render safety ratings
   const renderSlipSafetyRatings = (data: unknown) => (
     <div className="space-y-2">
@@ -47,13 +43,17 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {(data as any).barefootRampTest && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Barefoot Test:</span>
-          <Badge variant="outline">Class {(data as any).barefootRampTest}</Badge>
+          <Badge variant="outline">
+            Class {(data as any).barefootRampTest}
+          </Badge>
         </div>
       )}
       {(data as any).dcof && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">DCOF:</span>
-          <span className="text-sm font-medium">{(data as any).dcof.toFixed(2)}</span>
+          <span className="text-sm font-medium">
+            {(data as any).dcof.toFixed(2)}
+          </span>
         </div>
       )}
       {(data as any).pendulumTestValue && (
@@ -62,13 +62,17 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           {(data as any).pendulumTestValue.wet && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Wet:</span>
-              <span className="text-xs">{(data as any).pendulumTestValue.wet}</span>
+              <span className="text-xs">
+                {(data as any).pendulumTestValue.wet}
+              </span>
             </div>
           )}
           {(data as any).pendulumTestValue.dry && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Dry:</span>
-              <span className="text-xs">{(data as any).pendulumTestValue.dry}</span>
+              <span className="text-xs">
+                {(data as any).pendulumTestValue.dry}
+              </span>
             </div>
           )}
         </div>
@@ -88,13 +92,19 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {(data as any).glossValue !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Gloss Value:</span>
-          <span className="text-sm font-medium">{(data as any).glossValue}%</span>
+          <span className="text-sm font-medium">
+            {(data as any).glossValue}%
+          </span>
         </div>
       )}
       {(data as any).lightReflectance !== undefined && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Light Reflectance:</span>
-          <span className="text-sm font-medium">{(data as any).lightReflectance}%</span>
+          <span className="text-sm text-muted-foreground">
+            Light Reflectance:
+          </span>
+          <span className="text-sm font-medium">
+            {(data as any).lightReflectance}%
+          </span>
         </div>
       )}
     </div>
@@ -117,14 +127,22 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       )}
       {(data as any).breakingStrength && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Breaking Strength:</span>
-          <span className="text-sm font-medium">{(data as any).breakingStrength} N/mm²</span>
+          <span className="text-sm text-muted-foreground">
+            Breaking Strength:
+          </span>
+          <span className="text-sm font-medium">
+            {(data as any).breakingStrength} N/mm²
+          </span>
         </div>
       )}
       {(data as any).impactResistance && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Impact Resistance:</span>
-          <Badge variant="secondary">{(data as any).impactResistance.classification}</Badge>
+          <span className="text-sm text-muted-foreground">
+            Impact Resistance:
+          </span>
+          <Badge variant="secondary">
+            {(data as any).impactResistance.classification}
+          </Badge>
         </div>
       )}
     </div>
@@ -135,30 +153,51 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
     <div className="space-y-2">
       {(data as any).thermalConductivity && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Thermal Conductivity:</span>
-          <span className="text-sm font-medium">{(data as any).thermalConductivity} W/m·K</span>
+          <span className="text-sm text-muted-foreground">
+            Thermal Conductivity:
+          </span>
+          <span className="text-sm font-medium">
+            {(data as any).thermalConductivity} W/m·K
+          </span>
         </div>
       )}
       {(data as any).heatResistance && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Heat Resistance:</span>
-          <span className="text-sm font-medium">{(data as any).heatResistance}°C</span>
+          <span className="text-sm text-muted-foreground">
+            Heat Resistance:
+          </span>
+          <span className="text-sm font-medium">
+            {(data as any).heatResistance}°C
+          </span>
         </div>
       )}
       {(data as any).radiantHeatingCompatible !== undefined && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Radiant Heating:</span>
-          <Badge variant={(data as any).radiantHeatingCompatible ? 'default' : 'secondary'}>
-            {(data as any).radiantHeatingCompatible ? 'Compatible' : 'Not Compatible'}
+          <span className="text-sm text-muted-foreground">
+            Radiant Heating:
+          </span>
+          <Badge
+            variant={
+              (data as any).radiantHeatingCompatible ? 'default' : 'secondary'
+            }
+          >
+            {(data as any).radiantHeatingCompatible
+              ? 'Compatible'
+              : 'Not Compatible'}
           </Badge>
         </div>
       )}
-      {(data as any).coolRoofRating && (data as any).coolRoofRating.sriValue && (
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Cool Roof SRI:</span>
-          <span className="text-sm font-medium">{(data as any).coolRoofRating.sriValue}</span>
-        </div>
-      )}
+      {(data as any).coolRoofRating &&
+        (data as any).coolRoofRating.sriValue && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">
+              Cool Roof SRI:
+            </span>
+            <span className="text-sm font-medium">
+              {(data as any).coolRoofRating.sriValue}
+            </span>
+          </div>
+        )}
     </div>
   );
 
@@ -168,29 +207,45 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {(data as any).waterAbsorption && (
         <div className="space-y-1">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Water Absorption:</span>
-            <Badge variant="outline">{(data as any).waterAbsorption.classification}</Badge>
+            <span className="text-sm text-muted-foreground">
+              Water Absorption:
+            </span>
+            <Badge variant="outline">
+              {(data as any).waterAbsorption.classification}
+            </Badge>
           </div>
           {(data as any).waterAbsorption.percentage !== undefined && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Percentage:</span>
-              <span className="text-xs">{(data as any).waterAbsorption.percentage}%</span>
+              <span className="text-xs">
+                {(data as any).waterAbsorption.percentage}%
+              </span>
             </div>
           )}
         </div>
       )}
       {(data as any).frostResistance !== undefined && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Frost Resistance:</span>
-          <Badge variant={(data as any).frostResistance ? 'default' : 'secondary'}>
+          <span className="text-sm text-muted-foreground">
+            Frost Resistance:
+          </span>
+          <Badge
+            variant={(data as any).frostResistance ? 'default' : 'secondary'}
+          >
             {(data as any).frostResistance ? 'Yes' : 'No'}
           </Badge>
         </div>
       )}
       {(data as any).moldMildewResistant !== undefined && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Mold/Mildew Resistant:</span>
-          <Badge variant={(data as any).moldMildewResistant ? 'default' : 'secondary'}>
+          <span className="text-sm text-muted-foreground">
+            Mold/Mildew Resistant:
+          </span>
+          <Badge
+            variant={
+              (data as any).moldMildewResistant ? 'default' : 'secondary'
+            }
+          >
             {(data as any).moldMildewResistant ? 'Yes' : 'No'}
           </Badge>
         </div>
@@ -203,25 +258,35 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
     <div className="space-y-2">
       {(data as any).chemicalResistance && (
         <div className="space-y-1">
-          <span className="text-sm text-muted-foreground">Chemical Resistance:</span>
+          <span className="text-sm text-muted-foreground">
+            Chemical Resistance:
+          </span>
           {(data as any).chemicalResistance.acidResistance && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Acid:</span>
-              <Badge variant="outline">{(data as any).chemicalResistance.acidResistance}</Badge>
+              <Badge variant="outline">
+                {(data as any).chemicalResistance.acidResistance}
+              </Badge>
             </div>
           )}
           {(data as any).chemicalResistance.alkaliResistance && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Alkali:</span>
-              <Badge variant="outline">{(data as any).chemicalResistance.alkaliResistance}</Badge>
+              <Badge variant="outline">
+                {(data as any).chemicalResistance.alkaliResistance}
+              </Badge>
             </div>
           )}
         </div>
       )}
       {(data as any).stainResistance && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Stain Resistance:</span>
-          <Badge variant="outline">Class {(data as any).stainResistance.class}</Badge>
+          <span className="text-sm text-muted-foreground">
+            Stain Resistance:
+          </span>
+          <Badge variant="outline">
+            Class {(data as any).stainResistance.class}
+          </Badge>
         </div>
       )}
       {(data as any).antimicrobialProperties?.antimicrobialTreatment && (
@@ -233,7 +298,9 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {(data as any).foodSafeCertified !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Food Safe:</span>
-          <Badge variant={(data as any).foodSafeCertified ? 'default' : 'secondary'}>
+          <Badge
+            variant={(data as any).foodSafeCertified ? 'default' : 'secondary'}
+          >
             {(data as any).foodSafeCertified ? 'Certified' : 'Not Certified'}
           </Badge>
         </div>
@@ -250,13 +317,19 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           {(data as any).acousticProperties.nrc && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">NRC:</span>
-              <span className="text-xs">{(data as any).acousticProperties.nrc}</span>
+              <span className="text-xs">
+                {(data as any).acousticProperties.nrc}
+              </span>
             </div>
           )}
           {(data as any).acousticProperties.decibelReduction && (
             <div className="flex items-center justify-between ml-2">
-              <span className="text-xs text-muted-foreground">dB Reduction:</span>
-              <span className="text-xs">{(data as any).acousticProperties.decibelReduction} dB</span>
+              <span className="text-xs text-muted-foreground">
+                dB Reduction:
+              </span>
+              <span className="text-xs">
+                {(data as any).acousticProperties.decibelReduction} dB
+              </span>
             </div>
           )}
         </div>
@@ -264,7 +337,9 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {(data as any).impactInsulationClass && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">IIC:</span>
-          <span className="text-sm font-medium">{(data as any).impactInsulationClass}</span>
+          <span className="text-sm font-medium">
+            {(data as any).impactInsulationClass}
+          </span>
         </div>
       )}
       {(data as any).electricalProperties && (
@@ -272,8 +347,16 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           <span className="text-sm text-muted-foreground">Electrical:</span>
           {(data as any).electricalProperties.antiStatic !== undefined && (
             <div className="flex items-center justify-between ml-2">
-              <span className="text-xs text-muted-foreground">Anti-static:</span>
-              <Badge variant={(data as any).electricalProperties.antiStatic ? 'default' : 'secondary'}>
+              <span className="text-xs text-muted-foreground">
+                Anti-static:
+              </span>
+              <Badge
+                variant={
+                  (data as any).electricalProperties.antiStatic
+                    ? 'default'
+                    : 'secondary'
+                }
+              >
                 {(data as any).electricalProperties.antiStatic ? 'Yes' : 'No'}
               </Badge>
             </div>
@@ -281,7 +364,13 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
           {(data as any).electricalProperties.conductive !== undefined && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">Conductive:</span>
-              <Badge variant={(data as any).electricalProperties.conductive ? 'default' : 'secondary'}>
+              <Badge
+                variant={
+                  (data as any).electricalProperties.conductive
+                    ? 'default'
+                    : 'secondary'
+                }
+              >
                 {(data as any).electricalProperties.conductive ? 'Yes' : 'No'}
               </Badge>
             </div>
@@ -297,12 +386,17 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       {(data as any).vocEmissionRating && (
         <div className="space-y-1">
           <span className="text-sm text-muted-foreground">VOC Emissions:</span>
-          {(data as any).vocEmissionRating.greenguard && (data as any).vocEmissionRating.greenguard !== 'none' && (
-            <div className="flex items-center justify-between ml-2">
-              <span className="text-xs text-muted-foreground">Greenguard:</span>
-              <Badge variant="default">{(data as any).vocEmissionRating.greenguard}</Badge>
-            </div>
-          )}
+          {(data as any).vocEmissionRating.greenguard &&
+            (data as any).vocEmissionRating.greenguard !== 'none' && (
+              <div className="flex items-center justify-between ml-2">
+                <span className="text-xs text-muted-foreground">
+                  Greenguard:
+                </span>
+                <Badge variant="default">
+                  {(data as any).vocEmissionRating.greenguard}
+                </Badge>
+              </div>
+            )}
           {(data as any).vocEmissionRating.floorScore && (
             <div className="flex items-center justify-between ml-2">
               <span className="text-xs text-muted-foreground">FloorScore:</span>
@@ -313,22 +407,34 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
       )}
       {(data as any).recycledContent && (data as any).recycledContent.total && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Recycled Content:</span>
-          <span className="text-sm font-medium">{(data as any).recycledContent.total}%</span>
+          <span className="text-sm text-muted-foreground">
+            Recycled Content:
+          </span>
+          <span className="text-sm font-medium">
+            {(data as any).recycledContent.total}%
+          </span>
         </div>
       )}
       {(data as any).ecoLabels && (
         <div className="space-y-1">
           {(data as any).ecoLabels.leedCredits && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">LEED Credits:</span>
-              <Badge variant="default">{(data as any).ecoLabels.leedCredits}</Badge>
+              <span className="text-sm text-muted-foreground">
+                LEED Credits:
+              </span>
+              <Badge variant="default">
+                {(data as any).ecoLabels.leedCredits}
+              </Badge>
             </div>
           )}
           {(data as any).ecoLabels.breeamCredits && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">BREEAM Credits:</span>
-              <Badge variant="default">{(data as any).ecoLabels.breeamCredits}</Badge>
+              <span className="text-sm text-muted-foreground">
+                BREEAM Credits:
+              </span>
+              <Badge variant="default">
+                {(data as any).ecoLabels.breeamCredits}
+              </Badge>
             </div>
           )}
         </div>
@@ -341,28 +447,48 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
     <div className="space-y-2">
       {(data as any).edgeProperties?.rectifiedEdges !== undefined && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Rectified Edges:</span>
-          <Badge variant={(data as any).edgeProperties.rectifiedEdges ? 'default' : 'secondary'}>
+          <span className="text-sm text-muted-foreground">
+            Rectified Edges:
+          </span>
+          <Badge
+            variant={
+              (data as any).edgeProperties.rectifiedEdges
+                ? 'default'
+                : 'secondary'
+            }
+          >
             {(data as any).edgeProperties.rectifiedEdges ? 'Yes' : 'No'}
           </Badge>
         </div>
       )}
       {(data as any).colorProperties?.shadeVariation && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Shade Variation:</span>
-          <Badge variant="outline">{(data as any).colorProperties.shadeVariation}</Badge>
+          <span className="text-sm text-muted-foreground">
+            Shade Variation:
+          </span>
+          <Badge variant="outline">
+            {(data as any).colorProperties.shadeVariation}
+          </Badge>
         </div>
       )}
       {(data as any).textureProperties?.textureRating && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Texture Rating:</span>
-          <span className="text-sm font-medium">{(data as any).textureProperties.textureRating}/10</span>
+          <span className="text-sm font-medium">
+            {(data as any).textureProperties.textureRating}/10
+          </span>
         </div>
       )}
       {(data as any).specialProperties?.translucent !== undefined && (
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Translucent:</span>
-          <Badge variant={(data as any).specialProperties.translucent ? 'default' : 'secondary'}>
+          <Badge
+            variant={
+              (data as any).specialProperties.translucent
+                ? 'default'
+                : 'secondary'
+            }
+          >
             {(data as any).specialProperties.translucent ? 'Yes' : 'No'}
           </Badge>
         </div>
@@ -447,7 +573,7 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
   ];
 
   // Filter out categories without data
-  const categoriesWithData = categories.filter(category => category.data);
+  const categoriesWithData = categories.filter((category) => category.data);
 
   if (categoriesWithData.length === 0) {
     return (
@@ -495,7 +621,8 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
         <h3 className="text-lg font-semibold">Functional Properties</h3>
         {functionalMetadata.functionalMetadataSource && (
           <Badge variant="outline">
-            Source: {functionalMetadata.functionalMetadataSource.replace('_', ' ')}
+            Source:{' '}
+            {functionalMetadata.functionalMetadataSource.replace('_', ' ')}
           </Badge>
         )}
       </div>
@@ -532,7 +659,10 @@ export const FunctionalMetadataDisplay: React.FC<FunctionalMetadataDisplayProps>
 
       {functionalMetadata.functionalMetadataUpdatedAt && (
         <p className="text-xs text-muted-foreground text-center">
-          Last updated: {new Date(functionalMetadata.functionalMetadataUpdatedAt).toLocaleDateString()}
+          Last updated:{' '}
+          {new Date(
+            functionalMetadata.functionalMetadataUpdatedAt,
+          ).toLocaleDateString()}
         </p>
       )}
     </div>

@@ -41,7 +41,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { QualityControlService, HumanReviewTask, QualityAssessment } from '@/services/qualityControlService';
+import {
+  QualityControlService,
+  HumanReviewTask,
+  QualityAssessment,
+} from '@/services/qualityControlService';
 
 interface HumanReviewPanelProps {
   workspaceId?: string;
@@ -53,7 +57,9 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
   refreshInterval = 30000, // 30 seconds
 }) => {
   const [reviewTasks, setReviewTasks] = useState<HumanReviewTask[]>([]);
-  const [selectedTask, setSelectedTask] = useState<HumanReviewTask | null>(null);
+  const [selectedTask, setSelectedTask] = useState<HumanReviewTask | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [reviewNotes, setReviewNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -76,21 +82,25 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
       setReviewTasks(tasks);
 
       // Calculate stats
-      const pending = tasks.filter(t => t.status === 'pending').length;
-      const completedTasks = tasks.filter(t => t.status === 'completed');
-      const escalated = tasks.filter(t => t.status === 'escalated').length;
+      const pending = tasks.filter((t) => t.status === 'pending').length;
+      const completedTasks = tasks.filter((t) => t.status === 'completed');
+      const escalated = tasks.filter((t) => t.status === 'escalated').length;
 
       // Calculate average completion time from completed tasks
-      const avgCompletionTime = completedTasks.length > 0
-        ? completedTasks.reduce((sum, task) => {
-            if (task.completed_at && task.created_at) {
-              const completedAt = new Date(task.completed_at).getTime();
-              const createdAt = new Date(task.created_at).getTime();
-              return sum + (completedAt - createdAt);
-            }
-            return sum;
-          }, 0) / completedTasks.length / 1000 / 60 // Convert to minutes
-        : 0;
+      const avgCompletionTime =
+        completedTasks.length > 0
+          ? completedTasks.reduce((sum, task) => {
+              if (task.completed_at && task.created_at) {
+                const completedAt = new Date(task.completed_at).getTime();
+                const createdAt = new Date(task.created_at).getTime();
+                return sum + (completedAt - createdAt);
+              }
+              return sum;
+            }, 0) /
+            completedTasks.length /
+            1000 /
+            60 // Convert to minutes
+          : 0;
 
       setStats({
         pending,
@@ -98,7 +108,6 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
         escalated,
         avgCompletionTime: Math.round(avgCompletionTime),
       });
-
     } catch (error) {
       console.error('Failed to load review tasks:', error);
       toast({
@@ -121,7 +130,9 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
       setSubmitting(true);
 
       // Get current user ID from Supabase auth
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: 'Authentication Error',
@@ -148,7 +159,6 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
       await loadReviewTasks();
       setSelectedTask(null);
       setReviewNotes('');
-
     } catch (error) {
       console.error('Failed to complete review:', error);
       toast({
@@ -165,10 +175,12 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case 'urgent':
-        return <Badge variant="destructive" className="flex items-center gap-1">
-          <ArrowUp className="h-3 w-3" />
-          Urgent
-        </Badge>;
+        return (
+          <Badge variant="destructive" className="flex items-center gap-1">
+            <ArrowUp className="h-3 w-3" />
+            Urgent
+          </Badge>
+        );
       case 'high':
         return <Badge variant="destructive">High</Badge>;
       case 'medium':
@@ -240,9 +252,12 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <Clock className="h-4 w-4" />
               Pending
             </CardTitle>
-          </CardHeader><CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">{stats.pending}</div>
-            <p className="text-xs text-muted-foreground">Tasks awaiting review</p>
+            <p className="text-xs text-muted-foreground">
+              Tasks awaiting review
+            </p>
           </CardContent>
         </Card>
 
@@ -252,9 +267,12 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <CheckCircle className="h-4 w-4" />
               Completed
             </CardTitle>
-          </CardHeader><CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">{stats.completed}</div>
-            <p className="text-xs text-muted-foreground">Tasks completed today</p>
+            <p className="text-xs text-muted-foreground">
+              Tasks completed today
+            </p>
           </CardContent>
         </Card>
 
@@ -264,9 +282,12 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <AlertTriangle className="h-4 w-4" />
               Escalated
             </CardTitle>
-          </CardHeader><CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">{stats.escalated}</div>
-            <p className="text-xs text-muted-foreground">Tasks requiring attention</p>
+            <p className="text-xs text-muted-foreground">
+              Tasks requiring attention
+            </p>
           </CardContent>
         </Card>
 
@@ -276,9 +297,12 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
               <User className="h-4 w-4" />
               Avg Time
             </CardTitle>
-          </CardHeader><CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="text-2xl font-bold">{stats.avgCompletionTime}m</div>
-            <p className="text-xs text-muted-foreground">Average completion time</p>
+            <p className="text-xs text-muted-foreground">
+              Average completion time
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -287,7 +311,8 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
       <Card>
         <CardHeader>
           <CardTitle>Review Tasks</CardTitle>
-        </CardHeader><CardContent>
+        </CardHeader>
+        <CardContent>
           {loading ? (
             <div className="text-center py-8">Loading review tasks...</div>
           ) : reviewTasks.length === 0 ? (
@@ -321,12 +346,15 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                     <TableCell>
                       <Badge variant="outline">{task.reviewType}</Badge>
                     </TableCell>
+                    <TableCell>{getPriorityBadge(task.priority)}</TableCell>
                     <TableCell>
-                      {getPriorityBadge(task.priority)}
-                    </TableCell>
-                    <TableCell>
-                      <span className={getQualityScoreColor(task.qualityAssessment.overallScore)}>
-                        {(task.qualityAssessment.overallScore * 100).toFixed(1)}%
+                      <span
+                        className={getQualityScoreColor(
+                          task.qualityAssessment.overallScore,
+                        )}
+                      >
+                        {(task.qualityAssessment.overallScore * 100).toFixed(1)}
+                        %
                       </span>
                     </TableCell>
                     <TableCell>
@@ -354,7 +382,8 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                             <Eye className="h-4 w-4 mr-1" />
                             Review
                           </Button>
-                        </DialogTrigger><DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
                             <DialogTitle>
                               Review {task.entityType} - {task.reviewType}
@@ -365,18 +394,33 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                             <div className="space-y-6">
                               {/* Quality Assessment */}
                               <div>
-                                <h3 className="font-semibold mb-2">Quality Assessment</h3>
+                                <h3 className="font-semibold mb-2">
+                                  Quality Assessment
+                                </h3>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div>
-                                    <p className="text-sm text-muted-foreground">Overall Score</p>
-                                    <p className={`text-lg font-bold ${getQualityScoreColor(selectedTask.qualityAssessment.overallScore)}`}>
-                                      {(selectedTask.qualityAssessment.overallScore * 100).toFixed(1)}%
+                                    <p className="text-sm text-muted-foreground">
+                                      Overall Score
+                                    </p>
+                                    <p
+                                      className={`text-lg font-bold ${getQualityScoreColor(selectedTask.qualityAssessment.overallScore)}`}
+                                    >
+                                      {(
+                                        selectedTask.qualityAssessment
+                                          .overallScore * 100
+                                      ).toFixed(1)}
+                                      %
                                     </p>
                                   </div>
                                   <div>
-                                    <p className="text-sm text-muted-foreground">Passes Thresholds</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Passes Thresholds
+                                    </p>
                                     <p className="text-lg font-bold">
-                                      {selectedTask.qualityAssessment.passesThresholds ? '✅ Yes' : '❌ No'}
+                                      {selectedTask.qualityAssessment
+                                        .passesThresholds
+                                        ? '✅ Yes'
+                                        : '❌ No'}
                                     </p>
                                   </div>
                                 </div>
@@ -384,46 +428,76 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
 
                               {/* Issues */}
                               <div>
-                                <h3 className="font-semibold mb-2">Issues Identified</h3>
+                                <h3 className="font-semibold mb-2">
+                                  Issues Identified
+                                </h3>
                                 <div className="space-y-2">
-                                  {selectedTask.qualityAssessment.issues.map((issue, index) => (
-                                    <div key={index} className="border rounded p-3">
-                                      <div className="flex justify-between items-start mb-2">
-                                        <Badge variant={
-                                          issue.severity === 'critical' ? 'destructive' :
-                                          issue.severity === 'high' ? 'destructive' :
-                                          issue.severity === 'medium' ? 'secondary' : 'outline'
-                                        }>
-                                          {issue.severity}
-                                        </Badge>
-                                        <Badge variant="outline">{issue.type}</Badge>
+                                  {selectedTask.qualityAssessment.issues.map(
+                                    (issue, index) => (
+                                      <div
+                                        key={index}
+                                        className="border rounded p-3"
+                                      >
+                                        <div className="flex justify-between items-start mb-2">
+                                          <Badge
+                                            variant={
+                                              issue.severity === 'critical'
+                                                ? 'destructive'
+                                                : issue.severity === 'high'
+                                                  ? 'destructive'
+                                                  : issue.severity === 'medium'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                            }
+                                          >
+                                            {issue.severity}
+                                          </Badge>
+                                          <Badge variant="outline">
+                                            {issue.type}
+                                          </Badge>
+                                        </div>
+                                        <p className="text-sm">
+                                          {issue.description}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {issue.metric}:{' '}
+                                          {issue.currentValue.toFixed(2)}{' '}
+                                          (expected:{' '}
+                                          {issue.expectedValue.toFixed(2)})
+                                        </p>
                                       </div>
-                                      <p className="text-sm">{issue.description}</p>
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {issue.metric}: {issue.currentValue.toFixed(2)} (expected: {issue.expectedValue.toFixed(2)})
-                                      </p>
-                                    </div>
-                                  ))}
+                                    ),
+                                  )}
                                 </div>
                               </div>
 
                               {/* Recommendations */}
                               <div>
-                                <h3 className="font-semibold mb-2">Recommendations</h3>
+                                <h3 className="font-semibold mb-2">
+                                  Recommendations
+                                </h3>
                                 <ul className="list-disc list-inside space-y-1">
-                                  {selectedTask.qualityAssessment.recommendations.map((rec, index) => (
-                                    <li key={index} className="text-sm">{rec}</li>
-                                  ))}
+                                  {selectedTask.qualityAssessment.recommendations.map(
+                                    (rec, index) => (
+                                      <li key={index} className="text-sm">
+                                        {rec}
+                                      </li>
+                                    ),
+                                  )}
                                 </ul>
                               </div>
 
                               {/* Review Notes */}
                               <div>
-                                <h3 className="font-semibold mb-2">Review Notes</h3>
+                                <h3 className="font-semibold mb-2">
+                                  Review Notes
+                                </h3>
                                 <Textarea
                                   placeholder="Add your review notes..."
                                   value={reviewNotes}
-                                  onChange={(e) => setReviewNotes(e.target.value)}
+                                  onChange={(e) =>
+                                    setReviewNotes(e.target.value)
+                                  }
                                   rows={4}
                                 />
                               </div>
@@ -432,7 +506,9 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                               <div className="flex gap-2 justify-end">
                                 <Button
                                   variant="outline"
-                                  onClick={() => handleReviewDecision('escalate')}
+                                  onClick={() =>
+                                    handleReviewDecision('escalate')
+                                  }
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       handleReviewDecision('escalate');
@@ -458,7 +534,9 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                                 </Button>
                                 <Button
                                   variant="secondary"
-                                  onClick={() => handleReviewDecision('needs_improvement')}
+                                  onClick={() =>
+                                    handleReviewDecision('needs_improvement')
+                                  }
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       handleReviewDecision('needs_improvement');
@@ -470,7 +548,9 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
                                   Needs Work
                                 </Button>
                                 <Button
-                                  onClick={() => handleReviewDecision('approve')}
+                                  onClick={() =>
+                                    handleReviewDecision('approve')
+                                  }
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                       handleReviewDecision('approve');

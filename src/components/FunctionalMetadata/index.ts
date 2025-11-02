@@ -9,6 +9,4 @@ export { FunctionalMetadataCard } from './FunctionalMetadataCard';
 export { EnhancedFunctionalMetadataCard } from './EnhancedFunctionalMetadataCard';
 
 // Export types for convenience
-export type {
-  FunctionalMetadata,
-} from '@/types/materials';
+export type { FunctionalMetadata } from '@/types/materials';

@@ -6,7 +6,11 @@
 import { z } from 'zod';
 
 // Environment schema
-export const EnvironmentSchema = z.enum(['development', 'staging', 'production']);
+export const EnvironmentSchema = z.enum([
+  'development',
+  'staging',
+  'production',
+]);
 
 // Base configuration schema
 export const BaseConfigSchema = z.object({
@@ -174,15 +178,29 @@ export const EnvVarsSchema = z.object({
 // Type exports for TypeScript inference
 export type EnvironmentType = z.infer<typeof EnvironmentSchema>;
 export type BaseConfigType = z.infer<typeof BaseConfigSchema>;
-export type DocumentChunkingConfigType = z.infer<typeof DocumentChunkingConfigSchema>;
-export type EmbeddingGenerationConfigType = z.infer<typeof EmbeddingGenerationConfigSchema>;
-export type MivaaToRagTransformerConfigType = z.infer<typeof MivaaToRagTransformerConfigSchema>;
-export type ValidationIntegrationConfigType = z.infer<typeof ValidationIntegrationConfigSchema>;
-export type BatchProcessingConfigType = z.infer<typeof BatchProcessingConfigSchema>;
+export type DocumentChunkingConfigType = z.infer<
+  typeof DocumentChunkingConfigSchema
+>;
+export type EmbeddingGenerationConfigType = z.infer<
+  typeof EmbeddingGenerationConfigSchema
+>;
+export type MivaaToRagTransformerConfigType = z.infer<
+  typeof MivaaToRagTransformerConfigSchema
+>;
+export type ValidationIntegrationConfigType = z.infer<
+  typeof ValidationIntegrationConfigSchema
+>;
+export type BatchProcessingConfigType = z.infer<
+  typeof BatchProcessingConfigSchema
+>;
 export type PerformanceConfigType = z.infer<typeof PerformanceConfigSchema>;
-export type ExternalDependenciesConfigType = z.infer<typeof ExternalDependenciesConfigSchema>;
+export type ExternalDependenciesConfigType = z.infer<
+  typeof ExternalDependenciesConfigSchema
+>;
 export type ServicesConfigType = z.infer<typeof ServicesConfigSchema>;
 export type HotReloadConfigType = z.infer<typeof HotReloadConfigSchema>;
 export type AppConfigType = z.infer<typeof AppConfigSchema>;
-export type ConfigValidationResultType = z.infer<typeof ConfigValidationResultSchema>;
+export type ConfigValidationResultType = z.infer<
+  typeof ConfigValidationResultSchema
+>;
 export type EnvVarsType = z.infer<typeof EnvVarsSchema>;

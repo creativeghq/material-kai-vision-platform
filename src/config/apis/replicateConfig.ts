@@ -24,14 +24,28 @@ const commonImageParams = z.object({
 const interiorAISchema = z.object({
   image: z.string().url('Image URL is required'),
   prompt: z.string().min(1, 'Prompt is required'),
-  room_type: z.enum([
-    'Living room', 'Dining room', 'Bedroom', 'Bathroom',
-    'Kitchen', 'Reading room', 'Home office',
-  ]).optional(),
-  style: z.enum([
-    'Modern', 'Minimalist', 'Contemporary', 'Transitional',
-    'Traditional', 'Rustic', 'Industrial',
-  ]).optional(),
+  room_type: z
+    .enum([
+      'Living room',
+      'Dining room',
+      'Bedroom',
+      'Bathroom',
+      'Kitchen',
+      'Reading room',
+      'Home office',
+    ])
+    .optional(),
+  style: z
+    .enum([
+      'Modern',
+      'Minimalist',
+      'Contemporary',
+      'Transitional',
+      'Traditional',
+      'Rustic',
+      'Industrial',
+    ])
+    .optional(),
   num_inference_steps: z.number().int().min(10).max(50).default(20),
   guidance_scale: z.number().min(1).max(20).default(7),
   seed: z.number().int().optional(),
@@ -67,14 +81,28 @@ const interiorlyGen1Schema = z.object({
   image: z.string().url('Image URL is required'),
   prompt: z.string().min(1, 'Prompt is required'),
   negative_prompt: z.string().optional(),
-  room_type: z.enum([
-    'living_room', 'bedroom', 'kitchen', 'bathroom',
-    'dining_room', 'office', 'outdoor',
-  ]).optional(),
-  design_style: z.enum([
-    'modern', 'traditional', 'minimalist', 'rustic',
-    'industrial', 'scandinavian', 'bohemian',
-  ]).optional(),
+  room_type: z
+    .enum([
+      'living_room',
+      'bedroom',
+      'kitchen',
+      'bathroom',
+      'dining_room',
+      'office',
+      'outdoor',
+    ])
+    .optional(),
+  design_style: z
+    .enum([
+      'modern',
+      'traditional',
+      'minimalist',
+      'rustic',
+      'industrial',
+      'scandinavian',
+      'bohemian',
+    ])
+    .optional(),
   num_inference_steps: z.number().int().min(10).max(50).default(25),
   guidance_scale: z.number().min(1).max(20).default(7.5),
   strength: z.number().min(0).max(1).default(0.75),
@@ -193,11 +221,13 @@ export const replicateConfig: ReplicateApiConfig = {
         seed: z.number().int().optional(),
       }),
       outputSchema: z.object({
-        output: z.object({
-          mesh: z.string().url().optional(),
-          video: z.string().url().optional(),
-          images: z.array(z.string().url()).optional(),
-        }).optional(),
+        output: z
+          .object({
+            mesh: z.string().url().optional(),
+            video: z.string().url().optional(),
+            images: z.array(z.string().url()).optional(),
+          })
+          .optional(),
         error: z.string().optional(),
       }),
       defaultParams: {
@@ -290,7 +320,10 @@ export class ReplicateConfigUtils {
   /**
    * Validate input parameters for a specific model
    */
-  public static validateModelInput(modelId: string, input: unknown): { success: boolean; error?: string; data?: unknown } {
+  public static validateModelInput(
+    modelId: string,
+    input: unknown,
+  ): { success: boolean; error?: string; data?: unknown } {
     const modelConfig = this.getModelConfig(modelId);
     if (!modelConfig) {
       return { success: false, error: `Model ${modelId} not found` };
@@ -303,7 +336,7 @@ export class ReplicateConfigUtils {
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: `Validation error: ${error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          error: `Validation error: ${error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         };
       }
       return { success: false, error: 'Unknown validation error' };
@@ -321,7 +354,10 @@ export class ReplicateConfigUtils {
   /**
    * Merge user input with default parameters
    */
-  public static mergeWithDefaults(modelId: string, userInput: Record<string, unknown>) {
+  public static mergeWithDefaults(
+    modelId: string,
+    userInput: Record<string, unknown>,
+  ) {
     const defaults = this.getModelDefaults(modelId);
     return {
       ...defaults,
@@ -343,9 +379,13 @@ export class ReplicateConfigUtils {
    */
   public static getCategories(): string[] {
     const categories = new Set(
-      Object.values(replicateConfig.models).map(model => model.category).filter(Boolean),
+      Object.values(replicateConfig.models)
+        .map((model) => model.category)
+        .filter(Boolean),
     );
-    return Array.from(categories).filter((cat): cat is string => cat !== undefined);
+    return Array.from(categories).filter(
+      (cat): cat is string => cat !== undefined,
+    );
   }
 }
 

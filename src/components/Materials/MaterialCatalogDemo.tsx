@@ -17,7 +17,8 @@ const sampleMaterials: Material[] = [
     id: 'mat-001',
     name: 'Premium Carrara Marble Tile',
     category: 'MARBLE',
-    description: 'High-quality Carrara marble with natural veining, perfect for luxury applications. Extracted from Italian quarries with excellent durability and aesthetic appeal.',
+    description:
+      'High-quality Carrara marble with natural veining, perfect for luxury applications. Extracted from Italian quarries with excellent durability and aesthetic appeal.',
     properties: {
       density: 2.7,
       thermalConductivity: 2.9,
@@ -39,13 +40,15 @@ const sampleMaterials: Material[] = [
         r11: 'R11-2.5',
       },
     },
-    thumbnailUrl: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400',
+    thumbnailUrl:
+      'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400',
   },
   {
     id: 'mat-002',
     name: 'Industrial Grade Porcelain Tile',
     category: 'PORCELAIN',
-    description: 'Heavy-duty porcelain tile designed for commercial and industrial applications. Excellent resistance to chemicals and high traffic.',
+    description:
+      'Heavy-duty porcelain tile designed for commercial and industrial applications. Excellent resistance to chemicals and high traffic.',
     properties: {
       density: 2.4,
       thermalConductivity: 1.3,
@@ -68,13 +71,15 @@ const sampleMaterials: Material[] = [
         frostResistant: true,
       },
     },
-    thumbnailUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
+    thumbnailUrl:
+      'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
   },
   {
     id: 'mat-003',
     name: 'Brushed Stainless Steel Panel',
     category: 'METAL',
-    description: 'Grade 316 stainless steel with brushed finish, suitable for kitchen backsplashes and accent walls.',
+    description:
+      'Grade 316 stainless steel with brushed finish, suitable for kitchen backsplashes and accent walls.',
     properties: {
       density: 8.0,
       thermalConductivity: 16.2,
@@ -99,13 +104,15 @@ const sampleMaterials: Material[] = [
         corrosionResistance: 'excellent',
       },
     },
-    thumbnailUrl: 'https://images.unsplash.com/photo-1558618047-3c8d8c7c1b92?w=400',
+    thumbnailUrl:
+      'https://images.unsplash.com/photo-1558618047-3c8d8c7c1b92?w=400',
   },
   {
     id: 'mat-004',
     name: 'Natural Oak Wood Planks',
     category: 'WOOD',
-    description: 'Solid white oak hardwood flooring with natural grain patterns. Sustainably harvested and kiln-dried.',
+    description:
+      'Solid white oak hardwood flooring with natural grain patterns. Sustainably harvested and kiln-dried.',
     properties: {
       density: 0.75,
       thermalConductivity: 0.17,
@@ -128,13 +135,15 @@ const sampleMaterials: Material[] = [
         jankahardness: 1360,
       },
     },
-    thumbnailUrl: 'https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=400',
+    thumbnailUrl:
+      'https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=400',
   },
   {
     id: 'mat-005',
     name: 'Recycled Glass Mosaic',
     category: 'RECYCLED_GLASS',
-    description: 'Eco-friendly mosaic tiles made from 100% recycled glass. Available in various color combinations with excellent light reflection properties.',
+    description:
+      'Eco-friendly mosaic tiles made from 100% recycled glass. Available in various color combinations with excellent light reflection properties.',
     properties: {
       density: 2.5,
       thermalConductivity: 1.0,
@@ -157,7 +166,8 @@ const sampleMaterials: Material[] = [
         lightTransmission: 'high',
       },
     },
-    thumbnailUrl: 'https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=400',
+    thumbnailUrl:
+      'https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=400',
   },
 ];
 
@@ -166,7 +176,8 @@ const sampleMaterials: Material[] = [
  */
 export const MaterialCatalogDemo: React.FC = () => {
   // Validate sample materials
-  const validationResults = MaterialValidation.validateMaterialBatch(sampleMaterials);
+  const validationResults =
+    MaterialValidation.validateMaterialBatch(sampleMaterials);
 
   const handleMaterialSelect = (material: Material) => {
     console.log('Material selected:', material);
@@ -184,8 +195,8 @@ export const MaterialCatalogDemo: React.FC = () => {
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">Material Catalog Demo</h1>
         <p className="text-muted-foreground">
-          Demonstrating the full material catalog system with AI-extracted meta fields,
-          validation, filtering, and search capabilities.
+          Demonstrating the full material catalog system with AI-extracted meta
+          fields, validation, filtering, and search capabilities.
         </p>
       </div>
 
@@ -200,20 +211,34 @@ export const MaterialCatalogDemo: React.FC = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">{validationResults.summary.valid}</div>
-              <div className="text-sm text-muted-foreground">Valid Materials</div>
+              <div className="text-2xl font-bold text-green-600">
+                {validationResults.summary.valid}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Valid Materials
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">{validationResults.summary.invalid}</div>
-              <div className="text-sm text-muted-foreground">Invalid Materials</div>
+              <div className="text-2xl font-bold text-red-600">
+                {validationResults.summary.invalid}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Invalid Materials
+              </div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-yellow-600">{validationResults.summary.withWarnings}</div>
+              <div className="text-2xl font-bold text-yellow-600">
+                {validationResults.summary.withWarnings}
+              </div>
               <div className="text-sm text-muted-foreground">With Warnings</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{validationResults.summary.total}</div>
-              <div className="text-sm text-muted-foreground">Total Materials</div>
+              <div className="text-2xl font-bold text-blue-600">
+                {validationResults.summary.total}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Total Materials
+              </div>
             </div>
           </div>
 
@@ -224,11 +249,13 @@ export const MaterialCatalogDemo: React.FC = () => {
               <AlertDescription>
                 <strong>Validation Errors Found:</strong>
                 <ul className="mt-2 space-y-1">
-                  {validationResults.overall.errors.slice(0, 5).map((error, idx) => (
-                    <li key={idx} className="text-sm">
-                      • {error.field}: {error.message}
-                    </li>
-                  ))}
+                  {validationResults.overall.errors
+                    .slice(0, 5)
+                    .map((error, idx) => (
+                      <li key={idx} className="text-sm">
+                        • {error.field}: {error.message}
+                      </li>
+                    ))}
                   {validationResults.overall.errors.length > 5 && (
                     <li className="text-sm text-muted-foreground">
                       ...and {validationResults.overall.errors.length - 5} more
@@ -245,14 +272,17 @@ export const MaterialCatalogDemo: React.FC = () => {
               <AlertDescription>
                 <strong>Validation Warnings:</strong>
                 <ul className="mt-2 space-y-1">
-                  {validationResults.overall.warnings.slice(0, 3).map((warning, idx) => (
-                    <li key={idx} className="text-sm">
-                      • {warning.field}: {warning.message}
-                    </li>
-                  ))}
+                  {validationResults.overall.warnings
+                    .slice(0, 3)
+                    .map((warning, idx) => (
+                      <li key={idx} className="text-sm">
+                        • {warning.field}: {warning.message}
+                      </li>
+                    ))}
                   {validationResults.overall.warnings.length > 3 && (
                     <li className="text-sm text-muted-foreground">
-                      ...and {validationResults.overall.warnings.length - 3} more
+                      ...and {validationResults.overall.warnings.length - 3}{' '}
+                      more
                     </li>
                   )}
                 </ul>
@@ -260,15 +290,16 @@ export const MaterialCatalogDemo: React.FC = () => {
             </Alert>
           )}
 
-          {validationResults.overall.errors.length === 0 && validationResults.overall.warnings.length === 0 && (
-            <Alert>
-              <CheckCircle className="h-4 w-4" />
-              <AlertDescription>
-                All sample materials passed validation successfully
-                The type system and validation utilities are working correctly.
-              </AlertDescription>
-            </Alert>
-          )}
+          {validationResults.overall.errors.length === 0 &&
+            validationResults.overall.warnings.length === 0 && (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  All sample materials passed validation successfully The type
+                  system and validation utilities are working correctly.
+                </AlertDescription>
+              </Alert>
+            )}
         </CardContent>
       </Card>
 
@@ -359,12 +390,16 @@ export const MaterialCatalogDemo: React.FC = () => {
             <div className="flex items-center gap-2">
               <Info className="h-5 w-5 text-blue-600" />
               <span className="font-medium">Database Schema Updates</span>
-              <Badge className="bg-blue-100 text-blue-800">Pending - Database Team</Badge>
+              <Badge className="bg-blue-100 text-blue-800">
+                Pending - Database Team
+              </Badge>
             </div>
             <div className="flex items-center gap-2">
               <Info className="h-5 w-5 text-blue-600" />
               <span className="font-medium">Enhanced AI Extraction</span>
-              <Badge className="bg-blue-100 text-blue-800">Pending - ML Team</Badge>
+              <Badge className="bg-blue-100 text-blue-800">
+                Pending - ML Team
+              </Badge>
             </div>
           </div>
         </CardContent>
@@ -380,28 +415,32 @@ export const MaterialCatalogDemo: React.FC = () => {
             <h4 className="font-semibold mb-2">1. Filter Materials</h4>
             <p className="text-sm text-muted-foreground">
               Click the "Filters" button to access advanced filtering options.
-              Filter by category, finish, size, installation method, and application area.
+              Filter by category, finish, size, installation method, and
+              application area.
             </p>
           </div>
           <div>
             <h4 className="font-semibold mb-2">2. Search Materials</h4>
             <p className="text-sm text-muted-foreground">
-              Use the search field to find materials by name, description, or standards.
-              The search is intelligent and searches across all material properties.
+              Use the search field to find materials by name, description, or
+              standards. The search is intelligent and searches across all
+              material properties.
             </p>
           </div>
           <div>
             <h4 className="font-semibold mb-2">3. View Details</h4>
             <p className="text-sm text-muted-foreground">
-              Click the info (i) button on any material card to expand and see detailed
-              properties, meta fields, physical characteristics, and standards.
+              Click the info (i) button on any material card to expand and see
+              detailed properties, meta fields, physical characteristics, and
+              standards.
             </p>
           </div>
           <div>
             <h4 className="font-semibold mb-2">4. Switch View Modes</h4>
             <p className="text-sm text-muted-foreground">
               Toggle between grid and list view modes using the view controls.
-              Grid mode shows more materials at once, list mode shows more details.
+              Grid mode shows more materials at once, list mode shows more
+              details.
             </p>
           </div>
         </CardContent>

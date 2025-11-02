@@ -14,7 +14,14 @@ export interface DOMElement {
     height: number;
   };
   hierarchy: number;
-  elementType: 'heading' | 'paragraph' | 'table' | 'list' | 'image' | 'div' | 'span';
+  elementType:
+    | 'heading'
+    | 'paragraph'
+    | 'table'
+    | 'list'
+    | 'image'
+    | 'div'
+    | 'span';
   confidence: number;
   parent?: string;
   children: string[];
@@ -62,7 +69,13 @@ export interface ProductCandidate {
     width: number;
     height: number;
   };
-  contentType: 'product' | 'index' | 'sustainability' | 'technical' | 'moodboard' | 'unknown';
+  contentType:
+    | 'product'
+    | 'index'
+    | 'sustainability'
+    | 'technical'
+    | 'moodboard'
+    | 'unknown';
   patterns: {
     hasProductName: boolean;
     hasDimensions: boolean;
@@ -132,7 +145,10 @@ export class HTMLDOMAnalyzer {
   /**
    * Analyze HTML content and extract structured layout information
    */
-  async analyzeHTML(htmlContent: string, documentId?: string): Promise<LayoutAnalysisResult> {
+  async analyzeHTML(
+    htmlContent: string,
+    documentId?: string,
+  ): Promise<LayoutAnalysisResult> {
     try {
       console.log('Starting HTML DOM analysis...');
 
@@ -155,7 +171,11 @@ export class HTMLDOMAnalyzer {
       const textBlocks = await this.extractTextBlocks(doc);
 
       // ✅ NEW: Extract product candidates using layout-based detection
-      const productCandidates = await this.extractProductCandidates(doc, elements, textBlocks);
+      const productCandidates = await this.extractProductCandidates(
+        doc,
+        elements,
+        textBlocks,
+      );
 
       // Store analysis results if documentId provided
       if (documentId) {
@@ -169,7 +189,9 @@ export class HTMLDOMAnalyzer {
         });
       }
 
-      console.log(`HTML analysis completed: ${elements.length} elements, ${images.length} images, ${tables.length} tables, ${productCandidates.length} product candidates`);
+      console.log(
+        `HTML analysis completed: ${elements.length} elements, ${images.length} images, ${tables.length} tables, ${productCandidates.length} product candidates`,
+      );
 
       return {
         structure,
@@ -179,7 +201,6 @@ export class HTMLDOMAnalyzer {
         textBlocks,
         productCandidates,
       };
-
     } catch (error) {
       console.error('HTML DOM analysis error:', error);
       throw new Error(`HTML analysis failed: ${(error as any).message}`);
@@ -189,12 +210,18 @@ export class HTMLDOMAnalyzer {
   /**
    * Extract hierarchical document structure
    */
-  private async extractDocumentStructure(doc: Document): Promise<DocumentStructure> {
+  private async extractDocumentStructure(
+    doc: Document,
+  ): Promise<DocumentStructure> {
     const titleElement = doc.querySelector('title') || doc.querySelector('h1');
     const title = titleElement?.textContent?.trim() || 'Untitled Document';
 
     // Find all heading elements to build structure
-    const headings = Array.from(doc.querySelectorAll('h1, h2, h3, h4, h5, h6, .heading-1, .heading-2, .heading-3'));
+    const headings = Array.from(
+      doc.querySelectorAll(
+        'h1, h2, h3, h4, h5, h6, .heading-1, .heading-2, .heading-3',
+      ),
+    );
 
     const sections: DocumentSection[] = [];
     const readingOrder: string[] = [];
@@ -220,7 +247,7 @@ export class HTMLDOMAnalyzer {
 
       // Add to reading order
       readingOrder.push(sectionId);
-      section.elements.forEach(el => readingOrder.push(el.id));
+      section.elements.forEach((el) => readingOrder.push(el.id));
 
       // Build hierarchy
       if (level === 1 || !currentSection) {
@@ -242,10 +269,13 @@ export class HTMLDOMAnalyzer {
 
     // Count element types
     const allElements = await this.extractLayoutElements(doc);
-    const elementTypes = allElements.reduce((acc, el) => {
-      acc[el.elementType] = (acc[el.elementType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const elementTypes = allElements.reduce(
+      (acc, el) => {
+        acc[el.elementType] = (acc[el.elementType] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
       title,
@@ -296,7 +326,9 @@ export class HTMLDOMAnalyzer {
   /**
    * Analyze individual DOM element
    */
-  private async analyzeDOMElement(element: Element): Promise<DOMElement | null> {
+  private async analyzeDOMElement(
+    element: Element,
+  ): Promise<DOMElement | null> {
     try {
       const id = this.generateElementId();
       const tagName = element.tagName.toLowerCase();
@@ -321,8 +353,12 @@ export class HTMLDOMAnalyzer {
       const confidence = this.calculateElementConfidence(element);
 
       // Find parent and children relationships
-      const parent = element.parentElement ? this.generateElementId() : undefined;
-      const children = Array.from(element.children).map(() => this.generateElementId());
+      const parent = element.parentElement
+        ? this.generateElementId()
+        : undefined;
+      const children = Array.from(element.children).map(() =>
+        this.generateElementId(),
+      );
 
       return {
         id,
@@ -338,7 +374,6 @@ export class HTMLDOMAnalyzer {
         parent,
         children,
       };
-
     } catch (error) {
       console.warn('Error analyzing DOM element:', error);
       return null;
@@ -403,13 +438,17 @@ export class HTMLDOMAnalyzer {
 
       // Extract headers
       const headerElements = table.querySelectorAll('th');
-      const headers = Array.from(headerElements).map(th => th.textContent?.trim() || '');
+      const headers = Array.from(headerElements).map(
+        (th) => th.textContent?.trim() || '',
+      );
 
       // Extract rows
-      const rowElements = table.querySelectorAll('tbody tr, tr:not(:first-child)');
-      const rows = Array.from(rowElements).map(row => {
+      const rowElements = table.querySelectorAll(
+        'tbody tr, tr:not(:first-child)',
+      );
+      const rows = Array.from(rowElements).map((row) => {
         const cells = row.querySelectorAll('td');
-        return Array.from(cells).map(cell => cell.textContent?.trim() || '');
+        return Array.from(cells).map((cell) => cell.textContent?.trim() || '');
       });
 
       // Extract bounding box and page
@@ -438,7 +477,9 @@ export class HTMLDOMAnalyzer {
    */
   private async extractTextBlocks(doc: Document): Promise<TextBlock[]> {
     const textBlocks: TextBlock[] = [];
-    const textElements = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, .paragraph, .heading-1, .heading-2, .heading-3');
+    const textElements = doc.querySelectorAll(
+      'p, h1, h2, h3, h4, h5, h6, li, .paragraph, .heading-1, .heading-2, .heading-3',
+    );
 
     for (const element of Array.from(textElements)) {
       const id = this.generateElementId();
@@ -517,7 +558,12 @@ export class HTMLDOMAnalyzer {
     return pageElements.length || 1;
   }
 
-  private extractBoundingBox(element: Element): { x: number; y: number; width: number; height: number } {
+  private extractBoundingBox(element: Element): {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } {
     // Try to get bbox from data attribute
     const bboxAttr = element.getAttribute('data-bbox');
     if (bboxAttr) {
@@ -543,7 +589,7 @@ export class HTMLDOMAnalyzer {
     if (tagName.match(/^h[1-6]$/) || className.includes('heading')) {
       height = 40 + (6 - this.getHeadingLevel(element)) * 5;
     } else if (tagName === 'p' || className.includes('paragraph')) {
-      height = Math.max(30, (element.textContent?.length || 0) / 80 * 20);
+      height = Math.max(30, ((element.textContent?.length || 0) / 80) * 20);
     } else if (tagName === 'table') {
       height = 150;
     } else if (tagName === 'img') {
@@ -616,15 +662,14 @@ export class HTMLDOMAnalyzer {
 
   private findImageCaption(img: Element): string | undefined {
     // Look for caption in various locations
-    const captionSelectors = [
-      '.image-caption',
-      '.caption',
-      'figcaption',
-    ];
+    const captionSelectors = ['.image-caption', '.caption', 'figcaption'];
 
     for (const selector of captionSelectors) {
-      const caption = img.parentElement?.querySelector(selector) ||
-                     img.nextElementSibling?.matches(selector) ? img.nextElementSibling : null;
+      const caption =
+        img.parentElement?.querySelector(selector) ||
+        img.nextElementSibling?.matches(selector)
+          ? img.nextElementSibling
+          : null;
       if (caption) {
         return caption.textContent?.trim();
       }
@@ -640,7 +685,9 @@ export class HTMLDOMAnalyzer {
     // Look for text in the same container
     const container = img.closest('.material-block, .page, .section');
     if (container) {
-      const textElements = container.querySelectorAll('p, h1, h2, h3, h4, h5, h6');
+      const textElements = container.querySelectorAll(
+        'p, h1, h2, h3, h4, h5, h6',
+      );
       textElements.forEach(() => {
         associatedIds.push(this.generateElementId());
       });
@@ -669,7 +716,8 @@ export class HTMLDOMAnalyzer {
 
   private determineTableType(table: Element): TableElement['tableType'] {
     const className = table.className;
-    const caption = table.querySelector('caption')?.textContent?.toLowerCase() || '';
+    const caption =
+      table.querySelector('caption')?.textContent?.toLowerCase() || '';
 
     if (className.includes('spec-table') || caption.includes('specification')) {
       return 'specifications';
@@ -720,7 +768,7 @@ export class HTMLDOMAnalyzer {
 
     if (tagName.match(/^h[1-6]$/)) {
       const level = parseInt(tagName.charAt(1));
-      size = 24 - (level * 2);
+      size = 24 - level * 2;
       weight = 'bold';
     } else if (className.includes('heading-1')) {
       size = 24;
@@ -757,7 +805,10 @@ export class HTMLDOMAnalyzer {
     return [...new Set(tags)]; // Remove duplicates
   }
 
-  private findParentSection(sections: DocumentSection[], level: number): DocumentSection | null {
+  private findParentSection(
+    sections: DocumentSection[],
+    level: number,
+  ): DocumentSection | null {
     // Find the most recent section with a lower level
     for (let i = sections.length - 1; i >= 0; i--) {
       if (sections[i].level < level) {
@@ -767,7 +818,9 @@ export class HTMLDOMAnalyzer {
     return null;
   }
 
-  private async extractSectionElements(heading: Element): Promise<DOMElement[]> {
+  private async extractSectionElements(
+    heading: Element,
+  ): Promise<DOMElement[]> {
     const elements: DOMElement[] = [];
 
     // Find all elements between this heading and the next heading of same or higher level
@@ -796,28 +849,33 @@ export class HTMLDOMAnalyzer {
   /**
    * Store analysis results in the database
    */
-  private async storeAnalysisResults(documentId: string, results: LayoutAnalysisResult): Promise<void> {
+  private async storeAnalysisResults(
+    documentId: string,
+    results: LayoutAnalysisResult,
+  ): Promise<void> {
     try {
       // Store layout analysis with product candidates
-      await supabase
-        .from('document_layout_analysis')
-        .insert({
-          document_id: documentId,
-          page_number: 1, // Will be updated for multi-page documents
-          layout_elements: results.elements as unknown,
-          reading_order: results.structure.readingOrder as unknown,
-          structure_confidence: results.structure.metadata.confidence,
-          processing_version: '1.1.0', // Updated version for product candidate support
-          analysis_metadata: {
-            product_candidates: results.productCandidates,
-            total_candidates: results.productCandidates.length,
-            high_quality_candidates: results.productCandidates.filter(c => c.qualityScore > 0.7).length,
-            analysis_timestamp: new Date().toISOString(),
-            layout_analysis_version: '1.1.0',
-          } as unknown,
-        });
+      await supabase.from('document_layout_analysis').insert({
+        document_id: documentId,
+        page_number: 1, // Will be updated for multi-page documents
+        layout_elements: results.elements as unknown,
+        reading_order: results.structure.readingOrder as unknown,
+        structure_confidence: results.structure.metadata.confidence,
+        processing_version: '1.1.0', // Updated version for product candidate support
+        analysis_metadata: {
+          product_candidates: results.productCandidates,
+          total_candidates: results.productCandidates.length,
+          high_quality_candidates: results.productCandidates.filter(
+            (c) => c.qualityScore > 0.7,
+          ).length,
+          analysis_timestamp: new Date().toISOString(),
+          layout_analysis_version: '1.1.0',
+        } as unknown,
+      });
 
-      console.log(`Layout analysis results stored successfully with ${results.productCandidates.length} product candidates`);
+      console.log(
+        `Layout analysis results stored successfully with ${results.productCandidates.length} product candidates`,
+      );
     } catch (error) {
       console.error('Error storing layout analysis results:', error);
     }
@@ -826,7 +884,9 @@ export class HTMLDOMAnalyzer {
   /**
    * Get analysis results for a document
    */
-  async getAnalysisResults(documentId: string): Promise<LayoutAnalysisResult | null> {
+  async getAnalysisResults(
+    documentId: string,
+  ): Promise<LayoutAnalysisResult | null> {
     try {
       const { data, error } = await supabase
         .from('document_layout_analysis')
@@ -846,7 +906,9 @@ export class HTMLDOMAnalyzer {
           title: 'Stored Document',
           sections: [],
           readingOrder: (data.reading_order as unknown as string[]) || [],
-          totalElements: Array.isArray(data.layout_elements) ? data.layout_elements.length : 0,
+          totalElements: Array.isArray(data.layout_elements)
+            ? data.layout_elements.length
+            : 0,
           pageCount: 1,
           metadata: {
             processingDate: data.created_at,
@@ -860,7 +922,6 @@ export class HTMLDOMAnalyzer {
         textBlocks: [],
         productCandidates: (data.product_candidates as any) || [],
       };
-
     } catch (error) {
       console.error('Error retrieving analysis results:', error);
       return null;
@@ -881,18 +942,25 @@ export class HTMLDOMAnalyzer {
 
     // Analyze each text block for product patterns
     for (const textBlock of textBlocks) {
-      const candidate = await this.analyzeTextBlockForProduct(textBlock, elements);
-      if (candidate && candidate.confidence > 0.3) { // Minimum confidence threshold
+      const candidate = await this.analyzeTextBlockForProduct(
+        textBlock,
+        elements,
+      );
+      if (candidate && candidate.confidence > 0.3) {
+        // Minimum confidence threshold
         candidates.push(candidate);
       }
     }
 
     // Filter out non-product content (index, sustainability, technical)
-    const filteredCandidates = candidates.filter(candidate =>
-      candidate.contentType === 'product' && candidate.qualityScore > 0.5,
+    const filteredCandidates = candidates.filter(
+      (candidate) =>
+        candidate.contentType === 'product' && candidate.qualityScore > 0.5,
     );
 
-    console.log(`🎯 Found ${filteredCandidates.length} high-quality product candidates from ${candidates.length} total candidates`);
+    console.log(
+      `🎯 Found ${filteredCandidates.length} high-quality product candidates from ${candidates.length} total candidates`,
+    );
 
     return filteredCandidates;
   }
@@ -930,7 +998,11 @@ export class HTMLDOMAnalyzer {
     if (patterns.hasProductDescription) confidence += 0.1;
 
     // Calculate quality score
-    const qualityScore = this.calculateProductQualityScore(text, patterns, extractedData);
+    const qualityScore = this.calculateProductQualityScore(
+      text,
+      patterns,
+      extractedData,
+    );
 
     return {
       id,
@@ -1036,12 +1108,17 @@ export class HTMLDOMAnalyzer {
 
   private hasDesignerPattern(text: string): boolean {
     // Look for designer attribution patterns
-    return /by\s+[A-Z][a-z]+|BY\s+[A-Z]+|designed\s+by|studio|estudi/i.test(text);
+    return /by\s+[A-Z][a-z]+|BY\s+[A-Z]+|designed\s+by|studio|estudi/i.test(
+      text,
+    );
   }
 
   private hasProductDescriptionPattern(text: string): boolean {
     // Look for product description indicators
-    return text.length > 100 && /material|texture|finish|color|collection/i.test(text);
+    return (
+      text.length > 100 &&
+      /material|texture|finish|color|collection/i.test(text)
+    );
   }
 
   /**
@@ -1063,21 +1140,29 @@ export class HTMLDOMAnalyzer {
     }
 
     // Extract designer/studio
-    const designerMatch = text.match(/(?:by|BY)\s+([A-Z][a-zA-Z\s{}]+)|(?:studio|estudi)\s*([A-Z][a-zA-Z\s{}]*)/i);
+    const designerMatch = text.match(
+      /(?:by|BY)\s+([A-Z][a-zA-Z\s{}]+)|(?:studio|estudi)\s*([A-Z][a-zA-Z\s{}]*)/i,
+    );
     if (designerMatch) {
       data.designer = (designerMatch[1] || designerMatch[2]).trim();
     }
 
     // Extract colors (common color names and patterns)
-    const colorMatches = text.match(/\b(?:white|black|grey|gray|beige|taupe|sand|clay|anthracite|cream|ivory|brown|blue|green|red|yellow|orange|purple|pink)\b/gi);
+    const colorMatches = text.match(
+      /\b(?:white|black|grey|gray|beige|taupe|sand|clay|anthracite|cream|ivory|brown|blue|green|red|yellow|orange|purple|pink)\b/gi,
+    );
     if (colorMatches) {
-      data.colors = [...new Set(colorMatches.map(c => c.toLowerCase()))];
+      data.colors = [...new Set(colorMatches.map((c) => c.toLowerCase()))];
     }
 
     // Extract materials
-    const materialMatches = text.match(/\b(?:ceramic|porcelain|stone|marble|granite|wood|metal|glass|concrete|tile|vinyl|laminate)\b/gi);
+    const materialMatches = text.match(
+      /\b(?:ceramic|porcelain|stone|marble|granite|wood|metal|glass|concrete|tile|vinyl|laminate)\b/gi,
+    );
     if (materialMatches) {
-      data.materials = [...new Set(materialMatches.map(m => m.toLowerCase()))];
+      data.materials = [
+        ...new Set(materialMatches.map((m) => m.toLowerCase())),
+      ];
     }
 
     return data;
@@ -1100,11 +1185,14 @@ export class HTMLDOMAnalyzer {
     if (patterns.hasProductDescription) score += 0.15;
 
     // Bonus for extracted data quality
-    if (extractedData.productName && extractedData.productName.length > 2) score += 0.1;
-    if (extractedData.dimensions && extractedData.dimensions.length > 0) score += 0.1;
+    if (extractedData.productName && extractedData.productName.length > 2)
+      score += 0.1;
+    if (extractedData.dimensions && extractedData.dimensions.length > 0)
+      score += 0.1;
     if (extractedData.designer) score += 0.1;
     if (extractedData.colors && extractedData.colors.length > 0) score += 0.05;
-    if (extractedData.materials && extractedData.materials.length > 0) score += 0.05;
+    if (extractedData.materials && extractedData.materials.length > 0)
+      score += 0.05;
 
     // Penalty for very short content
     if (text.length < 100) score *= 0.5;

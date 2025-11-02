@@ -38,7 +38,7 @@ export const MivaaPDFProcessor: React.FC = () => {
   const [progress, setProgress] = useState(0);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prev => [...prev, ...acceptedFiles]);
+    setFiles((prev) => [...prev, ...acceptedFiles]);
     setResults([]);
   }, []);
 
@@ -109,7 +109,8 @@ export const MivaaPDFProcessor: React.FC = () => {
           processingResults.push({
             id: crypto.randomUUID(),
             fileName: file.name,
-            markdownContent: '# Processing Failed\n\nUnable to process this PDF file.',
+            markdownContent:
+              '# Processing Failed\n\nUnable to process this PDF file.',
             extractedImages: [],
             extractedTables: [],
             metadata: {
@@ -126,11 +127,14 @@ export const MivaaPDFProcessor: React.FC = () => {
       setResults(processingResults);
       setProgress(100);
 
-      toast.success(`Successfully processed ${processingResults.length} PDF files with MIVAA`);
-
+      toast.success(
+        `Successfully processed ${processingResults.length} PDF files with MIVAA`,
+      );
     } catch (error) {
       console.error('❌ MIVAA PDF processing failed:', error);
-      toast.error(error instanceof Error ? error.message : 'MIVAA PDF processing failed');
+      toast.error(
+        error instanceof Error ? error.message : 'MIVAA PDF processing failed',
+      );
     } finally {
       setIsProcessing(false);
     }
@@ -143,7 +147,7 @@ export const MivaaPDFProcessor: React.FC = () => {
   };
 
   const removeFile = (index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const downloadMarkdown = (result: PDFProcessingResult) => {
@@ -200,7 +204,8 @@ export const MivaaPDFProcessor: React.FC = () => {
                 </h3>
                 <div className="space-x-2">
                   <Button
-                    onClick={startProcessing} onKeyDown={(e) => e.key === 'Enter' && startProcessing()}
+                    onClick={startProcessing}
+                    onKeyDown={(e) => e.key === 'Enter' && startProcessing()}
                     disabled={isProcessing}
                     className="bg-primary hover:bg-primary/90"
                   >
@@ -264,7 +269,9 @@ export const MivaaPDFProcessor: React.FC = () => {
               {isProcessing && (
                 <div className="mt-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Processing Progress</span>
+                    <span className="text-sm font-medium">
+                      Processing Progress
+                    </span>
                     <span className="text-sm text-gray-500">{progress}%</span>
                   </div>
                   <Progress value={progress} className="w-full" />
@@ -289,7 +296,9 @@ export const MivaaPDFProcessor: React.FC = () => {
                 <div key={result.id} className="border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold">{result.fileName}</h3>
+                      <h3 className="text-lg font-semibold">
+                        {result.fileName}
+                      </h3>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span>{result.metadata.pageCount} pages</span>
                         <span>{result.metadata.wordCount} words</span>

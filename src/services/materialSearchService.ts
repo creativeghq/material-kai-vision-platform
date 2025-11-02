@@ -54,10 +54,14 @@ export class MaterialSearchService {
         search_type: params.searchType || 'hybrid',
         limit: (params.limit || 20).toString(),
         ...(params.category && { category: params.category }),
-        ...(params.minConfidence && { min_confidence: params.minConfidence.toString() }),
+        ...(params.minConfidence && {
+          min_confidence: params.minConfidence.toString(),
+        }),
         include_images: (params.includeImages !== false).toString(),
         include_metafields: (params.includeMetafields !== false).toString(),
-        include_relationships: (params.includeRelationships !== false).toString(),
+        include_relationships: (
+          params.includeRelationships !== false
+        ).toString(),
       });
 
       const response = await mivaaApi.searchMaterials({
@@ -83,7 +87,6 @@ export class MaterialSearchService {
         metadata: data.metadata || {},
         error: data.error,
       };
-
     } catch (error) {
       console.error('Material search service error:', error);
       return {
@@ -98,7 +101,10 @@ export class MaterialSearchService {
   /**
    * Get search suggestions
    */
-  async getSuggestions(_partial: string, _limit: number = 10): Promise<{
+  async getSuggestions(
+    _partial: string,
+    _limit: number = 10,
+  ): Promise<{
     success: boolean;
     data: Array<{
       text: string;
@@ -127,7 +133,6 @@ export class MaterialSearchService {
         data: data.data || [],
         error: data.error,
       };
-
     } catch (error) {
       console.error('Suggestions error:', error);
       return {
@@ -165,7 +170,6 @@ export class MaterialSearchService {
         data: data.data,
         error: data.error,
       };
-
     } catch (error) {
       console.error('Get material error:', error);
       return {
@@ -213,19 +217,22 @@ export class MaterialSearchService {
       }
 
       // Upload image to MIVAA API using the images upload endpoint
-      const uploadResponse = await this.mivaaClient.request('/api/images/upload-and-analyze', {
-        method: 'POST',
-        body: JSON.stringify({
-          image_data: base64Data,
-          material_id: materialId,
-          image_type: options.imageType || 'primary',
-          is_featured: options.isFeatured || false,
-          display_order: options.displayOrder || 0,
-          file_name: imageFile.name,
-          metadata: options.metadata || {},
-          analysis_types: ['description', 'material_recognition'],
-        }),
-      });
+      const uploadResponse = await this.mivaaClient.request(
+        '/api/images/upload-and-analyze',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            image_data: base64Data,
+            material_id: materialId,
+            image_type: options.imageType || 'primary',
+            is_featured: options.isFeatured || false,
+            display_order: options.displayOrder || 0,
+            file_name: imageFile.name,
+            metadata: options.metadata || {},
+            analysis_types: ['description', 'material_recognition'],
+          }),
+        },
+      );
 
       if (!uploadResponse.success) {
         return {
@@ -239,7 +246,6 @@ export class MaterialSearchService {
         data: data.data,
         error: data.error,
       };
-
     } catch (error) {
       console.error('Image upload error:', error);
       return {

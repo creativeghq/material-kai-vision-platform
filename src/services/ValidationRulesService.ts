@@ -163,7 +163,10 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
         critical: 0,
       };
 
-      for (const rule of rules.slice(0, this.defaultConfig.max_rules_per_chunk)) {
+      for (const rule of rules.slice(
+        0,
+        this.defaultConfig.max_rules_per_chunk,
+      )) {
         const result = await this.applyRule(
           request.chunk_id,
           rule,
@@ -194,7 +197,9 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
   /**
    * Validate multiple chunks
    */
-  async validateChunks(request: BatchValidationRequest): Promise<BatchValidationResponse> {
+  async validateChunks(
+    request: BatchValidationRequest,
+  ): Promise<BatchValidationResponse> {
     return this.executeOperation(async () => {
       const results: ValidationResponse[] = [];
       let passedChunks = 0;
@@ -264,11 +269,14 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
       // Calculate statistics
       const stats: ValidationStats = {
         total_rules: rules.length,
-        active_rules: rules.filter(r => r.is_active).length,
+        active_rules: rules.filter((r) => r.is_active).length,
         total_validations: results.length,
-        passed_validations: results.filter(r => r.passed).length,
-        failed_validations: results.filter(r => !r.passed).length,
-        pass_rate: results.length > 0 ? results.filter(r => r.passed).length / results.length : 0,
+        passed_validations: results.filter((r) => r.passed).length,
+        failed_validations: results.filter((r) => !r.passed).length,
+        pass_rate:
+          results.length > 0
+            ? results.filter((r) => r.passed).length / results.length
+            : 0,
         severity_distribution: this.getSeverityDistribution(results),
         rule_effectiveness: this.getRuleEffectiveness(rules, results),
       };
@@ -295,7 +303,9 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
       workspace_id: workspaceId,
       passed,
       severity: rule.severity,
-      message: passed ? `Rule "${rule.rule_name}" passed` : `Rule "${rule.rule_name}" failed`,
+      message: passed
+        ? `Rule "${rule.rule_name}" passed`
+        : `Rule "${rule.rule_name}" failed`,
       validated_at: new Date().toISOString(),
     };
 
@@ -332,7 +342,9 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
       case 'matches_regex':
         return new RegExp(String(definition.value)).test(String(fieldValue));
       case 'in_range':
-        return fieldValue >= definition.value[0] && fieldValue <= definition.value[1];
+        return (
+          fieldValue >= definition.value[0] && fieldValue <= definition.value[1]
+        );
       default:
         return false;
     }
@@ -349,7 +361,9 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
     return value;
   }
 
-  private getSeverityDistribution(results: ValidationResult[]): Record<ValidationSeverity, number> {
+  private getSeverityDistribution(
+    results: ValidationResult[],
+  ): Record<ValidationSeverity, number> {
     const distribution: Record<ValidationSeverity, number> = {
       info: 0,
       warning: 0,
@@ -357,7 +371,7 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
       critical: 0,
     };
 
-    results.forEach(result => {
+    results.forEach((result) => {
       distribution[result.severity]++;
     });
 
@@ -377,9 +391,10 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
     const effectiveness = [];
 
     for (const rule of rules) {
-      const ruleResults = results.filter(r => r.rule_id === rule.id);
-      const failures = ruleResults.filter(r => !r.passed).length;
-      const failureRate = ruleResults.length > 0 ? failures / ruleResults.length : 0;
+      const ruleResults = results.filter((r) => r.rule_id === rule.id);
+      const failures = ruleResults.filter((r) => !r.passed).length;
+      const failureRate =
+        ruleResults.length > 0 ? failures / ruleResults.length : 0;
 
       effectiveness.push({
         rule_id: rule.id,
@@ -398,4 +413,3 @@ export class ValidationRulesService extends BaseService<ValidationRulesServiceCo
  * Export singleton instance
  */
 export const validationRulesService = new ValidationRulesService();
-

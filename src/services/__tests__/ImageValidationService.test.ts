@@ -128,7 +128,9 @@ describe('ImageValidationService', () => {
       const response = await service.validateImage(request);
 
       expect(response.issues.length).toBeGreaterThan(0);
-      expect(response.issues.some(i => i.type === 'invalid_width')).toBe(true);
+      expect(response.issues.some((i) => i.type === 'invalid_width')).toBe(
+        true,
+      );
     });
 
     it('should detect invalid format when format is not allowed', async () => {
@@ -143,7 +145,9 @@ describe('ImageValidationService', () => {
       const response = await service.validateImage(request);
 
       expect(response.issues.length).toBeGreaterThan(0);
-      expect(response.issues.some(i => i.type === 'invalid_format')).toBe(true);
+      expect(response.issues.some((i) => i.type === 'invalid_format')).toBe(
+        true,
+      );
     });
 
     it('should detect file size issues when file is too large', async () => {
@@ -158,7 +162,9 @@ describe('ImageValidationService', () => {
       const response = await service.validateImage(request);
 
       expect(response.issues.length).toBeGreaterThan(0);
-      expect(response.issues.some(i => i.type === 'file_too_large')).toBe(true);
+      expect(response.issues.some((i) => i.type === 'file_too_large')).toBe(
+        true,
+      );
     });
 
     it('should generate recommendations for issues', async () => {
@@ -173,7 +179,9 @@ describe('ImageValidationService', () => {
       const response = await service.validateImage(request);
 
       expect(response.recommendations.length).toBeGreaterThan(0);
-      expect(response.recommendations.some(r => r.type === 'resize_image')).toBe(true);
+      expect(
+        response.recommendations.some((r) => r.type === 'resize_image'),
+      ).toBe(true);
     });
 
     it('should mark image as valid when all checks pass', async () => {
@@ -202,7 +210,7 @@ describe('ImageValidationService', () => {
       // Should have issues
       expect(response.issues.length).toBeGreaterThan(0);
       // Should have high severity issues
-      expect(response.issues.some(i => i.severity === 'high')).toBe(true);
+      expect(response.issues.some((i) => i.severity === 'high')).toBe(true);
     });
   });
 
@@ -239,4 +247,3 @@ describe('ImageValidationService', () => {
     });
   });
 });
-

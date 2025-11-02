@@ -26,12 +26,24 @@ import { ProductDeleteConfirmation } from './ProductDeleteConfirmation';
 import { ProductPreviewModal } from './ProductPreviewModal';
 import { ChunkDetailModal } from './ChunkDetailModal';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -55,20 +67,41 @@ const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) => {
           const { data, error } = await supabase
             .from('ai_call_logs')
             .select('*')
-            .or(`request_data->image_id.eq.${imageId},response_data->image_id.eq.${imageId}`)
+            .or(
+              `request_data->image_id.eq.${imageId},response_data->image_id.eq.${imageId}`,
+            )
             .order('timestamp', { ascending: false });
 
           if (!error && data && data.length > 0) {
-            const totalCost = data.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0);
-            const clipCalls = data.filter(log => log.task.includes('embedding') || log.model.includes('clip'));
-            const llamaCalls = data.filter(log => log.model.includes('llama'));
-            const claudeCalls = data.filter(log => log.model.includes('claude'));
+            const totalCost = data.reduce(
+              (sum, log) => sum + (parseFloat(log.cost) || 0),
+              0,
+            );
+            const clipCalls = data.filter(
+              (log) =>
+                log.task.includes('embedding') || log.model.includes('clip'),
+            );
+            const llamaCalls = data.filter((log) =>
+              log.model.includes('llama'),
+            );
+            const claudeCalls = data.filter((log) =>
+              log.model.includes('claude'),
+            );
 
             setAiCost({
               total: totalCost,
-              clip: clipCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
-              llama: llamaCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
-              claude: claudeCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+              clip: clipCalls.reduce(
+                (sum, log) => sum + (parseFloat(log.cost) || 0),
+                0,
+              ),
+              llama: llamaCalls.reduce(
+                (sum, log) => sum + (parseFloat(log.cost) || 0),
+                0,
+              ),
+              claude: claudeCalls.reduce(
+                (sum, log) => sum + (parseFloat(log.cost) || 0),
+                0,
+              ),
               calls: data.length,
             });
           }
@@ -93,30 +126,48 @@ const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) => {
       </h4>
       <div className="space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-green-700 dark:text-green-300">Total Cost:</span>
-          <span className="font-bold text-green-900 dark:text-green-100">${aiCost.total.toFixed(4)}</span>
+          <span className="text-green-700 dark:text-green-300">
+            Total Cost:
+          </span>
+          <span className="font-bold text-green-900 dark:text-green-100">
+            ${aiCost.total.toFixed(4)}
+          </span>
         </div>
         {aiCost.clip > 0 && (
           <div className="flex justify-between">
-            <span className="text-green-700 dark:text-green-300">CLIP Embedding:</span>
-            <span className="font-medium text-green-900 dark:text-green-100">${aiCost.clip.toFixed(4)}</span>
+            <span className="text-green-700 dark:text-green-300">
+              CLIP Embedding:
+            </span>
+            <span className="font-medium text-green-900 dark:text-green-100">
+              ${aiCost.clip.toFixed(4)}
+            </span>
           </div>
         )}
         {aiCost.llama > 0 && (
           <div className="flex justify-between">
-            <span className="text-green-700 dark:text-green-300">Llama Analysis:</span>
-            <span className="font-medium text-green-900 dark:text-green-100">${aiCost.llama.toFixed(4)}</span>
+            <span className="text-green-700 dark:text-green-300">
+              Llama Analysis:
+            </span>
+            <span className="font-medium text-green-900 dark:text-green-100">
+              ${aiCost.llama.toFixed(4)}
+            </span>
           </div>
         )}
         {aiCost.claude > 0 && (
           <div className="flex justify-between">
-            <span className="text-green-700 dark:text-green-300">Claude Vision:</span>
-            <span className="font-medium text-green-900 dark:text-green-100">${aiCost.claude.toFixed(4)}</span>
+            <span className="text-green-700 dark:text-green-300">
+              Claude Vision:
+            </span>
+            <span className="font-medium text-green-900 dark:text-green-100">
+              ${aiCost.claude.toFixed(4)}
+            </span>
           </div>
         )}
         <div className="flex justify-between pt-2 border-t border-green-200 dark:border-green-700">
           <span className="text-green-700 dark:text-green-300">AI Calls:</span>
-          <span className="font-medium text-green-900 dark:text-green-100">{aiCost.calls}</span>
+          <span className="font-medium text-green-900 dark:text-green-100">
+            {aiCost.calls}
+          </span>
         </div>
       </div>
     </div>
@@ -204,7 +255,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [imageChunkRelationships, setImageChunkRelationships] = useState<ImageChunkRelationship[]>([]);
+  const [imageChunkRelationships, setImageChunkRelationships] = useState<
+    ImageChunkRelationship[]
+  >([]);
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
   // Pagination state for chunks
@@ -220,7 +273,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   // Product management modal states
   const [productFormOpen, setProductFormOpen] = useState(false);
-  const [productFormMode, setProductFormMode] = useState<'create' | 'edit'>('create');
+  const [productFormMode, setProductFormMode] = useState<'create' | 'edit'>(
+    'create',
+  );
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<any | null>(null);
@@ -229,15 +284,41 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
   // Chunk detail modal state
   const [chunkDetailOpen, setChunkDetailOpen] = useState(false);
-  const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(null);
+  const [selectedChunk, setSelectedChunk] = useState<DocumentChunk | null>(
+    null,
+  );
 
   // Use the new API hooks
-  const { data: metadataData, loading: metadataLoading, refetch: refetchMetadata } = useKnowledgeBaseMetadata(workspaceId);
-  const { data: qualityData, loading: qualityLoading, refetch: refetchQuality } = useQualityScores(workspaceId);
-  const { data: embeddingsStatsData, loading: embeddingsStatsLoading, refetch: refetchEmbeddings } = useEmbeddingsStats(workspaceId);
-  const { data: detectionsData, loading: detectionsLoading, refetch: refetchDetections } = useDetections(workspaceId);
-  const { data: dashboardData, loading: dashboardLoading, refetch: refetchDashboard } = useQualityDashboard(workspaceId, 30);
-  const { data: patternsData, loading: patternsLoading, refetch: refetchPatterns } = usePatterns(workspaceId);
+  const {
+    data: metadataData,
+    loading: metadataLoading,
+    refetch: refetchMetadata,
+  } = useKnowledgeBaseMetadata(workspaceId);
+  const {
+    data: qualityData,
+    loading: qualityLoading,
+    refetch: refetchQuality,
+  } = useQualityScores(workspaceId);
+  const {
+    data: embeddingsStatsData,
+    loading: embeddingsStatsLoading,
+    refetch: refetchEmbeddings,
+  } = useEmbeddingsStats(workspaceId);
+  const {
+    data: detectionsData,
+    loading: detectionsLoading,
+    refetch: refetchDetections,
+  } = useDetections(workspaceId);
+  const {
+    data: dashboardData,
+    loading: dashboardLoading,
+    refetch: refetchDashboard,
+  } = useQualityDashboard(workspaceId, 30);
+  const {
+    data: patternsData,
+    loading: patternsLoading,
+    refetch: refetchPatterns,
+  } = usePatterns(workspaceId);
 
   useEffect(() => {
     // Load page immediately, then fetch data in background
@@ -285,7 +366,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
       console.log('🚀 Starting background data load...');
 
       // Get current user and their workspace
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         console.error('❌ User not authenticated');
         return;
@@ -300,7 +383,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
         .order('joined_at', { ascending: true })
         .limit(1);
 
-      if (workspaceError || !workspaceDataArray || workspaceDataArray.length === 0) {
+      if (
+        workspaceError ||
+        !workspaceDataArray ||
+        workspaceDataArray.length === 0
+      ) {
         console.error('❌ Error getting workspace:', workspaceError);
         console.error('❌ User has no active workspace membership');
         return;
@@ -320,9 +407,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       // Fetch chunks with pagination to handle large datasets
       while (hasMore) {
-        const { data: chunksData, error: chunksError, count: chunksCount } = await supabase
+        const {
+          data: chunksData,
+          error: chunksError,
+          count: chunksCount,
+        } = await supabase
           .from('document_chunks')
-          .select(`
+          .select(
+            `
             *,
             documents(
               id,
@@ -331,7 +423,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               processing_status,
               created_at
             )
-          `, { count: 'exact' })
+          `,
+            { count: 'exact' },
+          )
           .eq('workspace_id', workspaceId)
           .order('created_at', { ascending: false })
           .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -346,13 +440,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
         } else {
           allChunks = allChunks.concat(chunksData);
           totalCount = chunksCount || 0;
-          console.log(`📖 Fetched page ${page + 1}: ${chunksData.length} chunks (total so far: ${allChunks.length}/${totalCount})`);
+          console.log(
+            `📖 Fetched page ${page + 1}: ${chunksData.length} chunks (total so far: ${allChunks.length}/${totalCount})`,
+          );
           page++;
           hasMore = chunksData.length === pageSize;
         }
       }
 
-      console.log(`✅ Loaded ${allChunks.length} chunks (total count: ${totalCount})`);
+      console.log(
+        `✅ Loaded ${allChunks.length} chunks (total count: ${totalCount})`,
+      );
       setChunks(allChunks || []);
 
       // Load ALL images with pagination
@@ -364,7 +462,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       while (imagesHasMore) {
         try {
-          const { data: imagesData, error: imagesError, count: imagesCount } = await supabase
+          const {
+            data: imagesData,
+            error: imagesError,
+            count: imagesCount,
+          } = await supabase
             .from('document_images')
             .select('*', { count: 'exact' })
             .eq('workspace_id', workspaceId)
@@ -373,7 +475,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
           if (imagesError) {
             console.error('❌ Error loading images:', imagesError);
-            console.error('❌ Error details:', { code: imagesError.code, message: imagesError.message });
+            console.error('❌ Error details:', {
+              code: imagesError.code,
+              message: imagesError.message,
+            });
             // Don't throw - continue with empty images
             imagesHasMore = false;
           } else if (!imagesData || imagesData.length === 0) {
@@ -381,7 +486,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
           } else {
             allImages = allImages.concat(imagesData);
             imagesTotalCount = imagesCount || 0;
-            console.log(`📷 Fetched image page ${imagePage + 1}: ${imagesData.length} images (total so far: ${allImages.length}/${imagesTotalCount})`);
+            console.log(
+              `📷 Fetched image page ${imagePage + 1}: ${imagesData.length} images (total so far: ${allImages.length}/${imagesTotalCount})`,
+            );
             imagePage++;
             imagesHasMore = imagesData.length === pageSize;
           }
@@ -391,7 +498,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
         }
       }
 
-      console.log(`✅ Loaded ${allImages.length} images (total count: ${imagesTotalCount})`);
+      console.log(
+        `✅ Loaded ${allImages.length} images (total count: ${imagesTotalCount})`,
+      );
       setImages(allImages || []);
 
       // Load embeddings - query both embeddings and document_vectors tables
@@ -399,14 +508,20 @@ export const MaterialKnowledgeBase: React.FC = () => {
       console.log('🔢 Loading embeddings from database...');
       let embeddingsData: unknown[] = [];
 
-      const { data: vectorsData, error: vectorsError, count: vectorsCount } = await supabase
+      const {
+        data: vectorsData,
+        error: vectorsError,
+        count: vectorsCount,
+      } = await supabase
         .from('document_vectors')
         .select('*', { count: 'exact' })
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false });
 
       if (!vectorsError && vectorsData && vectorsData.length > 0) {
-        console.log(`✅ Loaded ${vectorsData.length} embeddings from document_vectors (total count: ${vectorsCount})`);
+        console.log(
+          `✅ Loaded ${vectorsData.length} embeddings from document_vectors (total count: ${vectorsCount})`,
+        );
         embeddingsData = vectorsData;
       } else {
         if (vectorsError) {
@@ -416,7 +531,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
         }
 
         // Fall back to embeddings table
-        const { data: embeddingsTableData, error: embeddingsError, count: embeddingsCount } = await supabase
+        const {
+          data: embeddingsTableData,
+          error: embeddingsError,
+          count: embeddingsCount,
+        } = await supabase
           .from('embeddings')
           .select('*', { count: 'exact' })
           .eq('workspace_id', workspaceId)
@@ -425,7 +544,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
         if (embeddingsError) {
           console.warn('⚠️ embeddings table query failed:', embeddingsError);
         } else {
-          console.log(`✅ Loaded ${embeddingsTableData?.length || 0} embeddings from embeddings table (total count: ${embeddingsCount})`);
+          console.log(
+            `✅ Loaded ${embeddingsTableData?.length || 0} embeddings from embeddings table (total count: ${embeddingsCount})`,
+          );
           embeddingsData = embeddingsTableData || [];
         }
       }
@@ -445,32 +566,50 @@ export const MaterialKnowledgeBase: React.FC = () => {
         // Don't throw - just log and continue with empty products
         setProducts([]);
       } else {
-        console.log(`✅ Loaded ${productsData?.length || 0} products from database`);
+        console.log(
+          `✅ Loaded ${productsData?.length || 0} products from database`,
+        );
         setProducts(productsData || []);
       }
 
       // Load image chunk relationships
       console.log('🔗 Loading image chunk relationships...');
-      const { data: relationshipsData, error: relationshipsError } = await supabase
-        .from('image_chunk_relationships')
-        .select('*')
-        .order('similarity_score', { ascending: false });
+      const { data: relationshipsData, error: relationshipsError } =
+        await supabase
+          .from('image_chunk_relationships')
+          .select('*')
+          .order('similarity_score', { ascending: false });
 
       if (relationshipsError) {
-        console.warn('⚠️ Error loading image chunk relationships:', relationshipsError);
+        console.warn(
+          '⚠️ Error loading image chunk relationships:',
+          relationshipsError,
+        );
         setImageChunkRelationships([]);
       } else {
-        console.log(`✅ Loaded ${relationshipsData?.length || 0} image chunk relationships`);
+        console.log(
+          `✅ Loaded ${relationshipsData?.length || 0} image chunk relationships`,
+        );
         setImageChunkRelationships(relationshipsData || []);
       }
 
       // Calculate stats
       console.log('📈 Calculating statistics...');
-      const uniqueDocuments = new Set(allChunks?.map((c: unknown) => (c as any).document_id) || []).size;
-      const avgChunkSize = allChunks?.length ?
-        allChunks.reduce((sum: number, chunk: any) => sum + chunk.content.length, 0) / allChunks.length : 0;
-      const avgConfidence = allImages?.length ?
-        allImages.reduce((sum: number, img: any) => sum + (img.confidence || 0), 0) / allImages.length : 0;
+      const uniqueDocuments = new Set(
+        allChunks?.map((c: unknown) => (c as any).document_id) || [],
+      ).size;
+      const avgChunkSize = allChunks?.length
+        ? allChunks.reduce(
+            (sum: number, chunk: any) => sum + chunk.content.length,
+            0,
+          ) / allChunks.length
+        : 0;
+      const avgConfidence = allImages?.length
+        ? allImages.reduce(
+            (sum: number, img: any) => sum + (img.confidence || 0),
+            0,
+          ) / allImages.length
+        : 0;
 
       const calculatedStats = {
         totalChunks: allChunks?.length || 0,
@@ -483,7 +622,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       console.log('📊 Final stats:', calculatedStats);
       setStats(calculatedStats);
-
     } catch (error) {
       console.error('❌ Error loading knowledge base data:', error);
       console.error('Error details:', {
@@ -529,10 +667,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
         .eq('image_id', imageId);
 
       // 5. Delete from image_validations
-      await supabase
-        .from('image_validations')
-        .delete()
-        .eq('image_id', imageId);
+      await supabase.from('image_validations').delete().eq('image_id', imageId);
 
       // 6. Finally delete from document_images
       const { error: deleteError } = await supabase
@@ -551,7 +686,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
       }
 
       // Remove from local state
-      setImages(images.filter(img => img.id !== imageId));
+      setImages(images.filter((img) => img.id !== imageId));
       console.log(`✅ Image deleted successfully: ${imageId}`);
       toast({
         title: 'Success',
@@ -570,37 +705,40 @@ export const MaterialKnowledgeBase: React.FC = () => {
   };
 
   const getChunksByDocument = (documentId: string) => {
-    return chunks.filter(chunk => chunk.document_id === documentId);
+    return chunks.filter((chunk) => chunk.document_id === documentId);
   };
 
   const getImagesByDocument = (documentId: string) => {
-    return images.filter(image => image.document_id === documentId);
+    return images.filter((image) => image.document_id === documentId);
   };
 
   const getImagesByChunk = (chunkId: string) => {
-    return images.filter(image => image.chunk_id === chunkId);
+    return images.filter((image) => image.chunk_id === chunkId);
   };
 
   const getEmbeddingByChunk = (chunkId: string) => {
-    return embeddings.find(embedding => embedding.chunk_id === chunkId);
+    return embeddings.find((embedding) => embedding.chunk_id === chunkId);
   };
 
   // IMPROVED: Find related chunks based on document proximity
   const getRelatedChunks = (chunk: DocumentChunk, limit: number = 3) => {
     return chunks
-      .filter(c =>
-        c.document_id === chunk.document_id &&
-        c.id !== chunk.id &&
-        Math.abs(c.chunk_index - chunk.chunk_index) <= 2,
+      .filter(
+        (c) =>
+          c.document_id === chunk.document_id &&
+          c.id !== chunk.id &&
+          Math.abs(c.chunk_index - chunk.chunk_index) <= 2,
       )
       .slice(0, limit);
   };
 
   // Get all related chunks for an image using semantic relationships
   const getRelatedChunksForImage = (imageId: string): DocumentChunk[] => {
-    const relationships = imageChunkRelationships.filter(r => r.image_id === imageId);
-    const relatedChunkIds = relationships.map(r => r.chunk_id);
-    return chunks.filter(c => relatedChunkIds.includes(c.id));
+    const relationships = imageChunkRelationships.filter(
+      (r) => r.image_id === imageId,
+    );
+    const relatedChunkIds = relationships.map((r) => r.chunk_id);
+    return chunks.filter((c) => relatedChunkIds.includes(c.id));
   };
 
   // Pagination helpers
@@ -699,7 +837,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
         if (error) throw error;
 
-        setProducts(products.map(p => p.id === data.id ? data : p));
+        setProducts(products.map((p) => (p.id === data.id ? data : p)));
         toast({
           title: 'Success',
           description: 'Product updated successfully',
@@ -720,7 +858,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       if (error) throw error;
 
-      setProducts(products.filter(p => p.id !== productId));
+      setProducts(products.filter((p) => p.id !== productId));
     } catch (error) {
       console.error('Error deleting product:', error);
       throw error;
@@ -782,7 +920,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
       description: 'Fetching latest admin data...',
       duration: 2000,
     });
-  }, [refetchMetadata, refetchQuality, refetchEmbeddings, refetchDetections, refetchDashboard, refetchPatterns, toast]);
+  }, [
+    refetchMetadata,
+    refetchQuality,
+    refetchEmbeddings,
+    refetchDetections,
+    refetchDashboard,
+    refetchPatterns,
+    toast,
+  ]);
 
   const formatJsonForDisplay = (data: unknown): string => {
     if (!data) return 'N/A';
@@ -800,29 +946,32 @@ export const MaterialKnowledgeBase: React.FC = () => {
   const filteredChunks = useMemo(() => {
     if (!debouncedSearchQuery) return chunks;
     const query = debouncedSearchQuery.toLowerCase();
-    return chunks.filter(chunk =>
-      chunk.content?.toLowerCase().includes(query) ||
-      chunk.chunk_index?.toString().includes(query) ||
-      getDocumentDisplayName(chunk).toLowerCase().includes(query),
+    return chunks.filter(
+      (chunk) =>
+        chunk.content?.toLowerCase().includes(query) ||
+        chunk.chunk_index?.toString().includes(query) ||
+        getDocumentDisplayName(chunk).toLowerCase().includes(query),
     );
   }, [chunks, debouncedSearchQuery]);
 
   const filteredImages = useMemo(() => {
     if (!debouncedSearchQuery) return images;
     const query = debouncedSearchQuery.toLowerCase();
-    return images.filter(image =>
-      image.caption?.toLowerCase().includes(query) ||
-      image.contextual_name?.toLowerCase().includes(query) ||
-      image.nearest_heading?.toLowerCase().includes(query),
+    return images.filter(
+      (image) =>
+        image.caption?.toLowerCase().includes(query) ||
+        image.contextual_name?.toLowerCase().includes(query) ||
+        image.nearest_heading?.toLowerCase().includes(query),
     );
   }, [images, debouncedSearchQuery]);
 
   const filteredProducts = useMemo(() => {
     if (!debouncedSearchQuery) return products;
     const query = debouncedSearchQuery.toLowerCase();
-    return products.filter(product =>
-      product.name?.toLowerCase().includes(query) ||
-      product.description?.toLowerCase().includes(query),
+    return products.filter(
+      (product) =>
+        product.name?.toLowerCase().includes(query) ||
+        product.description?.toLowerCase().includes(query),
     );
   }, [products, debouncedSearchQuery]);
 
@@ -881,7 +1030,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
       return (chunk.metadata as any).filename.replace(/\.[^/.]+$/, '');
     }
     if ((chunk.metadata as any)?.title) return (chunk.metadata as any).title;
-    if ((chunk.metadata as any)?.source) return `${(chunk.metadata as any).source} Document`;
+    if ((chunk.metadata as any)?.source)
+      return `${(chunk.metadata as any).source} Document`;
 
     return 'Unknown Document';
   };
@@ -909,7 +1059,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <div>
             <h1 className="text-3xl font-bold">Material Knowledge Base</h1>
             <p className="text-muted-foreground">
-              Comprehensive view of processed documents, chunks, images, and embeddings
+              Comprehensive view of processed documents, chunks, images, and
+              embeddings
               {lastRefreshTime && (
                 <span className="text-xs ml-2">
                   • Last updated: {lastRefreshTime.toLocaleTimeString()}
@@ -924,7 +1075,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
             variant={autoRefreshEnabled ? 'default' : 'outline'}
             size="sm"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${autoRefreshEnabled ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`h-4 w-4 mr-2 ${autoRefreshEnabled ? 'animate-spin' : ''}`}
+            />
             Auto-Refresh {autoRefreshEnabled ? 'ON' : 'OFF'}
           </Button>
           <Button onClick={refreshAllAdminData} variant="outline" size="sm">
@@ -951,7 +1104,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </div>
               </div>
             </CardContent>
-          </Card><Card>
+          </Card>
+          <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Layers className="h-4 w-4 text-green-500" />
@@ -993,17 +1147,22 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <Hash className="h-4 w-4 text-cyan-500" />
                 <div>
                   <p className="text-2xl font-bold">{stats.avgChunkSize}</p>
-                  <p className="text-xs text-muted-foreground">Avg Chunk Size</p>
+                  <p className="text-xs text-muted-foreground">
+                    Avg Chunk Size
+                  </p>
                 </div>
               </div>
             </CardContent>
-          </Card><Card>
+          </Card>
+          <Card>
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
                 <Brain className="h-4 w-4 text-yellow-500" />
                 <div>
                   <p className="text-2xl font-bold">{stats.avgConfidence}</p>
-                  <p className="text-xs text-muted-foreground">Avg Confidence</p>
+                  <p className="text-xs text-muted-foreground">
+                    Avg Confidence
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -1032,10 +1191,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-11">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="chunks">Chunks ({stats?.totalChunks || 0})</TabsTrigger>
-          <TabsTrigger value="images">Images ({stats?.totalImages || 0})</TabsTrigger>
-          <TabsTrigger value="embeddings">Embeddings ({stats?.totalEmbeddings || 0})</TabsTrigger>
-          <TabsTrigger value="products">📦 Products ({products.length})</TabsTrigger>
+          <TabsTrigger value="chunks">
+            Chunks ({stats?.totalChunks || 0})
+          </TabsTrigger>
+          <TabsTrigger value="images">
+            Images ({stats?.totalImages || 0})
+          </TabsTrigger>
+          <TabsTrigger value="embeddings">
+            Embeddings ({stats?.totalEmbeddings || 0})
+          </TabsTrigger>
+          <TabsTrigger value="products">
+            📦 Products ({products.length})
+          </TabsTrigger>
           <TabsTrigger value="metadata">📊 Metadata</TabsTrigger>
           <TabsTrigger value="quality">⭐ Quality</TabsTrigger>
           <TabsTrigger value="embeddings-stats">🧠 Embeddings</TabsTrigger>
@@ -1064,67 +1231,89 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {Array.from(new Set(chunks.map(c => c.document_id))).map(docId => {
-                      const docChunks = getChunksByDocument(docId);
-                      const docImages = getImagesByDocument(docId);
-                      const firstChunk = docChunks[0];
-                      const doc = (firstChunk as any).documents;
+                    {Array.from(new Set(chunks.map((c) => c.document_id))).map(
+                      (docId) => {
+                        const docChunks = getChunksByDocument(docId);
+                        const docImages = getImagesByDocument(docId);
+                        const firstChunk = docChunks[0];
+                        const doc = (firstChunk as any).documents;
 
-                      return (
-                        <div
-                          key={docId}
-                          className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
-                          onClick={() => navigate(`/admin/documents/${docId}`)}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <p className="font-semibold flex items-center gap-2 group-hover:text-primary">
-                                {getDocumentDisplayName(firstChunk)}
-                                <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                📄 {doc?.filename || 'Unknown filename'}
-                              </p>
-                            </div>
-                            <Badge variant={doc?.processing_status === 'completed' ? 'default' : 'secondary'}>
-                              {doc?.processing_status || 'unknown'}
-                            </Badge>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-                            <div>
-                              <span className="text-muted-foreground">Chunks:</span>
-                              <span className="ml-1 font-medium">{docChunks.length}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Images:</span>
-                              <span className="ml-1 font-medium">{docImages.length}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex gap-2 text-xs text-muted-foreground mb-3">
-                            <Badge variant="outline">{docChunks.length} chunks</Badge>
-                            <Badge variant="outline">{docImages.length} images</Badge>
-                            <Badge variant="outline">
-                              {new Date(doc?.created_at).toLocaleDateString()}
-                            </Badge>
-                          </div>
-
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/admin/documents/${docId}`);
-                            }}
+                        return (
+                          <div
+                            key={docId}
+                            className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
+                            onClick={() =>
+                              navigate(`/admin/documents/${docId}`)
+                            }
                           >
-                            View Details
-                            <ChevronRight className="h-4 w-4 ml-2" />
-                          </Button>
-                        </div>
-                      );
-                    })}
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <p className="font-semibold flex items-center gap-2 group-hover:text-primary">
+                                  {getDocumentDisplayName(firstChunk)}
+                                  <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  📄 {doc?.filename || 'Unknown filename'}
+                                </p>
+                              </div>
+                              <Badge
+                                variant={
+                                  doc?.processing_status === 'completed'
+                                    ? 'default'
+                                    : 'secondary'
+                                }
+                              >
+                                {doc?.processing_status || 'unknown'}
+                              </Badge>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+                              <div>
+                                <span className="text-muted-foreground">
+                                  Chunks:
+                                </span>
+                                <span className="ml-1 font-medium">
+                                  {docChunks.length}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">
+                                  Images:
+                                </span>
+                                <span className="ml-1 font-medium">
+                                  {docImages.length}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2 text-xs text-muted-foreground mb-3">
+                              <Badge variant="outline">
+                                {docChunks.length} chunks
+                              </Badge>
+                              <Badge variant="outline">
+                                {docImages.length} images
+                              </Badge>
+                              <Badge variant="outline">
+                                {new Date(doc?.created_at).toLocaleDateString()}
+                              </Badge>
+                            </div>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/admin/documents/${docId}`);
+                              }}
+                            >
+                              View Details
+                              <ChevronRight className="h-4 w-4 ml-2" />
+                            </Button>
+                          </div>
+                        );
+                      },
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1142,15 +1331,21 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>Text Chunks</span>
-                    <Badge variant="secondary">{stats?.totalChunks || 0} processed</Badge>
+                    <Badge variant="secondary">
+                      {stats?.totalChunks || 0} processed
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Images Extracted</span>
-                    <Badge variant="secondary">{stats?.totalImages || 0} extracted</Badge>
+                    <Badge variant="secondary">
+                      {stats?.totalImages || 0} extracted
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>Embeddings Generated</span>
-                    <Badge variant="secondary">{stats?.totalEmbeddings || 0} generated</Badge>
+                    <Badge variant="secondary">
+                      {stats?.totalEmbeddings || 0} generated
+                    </Badge>
                   </div>
                 </div>
               </CardContent>
@@ -1163,7 +1358,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
             <CardHeader>
               <CardTitle>Document Chunks</CardTitle>
               <CardDescription>
-                Text chunks extracted from processed documents with their metadata and relationships
+                Text chunks extracted from processed documents with their
+                metadata and relationships
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1171,7 +1367,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <div className="text-center py-8">
                   <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    {searchQuery ? 'No chunks match your search.' : 'No chunks available. Process some PDFs to see content here.'}
+                    {searchQuery
+                      ? 'No chunks match your search.'
+                      : 'No chunks available. Process some PDFs to see content here.'}
                   </p>
                 </div>
               ) : (
@@ -1179,7 +1377,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   {/* Pagination Info */}
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
                     <span>
-                      Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredChunks.length)} of {filteredChunks.length} chunks
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to{' '}
+                      {Math.min(
+                        currentPage * itemsPerPage,
+                        filteredChunks.length,
+                      )}{' '}
+                      of {filteredChunks.length} chunks
                     </span>
                   </div>
 
@@ -1197,18 +1400,26 @@ export const MaterialKnowledgeBase: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              <Badge variant="outline">Chunk {chunk.chunk_index}</Badge>
+                              <Badge variant="outline">
+                                Chunk {chunk.chunk_index}
+                              </Badge>
                               <Badge variant="secondary">
                                 {getDocumentDisplayName(chunk)}
                               </Badge>
                               {relatedImages.length > 0 && (
-                                <Badge variant="outline" className="text-purple-600">
+                                <Badge
+                                  variant="outline"
+                                  className="text-purple-600"
+                                >
                                   <ImageIcon className="h-3 w-3 mr-1" />
                                   {relatedImages.length} images
                                 </Badge>
                               )}
                               {embedding && (
-                                <Badge variant="outline" className="text-orange-600">
+                                <Badge
+                                  variant="outline"
+                                  className="text-orange-600"
+                                >
                                   <Brain className="h-3 w-3 mr-1" />
                                   Embedded
                                 </Badge>
@@ -1220,16 +1431,24 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             {/* IMPROVED: Add context information */}
                             <div className="grid grid-cols-2 gap-2 mt-2 text-xs text-muted-foreground">
                               <div>
-                                <span className="font-medium">Position:</span> {chunk.chunk_index + 1}
+                                <span className="font-medium">Position:</span>{' '}
+                                {chunk.chunk_index + 1}
                               </div>
                               <div>
-                                <span className="font-medium">Size:</span> {chunk.content.length} chars
+                                <span className="font-medium">Size:</span>{' '}
+                                {chunk.content.length} chars
                               </div>
                               <div>
-                                <span className="font-medium">Quality:</span> {(chunk.metadata as any)?.quality_score ? `${Math.round((chunk.metadata as any).quality_score * 100)}%` : 'N/A'}
+                                <span className="font-medium">Quality:</span>{' '}
+                                {(chunk.metadata as any)?.quality_score
+                                  ? `${Math.round((chunk.metadata as any).quality_score * 100)}%`
+                                  : 'N/A'}
                               </div>
                               <div>
-                                <span className="font-medium">Date:</span> {new Date(chunk.created_at).toLocaleDateString()}
+                                <span className="font-medium">Date:</span>{' '}
+                                {new Date(
+                                  chunk.created_at,
+                                ).toLocaleDateString()}
                               </div>
                             </div>
                           </div>
@@ -1245,7 +1464,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(1)} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(1)}
+                        onClick={() => setCurrentPage(1)}
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && setCurrentPage(1)
+                        }
                         disabled={currentPage === 1}
                         className="px-3"
                       >
@@ -1254,7 +1476,13 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(Math.max(1, currentPage - 1))}
+                        onClick={() =>
+                          setCurrentPage(Math.max(1, currentPage - 1))
+                        }
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' &&
+                          setCurrentPage(Math.max(1, currentPage - 1))
+                        }
                         disabled={currentPage === 1}
                         className="px-3"
                       >
@@ -1263,30 +1491,48 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                       {/* Smart pagination with ellipsis */}
                       <div className="flex gap-1">
-                        {getPaginationNumbers().map((page, index) => (
+                        {getPaginationNumbers().map((page, index) =>
                           page === '...' ? (
-                            <span key={`ellipsis-${index}`} className="px-2 py-1 text-muted-foreground">
+                            <span
+                              key={`ellipsis-${index}`}
+                              className="px-2 py-1 text-muted-foreground"
+                            >
                               ...
                             </span>
                           ) : (
                             <Button
                               key={page}
-                              variant={currentPage === page ? 'default' : 'outline'}
+                              variant={
+                                currentPage === page ? 'default' : 'outline'
+                              }
                               size="sm"
                               onClick={() => setCurrentPage(page as number)}
-                              onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(page as number)}
+                              onKeyDown={(e) =>
+                                e.key === 'Enter' &&
+                                setCurrentPage(page as number)
+                              }
                               className="w-8 h-8 p-0"
                             >
                               {page}
                             </Button>
-                          )
-                        ))}
+                          ),
+                        )}
                       </div>
 
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                        onClick={() =>
+                          setCurrentPage(
+                            Math.min(getTotalPages(), currentPage + 1),
+                          )
+                        }
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' &&
+                          setCurrentPage(
+                            Math.min(getTotalPages(), currentPage + 1),
+                          )
+                        }
                         disabled={currentPage === getTotalPages()}
                         className="px-3"
                       >
@@ -1295,7 +1541,10 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(getTotalPages())} onKeyDown={(e) => e.key === 'Enter' && setCurrentPage(getTotalPages())}
+                        onClick={() => setCurrentPage(getTotalPages())}
+                        onKeyDown={(e) =>
+                          e.key === 'Enter' && setCurrentPage(getTotalPages())
+                        }
                         disabled={currentPage === getTotalPages()}
                         className="px-3"
                       >
@@ -1314,7 +1563,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
             <CardHeader>
               <CardTitle>Extracted Images</CardTitle>
               <CardDescription>
-                Images extracted from documents with their metadata, analysis results, and relationships
+                Images extracted from documents with their metadata, analysis
+                results, and relationships
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1322,7 +1572,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <div className="text-center py-8">
                   <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    {searchQuery ? 'No images match your search.' : 'No images available. Process PDFs with images to see content here.'}
+                    {searchQuery
+                      ? 'No images match your search.'
+                      : 'No images available. Process PDFs with images to see content here.'}
                   </p>
                 </div>
               ) : (
@@ -1336,8 +1588,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             alt={image.caption || 'Document image'}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              console.warn(`Failed to load image: ${image.image_url}`);
-                              (e.target as HTMLImageElement).style.display = 'none';
+                              console.warn(
+                                `Failed to load image: ${image.image_url}`,
+                              );
+                              (e.target as HTMLImageElement).style.display =
+                                'none';
                             }}
                           />
                         ) : (
@@ -1347,9 +1602,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <CardContent className="p-4">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Badge variant="outline">{image.image_type || 'Unknown'}</Badge>
+                            <Badge variant="outline">
+                              {image.image_type || 'Unknown'}
+                            </Badge>
                             <Badge variant="secondary">
-                              {Math.round((image.confidence || 0) * 100)}% confidence
+                              {Math.round((image.confidence || 0) * 100)}%
+                              confidence
                             </Badge>
                           </div>
 
@@ -1358,21 +1616,26 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           </h4>
 
                           {image.alt_text && (
-                            <p className="text-sm text-muted-foreground">{image.alt_text}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {image.alt_text}
+                            </p>
                           )}
 
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
-                              <span className="font-medium">Page:</span> {image.page_number || 'N/A'}
+                              <span className="font-medium">Page:</span>{' '}
+                              {image.page_number || 'N/A'}
                             </div>
                             <div>
-                              <span className="font-medium">Status:</span> {image.processing_status || 'N/A'}
+                              <span className="font-medium">Status:</span>{' '}
+                              {image.processing_status || 'N/A'}
                             </div>
                           </div>
 
                           {image.nearest_heading && (
                             <div className="text-xs">
-                              <span className="font-medium">Near:</span> {image.nearest_heading}
+                              <span className="font-medium">Near:</span>{' '}
+                              {image.nearest_heading}
                             </div>
                           )}
 
@@ -1388,7 +1651,11 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div className="flex gap-2 pt-2">
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="flex-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="flex-1"
+                                >
                                   <Eye className="h-4 w-4 mr-2" />
                                   Details
                                 </Button>
@@ -1405,8 +1672,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                         alt={image.caption || 'Document image'}
                                         className="w-full h-full object-cover"
                                         onError={(e) => {
-                                          console.warn(`Failed to load image in modal: ${image.image_url}`);
-                                          (e.target as HTMLImageElement).style.display = 'none';
+                                          console.warn(
+                                            `Failed to load image in modal: ${image.image_url}`,
+                                          );
+                                          (
+                                            e.target as HTMLImageElement
+                                          ).style.display = 'none';
                                         }}
                                       />
                                     ) : (
@@ -1416,45 +1687,84 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                                   <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-                                      <h4 className="font-semibold mb-3 text-blue-900 dark:text-blue-100">Basic Information</h4>
+                                      <h4 className="font-semibold mb-3 text-blue-900 dark:text-blue-100">
+                                        Basic Information
+                                      </h4>
                                       <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
-                                          <span className="text-blue-700 dark:text-blue-300">Type:</span>
-                                          <span className="font-medium text-blue-900 dark:text-blue-100">{image.image_type || 'Unknown'}</span>
+                                          <span className="text-blue-700 dark:text-blue-300">
+                                            Type:
+                                          </span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">
+                                            {image.image_type || 'Unknown'}
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-blue-700 dark:text-blue-300">Page:</span>
-                                          <span className="font-medium text-blue-900 dark:text-blue-100">{image.page_number || 'N/A'}</span>
+                                          <span className="text-blue-700 dark:text-blue-300">
+                                            Page:
+                                          </span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">
+                                            {image.page_number || 'N/A'}
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-blue-700 dark:text-blue-300">Confidence:</span>
-                                          <span className="font-medium text-blue-900 dark:text-blue-100">{Math.round((image.confidence || 0) * 100)}%</span>
+                                          <span className="text-blue-700 dark:text-blue-300">
+                                            Confidence:
+                                          </span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">
+                                            {Math.round(
+                                              (image.confidence || 0) * 100,
+                                            )}
+                                            %
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-blue-700 dark:text-blue-300">Status:</span>
-                                          <span className="font-medium text-blue-900 dark:text-blue-100">{image.processing_status || 'N/A'}</span>
+                                          <span className="text-blue-700 dark:text-blue-300">
+                                            Status:
+                                          </span>
+                                          <span className="font-medium text-blue-900 dark:text-blue-100">
+                                            {image.processing_status || 'N/A'}
+                                          </span>
                                         </div>
                                       </div>
                                     </div>
 
                                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-                                      <h4 className="font-semibold mb-3 text-purple-900 dark:text-purple-100">Context Information</h4>
+                                      <h4 className="font-semibold mb-3 text-purple-900 dark:text-purple-100">
+                                        Context Information
+                                      </h4>
                                       <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
-                                          <span className="text-purple-700 dark:text-purple-300">Contextual Name:</span>
-                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.contextual_name || 'N/A'}</span>
+                                          <span className="text-purple-700 dark:text-purple-300">
+                                            Contextual Name:
+                                          </span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">
+                                            {image.contextual_name || 'N/A'}
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-purple-700 dark:text-purple-300">Nearest Heading:</span>
-                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.nearest_heading || 'N/A'}</span>
+                                          <span className="text-purple-700 dark:text-purple-300">
+                                            Nearest Heading:
+                                          </span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">
+                                            {image.nearest_heading || 'N/A'}
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-purple-700 dark:text-purple-300">Heading Level:</span>
-                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.heading_level || 'N/A'}</span>
+                                          <span className="text-purple-700 dark:text-purple-300">
+                                            Heading Level:
+                                          </span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">
+                                            {image.heading_level || 'N/A'}
+                                          </span>
                                         </div>
                                         <div className="flex justify-between">
-                                          <span className="text-purple-700 dark:text-purple-300">Distance:</span>
-                                          <span className="font-medium text-purple-900 dark:text-purple-100">{image.heading_distance || 'N/A'}</span>
+                                          <span className="text-purple-700 dark:text-purple-300">
+                                            Distance:
+                                          </span>
+                                          <span className="font-medium text-purple-900 dark:text-purple-100">
+                                            {image.heading_distance || 'N/A'}
+                                          </span>
                                         </div>
                                       </div>
                                     </div>
@@ -1462,7 +1772,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                                   {image.ocr_extracted_text && (
                                     <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg p-4 border border-green-200 dark:border-green-800">
-                                      <h4 className="font-semibold mb-2 text-green-900 dark:text-green-100">OCR Extracted Text</h4>
+                                      <h4 className="font-semibold mb-2 text-green-900 dark:text-green-100">
+                                        OCR Extracted Text
+                                      </h4>
                                       <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
                                         {image.ocr_extracted_text}
                                       </div>
@@ -1471,31 +1783,53 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                                   {/* IMPROVED: Show ALL related chunks */}
                                   {(() => {
-                                    const relatedChunks = getRelatedChunksForImage(image.id);
+                                    const relatedChunks =
+                                      getRelatedChunksForImage(image.id);
                                     return relatedChunks.length > 0 ? (
                                       <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
                                         <h4 className="font-semibold mb-3 text-amber-900 dark:text-amber-100">
-                                          Related Chunks ({relatedChunks.length})
+                                          Related Chunks ({relatedChunks.length}
+                                          )
                                         </h4>
                                         <div className="space-y-2 max-h-64 overflow-y-auto">
                                           {relatedChunks.map((chunk) => {
-                                            const relationship = imageChunkRelationships.find(
-                                              r => r.image_id === image.id && r.chunk_id === chunk.id,
-                                            );
+                                            const relationship =
+                                              imageChunkRelationships.find(
+                                                (r) =>
+                                                  r.image_id === image.id &&
+                                                  r.chunk_id === chunk.id,
+                                              );
                                             return (
-                                              <div key={chunk.id} className="bg-white dark:bg-gray-900 rounded p-3 border border-amber-100 dark:border-amber-800">
+                                              <div
+                                                key={chunk.id}
+                                                className="bg-white dark:bg-gray-900 rounded p-3 border border-amber-100 dark:border-amber-800"
+                                              >
                                                 <div className="flex items-center justify-between mb-2">
-                                                  <Badge variant="outline" className="text-xs">
+                                                  <Badge
+                                                    variant="outline"
+                                                    className="text-xs"
+                                                  >
                                                     Chunk {chunk.chunk_index}
                                                   </Badge>
                                                   {relationship && (
-                                                    <Badge variant="secondary" className="text-xs">
-                                                      {Math.round(relationship.similarity_score * 100)}% match
+                                                    <Badge
+                                                      variant="secondary"
+                                                      className="text-xs"
+                                                    >
+                                                      {Math.round(
+                                                        relationship.similarity_score *
+                                                          100,
+                                                      )}
+                                                      % match
                                                     </Badge>
                                                   )}
                                                 </div>
                                                 <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-3">
-                                                  {chunk.content.substring(0, 200)}...
+                                                  {chunk.content.substring(
+                                                    0,
+                                                    200,
+                                                  )}
+                                                  ...
                                                 </p>
                                               </div>
                                             );
@@ -1504,54 +1838,95 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                       </div>
                                     ) : image.chunk_id ? (
                                       <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
-                                        <h4 className="font-semibold mb-2 text-amber-900 dark:text-amber-100">Related Chunk</h4>
+                                        <h4 className="font-semibold mb-2 text-amber-900 dark:text-amber-100">
+                                          Related Chunk
+                                        </h4>
                                         <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm text-gray-700 dark:text-gray-300 max-h-32 overflow-y-auto">
-                                          {chunks.find(c => c.id === image.chunk_id)?.content.substring(0, 300) || 'Chunk not found'}...
+                                          {chunks
+                                            .find(
+                                              (c) => c.id === image.chunk_id,
+                                            )
+                                            ?.content.substring(0, 300) ||
+                                            'Chunk not found'}
+                                          ...
                                         </div>
                                       </div>
                                     ) : null;
                                   })()}
 
                                   {/* Material Properties */}
-                                  {image.material_properties && Object.keys(image.material_properties as any).length > 0 && (
-                                    <div className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 rounded-lg p-4 border border-teal-200 dark:border-teal-800">
-                                      <h4 className="font-semibold mb-3 text-teal-900 dark:text-teal-100">Material Properties</h4>
-                                      <div className="grid grid-cols-2 gap-3 text-sm">
-                                        {Object.entries(image.material_properties as any).map(([key, value]) => (
-                                          <div key={key} className="bg-white dark:bg-gray-900 rounded p-2 border border-teal-100 dark:border-teal-800">
-                                            <span className="font-medium text-teal-700 dark:text-teal-300">{key}:</span>
-                                            <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
-                                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                            </p>
-                                          </div>
-                                        ))}
+                                  {image.material_properties &&
+                                    Object.keys(
+                                      image.material_properties as any,
+                                    ).length > 0 && (
+                                      <div className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950 dark:to-teal-900 rounded-lg p-4 border border-teal-200 dark:border-teal-800">
+                                        <h4 className="font-semibold mb-3 text-teal-900 dark:text-teal-100">
+                                          Material Properties
+                                        </h4>
+                                        <div className="grid grid-cols-2 gap-3 text-sm">
+                                          {Object.entries(
+                                            image.material_properties as any,
+                                          ).map(([key, value]) => (
+                                            <div
+                                              key={key}
+                                              className="bg-white dark:bg-gray-900 rounded p-2 border border-teal-100 dark:border-teal-800"
+                                            >
+                                              <span className="font-medium text-teal-700 dark:text-teal-300">
+                                                {key}:
+                                              </span>
+                                              <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
+                                                {typeof value === 'object'
+                                                  ? JSON.stringify(value)
+                                                  : String(value)}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
                                   {/* Extracted Metadata */}
-                                  {image.extracted_metadata && Object.keys(image.extracted_metadata as any).length > 0 && (
-                                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
-                                      <h4 className="font-semibold mb-3 text-orange-900 dark:text-orange-100">Extracted Metadata</h4>
-                                      <div className="space-y-2 text-sm">
-                                        {Object.entries(image.extracted_metadata as any).map(([key, value]) => (
-                                          <div key={key} className="bg-white dark:bg-gray-900 rounded p-2 border border-orange-100 dark:border-orange-800">
-                                            <span className="font-medium text-orange-700 dark:text-orange-300">{key}:</span>
-                                            <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
-                                              {Array.isArray(value) ? value.join(', ') : typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                            </p>
-                                          </div>
-                                        ))}
+                                  {image.extracted_metadata &&
+                                    Object.keys(image.extracted_metadata as any)
+                                      .length > 0 && (
+                                      <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                                        <h4 className="font-semibold mb-3 text-orange-900 dark:text-orange-100">
+                                          Extracted Metadata
+                                        </h4>
+                                        <div className="space-y-2 text-sm">
+                                          {Object.entries(
+                                            image.extracted_metadata as any,
+                                          ).map(([key, value]) => (
+                                            <div
+                                              key={key}
+                                              className="bg-white dark:bg-gray-900 rounded p-2 border border-orange-100 dark:border-orange-800"
+                                            >
+                                              <span className="font-medium text-orange-700 dark:text-orange-300">
+                                                {key}:
+                                              </span>
+                                              <p className="text-gray-700 dark:text-gray-300 text-xs mt-1">
+                                                {Array.isArray(value)
+                                                  ? value.join(', ')
+                                                  : typeof value === 'object'
+                                                    ? JSON.stringify(value)
+                                                    : String(value)}
+                                              </p>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
 
                                   {image.visual_features && (
                                     <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
-                                      <h4 className="font-semibold mb-2 text-indigo-900 dark:text-indigo-100">Visual Features</h4>
+                                      <h4 className="font-semibold mb-2 text-indigo-900 dark:text-indigo-100">
+                                        Visual Features
+                                      </h4>
                                       <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm max-h-48 overflow-y-auto border border-indigo-100 dark:border-indigo-800">
                                         <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 dark:text-gray-300">
-                                          {formatJsonForDisplay(image.visual_features)}
+                                          {formatJsonForDisplay(
+                                            image.visual_features,
+                                          )}
                                         </pre>
                                       </div>
                                     </div>
@@ -1559,10 +1934,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                                   {image.image_analysis_results && (
                                     <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-950 dark:to-cyan-900 rounded-lg p-4 border border-cyan-200 dark:border-cyan-800">
-                                      <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">Analysis Results</h4>
+                                      <h4 className="font-semibold mb-2 text-cyan-900 dark:text-cyan-100">
+                                        Analysis Results
+                                      </h4>
                                       <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm max-h-48 overflow-y-auto border border-cyan-100 dark:border-cyan-800">
                                         <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 dark:text-gray-300">
-                                          {formatJsonForDisplay(image.image_analysis_results)}
+                                          {formatJsonForDisplay(
+                                            image.image_analysis_results,
+                                          )}
                                         </pre>
                                       </div>
                                     </div>
@@ -1573,7 +1952,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
                                   {image.metadata && (
                                     <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900 rounded-lg p-4 border border-rose-200 dark:border-rose-800">
-                                      <h4 className="font-semibold mb-2 text-rose-900 dark:text-rose-100">Metadata</h4>
+                                      <h4 className="font-semibold mb-2 text-rose-900 dark:text-rose-100">
+                                        Metadata
+                                      </h4>
                                       <div className="bg-white dark:bg-gray-900 rounded p-3 text-sm max-h-48 overflow-y-auto border border-rose-100 dark:border-rose-800">
                                         <pre className="whitespace-pre-wrap text-xs font-mono text-gray-700 dark:text-gray-300">
                                           {formatJsonForDisplay(image.metadata)}
@@ -1591,7 +1972,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               disabled={deletingImageId === image.id}
                               className="flex-1"
                             >
-                              {deletingImageId === image.id ? '🗑️ Deleting...' : '🗑️ Delete'}
+                              {deletingImageId === image.id
+                                ? '🗑️ Deleting...'
+                                : '🗑️ Delete'}
                             </Button>
                           </div>
                         </div>
@@ -1602,12 +1985,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent><TabsContent value="embeddings" className="space-y-4">
+        </TabsContent>
+        <TabsContent value="embeddings" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Generated Embeddings</CardTitle>
               <CardDescription>
-                Vector embeddings generated for text chunks to enable semantic search and RAG
+                Vector embeddings generated for text chunks to enable semantic
+                search and RAG
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1615,13 +2000,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <div className="text-center py-8">
                   <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">
-                    No embeddings available. Process documents to generate embeddings.
+                    No embeddings available. Process documents to generate
+                    embeddings.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {embeddings.map((embedding) => {
-                    const relatedChunk = chunks.find(c => c.id === embedding.chunk_id);
+                    const relatedChunk = chunks.find(
+                      (c) => c.id === embedding.chunk_id,
+                    );
 
                     return (
                       <Card key={embedding.id}>
@@ -1629,17 +2017,25 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
                               <Brain className="h-4 w-4 text-orange-500" />
-                              <span className="font-medium">Embedding {embedding.id.substring(0, 8)}</span>
+                              <span className="font-medium">
+                                Embedding {embedding.id.substring(0, 8)}
+                              </span>
                             </div>
                             <div className="flex gap-2">
-                              <Badge variant="outline">{embedding.model_name || 'Unknown Model'}</Badge>
-                              <Badge variant="secondary">{embedding.dimensions || 0}D</Badge>
+                              <Badge variant="outline">
+                                {embedding.model_name || 'Unknown Model'}
+                              </Badge>
+                              <Badge variant="secondary">
+                                {embedding.dimensions || 0}D
+                              </Badge>
                             </div>
                           </div>
 
                           {relatedChunk && (
                             <div className="mb-3">
-                              <h4 className="font-medium mb-1">Related Chunk</h4>
+                              <h4 className="font-medium mb-1">
+                                Related Chunk
+                              </h4>
                               <p className="text-sm text-muted-foreground bg-muted/50 rounded p-2 line-clamp-2">
                                 {relatedChunk.content.substring(0, 200)}...
                               </p>
@@ -1658,35 +2054,50 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div className="grid grid-cols-4 gap-3 text-sm mb-3">
                             <div>
                               <span className="font-medium">Model:</span>
-                              <p className="text-muted-foreground text-xs">{embedding.model_name || 'text-embedding-3-small'}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {embedding.model_name ||
+                                  'text-embedding-3-small'}
+                              </p>
                             </div>
                             <div>
                               <span className="font-medium">Dimensions:</span>
-                              <p className="text-muted-foreground text-xs">{embedding.dimensions || 1536}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {embedding.dimensions || 1536}
+                              </p>
                             </div>
                             <div>
                               <span className="font-medium">Type:</span>
-                              <p className="text-muted-foreground text-xs">{embedding.embedding_type || 'text'}</p>
+                              <p className="text-muted-foreground text-xs">
+                                {embedding.embedding_type || 'text'}
+                              </p>
                             </div>
                             <div>
                               <span className="font-medium">Generated:</span>
                               <p className="text-muted-foreground text-xs">
-                                {new Date(embedding.created_at).toLocaleDateString()}
+                                {new Date(
+                                  embedding.created_at,
+                                ).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
 
                           <div className="mt-3 pt-3 border-t">
                             <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium">Vector Status</span>
-                              <Badge variant="outline" className="text-green-600">
+                              <span className="text-sm font-medium">
+                                Vector Status
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="text-green-600"
+                              >
                                 ✓ Generated ({embedding.dimensions || 1536}D)
                               </Badge>
                             </div>
                             <div className="mt-2 bg-muted/50 rounded p-2 text-xs">
                               <p className="text-muted-foreground">
-                                Vector embedding successfully generated and stored.
-                                This chunk is ready for semantic search and RAG operations.
+                                Vector embedding successfully generated and
+                                stored. This chunk is ready for semantic search
+                                and RAG operations.
                               </p>
                             </div>
                           </div>
@@ -1711,7 +2122,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
                     Products from PDF Chunks
                   </CardTitle>
                   <CardDescription>
-                    Products created from real PDF chunks with source tracking and metadata
+                    Products created from real PDF chunks with source tracking
+                    and metadata
                   </CardDescription>
                 </div>
                 <Button onClick={handleCreateProduct} size="sm">
@@ -1725,7 +2137,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <div className="text-center py-8">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground mb-4">
-                    No products created yet. Process PDFs and create products from chunks.
+                    No products created yet. Process PDFs and create products
+                    from chunks.
                   </p>
                   <Button onClick={handleCreateProduct} variant="outline">
                     <Plus className="h-4 w-4 mr-2" />
@@ -1739,13 +2152,24 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
-                            <h4 className="font-semibold text-lg">{product.name}</h4>
+                            <h4 className="font-semibold text-lg">
+                              {product.name}
+                            </h4>
                             <p className="text-sm text-muted-foreground mt-1">
                               {product.description?.substring(0, 150)}
-                              {product.description && product.description.length > 150 ? '...' : ''}
+                              {product.description &&
+                              product.description.length > 150
+                                ? '...'
+                                : ''}
                             </p>
                           </div>
-                          <Badge variant={product.status === 'published' ? 'default' : 'secondary'}>
+                          <Badge
+                            variant={
+                              product.status === 'published'
+                                ? 'default'
+                                : 'secondary'
+                            }
+                          >
                             {product.status || 'draft'}
                           </Badge>
                         </div>
@@ -1753,7 +2177,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-sm">
                           <div>
                             <span className="font-medium">Source:</span>
-                            <p className="text-muted-foreground text-xs">{product.created_from_type}</p>
+                            <p className="text-muted-foreground text-xs">
+                              {product.created_from_type}
+                            </p>
                           </div>
                           <div>
                             <span className="font-medium">Material:</span>
@@ -1770,7 +2196,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <div>
                             <span className="font-medium">Created:</span>
                             <p className="text-muted-foreground text-xs">
-                              {new Date(product.created_at).toLocaleDateString()}
+                              {new Date(
+                                product.created_at,
+                              ).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
@@ -1778,7 +2206,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                         {product.metadata?.supplier && (
                           <div className="mb-3 text-sm">
                             <span className="font-medium">Supplier:</span>
-                            <p className="text-muted-foreground">{product.metadata.supplier}</p>
+                            <p className="text-muted-foreground">
+                              {product.metadata.supplier}
+                            </p>
                           </div>
                         )}
 
@@ -1836,10 +2266,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Total Entities</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Total Entities
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{metadataData.summary.total_entities}</div>
+                    <div className="text-3xl font-bold">
+                      {metadataData.summary.total_entities}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Across chunks, images, and products
                     </p>
@@ -1847,10 +2281,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">With Metadata</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      With Metadata
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{metadataData.summary.entities_with_metadata}</div>
+                    <div className="text-3xl font-bold">
+                      {metadataData.summary.entities_with_metadata}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {metadataData.summary.total_entities > 0
                         ? `${((metadataData.summary.entities_with_metadata / metadataData.summary.total_entities) * 100).toFixed(1)}% coverage`
@@ -1860,10 +2298,14 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Unique Fields</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Unique Fields
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{metadataData.summary.metadata_fields.length}</div>
+                    <div className="text-3xl font-bold">
+                      {metadataData.summary.metadata_fields.length}
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Different metadata properties
                     </p>
@@ -1876,9 +2318,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Hash className="h-5 w-5" />
-                    Metadata Fields ({metadataData.summary.metadata_fields.length})
+                    Metadata Fields (
+                    {metadataData.summary.metadata_fields.length})
                   </CardTitle>
-                  <CardDescription>All unique metadata fields across entities</CardDescription>
+                  <CardDescription>
+                    All unique metadata fields across entities
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -1892,178 +2337,256 @@ export const MaterialKnowledgeBase: React.FC = () => {
               </Card>
 
               {/* Chunks Metadata */}
-              {metadataData.metadata.chunks && metadataData.metadata.chunks.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Chunks Metadata ({metadataData.metadata.chunks.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {metadataData.metadata.chunks.slice(0, 20).map((chunk: any) => (
-                        <Card key={chunk.id} className="border hover:border-primary transition-colors">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <p className="text-sm text-muted-foreground line-clamp-1">{chunk.content_preview}</p>
-                              <div className="flex gap-2">
-                                {chunk.quality?.quality_score && (
-                                  <Badge variant="outline" className="text-xs">
-                                    Q: {(chunk.quality.quality_score * 100).toFixed(0)}%
-                                  </Badge>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={() => navigateToChunkDetails(chunk.id)}
-                                >
-                                  <ChevronRight className="h-3 w-3" />
-                                  View
-                                </Button>
-                              </div>
-                            </div>
-                            {chunk.metadata && Object.keys(chunk.metadata).length > 0 && (
-                              <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
-                                <pre className="whitespace-pre-wrap">{JSON.stringify(chunk.metadata, null, 2)}</pre>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                      {metadataData.metadata.chunks.length > 20 && (
-                        <p className="text-sm text-muted-foreground text-center">
-                          Showing 20 of {metadataData.metadata.chunks.length} chunks
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Images Metadata */}
-              {metadataData.metadata.images && metadataData.metadata.images.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ImageIcon className="h-5 w-5" />
-                      Images Metadata ({metadataData.metadata.images.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                      {metadataData.metadata.images.slice(0, 10).map((image: any) => (
-                        <Card key={image.id} className="border hover:border-primary transition-colors">
-                          <CardContent className="p-4">
-                            <div className="flex gap-3">
-                              {image.image_url && (
-                                <img
-                                  src={image.image_url}
-                                  alt="Image"
-                                  className="w-20 h-20 object-cover rounded cursor-pointer"
-                                  onClick={() => navigateToImageDetails(image.id)}
-                                />
-                              )}
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between gap-2 mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      Page {image.page_number || 'N/A'}
-                                    </Badge>
-                                    {image.quality?.quality_score && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Q: {(image.quality.quality_score * 100).toFixed(0)}%
+              {metadataData.metadata.chunks &&
+                metadataData.metadata.chunks.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Chunks Metadata ({metadataData.metadata.chunks.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {metadataData.metadata.chunks
+                          .slice(0, 20)
+                          .map((chunk: any) => (
+                            <Card
+                              key={chunk.id}
+                              className="border hover:border-primary transition-colors"
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <p className="text-sm text-muted-foreground line-clamp-1">
+                                    {chunk.content_preview}
+                                  </p>
+                                  <div className="flex gap-2">
+                                    {chunk.quality?.quality_score && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        Q:{' '}
+                                        {(
+                                          chunk.quality.quality_score * 100
+                                        ).toFixed(0)}
+                                        %
                                       </Badge>
                                     )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() =>
+                                        navigateToChunkDetails(chunk.id)
+                                      }
+                                    >
+                                      <ChevronRight className="h-3 w-3" />
+                                      View
+                                    </Button>
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-6 px-2 text-xs"
-                                    onClick={() => navigateToImageDetails(image.id)}
-                                  >
-                                    <ChevronRight className="h-3 w-3" />
-                                    View
-                                  </Button>
                                 </div>
-                                {image.metadata && Object.keys(image.metadata).length > 0 && (
-                                  <div className="p-2 bg-muted/50 rounded text-xs">
-                                    <pre className="whitespace-pre-wrap line-clamp-3">
-                                      {JSON.stringify(image.metadata, null, 2)}
-                                    </pre>
+                                {chunk.metadata &&
+                                  Object.keys(chunk.metadata).length > 0 && (
+                                    <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                                      <pre className="whitespace-pre-wrap">
+                                        {JSON.stringify(
+                                          chunk.metadata,
+                                          null,
+                                          2,
+                                        )}
+                                      </pre>
+                                    </div>
+                                  )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        {metadataData.metadata.chunks.length > 20 && (
+                          <p className="text-sm text-muted-foreground text-center">
+                            Showing 20 of {metadataData.metadata.chunks.length}{' '}
+                            chunks
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+              {/* Images Metadata */}
+              {metadataData.metadata.images &&
+                metadataData.metadata.images.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5" />
+                        Images Metadata ({metadataData.metadata.images.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                        {metadataData.metadata.images
+                          .slice(0, 10)
+                          .map((image: any) => (
+                            <Card
+                              key={image.id}
+                              className="border hover:border-primary transition-colors"
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex gap-3">
+                                  {image.image_url && (
+                                    <img
+                                      src={image.image_url}
+                                      alt="Image"
+                                      className="w-20 h-20 object-cover rounded cursor-pointer"
+                                      onClick={() =>
+                                        navigateToImageDetails(image.id)
+                                      }
+                                    />
+                                  )}
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between gap-2 mb-2">
+                                      <div className="flex items-center gap-2">
+                                        <Badge
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          Page {image.page_number || 'N/A'}
+                                        </Badge>
+                                        {image.quality?.quality_score && (
+                                          <Badge
+                                            variant="secondary"
+                                            className="text-xs"
+                                          >
+                                            Q:{' '}
+                                            {(
+                                              image.quality.quality_score * 100
+                                            ).toFixed(0)}
+                                            %
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-6 px-2 text-xs"
+                                        onClick={() =>
+                                          navigateToImageDetails(image.id)
+                                        }
+                                      >
+                                        <ChevronRight className="h-3 w-3" />
+                                        View
+                                      </Button>
+                                    </div>
+                                    {image.metadata &&
+                                      Object.keys(image.metadata).length >
+                                        0 && (
+                                        <div className="p-2 bg-muted/50 rounded text-xs">
+                                          <pre className="whitespace-pre-wrap line-clamp-3">
+                                            {JSON.stringify(
+                                              image.metadata,
+                                              null,
+                                              2,
+                                            )}
+                                          </pre>
+                                        </div>
+                                      )}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                      {metadataData.metadata.images.length > 10 && (
-                        <p className="text-sm text-muted-foreground text-center col-span-2">
-                          Showing 10 of {metadataData.metadata.images.length} images
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        {metadataData.metadata.images.length > 10 && (
+                          <p className="text-sm text-muted-foreground text-center col-span-2">
+                            Showing 10 of {metadataData.metadata.images.length}{' '}
+                            images
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
               {/* Products Metadata */}
-              {metadataData.metadata.products && metadataData.metadata.products.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      Products Metadata ({metadataData.metadata.products.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {metadataData.metadata.products.slice(0, 20).map((product: any) => (
-                        <Card key={product.id} className="border hover:border-primary transition-colors">
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <h4 className="font-medium">{product.name}</h4>
-                                <p className="text-sm text-muted-foreground line-clamp-1">
-                                  {product.description_preview}
-                                </p>
-                              </div>
-                              <div className="flex gap-2">
-                                {product.quality?.quality_score && (
-                                  <Badge variant="outline" className="text-xs">
-                                    Q: {(product.quality.quality_score * 100).toFixed(0)}%
-                                  </Badge>
-                                )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 px-2 text-xs"
-                                  onClick={() => navigateToProductDetails(product.id)}
-                                >
-                                  <ChevronRight className="h-3 w-3" />
-                                  View
-                                </Button>
-                              </div>
-                            </div>
-                            {product.metadata && Object.keys(product.metadata).length > 0 && (
-                              <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
-                                <pre className="whitespace-pre-wrap">{JSON.stringify(product.metadata, null, 2)}</pre>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                      {metadataData.metadata.products.length > 20 && (
-                        <p className="text-sm text-muted-foreground text-center">
-                          Showing 20 of {metadataData.metadata.products.length} products
-                        </p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {metadataData.metadata.products &&
+                metadataData.metadata.products.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Package className="h-5 w-5" />
+                        Products Metadata (
+                        {metadataData.metadata.products.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {metadataData.metadata.products
+                          .slice(0, 20)
+                          .map((product: any) => (
+                            <Card
+                              key={product.id}
+                              className="border hover:border-primary transition-colors"
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium">
+                                      {product.name}
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground line-clamp-1">
+                                      {product.description_preview}
+                                    </p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {product.quality?.quality_score && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        Q:{' '}
+                                        {(
+                                          product.quality.quality_score * 100
+                                        ).toFixed(0)}
+                                        %
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-6 px-2 text-xs"
+                                      onClick={() =>
+                                        navigateToProductDetails(product.id)
+                                      }
+                                    >
+                                      <ChevronRight className="h-3 w-3" />
+                                      View
+                                    </Button>
+                                  </div>
+                                </div>
+                                {product.metadata &&
+                                  Object.keys(product.metadata).length > 0 && (
+                                    <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                                      <pre className="whitespace-pre-wrap">
+                                        {JSON.stringify(
+                                          product.metadata,
+                                          null,
+                                          2,
+                                        )}
+                                      </pre>
+                                    </div>
+                                  )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                        {metadataData.metadata.products.length > 20 && (
+                          <p className="text-sm text-muted-foreground text-center">
+                            Showing 20 of{' '}
+                            {metadataData.metadata.products.length} products
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
             </>
           ) : (
             <Card>
@@ -2084,7 +2607,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="flex items-center justify-center gap-3">
                   <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Loading quality scores...</p>
+                  <p className="text-muted-foreground">
+                    Loading quality scores...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2102,46 +2627,104 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Validated</p>
-                        <p className="text-2xl font-bold">{qualityData.kpis.chunks.total_validated}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Validated
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {qualityData.kpis.chunks.total_validated}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Overall Score</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.chunks.avg_overall_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Overall Score
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.chunks.avg_overall_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Valid</p>
-                        <p className="text-2xl font-bold text-green-600">{qualityData.kpis.chunks.valid_count}</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {qualityData.kpis.chunks.valid_count}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Needs Review</p>
-                        <p className="text-2xl font-bold text-orange-600">{qualityData.kpis.chunks.needs_review_count}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Needs Review
+                        </p>
+                        <p className="text-2xl font-bold text-orange-600">
+                          {qualityData.kpis.chunks.needs_review_count}
+                        </p>
                       </div>
                     </div>
                     <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-xs text-muted-foreground">Content Quality</p>
-                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_content_quality) * 100).toFixed(0)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          Content Quality
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.chunks.avg_content_quality,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Boundary Quality</p>
-                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_boundary_quality) * 100).toFixed(0)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          Boundary Quality
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.chunks.avg_boundary_quality,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Semantic Coherence</p>
-                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_semantic_coherence) * 100).toFixed(0)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          Semantic Coherence
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.chunks.avg_semantic_coherence,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Completeness</p>
-                        <p className="text-lg font-semibold">{(parseFloat(qualityData.kpis.chunks.avg_completeness) * 100).toFixed(0)}%</p>
+                        <p className="text-xs text-muted-foreground">
+                          Completeness
+                        </p>
+                        <p className="text-lg font-semibold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.chunks.avg_completeness,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                     </div>
                     {qualityData.distributions.chunks && (
                       <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">Quality Distribution</p>
+                        <p className="text-sm font-medium mb-2">
+                          Quality Distribution
+                        </p>
                         <div className="flex gap-2">
                           <Badge variant="default" className="bg-green-600">
-                            Excellent: {qualityData.distributions.chunks.excellent}
+                            Excellent:{' '}
+                            {qualityData.distributions.chunks.excellent}
                           </Badge>
                           <Badge variant="default" className="bg-blue-600">
                             Good: {qualityData.distributions.chunks.good}
@@ -2171,28 +2754,62 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Validated</p>
-                        <p className="text-2xl font-bold">{qualityData.kpis.images.total_validated}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Validated
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {qualityData.kpis.images.total_validated}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Quality Score</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.images.avg_quality_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Quality Score
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.images.avg_quality_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Relevance</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.images.avg_relevance_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Relevance
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.images.avg_relevance_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg OCR Confidence</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.images.avg_ocr_confidence) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg OCR Confidence
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.images.avg_ocr_confidence,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                     </div>
                     {qualityData.distributions.images && (
                       <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">Quality Distribution</p>
+                        <p className="text-sm font-medium mb-2">
+                          Quality Distribution
+                        </p>
                         <div className="flex gap-2">
                           <Badge variant="default" className="bg-green-600">
-                            Excellent: {qualityData.distributions.images.excellent}
+                            Excellent:{' '}
+                            {qualityData.distributions.images.excellent}
                           </Badge>
                           <Badge variant="default" className="bg-blue-600">
                             Good: {qualityData.distributions.images.good}
@@ -2222,28 +2839,62 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Scored</p>
-                        <p className="text-2xl font-bold">{qualityData.kpis.products.total_scored}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Scored
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {qualityData.kpis.products.total_scored}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Quality</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.products.avg_quality_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Quality
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.products.avg_quality_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Confidence</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.products.avg_confidence_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Confidence
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.products.avg_confidence_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Completeness</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.products.avg_completeness_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Completeness
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.products.avg_completeness_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                     </div>
                     {qualityData.distributions.products && (
                       <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">Quality Distribution</p>
+                        <p className="text-sm font-medium mb-2">
+                          Quality Distribution
+                        </p>
                         <div className="flex gap-2">
                           <Badge variant="default" className="bg-green-600">
-                            Excellent: {qualityData.distributions.products.excellent}
+                            Excellent:{' '}
+                            {qualityData.distributions.products.excellent}
                           </Badge>
                           <Badge variant="default" className="bg-blue-600">
                             Good: {qualityData.distributions.products.good}
@@ -2273,16 +2924,38 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Documents</p>
-                        <p className="text-2xl font-bold">{qualityData.kpis.documents.total_documents}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Documents
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {qualityData.kpis.documents.total_documents}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Coherence</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.documents.avg_coherence_score) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Coherence
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.documents.avg_coherence_score,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Overall Quality</p>
-                        <p className="text-2xl font-bold">{(parseFloat(qualityData.kpis.documents.avg_overall_quality) * 100).toFixed(0)}%</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Overall Quality
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {(
+                            parseFloat(
+                              qualityData.kpis.documents.avg_overall_quality,
+                            ) * 100
+                          ).toFixed(0)}
+                          %
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -2294,12 +2967,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold mb-1">Need Deeper Analysis?</h3>
+                      <h3 className="font-semibold mb-1">
+                        Need Deeper Analysis?
+                      </h3>
                       <p className="text-sm text-muted-foreground">
                         View AI-driven patterns, anomalies, and recommendations
                       </p>
                     </div>
-                    <Button onClick={() => navigateToTab('insights')} className="gap-2">
+                    <Button
+                      onClick={() => navigateToTab('insights')}
+                      className="gap-2"
+                    >
                       <Eye className="h-4 w-4" />
                       View Insights
                     </Button>
@@ -2312,7 +2990,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="text-center">
                   <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No quality data available</p>
+                  <p className="text-muted-foreground">
+                    No quality data available
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2326,7 +3006,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="flex items-center justify-center gap-3">
                   <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Loading embeddings statistics...</p>
+                  <p className="text-muted-foreground">
+                    Loading embeddings statistics...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2341,8 +3023,12 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-4xl font-bold">{embeddingsStatsData.total_embeddings}</div>
-                  <p className="text-sm text-muted-foreground mt-1">Vector embeddings generated</p>
+                  <div className="text-4xl font-bold">
+                    {embeddingsStatsData.total_embeddings}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Vector embeddings generated
+                  </p>
                 </CardContent>
               </Card>
 
@@ -2350,34 +3036,53 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Chunks Coverage</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Chunks Coverage
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{embeddingsStatsData.coverage.chunks.coverage_percentage}%</div>
+                    <div className="text-2xl font-bold">
+                      {embeddingsStatsData.coverage.chunks.coverage_percentage}%
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {embeddingsStatsData.coverage.chunks.with_embeddings} / {embeddingsStatsData.coverage.chunks.total} chunks
+                      {embeddingsStatsData.coverage.chunks.with_embeddings} /{' '}
+                      {embeddingsStatsData.coverage.chunks.total} chunks
                     </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Images Coverage</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Images Coverage
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{embeddingsStatsData.coverage.images.coverage_percentage}%</div>
+                    <div className="text-2xl font-bold">
+                      {embeddingsStatsData.coverage.images.coverage_percentage}%
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {embeddingsStatsData.coverage.images.with_embeddings} / {embeddingsStatsData.coverage.images.total} images
+                      {embeddingsStatsData.coverage.images.with_embeddings} /{' '}
+                      {embeddingsStatsData.coverage.images.total} images
                     </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Products Coverage</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Products Coverage
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{embeddingsStatsData.coverage.products.coverage_percentage}%</div>
+                    <div className="text-2xl font-bold">
+                      {
+                        embeddingsStatsData.coverage.products
+                          .coverage_percentage
+                      }
+                      %
+                    </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {embeddingsStatsData.coverage.products.with_embeddings} / {embeddingsStatsData.coverage.products.total} products
+                      {embeddingsStatsData.coverage.products.with_embeddings} /{' '}
+                      {embeddingsStatsData.coverage.products.total} products
                     </p>
                   </CardContent>
                 </Card>
@@ -2394,14 +3099,21 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {Object.entries(embeddingsStatsData.by_type).map(([type, count]) => (
-                        <div key={type} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline">{type}</Badge>
+                      {Object.entries(embeddingsStatsData.by_type).map(
+                        ([type, count]) => (
+                          <div
+                            key={type}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{type}</Badge>
+                            </div>
+                            <div className="text-lg font-semibold">
+                              {count as number}
+                            </div>
                           </div>
-                          <div className="text-lg font-semibold">{count as number}</div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -2418,39 +3130,50 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {Object.entries(embeddingsStatsData.by_model).map(([model, count]) => (
-                        <div key={model} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{model}</Badge>
+                      {Object.entries(embeddingsStatsData.by_model).map(
+                        ([model, count]) => (
+                          <div
+                            key={model}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary">{model}</Badge>
+                            </div>
+                            <div className="text-lg font-semibold">
+                              {count as number}
+                            </div>
                           </div>
-                          <div className="text-lg font-semibold">{count as number}</div>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               )}
 
               {/* By Embedding Type */}
-              {embeddingsStatsData.by_embedding_type && Object.keys(embeddingsStatsData.by_embedding_type).length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Hash className="h-5 w-5" />
-                      Embeddings by Type
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.entries(embeddingsStatsData.by_embedding_type).map(([type, count]) => (
-                        <Badge key={type} variant="default">
-                          {type}: {count as number}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {embeddingsStatsData.by_embedding_type &&
+                Object.keys(embeddingsStatsData.by_embedding_type).length >
+                  0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Hash className="h-5 w-5" />
+                        Embeddings by Type
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(
+                          embeddingsStatsData.by_embedding_type,
+                        ).map(([type, count]) => (
+                          <Badge key={type} variant="default">
+                            {type}: {count as number}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
               {/* Document Vectors */}
               {embeddingsStatsData.document_vectors && (
@@ -2462,12 +3185,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold mb-4">{embeddingsStatsData.document_vectors.total}</div>
+                    <div className="text-2xl font-bold mb-4">
+                      {embeddingsStatsData.document_vectors.total}
+                    </div>
                     {embeddingsStatsData.document_vectors.by_type && (
                       <div className="space-y-2">
                         <p className="text-sm font-medium">By Vector Type:</p>
                         <div className="flex flex-wrap gap-2">
-                          {Object.entries(embeddingsStatsData.document_vectors.by_type).map(([type, count]) => (
+                          {Object.entries(
+                            embeddingsStatsData.document_vectors.by_type,
+                          ).map(([type, count]) => (
                             <Badge key={type} variant="outline">
                               {type}: {count as number}
                             </Badge>
@@ -2491,20 +3218,32 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Stability Score</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Stability Score
+                        </p>
                         <p className="text-2xl font-bold">
-                          {(embeddingsStatsData.quality.avg_stability_score * 100).toFixed(0)}%
+                          {(
+                            embeddingsStatsData.quality.avg_stability_score *
+                            100
+                          ).toFixed(0)}
+                          %
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Anomalies Detected</p>
+                        <p className="text-sm text-muted-foreground">
+                          Anomalies Detected
+                        </p>
                         <p className="text-2xl font-bold text-orange-600">
                           {embeddingsStatsData.quality.anomaly_count}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Analyzed</p>
-                        <p className="text-2xl font-bold">{embeddingsStatsData.quality.total_analyzed}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Analyzed
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {embeddingsStatsData.quality.total_analyzed}
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -2516,7 +3255,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="text-center">
                   <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No embeddings data available</p>
+                  <p className="text-muted-foreground">
+                    No embeddings data available
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2540,42 +3281,59 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Total Detections</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold">{detectionsData.total_detections}</div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Total Detections
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold">
-                      {(parseFloat(detectionsData.summary.avg_confidence) * 100).toFixed(0)}%
+                      {detectionsData.total_detections}
                     </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">High Confidence</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Avg Confidence
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold">
+                      {(
+                        parseFloat(detectionsData.summary.avg_confidence) * 100
+                      ).toFixed(0)}
+                      %
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">
+                      High Confidence
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-green-600">
                       {detectionsData.summary.high_confidence_count}
                     </div>
-                    <p className="text-xs text-muted-foreground">≥80% confidence</p>
+                    <p className="text-xs text-muted-foreground">
+                      ≥80% confidence
+                    </p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Low Confidence</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Low Confidence
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-orange-600">
                       {detectionsData.summary.low_confidence_count}
                     </div>
-                    <p className="text-xs text-muted-foreground">&lt;50% confidence</p>
+                    <p className="text-xs text-muted-foreground">
+                      &lt;50% confidence
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -2591,11 +3349,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
-                      {Object.entries(detectionsData.summary.by_type).map(([type, count]) => (
-                        <Badge key={type} variant="default" className="text-base px-4 py-2">
-                          {type}: {count as number}
-                        </Badge>
-                      ))}
+                      {Object.entries(detectionsData.summary.by_type).map(
+                        ([type, count]) => (
+                          <Badge
+                            key={type}
+                            variant="default"
+                            className="text-base px-4 py-2"
+                          >
+                            {type}: {count as number}
+                          </Badge>
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -2612,54 +3376,73 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {Object.entries(detectionsData.summary.by_event).map(([event, count]) => (
-                        <div key={event} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                          <span className="font-medium">{event}</span>
-                          <Badge variant="secondary">{count as number}</Badge>
-                        </div>
-                      ))}
+                      {Object.entries(detectionsData.summary.by_event).map(
+                        ([event, count]) => (
+                          <div
+                            key={event}
+                            className="flex items-center justify-between p-2 bg-muted/50 rounded"
+                          >
+                            <span className="font-medium">{event}</span>
+                            <Badge variant="secondary">{count as number}</Badge>
+                          </div>
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               )}
 
               {/* Timeline */}
-              {detectionsData.timeline && Object.keys(detectionsData.timeline).length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ChevronRight className="h-5 w-5" />
-                      Detection Timeline (Last 30 Days)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-1">
-                      {Object.entries(detectionsData.timeline)
-                        .sort(([a], [b]) => b.localeCompare(a))
-                        .slice(0, 10)
-                        .map(([date, count]) => (
-                          <div key={date} className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">{date}</span>
-                            <div className="flex items-center gap-2">
-                              <div className="w-32 bg-muted rounded-full h-2">
-                                <div
-                                  className="bg-primary h-2 rounded-full"
-                                  style={{
-                                    width: `${Math.min(
-                                      100,
-                                      ((count as number) / Math.max(...Object.values(detectionsData.timeline!))) * 100,
-                                    )}%`,
-                                  }}
-                                />
+              {detectionsData.timeline &&
+                Object.keys(detectionsData.timeline).length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ChevronRight className="h-5 w-5" />
+                        Detection Timeline (Last 30 Days)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {Object.entries(detectionsData.timeline)
+                          .sort(([a], [b]) => b.localeCompare(a))
+                          .slice(0, 10)
+                          .map(([date, count]) => (
+                            <div
+                              key={date}
+                              className="flex items-center justify-between text-sm"
+                            >
+                              <span className="text-muted-foreground">
+                                {date}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-32 bg-muted rounded-full h-2">
+                                  <div
+                                    className="bg-primary h-2 rounded-full"
+                                    style={{
+                                      width: `${Math.min(
+                                        100,
+                                        ((count as number) /
+                                          Math.max(
+                                            ...Object.values(
+                                              detectionsData.timeline!,
+                                            ),
+                                          )) *
+                                          100,
+                                      )}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className="font-medium w-8 text-right">
+                                  {count as number}
+                                </span>
                               </div>
-                              <span className="font-medium w-8 text-right">{count as number}</span>
                             </div>
-                          </div>
-                        ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                          ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
               {/* Recent Detections */}
               {detectionsData.detections.length > 0 && (
@@ -2672,41 +3455,50 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {detectionsData.detections.slice(0, 50).map((detection: any) => (
-                        <Card key={detection.id} className="border">
-                          <CardContent className="p-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline">{detection.detection_type || 'chunk'}</Badge>
-                                <Badge variant="secondary">{detection.event}</Badge>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {detection.confidence !== null && (
-                                  <Badge
-                                    variant={
-                                      detection.confidence >= 0.8
-                                        ? 'default'
-                                        : detection.confidence >= 0.5
-                                        ? 'secondary'
-                                        : 'destructive'
-                                    }
-                                  >
-                                    {(detection.confidence * 100).toFixed(0)}%
+                      {detectionsData.detections
+                        .slice(0, 50)
+                        .map((detection: any) => (
+                          <Card key={detection.id} className="border">
+                            <CardContent className="p-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline">
+                                    {detection.detection_type || 'chunk'}
                                   </Badge>
-                                )}
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(detection.created_at).toLocaleString()}
-                                </span>
+                                  <Badge variant="secondary">
+                                    {detection.event}
+                                  </Badge>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {detection.confidence !== null && (
+                                    <Badge
+                                      variant={
+                                        detection.confidence >= 0.8
+                                          ? 'default'
+                                          : detection.confidence >= 0.5
+                                            ? 'secondary'
+                                            : 'destructive'
+                                      }
+                                    >
+                                      {(detection.confidence * 100).toFixed(0)}%
+                                    </Badge>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(
+                                      detection.created_at,
+                                    ).toLocaleString()}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            {detection.details && (
-                              <div className="mt-2 text-xs text-muted-foreground">
-                                Entity: {detection.entity_id?.substring(0, 8)}...
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
+                              {detection.details && (
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                  Entity: {detection.entity_id?.substring(0, 8)}
+                                  ...
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -2717,7 +3509,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="text-center">
                   <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No detection data available</p>
+                  <p className="text-muted-foreground">
+                    No detection data available
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2731,7 +3525,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="flex items-center justify-center gap-3">
                   <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Loading quality dashboard...</p>
+                  <p className="text-muted-foreground">
+                    Loading quality dashboard...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2742,12 +3538,17 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground">Reporting Period</p>
+                      <p className="text-sm text-muted-foreground">
+                        Reporting Period
+                      </p>
                       <p className="font-medium">
-                        {dashboardData.period.start_date} to {dashboardData.period.end_date}
+                        {dashboardData.period.start_date} to{' '}
+                        {dashboardData.period.end_date}
                       </p>
                     </div>
-                    <Badge variant="outline">{dashboardData.period.days} days</Badge>
+                    <Badge variant="outline">
+                      {dashboardData.period.days} days
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -2768,8 +3569,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
                           <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                               <Badge
-                                variant={alert.severity === 'high' ? 'destructive' : 'default'}
-                                className={alert.severity === 'medium' ? 'bg-orange-500' : ''}
+                                variant={
+                                  alert.severity === 'high'
+                                    ? 'destructive'
+                                    : 'default'
+                                }
+                                className={
+                                  alert.severity === 'medium'
+                                    ? 'bg-orange-500'
+                                    : ''
+                                }
                               >
                                 {alert.severity}
                               </Badge>
@@ -2815,27 +3624,44 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Quality
+                        </p>
                         <p className="text-2xl font-bold">
                           {dashboardData.current_kpis.chunks.avg_quality
-                            ? (dashboardData.current_kpis.chunks.avg_quality * 100).toFixed(0) + '%'
+                            ? (
+                                dashboardData.current_kpis.chunks.avg_quality *
+                                100
+                              ).toFixed(0) + '%'
                             : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Processed</p>
-                        <p className="text-2xl font-bold">{dashboardData.current_kpis.chunks.total_processed || 0}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Processed
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.chunks.total_processed ||
+                            0}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Below Threshold</p>
+                        <p className="text-sm text-muted-foreground">
+                          Below Threshold
+                        </p>
                         <p className="text-2xl font-bold text-orange-600">
-                          {dashboardData.current_kpis.chunks.below_threshold || 0}
+                          {dashboardData.current_kpis.chunks.below_threshold ||
+                            0}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Below %</p>
                         <p className="text-2xl font-bold">
-                          {dashboardData.current_kpis.chunks.below_threshold_percentage}%
+                          {
+                            dashboardData.current_kpis.chunks
+                              .below_threshold_percentage
+                          }
+                          %
                         </p>
                       </div>
                     </div>
@@ -2855,27 +3681,44 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Quality
+                        </p>
                         <p className="text-2xl font-bold">
                           {dashboardData.current_kpis.images.avg_quality
-                            ? (dashboardData.current_kpis.images.avg_quality * 100).toFixed(0) + '%'
+                            ? (
+                                dashboardData.current_kpis.images.avg_quality *
+                                100
+                              ).toFixed(0) + '%'
                             : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Extracted</p>
-                        <p className="text-2xl font-bold">{dashboardData.current_kpis.images.total_extracted || 0}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Extracted
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.images.total_extracted ||
+                            0}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Below Threshold</p>
+                        <p className="text-sm text-muted-foreground">
+                          Below Threshold
+                        </p>
                         <p className="text-2xl font-bold text-orange-600">
-                          {dashboardData.current_kpis.images.below_threshold || 0}
+                          {dashboardData.current_kpis.images.below_threshold ||
+                            0}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Below %</p>
                         <p className="text-2xl font-bold">
-                          {dashboardData.current_kpis.images.below_threshold_percentage}%
+                          {
+                            dashboardData.current_kpis.images
+                              .below_threshold_percentage
+                          }
+                          %
                         </p>
                       </div>
                     </div>
@@ -2895,27 +3738,44 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <div>
-                        <p className="text-sm text-muted-foreground">Avg Quality</p>
+                        <p className="text-sm text-muted-foreground">
+                          Avg Quality
+                        </p>
                         <p className="text-2xl font-bold">
                           {dashboardData.current_kpis.products.avg_quality
-                            ? (dashboardData.current_kpis.products.avg_quality * 100).toFixed(0) + '%'
+                            ? (
+                                dashboardData.current_kpis.products
+                                  .avg_quality * 100
+                              ).toFixed(0) + '%'
                             : 'N/A'}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Total Created</p>
-                        <p className="text-2xl font-bold">{dashboardData.current_kpis.products.total_created || 0}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Total Created
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {dashboardData.current_kpis.products.total_created ||
+                            0}
+                        </p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Below Threshold</p>
+                        <p className="text-sm text-muted-foreground">
+                          Below Threshold
+                        </p>
                         <p className="text-2xl font-bold text-orange-600">
-                          {dashboardData.current_kpis.products.below_threshold || 0}
+                          {dashboardData.current_kpis.products
+                            .below_threshold || 0}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Below %</p>
                         <p className="text-2xl font-bold">
-                          {dashboardData.current_kpis.products.below_threshold_percentage}%
+                          {
+                            dashboardData.current_kpis.products
+                              .below_threshold_percentage
+                          }
+                          %
                         </p>
                       </div>
                     </div>
@@ -2924,46 +3784,58 @@ export const MaterialKnowledgeBase: React.FC = () => {
               )}
 
               {/* Trends */}
-              {dashboardData.trends && Object.keys(dashboardData.trends).length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ChevronRight className="h-5 w-5" />
-                      Quality Trends
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {Object.entries(dashboardData.trends).map(([key, trend]: [string, any]) => (
-                        <div key={key} className="flex items-center justify-between p-3 bg-muted/50 rounded">
-                          <span className="font-medium capitalize">{key.replace(/_/g, ' ')}</span>
-                          <div className="flex items-center gap-3">
-                            <Badge
-                              variant={
-                                trend.trend === 'improving'
-                                  ? 'default'
-                                  : trend.trend === 'declining'
-                                  ? 'destructive'
-                                  : 'secondary'
-                              }
+              {dashboardData.trends &&
+                Object.keys(dashboardData.trends).length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ChevronRight className="h-5 w-5" />
+                        Quality Trends
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {Object.entries(dashboardData.trends).map(
+                          ([key, trend]: [string, any]) => (
+                            <div
+                              key={key}
+                              className="flex items-center justify-between p-3 bg-muted/50 rounded"
                             >
-                              {trend.trend}
-                            </Badge>
-                            <span className="text-sm font-medium">{trend.change_percentage}%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                              <span className="font-medium capitalize">
+                                {key.replace(/_/g, ' ')}
+                              </span>
+                              <div className="flex items-center gap-3">
+                                <Badge
+                                  variant={
+                                    trend.trend === 'improving'
+                                      ? 'default'
+                                      : trend.trend === 'declining'
+                                        ? 'destructive'
+                                        : 'secondary'
+                                  }
+                                >
+                                  {trend.trend}
+                                </Badge>
+                                <span className="text-sm font-medium">
+                                  {trend.change_percentage}%
+                                </span>
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
             </>
           ) : (
             <Card>
               <CardContent className="p-8">
                 <div className="text-center">
                   <Layers className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No dashboard data available</p>
+                  <p className="text-muted-foreground">
+                    No dashboard data available
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2977,7 +3849,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <CardContent className="p-8">
                 <div className="flex items-center justify-center gap-3">
                   <RefreshCw className="h-5 w-5 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Analyzing patterns and insights...</p>
+                  <p className="text-muted-foreground">
+                    Analyzing patterns and insights...
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -2987,23 +3861,33 @@ export const MaterialKnowledgeBase: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Total Patterns</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Total Patterns
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold">{patternsData.summary.total_patterns}</div>
+                    <div className="text-3xl font-bold">
+                      {patternsData.summary.total_patterns}
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Anomalies</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Anomalies
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-bold text-orange-600">{patternsData.summary.total_anomalies}</div>
+                    <div className="text-3xl font-bold text-orange-600">
+                      {patternsData.summary.total_anomalies}
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">High Severity</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      High Severity
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-red-600">
@@ -3013,7 +3897,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">Medium Severity</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Medium Severity
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-3xl font-bold text-yellow-600">
@@ -3034,54 +3920,72 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {patternsData.patterns.map((pattern: any, idx: number) => (
-                        <Card
-                          key={idx}
-                          className={`border-2 ${
-                            pattern.severity === 'high'
-                              ? 'border-red-200 bg-red-50 dark:bg-red-950'
-                              : pattern.severity === 'medium'
-                              ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950'
-                              : 'border-blue-200 bg-blue-50 dark:bg-blue-950'
-                          }`}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <Badge
-                                variant={
-                                  pattern.severity === 'high'
-                                    ? 'destructive'
-                                    : pattern.severity === 'medium'
-                                    ? 'default'
-                                    : 'secondary'
-                                }
-                                className={pattern.severity === 'medium' ? 'bg-yellow-500' : ''}
-                              >
-                                {pattern.severity}
-                              </Badge>
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="font-semibold capitalize">{pattern.type.replace(/_/g, ' ')}</h4>
-                                  <Badge variant="outline">{pattern.affected_entities} entities</Badge>
+                      {patternsData.patterns.map(
+                        (pattern: any, idx: number) => (
+                          <Card
+                            key={idx}
+                            className={`border-2 ${
+                              pattern.severity === 'high'
+                                ? 'border-red-200 bg-red-50 dark:bg-red-950'
+                                : pattern.severity === 'medium'
+                                  ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950'
+                                  : 'border-blue-200 bg-blue-50 dark:bg-blue-950'
+                            }`}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-3">
+                                <Badge
+                                  variant={
+                                    pattern.severity === 'high'
+                                      ? 'destructive'
+                                      : pattern.severity === 'medium'
+                                        ? 'default'
+                                        : 'secondary'
+                                  }
+                                  className={
+                                    pattern.severity === 'medium'
+                                      ? 'bg-yellow-500'
+                                      : ''
+                                  }
+                                >
+                                  {pattern.severity}
+                                </Badge>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-semibold capitalize">
+                                      {pattern.type.replace(/_/g, ' ')}
+                                    </h4>
+                                    <Badge variant="outline">
+                                      {pattern.affected_entities} entities
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm mb-3">
+                                    {pattern.description}
+                                  </p>
+                                  <div className="bg-white dark:bg-gray-900 rounded p-3 mb-3">
+                                    <p className="text-xs font-medium mb-1">
+                                      💡 Recommendation:
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {pattern.recommendation}
+                                    </p>
+                                  </div>
+                                  {pattern.data && (
+                                    <details className="text-xs">
+                                      <summary className="cursor-pointer font-medium mb-2">
+                                        View Details
+                                      </summary>
+                                      <pre className="bg-muted/50 p-2 rounded overflow-x-auto">
+                                        {JSON.stringify(pattern.data, null, 2)}
+                                      </pre>
+                                    </details>
+                                  )}
                                 </div>
-                                <p className="text-sm mb-3">{pattern.description}</p>
-                                <div className="bg-white dark:bg-gray-900 rounded p-3 mb-3">
-                                  <p className="text-xs font-medium mb-1">💡 Recommendation:</p>
-                                  <p className="text-xs text-muted-foreground">{pattern.recommendation}</p>
-                                </div>
-                                {pattern.data && (
-                                  <details className="text-xs">
-                                    <summary className="cursor-pointer font-medium mb-2">View Details</summary>
-                                    <pre className="bg-muted/50 p-2 rounded overflow-x-auto">
-                                      {JSON.stringify(pattern.data, null, 2)}
-                                    </pre>
-                                  </details>
-                                )}
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -3098,69 +4002,82 @@ export const MaterialKnowledgeBase: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {patternsData.anomalies.map((anomaly: any, idx: number) => (
-                        <Card key={idx} className="border-orange-300">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <Badge variant="destructive">{anomaly.severity}</Badge>
-                              <div className="flex-1">
-                                <h4 className="font-semibold capitalize mb-2">
-                                  {anomaly.type.replace(/_/g, ' ')}
-                                </h4>
-                                <p className="text-sm text-orange-900 dark:text-orange-100 mb-3">
-                                  {anomaly.description}
-                                </p>
-                                <div className="bg-white dark:bg-gray-900 rounded p-3 mb-3">
-                                  <p className="text-xs font-medium mb-1">💡 Recommendation:</p>
-                                  <p className="text-xs text-muted-foreground">{anomaly.recommendation}</p>
+                      {patternsData.anomalies.map(
+                        (anomaly: any, idx: number) => (
+                          <Card key={idx} className="border-orange-300">
+                            <CardContent className="p-4">
+                              <div className="flex items-start gap-3">
+                                <Badge variant="destructive">
+                                  {anomaly.severity}
+                                </Badge>
+                                <div className="flex-1">
+                                  <h4 className="font-semibold capitalize mb-2">
+                                    {anomaly.type.replace(/_/g, ' ')}
+                                  </h4>
+                                  <p className="text-sm text-orange-900 dark:text-orange-100 mb-3">
+                                    {anomaly.description}
+                                  </p>
+                                  <div className="bg-white dark:bg-gray-900 rounded p-3 mb-3">
+                                    <p className="text-xs font-medium mb-1">
+                                      💡 Recommendation:
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {anomaly.recommendation}
+                                    </p>
+                                  </div>
+                                  {anomaly.data && (
+                                    <details className="text-xs">
+                                      <summary className="cursor-pointer font-medium mb-2">
+                                        View Details
+                                      </summary>
+                                      <pre className="bg-muted/50 p-2 rounded overflow-x-auto">
+                                        {JSON.stringify(anomaly.data, null, 2)}
+                                      </pre>
+                                    </details>
+                                  )}
                                 </div>
-                                {anomaly.data && (
-                                  <details className="text-xs">
-                                    <summary className="cursor-pointer font-medium mb-2">View Details</summary>
-                                    <pre className="bg-muted/50 p-2 rounded overflow-x-auto">
-                                      {JSON.stringify(anomaly.data, null, 2)}
-                                    </pre>
-                                  </details>
-                                )}
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        ),
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               )}
 
               {/* No Issues Found */}
-              {patternsData.patterns.length === 0 && patternsData.anomalies.length === 0 && (
-                <Card className="border-green-200 bg-green-50 dark:bg-green-950">
-                  <CardContent className="p-8">
-                    <div className="text-center">
-                      <div className="text-6xl mb-4">✅</div>
-                      <h3 className="text-xl font-semibold text-green-900 dark:text-green-100 mb-2">
-                        All Systems Healthy!
-                      </h3>
-                      <p className="text-green-800 dark:text-green-200">
-                        No patterns or anomalies detected. Your knowledge base is performing optimally.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {patternsData.patterns.length === 0 &&
+                patternsData.anomalies.length === 0 && (
+                  <Card className="border-green-200 bg-green-50 dark:bg-green-950">
+                    <CardContent className="p-8">
+                      <div className="text-center">
+                        <div className="text-6xl mb-4">✅</div>
+                        <h3 className="text-xl font-semibold text-green-900 dark:text-green-100 mb-2">
+                          All Systems Healthy!
+                        </h3>
+                        <p className="text-green-800 dark:text-green-200">
+                          No patterns or anomalies detected. Your knowledge base
+                          is performing optimally.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
             </>
           ) : (
             <Card>
               <CardContent className="p-8">
                 <div className="text-center">
                   <Eye className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No insights data available</p>
+                  <p className="text-muted-foreground">
+                    No insights data available
+                  </p>
                 </div>
               </CardContent>
             </Card>
           )}
         </TabsContent>
-
       </Tabs>
 
       {/* Product Management Modals */}
@@ -3193,7 +4110,9 @@ export const MaterialKnowledgeBase: React.FC = () => {
         relatedChunks={selectedChunk ? getRelatedChunks(selectedChunk) : []}
         images={selectedChunk ? getImagesByChunk(selectedChunk.id) : []}
         embedding={selectedChunk ? getEmbeddingByChunk(selectedChunk.id) : null}
-        documentName={selectedChunk ? getDocumentDisplayName(selectedChunk) : ''}
+        documentName={
+          selectedChunk ? getDocumentDisplayName(selectedChunk) : ''
+        }
       />
     </div>
   );

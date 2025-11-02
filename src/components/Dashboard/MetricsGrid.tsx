@@ -10,8 +10,12 @@ export const MetricsGrid: React.FC = () => {
     <div className={styles.metricsSection}>
       <div className={styles.metricsContainer}>
         <div className={styles.sectionHeader}>
-          <h3 className={styles.sectionTitle}>{metricsConfig.sectionHeader.title}</h3>
-          <p className={styles.sectionDescription}>{metricsConfig.sectionHeader.description}</p>
+          <h3 className={styles.sectionTitle}>
+            {metricsConfig.sectionHeader.title}
+          </h3>
+          <p className={styles.sectionDescription}>
+            {metricsConfig.sectionHeader.description}
+          </p>
         </div>
 
         <div className={styles.metricsGrid}>
@@ -19,7 +23,9 @@ export const MetricsGrid: React.FC = () => {
             <Card key={metric.id} className={styles.metricCard}>
               <div className={styles.metricHeader}>
                 <metric.icon className={`h-6 w-6 ${metric.iconColor} mr-2`} />
-                <div className={`${styles.metricValue} ${styles[metric.valueColor]}`}>
+                <div
+                  className={`${styles.metricValue} ${styles[metric.valueColor]}`}
+                >
                   {metric.value}
                 </div>
               </div>

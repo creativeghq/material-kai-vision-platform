@@ -41,8 +41,12 @@ export function isMaterial(value: unknown): value is Material {
  * @param value - The value to check
  * @returns True if value is a valid ProcessingJobStatus
  */
-export function isProcessingJobStatus(value: unknown): value is ProcessingJobStatus {
-  return Object.values(ProcessingJobStatus).includes(value as ProcessingJobStatus);
+export function isProcessingJobStatus(
+  value: unknown,
+): value is ProcessingJobStatus {
+  return Object.values(ProcessingJobStatus).includes(
+    value as ProcessingJobStatus,
+  );
 }
 
 /**
@@ -50,7 +54,9 @@ export function isProcessingJobStatus(value: unknown): value is ProcessingJobSta
  * @param value - The value to check
  * @returns True if value is a valid RecognitionResult
  */
-export function isRecognitionResult(value: unknown): value is RecognitionResult {
+export function isRecognitionResult(
+  value: unknown,
+): value is RecognitionResult {
   if (!value || typeof value !== 'object') return false;
 
   const obj = value as Record<string, unknown>;
@@ -58,7 +64,8 @@ export function isRecognitionResult(value: unknown): value is RecognitionResult 
   return (
     typeof obj.materialId === 'string' &&
     typeof obj.confidence === 'number' &&
-    obj.confidence >= 0 && obj.confidence <= 1 &&
+    obj.confidence >= 0 &&
+    obj.confidence <= 1 &&
     isMaterial(obj.matchedMaterial) &&
     typeof obj.extractedProperties === 'object'
   );
@@ -69,13 +76,17 @@ export function isRecognitionResult(value: unknown): value is RecognitionResult 
  * @param value - The value to check
  * @returns True if value is a valid MaterialAgentTaskRequest
  */
-export function isMaterialAgentTaskRequest(value: unknown): value is MaterialAgentTaskRequest {
+export function isMaterialAgentTaskRequest(
+  value: unknown,
+): value is MaterialAgentTaskRequest {
   if (!value || typeof value !== 'object') return false;
 
   const obj = value as Record<string, unknown>;
 
   return (
-    ['analysis', 'recognition', 'processing'].includes(obj.taskType as string) &&
+    ['analysis', 'recognition', 'processing'].includes(
+      obj.taskType as string,
+    ) &&
     typeof obj.inputData === 'object' &&
     obj.inputData !== null
   );
@@ -86,7 +97,9 @@ export function isMaterialAgentTaskRequest(value: unknown): value is MaterialAge
  * @param value - The value to check
  * @returns True if value is a valid AgentExecutionResult
  */
-export function isAgentExecutionResult(value: unknown): value is AgentExecutionData {
+export function isAgentExecutionResult(
+  value: unknown,
+): value is AgentExecutionData {
   if (!value || typeof value !== 'object') return false;
 
   const obj = value as Record<string, unknown>;
@@ -104,7 +117,9 @@ export function isAgentExecutionResult(value: unknown): value is AgentExecutionD
  * @param value - The value to check
  * @returns True if value is a valid MaterialProperties
  */
-export function isMaterialProperties(value: unknown): value is MaterialProperties {
+export function isMaterialProperties(
+  value: unknown,
+): value is MaterialProperties {
   if (!value || typeof value !== 'object') return false;
 
   const obj = value as Record<string, unknown>;
@@ -112,9 +127,12 @@ export function isMaterialProperties(value: unknown): value is MaterialPropertie
   // All properties are optional, but if present must be correct types
   return (
     (obj.density === undefined || typeof obj.density === 'number') &&
-    (obj.thermalConductivity === undefined || typeof obj.thermalConductivity === 'number') &&
-    (obj.yieldStrength === undefined || typeof obj.yieldStrength === 'number') &&
-    (obj.tensileStrength === undefined || typeof obj.tensileStrength === 'number')
+    (obj.thermalConductivity === undefined ||
+      typeof obj.thermalConductivity === 'number') &&
+    (obj.yieldStrength === undefined ||
+      typeof obj.yieldStrength === 'number') &&
+    (obj.tensileStrength === undefined ||
+      typeof obj.tensileStrength === 'number')
   );
 }
 
@@ -123,7 +141,9 @@ export function isMaterialProperties(value: unknown): value is MaterialPropertie
  * @param value - The value to check
  * @returns True if value is a valid SpatialAnalysisData
  */
-export function isSpatialAnalysisData(value: unknown): value is SpatialAnalysisData {
+export function isSpatialAnalysisData(
+  value: unknown,
+): value is SpatialAnalysisData {
   if (!value || typeof value !== 'object') return false;
 
   const obj = value as Record<string, unknown>;

@@ -41,4 +41,3 @@ class BrowserApiClientFactory {
 
 // Export singleton instance
 export const browserApiClientFactory = new BrowserApiClientFactory();
-

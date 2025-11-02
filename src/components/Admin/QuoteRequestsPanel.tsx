@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
-import { QuoteRequestService, QuoteRequest } from '../../services/quote/QuoteRequestService';
+import {
+  QuoteRequestService,
+  QuoteRequest,
+} from '../../services/quote/QuoteRequestService';
 
 interface QuoteRequestsPanelProps {
   onSelectRequest?: (request: QuoteRequest) => void;
@@ -36,7 +39,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
 
       let filtered = data;
       if (filter !== 'all') {
-        filtered = data.filter(r => r.status === filter);
+        filtered = data.filter((r) => r.status === filter);
       }
 
       setRequests(filtered);
@@ -126,14 +129,20 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
             ) : (
               requests.map((request) => (
                 <tr key={request.id} className="border-b hover:bg-gray-50">
-                  <td className="p-3 font-mono text-sm">{request.id.slice(0, 8)}</td>
-                  <td className="p-3 font-mono text-sm">{request.user_id.slice(0, 8)}</td>
+                  <td className="p-3 font-mono text-sm">
+                    {request.id.slice(0, 8)}
+                  </td>
+                  <td className="p-3 font-mono text-sm">
+                    {request.user_id.slice(0, 8)}
+                  </td>
                   <td className="text-center p-3">{request.items_count}</td>
                   <td className="text-right p-3">
                     ${(request.total_estimated || 0).toFixed(2)}
                   </td>
                   <td className="text-center p-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}>
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(request.status)}`}
+                    >
                       {quoteService.getStatusLabel(request.status)}
                     </span>
                   </td>
@@ -142,7 +151,10 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
                   </td>
                   <td className="text-center p-3">
                     <button
-                      onClick={() => onSelectRequest?.(request)} onKeyDown={(e) => e.key === 'Enter' && onSelectRequest?.(request)}
+                      onClick={() => onSelectRequest?.(request)}
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && onSelectRequest?.(request)
+                      }
                       className="text-blue-600 hover:text-blue-800 font-medium"
                     >
                       View
@@ -158,17 +170,17 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
       {/* Pagination */}
       <div className="mt-4 flex justify-between items-center">
         <button
-          onClick={() => setPage(Math.max(0, page - 1))} onKeyDown={(e) => e.key === 'Enter' && setPage(Math.max(0, page - 1))}
+          onClick={() => setPage(Math.max(0, page - 1))}
+          onKeyDown={(e) => e.key === 'Enter' && setPage(Math.max(0, page - 1))}
           disabled={page === 0}
           className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50"
         >
           Previous
         </button>
-        <span className="text-sm text-gray-600">
-          Page {page + 1}
-        </span>
+        <span className="text-sm text-gray-600">Page {page + 1}</span>
         <button
-          onClick={() => setPage(page + 1)} onKeyDown={(e) => e.key === 'Enter' && setPage(page + 1)}
+          onClick={() => setPage(page + 1)}
+          onKeyDown={(e) => e.key === 'Enter' && setPage(page + 1)}
           disabled={requests.length < pageSize}
           className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50"
         >
@@ -177,7 +189,8 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
       </div>
 
       <button
-        onClick={loadRequests} onKeyDown={(e) => e.key === 'Enter' && loadRequests()}
+        onClick={loadRequests}
+        onKeyDown={(e) => e.key === 'Enter' && loadRequests()}
         className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
       >
         Refresh
@@ -187,4 +200,3 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
 };
 
 export default QuoteRequestsPanel;
-

@@ -13,7 +13,9 @@ export const FeatureGrid: React.FC<FeatureGridProps> = ({ onNavigate }) => {
   return (
     <div className={styles.mainSection}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>{featuresConfig.sectionHeader.title}</h2>
+        <h2 className={styles.sectionTitle}>
+          {featuresConfig.sectionHeader.title}
+        </h2>
         <p className={styles.sectionDescription}>
           {featuresConfig.sectionHeader.description}
         </p>
@@ -33,18 +35,22 @@ export const FeatureGrid: React.FC<FeatureGridProps> = ({ onNavigate }) => {
           >
             <CardHeader className="pb-4">
               <div className={styles.featureHeader}>
-                <div className={`${styles.featureIconWrapper} ${styles[card.iconColor]}`}>
+                <div
+                  className={`${styles.featureIconWrapper} ${styles[card.iconColor]}`}
+                >
                   <card.icon className="h-8 w-8" />
                 </div>
                 <span className={styles.featureBadge}>{card.badge}</span>
               </div>
-              <CardTitle className={styles.featureTitle}>{card.title}</CardTitle>
+              <CardTitle className={styles.featureTitle}>
+                {card.title}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={styles.featureDescription}>
-                {card.description}
-              </p>
-              <div className={`${styles.featureAction} ${styles[card.action.color]}`}>
+              <p className={styles.featureDescription}>{card.description}</p>
+              <div
+                className={`${styles.featureAction} ${styles[card.action.color]}`}
+              >
                 <card.action.icon className="h-4 w-4 mr-2" />
                 {card.action.text}
               </div>

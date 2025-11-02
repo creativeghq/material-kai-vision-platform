@@ -75,10 +75,12 @@ export class RetryHelper {
     const retryableError = error as RetryableError;
 
     // Network errors
-    if (retryableError.code === 'ECONNRESET' ||
-        retryableError.code === 'ENOTFOUND' ||
-        retryableError.code === 'ECONNREFUSED' ||
-        retryableError.code === 'ETIMEDOUT') {
+    if (
+      retryableError.code === 'ECONNRESET' ||
+      retryableError.code === 'ENOTFOUND' ||
+      retryableError.code === 'ECONNREFUSED' ||
+      retryableError.code === 'ETIMEDOUT'
+    ) {
       return true;
     }
 
@@ -99,6 +101,6 @@ export class RetryHelper {
    * Sleep for the specified number of milliseconds
    */
   private static sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

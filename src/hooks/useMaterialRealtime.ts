@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 
-import { MaterialRealtimeService, MaterialChangePayload, MaterialSubscriptionCallbacks } from '../services/realtime/materialRealtimeService';
+import {
+  MaterialRealtimeService,
+  MaterialChangePayload,
+  MaterialSubscriptionCallbacks,
+} from '../services/realtime/materialRealtimeService';
 // import { supabase } from '../lib/supabase'; // Fixed: Using window.supabase instead
 
 interface UseMaterialRealtimeOptions {
@@ -28,10 +32,17 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
   });
 
   const serviceRef = useRef<MaterialRealtimeService | null>(null);
-  const [materialData, setMaterialData] = useState<Record<string, unknown> | null>(null);
+  const [materialData, setMaterialData] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [imageUpdates, setImageUpdates] = useState<MaterialChangePayload[]>([]);
-  const [metafieldUpdates, setMetafieldUpdates] = useState<MaterialChangePayload[]>([]);
-  const [relationshipUpdates, setRelationshipUpdates] = useState<MaterialChangePayload[]>([]);
+  const [metafieldUpdates, setMetafieldUpdates] = useState<
+    MaterialChangePayload[]
+  >([]);
+  const [relationshipUpdates, setRelationshipUpdates] = useState<
+    MaterialChangePayload[]
+  >([]);
 
   useEffect(() => {
     // Initialize service
@@ -52,7 +63,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
           }));
         }
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           lastUpdate: payload.timestamp,
         }));
@@ -61,9 +72,9 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
       onImageChange: (payload) => {
         console.log('Image change received:', payload);
 
-        setImageUpdates(prev => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
+        setImageUpdates((prev) => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           lastUpdate: payload.timestamp,
         }));
@@ -72,9 +83,9 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
       onMetafieldChange: (payload) => {
         console.log('Metafield change received:', payload);
 
-        setMetafieldUpdates(prev => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
+        setMetafieldUpdates((prev) => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           lastUpdate: payload.timestamp,
         }));
@@ -83,16 +94,16 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
       onRelationshipChange: (payload) => {
         console.log('Relationship change received:', payload);
 
-        setRelationshipUpdates(prev => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
+        setRelationshipUpdates((prev) => [payload, ...prev.slice(0, 9)]); // Keep last 10 updates
 
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           lastUpdate: payload.timestamp,
         }));
       },
 
       onConnected: () => {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isConnected: true,
           error: undefined,
@@ -100,7 +111,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
       },
 
       onDisconnected: () => {
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isConnected: false,
         }));
@@ -108,7 +119,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
 
       onError: (error) => {
         console.error('Material realtime error:', error);
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           error: error.message,
         }));
@@ -121,24 +132,27 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
 
     // Auto-connect if enabled
     if (options.autoConnect !== false) {
-      service.connect().then(() => {
-        // Set up subscriptions based on options
-        const subscriptionConfig = {
-          materials: true,
-          images: options.subscribeToImages !== false,
-          metafields: options.subscribeToMetafields !== false,
-          relationships: options.subscribeToRelationships !== false,
-          materialId: options.materialId,
-        };
+      service
+        .connect()
+        .then(() => {
+          // Set up subscriptions based on options
+          const subscriptionConfig = {
+            materials: true,
+            images: options.subscribeToImages !== false,
+            metafields: options.subscribeToMetafields !== false,
+            relationships: options.subscribeToRelationships !== false,
+            materialId: options.materialId,
+          };
 
-        service.configureSubscriptions(subscriptionConfig);
-      }).catch(error => {
-        console.error('Failed to auto-connect:', error);
-        setState(prev => ({
-          ...prev,
-          error: error.message,
-        }));
-      });
+          service.configureSubscriptions(subscriptionConfig);
+        })
+        .catch((error) => {
+          console.error('Failed to auto-connect:', error);
+          setState((prev) => ({
+            ...prev,
+            error: error.message,
+          }));
+        });
     }
 
     // Cleanup
@@ -152,7 +166,7 @@ export function useMaterialRealtime(options: UseMaterialRealtimeOptions = {}) {
     const interval = setInterval(() => {
       if (serviceRef.current) {
         const status = serviceRef.current.getConnectionStatus();
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           isConnected: status.isConnected,
           activeChannels: status.activeChannels,

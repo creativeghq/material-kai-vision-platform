@@ -23,12 +23,29 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -94,7 +111,9 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<'page' | 'confidence' | 'created'>('page');
+  const [sortBy, setSortBy] = useState<'page' | 'confidence' | 'created'>(
+    'page',
+  );
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedImage, setSelectedImage] = useState<PDFImage | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -120,7 +139,9 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
       if (fetchError) {
         // Provide specific error messages
         if (fetchError.message.includes('invalid input syntax for type uuid')) {
-          throw new Error(`Invalid document ID format: "${documentId}". This may indicate a database schema issue.`);
+          throw new Error(
+            `Invalid document ID format: "${documentId}". This may indicate a database schema issue.`,
+          );
         }
         throw new Error(`Failed to load images: ${fetchError.message}`);
       }
@@ -128,7 +149,8 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
       setImages(data || []);
     } catch (err) {
       console.error('Error loading images:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load images';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to load images';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -147,17 +169,22 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
 
     // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(image =>
-        image.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        image.alt_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        image.metadata?.filename?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        image.metadata?.nearest_heading?.toLowerCase().includes(searchTerm.toLowerCase()),
+      filtered = filtered.filter(
+        (image) =>
+          image.caption?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          image.alt_text?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          image.metadata?.filename
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()) ||
+          image.metadata?.nearest_heading
+            ?.toLowerCase()
+            .includes(searchTerm.toLowerCase()),
       );
     }
 
     // Apply type filter
     if (filterType !== 'all') {
-      filtered = filtered.filter(image => image.image_type === filterType);
+      filtered = filtered.filter((image) => image.image_type === filterType);
     }
 
     // Apply sorting
@@ -193,7 +220,7 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
 
   // Get unique image types for filter
   const imageTypes = React.useMemo(() => {
-    const types = new Set(images.map(img => img.image_type));
+    const types = new Set(images.map((img) => img.image_type));
     return Array.from(types);
   }, [images]);
 
@@ -211,9 +238,10 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
   };
 
   const handleModalNavigate = (direction: 'prev' | 'next') => {
-    const newIndex = direction === 'prev'
-      ? Math.max(0, currentImageIndex - 1)
-      : Math.min(filteredAndSortedImages.length - 1, currentImageIndex + 1);
+    const newIndex =
+      direction === 'prev'
+        ? Math.max(0, currentImageIndex - 1)
+        : Math.min(filteredAndSortedImages.length - 1, currentImageIndex + 1);
 
     setCurrentImageIndex(newIndex);
     setSelectedImage(filteredAndSortedImages[newIndex]);
@@ -246,10 +274,12 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
         }}
       >
         {/* Image */}
-        <div className={cn(
-          'relative bg-gray-100 flex items-center justify-center',
-          isGridMode ? 'aspect-video' : 'w-32 h-full flex-shrink-0',
-        )}>
+        <div
+          className={cn(
+            'relative bg-gray-100 flex items-center justify-center',
+            isGridMode ? 'aspect-video' : 'w-32 h-full flex-shrink-0',
+          )}
+        >
           <img
             src={image.image_url}
             alt={image.alt_text || image.caption || `Image ${index + 1}`}
@@ -278,14 +308,18 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
         </div>
 
         {/* Content */}
-        <CardContent className={cn(
-          'p-3',
-          isGridMode ? '' : 'flex-1 flex flex-col justify-between',
-        )}>
+        <CardContent
+          className={cn(
+            'p-3',
+            isGridMode ? '' : 'flex-1 flex flex-col justify-between',
+          )}
+        >
           <div>
             <div className="flex items-center justify-between mb-1">
               <h4 className="font-medium text-sm truncate">
-                {image.caption || image.metadata?.filename || `Image ${index + 1}`}
+                {image.caption ||
+                  image.metadata?.filename ||
+                  `Image ${index + 1}`}
               </h4>
               <Button
                 size="sm"
@@ -317,23 +351,26 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                 {image.image_type}
               </Badge>
               {image.metadata?.width && image.metadata?.height && (
-                <span>{image.metadata.width}×{image.metadata.height}</span>
+                <span>
+                  {image.metadata.width}×{image.metadata.height}
+                </span>
               )}
-              {image.metadata?.format && (
-                <span>{image.metadata.format}</span>
-              )}
+              {image.metadata?.format && <span>{image.metadata.format}</span>}
             </div>
           </div>
 
           {/* Associated content info */}
-          {image.metadata?.associated_chunks && image.metadata.associated_chunks.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <div className="flex items-center gap-1 text-xs text-gray-500">
-                <FileText className="h-3 w-3" />
-                <span>{image.metadata.associated_chunks.length} related chunks</span>
+          {image.metadata?.associated_chunks &&
+            image.metadata.associated_chunks.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-1 text-xs text-gray-500">
+                  <FileText className="h-3 w-3" />
+                  <span>
+                    {image.metadata.associated_chunks.length} related chunks
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
         </CardContent>
       </Card>
     );
@@ -360,18 +397,27 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <h3 className="font-semibold text-red-900">Failed to Load Images</h3>
+                <h3 className="font-semibold text-red-900">
+                  Failed to Load Images
+                </h3>
                 <p className="text-red-700 text-sm mt-1">{error}</p>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button onClick={loadImages} onKeyDown={(e) => e.key === 'Enter' && loadImages()} variant="outline" size="sm">
+              <Button
+                onClick={loadImages}
+                onKeyDown={(e) => e.key === 'Enter' && loadImages()}
+                variant="outline"
+                size="sm"
+              >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry
               </Button>
               <details className="text-xs text-gray-500 cursor-pointer">
                 <summary className="hover:underline">Technical Details</summary>
-                <p className="mt-2 p-2 bg-gray-100 rounded font-mono break-words">{error}</p>
+                <p className="mt-2 p-2 bg-gray-100 rounded font-mono break-words">
+                  {error}
+                </p>
               </details>
             </div>
           </div>
@@ -447,14 +493,19 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {imageTypes.map(type => (
+                  {imageTypes.map((type) => (
                     <SelectItem key={type} value={type}>
-                      {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      {type
+                        .replace('_', ' ')
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <Select
+                value={sortBy}
+                onValueChange={(value: any) => setSortBy(value)}
+              >
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -467,14 +518,20 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                onClick={() =>
+                  setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+                }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
                   }
                 }}
               >
-                {sortOrder === 'asc' ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                {sortOrder === 'asc' ? (
+                  <SortAsc className="h-4 w-4" />
+                ) : (
+                  <SortDesc className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </CardContent>
@@ -486,22 +543,27 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
         <Card>
           <CardContent className="p-12 text-center">
             <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No images found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No images found
+            </h3>
             <p className="text-gray-500">
               {searchTerm || filterType !== 'all'
                 ? 'Try adjusting your search or filter criteria'
-                : 'No images have been extracted from this document yet'
-              }
+                : 'No images have been extracted from this document yet'}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className={cn(
-          viewMode === 'grid'
-            ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
-            : 'space-y-4',
-        )}>
-          {filteredAndSortedImages.map((image, index) => renderImageCard(image, index))}
+        <div
+          className={cn(
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
+              : 'space-y-4',
+          )}
+        >
+          {filteredAndSortedImages.map((image, index) =>
+            renderImageCard(image, index),
+          )}
         </div>
       )}
 
@@ -513,7 +575,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
               <DialogTitle className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5" />
-                  <span>{selectedImage.caption || selectedImage.metadata?.filename || `Image ${currentImageIndex + 1}`}</span>
+                  <span>
+                    {selectedImage.caption ||
+                      selectedImage.metadata?.filename ||
+                      `Image ${currentImageIndex + 1}`}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">
@@ -552,7 +618,9 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
               <div className="flex-1 relative bg-gray-50 flex items-center justify-center">
                 <img
                   src={selectedImage.image_url}
-                  alt={selectedImage.alt_text || selectedImage.caption || 'Image'}
+                  alt={
+                    selectedImage.alt_text || selectedImage.caption || 'Image'
+                  }
                   className="max-w-full max-h-full object-contain"
                 />
 
@@ -583,7 +651,9 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                           handleModalNavigate('next');
                         }
                       }}
-                      disabled={currentImageIndex === filteredAndSortedImages.length - 1}
+                      disabled={
+                        currentImageIndex === filteredAndSortedImages.length - 1
+                      }
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -604,18 +674,26 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Type:</span>
-                          <Badge variant="secondary">{selectedImage.image_type}</Badge>
+                          <Badge variant="secondary">
+                            {selectedImage.image_type}
+                          </Badge>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-600">Confidence:</span>
-                          <span>{Math.round(selectedImage.confidence * 100)}%</span>
+                          <span>
+                            {Math.round(selectedImage.confidence * 100)}%
+                          </span>
                         </div>
-                        {selectedImage.metadata?.width && selectedImage.metadata?.height && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Dimensions:</span>
-                            <span>{selectedImage.metadata.width}×{selectedImage.metadata.height}</span>
-                          </div>
-                        )}
+                        {selectedImage.metadata?.width &&
+                          selectedImage.metadata?.height && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Dimensions:</span>
+                              <span>
+                                {selectedImage.metadata.width}×
+                                {selectedImage.metadata.height}
+                              </span>
+                            </div>
+                          )}
                         {selectedImage.metadata?.format && (
                           <div className="flex justify-between">
                             <span className="text-gray-600">Format:</span>
@@ -628,37 +706,50 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                     {selectedImage.caption && (
                       <div>
                         <h4 className="font-medium mb-2">Caption</h4>
-                        <p className="text-sm text-gray-600">{selectedImage.caption}</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedImage.caption}
+                        </p>
                       </div>
                     )}
 
-                    {selectedImage.alt_text && selectedImage.alt_text !== selectedImage.caption && (
-                      <div>
-                        <h4 className="font-medium mb-2">Description</h4>
-                        <p className="text-sm text-gray-600">{selectedImage.alt_text}</p>
-                      </div>
-                    )}
+                    {selectedImage.alt_text &&
+                      selectedImage.alt_text !== selectedImage.caption && (
+                        <div>
+                          <h4 className="font-medium mb-2">Description</h4>
+                          <p className="text-sm text-gray-600">
+                            {selectedImage.alt_text}
+                          </p>
+                        </div>
+                      )}
 
                     {selectedImage.metadata?.nearest_heading && (
                       <div>
                         <h4 className="font-medium mb-2">Context</h4>
-                        <p className="text-sm text-gray-600">{selectedImage.metadata.nearest_heading}</p>
+                        <p className="text-sm text-gray-600">
+                          {selectedImage.metadata.nearest_heading}
+                        </p>
                       </div>
                     )}
 
-                    {selectedImage.metadata?.associated_chunks && selectedImage.metadata.associated_chunks.length > 0 && (
-                      <div>
-                        <h4 className="font-medium mb-2">Related Content</h4>
-                        <div className="space-y-1">
-                          {selectedImage.metadata.associated_chunks.map((chunkId, index) => (
-                            <div key={index} className="flex items-center gap-2 text-sm text-gray-600">
-                              <FileText className="h-3 w-3" />
-                              <span>Chunk {chunkId}</span>
-                            </div>
-                          ))}
+                    {selectedImage.metadata?.associated_chunks &&
+                      selectedImage.metadata.associated_chunks.length > 0 && (
+                        <div>
+                          <h4 className="font-medium mb-2">Related Content</h4>
+                          <div className="space-y-1">
+                            {selectedImage.metadata.associated_chunks.map(
+                              (chunkId, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-2 text-sm text-gray-600"
+                                >
+                                  <FileText className="h-3 w-3" />
+                                  <span>Chunk {chunkId}</span>
+                                </div>
+                              ),
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </ScrollArea>
               </div>

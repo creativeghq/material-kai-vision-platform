@@ -8,7 +8,13 @@ import {
   Info,
 } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -23,9 +29,10 @@ export const PDFKnowledgeDemo: React.FC = () => {
 
   // Sample PDF URL from your public folder for demonstration
   // Use empty string during SSR, will be set on client
-  const samplePdfUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/test-materials.pdf`
-    : '/test-materials.pdf';
+  const samplePdfUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/test-materials.pdf`
+      : '/test-materials.pdf';
 
   const addSampleEntry = async () => {
     try {
@@ -33,7 +40,8 @@ export const PDFKnowledgeDemo: React.FC = () => {
       // but we're showing how it would work with a sample PDF
       const sampleEntry = {
         title: 'Advanced Material Properties Guide',
-        content: 'This comprehensive guide covers the fundamental properties of construction materials including ceramics, metals, composites, and polymers. It includes detailed specifications, performance characteristics, and application guidelines for various building and design projects.',
+        content:
+          'This comprehensive guide covers the fundamental properties of construction materials including ceramics, metals, composites, and polymers. It includes detailed specifications, performance characteristics, and application guidelines for various building and design projects.',
         contentType: 'material_guide',
         pdfUrl: samplePdfUrl,
         materialCategories: ['ceramics', 'metals', 'composites'],
@@ -45,23 +53,26 @@ export const PDFKnowledgeDemo: React.FC = () => {
 
       toast({
         title: 'Sample Entry Added',
-        description: 'Added sample knowledge entry with PDF link for demonstration',
+        description:
+          'Added sample knowledge entry with PDF link for demonstration',
       });
 
       // Simulate the entry being added to results
-      setDemoResults([{
-        id: 'demo-1',
-        title: sampleEntry.title,
-        content: sampleEntry.content,
-        relevanceScore: 0.95,
-        source: 'PDF Knowledge Base',
-        pdfUrl: sampleEntry.pdfUrl,
-        metadata: {
-          tags: sampleEntry.semanticTags,
-          contentType: sampleEntry.contentType,
-          materialCategories: sampleEntry.materialCategories,
+      setDemoResults([
+        {
+          id: 'demo-1',
+          title: sampleEntry.title,
+          content: sampleEntry.content,
+          relevanceScore: 0.95,
+          source: 'PDF Knowledge Base',
+          pdfUrl: sampleEntry.pdfUrl,
+          metadata: {
+            tags: sampleEntry.semanticTags,
+            contentType: sampleEntry.contentType,
+            materialCategories: sampleEntry.materialCategories,
+          },
         },
-      }]);
+      ]);
     } catch (error) {
       console.error('Error adding sample entry:', error);
       toast({
@@ -89,7 +100,8 @@ export const PDFKnowledgeDemo: React.FC = () => {
             New PDF Link Feature
           </CardTitle>
           <CardDescription>
-            Your knowledge base now supports linking to PDFs stored on Supabase for additional details
+            Your knowledge base now supports linking to PDFs stored on Supabase
+            for additional details
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -128,9 +140,10 @@ export const PDFKnowledgeDemo: React.FC = () => {
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>How it works:</strong> Add content to the knowledge base with a PDF URL.
-              When users search and find relevant content, they can click "View PDF Details"
-              to access the original document for comprehensive information.
+              <strong>How it works:</strong> Add content to the knowledge base
+              with a PDF URL. When users search and find relevant content, they
+              can click "View PDF Details" to access the original document for
+              comprehensive information.
             </AlertDescription>
           </Alert>
         </CardContent>
@@ -149,7 +162,8 @@ export const PDFKnowledgeDemo: React.FC = () => {
             <CardHeader>
               <CardTitle>Demo: Knowledge Entry with PDF Link</CardTitle>
               <CardDescription>
-                See how search results display with PDF links for additional details
+                See how search results display with PDF links for additional
+                details
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -160,7 +174,8 @@ export const PDFKnowledgeDemo: React.FC = () => {
                     addSampleEntry();
                   }
                 }}
-                className="w-full">
+                className="w-full"
+              >
                 Add Sample Knowledge Entry with PDF Link
               </Button>
 
@@ -173,12 +188,17 @@ export const PDFKnowledgeDemo: React.FC = () => {
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <Database className="h-4 w-4" />
-                            <h3 className="font-semibold">{(result as any).title}</h3>
+                            <h3 className="font-semibold">
+                              {(result as any).title}
+                            </h3>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="w-2 h-2 rounded-full bg-green-500" />
                             <span className="text-sm text-muted-foreground">
-                              {((result as any).relevanceScore * 100).toFixed(1)}%
+                              {((result as any).relevanceScore * 100).toFixed(
+                                1,
+                              )}
+                              %
                             </span>
                           </div>
                         </div>
@@ -186,30 +206,39 @@ export const PDFKnowledgeDemo: React.FC = () => {
                         <p className="text-sm text-muted-foreground mb-3">
                           {((result as any).content as string).length > 300
                             ? `${((result as any).content as string).substring(0, 300)}...`
-                            : (result as any).content
-                          }
+                            : (result as any).content}
                         </p>
 
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary">{(result as any).source}</Badge>
-                            {(result as any).metadata?.tags && (
-                              (result as any).metadata.tags.slice(0, 3).map((tag: string, i: number) => (
-                                <Badge key={i} variant="outline">{tag}</Badge>
-                              ))
-                            )}
+                            <Badge variant="secondary">
+                              {(result as any).source}
+                            </Badge>
+                            {(result as any).metadata?.tags &&
+                              (result as any).metadata.tags
+                                .slice(0, 3)
+                                .map((tag: string, i: number) => (
+                                  <Badge key={i} variant="outline">
+                                    {tag}
+                                  </Badge>
+                                ))}
                           </div>
 
                           {/* PDF Link for additional details */}
-                          {(result.pdfUrl) ? (
+                          {result.pdfUrl ? (
                             <Button
                               variant="outline"
                               size="sm"
                               className="flex items-center gap-1"
-                              onClick={() => window.open(result.pdfUrl as string, '_blank')}
+                              onClick={() =>
+                                window.open(result.pdfUrl as string, '_blank')
+                              }
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
-                                  window.open(result.pdfUrl as string, '_blank');
+                                  window.open(
+                                    result.pdfUrl as string,
+                                    '_blank',
+                                  );
                                 }
                               }}
                             >
@@ -233,7 +262,8 @@ export const PDFKnowledgeDemo: React.FC = () => {
             onEntryAdded={(_entry) => {
               toast({
                 title: 'Knowledge Entry Added',
-                description: 'Successfully added to the knowledge base with PDF link support',
+                description:
+                  'Successfully added to the knowledge base with PDF link support',
               });
             }}
           />
@@ -257,7 +287,9 @@ export const PDFKnowledgeDemo: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">1</div>
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">
+                1
+              </div>
               <div>
                 <h4 className="font-semibold">Upload PDF to Supabase</h4>
                 <p className="text-sm text-muted-foreground">
@@ -267,21 +299,27 @@ export const PDFKnowledgeDemo: React.FC = () => {
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">2</div>
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">
+                2
+              </div>
               <div>
                 <h4 className="font-semibold">Add Knowledge Entry</h4>
                 <p className="text-sm text-muted-foreground">
-                  Extract key content and add it to the knowledge base with the PDF URL
+                  Extract key content and add it to the knowledge base with the
+                  PDF URL
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
-              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">3</div>
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-sm flex items-center justify-center font-semibold">
+                3
+              </div>
               <div>
                 <h4 className="font-semibold">Search & Access</h4>
                 <p className="text-sm text-muted-foreground">
-                  Users can search the extracted content and click "View PDF Details" for the full document
+                  Users can search the extracted content and click "View PDF
+                  Details" for the full document
                 </p>
               </div>
             </div>

@@ -69,7 +69,9 @@ class MoodBoardAPI {
 
   // Create a new moodboard
   async createMoodBoard(data: CreateMoodBoardData): Promise<MoodBoard> {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
     const { data: result, error } = await supabase
@@ -99,7 +101,10 @@ class MoodBoardAPI {
   }
 
   // Update a moodboard
-  async updateMoodBoard(id: string, data: UpdateMoodBoardData): Promise<MoodBoard> {
+  async updateMoodBoard(
+    id: string,
+    data: UpdateMoodBoardData,
+  ): Promise<MoodBoard> {
     const { data: result, error } = await supabase
       .from('moodboards')
       .update(data)
@@ -123,10 +128,7 @@ class MoodBoardAPI {
 
   // Delete a moodboard
   async deleteMoodBoard(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('moodboards')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('moodboards').delete().eq('id', id);
 
     if (error) throw error;
   }
@@ -135,7 +137,8 @@ class MoodBoardAPI {
   async getMoodBoardItems(moodboardId: string): Promise<MoodBoardItem[]> {
     const { data, error } = await supabase
       .from('moodboard_items')
-      .select(`
+      .select(
+        `
         *,
         material:materials_catalog(
           id,
@@ -144,7 +147,8 @@ class MoodBoardAPI {
           thumbnail_url,
           properties
         )
-      `)
+      `,
+      )
       .eq('moodboard_id', moodboardId)
       .order('position', { ascending: true });
 
@@ -162,7 +166,8 @@ class MoodBoardAPI {
       .order('position', { ascending: false })
       .limit(1);
 
-    const nextPosition = data.position ?? ((existingItems?.[0]?.position ?? -1) + 1);
+    const nextPosition =
+      data.position ?? (existingItems?.[0]?.position ?? -1) + 1;
 
     const { data: result, error } = await supabase
       .from('moodboard_items')
@@ -172,7 +177,8 @@ class MoodBoardAPI {
         notes: data.notes,
         position: nextPosition,
       })
-      .select(`
+      .select(
+        `
         *,
         material:materials_catalog(
           id,
@@ -181,7 +187,8 @@ class MoodBoardAPI {
           thumbnail_url,
           properties
         )
-      `)
+      `,
+      )
       .single();
 
     if (error) throw error;
@@ -197,7 +204,8 @@ class MoodBoardAPI {
       .from('moodboard_items')
       .update(data)
       .eq('id', id)
-      .select(`
+      .select(
+        `
         *,
         material:materials_catalog(
           id,
@@ -206,7 +214,8 @@ class MoodBoardAPI {
           thumbnail_url,
           properties
         )
-      `)
+      `,
+      )
       .single();
 
     if (error) throw error;

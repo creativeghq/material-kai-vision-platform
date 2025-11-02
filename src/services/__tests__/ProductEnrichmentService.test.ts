@@ -22,7 +22,8 @@ jest.mock('@/integrations/supabase/client', () => {
       chainable.single.mockResolvedValue({
         data: {
           id: 'chunk-1',
-          content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+          content:
+            'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
           workspace_id: 'workspace-1',
         },
         error: null,
@@ -58,7 +59,8 @@ jest.mock('@/integrations/supabase/client', () => {
           data: [
             {
               id: 'chunk-1',
-              content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+              content:
+                'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
               workspace_id: 'workspace-1',
             },
           ],
@@ -106,7 +108,8 @@ describe('ProductEnrichmentService', () => {
       const request: ProductEnrichmentRequest = {
         chunk_id: 'chunk-1',
         workspace_id: 'workspace-1',
-        chunk_content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+        chunk_content:
+          'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
       };
 
       const response = await service.enrichChunk(request);
@@ -121,7 +124,8 @@ describe('ProductEnrichmentService', () => {
       const request: ProductEnrichmentRequest = {
         chunk_id: 'chunk-1',
         workspace_id: 'workspace-1',
-        chunk_content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+        chunk_content:
+          'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
       };
 
       const response = await service.enrichChunk(request);
@@ -134,7 +138,8 @@ describe('ProductEnrichmentService', () => {
       const request: ProductEnrichmentRequest = {
         chunk_id: 'chunk-1',
         workspace_id: 'workspace-1',
-        chunk_content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+        chunk_content:
+          'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
       };
 
       const response = await service.enrichChunk(request);
@@ -147,7 +152,8 @@ describe('ProductEnrichmentService', () => {
       const request: ProductEnrichmentRequest = {
         chunk_id: 'chunk-1',
         workspace_id: 'workspace-1',
-        chunk_content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+        chunk_content:
+          'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
       };
 
       const response = await service.enrichChunk(request);
@@ -160,12 +166,15 @@ describe('ProductEnrichmentService', () => {
       const request: ProductEnrichmentRequest = {
         chunk_id: 'chunk-1',
         workspace_id: 'workspace-1',
-        chunk_content: 'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
+        chunk_content:
+          'Premium wireless headphones. Brand: Sony. Model: WH-1000XM5.',
       };
 
       const response = await service.enrichChunk(request);
 
-      expect(['enriched', 'needs_review', 'failed']).toContain(response.enrichment.enrichment_status);
+      expect(['enriched', 'needs_review', 'failed']).toContain(
+        response.enrichment.enrichment_status,
+      );
     });
   });
 
@@ -193,7 +202,8 @@ describe('ProductEnrichmentService', () => {
     });
 
     it('should retrieve enrichments needing review', async () => {
-      const enrichments = await service.getEnrichmentsNeedingReview('workspace-1');
+      const enrichments =
+        await service.getEnrichmentsNeedingReview('workspace-1');
 
       expect(Array.isArray(enrichments)).toBe(true);
     });
@@ -218,4 +228,3 @@ describe('ProductEnrichmentService', () => {
     });
   });
 });
-

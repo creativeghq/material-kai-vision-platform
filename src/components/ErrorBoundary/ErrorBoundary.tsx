@@ -172,10 +172,15 @@ export class ErrorBoundary extends Component<Props, State> {
       <Card className={`w-full ${isCritical ? 'border-destructive' : ''}`}>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <AlertTriangle className={`w-5 h-5 ${isCritical ? 'text-destructive' : 'text-yellow-500'}`} />
+            <AlertTriangle
+              className={`w-5 h-5 ${isCritical ? 'text-destructive' : 'text-yellow-500'}`}
+            />
             <span>
-              {isCritical ? 'Critical Error' :
-               isPageLevel ? 'Page Error' : 'Component Error'}
+              {isCritical
+                ? 'Critical Error'
+                : isPageLevel
+                  ? 'Page Error'
+                  : 'Component Error'}
             </span>
             <Badge variant={isCritical ? 'destructive' : 'secondary'}>
               {level}
@@ -188,9 +193,8 @@ export class ErrorBoundary extends Component<Props, State> {
               {isCritical
                 ? 'A critical error has occurred that prevents the application from functioning properly.'
                 : isPageLevel
-                ? 'An error occurred while loading this page.'
-                : `An error occurred in the ${name || 'component'}.`
-              }
+                  ? 'An error occurred while loading this page.'
+                  : `An error occurred in the ${name || 'component'}.`}
             </p>
             {error && (
               <p className="mt-2 text-sm font-mono bg-muted p-2 rounded">
@@ -208,7 +212,8 @@ export class ErrorBoundary extends Component<Props, State> {
                     this.handleRetry();
                   }
                 }}
-                variant="default">
+                variant="default"
+              >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Try Again ({this.maxRetries - this.retryCount} left)
               </Button>
@@ -222,7 +227,8 @@ export class ErrorBoundary extends Component<Props, State> {
                     this.handleGoHome();
                   }
                 }}
-                variant="outline">
+                variant="outline"
+              >
                 <Home className="w-4 h-4 mr-2" />
                 Go Home
               </Button>
@@ -235,7 +241,8 @@ export class ErrorBoundary extends Component<Props, State> {
                   this.handleReload();
                 }
               }}
-              variant="outline">
+              variant="outline"
+            >
               <RefreshCw className="w-4 h-4 mr-2" />
               Reload Page
             </Button>
@@ -279,28 +286,28 @@ export function withErrorBoundary<P extends object>(
 }
 
 // Specialized error boundaries for different use cases
-export const PageErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({
-  children,
-  name,
-}) => (
+export const PageErrorBoundary: React.FC<{
+  children: ReactNode;
+  name?: string;
+}> = ({ children, name }) => (
   <ErrorBoundary level="page" name={name}>
     {children}
   </ErrorBoundary>
 );
 
-export const ComponentErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({
-  children,
-  name,
-}) => (
+export const ComponentErrorBoundary: React.FC<{
+  children: ReactNode;
+  name?: string;
+}> = ({ children, name }) => (
   <ErrorBoundary level="component" name={name}>
     {children}
   </ErrorBoundary>
 );
 
-export const CriticalErrorBoundary: React.FC<{ children: ReactNode; name?: string }> = ({
-  children,
-  name,
-}) => (
+export const CriticalErrorBoundary: React.FC<{
+  children: ReactNode;
+  name?: string;
+}> = ({ children, name }) => (
   <ErrorBoundary level="critical" name={name}>
     {children}
   </ErrorBoundary>

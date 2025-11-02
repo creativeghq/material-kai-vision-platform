@@ -10,23 +10,49 @@ function isMaterialCategory(category: string): category is MaterialCategory {
 }
 
 function isValidFinish(finish: string, category: MaterialCategory): boolean {
-  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
-  return categoryData ? (categoryData.finish as unknown as string[]).includes(finish) : false;
+  const categoryData =
+    MATERIAL_CATEGORIES[
+      category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+    ];
+  return categoryData
+    ? (categoryData.finish as unknown as string[]).includes(finish)
+    : false;
 }
 
 function isValidSize(size: string, category: MaterialCategory): boolean {
-  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
-  return categoryData ? (categoryData.size as unknown as string[]).includes(size) : false;
+  const categoryData =
+    MATERIAL_CATEGORIES[
+      category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+    ];
+  return categoryData
+    ? (categoryData.size as unknown as string[]).includes(size)
+    : false;
 }
 
-function isValidInstallationMethod(method: string, category: MaterialCategory): boolean {
-  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
-  return categoryData ? (categoryData.installationMethod as unknown as string[]).includes(method) : false;
+function isValidInstallationMethod(
+  method: string,
+  category: MaterialCategory,
+): boolean {
+  const categoryData =
+    MATERIAL_CATEGORIES[
+      category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+    ];
+  return categoryData
+    ? (categoryData.installationMethod as unknown as string[]).includes(method)
+    : false;
 }
 
-function isValidApplication(application: string, category: MaterialCategory): boolean {
-  const categoryData = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
-  return categoryData ? (categoryData.application as unknown as string[]).includes(application) : false;
+function isValidApplication(
+  application: string,
+  category: MaterialCategory,
+): boolean {
+  const categoryData =
+    MATERIAL_CATEGORIES[
+      category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+    ];
+  return categoryData
+    ? (categoryData.application as unknown as string[]).includes(application)
+    : false;
 }
 
 // Material metadata interface
@@ -62,7 +88,9 @@ export interface ValidationWarning {
 /**
  * Validate a complete Material object
  */
-export function validateMaterial(material: Partial<Material>): ValidationResult {
+export function validateMaterial(
+  material: Partial<Material>,
+): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -150,15 +178,24 @@ export function validateMaterial(material: Partial<Material>): ValidationResult 
   }
 
   // Validate metadata if present
-  if (material.metadata && material.category && isMaterialCategory(material.category)) {
-    const metadataValidation = validateMaterialMetadata(material.metadata, material.category);
+  if (
+    material.metadata &&
+    material.category &&
+    isMaterialCategory(material.category)
+  ) {
+    const metadataValidation = validateMaterialMetadata(
+      material.metadata,
+      material.category,
+    );
     errors.push(...metadataValidation.errors);
     warnings.push(...metadataValidation.warnings);
   }
 
   // Validate properties if present
   if (material.properties) {
-    const propertiesValidation = validateMaterialProperties(material.properties);
+    const propertiesValidation = validateMaterialProperties(
+      material.properties,
+    );
     errors.push(...propertiesValidation.errors);
     warnings.push(...propertiesValidation.warnings);
   }
@@ -205,7 +242,10 @@ export function validateMaterialMetadata(
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
-  const categoryDef = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+  const categoryDef =
+    MATERIAL_CATEGORIES[
+      category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+    ];
 
   // Validate finish
   if (metadata.finish) {
@@ -285,7 +325,9 @@ export function validateMaterialMetadata(
 /**
  * Validate material properties for data integrity
  */
-export function validateMaterialProperties(properties: Record<string, unknown>): ValidationResult {
+export function validateMaterialProperties(
+  properties: Record<string, unknown>,
+): ValidationResult {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -307,7 +349,10 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
   }
 
   if (properties.yieldStrength !== undefined) {
-    if (typeof properties.yieldStrength !== 'number' || properties.yieldStrength <= 0) {
+    if (
+      typeof properties.yieldStrength !== 'number' ||
+      properties.yieldStrength <= 0
+    ) {
       errors.push({
         field: 'properties.yieldStrength',
         message: 'Yield strength must be a positive number (MPa)',
@@ -316,14 +361,18 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
     } else if (properties.yieldStrength > 10000) {
       warnings.push({
         field: 'properties.yieldStrength',
-        message: 'Yield strength seems unusually high (>10,000 MPa) - please verify',
+        message:
+          'Yield strength seems unusually high (>10,000 MPa) - please verify',
         severity: 'warning',
       });
     }
   }
 
   if (properties.tensileStrength !== undefined) {
-    if (typeof properties.tensileStrength !== 'number' || properties.tensileStrength <= 0) {
+    if (
+      typeof properties.tensileStrength !== 'number' ||
+      properties.tensileStrength <= 0
+    ) {
       errors.push({
         field: 'properties.tensileStrength',
         message: 'Tensile strength must be a positive number (MPa)',
@@ -332,14 +381,18 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
     } else if (properties.tensileStrength > 15000) {
       warnings.push({
         field: 'properties.tensileStrength',
-        message: 'Tensile strength seems unusually high (>15,000 MPa) - please verify',
+        message:
+          'Tensile strength seems unusually high (>15,000 MPa) - please verify',
         severity: 'warning',
       });
     }
   }
 
   if (properties.thermalConductivity !== undefined) {
-    if (typeof properties.thermalConductivity !== 'number' || properties.thermalConductivity < 0) {
+    if (
+      typeof properties.thermalConductivity !== 'number' ||
+      properties.thermalConductivity < 0
+    ) {
       errors.push({
         field: 'properties.thermalConductivity',
         message: 'Thermal conductivity must be a non-negative number (W/m·K)',
@@ -348,7 +401,8 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
     } else if (properties.thermalConductivity > 1000) {
       warnings.push({
         field: 'properties.thermalConductivity',
-        message: 'Thermal conductivity seems unusually high (>1000 W/m·K) - please verify',
+        message:
+          'Thermal conductivity seems unusually high (>1000 W/m·K) - please verify',
         severity: 'warning',
       });
     }
@@ -386,7 +440,8 @@ export function validateMaterialProperties(properties: Record<string, unknown>):
     } else if (properties.glassTransition < -273.15) {
       errors.push({
         field: 'properties.glassTransition',
-        message: 'Glass transition temperature cannot be below absolute zero (-273.15°C)',
+        message:
+          'Glass transition temperature cannot be below absolute zero (-273.15°C)',
         severity: 'error',
       });
     }
@@ -432,7 +487,11 @@ export function validateExtractedAIData(
 
     // Check extraction confidence
     if (metadata?.confidence !== undefined) {
-      if (typeof metadata.confidence !== 'number' || metadata.confidence < 0 || metadata.confidence > 1) {
+      if (
+        typeof metadata.confidence !== 'number' ||
+        metadata.confidence < 0 ||
+        metadata.confidence > 1
+      ) {
         errors.push({
           field: 'processing_metadata.confidence',
           message: 'Confidence score must be a number between 0 and 1',
@@ -449,13 +508,17 @@ export function validateExtractedAIData(
 
     // Check for extracted meta fields
     if (metadata?.extracted_meta) {
-      const metaValidation = validateExtractedMetaFields(metadata.extracted_meta as any, expectedCategory);
+      const metaValidation = validateExtractedMetaFields(
+        metadata.extracted_meta as any,
+        expectedCategory,
+      );
       errors.push(...metaValidation.errors);
       warnings.push(...metaValidation.warnings);
     } else {
       warnings.push({
         field: 'processing_metadata.extracted_meta',
-        message: 'No meta fields extracted - catalog information may be incomplete',
+        message:
+          'No meta fields extracted - catalog information may be incomplete',
         severity: 'warning',
       });
     }
@@ -517,13 +580,17 @@ export function validateExtractedMetaFields(
   if (!category) {
     warnings.push({
       field: 'category',
-      message: 'Category not specified - unable to validate meta fields against constraints',
+      message:
+        'Category not specified - unable to validate meta fields against constraints',
       severity: 'warning',
     });
     return { isValid: true, errors, warnings };
   }
 
-  const categoryDef = MATERIAL_CATEGORIES[category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
+  const categoryDef =
+    MATERIAL_CATEGORIES[
+      category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+    ];
 
   // Validate finish
   if (extractedMeta.finish) {
@@ -549,7 +616,12 @@ export function validateExtractedMetaFields(
 
   // Validate installation method
   if (extractedMeta.installation_method) {
-    if (!isValidInstallationMethod(extractedMeta.installation_method as string, category)) {
+    if (
+      !isValidInstallationMethod(
+        extractedMeta.installation_method as string,
+        category,
+      )
+    ) {
       errors.push({
         field: 'extracted_meta.installation_method',
         message: `Invalid installation method "${extractedMeta.installation_method}" for category "${category}". Valid options: ${categoryDef.installationMethod.join(', ')}`,
@@ -580,7 +652,8 @@ export function validateExtractedMetaFields(
     } else if (!validateR11Format(extractedMeta.r11)) {
       warnings.push({
         field: 'extracted_meta.r11',
-        message: 'R11 rating format may be invalid - expected format like "R11-2.5" or "2.5"',
+        message:
+          'R11 rating format may be invalid - expected format like "R11-2.5" or "2.5"',
         severity: 'warning',
       });
     }
@@ -624,21 +697,33 @@ export function validateAndSuggestCorrections(
   const suggestions: string[] = [];
 
   // Generate correction suggestions based on validation results
-  validation.errors.forEach(error => {
+  validation.errors.forEach((error) => {
     switch (error.field) {
       case 'category':
-        suggestions.push(`Consider using one of these categories: ${Object.keys(MATERIAL_CATEGORIES).slice(0, 5).join(', ')}...`);
+        suggestions.push(
+          `Consider using one of these categories: ${Object.keys(MATERIAL_CATEGORIES).slice(0, 5).join(', ')}...`,
+        );
         break;
       case 'metadata.finish':
         if (material.category && isMaterialCategory(material.category)) {
-          const categoryDef = MATERIAL_CATEGORIES[material.category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
-          suggestions.push(`For ${material.category}, try these finishes: ${(categoryDef?.finish as unknown as string[])?.slice(0, 3).join(', ')}`);
+          const categoryDef =
+            MATERIAL_CATEGORIES[
+              material.category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+            ];
+          suggestions.push(
+            `For ${material.category}, try these finishes: ${(categoryDef?.finish as unknown as string[])?.slice(0, 3).join(', ')}`,
+          );
         }
         break;
       case 'metadata.size':
         if (material.category && isMaterialCategory(material.category)) {
-          const categoryDef = MATERIAL_CATEGORIES[material.category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES];
-          suggestions.push(`For ${material.category}, try these sizes: ${(categoryDef?.size as unknown as string[])?.slice(0, 3).join(', ')}`);
+          const categoryDef =
+            MATERIAL_CATEGORIES[
+              material.category.toUpperCase() as keyof typeof MATERIAL_CATEGORIES
+            ];
+          suggestions.push(
+            `For ${material.category}, try these sizes: ${(categoryDef?.size as unknown as string[])?.slice(0, 3).join(', ')}`,
+          );
         }
         break;
     }
@@ -646,15 +731,21 @@ export function validateAndSuggestCorrections(
 
   // Add suggestions for missing recommended fields
   if (!material.description) {
-    suggestions.push('Add a detailed description to improve searchability and user understanding');
+    suggestions.push(
+      'Add a detailed description to improve searchability and user understanding',
+    );
   }
 
   if (!material.thumbnailUrl && !material.imageUrl) {
-    suggestions.push('Add product images to help with visual identification and user experience');
+    suggestions.push(
+      'Add product images to help with visual identification and user experience',
+    );
   }
 
   if (material.standards && material.standards.length === 0) {
-    suggestions.push('Consider adding industry standards or certifications (ISO, ANSI, ASTM, etc.)');
+    suggestions.push(
+      'Consider adding industry standards or certifications (ISO, ANSI, ASTM, etc.)',
+    );
   }
 
   return {
@@ -676,16 +767,20 @@ export function validateMaterialBatch(materials: Partial<Material>[]): {
     withWarnings: number;
   };
 } {
-  const individualResults = materials.map(material => validateMaterial(material));
+  const individualResults = materials.map((material) =>
+    validateMaterial(material),
+  );
 
-  const allErrors = individualResults.flatMap(result => result.errors);
-  const allWarnings = individualResults.flatMap(result => result.warnings);
+  const allErrors = individualResults.flatMap((result) => result.errors);
+  const allWarnings = individualResults.flatMap((result) => result.warnings);
 
   const summary = {
     total: materials.length,
-    valid: individualResults.filter(result => result.isValid).length,
-    invalid: individualResults.filter(result => !result.isValid).length,
-    withWarnings: individualResults.filter(result => result.warnings.length > 0).length,
+    valid: individualResults.filter((result) => result.isValid).length,
+    invalid: individualResults.filter((result) => !result.isValid).length,
+    withWarnings: individualResults.filter(
+      (result) => result.warnings.length > 0,
+    ).length,
   };
 
   return {
@@ -704,7 +799,9 @@ export function validateMaterialBatch(materials: Partial<Material>[]): {
  */
 function isValidISODate(dateString: string): boolean {
   const date = new Date(dateString);
-  return date instanceof Date && !isNaN(date.getTime()) && dateString.includes('T');
+  return (
+    date instanceof Date && !isNaN(date.getTime()) && dateString.includes('T')
+  );
 }
 
 /**
@@ -713,12 +810,12 @@ function isValidISODate(dateString: string): boolean {
 function validateR11Format(r11: string): boolean {
   // Accept formats like "R11-2.5", "R-2.5", "2.5", "R11 2.5"
   const r11Patterns = [
-    /^R11[-\s]?\d+(\.\d+)?$/i,  // R11-2.5, R11 2.5
-    /^R[-\s]?\d+(\.\d+)?$/i,    // R-2.5, R 2.5
-    /^\d+(\.\d+)?$/,            // 2.5
+    /^R11[-\s]?\d+(\.\d+)?$/i, // R11-2.5, R11 2.5
+    /^R[-\s]?\d+(\.\d+)?$/i, // R-2.5, R 2.5
+    /^\d+(\.\d+)?$/, // 2.5
   ];
 
-  return r11Patterns.some(pattern => pattern.test(r11.trim()));
+  return r11Patterns.some((pattern) => pattern.test(r11.trim()));
 }
 
 /**
@@ -726,21 +823,30 @@ function validateR11Format(r11: string): boolean {
  */
 export function checkExtractionCompleteness(
   extractedData: Record<string, unknown>,
-  expectedFields: string[] = ['finish', 'size', 'installation_method', 'application'],
+  expectedFields: string[] = [
+    'finish',
+    'size',
+    'installation_method',
+    'application',
+  ],
 ): {
   completeness: number;
   missingFields: string[];
   presentFields: string[];
 } {
-  const extractedMeta = (extractedData.processing_metadata as any)?.extracted_meta || {};
-  const presentFields = expectedFields.filter(field =>
-    extractedMeta[field] &&
-    extractedMeta[field] !== '' &&
-    extractedMeta[field] !== null &&
-    extractedMeta[field] !== undefined,
+  const extractedMeta =
+    (extractedData.processing_metadata as any)?.extracted_meta || {};
+  const presentFields = expectedFields.filter(
+    (field) =>
+      extractedMeta[field] &&
+      extractedMeta[field] !== '' &&
+      extractedMeta[field] !== null &&
+      extractedMeta[field] !== undefined,
   );
 
-  const missingFields = expectedFields.filter(field => !presentFields.includes(field));
+  const missingFields = expectedFields.filter(
+    (field) => !presentFields.includes(field),
+  );
   const completeness = presentFields.length / expectedFields.length;
 
   return {
@@ -769,7 +875,9 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.finish.toLowerCase().trim();
       if (normalized !== meta.finish) {
         meta.finish = normalized;
-        changes.push(`Normalized finish: "${(rawData.processing_metadata as any)?.extracted_meta?.finish}" → "${normalized}"`);
+        changes.push(
+          `Normalized finish: "${(rawData.processing_metadata as any)?.extracted_meta?.finish}" → "${normalized}"`,
+        );
       }
     }
 
@@ -778,16 +886,23 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.size.trim().replace(/\s+/g, ' ');
       if (normalized !== meta.size) {
         meta.size = normalized;
-        changes.push(`Normalized size: "${(rawData.processing_metadata as any)?.extracted_meta?.size}" → "${normalized}"`);
+        changes.push(
+          `Normalized size: "${(rawData.processing_metadata as any)?.extracted_meta?.size}" → "${normalized}"`,
+        );
       }
     }
 
     // Normalize installation method
-    if (meta.installation_method && typeof meta.installation_method === 'string') {
+    if (
+      meta.installation_method &&
+      typeof meta.installation_method === 'string'
+    ) {
       const normalized = meta.installation_method.toLowerCase().trim();
       if (normalized !== meta.installation_method) {
         meta.installation_method = normalized;
-        changes.push(`Normalized installation method: "${(rawData.processing_metadata as any)?.extracted_meta?.installation_method}" → "${normalized}"`);
+        changes.push(
+          `Normalized installation method: "${(rawData.processing_metadata as any)?.extracted_meta?.installation_method}" → "${normalized}"`,
+        );
       }
     }
 
@@ -796,7 +911,9 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = meta.application.toLowerCase().trim();
       if (normalized !== meta.application) {
         meta.application = normalized;
-        changes.push(`Normalized application: "${(rawData.processing_metadata as any)?.extracted_meta?.application}" → "${normalized}"`);
+        changes.push(
+          `Normalized application: "${(rawData.processing_metadata as any)?.extracted_meta?.application}" → "${normalized}"`,
+        );
       }
     }
 
@@ -805,7 +922,9 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
       const normalized = normalizeR11Rating(meta.r11);
       if (normalized !== meta.r11) {
         meta.r11 = normalized;
-        changes.push(`Normalized R11 rating: "${(rawData.processing_metadata as any)?.extracted_meta?.r11}" → "${normalized}"`);
+        changes.push(
+          `Normalized R11 rating: "${(rawData.processing_metadata as any)?.extracted_meta?.r11}" → "${normalized}"`,
+        );
       }
     }
 
@@ -818,7 +937,9 @@ export function sanitizeExtractedData(rawData: Record<string, unknown>): {
 
       if (JSON.stringify(normalized) !== JSON.stringify(meta.metal_types)) {
         meta.metal_types = normalized;
-        changes.push(`Normalized metal types: ${JSON.stringify((rawData.processing_metadata as any)?.extracted_meta?.metal_types)} → ${JSON.stringify(normalized)}`);
+        changes.push(
+          `Normalized metal types: ${JSON.stringify((rawData.processing_metadata as any)?.extracted_meta?.metal_types)} → ${JSON.stringify(normalized)}`,
+        );
       }
     }
   }
@@ -856,14 +977,15 @@ export function createMaterialFromExtractedData(
     createdBy?: string;
     imageUrl?: string;
   },
-  ): Partial<Material> {
+): Partial<Material> {
   const { sanitized } = sanitizeExtractedData(extractedData);
   const now = new Date().toISOString();
 
   const material: Partial<Material> = {
     id: additionalInfo.id,
     name: additionalInfo.name,
-    category: (sanitized.material_identification as any)?.category as MaterialCategory,
+    category: (sanitized.material_identification as any)
+      ?.category as MaterialCategory,
     description: (sanitized.material_identification as any)?.description,
     properties: (sanitized.properties as any) || {},
     standards: [],
@@ -874,10 +996,11 @@ export function createMaterialFromExtractedData(
       ...(sanitized.processing_metadata as any)?.extracted_meta,
       additionalProperties: {
         extractionMethod: (sanitized.processing_metadata as any)?.method,
-        extractionConfidence: (sanitized.processing_metadata as any)?.confidence,
+        extractionConfidence: (sanitized.processing_metadata as any)
+          ?.confidence,
         modelVersion: (sanitized.processing_metadata as any)?.model_version,
       },
-  },
+    },
   };
 
   // Add optional properties separately to handle undefined properly

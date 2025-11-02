@@ -74,7 +74,9 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   /**
    * Validate a single image
    */
-  async validateImage(request: ImageValidationRequest): Promise<ImageValidationResponse> {
+  async validateImage(
+    request: ImageValidationRequest,
+  ): Promise<ImageValidationResponse> {
     return this.executeOperation(async () => {
       // Get image metadata from database
       const { data: imageData, error: imageError } = await supabase
@@ -127,7 +129,8 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
         format_valid: formatValid,
         file_size_valid: fileSizeValid,
         issues: issues.length > 0 ? issues : undefined,
-        recommendations: recommendations.length > 0 ? recommendations : undefined,
+        recommendations:
+          recommendations.length > 0 ? recommendations : undefined,
         validated_at: new Date().toISOString(),
       };
 
@@ -154,7 +157,9 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   /**
    * Validate multiple images
    */
-  async validateImages(request: BatchImageValidationRequest): Promise<BatchImageValidationResponse> {
+  async validateImages(
+    request: BatchImageValidationRequest,
+  ): Promise<BatchImageValidationResponse> {
     return this.executeOperation(async () => {
       const results: ImageValidation[] = [];
       let passed = 0;
@@ -197,7 +202,9 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   /**
    * Get images needing review
    */
-  async getImagesNeedingReview(workspaceId: string): Promise<ImageValidation[]> {
+  async getImagesNeedingReview(
+    workspaceId: string,
+  ): Promise<ImageValidation[]> {
     return this.executeOperation(async () => {
       const { data, error } = await supabase
         .from('image_validations')
@@ -207,7 +214,9 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
         .order('created_at', { ascending: false });
 
       if (error) {
-        throw new Error(`Failed to fetch images needing review: ${error.message}`);
+        throw new Error(
+          `Failed to fetch images needing review: ${error.message}`,
+        );
       }
 
       return (data || []) as ImageValidation[];
@@ -231,10 +240,17 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
       const validations = (data || []) as ImageValidation[];
       const stats: ImageValidationStats = {
         total_images: validations.length,
-        valid_images: validations.filter(v => v.validation_status === 'valid').length,
-        invalid_images: validations.filter(v => v.validation_status === 'invalid').length,
-        needs_review_images: validations.filter(v => v.validation_status === 'needs_review').length,
-        avg_quality_score: validations.reduce((sum, v) => sum + v.quality_score, 0) / validations.length || 0,
+        valid_images: validations.filter((v) => v.validation_status === 'valid')
+          .length,
+        invalid_images: validations.filter(
+          (v) => v.validation_status === 'invalid',
+        ).length,
+        needs_review_images: validations.filter(
+          (v) => v.validation_status === 'needs_review',
+        ).length,
+        avg_quality_score:
+          validations.reduce((sum, v) => sum + v.quality_score, 0) /
+            validations.length || 0,
         common_issues: this.getCommonIssues(validations),
       };
 
@@ -313,11 +329,14 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
     return true;
   }
 
-  private calculateQualityScore(imageData: any, issues: ImageValidationIssue[]): number {
+  private calculateQualityScore(
+    imageData: any,
+    issues: ImageValidationIssue[],
+  ): number {
     let score = 1.0;
 
     // Deduct points for each issue
-    issues.forEach(issue => {
+    issues.forEach((issue) => {
       if (issue.severity === 'high') {
         score -= 0.3;
       } else if (issue.severity === 'medium') {
@@ -334,7 +353,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
     issues: ImageValidationIssue[],
     recommendations: ImageValidationRecommendation[],
   ): void {
-    issues.forEach(issue => {
+    issues.forEach((issue) => {
       if (issue.type === 'invalid_width' || issue.type === 'invalid_height') {
         recommendations.push({
           type: 'resize_image',
@@ -365,7 +384,7 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
     qualityScore: number,
     minQualityScore: number,
   ): ImageValidationStatus {
-    const criticalIssues = issues.filter(i => i.severity === 'high');
+    const criticalIssues = issues.filter((i) => i.severity === 'high');
 
     if (criticalIssues.length > 0) {
       return 'invalid';
@@ -385,8 +404,8 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
   }> {
     const issueMap = new Map<string, { count: number; severity: string }>();
 
-    validations.forEach(validation => {
-      validation.issues?.forEach(issue => {
+    validations.forEach((validation) => {
+      validation.issues?.forEach((issue) => {
         const key = issue.type;
         const existing = issueMap.get(key);
         issueMap.set(key, {
@@ -410,4 +429,3 @@ export class ImageValidationService extends BaseService<ImageValidationServiceCo
  * Export singleton instance
  */
 export const imageValidationService = new ImageValidationService();
-

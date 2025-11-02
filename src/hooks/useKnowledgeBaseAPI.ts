@@ -44,9 +44,21 @@ interface EmbeddingsStatsResponse {
   by_model: Record<string, number>;
   by_embedding_type?: Record<string, number>;
   coverage: {
-    chunks: { total: number; with_embeddings: number; coverage_percentage: string };
-    images: { total: number; with_embeddings: number; coverage_percentage: string };
-    products: { total: number; with_embeddings: number; coverage_percentage: string };
+    chunks: {
+      total: number;
+      with_embeddings: number;
+      coverage_percentage: string;
+    };
+    images: {
+      total: number;
+      with_embeddings: number;
+      coverage_percentage: string;
+    };
+    products: {
+      total: number;
+      with_embeddings: number;
+      coverage_percentage: string;
+    };
   };
   document_vectors?: any;
   quality?: any;
@@ -95,7 +107,10 @@ interface PatternsResponse {
 /**
  * Hook to fetch metadata from all entities
  */
-export const useKnowledgeBaseMetadata = (workspaceId: string | null, entityType?: string) => {
+export const useKnowledgeBaseMetadata = (
+  workspaceId: string | null,
+  entityType?: string,
+) => {
   const [data, setData] = useState<MetadataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +123,9 @@ export const useKnowledgeBaseMetadata = (workspaceId: string | null, entityType?
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const params = new URLSearchParams({ workspace_id: workspaceId });
@@ -139,7 +156,7 @@ export const useKnowledgeBaseMetadata = (workspaceId: string | null, entityType?
     fetchMetadata();
   }, [workspaceId, entityType, refreshTrigger]);
 
-  const refetch = () => setRefreshTrigger(prev => prev + 1);
+  const refetch = () => setRefreshTrigger((prev) => prev + 1);
 
   return { data, loading, error, refetch };
 };
@@ -160,7 +177,9 @@ export const useQualityScores = (workspaceId: string | null) => {
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
@@ -188,7 +207,7 @@ export const useQualityScores = (workspaceId: string | null) => {
     fetchQualityScores();
   }, [workspaceId, refreshTrigger]);
 
-  const refetch = () => setRefreshTrigger(prev => prev + 1);
+  const refetch = () => setRefreshTrigger((prev) => prev + 1);
 
   return { data, loading, error, refetch };
 };
@@ -209,7 +228,9 @@ export const useEmbeddingsStats = (workspaceId: string | null) => {
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
@@ -237,7 +258,7 @@ export const useEmbeddingsStats = (workspaceId: string | null) => {
     fetchEmbeddingsStats();
   }, [workspaceId, refreshTrigger]);
 
-  const refetch = () => setRefreshTrigger(prev => prev + 1);
+  const refetch = () => setRefreshTrigger((prev) => prev + 1);
 
   return { data, loading, error, refetch };
 };
@@ -263,7 +284,9 @@ export const useDetections = (
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const params = new URLSearchParams({ workspace_id: workspaceId });
@@ -296,7 +319,7 @@ export const useDetections = (
     fetchDetections();
   }, [workspaceId, detectionType, startDate, endDate, refreshTrigger]);
 
-  const refetch = () => setRefreshTrigger(prev => prev + 1);
+  const refetch = () => setRefreshTrigger((prev) => prev + 1);
 
   return { data, loading, error, refetch };
 };
@@ -304,7 +327,10 @@ export const useDetections = (
 /**
  * Hook to fetch quality dashboard
  */
-export const useQualityDashboard = (workspaceId: string | null, days: number = 30) => {
+export const useQualityDashboard = (
+  workspaceId: string | null,
+  days: number = 30,
+) => {
   const [data, setData] = useState<QualityDashboardResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -317,7 +343,9 @@ export const useQualityDashboard = (workspaceId: string | null, days: number = 3
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
@@ -345,7 +373,7 @@ export const useQualityDashboard = (workspaceId: string | null, days: number = 3
     fetchDashboard();
   }, [workspaceId, days, refreshTrigger]);
 
-  const refetch = () => setRefreshTrigger(prev => prev + 1);
+  const refetch = () => setRefreshTrigger((prev) => prev + 1);
 
   return { data, loading, error, refetch };
 };
@@ -366,7 +394,9 @@ export const usePatterns = (workspaceId: string | null) => {
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
@@ -394,8 +424,7 @@ export const usePatterns = (workspaceId: string | null) => {
     fetchPatterns();
   }, [workspaceId, refreshTrigger]);
 
-  const refetch = () => setRefreshTrigger(prev => prev + 1);
+  const refetch = () => setRefreshTrigger((prev) => prev + 1);
 
   return { data, loading, error, refetch };
 };
-

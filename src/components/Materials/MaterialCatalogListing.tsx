@@ -23,7 +23,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
@@ -107,13 +113,14 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
   useEffect(() => {
     const loadFilterOptions = async () => {
       try {
-        const [categories, finishes, sizes, installationMethods, applications] = await Promise.all([
-          getMaterialCategoriesAsync(),
-          getAllMaterialFinishes(),
-          getAllMaterialSizes(),
-          getAllMaterialInstallationMethods(),
-          getAllMaterialApplications(),
-        ]);
+        const [categories, finishes, sizes, installationMethods, applications] =
+          await Promise.all([
+            getMaterialCategoriesAsync(),
+            getAllMaterialFinishes(),
+            getAllMaterialSizes(),
+            getAllMaterialInstallationMethods(),
+            getAllMaterialApplications(),
+          ]);
 
         setFilterOptions({
           categories,
@@ -133,7 +140,7 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
 
   // Filter and sort materials based on current filter state
   const filteredAndSortedMaterials = useMemo(() => {
-    const filtered = materials.filter(material => {
+    const filtered = materials.filter((material) => {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -143,15 +150,22 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
           material.category.toLowerCase().includes(searchLower) ||
           material.metadata?.finish?.toLowerCase().includes(searchLower) ||
           material.metadata?.size?.toLowerCase().includes(searchLower) ||
-          material.metadata?.installationMethod?.toLowerCase().includes(searchLower) ||
+          material.metadata?.installationMethod
+            ?.toLowerCase()
+            .includes(searchLower) ||
           material.metadata?.application?.toLowerCase().includes(searchLower) ||
-          material.standards.some(standard => standard.toLowerCase().includes(searchLower));
+          material.standards.some((standard) =>
+            standard.toLowerCase().includes(searchLower),
+          );
 
         if (!matchesSearch) return false;
       }
 
       // Category filter
-      if (filters.category !== 'all' && material.category !== filters.category) {
+      if (
+        filters.category !== 'all' &&
+        material.category !== filters.category
+      ) {
         return false;
       }
 
@@ -162,10 +176,16 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
       if (filters.size && material.metadata?.size !== filters.size) {
         return false;
       }
-      if (filters.installationMethod && material.metadata?.installationMethod !== filters.installationMethod) {
+      if (
+        filters.installationMethod &&
+        material.metadata?.installationMethod !== filters.installationMethod
+      ) {
         return false;
       }
-      if (filters.application && material.metadata?.application !== filters.application) {
+      if (
+        filters.application &&
+        material.metadata?.application !== filters.application
+      ) {
         return false;
       }
 
@@ -184,10 +204,12 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
           comparison = a.category.localeCompare(b.category);
           break;
         case 'createdAt':
-          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          comparison =
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           break;
         case 'updatedAt':
-          comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+          comparison =
+            new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
           break;
         default:
           comparison = 0;
@@ -199,19 +221,19 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
     return filtered;
   }, [materials, filters]);
 
-  const updateFilter = useCallback(<K extends keyof FilterState>(
-    key: K,
-    value: FilterState[K],
-  ) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  }, []);
+  const updateFilter = useCallback(
+    <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
+      setFilters((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
 
   const resetFilters = useCallback(() => {
     setFilters(defaultFilters);
   }, []);
 
   const toggleCardExpansion = useCallback((materialId: string) => {
-    setExpandedCards(prev => {
+    setExpandedCards((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(materialId)) {
         newSet.delete(materialId);
@@ -227,7 +249,9 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
       <Card>
         <CardContent className="p-6 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <span className="text-muted-foreground">Loading materials catalog...</span>
+          <span className="text-muted-foreground">
+            Loading materials catalog...
+          </span>
         </CardContent>
       </Card>
     );
@@ -241,10 +265,14 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
           <h2 className="text-xl font-semibold">Material Catalog</h2>
           <p className="text-sm text-muted-foreground">
             {filteredAndSortedMaterials.length} of {materials.length} materials
-            {filters.search || filters.category !== 'all' || filters.finish || filters.size || filters.installationMethod || filters.application
+            {filters.search ||
+            filters.category !== 'all' ||
+            filters.finish ||
+            filters.size ||
+            filters.installationMethod ||
+            filters.application
               ? ' (filtered)'
-              : ''
-            }
+              : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -252,23 +280,32 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowFilters(!showFilters)} onKeyDown={(e) => e.key === 'Enter' && setShowFilters(!showFilters)}
+              onClick={() => setShowFilters(!showFilters)}
+              onKeyDown={(e) =>
+                e.key === 'Enter' && setShowFilters(!showFilters)
+              }
               className="flex items-center gap-2"
             >
               <Filter className="h-4 w-4" />
               Filters
-              {showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {showFilters ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
             </Button>
           )}
           <div className="flex border border-border rounded-md">
             <Button
               variant={viewMode === 'grid' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setViewMode('grid')} onKeyDown={(e) => e.key === 'Enter' && setViewMode('grid')}
+              onClick={() => setViewMode('grid')}
+              onKeyDown={(e) => e.key === 'Enter' && setViewMode('grid')}
               className="rounded-r-none border-r"
             >
               <Grid3X3 className="h-4 w-4" />
-            </Button><Button
+            </Button>
+            <Button
               variant={viewMode === 'list' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('list')}
@@ -294,11 +331,17 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 <Filter className="h-5 w-5" />
                 Filter & Sort Materials
               </span>
-              <Button variant="outline" size="sm" onClick={resetFilters} onKeyDown={(e) => e.key === 'Enter' && resetFilters()}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetFilters}
+                onKeyDown={(e) => e.key === 'Enter' && resetFilters()}
+              >
                 Reset All
               </Button>
             </CardTitle>
-          </CardHeader><CardContent className="space-y-4">
+          </CardHeader>
+          <CardContent className="space-y-4">
             {/* Search and Category */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -318,7 +361,9 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 <Label htmlFor="category">Category</Label>
                 <Select
                   value={filters.category}
-                  onValueChange={(value: MaterialCategory | 'all') => updateFilter('category', value)}
+                  onValueChange={(value: MaterialCategory | 'all') =>
+                    updateFilter('category', value)
+                  }
                 >
                   <SelectTrigger id="category">
                     <SelectValue />
@@ -340,7 +385,12 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="finish">Finish</Label>
-                  <Select value={filters.finish} onValueChange={(value: string) => updateFilter('finish', value)}>
+                  <Select
+                    value={filters.finish}
+                    onValueChange={(value: string) =>
+                      updateFilter('finish', value)
+                    }
+                  >
                     <SelectTrigger id="finish">
                       <SelectValue placeholder="Any finish" />
                     </SelectTrigger>
@@ -356,13 +406,18 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="size">Size</Label>
-                  <Select value={filters.size} onValueChange={(value: string) => updateFilter('size', value)}>
+                  <Select
+                    value={filters.size}
+                    onValueChange={(value: string) =>
+                      updateFilter('size', value)
+                    }
+                  >
                     <SelectTrigger id="size">
                       <SelectValue placeholder="Any size" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Any size</SelectItem>
-                      {filterOptions.sizes.map(size => (
+                      {filterOptions.sizes.map((size) => (
                         <SelectItem key={size} value={size}>
                           {size}
                         </SelectItem>
@@ -372,13 +427,18 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="installation">Installation</Label>
-                  <Select value={filters.installationMethod} onValueChange={(value: string) => updateFilter('installationMethod', value)}>
+                  <Select
+                    value={filters.installationMethod}
+                    onValueChange={(value: string) =>
+                      updateFilter('installationMethod', value)
+                    }
+                  >
                     <SelectTrigger id="installation">
                       <SelectValue placeholder="Any method" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Any method</SelectItem>
-                      {filterOptions.installationMethods.map(method => (
+                      {filterOptions.installationMethods.map((method) => (
                         <SelectItem key={method} value={method}>
                           {method}
                         </SelectItem>
@@ -388,13 +448,18 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="application">Application</Label>
-                  <Select value={filters.application} onValueChange={(value: string) => updateFilter('application', value)}>
+                  <Select
+                    value={filters.application}
+                    onValueChange={(value: string) =>
+                      updateFilter('application', value)
+                    }
+                  >
                     <SelectTrigger id="application">
                       <SelectValue placeholder="Any application" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">Any application</SelectItem>
-                      {filterOptions.applications.map(application => (
+                      {filterOptions.applications.map((application) => (
                         <SelectItem key={application} value={application}>
                           {application}
                         </SelectItem>
@@ -410,7 +475,12 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
               <div className="flex items-center gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="sortBy">Sort by</Label>
-                  <Select value={filters.sortBy} onValueChange={(value: FilterState['sortBy']) => updateFilter('sortBy', value)}>
+                  <Select
+                    value={filters.sortBy}
+                    onValueChange={(value: FilterState['sortBy']) =>
+                      updateFilter('sortBy', value)
+                    }
+                  >
                     <SelectTrigger id="sortBy" className="w-40">
                       <SelectValue />
                     </SelectTrigger>
@@ -424,7 +494,12 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="sortOrder">Order</Label>
-                  <Select value={filters.sortOrder} onValueChange={(value: FilterState['sortOrder']) => updateFilter('sortOrder', value)}>
+                  <Select
+                    value={filters.sortOrder}
+                    onValueChange={(value: FilterState['sortOrder']) =>
+                      updateFilter('sortOrder', value)
+                    }
+                  >
                     <SelectTrigger id="sortOrder" className="w-32">
                       <SelectValue />
                     </SelectTrigger>
@@ -437,10 +512,18 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc')}
+                  onClick={() =>
+                    updateFilter(
+                      'sortOrder',
+                      filters.sortOrder === 'asc' ? 'desc' : 'asc',
+                    )
+                  }
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc');
+                      updateFilter(
+                        'sortOrder',
+                        filters.sortOrder === 'asc' ? 'desc' : 'asc',
+                      );
                     }
                   }}
                   className="mt-7 flex items-center gap-2"
@@ -462,16 +545,18 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
             <p className="text-muted-foreground">
               {materials.length === 0
                 ? 'No materials in the catalog yet.'
-                : 'Try adjusting your filters or search terms.'
-              }
+                : 'Try adjusting your filters or search terms.'}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className={viewMode === 'grid'
-          ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-          : 'space-y-4'
-        }>
+        <div
+          className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+              : 'space-y-4'
+          }
+        >
           {filteredAndSortedMaterials.map((material) => (
             <MaterialCard
               key={material.id}
@@ -515,9 +600,11 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
   const categoryDef = (MATERIAL_CATEGORIES as any)[material.category];
 
   return (
-    <Card className={`overflow-hidden transition-all hover:shadow-md ${
-      viewMode === 'list' ? 'h-auto' : 'h-fit'
-    }`}>
+    <Card
+      className={`overflow-hidden transition-all hover:shadow-md ${
+        viewMode === 'list' ? 'h-auto' : 'h-fit'
+      }`}
+    >
       {/* Material Image */}
       {showImages && (material.thumbnailUrl || material.imageUrl) && (
         <div className="relative h-48 bg-muted">
@@ -551,7 +638,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
               </Badge>
               {material.standards.length > 0 && (
                 <Badge variant="outline" className="text-xs">
-                  {material.standards.length} standard{material.standards.length > 1 ? 's' : ''}
+                  {material.standards.length} standard
+                  {material.standards.length > 1 ? 's' : ''}
                 </Badge>
               )}
             </div>
@@ -571,7 +659,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                   if (e.key === 'Enter') {
                     onSelect();
                   }
-                }}>
+                }}
+              >
                 Select
               </Button>
             )}
@@ -607,7 +696,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                     <div className="flex items-center gap-2">
                       <Layers className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <span className="font-medium">Finish:</span> {material.metadata.finish}
+                        <span className="font-medium">Finish:</span>{' '}
+                        {material.metadata.finish}
                       </span>
                     </div>
                   )}
@@ -615,7 +705,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                     <div className="flex items-center gap-2">
                       <Grid3X3 className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <span className="font-medium">Size:</span> {material.metadata.size}
+                        <span className="font-medium">Size:</span>{' '}
+                        {material.metadata.size}
                       </span>
                     </div>
                   )}
@@ -623,7 +714,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                     <div className="flex items-center gap-2">
                       <Wrench className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <span className="font-medium">Installation:</span> {material.metadata.installationMethod}
+                        <span className="font-medium">Installation:</span>{' '}
+                        {material.metadata.installationMethod}
                       </span>
                     </div>
                   )}
@@ -631,22 +723,36 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        <span className="font-medium">Application:</span> {material.metadata.application}
+                        <span className="font-medium">Application:</span>{' '}
+                        {material.metadata.application}
                       </span>
                     </div>
                   )}
                 </div>
 
                 {/* Additional Meta Properties */}
-                {(material.metadata?.additionalProperties && Object.keys(material.metadata.additionalProperties).length > 0) ? (
+                {material.metadata?.additionalProperties &&
+                Object.keys(material.metadata.additionalProperties).length >
+                  0 ? (
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Additional Properties</Label>
+                    <Label className="text-sm font-medium">
+                      Additional Properties
+                    </Label>
                     <div className="space-y-1">
-                      {Object.entries(material.metadata.additionalProperties).map(([key, value]) => (
-                        <div key={key} className="flex items-center gap-2 text-sm">
-                          <span className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                      {Object.entries(
+                        material.metadata.additionalProperties,
+                      ).map(([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex items-center gap-2 text-sm"
+                        >
+                          <span className="font-medium capitalize">
+                            {key.replace(/([A-Z])/g, ' $1').trim()}:
+                          </span>
                           <span className="text-muted-foreground">
-                            {typeof value === 'string' ? value : JSON.stringify(value)}
+                            {typeof value === 'string'
+                              ? value
+                              : JSON.stringify(value)}
                           </span>
                         </div>
                       ))}
@@ -655,24 +761,32 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                 ) : null}
 
                 {/* Enhanced Metafield System Display */}
-                {material.metafieldValues && material.metafieldValues.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
-                      <Database className="h-4 w-4" />
-                      Metafields
-                    </Label>
-                    <div className="space-y-1">
-                      {material.metafieldValues.map((metafield, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <span className="font-medium">{metafield.key}:</span>
-                          <span className="text-muted-foreground">
-                            {typeof metafield.value === 'string' ? metafield.value : JSON.stringify(metafield.value)}
-                          </span>
-                        </div>
-                      ))}
+                {material.metafieldValues &&
+                  material.metafieldValues.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Database className="h-4 w-4" />
+                        Metafields
+                      </Label>
+                      <div className="space-y-1">
+                        {material.metafieldValues.map((metafield, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <span className="font-medium">
+                              {metafield.key}:
+                            </span>
+                            <span className="text-muted-foreground">
+                              {typeof metafield.value === 'string'
+                                ? metafield.value
+                                : JSON.stringify(metafield.value)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Material Images Display */}
                 {material.images && material.images.length > 0 && (
@@ -683,7 +797,10 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                     </Label>
                     <div className="flex flex-wrap gap-2">
                       {material.images.slice(0, 3).map((image, index) => (
-                        <div key={index} className="relative w-16 h-16 rounded overflow-hidden bg-muted">
+                        <div
+                          key={index}
+                          className="relative w-16 h-16 rounded overflow-hidden bg-muted"
+                        >
                           <img
                             src={image.url}
                             alt={image.alt || `Material image ${index + 1}`}
@@ -705,26 +822,30 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                 )}
 
                 {/* Material Relationships Display */}
-                {material.relationships && material.relationships.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
-                      <Link className="h-4 w-4" />
-                      Related Materials
-                    </Label>
-                    <div className="space-y-1">
-                      {material.relationships.map((relationship, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <Badge variant="outline" className="text-xs">
-                            {relationship.type}
-                          </Badge>
-                          <span className="text-muted-foreground">
-                            {(relationship as any).relatedMaterialId}
-                          </span>
-                        </div>
-                      ))}
+                {material.relationships &&
+                  material.relationships.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Link className="h-4 w-4" />
+                        Related Materials
+                      </Label>
+                      <div className="space-y-1">
+                        {material.relationships.map((relationship, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center gap-2 text-sm"
+                          >
+                            <Badge variant="outline" className="text-xs">
+                              {relationship.type}
+                            </Badge>
+                            <span className="text-muted-foreground">
+                              {(relationship as any).relatedMaterialId}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
 
@@ -740,25 +861,33 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                   {material.properties.density && (
                     <div className="text-sm">
                       <span className="font-medium">Density:</span>
-                      <span className="text-muted-foreground ml-1">{material.properties.density} g/cm³</span>
+                      <span className="text-muted-foreground ml-1">
+                        {material.properties.density} g/cm³
+                      </span>
                     </div>
                   )}
                   {material.properties.thermalConductivity && (
                     <div className="text-sm">
                       <span className="font-medium">Thermal Conductivity:</span>
-                      <span className="text-muted-foreground ml-1">{material.properties.thermalConductivity} W/m·K</span>
+                      <span className="text-muted-foreground ml-1">
+                        {material.properties.thermalConductivity} W/m·K
+                      </span>
                     </div>
                   )}
                   {material.properties.yieldStrength && (
                     <div className="text-sm">
                       <span className="font-medium">Yield Strength:</span>
-                      <span className="text-muted-foreground ml-1">{material.properties.yieldStrength} MPa</span>
+                      <span className="text-muted-foreground ml-1">
+                        {material.properties.yieldStrength} MPa
+                      </span>
                     </div>
                   )}
                   {material.properties.tensileStrength && (
                     <div className="text-sm">
                       <span className="font-medium">Tensile Strength:</span>
-                      <span className="text-muted-foreground ml-1">{material.properties.tensileStrength} MPa</span>
+                      <span className="text-muted-foreground ml-1">
+                        {material.properties.tensileStrength} MPa
+                      </span>
                     </div>
                   )}
                 </div>
@@ -769,7 +898,9 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
             {material.standards.length > 0 && (
               <div className="space-y-2">
                 <Separator />
-                <Label className="text-sm font-medium">Standards & Certifications</Label>
+                <Label className="text-sm font-medium">
+                  Standards & Certifications
+                </Label>
                 <div className="flex flex-wrap gap-1">
                   {material.standards.map((standard, index) => (
                     <Badge key={index} variant="outline" className="text-xs">
@@ -782,8 +913,12 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
 
             {/* Timestamps */}
             <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t">
-              <span>Created: {new Date(material.createdAt).toLocaleDateString()}</span>
-              <span>Updated: {new Date(material.updatedAt).toLocaleDateString()}</span>
+              <span>
+                Created: {new Date(material.createdAt).toLocaleDateString()}
+              </span>
+              <span>
+                Updated: {new Date(material.updatedAt).toLocaleDateString()}
+              </span>
             </div>
           </CardContent>
         </CollapsibleContent>

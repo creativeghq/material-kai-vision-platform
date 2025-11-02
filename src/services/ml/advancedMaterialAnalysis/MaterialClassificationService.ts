@@ -5,9 +5,21 @@
  * through specialized texture analysis and multi-modal feature fusion.
  */
 
-import { TextureAttentionModule, AttentionConfig, TextureAttentionOutput } from '../textureComponents/TextureAttentionModule';
-import { TextureGaborFilters, GaborFilterConfig, TextureResponse } from '../textureComponents/TextureGaborFilters';
-import { MultiScaleTextureModule, ScaleConfig, MultiScaleFeatures } from '../textureComponents/MultiScaleTextureModule';
+import {
+  TextureAttentionModule,
+  AttentionConfig,
+  TextureAttentionOutput,
+} from '../textureComponents/TextureAttentionModule';
+import {
+  TextureGaborFilters,
+  GaborFilterConfig,
+  TextureResponse,
+} from '../textureComponents/TextureGaborFilters';
+import {
+  MultiScaleTextureModule,
+  ScaleConfig,
+  MultiScaleFeatures,
+} from '../textureComponents/MultiScaleTextureModule';
 
 export interface MaterialClassificationConfig {
   modelType: 'TextureNetSVD' | 'MaterialTextureNet' | 'HybridNet';
@@ -81,7 +93,6 @@ export class MaterialClassificationService {
   private ensemble: ModelEnsemble | null = null;
   private modelWeights: Map<string, Float32Array> = new Map();
 
-
   constructor(config: MaterialClassificationConfig) {
     this.config = config;
     this.initializeModules();
@@ -92,9 +103,13 @@ export class MaterialClassificationService {
    * Initialize all processing modules
    */
   private initializeModules(): void {
-    this.attentionModule = new TextureAttentionModule(this.config.attentionConfig);
+    this.attentionModule = new TextureAttentionModule(
+      this.config.attentionConfig,
+    );
     this.gaborFilters = new TextureGaborFilters(this.config.gaborConfig);
-    this.multiScaleModule = new MultiScaleTextureModule(this.config.scaleConfig);
+    this.multiScaleModule = new MultiScaleTextureModule(
+      this.config.scaleConfig,
+    );
 
     if (this.config.enableEnsemble) {
       this.initializeEnsemble();
@@ -130,7 +145,10 @@ export class MaterialClassificationService {
           type: 'HybridNet',
           accuracy: 0.901,
           weights: new Float32Array(0),
-          architecture: { type: 'Hybrid', components: ['CNN', 'Attention', 'Gabor'] },
+          architecture: {
+            type: 'Hybrid',
+            components: ['CNN', 'Attention', 'Gabor'],
+          },
           trained: false,
         },
       ],
@@ -151,22 +169,39 @@ export class MaterialClassificationService {
       const featureSize = 2048; // Standard feature vector size
 
       // Simulated weights for different model components
-      this.modelWeights.set('attention_weights', this.generateRandomWeights(512, 256));
-      this.modelWeights.set('gabor_weights', this.generateRandomWeights(256, 128));
-      this.modelWeights.set('multiscale_weights', this.generateRandomWeights(1024, 512));
-      this.modelWeights.set('classification_weights', this.generateRandomWeights(featureSize, this.config.categories.length));
+      this.modelWeights.set(
+        'attention_weights',
+        this.generateRandomWeights(512, 256),
+      );
+      this.modelWeights.set(
+        'gabor_weights',
+        this.generateRandomWeights(256, 128),
+      );
+      this.modelWeights.set(
+        'multiscale_weights',
+        this.generateRandomWeights(1024, 512),
+      );
+      this.modelWeights.set(
+        'classification_weights',
+        this.generateRandomWeights(featureSize, this.config.categories.length),
+      );
 
       console.log('Pretrained weights loaded successfully');
     } catch (error) {
       console.error('Error loading pretrained weights:', error);
-      throw new Error(`Failed to load model weights: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to load model weights: ${(error as Error).message}`,
+      );
     }
   }
 
   /**
    * Generate random weights with proper initialization
    */
-  private generateRandomWeights(inputSize: number, outputSize: number): Float32Array {
+  private generateRandomWeights(
+    inputSize: number,
+    outputSize: number,
+  ): Float32Array {
     const weights = new Float32Array(inputSize * outputSize);
     const scale = Math.sqrt(2.0 / inputSize); // He initialization
 
@@ -193,7 +228,10 @@ export class MaterialClassificationService {
 
       // Step 1: Multi-scale texture analysis
       const multiScaleFeatures = await this.multiScaleModule.processMultiScale(
-        imageData, width, height, channels,
+        imageData,
+        width,
+        height,
+        channels,
       );
 
       // Step 2: Attention-based feature enhancement
@@ -206,7 +244,10 @@ export class MaterialClassificationService {
 
       // Step 3: Gabor filter analysis
       const gaborResponse = await this.gaborFilters.applyFilterBank(
-        imageData, width, height, channels,
+        imageData,
+        width,
+        height,
+        channels,
       );
 
       // Step 4: Fuse all features
@@ -241,7 +282,10 @@ export class MaterialClassificationService {
         predictions,
         confidence,
         category: topPrediction.category,
-        subcategory: this.determineSubcategory(topPrediction.category, properties),
+        subcategory: this.determineSubcategory(
+          topPrediction.category,
+          properties,
+        ),
         properties,
         textureAnalysis: {
           attentionWeights: attentionOutput.attentionWeights,
@@ -256,10 +300,11 @@ export class MaterialClassificationService {
       };
 
       console.log(`Classification completed in ${processingTime.toFixed(2)}ms`);
-      console.log(`Predicted category: ${result.category} (confidence: ${(confidence * 100).toFixed(1)}%)`);
+      console.log(
+        `Predicted category: ${result.category} (confidence: ${(confidence * 100).toFixed(1)}%)`,
+      );
 
       return result;
-
     } catch (error) {
       console.error('Error in material classification:', error);
       throw new Error(`Classification failed: ${(error as Error).message}`);
@@ -320,8 +365,12 @@ export class MaterialClassificationService {
   /**
    * Single model classification
    */
-  private async singleModelClassification(features: Float32Array): Promise<MaterialPrediction[]> {
-    const classificationWeights = this.modelWeights.get('classification_weights');
+  private async singleModelClassification(
+    features: Float32Array,
+  ): Promise<MaterialPrediction[]> {
+    const classificationWeights = this.modelWeights.get(
+      'classification_weights',
+    );
     if (!classificationWeights) {
       throw new Error('Classification weights not loaded');
     }
@@ -349,7 +398,10 @@ export class MaterialClassificationService {
         category: this.config.categories[i],
         probability: probabilities[i],
         confidence: this.computeConfidence(probabilities[i], probabilities),
-        reasoning: this.generateReasoning(this.config.categories[i], probabilities[i]),
+        reasoning: this.generateReasoning(
+          this.config.categories[i],
+          probabilities[i],
+        ),
       });
     }
 
@@ -362,7 +414,9 @@ export class MaterialClassificationService {
   /**
    * Ensemble model classification
    */
-  private async ensembleClassification(features: Float32Array): Promise<MaterialPrediction[]> {
+  private async ensembleClassification(
+    features: Float32Array,
+  ): Promise<MaterialPrediction[]> {
     if (!this.ensemble) {
       throw new Error('Ensemble not initialized');
     }
@@ -394,7 +448,10 @@ export class MaterialClassificationService {
         category: this.config.categories[i],
         probability: probabilities[i],
         confidence: this.computeConfidence(probabilities[i], probabilities),
-        reasoning: this.generateEnsembleReasoning(this.config.categories[i], probabilities[i]),
+        reasoning: this.generateEnsembleReasoning(
+          this.config.categories[i],
+          probabilities[i],
+        ),
       });
     }
 
@@ -405,7 +462,10 @@ export class MaterialClassificationService {
   /**
    * Get prediction from a specific model
    */
-  private async getModelPrediction(features: Float32Array, model: ClassificationModel): Promise<Float32Array> {
+  private async getModelPrediction(
+    features: Float32Array,
+    model: ClassificationModel,
+  ): Promise<Float32Array> {
     const numClasses = this.config.categories.length;
     const scores = new Float32Array(numClasses);
 
@@ -429,7 +489,8 @@ export class MaterialClassificationService {
 
     // Simulate classification scores based on model accuracy
     for (let i = 0; i < numClasses; i++) {
-      scores[i] = Math.random() * model.accuracy + (1 - model.accuracy) * Math.random();
+      scores[i] =
+        Math.random() * model.accuracy + (1 - model.accuracy) * Math.random();
     }
 
     return scores;
@@ -453,7 +514,9 @@ export class MaterialClassificationService {
   /**
    * Apply MaterialTextureNet-specific processing
    */
-  private applyMaterialTextureNetProcessing(features: Float32Array): Float32Array {
+  private applyMaterialTextureNetProcessing(
+    features: Float32Array,
+  ): Float32Array {
     // Material-specific texture enhancement
     const processed = new Float32Array(features.length);
 
@@ -512,7 +575,10 @@ export class MaterialClassificationService {
   /**
    * Compute confidence score for a prediction
    */
-  private computeConfidence(probability: number, allProbabilities: Float32Array): number {
+  private computeConfidence(
+    probability: number,
+    allProbabilities: Float32Array,
+  ): number {
     // Confidence based on probability margin and entropy
     const sortedProbs = Array.from(allProbabilities).sort((a, b) => b - a);
     const margin = sortedProbs[0] - sortedProbs[1];
@@ -577,12 +643,18 @@ export class MaterialClassificationService {
   /**
    * Estimate surface roughness from texture analysis
    */
-  private estimateRoughness(gaborResponse: TextureResponse, multiScaleFeatures: MultiScaleFeatures): number {
+  private estimateRoughness(
+    gaborResponse: TextureResponse,
+    multiScaleFeatures: MultiScaleFeatures,
+  ): number {
     // Higher texture energy and complexity indicate higher roughness
     const energyFactor = Math.min(1.0, gaborResponse.textureEnergy / 100);
-    const complexityFactor = Math.min(1.0, multiScaleFeatures.textureComplexity / 10);
+    const complexityFactor = Math.min(
+      1.0,
+      multiScaleFeatures.textureComplexity / 10,
+    );
 
-    return (energyFactor * 0.6 + complexityFactor * 0.4);
+    return energyFactor * 0.6 + complexityFactor * 0.4;
   }
 
   /**
@@ -699,12 +771,17 @@ export class MaterialClassificationService {
   /**
    * Determine subcategory based on category and properties
    */
-  private determineSubcategory(category: string, properties: MaterialProperties): string {
+  private determineSubcategory(
+    category: string,
+    properties: MaterialProperties,
+  ): string {
     switch (category.toLowerCase()) {
       case 'metal':
         return properties.surfaceType;
       case 'fabric':
-        return properties.patternType === 'fine' ? 'fine_weave' : 'coarse_weave';
+        return properties.patternType === 'fine'
+          ? 'fine_weave'
+          : 'coarse_weave';
       case 'wood':
         return properties.textureScale > 0.5 ? 'coarse_grain' : 'fine_grain';
       case 'plastic':
@@ -725,7 +802,10 @@ export class MaterialClassificationService {
   /**
    * Generate reasoning for ensemble prediction
    */
-  private generateEnsembleReasoning(category: string, probability: number): string {
+  private generateEnsembleReasoning(
+    category: string,
+    probability: number,
+  ): string {
     const confidence = probability * 100;
     return `Ensemble classification: ${category} (${confidence.toFixed(1)}% confidence) based on consensus from TextureNetSVD, MaterialTextureNet, and HybridNet models.`;
   }
@@ -733,7 +813,10 @@ export class MaterialClassificationService {
   /**
    * Update model weights during training
    */
-  public updateWeights(gradients: Map<string, Float32Array>, learningRate: number = 0.001): void {
+  public updateWeights(
+    gradients: Map<string, Float32Array>,
+    learningRate: number = 0.001,
+  ): void {
     for (const [key, gradient] of gradients) {
       const weights = this.modelWeights.get(key);
       if (weights) {
@@ -751,7 +834,10 @@ export class MaterialClassificationService {
     return {
       config: this.config,
       weights: Object.fromEntries(
-        Array.from(this.modelWeights.entries()).map(([key, weights]) => [key, Array.from(weights)]),
+        Array.from(this.modelWeights.entries()).map(([key, weights]) => [
+          key,
+          Array.from(weights),
+        ]),
       ),
       ensemble: this.ensemble,
       version: '1.0.0',
@@ -764,7 +850,9 @@ export class MaterialClassificationService {
   public importModel(modelData: Record<string, unknown>): void {
     this.config = { ...this.config, ...(modelData.config as any) };
 
-    for (const [key, weights] of Object.entries((modelData.weights as any) || {})) {
+    for (const [key, weights] of Object.entries(
+      (modelData.weights as any) || {},
+    )) {
       this.modelWeights.set(key, new Float32Array(weights as number[]));
     }
 

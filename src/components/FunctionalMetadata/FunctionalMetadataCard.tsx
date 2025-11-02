@@ -35,14 +35,21 @@ interface FunctionalMetadataCardProps {
   /** Whether to show confidence indicators */
   showConfidence?: boolean;
   /** Callback for when user clicks on a specific property */
-  onPropertyClick?: (category: string, property: string, value: unknown) => void;
+  onPropertyClick?: (
+    category: string,
+    property: string,
+    value: unknown,
+  ) => void;
   /** Raw functional data from MIVAA API for enhanced display */
-  rawFunctionalData?: Record<string, {
-    display_name: string;
-    highlights: string[];
-    technical_details: string[];
-    extraction_confidence: 'low' | 'medium' | 'high';
-  }>;
+  rawFunctionalData?: Record<
+    string,
+    {
+      display_name: string;
+      highlights: string[];
+      technical_details: string[];
+      extraction_confidence: 'low' | 'medium' | 'high';
+    }
+  >;
   /** Extraction summary for application suggestions */
   extractionSummary?: {
     categories_with_data: string[];
@@ -118,7 +125,9 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
   rawFunctionalData,
   extractionSummary,
 }) => {
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(),
+  );
 
   const toggleCategory = (categoryKey: string) => {
     const newExpanded = new Set(expandedCategories);
@@ -130,16 +139,25 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
     setExpandedCategories(newExpanded);
   };
 
-  const getConfidenceColor = (confidence: 'low' | 'medium' | 'high' | string): string => {
+  const getConfidenceColor = (
+    confidence: 'low' | 'medium' | 'high' | string,
+  ): string => {
     switch (confidence) {
-      case 'high': return 'text-green-600 bg-green-100';
-      case 'medium': return 'text-yellow-600 bg-yellow-100';
-      case 'low': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'high':
+        return 'text-green-600 bg-green-100';
+      case 'medium':
+        return 'text-yellow-600 bg-yellow-100';
+      case 'low':
+        return 'text-red-600 bg-red-100';
+      default:
+        return 'text-gray-600 bg-gray-100';
     }
   };
 
-  const renderPropertyValue = (_key: string, value: unknown): React.ReactNode => {
+  const renderPropertyValue = (
+    _key: string,
+    value: unknown,
+  ): React.ReactNode => {
     if (value === null || value === undefined) return null;
 
     if (typeof value === 'boolean') {
@@ -169,28 +187,45 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
     return <span className="text-sm">{String(value)}</span>;
   };
 
-  const renderCategoryContent = (categoryKey: string, categoryData: unknown) => {
+  const renderCategoryContent = (
+    categoryKey: string,
+    categoryData: unknown,
+  ) => {
     const config = CATEGORY_CONFIG[categoryKey as keyof typeof CATEGORY_CONFIG];
     if (!config || !categoryData) return null;
 
     const Icon = config.icon;
-    const hasData = Object.keys(categoryData as Record<string, unknown>).length > 0;
+    const hasData =
+      Object.keys(categoryData as Record<string, unknown>).length > 0;
     const isExpanded = expandedCategories.has(categoryKey);
 
     // Get raw data for this category to display highlights/technical details
-    const rawCategoryKey = categoryKey.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '');
+    const rawCategoryKey = categoryKey
+      .replace(/([A-Z])/g, '_$1')
+      .toLowerCase()
+      .replace(/^_/, '');
     const rawCategoryData = rawFunctionalData?.[rawCategoryKey];
-    const extractionConfidence = rawCategoryData?.extraction_confidence as 'low' | 'medium' | 'high' | undefined;
+    const extractionConfidence = rawCategoryData?.extraction_confidence as
+      | 'low'
+      | 'medium'
+      | 'high'
+      | undefined;
 
-    const renderConfidenceIndicator = (confidence?: 'low' | 'medium' | 'high') => {
+    const renderConfidenceIndicator = (
+      confidence?: 'low' | 'medium' | 'high',
+    ) => {
       if (!confidence || !showConfidence) return null;
 
       const getConfidenceIcon = () => {
         switch (confidence) {
-          case 'high': return <CheckCircle className="h-3 w-3" />;
-          case 'medium': return <AlertCircle className="h-3 w-3" />;
-          case 'low': return <Info className="h-3 w-3" />;
-          default: return <Info className="h-3 w-3" />;
+          case 'high':
+            return <CheckCircle className="h-3 w-3" />;
+          case 'medium':
+            return <AlertCircle className="h-3 w-3" />;
+          case 'low':
+            return <Info className="h-3 w-3" />;
+          default:
+            return <Info className="h-3 w-3" />;
         }
       };
 
@@ -206,11 +241,20 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
     };
 
     return (
-      <Card key={categoryKey} className={`border-l-4 ${config.bgColor} border-l-current transition-all duration-200 hover:shadow-md`}>
-        <Collapsible open={isExpanded} onOpenChange={() => toggleCategory(categoryKey)}>
+      <Card
+        key={categoryKey}
+        className={`border-l-4 ${config.bgColor} border-l-current transition-all duration-200 hover:shadow-md`}
+      >
+        <Collapsible
+          open={isExpanded}
+          onOpenChange={() => toggleCategory(categoryKey)}
+        >
           <CardHeader className="pb-2">
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-0 h-auto"
+              >
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <Icon className={`h-4 w-4 ${config.color}`} />
                   {config.displayName}
@@ -224,9 +268,15 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                   </div>
                 </CardTitle>
                 {hasData ? (
-                  isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                  isExpanded ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )
                 ) : (
-                  <Badge variant="secondary" className="text-xs">No data</Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    No data
+                  </Badge>
                 )}
               </Button>
             </CollapsibleTrigger>
@@ -236,21 +286,27 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
             <CollapsibleContent>
               <CardContent className="pt-0">
                 {/* Raw highlights section */}
-                {rawCategoryData?.highlights && rawCategoryData.highlights.length > 0 && (
-                  <div className="mb-4 p-3 bg-white/60 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Star className="h-3 w-3 text-amber-500" />
-                      <span className="text-xs font-semibold text-muted-foreground">Key Highlights</span>
+                {rawCategoryData?.highlights &&
+                  rawCategoryData.highlights.length > 0 && (
+                    <div className="mb-4 p-3 bg-white/60 rounded-lg border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Star className="h-3 w-3 text-amber-500" />
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Key Highlights
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {rawCategoryData.highlights.map((highlight, idx) => (
+                          <div
+                            key={idx}
+                            className="text-xs text-foreground bg-white/80 p-2 rounded border-l-2 border-amber-200"
+                          >
+                            {highlight}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {rawCategoryData.highlights.map((highlight, idx) => (
-                        <div key={idx} className="text-xs text-foreground bg-white/80 p-2 rounded border-l-2 border-amber-200">
-                          {highlight}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
 
                 {/* Structured properties */}
                 <div className="space-y-3">
@@ -258,7 +314,9 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                     <div
                       key={propKey}
                       className="flex justify-between items-start p-2 rounded-md hover:bg-white/50 cursor-pointer transition-colors border border-transparent hover:border-gray-200"
-                      onClick={() => onPropertyClick?.(categoryKey, propKey, propValue)}
+                      onClick={() =>
+                        onPropertyClick?.(categoryKey, propKey, propValue)
+                      }
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           onPropertyClick?.(categoryKey, propKey, propValue);
@@ -267,7 +325,9 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                     >
                       <div className="flex-1">
                         <div className="text-xs font-medium text-muted-foreground mb-1">
-                          {propKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                          {propKey
+                            .replace(/([A-Z])/g, ' $1')
+                            .replace(/^./, (str) => str.toUpperCase())}
                         </div>
                         <div className="flex items-center gap-2">
                           {renderPropertyValue(propKey, propValue)}
@@ -282,26 +342,35 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
                 </div>
 
                 {/* Technical details section */}
-                {rawCategoryData?.technical_details && rawCategoryData.technical_details.length > 0 && (
-                  <div className="mt-4 p-3 bg-gray-50/60 rounded-lg border">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Info className="h-3 w-3 text-blue-500" />
-                      <span className="text-xs font-semibold text-muted-foreground">Technical Details</span>
+                {rawCategoryData?.technical_details &&
+                  rawCategoryData.technical_details.length > 0 && (
+                    <div className="mt-4 p-3 bg-gray-50/60 rounded-lg border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Info className="h-3 w-3 text-blue-500" />
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Technical Details
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {rawCategoryData.technical_details
+                          .slice(0, 3)
+                          .map((detail, idx) => (
+                            <div
+                              key={idx}
+                              className="text-xs text-muted-foreground"
+                            >
+                              • {detail}
+                            </div>
+                          ))}
+                        {rawCategoryData.technical_details.length > 3 && (
+                          <div className="text-xs text-muted-foreground italic">
+                            +{rawCategoryData.technical_details.length - 3} more
+                            details
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      {rawCategoryData.technical_details.slice(0, 3).map((detail, idx) => (
-                        <div key={idx} className="text-xs text-muted-foreground">
-                          • {detail}
-                        </div>
-                      ))}
-                      {rawCategoryData.technical_details.length > 3 && (
-                        <div className="text-xs text-muted-foreground italic">
-                          +{rawCategoryData.technical_details.length - 3} more details
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                  )}
               </CardContent>
             </CollapsibleContent>
           )}
@@ -311,7 +380,12 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
   };
 
   const availableCategories = Object.entries(functionalMetadata)
-    .filter(([key, value]) => key !== 'functionalMetadataUpdatedAt' && key !== 'functionalMetadataSource' && value)
+    .filter(
+      ([key, value]) =>
+        key !== 'functionalMetadataUpdatedAt' &&
+        key !== 'functionalMetadataSource' &&
+        value,
+    )
     .sort(([a], [b]) => a.localeCompare(b));
 
   if (availableCategories.length === 0) {
@@ -321,7 +395,9 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
           <div className="text-center text-muted-foreground">
             <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">No functional metadata available</p>
-            <p className="text-xs mt-1">Process document with MIVAA to generate functional properties</p>
+            <p className="text-xs mt-1">
+              Process document with MIVAA to generate functional properties
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -354,47 +430,65 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
       </div>
 
       {/* Application Suggestions Section */}
-      {extractionSummary?.suggested_applications && extractionSummary.suggested_applications.length > 0 && (
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Lightbulb className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-semibold text-blue-900">Suggested Applications</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-              {extractionSummary.suggested_applications.map((app, idx) => (
-                <Badge
-                  key={idx}
-                  variant="secondary"
-                  className="justify-center p-2 text-xs bg-white/80 text-blue-800 border-blue-200 hover:bg-white cursor-pointer transition-colors"
-                  onClick={() => onPropertyClick?.('applications', 'suggested_application', app)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      onPropertyClick?.('applications', 'suggested_application', app);
-                    }
-                  }}
-                >
-                  {app}
-                </Badge>
-              ))}
-            </div>
-            {extractionSummary.key_properties_found && extractionSummary.key_properties_found.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-blue-200">
-                <div className="text-xs text-blue-700 mb-1 font-medium">Key Properties Found:</div>
-                <div className="text-xs text-blue-600">
-                  {extractionSummary.key_properties_found.join(' • ')}
-                </div>
+      {extractionSummary?.suggested_applications &&
+        extractionSummary.suggested_applications.length > 0 && (
+          <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Lightbulb className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-900">
+                  Suggested Applications
+                </span>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                {extractionSummary.suggested_applications.map((app, idx) => (
+                  <Badge
+                    key={idx}
+                    variant="secondary"
+                    className="justify-center p-2 text-xs bg-white/80 text-blue-800 border-blue-200 hover:bg-white cursor-pointer transition-colors"
+                    onClick={() =>
+                      onPropertyClick?.(
+                        'applications',
+                        'suggested_application',
+                        app,
+                      )
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        onPropertyClick?.(
+                          'applications',
+                          'suggested_application',
+                          app,
+                        );
+                      }
+                    }}
+                  >
+                    {app}
+                  </Badge>
+                ))}
+              </div>
+              {extractionSummary.key_properties_found &&
+                extractionSummary.key_properties_found.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <div className="text-xs text-blue-700 mb-1 font-medium">
+                      Key Properties Found:
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      {extractionSummary.key_properties_found.join(' • ')}
+                    </div>
+                  </div>
+                )}
+            </CardContent>
+          </Card>
+        )}
 
       {displayMode === 'compact' ? (
         <div className="grid gap-2">
-          {availableCategories.slice(0, 3).map(([categoryKey, categoryData]) =>
-            renderCategoryContent(categoryKey, categoryData),
-          )}
+          {availableCategories
+            .slice(0, 3)
+            .map(([categoryKey, categoryData]) =>
+              renderCategoryContent(categoryKey, categoryData),
+            )}
           {availableCategories.length > 3 && (
             <div className="text-center">
               <Badge variant="outline" className="text-xs">
@@ -413,7 +507,10 @@ export const FunctionalMetadataCard: React.FC<FunctionalMetadataCardProps> = ({
 
       {functionalMetadata.functionalMetadataUpdatedAt && (
         <div className="text-xs text-muted-foreground text-right mt-2">
-          Last updated: {new Date(functionalMetadata.functionalMetadataUpdatedAt).toLocaleString()}
+          Last updated:{' '}
+          {new Date(
+            functionalMetadata.functionalMetadataUpdatedAt,
+          ).toLocaleString()}
         </div>
       )}
     </div>

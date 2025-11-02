@@ -23,8 +23,10 @@ interface QualityTrendsChartProps {
   trends: QualityTrend[];
 }
 
-export const QualityTrendsChart: React.FC<QualityTrendsChartProps> = ({ trends }) => {
-  const chartData = trends.map(trend => ({
+export const QualityTrendsChart: React.FC<QualityTrendsChartProps> = ({
+  trends,
+}) => {
+  const chartData = trends.map((trend) => ({
     date: new Date(trend.date).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -100,4 +102,3 @@ export const QualityTrendsChart: React.FC<QualityTrendsChartProps> = ({ trends }
     </Card>
   );
 };
-

@@ -24,7 +24,10 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import { materialSearchService, MaterialSearchResult } from '@/services/materialSearchService';
+import {
+  materialSearchService,
+  MaterialSearchResult,
+} from '@/services/materialSearchService';
 import { supabase } from '@/integrations/supabase/client';
 
 // Using MaterialSearchResult from our service as base, with additional UI fields
@@ -84,12 +87,14 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     locations: [],
     people: [],
   });
-  const [availableEntities, setAvailableEntities] = useState<AvailableEntities>({
-    materials: [],
-    organizations: [],
-    locations: [],
-    people: [],
-  });
+  const [availableEntities, setAvailableEntities] = useState<AvailableEntities>(
+    {
+      materials: [],
+      organizations: [],
+      locations: [],
+      people: [],
+    },
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -111,9 +116,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       };
 
       data?.forEach((item: unknown) => {
-        const entities = (item as any).extracted_entities as EntityData[] || [];
-        entities.forEach(entity => {
-          if (entity.confidence >= 0.7) { // Only include high-confidence entities
+        const entities =
+          ((item as any).extracted_entities as EntityData[]) || [];
+        entities.forEach((entity) => {
+          if (entity.confidence >= 0.7) {
+            // Only include high-confidence entities
             switch (entity.type) {
               case 'MATERIAL':
                 if (!allEntities.materials.includes(entity.text)) {
@@ -141,7 +148,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       });
 
       // Sort entities alphabetically
-      Object.keys(allEntities).forEach(key => {
+      Object.keys(allEntities).forEach((key) => {
         (allEntities as any)[key].sort();
       });
 
@@ -173,62 +180,88 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     }
   }, []);
 
-  const detectQueryType = useCallback((searchQuery: string): 'text' | 'image' | 'hybrid' => {
-    if (selectedImage && searchQuery.trim()) return 'hybrid';
-    if (selectedImage) return 'image';
-    return 'text';
-  }, [selectedImage]);
+  const detectQueryType = useCallback(
+    (searchQuery: string): 'text' | 'image' | 'hybrid' => {
+      if (selectedImage && searchQuery.trim()) return 'hybrid';
+      if (selectedImage) return 'image';
+      return 'text';
+    },
+    [selectedImage],
+  );
 
   // Apply entity filters to search results
-  const applyEntityFilters = useCallback((searchResults: SearchResult[]) => {
-    if (!entityFilters.materials.length &&
+  const applyEntityFilters = useCallback(
+    (searchResults: SearchResult[]) => {
+      if (
+        !entityFilters.materials.length &&
         !entityFilters.organizations.length &&
         !entityFilters.locations.length &&
-        !entityFilters.people.length) {
-      return searchResults; // No filters applied
-    }
-
-    return searchResults.filter(result => {
-      const entities = result.extracted_entities || [];
-
-      // Check if result matches any selected entity filters
-      let matchesFilter = false;
-
-      // Check material entities
-      if (entityFilters.materials.length > 0) {
-        const materialEntities = entities.filter(e => e.type === 'MATERIAL');
-        if (materialEntities.some(e => entityFilters.materials.includes(e.text))) {
-          matchesFilter = true;
-        }
+        !entityFilters.people.length
+      ) {
+        return searchResults; // No filters applied
       }
 
-      // Check organization entities
-      if (entityFilters.organizations.length > 0) {
-        const orgEntities = entities.filter(e => e.type === 'ORG');
-        if (orgEntities.some(e => entityFilters.organizations.includes(e.text))) {
-          matchesFilter = true;
-        }
-      }
+      return searchResults.filter((result) => {
+        const entities = result.extracted_entities || [];
 
-      // Check location entities
-      if (entityFilters.locations.length > 0) {
-        const locationEntities = entities.filter(e => e.type === 'LOCATION');
-        if (locationEntities.some(e => entityFilters.locations.includes(e.text))) {
-          matchesFilter = true;
-        }
-      }
+        // Check if result matches any selected entity filters
+        let matchesFilter = false;
 
-      // Check people entities
-      if (entityFilters.people.length > 0) {
-        const peopleEntities = entities.filter(e => e.type === 'PERSON');
-        if (peopleEntities.some(e => entityFilters.people.includes(e.text))) {
-          matchesFilter = true;
+        // Check material entities
+        if (entityFilters.materials.length > 0) {
+          const materialEntities = entities.filter(
+            (e) => e.type === 'MATERIAL',
+          );
+          if (
+            materialEntities.some((e) =>
+              entityFilters.materials.includes(e.text),
+            )
+          ) {
+            matchesFilter = true;
+          }
         }
-      }
 
-      return matchesFilter;
-    });
-  }, [entityFilters]);
+        // Check organization entities
+        if (entityFilters.organizations.length > 0) {
+          const orgEntities = entities.filter((e) => e.type === 'ORG');
+          if (
+            orgEntities.some((e) =>
+              entityFilters.organizations.includes(e.text),
+            )
+          ) {
+            matchesFilter = true;
+          }
+        }
+
+        // Check location entities
+        if (entityFilters.locations.length > 0) {
+          const locationEntities = entities.filter(
+            (e) => e.type === 'LOCATION',
+          );
+          if (
+            locationEntities.some((e) =>
+              entityFilters.locations.includes(e.text),
+            )
+          ) {
+            matchesFilter = true;
+          }
+        }
+
+        // Check people entities
+        if (entityFilters.people.length > 0) {
+          const peopleEntities = entities.filter((e) => e.type === 'PERSON');
+          if (
+            peopleEntities.some((e) => entityFilters.people.includes(e.text))
+          ) {
+            matchesFilter = true;
+          }
+        }
+
+        return matchesFilter;
+      });
+    },
+    [entityFilters],
+  );
 
   // Update filtered results when filters or results change
   useEffect(() => {
@@ -291,7 +324,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       }
 
       // Transform MaterialSearchResult to SearchResult format and fetch entity data
-      const resultIds = materialSearchResponse.data.map(result => result.id);
+      const resultIds = materialSearchResponse.data.map((result) => result.id);
 
       // Fetch entity data for the search results
       let entityDataMap: Record<string, EntityData[]> = {};
@@ -305,7 +338,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
           entityData?.forEach((item: unknown) => {
             if ((item as any).extracted_entities) {
-              entityDataMap[(item as any).id] = (item as any).extracted_entities as EntityData[];
+              entityDataMap[(item as any).id] = (item as any)
+                .extracted_entities as EntityData[];
             }
           });
         } catch (entityError) {
@@ -313,20 +347,22 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         }
       }
 
-      const unifiedResults: SearchResult[] = materialSearchResponse.data.map((result) => ({
-        ...result,
-        title: result.name,
-        content: result.description || 'No description available',
-        type: 'material' as const,
-        similarity_score: result.search_score || 0.8,
-        source: 'unified_search',
-        extracted_entities: entityDataMap[result.id] || [],
-        metadata: {
-          category: result.category,
-          properties: result.properties,
-          metafield_values: result.metafield_values,
-        },
-      }));
+      const unifiedResults: SearchResult[] = materialSearchResponse.data.map(
+        (result) => ({
+          ...result,
+          title: result.name,
+          content: result.description || 'No description available',
+          type: 'material' as const,
+          similarity_score: result.search_score || 0.8,
+          source: 'unified_search',
+          extracted_entities: entityDataMap[result.id] || [],
+          metadata: {
+            category: result.category,
+            properties: result.properties,
+            metafield_values: result.metafield_values,
+          },
+        }),
+      );
 
       // Sort by similarity score
       unifiedResults.sort((a, b) => b.similarity_score - a.similarity_score);
@@ -338,65 +374,74 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         title: 'Search Completed',
         description: `Found ${unifiedResults.length} results using ${actualSearchType} search`,
       });
-
     } catch (error) {
       console.error('Search error:', error);
       toast({
         title: 'Search Failed',
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description:
+          error instanceof Error ? error.message : 'Unknown error occurred',
         variant: 'destructive',
       });
     } finally {
       setIsSearching(false);
     }
-  }, [query, selectedImage, imagePreview, detectQueryType, onResultsFound, toast]);
+  }, [
+    query,
+    selectedImage,
+    imagePreview,
+    detectQueryType,
+    onResultsFound,
+    toast,
+  ]);
 
-  const handleQuickSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) return;
+  const handleQuickSearch = useCallback(
+    async (searchQuery: string) => {
+      if (!searchQuery.trim()) return;
 
-    setIsSearching(true);
-    try {
-      // Quick text-based search using unified material search
-      const quickResponse = await materialSearchService.search({
-        query: searchQuery,
-        searchType: 'text',
-        limit: 8,
-        includeImages: false,
-        includeMetafields: false,
-        includeRelationships: false,
-      });
+      setIsSearching(true);
+      try {
+        // Quick text-based search using unified material search
+        const quickResponse = await materialSearchService.search({
+          query: searchQuery,
+          searchType: 'text',
+          limit: 8,
+          includeImages: false,
+          includeMetafields: false,
+          includeRelationships: false,
+        });
 
-      if (!quickResponse.success) {
-        throw new Error(quickResponse.error || 'Quick search failed');
+        if (!quickResponse.success) {
+          throw new Error(quickResponse.error || 'Quick search failed');
+        }
+
+        const formatted: SearchResult[] = quickResponse.data.map((result) => ({
+          ...result,
+          title: result.name,
+          content: result.description || 'No description available',
+          type: 'material' as const,
+          similarity_score: result.search_score || 0.8,
+          source: 'quick_search',
+          metadata: {
+            category: result.category,
+            properties: result.properties,
+          },
+        }));
+
+        setResults(formatted);
+        onResultsFound?.(formatted);
+      } catch (error) {
+        console.error('Quick search error:', error);
+        toast({
+          title: 'Quick Search Failed',
+          description: 'Please try the full search',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsSearching(false);
       }
-
-      const formatted: SearchResult[] = quickResponse.data.map((result) => ({
-        ...result,
-        title: result.name,
-        content: result.description || 'No description available',
-        type: 'material' as const,
-        similarity_score: result.search_score || 0.8,
-        source: 'quick_search',
-        metadata: {
-          category: result.category,
-          properties: result.properties,
-        },
-      }));
-
-      setResults(formatted);
-      onResultsFound?.(formatted);
-
-    } catch (error) {
-      console.error('Quick search error:', error);
-      toast({
-        title: 'Quick Search Failed',
-        description: 'Please try the full search',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSearching(false);
-    }
-  }, [onResultsFound, toast]);
+    },
+    [onResultsFound, toast],
+  );
 
   const getResultIcon = (type: string) => {
     switch (type) {
@@ -427,7 +472,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             Intelligent Material Search
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Search by text specifications, upload images, or combine both for enhanced results
+            Search by text specifications, upload images, or combine both for
+            enhanced results
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -455,7 +501,11 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
               Quick
             </Button>
             <Button onClick={performSearch} disabled={isSearching}>
-              {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              {isSearching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
               Search
             </Button>
           </div>
@@ -521,15 +571,26 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           {/* Search Type Indicator */}
           <div className="flex items-center gap-2">
             <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-1">
-              {detectQueryType(query) === 'text' && <Type className="h-3 w-3" />}
-              {detectQueryType(query) === 'image' && <ImageIcon className="h-3 w-3" />}
-              {detectQueryType(query) === 'hybrid' && <Sparkles className="h-3 w-3" />}
-              {detectQueryType(query).charAt(0).toUpperCase() + detectQueryType(query).slice(1)} Search
+              {detectQueryType(query) === 'text' && (
+                <Type className="h-3 w-3" />
+              )}
+              {detectQueryType(query) === 'image' && (
+                <ImageIcon className="h-3 w-3" />
+              )}
+              {detectQueryType(query) === 'hybrid' && (
+                <Sparkles className="h-3 w-3" />
+              )}
+              {detectQueryType(query).charAt(0).toUpperCase() +
+                detectQueryType(query).slice(1)}{' '}
+              Search
             </Badge>
             <span className="text-xs text-muted-foreground">
-              {detectQueryType(query) === 'hybrid' && 'Using both text and image for enhanced matching'}
-              {detectQueryType(query) === 'image' && 'AI will analyze the image to identify materials'}
-              {detectQueryType(query) === 'text' && 'Natural language processing for material specifications'}
+              {detectQueryType(query) === 'hybrid' &&
+                'Using both text and image for enhanced matching'}
+              {detectQueryType(query) === 'image' &&
+                'AI will analyze the image to identify materials'}
+              {detectQueryType(query) === 'text' &&
+                'Natural language processing for material specifications'}
             </span>
           </div>
         </CardContent>
@@ -563,33 +624,44 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     Materials ({availableEntities.materials.length})
                   </Label>
                   <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.materials.slice(0, 10).map(material => (
-                      <div key={material} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`material-${material}`}
-                          checked={entityFilters.materials.includes(material)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setEntityFilters(prev => ({
-                                ...prev,
-                                materials: [...prev.materials, material],
-                              }));
-                            } else {
-                              setEntityFilters(prev => ({
-                                ...prev,
-                                materials: prev.materials.filter(m => m !== material),
-                              }));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`material-${material}`} className="text-sm">
-                          {material}
-                        </Label>
-                      </div>
-                    ))}
+                    {availableEntities.materials
+                      .slice(0, 10)
+                      .map((material) => (
+                        <div
+                          key={material}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={`material-${material}`}
+                            checked={entityFilters.materials.includes(material)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEntityFilters((prev) => ({
+                                  ...prev,
+                                  materials: [...prev.materials, material],
+                                }));
+                              } else {
+                                setEntityFilters((prev) => ({
+                                  ...prev,
+                                  materials: prev.materials.filter(
+                                    (m) => m !== material,
+                                  ),
+                                }));
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`material-${material}`}
+                            className="text-sm"
+                          >
+                            {material}
+                          </Label>
+                        </div>
+                      ))}
                     {availableEntities.materials.length > 10 && (
                       <div className="text-xs text-muted-foreground">
-                        +{availableEntities.materials.length - 10} more materials
+                        +{availableEntities.materials.length - 10} more
+                        materials
                       </div>
                     )}
                   </div>
@@ -602,21 +674,23 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     Organizations ({availableEntities.organizations.length})
                   </Label>
                   <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.organizations.slice(0, 10).map(org => (
+                    {availableEntities.organizations.slice(0, 10).map((org) => (
                       <div key={org} className="flex items-center space-x-2">
                         <Checkbox
                           id={`org-${org}`}
                           checked={entityFilters.organizations.includes(org)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setEntityFilters(prev => ({
+                              setEntityFilters((prev) => ({
                                 ...prev,
                                 organizations: [...prev.organizations, org],
                               }));
                             } else {
-                              setEntityFilters(prev => ({
+                              setEntityFilters((prev) => ({
                                 ...prev,
-                                organizations: prev.organizations.filter(o => o !== org),
+                                organizations: prev.organizations.filter(
+                                  (o) => o !== org,
+                                ),
                               }));
                             }
                           }}
@@ -628,7 +702,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     ))}
                     {availableEntities.organizations.length > 10 && (
                       <div className="text-xs text-muted-foreground">
-                        +{availableEntities.organizations.length - 10} more organizations
+                        +{availableEntities.organizations.length - 10} more
+                        organizations
                       </div>
                     )}
                   </div>
@@ -641,33 +716,44 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     Locations ({availableEntities.locations.length})
                   </Label>
                   <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.locations.slice(0, 10).map(location => (
-                      <div key={location} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`location-${location}`}
-                          checked={entityFilters.locations.includes(location)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setEntityFilters(prev => ({
-                                ...prev,
-                                locations: [...prev.locations, location],
-                              }));
-                            } else {
-                              setEntityFilters(prev => ({
-                                ...prev,
-                                locations: prev.locations.filter(l => l !== location),
-                              }));
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`location-${location}`} className="text-sm">
-                          {location}
-                        </Label>
-                      </div>
-                    ))}
+                    {availableEntities.locations
+                      .slice(0, 10)
+                      .map((location) => (
+                        <div
+                          key={location}
+                          className="flex items-center space-x-2"
+                        >
+                          <Checkbox
+                            id={`location-${location}`}
+                            checked={entityFilters.locations.includes(location)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEntityFilters((prev) => ({
+                                  ...prev,
+                                  locations: [...prev.locations, location],
+                                }));
+                              } else {
+                                setEntityFilters((prev) => ({
+                                  ...prev,
+                                  locations: prev.locations.filter(
+                                    (l) => l !== location,
+                                  ),
+                                }));
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`location-${location}`}
+                            className="text-sm"
+                          >
+                            {location}
+                          </Label>
+                        </div>
+                      ))}
                     {availableEntities.locations.length > 10 && (
                       <div className="text-xs text-muted-foreground">
-                        +{availableEntities.locations.length - 10} more locations
+                        +{availableEntities.locations.length - 10} more
+                        locations
                       </div>
                     )}
                   </div>
@@ -680,21 +766,21 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     People ({availableEntities.people.length})
                   </Label>
                   <div className="max-h-32 overflow-y-auto space-y-1">
-                    {availableEntities.people.slice(0, 10).map(person => (
+                    {availableEntities.people.slice(0, 10).map((person) => (
                       <div key={person} className="flex items-center space-x-2">
                         <Checkbox
                           id={`person-${person}`}
                           checked={entityFilters.people.includes(person)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setEntityFilters(prev => ({
+                              setEntityFilters((prev) => ({
                                 ...prev,
                                 people: [...prev.people, person],
                               }));
                             } else {
-                              setEntityFilters(prev => ({
+                              setEntityFilters((prev) => ({
                                 ...prev,
-                                people: prev.people.filter(p => p !== person),
+                                people: prev.people.filter((p) => p !== person),
                               }));
                             }
                           }}
@@ -716,55 +802,77 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
               {/* Clear Filters Button */}
               <div className="mt-4 flex items-center justify-between">
                 <div className="flex flex-wrap gap-1">
-                  {entityFilters.materials.map(material => (
-                    <Badge key={material} variant="secondary" className="text-xs">
+                  {entityFilters.materials.map((material) => (
+                    <Badge
+                      key={material}
+                      variant="secondary"
+                      className="text-xs"
+                    >
                       <Hash className="h-2 w-2 mr-1" />
                       {material}
                       <X
                         className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() => setEntityFilters(prev => ({
-                          ...prev,
-                          materials: prev.materials.filter(m => m !== material),
-                        }))}
+                        onClick={() =>
+                          setEntityFilters((prev) => ({
+                            ...prev,
+                            materials: prev.materials.filter(
+                              (m) => m !== material,
+                            ),
+                          }))
+                        }
                       />
                     </Badge>
                   ))}
-                  {entityFilters.organizations.map(org => (
+                  {entityFilters.organizations.map((org) => (
                     <Badge key={org} variant="secondary" className="text-xs">
                       <Building className="h-2 w-2 mr-1" />
                       {org}
                       <X
                         className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() => setEntityFilters(prev => ({
-                          ...prev,
-                          organizations: prev.organizations.filter(o => o !== org),
-                        }))}
+                        onClick={() =>
+                          setEntityFilters((prev) => ({
+                            ...prev,
+                            organizations: prev.organizations.filter(
+                              (o) => o !== org,
+                            ),
+                          }))
+                        }
                       />
                     </Badge>
                   ))}
-                  {entityFilters.locations.map(location => (
-                    <Badge key={location} variant="secondary" className="text-xs">
+                  {entityFilters.locations.map((location) => (
+                    <Badge
+                      key={location}
+                      variant="secondary"
+                      className="text-xs"
+                    >
                       <MapPin className="h-2 w-2 mr-1" />
                       {location}
                       <X
                         className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() => setEntityFilters(prev => ({
-                          ...prev,
-                          locations: prev.locations.filter(l => l !== location),
-                        }))}
+                        onClick={() =>
+                          setEntityFilters((prev) => ({
+                            ...prev,
+                            locations: prev.locations.filter(
+                              (l) => l !== location,
+                            ),
+                          }))
+                        }
                       />
                     </Badge>
                   ))}
-                  {entityFilters.people.map(person => (
+                  {entityFilters.people.map((person) => (
                     <Badge key={person} variant="secondary" className="text-xs">
                       <User className="h-2 w-2 mr-1" />
                       {person}
                       <X
                         className="h-2 w-2 ml-1 cursor-pointer"
-                        onClick={() => setEntityFilters(prev => ({
-                          ...prev,
-                          people: prev.people.filter(p => p !== person),
-                        }))}
+                        onClick={() =>
+                          setEntityFilters((prev) => ({
+                            ...prev,
+                            people: prev.people.filter((p) => p !== person),
+                          }))
+                        }
                       />
                     </Badge>
                   ))}
@@ -772,16 +880,20 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setEntityFilters({
-                    materials: [],
-                    organizations: [],
-                    locations: [],
-                    people: [],
-                  })}
-                  disabled={!entityFilters.materials.length &&
-                           !entityFilters.organizations.length &&
-                           !entityFilters.locations.length &&
-                           !entityFilters.people.length}
+                  onClick={() =>
+                    setEntityFilters({
+                      materials: [],
+                      organizations: [],
+                      locations: [],
+                      people: [],
+                    })
+                  }
+                  disabled={
+                    !entityFilters.materials.length &&
+                    !entityFilters.organizations.length &&
+                    !entityFilters.locations.length &&
+                    !entityFilters.people.length
+                  }
                 >
                   Clear All Filters
                 </Button>
@@ -796,7 +908,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         <Card>
           <CardHeader>
             <CardTitle>
-              Search Results ({filteredResults.length} of {results.length} found)
+              Search Results ({filteredResults.length} of {results.length}{' '}
+              found)
               {filteredResults.length !== results.length && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
                   (filtered by entities)
@@ -817,7 +930,9 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                       <div className="flex items-center gap-2">
                         {getResultIcon(result.type)}
                         <h3 className="font-semibold">{result.title}</h3>
-                        <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">{result.type}</Badge>
+                        <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
+                          {result.type}
+                        </Badge>
                         {result.source && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs">
                             {result.source}
@@ -837,8 +952,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     <p className="text-sm text-muted-foreground mb-3">
                       {result.content.length > 300
                         ? `${result.content.substring(0, 300)}...`
-                        : result.content
-                      }
+                        : result.content}
                     </p>
 
                     {/* Metadata */}
@@ -849,11 +963,20 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                             {result.category}
                           </Badge>
                         )}
-                        {result.metafield_values && result.metafield_values.slice(0, 2).map((field, i) => (
-                          <Badge key={i} className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            {field.display_name}: {field.value_text || field.value_number || String(field.value_boolean)}
-                          </Badge>
-                        ))}
+                        {result.metafield_values &&
+                          result.metafield_values
+                            .slice(0, 2)
+                            .map((field, i) => (
+                              <Badge
+                                key={i}
+                                className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                              >
+                                {field.display_name}:{' '}
+                                {field.value_text ||
+                                  field.value_number ||
+                                  String(field.value_boolean)}
+                              </Badge>
+                            ))}
                         {(result as any).properties && (
                           <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
                             Properties Available
@@ -863,34 +986,47 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                     )}
 
                     {/* Entity Badges */}
-                    {result.extracted_entities && result.extracted_entities.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-xs text-muted-foreground mb-1">Extracted Entities:</div>
-                        <div className="flex flex-wrap gap-1">
-                          {result.extracted_entities.slice(0, 6).map((entity, i) => (
-                            <Badge
-                              key={i}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {entity.type === 'MATERIAL' && <Hash className="h-2 w-2 mr-1" />}
-                              {entity.type === 'ORG' && <Building className="h-2 w-2 mr-1" />}
-                              {entity.type === 'LOCATION' && <MapPin className="h-2 w-2 mr-1" />}
-                              {entity.type === 'PERSON' && <User className="h-2 w-2 mr-1" />}
-                              {entity.text}
-                              <span className="ml-1 text-muted-foreground">
-                                ({Math.round(entity.confidence * 100)}%)
-                              </span>
-                            </Badge>
-                          ))}
-                          {result.extracted_entities.length > 6 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{result.extracted_entities.length - 6} more
-                            </Badge>
-                          )}
+                    {result.extracted_entities &&
+                      result.extracted_entities.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-xs text-muted-foreground mb-1">
+                            Extracted Entities:
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {result.extracted_entities
+                              .slice(0, 6)
+                              .map((entity, i) => (
+                                <Badge
+                                  key={i}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {entity.type === 'MATERIAL' && (
+                                    <Hash className="h-2 w-2 mr-1" />
+                                  )}
+                                  {entity.type === 'ORG' && (
+                                    <Building className="h-2 w-2 mr-1" />
+                                  )}
+                                  {entity.type === 'LOCATION' && (
+                                    <MapPin className="h-2 w-2 mr-1" />
+                                  )}
+                                  {entity.type === 'PERSON' && (
+                                    <User className="h-2 w-2 mr-1" />
+                                  )}
+                                  {entity.text}
+                                  <span className="ml-1 text-muted-foreground">
+                                    ({Math.round(entity.confidence * 100)}%)
+                                  </span>
+                                </Badge>
+                              ))}
+                            {result.extracted_entities.length > 6 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{result.extracted_entities.length - 6} more
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </CardContent>
                 </Card>
               ))}

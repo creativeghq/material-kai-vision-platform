@@ -20,7 +20,10 @@ const TableDataSchema = z.object({
   headers: z.array(z.string()).min(1, 'At least one header is required'),
   rows: z.array(z.array(z.string())).min(1, 'At least one row is required'),
   position: PositionSchema,
-  confidence: z.number().min(0, 'Confidence must be non-negative').max(1, 'Confidence must not exceed 1'),
+  confidence: z
+    .number()
+    .min(0, 'Confidence must be non-negative')
+    .max(1, 'Confidence must not exceed 1'),
   format: z.enum(['csv', 'json', 'markdown']),
   rawData: z.string().optional(),
 });
@@ -39,7 +42,10 @@ const ImageMetadataSchema = z.object({
   url: z.string().url('Invalid URL format').optional(),
   base64: z.string().optional(),
   extractedText: z.string().optional(),
-  confidence: z.number().min(0, 'Confidence must be non-negative').max(1, 'Confidence must not exceed 1'),
+  confidence: z
+    .number()
+    .min(0, 'Confidence must be non-negative')
+    .max(1, 'Confidence must not exceed 1'),
 });
 
 /**
@@ -57,7 +63,10 @@ const MivaaDocumentMetadataSchema = z.object({
   language: z.string().optional(),
   keywords: z.array(z.string()).optional(),
   extractionMethod: z.string().min(1, 'Extraction method is required'),
-  confidence: z.number().min(0, 'Confidence must be non-negative').max(1, 'Confidence must not exceed 1'),
+  confidence: z
+    .number()
+    .min(0, 'Confidence must be non-negative')
+    .max(1, 'Confidence must not exceed 1'),
   processingVersion: z.string().min(1, 'Processing version is required'),
 });
 
@@ -67,65 +76,81 @@ const MivaaDocumentMetadataSchema = z.object({
 const ProcessingStatsSchema = z.object({
   pages: z.number().int().min(1, 'Page count must be at least 1'),
   processingTime: z.number().min(0, 'Processing time must be non-negative'),
-  extractionQuality: z.number().min(0, 'Extraction quality must be non-negative').max(1, 'Extraction quality must not exceed 1'),
+  extractionQuality: z
+    .number()
+    .min(0, 'Extraction quality must be non-negative')
+    .max(1, 'Extraction quality must not exceed 1'),
 });
 
 /**
  * Main validation schema for MivaaDocument
  */
-export const MivaaDocumentSchema = z.object({
-  id: z.string().optional(),
-  filename: z.string().min(1, 'Filename is required').max(255, 'Filename too long'),
-  markdown: z.string().min(1, 'Markdown content is required').max(10_000_000, 'Markdown content too large'), // 10MB limit
-  tables: z.array(TableDataSchema).max(1000, 'Too many tables'), // Reasonable limit
-  images: z.array(ImageMetadataSchema).max(1000, 'Too many images'), // Reasonable limit
-  metadata: MivaaDocumentMetadataSchema,
-  extractionTimestamp: z.string().datetime('Invalid extraction timestamp format'),
-  processingStats: ProcessingStatsSchema.optional(),
-}).refine(
-  (data) => {
-    // Custom validation: ensure tables have consistent row lengths
-    return data.tables.every(table => {
-      const headerCount = table.headers.length;
-      return table.rows.every(row => row.length === headerCount);
-    });
-  },
-  {
-    message: 'All table rows must have the same number of columns as headers',
-    path: ['tables'],
-  },
-).refine(
-  (data) => {
-    // Custom validation: ensure filename has valid extension
-    const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
-    const hasValidExtension = validExtensions.some(ext =>
-      data.filename.toLowerCase().endsWith(ext),
-    );
-    return hasValidExtension;
-  },
-  {
-    message: 'Filename must have a valid extension (.pdf, .docx, .doc, .txt)',
-    path: ['filename'],
-  },
-).refine(
-  (data) => {
-    // Custom validation: ensure markdown content doesn't contain dangerous scripts
-    const dangerousPatterns = [
-      /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-      /javascript:/gi,
-      /on\w+\s*=/gi, // onclick, onload, etc.
-      /<iframe\b/gi,
-      /<object\b/gi,
-      /<embed\b/gi,
-    ];
+export const MivaaDocumentSchema = z
+  .object({
+    id: z.string().optional(),
+    filename: z
+      .string()
+      .min(1, 'Filename is required')
+      .max(255, 'Filename too long'),
+    markdown: z
+      .string()
+      .min(1, 'Markdown content is required')
+      .max(10_000_000, 'Markdown content too large'), // 10MB limit
+    tables: z.array(TableDataSchema).max(1000, 'Too many tables'), // Reasonable limit
+    images: z.array(ImageMetadataSchema).max(1000, 'Too many images'), // Reasonable limit
+    metadata: MivaaDocumentMetadataSchema,
+    extractionTimestamp: z
+      .string()
+      .datetime('Invalid extraction timestamp format'),
+    processingStats: ProcessingStatsSchema.optional(),
+  })
+  .refine(
+    (data) => {
+      // Custom validation: ensure tables have consistent row lengths
+      return data.tables.every((table) => {
+        const headerCount = table.headers.length;
+        return table.rows.every((row) => row.length === headerCount);
+      });
+    },
+    {
+      message: 'All table rows must have the same number of columns as headers',
+      path: ['tables'],
+    },
+  )
+  .refine(
+    (data) => {
+      // Custom validation: ensure filename has valid extension
+      const validExtensions = ['.pdf', '.docx', '.doc', '.txt'];
+      const hasValidExtension = validExtensions.some((ext) =>
+        data.filename.toLowerCase().endsWith(ext),
+      );
+      return hasValidExtension;
+    },
+    {
+      message: 'Filename must have a valid extension (.pdf, .docx, .doc, .txt)',
+      path: ['filename'],
+    },
+  )
+  .refine(
+    (data) => {
+      // Custom validation: ensure markdown content doesn't contain dangerous scripts
+      const dangerousPatterns = [
+        /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+        /javascript:/gi,
+        /on\w+\s*=/gi, // onclick, onload, etc.
+        /<iframe\b/gi,
+        /<object\b/gi,
+        /<embed\b/gi,
+      ];
 
-    return !dangerousPatterns.some(pattern => pattern.test(data.markdown));
-  },
-  {
-    message: 'Markdown content contains potentially dangerous scripts or HTML elements',
-    path: ['markdown'],
-  },
-);
+      return !dangerousPatterns.some((pattern) => pattern.test(data.markdown));
+    },
+    {
+      message:
+        'Markdown content contains potentially dangerous scripts or HTML elements',
+      path: ['markdown'],
+    },
+  );
 
 /**
  * Type inference from the schema
@@ -170,12 +195,20 @@ export function validateMivaaDocument(data: unknown): {
  */
 const BaseMivaaDocumentSchema = z.object({
   id: z.string().optional(),
-  filename: z.string().min(1, 'Filename is required').max(255, 'Filename too long'),
-  markdown: z.string().min(1, 'Markdown content is required').max(10_000_000, 'Markdown content too large'), // 10MB limit
+  filename: z
+    .string()
+    .min(1, 'Filename is required')
+    .max(255, 'Filename too long'),
+  markdown: z
+    .string()
+    .min(1, 'Markdown content is required')
+    .max(10_000_000, 'Markdown content too large'), // 10MB limit
   tables: z.array(TableDataSchema).max(1000, 'Too many tables'), // Reasonable limit
   images: z.array(ImageMetadataSchema).max(1000, 'Too many images'), // Reasonable limit
   metadata: MivaaDocumentMetadataSchema,
-  extractionTimestamp: z.string().datetime('Invalid extraction timestamp format'),
+  extractionTimestamp: z
+    .string()
+    .datetime('Invalid extraction timestamp format'),
   processingStats: ProcessingStatsSchema.optional(),
 });
 

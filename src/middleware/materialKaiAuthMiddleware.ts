@@ -52,25 +52,28 @@ export class MaterialKaiAuthMiddleware {
 
   // Hardcoded Material Kai API keys for immediate deployment
   private readonly HARDCODED_KEYS: Record<string, MaterialKaiKeyData> = {
-    'mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s': {
-      id: 'hardcoded-key-1',
-      api_key: 'mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s',
-      workspace_id: 'workspace_main_2024_basil_material_kai_vision',
-      key_name: 'Main Development Key',
-      description: 'Primary API key for Material Kai Vision Platform development',
-      is_active: true,
-      expires_at: '2025-12-31T23:59:59Z',
-      created_at: '2024-08-14T00:00:00Z',
-      updated_at: '2024-08-14T00:00:00Z',
-      usage_count: 0,
-      rate_limit_per_minute: 100,
-      allowed_origins: [
-        'http://localhost:3000',
-        'http://localhost:5173',
-        'https://material-kai-vision.vercel.app',
-        'https://*.material-kai-vision.vercel.app',
-      ],
-    },
+    mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s:
+      {
+        id: 'hardcoded-key-1',
+        api_key:
+          'mk_api_2024_Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s',
+        workspace_id: 'workspace_main_2024_basil_material_kai_vision',
+        key_name: 'Main Development Key',
+        description:
+          'Primary API key for Material Kai Vision Platform development',
+        is_active: true,
+        expires_at: '2025-12-31T23:59:59Z',
+        created_at: '2024-08-14T00:00:00Z',
+        updated_at: '2024-08-14T00:00:00Z',
+        usage_count: 0,
+        rate_limit_per_minute: 100,
+        allowed_origins: [
+          'http://localhost:3000',
+          'http://localhost:5173',
+          'https://material-kai-vision.vercel.app',
+          'https://*.material-kai-vision.vercel.app',
+        ],
+      },
   };
 
   constructor(_supabase: SupabaseClientType) {
@@ -110,7 +113,10 @@ export class MaterialKaiAuthMiddleware {
         }
 
         // Check if the key has expired
-        if (hardcodedKey.expires_at && new Date(hardcodedKey.expires_at) < new Date()) {
+        if (
+          hardcodedKey.expires_at &&
+          new Date(hardcodedKey.expires_at) < new Date()
+        ) {
           return {
             success: false,
             error: {
@@ -210,7 +216,7 @@ export class MaterialKaiAuthMiddleware {
     }
 
     // Check against allowed origins (support wildcards)
-    return keyData.allowed_origins.some(allowedOrigin => {
+    return keyData.allowed_origins.some((allowedOrigin) => {
       if (allowedOrigin.includes('*')) {
         // Convert wildcard pattern to regex
         const pattern = allowedOrigin
@@ -226,7 +232,9 @@ export class MaterialKaiAuthMiddleware {
   /**
    * Extracts API key from request headers
    */
-  extractApiKey(headers: Record<string, string | string[] | undefined>): string | null {
+  extractApiKey(
+    headers: Record<string, string | string[] | undefined>,
+  ): string | null {
     // Check Authorization header (Bearer token)
     const authHeader = headers.authorization || headers.Authorization;
     if (typeof authHeader === 'string') {
@@ -243,7 +251,8 @@ export class MaterialKaiAuthMiddleware {
     }
 
     // Check material-kai-api-key header
-    const materialKaiHeader = headers['material-kai-api-key'] || headers['Material-Kai-API-Key'];
+    const materialKaiHeader =
+      headers['material-kai-api-key'] || headers['Material-Kai-API-Key'];
     if (typeof materialKaiHeader === 'string') {
       return materialKaiHeader;
     }
@@ -322,7 +331,9 @@ export class MaterialKaiAuthMiddleware {
 }
 
 // Export a factory function for creating the middleware
-export function createMaterialKaiAuthMiddleware(supabase: SupabaseClientType): MaterialKaiAuthMiddleware {
+export function createMaterialKaiAuthMiddleware(
+  supabase: SupabaseClientType,
+): MaterialKaiAuthMiddleware {
   return new MaterialKaiAuthMiddleware(supabase);
 }
 

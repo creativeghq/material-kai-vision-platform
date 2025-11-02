@@ -27,16 +27,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
           <span className={styles.heroSubtitle}>{heroConfig.subtitle}</span>
         </h1>
 
-        <p className={styles.heroDescription}>
-          {heroConfig.description}
-        </p>
+        <p className={styles.heroDescription}>{heroConfig.description}</p>
 
         <div className={styles.heroActions}>
           {heroConfig.actions.map((action: HeroAction, index: number) => (
             <Button
               key={index}
-              className={action.type === 'primary' ? styles.primaryButton : styles.outlineButton}
-              onClick={() => onNavigate(action.path)} onKeyDown={(e) => e.key === 'Enter' && onNavigate(action.path)}
+              className={
+                action.type === 'primary'
+                  ? styles.primaryButton
+                  : styles.outlineButton
+              }
+              onClick={() => onNavigate(action.path)}
+              onKeyDown={(e) => e.key === 'Enter' && onNavigate(action.path)}
             >
               <action.icon className="mr-2 h-5 w-5" />
               {action.text}

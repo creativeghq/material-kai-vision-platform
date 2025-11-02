@@ -60,7 +60,10 @@ export class TextureAttentionModule {
   /**
    * Xavier/Glorot weight initialization
    */
-  private initializeMatrix(inputSize: number, outputSize: number): Float32Array {
+  private initializeMatrix(
+    inputSize: number,
+    outputSize: number,
+  ): Float32Array {
     const limit = Math.sqrt(6.0 / (inputSize + outputSize));
     const weights = new Float32Array(inputSize * outputSize);
 
@@ -82,7 +85,8 @@ export class TextureAttentionModule {
     for (let pos = 0; pos < maxLen; pos++) {
       for (let i = 0; i < dModel; i++) {
         const angle = pos / Math.pow(10000, (2 * Math.floor(i / 2)) / dModel);
-        embeddings[pos * dModel + i] = i % 2 === 0 ? Math.sin(angle) : Math.cos(angle);
+        embeddings[pos * dModel + i] =
+          i % 2 === 0 ? Math.sin(angle) : Math.cos(angle);
       }
     }
 
@@ -92,25 +96,44 @@ export class TextureAttentionModule {
   /**
    * Apply texture-aware multi-head attention
    */
-  public async processTexture(input: TextureFeatureMap): Promise<TextureAttentionOutput> {
+  public async processTexture(
+    input: TextureFeatureMap,
+  ): Promise<TextureAttentionOutput> {
     try {
       const { features, width, height, channels } = input;
       const sequenceLength = width * height;
 
       // Reshape features to sequence format [seq_len, channels]
-      const sequenceFeatures = this.reshapeToSequence(features, width, height, channels);
+      const sequenceFeatures = this.reshapeToSequence(
+        features,
+        width,
+        height,
+        channels,
+      );
 
       // Add positional embeddings for spatial awareness
-      const embeddedFeatures = this.addPositionalEmbeddings(sequenceFeatures, sequenceLength);
+      const embeddedFeatures = this.addPositionalEmbeddings(
+        sequenceFeatures,
+        sequenceLength,
+      );
 
       // Compute multi-head attention
-      const attentionOutput = await this.computeMultiHeadAttention(embeddedFeatures, sequenceLength);
+      const attentionOutput = await this.computeMultiHeadAttention(
+        embeddedFeatures,
+        sequenceLength,
+      );
 
       // Extract texture directions from attention patterns
-      const textureDirections = this.extractTextureDirections(attentionOutput.attentionWeights, width, height);
+      const textureDirections = this.extractTextureDirections(
+        attentionOutput.attentionWeights,
+        width,
+        height,
+      );
 
       // Compute confidence scores based on attention entropy
-      const confidenceScores = this.computeConfidenceScores(attentionOutput.attentionWeights);
+      const confidenceScores = this.computeConfidenceScores(
+        attentionOutput.attentionWeights,
+      );
 
       return {
         attentionWeights: attentionOutput.attentionWeights,
@@ -118,17 +141,23 @@ export class TextureAttentionModule {
         textureDirections,
         confidenceScores,
       };
-
     } catch (error) {
       console.error('Error in texture attention processing:', error);
-      throw new Error(`Texture attention processing failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Texture attention processing failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   /**
    * Reshape feature maps to sequence format for attention computation
    */
-  private reshapeToSequence(features: Float32Array, width: number, height: number, channels: number): Float32Array {
+  private reshapeToSequence(
+    features: Float32Array,
+    width: number,
+    height: number,
+    channels: number,
+  ): Float32Array {
     const sequenceLength = width * height;
     const sequenceFeatures = new Float32Array(sequenceLength * channels);
 
@@ -149,7 +178,10 @@ export class TextureAttentionModule {
   /**
    * Add positional embeddings to sequence features
    */
-  private addPositionalEmbeddings(features: Float32Array, sequenceLength: number): Float32Array {
+  private addPositionalEmbeddings(
+    features: Float32Array,
+    sequenceLength: number,
+  ): Float32Array {
     const channels = this.config.inputChannels;
     const embeddedFeatures = new Float32Array(features.length);
 
@@ -158,8 +190,8 @@ export class TextureAttentionModule {
         const featureIdx = seq * channels + ch;
         const posIdx = seq * this.config.keyDim + (ch % this.config.keyDim);
 
-        embeddedFeatures[featureIdx] = features[featureIdx] +
-          (this.positionEmbeddings[posIdx] || 0) * 0.1; // Scale factor for positional encoding
+        embeddedFeatures[featureIdx] =
+          features[featureIdx] + (this.positionEmbeddings[posIdx] || 0) * 0.1; // Scale factor for positional encoding
       }
     }
 
@@ -169,7 +201,10 @@ export class TextureAttentionModule {
   /**
    * Compute multi-head attention with texture-specific optimizations
    */
-  private async computeMultiHeadAttention(features: Float32Array, sequenceLength: number): Promise<{
+  private async computeMultiHeadAttention(
+    features: Float32Array,
+    sequenceLength: number,
+  ): Promise<{
     attentionWeights: Float32Array;
     enhancedFeatures: Float32Array;
   }> {
@@ -177,22 +212,63 @@ export class TextureAttentionModule {
     const channels = this.config.inputChannels;
 
     // Transform input to Q, K, V
-    const queries = this.linearTransform(features, this.queryWeights, sequenceLength, channels);
-    const keys = this.linearTransform(features, this.keyWeights, sequenceLength, channels);
-    const values = this.linearTransform(features, this.valueWeights, sequenceLength, channels);
+    const queries = this.linearTransform(
+      features,
+      this.queryWeights,
+      sequenceLength,
+      channels,
+    );
+    const keys = this.linearTransform(
+      features,
+      this.keyWeights,
+      sequenceLength,
+      channels,
+    );
+    const values = this.linearTransform(
+      features,
+      this.valueWeights,
+      sequenceLength,
+      channels,
+    );
 
     // Split into multiple heads
     const headOutputs: Float32Array[] = [];
     const headAttentions: Float32Array[] = [];
 
     for (let head = 0; head < headCount; head++) {
-      const headQ = this.extractHead(queries, head, headCount, keyDim, sequenceLength);
-      const headK = this.extractHead(keys, head, headCount, keyDim, sequenceLength);
-      const headV = this.extractHead(values, head, headCount, keyDim, sequenceLength);
+      const headQ = this.extractHead(
+        queries,
+        head,
+        headCount,
+        keyDim,
+        sequenceLength,
+      );
+      const headK = this.extractHead(
+        keys,
+        head,
+        headCount,
+        keyDim,
+        sequenceLength,
+      );
+      const headV = this.extractHead(
+        values,
+        head,
+        headCount,
+        keyDim,
+        sequenceLength,
+      );
 
       // Compute attention scores with temperature scaling
-      const attentionScores = this.computeAttentionScores(headQ, headK, sequenceLength, keyDim);
-      const attentionWeights = this.applySoftmax(attentionScores, sequenceLength);
+      const attentionScores = this.computeAttentionScores(
+        headQ,
+        headK,
+        sequenceLength,
+        keyDim,
+      );
+      const attentionWeights = this.applySoftmax(
+        attentionScores,
+        sequenceLength,
+      );
 
       // Apply dropout if configured
       if (this.config.dropoutRate > 0) {
@@ -200,14 +276,23 @@ export class TextureAttentionModule {
       }
 
       // Compute attention output
-      const headOutput = this.applyAttention(attentionWeights, headV, sequenceLength, keyDim);
+      const headOutput = this.applyAttention(
+        attentionWeights,
+        headV,
+        sequenceLength,
+        keyDim,
+      );
 
       headOutputs.push(headOutput);
       headAttentions.push(attentionWeights);
     }
 
     // Concatenate head outputs
-    const concatenated = this.concatenateHeads(headOutputs, sequenceLength, keyDim);
+    const concatenated = this.concatenateHeads(
+      headOutputs,
+      sequenceLength,
+      keyDim,
+    );
 
     // Final linear transformation
     const enhancedFeatures = this.linearTransform(
@@ -218,7 +303,10 @@ export class TextureAttentionModule {
     );
 
     // Combine attention weights from all heads
-    const combinedAttention = this.combineAttentionWeights(headAttentions, sequenceLength);
+    const combinedAttention = this.combineAttentionWeights(
+      headAttentions,
+      sequenceLength,
+    );
 
     return {
       attentionWeights: combinedAttention,
@@ -287,7 +375,7 @@ export class TextureAttentionModule {
     keyDim: number,
   ): Float32Array {
     const scores = new Float32Array(sequenceLength * sequenceLength);
-    const scale = 1.0 / Math.sqrt(keyDim) * this.config.temperatureScaling;
+    const scale = (1.0 / Math.sqrt(keyDim)) * this.config.temperatureScaling;
 
     for (let i = 0; i < sequenceLength; i++) {
       for (let j = 0; j < sequenceLength; j++) {
@@ -305,7 +393,10 @@ export class TextureAttentionModule {
   /**
    * Apply softmax to attention scores
    */
-  private applySoftmax(scores: Float32Array, sequenceLength: number): Float32Array {
+  private applySoftmax(
+    scores: Float32Array,
+    sequenceLength: number,
+  ): Float32Array {
     const weights = new Float32Array(scores.length);
 
     for (let i = 0; i < sequenceLength; i++) {
@@ -374,7 +465,11 @@ export class TextureAttentionModule {
   /**
    * Concatenate outputs from multiple attention heads
    */
-  private concatenateHeads(headOutputs: Float32Array[], sequenceLength: number, keyDim: number): Float32Array {
+  private concatenateHeads(
+    headOutputs: Float32Array[],
+    sequenceLength: number,
+    keyDim: number,
+  ): Float32Array {
     const headCount = headOutputs.length;
     const concatenated = new Float32Array(sequenceLength * headCount * keyDim);
 
@@ -394,7 +489,10 @@ export class TextureAttentionModule {
   /**
    * Combine attention weights from multiple heads
    */
-  private combineAttentionWeights(headAttentions: Float32Array[], sequenceLength: number): Float32Array {
+  private combineAttentionWeights(
+    headAttentions: Float32Array[],
+    sequenceLength: number,
+  ): Float32Array {
     const combined = new Float32Array(sequenceLength * sequenceLength);
     const headCount = headAttentions.length;
 
@@ -414,7 +512,11 @@ export class TextureAttentionModule {
   /**
    * Extract dominant texture directions from attention patterns
    */
-  private extractTextureDirections(attentionWeights: Float32Array, width: number, height: number): Float32Array {
+  private extractTextureDirections(
+    attentionWeights: Float32Array,
+    width: number,
+    height: number,
+  ): Float32Array {
     const directions = new Float32Array(4); // [horizontal, vertical, diagonal1, diagonal2]
     const sequenceLength = width * height;
 
@@ -457,7 +559,9 @@ export class TextureAttentionModule {
   /**
    * Compute confidence scores based on attention entropy
    */
-  private computeConfidenceScores(attentionWeights: Float32Array): Float32Array {
+  private computeConfidenceScores(
+    attentionWeights: Float32Array,
+  ): Float32Array {
     const sequenceLength = Math.sqrt(attentionWeights.length);
     const confidenceScores = new Float32Array(sequenceLength);
 
@@ -474,7 +578,7 @@ export class TextureAttentionModule {
 
       // Convert entropy to confidence (lower entropy = higher confidence)
       const maxEntropy = Math.log2(sequenceLength);
-      confidenceScores[i] = 1.0 - (entropy / maxEntropy);
+      confidenceScores[i] = 1.0 - entropy / maxEntropy;
     }
 
     return confidenceScores;

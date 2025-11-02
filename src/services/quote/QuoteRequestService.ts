@@ -86,11 +86,7 @@ export class QuoteRequestService {
       const response = await this.apiService.call<
         { request_id: string },
         QuoteRequestWithItems
-      >(
-        'quote-request-api',
-        { request_id: requestId },
-        { method: 'GET' },
-      );
+      >('quote-request-api', { request_id: requestId }, { method: 'GET' });
 
       return response as unknown as QuoteRequestWithItems;
     } catch (error) {
@@ -149,4 +145,3 @@ export class QuoteRequestService {
 }
 
 export default QuoteRequestService;
-

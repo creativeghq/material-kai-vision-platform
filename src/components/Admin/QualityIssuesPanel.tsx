@@ -15,7 +15,9 @@ interface QualityIssuesPanelProps {
   issues: QualityIssue[];
 }
 
-export const QualityIssuesPanel: React.FC<QualityIssuesPanelProps> = ({ issues }) => {
+export const QualityIssuesPanel: React.FC<QualityIssuesPanelProps> = ({
+  issues,
+}) => {
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
       case 'critical':
@@ -84,7 +86,9 @@ export const QualityIssuesPanel: React.FC<QualityIssuesPanelProps> = ({ issues }
 
                 <div className="bg-muted/50 rounded p-2 text-sm">
                   <p className="font-medium mb-1">Recommendation:</p>
-                  <p className="text-muted-foreground">{issue.recommendation}</p>
+                  <p className="text-muted-foreground">
+                    {issue.recommendation}
+                  </p>
                 </div>
               </div>
             ))}
@@ -94,4 +98,3 @@ export const QualityIssuesPanel: React.FC<QualityIssuesPanelProps> = ({ issues }
     </Card>
   );
 };
-

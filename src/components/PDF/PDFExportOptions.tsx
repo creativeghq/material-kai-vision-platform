@@ -1,12 +1,14 @@
 import React from 'react';
-import {
-  Download,
-  FileSpreadsheet,
-  FileJson,
-} from 'lucide-react';
+import { Download, FileSpreadsheet, FileJson } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 
 interface StructuredData {
@@ -62,7 +64,7 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
   const { toast } = useToast();
 
   const exportToCSV = () => {
-    const materialTiles = tiles.filter(t => t.material_detected);
+    const materialTiles = tiles.filter((t) => t.material_detected);
 
     const csvHeaders = [
       'Page',
@@ -76,7 +78,7 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
       'Structured Data',
     ];
 
-    const csvRows = materialTiles.map(tile => [
+    const csvRows = materialTiles.map((tile) => [
       tile.page_number,
       tile.tile_index,
       tile.material_type,
@@ -89,7 +91,7 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
     ]);
 
     const csvContent = [csvHeaders, ...csvRows]
-      .map(row => row.join(','))
+      .map((row) => row.join(','))
       .join('\n');
 
     downloadFile(csvContent, `pdf_materials_${processingId}.csv`, 'text/csv');
@@ -105,27 +107,33 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
       processing_id: processingId,
       summary: resultSummary,
       export_timestamp: new Date().toISOString(),
-      materials: tiles.filter(t => t.material_detected).map(tile => ({
-        id: tile.id,
-        page_number: tile.page_number,
-        tile_index: tile.tile_index,
-        material_type: tile.material_type,
-        material_confidence: tile.material_confidence,
-        ocr_confidence: tile.ocr_confidence,
-        position: {
-          x: tile.x_coordinate,
-          y: tile.y_coordinate,
-          width: tile.width,
-          height: tile.height,
-        },
-        extracted_text: tile.extracted_text,
-        structured_data: tile.structured_data,
-        metadata: tile.metadata_extracted,
-      })),
+      materials: tiles
+        .filter((t) => t.material_detected)
+        .map((tile) => ({
+          id: tile.id,
+          page_number: tile.page_number,
+          tile_index: tile.tile_index,
+          material_type: tile.material_type,
+          material_confidence: tile.material_confidence,
+          ocr_confidence: tile.ocr_confidence,
+          position: {
+            x: tile.x_coordinate,
+            y: tile.y_coordinate,
+            width: tile.width,
+            height: tile.height,
+          },
+          extracted_text: tile.extracted_text,
+          structured_data: tile.structured_data,
+          metadata: tile.metadata_extracted,
+        })),
     };
 
     const jsonContent = JSON.stringify(exportData, null, 2);
-    downloadFile(jsonContent, `pdf_materials_${processingId}.json`, 'application/json');
+    downloadFile(
+      jsonContent,
+      `pdf_materials_${processingId}.json`,
+      'application/json',
+    );
 
     toast({
       title: 'JSON Export',
@@ -133,8 +141,11 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
     });
   };
 
-
-  const downloadFile = (content: string, filename: string, contentType: string) => {
+  const downloadFile = (
+    content: string,
+    filename: string,
+    contentType: string,
+  ) => {
     const blob = new Blob([content], { type: contentType });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -146,8 +157,10 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
     window.URL.revokeObjectURL(url);
   };
 
-  const materialTiles = tiles.filter(t => t.material_detected);
-  const materialTypes = Array.from(new Set(materialTiles.map(t => t.material_type)));
+  const materialTiles = tiles.filter((t) => t.material_detected);
+  const materialTypes = Array.from(
+    new Set(materialTiles.map((t) => t.material_type)),
+  );
 
   return (
     <Card>
@@ -164,33 +177,47 @@ export const PDFExportOptions: React.FC<PDFExportOptionsProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="font-medium">Total Materials</p>
-            <p className="text-muted-foreground">{materialTiles.length} detected</p>
+            <p className="text-muted-foreground">
+              {materialTiles.length} detected
+            </p>
           </div>
           <div>
             <p className="font-medium">Material Types</p>
-            <p className="text-muted-foreground">{materialTypes.length} unique types</p>
+            <p className="text-muted-foreground">
+              {materialTypes.length} unique types
+            </p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {materialTypes.map(type => (
-            <span key={type} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300">
+          {materialTypes.map((type) => (
+            <span
+              key={type}
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-300"
+            >
               {type}
             </span>
           ))}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <Button onClick={exportToCSV} onKeyDown={(e) => e.key === 'Enter' && exportToCSV()} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+          <Button
+            onClick={exportToCSV}
+            onKeyDown={(e) => e.key === 'Enter' && exportToCSV()}
+            className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
             <FileSpreadsheet className="h-4 w-4" />
             Export CSV
           </Button>
 
-          <Button onClick={exportToJSON} onKeyDown={(e) => e.key === 'Enter' && exportToJSON()} className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50">
+          <Button
+            onClick={exportToJSON}
+            onKeyDown={(e) => e.key === 'Enter' && exportToJSON()}
+            className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+          >
             <FileJson className="h-4 w-4" />
             Export JSON
           </Button>
-
         </div>
 
         <div className="text-xs text-muted-foreground">

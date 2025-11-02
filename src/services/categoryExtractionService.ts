@@ -7,7 +7,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-import { dynamicCategoryManagementService, CategoryExtractionResult } from './dynamicCategoryManagementService';
+import {
+  dynamicCategoryManagementService,
+  CategoryExtractionResult,
+} from './dynamicCategoryManagementService';
 
 export interface CategoryExtractionOptions {
   includeProductCategories?: boolean;
@@ -31,21 +34,81 @@ class CategoryExtractionService {
   private static instance: CategoryExtractionService;
 
   private readonly PRODUCT_KEYWORDS = {
-    tiles: ['tile', 'tiles', 'flooring', 'floor tile', 'wall tile', 'ceramic tile', 'porcelain tile'],
-    decor: ['decor', 'decoration', 'decorative', 'ornament', 'art', 'sculpture', 'vase', 'planter'],
-    lighting: ['light', 'lighting', 'lamp', 'fixture', 'chandelier', 'sconce', 'pendant', 'led'],
-    furniture: ['furniture', 'chair', 'table', 'desk', 'cabinet', 'shelf', 'sofa', 'bed'],
+    tiles: [
+      'tile',
+      'tiles',
+      'flooring',
+      'floor tile',
+      'wall tile',
+      'ceramic tile',
+      'porcelain tile',
+    ],
+    decor: [
+      'decor',
+      'decoration',
+      'decorative',
+      'ornament',
+      'art',
+      'sculpture',
+      'vase',
+      'planter',
+    ],
+    lighting: [
+      'light',
+      'lighting',
+      'lamp',
+      'fixture',
+      'chandelier',
+      'sconce',
+      'pendant',
+      'led',
+    ],
+    furniture: [
+      'furniture',
+      'chair',
+      'table',
+      'desk',
+      'cabinet',
+      'shelf',
+      'sofa',
+      'bed',
+    ],
   };
 
   private readonly MATERIAL_KEYWORDS = {
-    wood: ['wood', 'timber', 'oak', 'pine', 'maple', 'cherry', 'walnut', 'bamboo'],
+    wood: [
+      'wood',
+      'timber',
+      'oak',
+      'pine',
+      'maple',
+      'cherry',
+      'walnut',
+      'bamboo',
+    ],
     metals: ['metal', 'steel', 'aluminum', 'brass', 'copper', 'iron', 'bronze'],
     ceramics: ['ceramic', 'porcelain', 'clay', 'earthenware', 'stoneware'],
     glass: ['glass', 'crystal', 'tempered glass', 'laminated glass'],
     concrete: ['concrete', 'cement', 'mortar', 'aggregate'],
     plastics: ['plastic', 'polymer', 'vinyl', 'acrylic', 'polycarbonate'],
-    textiles: ['fabric', 'textile', 'cotton', 'wool', 'silk', 'linen', 'polyester'],
-    stone: ['stone', 'marble', 'granite', 'limestone', 'slate', 'travertine', 'quartzite'],
+    textiles: [
+      'fabric',
+      'textile',
+      'cotton',
+      'wool',
+      'silk',
+      'linen',
+      'polyester',
+    ],
+    stone: [
+      'stone',
+      'marble',
+      'granite',
+      'limestone',
+      'slate',
+      'travertine',
+      'quartzite',
+    ],
   };
 
   private constructor() {}
@@ -79,31 +142,39 @@ class CategoryExtractionService {
     try {
       // Method 1: AI-powered extraction using MIVAA
       if (extractionMethods.includes('ai')) {
-        const aiCategories = await this.extractCategoriesWithAI(content, documentId);
+        const aiCategories = await this.extractCategoriesWithAI(
+          content,
+          documentId,
+        );
         extractedCategories.push(...aiCategories);
       }
 
       // Method 2: Keyword-based extraction
       if (extractionMethods.includes('keyword')) {
-        const keywordCategories = await this.extractCategoriesWithKeywords(content, {
-          includeProductCategories,
-          includeMaterialCategories,
-        });
+        const keywordCategories = await this.extractCategoriesWithKeywords(
+          content,
+          {
+            includeProductCategories,
+            includeMaterialCategories,
+          },
+        );
         extractedCategories.push(...keywordCategories);
       }
 
       // Method 3: Pattern-based extraction
       if (extractionMethods.includes('pattern')) {
-        const patternCategories = await this.extractCategoriesWithPatterns(content);
+        const patternCategories =
+          await this.extractCategoriesWithPatterns(content);
         extractedCategories.push(...patternCategories);
       }
 
       // Merge and deduplicate results
-      const mergedCategories = this.mergeAndDeduplicateCategories(extractedCategories);
+      const mergedCategories =
+        this.mergeAndDeduplicateCategories(extractedCategories);
 
       // Filter by confidence threshold and limit
       const filteredCategories = mergedCategories
-        .filter(cat => cat.confidence >= confidenceThreshold)
+        .filter((cat) => cat.confidence >= confidenceThreshold)
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, maxCategories);
 
@@ -135,7 +206,10 @@ class CategoryExtractionService {
   /**
    * AI-powered category extraction using MIVAA service
    */
-  private async extractCategoriesWithAI(content: string, documentId: string): Promise<CategoryExtractionResult[]> {
+  private async extractCategoriesWithAI(
+    content: string,
+    documentId: string,
+  ): Promise<CategoryExtractionResult[]> {
     try {
       const response = await fetch('/api/mivaa/extract-categories', {
         method: 'POST',
@@ -154,7 +228,9 @@ class CategoryExtractionService {
       });
 
       if (!response.ok) {
-        throw new Error(`MIVAA category extraction failed: ${response.statusText}`);
+        throw new Error(
+          `MIVAA category extraction failed: ${response.statusText}`,
+        );
       }
 
       const result = await response.json();
@@ -175,17 +251,24 @@ class CategoryExtractionService {
    */
   private async extractCategoriesWithKeywords(
     content: string,
-    options: { includeProductCategories: boolean; includeMaterialCategories: boolean },
+    options: {
+      includeProductCategories: boolean;
+      includeMaterialCategories: boolean;
+    },
   ): Promise<CategoryExtractionResult[]> {
     const results: CategoryExtractionResult[] = [];
     const contentLower = content.toLowerCase();
 
     // Extract product categories
     if (options.includeProductCategories) {
-      for (const [categoryKey, keywords] of Object.entries(this.PRODUCT_KEYWORDS)) {
-        const matches = keywords.filter(keyword => contentLower.includes(keyword.toLowerCase()));
+      for (const [categoryKey, keywords] of Object.entries(
+        this.PRODUCT_KEYWORDS,
+      )) {
+        const matches = keywords.filter((keyword) =>
+          contentLower.includes(keyword.toLowerCase()),
+        );
         if (matches.length > 0) {
-          const confidence = Math.min(0.9, 0.5 + (matches.length * 0.1));
+          const confidence = Math.min(0.9, 0.5 + matches.length * 0.1);
           results.push({
             categoryKey,
             confidence,
@@ -198,10 +281,14 @@ class CategoryExtractionService {
 
     // Extract material categories
     if (options.includeMaterialCategories) {
-      for (const [categoryKey, keywords] of Object.entries(this.MATERIAL_KEYWORDS)) {
-        const matches = keywords.filter(keyword => contentLower.includes(keyword.toLowerCase()));
+      for (const [categoryKey, keywords] of Object.entries(
+        this.MATERIAL_KEYWORDS,
+      )) {
+        const matches = keywords.filter((keyword) =>
+          contentLower.includes(keyword.toLowerCase()),
+        );
         if (matches.length > 0) {
-          const confidence = Math.min(0.9, 0.5 + (matches.length * 0.1));
+          const confidence = Math.min(0.9, 0.5 + matches.length * 0.1);
           results.push({
             categoryKey,
             confidence,
@@ -218,19 +305,45 @@ class CategoryExtractionService {
   /**
    * Pattern-based category extraction using regex patterns
    */
-  private async extractCategoriesWithPatterns(content: string): Promise<CategoryExtractionResult[]> {
+  private async extractCategoriesWithPatterns(
+    content: string,
+  ): Promise<CategoryExtractionResult[]> {
     const results: CategoryExtractionResult[] = [];
 
     const patterns = [
       // Product category patterns
-      { pattern: /(?:ceramic|porcelain|stone)\s+tiles?/gi, category: 'tiles', confidence: 0.8 },
-      { pattern: /(?:wall|floor)\s+tiles?/gi, category: 'tiles', confidence: 0.7 },
-      { pattern: /decorative\s+(?:panel|element|item)/gi, category: 'decor', confidence: 0.7 },
-      { pattern: /(?:ceiling|pendant|table)\s+(?:light|lamp)/gi, category: 'lighting', confidence: 0.8 },
-      { pattern: /led\s+(?:light|lighting|fixture)/gi, category: 'lighting', confidence: 0.8 },
+      {
+        pattern: /(?:ceramic|porcelain|stone)\s+tiles?/gi,
+        category: 'tiles',
+        confidence: 0.8,
+      },
+      {
+        pattern: /(?:wall|floor)\s+tiles?/gi,
+        category: 'tiles',
+        confidence: 0.7,
+      },
+      {
+        pattern: /decorative\s+(?:panel|element|item)/gi,
+        category: 'decor',
+        confidence: 0.7,
+      },
+      {
+        pattern: /(?:ceiling|pendant|table)\s+(?:light|lamp)/gi,
+        category: 'lighting',
+        confidence: 0.8,
+      },
+      {
+        pattern: /led\s+(?:light|lighting|fixture)/gi,
+        category: 'lighting',
+        confidence: 0.8,
+      },
 
       // Material category patterns
-      { pattern: /(?:solid|engineered)\s+wood/gi, category: 'wood', confidence: 0.8 },
+      {
+        pattern: /(?:solid|engineered)\s+wood/gi,
+        category: 'wood',
+        confidence: 0.8,
+      },
       { pattern: /stainless\s+steel/gi, category: 'metals', confidence: 0.9 },
       { pattern: /tempered\s+glass/gi, category: 'glass', confidence: 0.9 },
       { pattern: /natural\s+stone/gi, category: 'stone', confidence: 0.8 },
@@ -254,7 +367,9 @@ class CategoryExtractionService {
   /**
    * Merge and deduplicate category results
    */
-  private mergeAndDeduplicateCategories(categories: CategoryExtractionResult[]): CategoryExtractionResult[] {
+  private mergeAndDeduplicateCategories(
+    categories: CategoryExtractionResult[],
+  ): CategoryExtractionResult[] {
     const categoryMap = new Map<string, CategoryExtractionResult>();
 
     for (const category of categories) {
@@ -264,11 +379,15 @@ class CategoryExtractionService {
         categoryMap.set(category.categoryKey, category);
       } else {
         // Merge with higher confidence and combined context
-        const mergedConfidence = Math.max(existing.confidence, category.confidence);
+        const mergedConfidence = Math.max(
+          existing.confidence,
+          category.confidence,
+        );
         const mergedContext = `${existing.context}; ${category.context}`;
-        const mergedExtractedFrom = existing.extractedFrom === category.extractedFrom
-          ? existing.extractedFrom
-          : `${existing.extractedFrom}, ${category.extractedFrom}`;
+        const mergedExtractedFrom =
+          existing.extractedFrom === category.extractedFrom
+            ? existing.extractedFrom
+            : `${existing.extractedFrom}, ${category.extractedFrom}`;
 
         categoryMap.set(category.categoryKey, {
           categoryKey: category.categoryKey,
@@ -321,7 +440,9 @@ class CategoryExtractionService {
   /**
    * Get category suggestions for a document
    */
-  public async getCategorySuggestions(documentId: string): Promise<CategoryExtractionResult[]> {
+  public async getCategorySuggestions(
+    documentId: string,
+  ): Promise<CategoryExtractionResult[]> {
     try {
       const { data, error } = await supabase
         .from('documents')
@@ -335,10 +456,14 @@ class CategoryExtractionService {
         return [];
       }
 
-      const extractedData = await this.extractCategories(data.content, documentId, {
-        confidenceThreshold: 0.5,
-        maxCategories: 5,
-      });
+      const extractedData = await this.extractCategories(
+        data.content,
+        documentId,
+        {
+          confidenceThreshold: 0.5,
+          maxCategories: 5,
+        },
+      );
 
       return extractedData.categories;
     } catch (error) {
@@ -349,7 +474,8 @@ class CategoryExtractionService {
 }
 
 // Export singleton instance
-export const categoryExtractionService = CategoryExtractionService.getInstance();
+export const categoryExtractionService =
+  CategoryExtractionService.getInstance();
 
 // Convenience functions
 export async function extractCategoriesFromContent(
@@ -357,10 +483,16 @@ export async function extractCategoriesFromContent(
   documentId: string,
   options?: CategoryExtractionOptions,
 ): Promise<ExtractedCategoryData> {
-  return await categoryExtractionService.extractCategories(content, documentId, options);
+  return await categoryExtractionService.extractCategories(
+    content,
+    documentId,
+    options,
+  );
 }
 
-export async function getCategorySuggestions(documentId: string): Promise<CategoryExtractionResult[]> {
+export async function getCategorySuggestions(
+  documentId: string,
+): Promise<CategoryExtractionResult[]> {
   return await categoryExtractionService.getCategorySuggestions(documentId);
 }
 
@@ -368,5 +500,8 @@ export async function updateDocumentCategories(
   documentId: string,
   extractedData: ExtractedCategoryData,
 ): Promise<void> {
-  return await categoryExtractionService.updateDocumentCategories(documentId, extractedData);
+  return await categoryExtractionService.updateDocumentCategories(
+    documentId,
+    extractedData,
+  );
 }

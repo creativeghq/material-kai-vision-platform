@@ -14,8 +14,23 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 import { useToast } from '../../hooks/useToast';
 
@@ -23,7 +38,13 @@ import { useToast } from '../../hooks/useToast';
 export interface JobItem {
   id: string;
   name: string;
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'paused' | 'cancelled';
+  status:
+    | 'pending'
+    | 'running'
+    | 'completed'
+    | 'failed'
+    | 'paused'
+    | 'cancelled';
   priority: 'low' | 'normal' | 'high' | 'urgent';
   progress: number;
   filesProcessed: number;
@@ -73,7 +94,10 @@ export const JobControls: React.FC<JobControlsProps> = ({
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleAction = async (action: string, handler?: (jobId: string) => Promise<void>) => {
+  const handleAction = async (
+    action: string,
+    handler?: (jobId: string) => Promise<void>,
+  ) => {
     if (!handler || disabled) return;
 
     setIsLoading(action);
@@ -150,7 +174,6 @@ export const JobControls: React.FC<JobControlsProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-
                     className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('resume', onResume)}
                     onKeyDown={(e) => {
@@ -173,7 +196,6 @@ export const JobControls: React.FC<JobControlsProps> = ({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-
                     className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={() => handleAction('pause', onPause)}
                     onKeyDown={(e) => {
@@ -192,100 +214,109 @@ export const JobControls: React.FC<JobControlsProps> = ({
           )}
 
           {/* Cancel Button */}
-          {(job.status === 'running' || job.status === 'paused' || job.status === 'pending') && job.canCancel && onCancel && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-
-                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                  disabled={disabled || isLoading === 'cancel'}
-                >
-                  <Square className="h-3 w-3" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Job</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to cancel "{job.name}"? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleAction('cancel', onCancel)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAction('cancel', onCancel);
-                      }
-                    }}
+          {(job.status === 'running' ||
+            job.status === 'paused' ||
+            job.status === 'pending') &&
+            job.canCancel &&
+            onCancel && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                    disabled={disabled || isLoading === 'cancel'}
                   >
-                    Confirm
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Square className="h-3 w-3" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel Job</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to cancel "{job.name}"? This action
+                      cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleAction('cancel', onCancel)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAction('cancel', onCancel);
+                        }
+                      }}
+                    >
+                      Confirm
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
 
           {/* Retry Button */}
-          {(job.status === 'failed' || job.status === 'cancelled') && job.canRetry && onRetry && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-
-                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => handleAction('retry', onRetry)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAction('retry', onRetry);
-                      }
-                    }}
-                    disabled={disabled || isLoading === 'retry'}
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Retry job</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          {(job.status === 'failed' || job.status === 'cancelled') &&
+            job.canRetry &&
+            onRetry && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => handleAction('retry', onRetry)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAction('retry', onRetry);
+                        }
+                      }}
+                      disabled={disabled || isLoading === 'retry'}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Retry job</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
           {/* Delete Button */}
-          {(job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') && job.canDelete && onDelete && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-
-                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                  disabled={disabled || isLoading === 'delete'}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Job</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete "{job.name}"? This will remove all job data and cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleAction('delete', onDelete)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAction('delete', onDelete);
-                      }
-                    }}
+          {(job.status === 'completed' ||
+            job.status === 'failed' ||
+            job.status === 'cancelled') &&
+            job.canDelete &&
+            onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
+                    disabled={disabled || isLoading === 'delete'}
                   >
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{job.name}"? This will
+                      remove all job data and cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleAction('delete', onDelete)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAction('delete', onDelete);
+                        }
+                      }}
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
         </div>
       </div>
     );
@@ -299,9 +330,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
           {getStatusBadge()}
         </div>
         <div className="text-sm text-muted-foreground">
-          Progress: {job.filesProcessed}/{job.totalFiles} files ({job.progress}%)
+          Progress: {job.filesProcessed}/{job.totalFiles} files ({job.progress}
+          %)
         </div>
-      </CardHeader><CardContent>
+      </CardHeader>
+      <CardContent>
         <div className="flex flex-wrap gap-2">
           {/* Resume/Pause Button */}
           {job.status === 'paused' && job.canPause && onResume && (
@@ -313,7 +346,6 @@ export const JobControls: React.FC<JobControlsProps> = ({
                 }
               }}
               disabled={disabled || isLoading === 'resume'}
-
             >
               <Play className="h-4 w-4" />
               Resume
@@ -337,94 +369,106 @@ export const JobControls: React.FC<JobControlsProps> = ({
           )}
 
           {/* Cancel Button */}
-          {(job.status === 'running' || job.status === 'paused' || job.status === 'pending') && job.canCancel && onCancel && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
-                  disabled={disabled || isLoading === 'cancel'}
-                >
-                  <Square className="h-4 w-4" />
-                  Cancel
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Cancel Job</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to cancel "{job.name}"? This action cannot be undone and any progress will be lost.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleAction('cancel', onCancel)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAction('cancel', onCancel);
-                      }
-                    }}
+          {(job.status === 'running' ||
+            job.status === 'paused' ||
+            job.status === 'pending') &&
+            job.canCancel &&
+            onCancel && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                    disabled={disabled || isLoading === 'cancel'}
                   >
-                    Confirm Cancellation
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Square className="h-4 w-4" />
+                    Cancel
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel Job</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to cancel "{job.name}"? This action
+                      cannot be undone and any progress will be lost.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleAction('cancel', onCancel)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAction('cancel', onCancel);
+                        }
+                      }}
+                    >
+                      Confirm Cancellation
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
 
           {/* Retry Button */}
-          {(job.status === 'failed' || job.status === 'cancelled') && job.canRetry && onRetry && (
-            <Button
-              className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
-              onClick={() => handleAction('retry', onRetry)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleAction('retry', onRetry);
-                }
-              }}
-              disabled={disabled || isLoading === 'retry'}
-            >
-              <RotateCcw className="h-4 w-4" />
-              Retry
-            </Button>
-          )}
+          {(job.status === 'failed' || job.status === 'cancelled') &&
+            job.canRetry &&
+            onRetry && (
+              <Button
+                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground flex items-center gap-2"
+                onClick={() => handleAction('retry', onRetry)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAction('retry', onRetry);
+                  }
+                }}
+                disabled={disabled || isLoading === 'retry'}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Retry
+              </Button>
+            )}
 
           {/* Delete Button */}
-          {(job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') && job.canDelete && onDelete && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  disabled={disabled || isLoading === 'delete'}
-
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Job</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete "{job.name}"? This will permanently remove all job data, logs, and results. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => handleAction('delete', onDelete)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAction('delete', onDelete);
-                      }
-                    }}
+          {(job.status === 'completed' ||
+            job.status === 'failed' ||
+            job.status === 'cancelled') &&
+            job.canDelete &&
+            onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={disabled || isLoading === 'delete'}
                   >
-                    Delete Permanently
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+                    <Trash2 className="h-4 w-4" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Job</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{job.name}"? This will
+                      permanently remove all job data, logs, and results. This
+                      action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => handleAction('delete', onDelete)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAction('delete', onDelete);
+                        }
+                      }}
+                    >
+                      Delete Permanently
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
         </div>
 
         {/* Error Message */}
@@ -433,7 +477,9 @@ export const JobControls: React.FC<JobControlsProps> = ({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-red-800">Error Details</p>
+                <p className="text-sm font-medium text-red-800">
+                  Error Details
+                </p>
                 <p className="text-sm text-red-700 mt-1">{job.errorMessage}</p>
               </div>
             </div>
@@ -445,11 +491,11 @@ export const JobControls: React.FC<JobControlsProps> = ({
           {job.startTime && (
             <div>Started: {job.startTime.toLocaleString()}</div>
           )}
-          {job.endTime && (
-            <div>Ended: {job.endTime.toLocaleString()}</div>
-          )}
+          {job.endTime && <div>Ended: {job.endTime.toLocaleString()}</div>}
           {job.estimatedCompletion && job.status === 'running' && (
-            <div>Estimated completion: {job.estimatedCompletion.toLocaleString()}</div>
+            <div>
+              Estimated completion: {job.estimatedCompletion.toLocaleString()}
+            </div>
           )}
         </div>
       </CardContent>
@@ -470,12 +516,15 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleBatchAction = async (action: string, handler?: (jobIds: string[]) => Promise<void>) => {
+  const handleBatchAction = async (
+    action: string,
+    handler?: (jobIds: string[]) => Promise<void>,
+  ) => {
     if (!handler || disabled || selectedJobs.length === 0) return;
 
     setIsLoading(action);
     try {
-      const jobIds = selectedJobs.map(job => job.id);
+      const jobIds = selectedJobs.map((job) => job.id);
       await handler(jobIds);
       toast({
         title: 'Success',
@@ -493,20 +542,29 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
   };
 
   // Filter jobs by what actions are available
-  const pausableJobs = selectedJobs.filter(job =>
-    job.status === 'running' && job.canPause,
+  const pausableJobs = selectedJobs.filter(
+    (job) => job.status === 'running' && job.canPause,
   );
-  const resumableJobs = selectedJobs.filter(job =>
-    job.status === 'paused' && job.canPause,
+  const resumableJobs = selectedJobs.filter(
+    (job) => job.status === 'paused' && job.canPause,
   );
-  const cancellableJobs = selectedJobs.filter(job =>
-    (job.status === 'running' || job.status === 'paused' || job.status === 'pending') && job.canCancel,
+  const cancellableJobs = selectedJobs.filter(
+    (job) =>
+      (job.status === 'running' ||
+        job.status === 'paused' ||
+        job.status === 'pending') &&
+      job.canCancel,
   );
-  const retryableJobs = selectedJobs.filter(job =>
-    (job.status === 'failed' || job.status === 'cancelled') && job.canRetry,
+  const retryableJobs = selectedJobs.filter(
+    (job) =>
+      (job.status === 'failed' || job.status === 'cancelled') && job.canRetry,
   );
-  const deletableJobs = selectedJobs.filter(job =>
-    (job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') && job.canDelete,
+  const deletableJobs = selectedJobs.filter(
+    (job) =>
+      (job.status === 'completed' ||
+        job.status === 'failed' ||
+        job.status === 'cancelled') &&
+      job.canDelete,
   );
 
   if (selectedJobs.length === 0) {
@@ -524,11 +582,14 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle >
+        <CardTitle>
           Batch Operations
-          <Badge className="bg-secondary text-secondary-foreground">{selectedJobs.length} selected</Badge>
+          <Badge className="bg-secondary text-secondary-foreground">
+            {selectedJobs.length} selected
+          </Badge>
         </CardTitle>
-      </CardHeader><CardContent>
+      </CardHeader>
+      <CardContent>
         <div className="flex flex-wrap gap-2">
           {/* Batch Pause */}
           {pausableJobs.length > 0 && onBatchPause && (
@@ -541,7 +602,6 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 }
               }}
               disabled={disabled || isLoading === 'pause'}
-
             >
               <Pause className="h-4 w-4" />
               Pause ({pausableJobs.length})
@@ -558,7 +618,6 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 }
               }}
               disabled={disabled || isLoading === 'resume'}
-
             >
               <Play className="h-4 w-4" />
               Resume ({resumableJobs.length})
@@ -572,7 +631,6 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 <Button
                   className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                   disabled={disabled || isLoading === 'cancel'}
-
                 >
                   <Square className="h-4 w-4" />
                   Cancel ({cancellableJobs.length})
@@ -582,7 +640,9 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Cancel Multiple Jobs</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to cancel {cancellableJobs.length} jobs? This action cannot be undone and any progress will be lost.
+                    Are you sure you want to cancel {cancellableJobs.length}{' '}
+                    jobs? This action cannot be undone and any progress will be
+                    lost.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -613,7 +673,6 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 }
               }}
               disabled={disabled || isLoading === 'retry'}
-
             >
               <RotateCcw className="h-4 w-4" />
               Retry ({retryableJobs.length})
@@ -627,7 +686,6 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 <Button
                   className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   disabled={disabled || isLoading === 'delete'}
-
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete ({deletableJobs.length})
@@ -637,7 +695,9 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Multiple Jobs</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete {deletableJobs.length} jobs? This will permanently remove all job data, logs, and results. This action cannot be undone.
+                    Are you sure you want to delete {deletableJobs.length} jobs?
+                    This will permanently remove all job data, logs, and
+                    results. This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -662,11 +722,24 @@ export const BatchJobControls: React.FC<BatchJobControlsProps> = ({
         <div className="mt-4 p-3 bg-muted rounded-md">
           <p className="text-sm font-medium mb-2">Selected Jobs Summary:</p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-            <div>Running: {selectedJobs.filter(j => j.status === 'running').length}</div>
-            <div>Paused: {selectedJobs.filter(j => j.status === 'paused').length}</div>
-            <div>Failed: {selectedJobs.filter(j => j.status === 'failed').length}</div>
-            <div>Completed: {selectedJobs.filter(j => j.status === 'completed').length}</div>
-            <div>Pending: {selectedJobs.filter(j => j.status === 'pending').length}</div>
+            <div>
+              Running:{' '}
+              {selectedJobs.filter((j) => j.status === 'running').length}
+            </div>
+            <div>
+              Paused: {selectedJobs.filter((j) => j.status === 'paused').length}
+            </div>
+            <div>
+              Failed: {selectedJobs.filter((j) => j.status === 'failed').length}
+            </div>
+            <div>
+              Completed:{' '}
+              {selectedJobs.filter((j) => j.status === 'completed').length}
+            </div>
+            <div>
+              Pending:{' '}
+              {selectedJobs.filter((j) => j.status === 'pending').length}
+            </div>
           </div>
         </div>
       </CardContent>

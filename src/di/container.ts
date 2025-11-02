@@ -25,7 +25,9 @@ import {
 /**
  * Service registration builder implementation
  */
-export class ServiceRegistrationBuilder<T> implements IServiceRegistrationBuilder<T> {
+export class ServiceRegistrationBuilder<T>
+  implements IServiceRegistrationBuilder<T>
+{
   private descriptor: IServiceDescriptor<T>;
 
   constructor(
@@ -59,7 +61,9 @@ export class ServiceRegistrationBuilder<T> implements IServiceRegistrationBuilde
     return this;
   }
 
-  withDependencies(...dependencies: ServiceIdentifier[]): IServiceRegistrationBuilder<T> {
+  withDependencies(
+    ...dependencies: ServiceIdentifier[]
+  ): IServiceRegistrationBuilder<T> {
     this.descriptor.dependencies = dependencies;
     return this;
   }
@@ -79,7 +83,9 @@ export class ServiceRegistrationBuilder<T> implements IServiceRegistrationBuilde
     return this;
   }
 
-  withHealthCheck(healthCheck: (instance: T) => boolean | Promise<boolean>): IServiceRegistrationBuilder<T> {
+  withHealthCheck(
+    healthCheck: (instance: T) => boolean | Promise<boolean>,
+  ): IServiceRegistrationBuilder<T> {
     this.descriptor.healthCheck = healthCheck;
     return this;
   }
@@ -108,7 +114,13 @@ export class ServiceScope implements IServiceScope {
     const instances = Array.from(this.instances.values()).reverse();
 
     for (const instance of instances) {
-      if (instance && typeof instance === 'object' && instance !== null && 'dispose' in instance && typeof (instance as { dispose: unknown }).dispose === 'function') {
+      if (
+        instance &&
+        typeof instance === 'object' &&
+        instance !== null &&
+        'dispose' in instance &&
+        typeof (instance as { dispose: unknown }).dispose === 'function'
+      ) {
         try {
           await (instance as { dispose: () => Promise<void> }).dispose();
         } catch (error) {
@@ -126,8 +138,10 @@ export class ServiceScope implements IServiceScope {
  * Main service container implementation
  */
 export class ServiceContainer implements IServiceContainer {
-  private readonly services: Map<ServiceIdentifier, IServiceDescriptor> = new Map();
-  private readonly singletonInstances: Map<ServiceIdentifier, unknown> = new Map();
+  private readonly services: Map<ServiceIdentifier, IServiceDescriptor> =
+    new Map();
+  private readonly singletonInstances: Map<ServiceIdentifier, unknown> =
+    new Map();
   private readonly options: Required<IContainerOptions>;
   private readonly logger?: Logger;
   private healthCheckInterval?: NodeJS.Timeout;
@@ -156,9 +170,15 @@ export class ServiceContainer implements IServiceContainer {
     }
 
     this.validateDescriptor(descriptor);
-    this.services.set(descriptor.identifier, descriptor as IServiceDescriptor<unknown>);
+    this.services.set(
+      descriptor.identifier,
+      descriptor as IServiceDescriptor<unknown>,
+    );
 
-    this.log('debug', `Registered service: ${this.getServiceName(descriptor.identifier)} (${descriptor.lifetime})`);
+    this.log(
+      'debug',
+      `Registered service: ${this.getServiceName(descriptor.identifier)} (${descriptor.lifetime})`,
+    );
   }
 
   registerType<T>(
@@ -179,7 +199,13 @@ export class ServiceContainer implements IServiceContainer {
     identifier: ServiceIdentifier<T>,
     instance: T,
   ): IServiceRegistrationBuilder<T> {
-    return new ServiceRegistrationBuilder(this, identifier, undefined, undefined, instance);
+    return new ServiceRegistrationBuilder(
+      this,
+      identifier,
+      undefined,
+      undefined,
+      instance,
+    );
   }
 
   resolve<T>(identifier: ServiceIdentifier<T>): T {
@@ -220,7 +246,9 @@ export class ServiceContainer implements IServiceContainer {
   getServicesByTag(tag: string): ServiceIdentifier[] {
     const result: ServiceIdentifier[] = [];
 
-    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
+    for (const [identifier, descriptor] of Array.from(
+      this.services.entries(),
+    )) {
       if (descriptor.tags?.includes(tag)) {
         result.push(identifier);
       }
@@ -230,7 +258,9 @@ export class ServiceContainer implements IServiceContainer {
   }
 
   createScope(): IServiceScope {
-    return new ServiceScope(`scope-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+    return new ServiceScope(
+      `scope-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    );
   }
 
   resolveScoped<T>(identifier: ServiceIdentifier<T>, scope: IServiceScope): T {
@@ -262,7 +292,9 @@ export class ServiceContainer implements IServiceContainer {
   async getHealthStatus(): Promise<IServiceHealth[]> {
     const healthStatuses: IServiceHealth[] = [];
 
-    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
+    for (const [identifier, descriptor] of Array.from(
+      this.services.entries(),
+    )) {
       if (!descriptor.healthCheck) {
         continue;
       }
@@ -274,7 +306,10 @@ export class ServiceContainer implements IServiceContainer {
         // Get instance for health check
         let instance: unknown;
 
-        if (descriptor.lifetime === ServiceLifetime.Singleton && this.singletonInstances.has(identifier)) {
+        if (
+          descriptor.lifetime === ServiceLifetime.Singleton &&
+          this.singletonInstances.has(identifier)
+        ) {
           instance = this.singletonInstances.get(identifier);
         } else if (descriptor.instance) {
           instance = descriptor.instance;
@@ -318,24 +353,32 @@ export class ServiceContainer implements IServiceContainer {
     }
 
     // Check for missing dependencies
-    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
+    for (const [identifier, descriptor] of Array.from(
+      this.services.entries(),
+    )) {
       if (descriptor.dependencies) {
         for (const dependency of descriptor.dependencies) {
           if (!this.services.has(dependency)) {
-            errors.push(`Service ${this.getServiceName(identifier)} depends on unregistered service ${this.getServiceName(dependency)}`);
+            errors.push(
+              `Service ${this.getServiceName(identifier)} depends on unregistered service ${this.getServiceName(dependency)}`,
+            );
           }
         }
       }
     }
 
     // Validate required services can be instantiated
-    for (const [identifier, descriptor] of Array.from(this.services.entries())) {
+    for (const [identifier, descriptor] of Array.from(
+      this.services.entries(),
+    )) {
       if (descriptor.required) {
         try {
           // Try to resolve without actually creating the instance
           this.validateCanResolve(identifier, new Set(), 0);
         } catch (error) {
-          errors.push(`Required service ${this.getServiceName(identifier)} cannot be resolved: ${error instanceof Error ? error.message : String(error)}`);
+          errors.push(
+            `Required service ${this.getServiceName(identifier)} cannot be resolved: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     }
@@ -359,7 +402,13 @@ export class ServiceContainer implements IServiceContainer {
     const instances = Array.from(this.singletonInstances.values()).reverse();
 
     for (const instance of instances) {
-      if (instance && typeof instance === 'object' && instance !== null && 'dispose' in instance && typeof (instance as { dispose: unknown }).dispose === 'function') {
+      if (
+        instance &&
+        typeof instance === 'object' &&
+        instance !== null &&
+        'dispose' in instance &&
+        typeof (instance as { dispose: unknown }).dispose === 'function'
+      ) {
         try {
           await (instance as { dispose: () => Promise<void> }).dispose();
         } catch (error) {
@@ -384,11 +433,16 @@ export class ServiceContainer implements IServiceContainer {
     if (depth > this.options.maxResolutionDepth) {
       throw new ServiceResolutionError(
         identifier,
-        new Error(`Maximum resolution depth (${this.options.maxResolutionDepth}) exceeded`),
+        new Error(
+          `Maximum resolution depth (${this.options.maxResolutionDepth}) exceeded`,
+        ),
       );
     }
 
-    if (this.options.detectCircularDependencies && resolutionChain.has(identifier)) {
+    if (
+      this.options.detectCircularDependencies &&
+      resolutionChain.has(identifier)
+    ) {
       throw new CircularDependencyError(Array.from(resolutionChain));
     }
 
@@ -443,7 +497,9 @@ export class ServiceContainer implements IServiceContainer {
         if (result instanceof Promise) {
           throw new ServiceResolutionError(
             descriptor.identifier,
-            new Error('Async factories are not supported in synchronous resolution. Use resolveAsync instead.'),
+            new Error(
+              'Async factories are not supported in synchronous resolution. Use resolveAsync instead.',
+            ),
           );
         }
         return result;
@@ -451,7 +507,12 @@ export class ServiceContainer implements IServiceContainer {
 
       // Use constructor
       if (descriptor.implementation) {
-        const dependencies = this.resolveDependencies(descriptor as IServiceDescriptor<unknown>, resolutionChain, depth, scope);
+        const dependencies = this.resolveDependencies(
+          descriptor as IServiceDescriptor<unknown>,
+          resolutionChain,
+          depth,
+          scope,
+        );
         return new descriptor.implementation(...dependencies);
       }
 
@@ -460,7 +521,10 @@ export class ServiceContainer implements IServiceContainer {
         new Error('No implementation, factory, or instance provided'),
       );
     } catch (error) {
-      if (error instanceof CircularDependencyError || error instanceof ServiceNotFoundError) {
+      if (
+        error instanceof CircularDependencyError ||
+        error instanceof ServiceNotFoundError
+      ) {
         throw error;
       }
       throw new ServiceResolutionError(descriptor.identifier, error as Error);
@@ -479,7 +543,7 @@ export class ServiceContainer implements IServiceContainer {
       return [];
     }
 
-    return descriptor.dependencies.map(dependency => {
+    return descriptor.dependencies.map((dependency) => {
       if (scope) {
         return this.resolveScoped(dependency, scope);
       }
@@ -496,18 +560,28 @@ export class ServiceContainer implements IServiceContainer {
     const hasFactory = !!descriptor.factory;
     const hasInstance = descriptor.instance !== undefined;
 
-    const implementationCount = [hasImplementation, hasFactory, hasInstance].filter(Boolean).length;
+    const implementationCount = [
+      hasImplementation,
+      hasFactory,
+      hasInstance,
+    ].filter(Boolean).length;
 
     if (implementationCount === 0) {
-      throw new Error('Service descriptor must have either implementation, factory, or instance');
+      throw new Error(
+        'Service descriptor must have either implementation, factory, or instance',
+      );
     }
 
     if (implementationCount > 1) {
-      throw new Error('Service descriptor cannot have multiple implementation types');
+      throw new Error(
+        'Service descriptor cannot have multiple implementation types',
+      );
     }
 
     if (hasInstance && descriptor.lifetime !== ServiceLifetime.Singleton) {
-      throw new Error('Pre-created instances can only be registered as singletons');
+      throw new Error(
+        'Pre-created instances can only be registered as singletons',
+      );
     }
   }
 
@@ -566,10 +640,15 @@ export class ServiceContainer implements IServiceContainer {
     this.healthCheckInterval = setInterval(async () => {
       try {
         const healthStatuses = await this.getHealthStatus();
-        const unhealthyServices = healthStatuses.filter(status => !status.healthy);
+        const unhealthyServices = healthStatuses.filter(
+          (status) => !status.healthy,
+        );
 
         if (unhealthyServices.length > 0) {
-          this.log('warn', `Unhealthy services detected: ${unhealthyServices.map(s => this.getServiceName(s.identifier)).join(', ')}`);
+          this.log(
+            'warn',
+            `Unhealthy services detected: ${unhealthyServices.map((s) => this.getServiceName(s.identifier)).join(', ')}`,
+          );
         }
       } catch (error) {
         this.log('error', `Health check failed: ${error}`);
@@ -590,7 +669,10 @@ export class ServiceContainer implements IServiceContainer {
     return String(identifier);
   }
 
-  private log(level: 'debug' | 'info' | 'warn' | 'error', message: string): void {
+  private log(
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+  ): void {
     if (this.logger) {
       this.logger[level](`[DI Container] ${message}`);
     } else if (this.options.developmentMode) {

@@ -33,10 +33,13 @@ export class ChunkQualityService {
 
     // Check for complete sentences
     const sentences = content.match(/[.!?]+/g) || [];
-    const sentenceRatio = sentences.length / Math.max(1, content.split(/\s+/).length / 10);
+    const sentenceRatio =
+      sentences.length / Math.max(1, content.split(/\s+/).length / 10);
 
     // Check for paragraph structure
-    const paragraphs = content.split(/\n\n+/).filter(p => p.trim().length > 0);
+    const paragraphs = content
+      .split(/\n\n+/)
+      .filter((p) => p.trim().length > 0);
     const hasStructure = paragraphs.length > 0 ? 1 : 0;
 
     // Check for proper boundaries
@@ -57,10 +60,15 @@ export class ChunkQualityService {
   private calculateBoundaryQuality(content: string): number {
     const endsSentence = /[.!?]\s*$/.test(content.trim()) ? 0.5 : 0;
     const endsParagraph = /\n\s*$/.test(content) ? 0.3 : 0;
-    const endsSection = /^#+\s+/.test(content.trim().split('\n').pop() || '') ? 0.2 : 0;
+    const endsSection = /^#+\s+/.test(content.trim().split('\n').pop() || '')
+      ? 0.2
+      : 0;
     const midWordBreak = /\w$/.test(content.trim()) ? -0.1 : 0;
 
-    return Math.max(0, Math.min(1, endsSentence + endsParagraph + endsSection + midWordBreak));
+    return Math.max(
+      0,
+      Math.min(1, endsSentence + endsParagraph + endsSection + midWordBreak),
+    );
   }
 
   /**
@@ -96,8 +104,15 @@ export class ChunkQualityService {
   private calculateMetadataRichness(metadata: Record<string, unknown>): number {
     if (!metadata || Object.keys(metadata).length === 0) return 0;
 
-    const requiredFields = ['document_name', 'page_number', 'chunk_index', 'source_document'];
-    const presentFields = requiredFields.filter(field => metadata[field] !== undefined).length;
+    const requiredFields = [
+      'document_name',
+      'page_number',
+      'chunk_index',
+      'source_document',
+    ];
+    const presentFields = requiredFields.filter(
+      (field) => metadata[field] !== undefined,
+    ).length;
     const baseScore = presentFields / requiredFields.length;
 
     const extraFields = Object.keys(metadata).length - requiredFields.length;
@@ -136,13 +151,12 @@ export class ChunkQualityService {
     const metadataRichness = this.calculateMetadataRichness(metadata);
     const structuralIntegrity = this.calculateStructuralIntegrity(content);
 
-    const overallCoherence = (
+    const overallCoherence =
       semanticCompleteness * 0.25 +
       boundaryQuality * 0.25 +
       contextPreservation * 0.2 +
       metadataRichness * 0.15 +
-      structuralIntegrity * 0.15
-    );
+      structuralIntegrity * 0.15;
 
     const coherenceScore = Math.round(overallCoherence * 100) / 100;
     const qualityAssessment = this.getQualityAssessment(coherenceScore);
@@ -190,10 +204,14 @@ export class ChunkQualityService {
     const recommendations: string[] = [];
 
     if (metrics.semantic_completeness < 0.7) {
-      recommendations.push('Adjust chunk boundaries to preserve complete thoughts');
+      recommendations.push(
+        'Adjust chunk boundaries to preserve complete thoughts',
+      );
     }
     if (metrics.boundary_quality < 0.7) {
-      recommendations.push('Align boundaries with sentence or paragraph breaks');
+      recommendations.push(
+        'Align boundaries with sentence or paragraph breaks',
+      );
     }
     if (metrics.context_preservation < 0.7) {
       recommendations.push('Add context references or improve chunk overlap');
@@ -202,7 +220,9 @@ export class ChunkQualityService {
       recommendations.push('Ensure all required metadata fields are populated');
     }
     if (metrics.structural_integrity < 0.7) {
-      recommendations.push('Preserve document structure (headings, lists, tables)');
+      recommendations.push(
+        'Preserve document structure (headings, lists, tables)',
+      );
     }
 
     return recommendations;
@@ -221,16 +241,14 @@ export class ChunkQualityService {
     });
 
     // Log to database
-    await supabase
-      .from('quality_scoring_logs')
-      .insert({
-        chunk_id: chunkId,
-        event: 'update_attempt',
-        details: {
-          coherence_score: qualityData.coherence_score,
-          quality_assessment: qualityData.quality_assessment,
-        },
-      });
+    await supabase.from('quality_scoring_logs').insert({
+      chunk_id: chunkId,
+      event: 'update_attempt',
+      details: {
+        coherence_score: qualityData.coherence_score,
+        quality_assessment: qualityData.quality_assessment,
+      },
+    });
 
     const { error } = await supabase
       .from('document_chunks')
@@ -246,16 +264,14 @@ export class ChunkQualityService {
       console.error(`❌ Failed to update chunk quality for ${chunkId}:`, error);
 
       // Log error to database
-      await supabase
-        .from('quality_scoring_logs')
-        .insert({
-          chunk_id: chunkId,
-          event: 'update_error',
-          details: {
-            error: error.message,
-            code: error.code,
-          },
-        });
+      await supabase.from('quality_scoring_logs').insert({
+        chunk_id: chunkId,
+        event: 'update_error',
+        details: {
+          error: error.message,
+          code: error.code,
+        },
+      });
 
       throw error;
     }
@@ -263,15 +279,13 @@ export class ChunkQualityService {
     console.log(`✅ Successfully updated chunk quality for ${chunkId}`);
 
     // Log success to database
-    await supabase
-      .from('quality_scoring_logs')
-      .insert({
-        chunk_id: chunkId,
-        event: 'update_success',
-        details: {
-          coherence_score: qualityData.coherence_score,
-        },
-      });
+    await supabase.from('quality_scoring_logs').insert({
+      chunk_id: chunkId,
+      event: 'update_success',
+      details: {
+        coherence_score: qualityData.coherence_score,
+      },
+    });
   }
 
   /**
@@ -294,12 +308,17 @@ export class ChunkQualityService {
       .map((c: unknown) => (c as any).coherence_score)
       .filter((s: unknown) => s !== null) as number[];
 
-    const averageCoherence = coherenceScores.length > 0
-      ? Math.round((coherenceScores.reduce((a, b) => a + b, 0) / coherenceScores.length) * 100) / 100
-      : 0;
+    const averageCoherence =
+      coherenceScores.length > 0
+        ? Math.round(
+            (coherenceScores.reduce((a, b) => a + b, 0) /
+              coherenceScores.length) *
+              100,
+          ) / 100
+        : 0;
 
-    const highCoherence = coherenceScores.filter(s => s >= 0.8).length;
-    const lowCoherence = coherenceScores.filter(s => s < 0.6).length;
+    const highCoherence = coherenceScores.filter((s) => s >= 0.8).length;
+    const lowCoherence = coherenceScores.filter((s) => s < 0.6).length;
 
     // First, try to check if a record exists
     const { data: existingRecord } = await supabase
@@ -325,17 +344,15 @@ export class ChunkQualityService {
       updateError = result.error;
     } else {
       // Insert new record
-      const result = await supabase
-        .from('document_quality_metrics')
-        .insert({
-          document_id: documentId,
-          average_coherence_score: averageCoherence,
-          chunks_with_high_coherence: highCoherence,
-          chunks_with_low_coherence: lowCoherence,
-          overall_quality_score: averageCoherence,
-          quality_assessment: this.getQualityAssessment(averageCoherence),
-          updated_at: new Date().toISOString(),
-        });
+      const result = await supabase.from('document_quality_metrics').insert({
+        document_id: documentId,
+        average_coherence_score: averageCoherence,
+        chunks_with_high_coherence: highCoherence,
+        chunks_with_low_coherence: lowCoherence,
+        overall_quality_score: averageCoherence,
+        quality_assessment: this.getQualityAssessment(averageCoherence),
+        updated_at: new Date().toISOString(),
+      });
       updateError = result.error;
     }
 
@@ -346,4 +363,3 @@ export class ChunkQualityService {
 }
 
 export const chunkQualityService = new ChunkQualityService();
-

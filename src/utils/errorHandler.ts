@@ -55,7 +55,10 @@ export class UnauthorizedError extends AppError {
 }
 
 export class ServiceUnavailableError extends AppError {
-  constructor(message: string = 'Service temporarily unavailable', context?: ErrorContext) {
+  constructor(
+    message: string = 'Service temporarily unavailable',
+    context?: ErrorContext,
+  ) {
     super(message, 503, true, context);
   }
 }
@@ -80,9 +83,15 @@ export class ErrorHandler {
 
     // Handle Axios errors
     if (error && typeof error === 'object' && 'response' in error) {
-      const axiosError = error as { response: { status: number; data?: { message?: string } }; message?: string };
+      const axiosError = error as {
+        response: { status: number; data?: { message?: string } };
+        message?: string;
+      };
       const statusCode = axiosError.response.status;
-      const message = axiosError.response.data?.message || axiosError.message || 'HTTP request failed';
+      const message =
+        axiosError.response.data?.message ||
+        axiosError.message ||
+        'HTTP request failed';
 
       return new AppError(message, statusCode, true, {
         ...context,
@@ -94,15 +103,24 @@ export class ErrorHandler {
     // Handle network errors
     if (error && typeof error === 'object' && 'request' in error) {
       const networkError = error as { code?: string };
-      return new ServiceUnavailableError('Network error - service unavailable', {
-        ...context,
-        errorCode: networkError.code,
-        errorType: 'network',
-      });
+      return new ServiceUnavailableError(
+        'Network error - service unavailable',
+        {
+          ...context,
+          errorCode: networkError.code,
+          errorType: 'network',
+        },
+      );
     }
 
     // Handle validation errors (Zod, etc.)
-    if (error && typeof error === 'object' && 'name' in error && error.name === 'ZodError' && 'errors' in error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'name' in error &&
+      error.name === 'ZodError' &&
+      'errors' in error
+    ) {
       const zodError = error as { errors: unknown[] };
       return new ValidationError('Validation failed', {
         ...context,
@@ -167,7 +185,8 @@ export class ErrorHandler {
         message: error.message,
         code: error.name,
         statusCode: error.statusCode,
-        ...(process.env.NODE_ENV === 'development' && error.context && { context: error.context }),
+        ...(process.env.NODE_ENV === 'development' &&
+          error.context && { context: error.context }),
       },
     };
   }

@@ -37,7 +37,9 @@ interface PageQueueViewerProps {
   sessionId: string;
 }
 
-export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) => {
+export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({
+  sessionId,
+}) => {
   const { toast } = useToast();
   const [pages, setPages] = useState<ScrapingPage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,20 +91,22 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
       }
 
       // Transform the data to match the expected interface
-      const transformedPages: ScrapingPage[] = (pagesData || []).map((page: any) => ({
-        id: page.id,
-        url: page.url,
-        status: page.status,
-        started_at: page.started_at,
-        completed_at: page.completed_at,
-        materials_found: page.materials_found || 0,
-        error_message: page.error_message,
-        processing_time_ms: page.processing_time_ms,
-        retry_count: page.retry_count || 0,
-        page_index: page.page_index,
-        created_at: page.created_at,
-        updated_at: page.updated_at,
-      }));
+      const transformedPages: ScrapingPage[] = (pagesData || []).map(
+        (page: any) => ({
+          id: page.id,
+          url: page.url,
+          status: page.status,
+          started_at: page.started_at,
+          completed_at: page.completed_at,
+          materials_found: page.materials_found || 0,
+          error_message: page.error_message,
+          processing_time_ms: page.processing_time_ms,
+          retry_count: page.retry_count || 0,
+          page_index: page.page_index,
+          created_at: page.created_at,
+          updated_at: page.updated_at,
+        }),
+      );
 
       setPages(transformedPages);
     } catch (error) {
@@ -138,28 +142,38 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
       }
 
       // Update local state to reflect the retry
-      setPages(prevPages =>
-        prevPages.map(p =>
+      setPages((prevPages) =>
+        prevPages.map((p) =>
           p.id === pageId
-            ? { ...p, status: 'pending', error_message: null, started_at: null, completed_at: null }
+            ? {
+                ...p,
+                status: 'pending',
+                error_message: null,
+                started_at: null,
+                completed_at: null,
+              }
             : p,
         ),
       );
 
       // Trigger single page processing
-      const page = pages.find(p => p.id === pageId);
+      const page = pages.find((p) => p.id === pageId);
       if (page) {
-        const result = await apiService.callSupabaseFunction('scrape-single-page', {
-          pageUrl: page.url,
-          sessionId: sessionId,
-          pageId: pageId,
-          options: {
-            service: 'firecrawl',
-            retryAttempt: page.retry_count + 1,
+        const result = await apiService.callSupabaseFunction(
+          'scrape-single-page',
+          {
+            pageUrl: page.url,
+            sessionId: sessionId,
+            pageId: pageId,
+            options: {
+              service: 'firecrawl',
+              retryAttempt: page.retry_count + 1,
+            },
           },
-        });
+        );
 
-        if (!result.success) throw new Error(result.error?.message || 'Unknown error');
+        if (!result.success)
+          throw new Error(result.error?.message || 'Unknown error');
       }
 
       toast({
@@ -202,16 +216,22 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
     }
   };
 
-  const filteredPages = pages.filter(page => {
-    const matchesSearch = page.url.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || page.status === statusFilter;
+  const filteredPages = pages.filter((page) => {
+    const matchesSearch = page.url
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === 'all' || page.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const statusCounts = pages.reduce((acc, page) => {
-    acc[page.status] = (acc[page.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const statusCounts = pages.reduce(
+    (acc, page) => {
+      acc[page.status] = (acc[page.status] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
   if (loading) {
     return (
@@ -350,7 +370,8 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
                   {page.status === 'failed' && (
                     <Button
                       className="border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm"
-                      onClick={() => retryPage(page.id)} onKeyDown={(e) => e.key === 'Enter' && retryPage(page.id)}
+                      onClick={() => retryPage(page.id)}
+                      onKeyDown={(e) => e.key === 'Enter' && retryPage(page.id)}
                     >
                       Retry
                     </Button>
@@ -358,7 +379,9 @@ export const PageQueueViewer: React.FC<PageQueueViewerProps> = ({ sessionId }) =
 
                   {page.completed_at && (
                     <span className="text-xs text-gray-500">
-                      {formatDistanceToNow(new Date(page.completed_at), { addSuffix: true })}
+                      {formatDistanceToNow(new Date(page.completed_at), {
+                        addSuffix: true,
+                      })}
                     </span>
                   )}
                 </div>

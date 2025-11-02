@@ -14,7 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
@@ -95,22 +101,28 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
     // Group tiles by material type to create consolidated materials
     const materialGroups: Record<string, MaterialTile[]> = {};
 
-    tiles.filter(t => t.material_detected).forEach(tile => {
-      const key = tile.material_type;
-      if (!materialGroups[key]) {
-        materialGroups[key] = [];
-      }
-      materialGroups[key].push(tile);
-    });
+    tiles
+      .filter((t) => t.material_detected)
+      .forEach((tile) => {
+        const key = tile.material_type;
+        if (!materialGroups[key]) {
+          materialGroups[key] = [];
+        }
+        materialGroups[key].push(tile);
+      });
 
-    const detectedMaterials: DetectedMaterial[] = Object.entries(materialGroups).map(([type, groupTiles]) => {
-      const avgConfidence = groupTiles.reduce((sum, t) => sum + (t.material_confidence || 0), 0) / groupTiles.length;
+    const detectedMaterials: DetectedMaterial[] = Object.entries(
+      materialGroups,
+    ).map(([type, groupTiles]) => {
+      const avgConfidence =
+        groupTiles.reduce((sum, t) => sum + (t.material_confidence || 0), 0) /
+        groupTiles.length;
 
       // Extract properties and effects from structured data
       const properties: Record<string, unknown> = {};
       const effects: string[] = [];
 
-      groupTiles.forEach(tile => {
+      groupTiles.forEach((tile) => {
         if (tile.structured_data) {
           Object.assign(properties, tile.structured_data);
         }
@@ -127,7 +139,7 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
         effects: Array.from(new Set(effects)),
         properties,
         confidence: avgConfidence,
-        sources: groupTiles.map(tile => ({
+        sources: groupTiles.map((tile) => ({
           page: tile.page_number,
           tile: tile.tile_index,
           text: tile.extracted_text,
@@ -196,7 +208,6 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
       });
 
       console.log('Material saved to catalog:', data);
-
     } catch (error) {
       console.error('Error saving material to catalog:', error);
       toast({
@@ -207,16 +218,22 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
     }
   };
 
-  const updateMaterial = (materialId: string, updates: Partial<DetectedMaterial>) => {
-    setMaterials(prev => prev.map(m =>
-      m.id === materialId ? { ...m, ...updates } : m,
-    ));
+  const updateMaterial = (
+    materialId: string,
+    updates: Partial<DetectedMaterial>,
+  ) => {
+    setMaterials((prev) =>
+      prev.map((m) => (m.id === materialId ? { ...m, ...updates } : m)),
+    );
   };
 
-  const filteredMaterials = materials.filter(material =>
-    material.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    material.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    material.effects.some(effect => effect.toLowerCase().includes(searchQuery.toLowerCase())),
+  const filteredMaterials = materials.filter(
+    (material) =>
+      material.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      material.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      material.effects.some((effect) =>
+        effect.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
   );
 
   if (loading) {
@@ -236,7 +253,8 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
         <div>
           <h3 className="text-lg font-semibold">Detected Materials</h3>
           <p className="text-sm text-muted-foreground">
-            {materials.length} materials found across {tiles.filter(t => t.material_detected).length} tiles
+            {materials.length} materials found across{' '}
+            {tiles.filter((t) => t.material_detected).length} tiles
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -267,7 +285,9 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     {editingMaterial === material.id ? (
                       <Input
                         value={material.name}
-                        onChange={(e) => updateMaterial(material.id, { name: e.target.value })}
+                        onChange={(e) =>
+                          updateMaterial(material.id, { name: e.target.value })
+                        }
                         className="font-semibold"
                       />
                     ) : (
@@ -343,21 +363,29 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     {editingMaterial === material.id ? (
                       <Select
                         value={material.category}
-                        onValueChange={(value: string) => updateMaterial(material.id, { category: value })}
+                        onValueChange={(value: string) =>
+                          updateMaterial(material.id, { category: value })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {MATERIAL_CATEGORIES.map(cat => (
-                            <SelectItem key={cat} value={cat} className="capitalize">
+                          {MATERIAL_CATEGORIES.map((cat) => (
+                            <SelectItem
+                              key={cat}
+                              value={cat}
+                              className="capitalize"
+                            >
                               {cat}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : (
-                      <p className="text-sm text-muted-foreground capitalize">{material.category}</p>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {material.category}
+                      </p>
                     )}
                   </div>
                   <div>
@@ -365,10 +393,14 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     {editingMaterial === material.id ? (
                       <Input
                         value={material.type}
-                        onChange={(e) => updateMaterial(material.id, { type: e.target.value })}
+                        onChange={(e) =>
+                          updateMaterial(material.id, { type: e.target.value })
+                        }
                       />
                     ) : (
-                      <p className="text-sm text-muted-foreground capitalize">{material.type}</p>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {material.type}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -382,7 +414,10 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                     </Label>
                     <div className="flex flex-wrap gap-2 mt-1">
                       {material.effects.map((effect, index) => (
-                        <span key={index} className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800">
+                        <span
+                          key={index}
+                          className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-800"
+                        >
                           {effect}
                         </span>
                       ))}
@@ -395,17 +430,20 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                   <div>
                     <Label className="text-sm font-medium">Properties</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
-                      {Object.entries(material.properties).map(([key, value]) => (
-                        <div key={key} className="text-sm">
-                          <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>
-                          <span className="text-muted-foreground ml-1">
-                            {typeof value === 'object' && value !== null
-                              ? JSON.stringify(value)
-                              : String(value ?? '')
-                            }
-                          </span>
-                        </div>
-                      ))}
+                      {Object.entries(material.properties).map(
+                        ([key, value]) => (
+                          <div key={key} className="text-sm">
+                            <span className="font-medium capitalize">
+                              {key.replace(/_/g, ' ')}:
+                            </span>
+                            <span className="text-muted-foreground ml-1">
+                              {typeof value === 'object' && value !== null
+                                ? JSON.stringify(value)
+                                : String(value ?? '')}
+                            </span>
+                          </div>
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
@@ -414,10 +452,15 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
 
                 {/* Sources */}
                 <div>
-                  <Label className="text-sm font-medium">Source References ({material.sources.length})</Label>
+                  <Label className="text-sm font-medium">
+                    Source References ({material.sources.length})
+                  </Label>
                   <div className="space-y-2 mt-2">
                     {material.sources.slice(0, 3).map((source, index) => (
-                      <div key={index} className="flex items-start space-x-3 p-3 bg-muted rounded-lg">
+                      <div
+                        key={index}
+                        className="flex items-start space-x-3 p-3 bg-muted rounded-lg"
+                      >
                         <div className="flex items-center space-x-1 text-xs text-muted-foreground">
                           <span>Page {source.page}</span>
                           <span>•</span>
@@ -427,7 +470,8 @@ export const MaterialsListViewer: React.FC<MaterialsListViewerProps> = ({
                           <ImageIcon className="h-4 w-4 text-blue-500 flex-shrink-0" />
                         )}
                         <div className="flex-1">
-                          <p className="text-sm">{source.text.substring(0, 200)}
+                          <p className="text-sm">
+                            {source.text.substring(0, 200)}
                             {source.text.length > 200 && '...'}
                           </p>
                         </div>

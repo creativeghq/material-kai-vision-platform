@@ -47,14 +47,16 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
     'stabilityai/stable-diffusion-xl-base-1.0': {
       inputSchema: z.object({
         inputs: z.string().min(1, 'Prompt is required'),
-        parameters: z.object({
-          negative_prompt: z.string().optional(),
-          num_inference_steps: z.number().int().min(1).max(50).default(20),
-          guidance_scale: z.number().min(1).max(20).default(7.5),
-          width: z.number().int().min(64).max(1024).default(1024),
-          height: z.number().int().min(64).max(1024).default(1024),
-          seed: z.number().int().optional(),
-        }).optional(),
+        parameters: z
+          .object({
+            negative_prompt: z.string().optional(),
+            num_inference_steps: z.number().int().min(1).max(50).default(20),
+            guidance_scale: z.number().min(1).max(20).default(7.5),
+            width: z.number().int().min(64).max(1024).default(1024),
+            height: z.number().int().min(64).max(1024).default(1024),
+            seed: z.number().int().optional(),
+          })
+          .optional(),
       }),
       outputSchema: imageOutputSchema,
       defaultParams: {
@@ -65,7 +67,8 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
           height: 1024,
         },
       },
-      description: 'Stable Diffusion XL base model for high-quality image generation',
+      description:
+        'Stable Diffusion XL base model for high-quality image generation',
       category: 'text-to-image',
       status: 'working',
     },
@@ -74,13 +77,15 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
     'black-forest-labs/FLUX.1-schnell': {
       inputSchema: z.object({
         inputs: z.string().min(1, 'Prompt is required'),
-        parameters: z.object({
-          num_inference_steps: z.number().int().min(1).max(4).default(4),
-          guidance_scale: z.number().min(0).max(10).default(0),
-          width: z.number().int().min(256).max(1440).default(1024),
-          height: z.number().int().min(256).max(1440).default(1024),
-          seed: z.number().int().optional(),
-        }).optional(),
+        parameters: z
+          .object({
+            num_inference_steps: z.number().int().min(1).max(4).default(4),
+            guidance_scale: z.number().min(0).max(10).default(0),
+            width: z.number().int().min(256).max(1440).default(1024),
+            height: z.number().int().min(256).max(1440).default(1024),
+            seed: z.number().int().optional(),
+          })
+          .optional(),
       }),
       outputSchema: imageOutputSchema,
       defaultParams: {
@@ -100,14 +105,16 @@ export const huggingfaceConfig: HuggingFaceApiConfig = {
     'stabilityai/stable-diffusion-2-1': {
       inputSchema: z.object({
         inputs: z.string().min(1, 'Prompt is required'),
-        parameters: z.object({
-          negative_prompt: z.string().optional(),
-          num_inference_steps: z.number().int().min(1).max(50).default(50),
-          guidance_scale: z.number().min(1).max(20).default(7.5),
-          width: z.number().int().min(64).max(768).default(768),
-          height: z.number().int().min(64).max(768).default(768),
-          seed: z.number().int().optional(),
-        }).optional(),
+        parameters: z
+          .object({
+            negative_prompt: z.string().optional(),
+            num_inference_steps: z.number().int().min(1).max(50).default(50),
+            guidance_scale: z.number().min(1).max(20).default(7.5),
+            width: z.number().int().min(64).max(768).default(768),
+            height: z.number().int().min(64).max(768).default(768),
+            seed: z.number().int().optional(),
+          })
+          .optional(),
       }),
       outputSchema: imageOutputSchema,
       defaultParams: {

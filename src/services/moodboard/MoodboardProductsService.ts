@@ -143,4 +143,3 @@ export class MoodboardProductsService {
 }
 
 export default MoodboardProductsService;
-

@@ -8,7 +8,12 @@ import * as path from 'path';
 
 import { z } from 'zod';
 
-import { AppConfig, Environment, ConfigValidationResult, ConfigFactory } from './types';
+import {
+  AppConfig,
+  Environment,
+  ConfigValidationResult,
+  ConfigFactory,
+} from './types';
 import { AppConfigSchema, EnvVarsSchema } from './schemas/configSchemas';
 import { developmentConfig } from './environments/development';
 import { productionConfig } from './environments/production';
@@ -55,7 +60,7 @@ class ConfigurationFactory implements ConfigFactory {
         const envContent = fs.readFileSync(envPath, 'utf-8');
         const envLines = envContent.split('\n');
 
-        envLines.forEach(line => {
+        envLines.forEach((line) => {
           const trimmedLine = line.trim();
           if (trimmedLine && !trimmedLine.startsWith('#')) {
             const [key, ...valueParts] = trimmedLine.split('=');
@@ -79,12 +84,19 @@ class ConfigurationFactory implements ConfigFactory {
   /**
    * Apply environment variable overrides to configuration
    */
-  private applyEnvironmentOverrides(config: AppConfig, envVars: Record<string, string>): AppConfig {
+  private applyEnvironmentOverrides(
+    config: AppConfig,
+    envVars: Record<string, string>,
+  ): AppConfig {
     const overriddenConfig = { ...config };
 
     // Apply environment-specific overrides
     if (envVars.LOG_LEVEL) {
-      overriddenConfig.logLevel = envVars.LOG_LEVEL as 'error' | 'warn' | 'info' | 'debug';
+      overriddenConfig.logLevel = envVars.LOG_LEVEL as
+        | 'error'
+        | 'warn'
+        | 'info'
+        | 'debug';
     }
 
     if (envVars.DEBUG) {
@@ -93,34 +105,51 @@ class ConfigurationFactory implements ConfigFactory {
 
     // Service-specific overrides
     if (envVars.CHUNK_SIZE) {
-      overriddenConfig.services.documentChunking.chunkSize = parseInt(envVars.CHUNK_SIZE, 10);
+      overriddenConfig.services.documentChunking.chunkSize = parseInt(
+        envVars.CHUNK_SIZE,
+        10,
+      );
     }
 
     if (envVars.EMBEDDING_BATCH_SIZE) {
-      overriddenConfig.services.embeddingGeneration.batchSize = parseInt(envVars.EMBEDDING_BATCH_SIZE, 10);
+      overriddenConfig.services.embeddingGeneration.batchSize = parseInt(
+        envVars.EMBEDDING_BATCH_SIZE,
+        10,
+      );
     }
 
     if (envVars.MAX_CONCURRENCY) {
-      overriddenConfig.services.batchProcessing.maxConcurrency = parseInt(envVars.MAX_CONCURRENCY, 10);
+      overriddenConfig.services.batchProcessing.maxConcurrency = parseInt(
+        envVars.MAX_CONCURRENCY,
+        10,
+      );
     }
 
     // Performance overrides
     if (envVars.CACHE_TTL) {
-      overriddenConfig.performance.caching.ttl = parseInt(envVars.CACHE_TTL, 10);
+      overriddenConfig.performance.caching.ttl = parseInt(
+        envVars.CACHE_TTL,
+        10,
+      );
     }
 
     if (envVars.RATE_LIMIT_RPM) {
-      overriddenConfig.performance.rateLimit.requestsPerMinute = parseInt(envVars.RATE_LIMIT_RPM, 10);
+      overriddenConfig.performance.rateLimit.requestsPerMinute = parseInt(
+        envVars.RATE_LIMIT_RPM,
+        10,
+      );
     }
 
     // Storage overrides
     if (envVars.STORAGE_PROVIDER) {
-      overriddenConfig.externalDependencies.storage.provider = envVars.STORAGE_PROVIDER as 'local' | 's3' | 'gcs' | 'azure';
+      overriddenConfig.externalDependencies.storage.provider =
+        envVars.STORAGE_PROVIDER as 'local' | 's3' | 'gcs' | 'azure';
     }
 
     // Legacy AWS S3 support (optional, not actively used - Supabase Storage is primary)
     if (envVars.AWS_S3_BUCKET) {
-      overriddenConfig.externalDependencies.storage.bucket = envVars.AWS_S3_BUCKET;
+      overriddenConfig.externalDependencies.storage.bucket =
+        envVars.AWS_S3_BUCKET;
     }
 
     if (envVars.AWS_REGION) {
@@ -171,8 +200,8 @@ class ConfigurationFactory implements ConfigFactory {
       };
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const errors = error.issues.map(err =>
-          `${err.path.join('.')}: ${err.message}`,
+        const errors = error.issues.map(
+          (err) => `${err.path.join('.')}: ${err.message}`,
         );
         return {
           isValid: false,
@@ -183,7 +212,9 @@ class ConfigurationFactory implements ConfigFactory {
 
       return {
         isValid: false,
-        errors: [error instanceof Error ? error.message : 'Unknown validation error'],
+        errors: [
+          error instanceof Error ? error.message : 'Unknown validation error',
+        ],
         warnings: [],
       };
     }
@@ -209,7 +240,9 @@ class ConfigurationFactory implements ConfigFactory {
       // Validate the final configuration
       const validation = this.validate(config);
       if (!validation.isValid) {
-        throw new Error(`Configuration validation failed: ${validation.errors.join(', ')}`);
+        throw new Error(
+          `Configuration validation failed: ${validation.errors.join(', ')}`,
+        );
       }
 
       // Log warnings if any
@@ -225,9 +258,10 @@ class ConfigurationFactory implements ConfigFactory {
         this.setupHotReload(config);
       }
 
-      console.log(`Configuration loaded successfully for environment: ${targetEnvironment}`);
+      console.log(
+        `Configuration loaded successfully for environment: ${targetEnvironment}`,
+      );
       return config;
-
     } catch (error) {
       console.error('Failed to create configuration:', error);
       throw error;
@@ -239,7 +273,7 @@ class ConfigurationFactory implements ConfigFactory {
    */
   private setupHotReload(config: AppConfig): void {
     // Clear existing watchers
-    this.watchers.forEach(watcher => watcher.close());
+    this.watchers.forEach((watcher) => watcher.close());
     this.watchers = [];
 
     if (!config.hotReload.enabled || config.hotReload.watchPaths.length === 0) {
@@ -265,16 +299,25 @@ class ConfigurationFactory implements ConfigFactory {
     };
 
     // Watch specified paths
-    config.hotReload.watchPaths.forEach(watchPath => {
+    config.hotReload.watchPaths.forEach((watchPath) => {
       try {
         const fullPath = path.resolve(watchPath);
         if (fs.existsSync(fullPath)) {
-          const watcher = fs.watch(fullPath, { recursive: true }, (_, filename) => {
-            if (filename && (filename.endsWith('.ts') || filename.endsWith('.json') || filename.endsWith('.env'))) {
-              console.log(`Configuration file changed: ${filename}`);
-              scheduleReload();
-            }
-          });
+          const watcher = fs.watch(
+            fullPath,
+            { recursive: true },
+            (_, filename) => {
+              if (
+                filename &&
+                (filename.endsWith('.ts') ||
+                  filename.endsWith('.json') ||
+                  filename.endsWith('.env'))
+              ) {
+                console.log(`Configuration file changed: ${filename}`);
+                scheduleReload();
+              }
+            },
+          );
 
           this.watchers.push(watcher);
           console.log(`Watching for configuration changes: ${watchPath}`);
@@ -329,7 +372,7 @@ class ConfigurationFactory implements ConfigFactory {
    * Cleanup watchers on shutdown
    */
   public cleanup(): void {
-    this.watchers.forEach(watcher => watcher.close());
+    this.watchers.forEach((watcher) => watcher.close());
     this.watchers = [];
   }
 }

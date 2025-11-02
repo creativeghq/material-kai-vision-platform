@@ -3,12 +3,19 @@ export async function debugCORSIssue() {
   console.log('🔍 CORS Debug - Environment Check');
 
   // Check environment variables
-  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co';
-  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+  const supabaseUrl =
+    (import.meta as any).env?.VITE_SUPABASE_URL ||
+    'https://bgbavxtjlbvgplozizxu.supabase.co';
+  const supabaseKey =
+    (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
 
   console.log('Environment Variables:');
   console.log('  VITE_SUPABASE_URL:', supabaseUrl);
-  console.log('  VITE_SUPABASE_ANON_KEY:', supabaseKey.substring(0, 50) + '...');
+  console.log(
+    '  VITE_SUPABASE_ANON_KEY:',
+    supabaseKey.substring(0, 50) + '...',
+  );
   console.log('  Current Origin:', window.location.origin);
   console.log('  User Agent:', navigator.userAgent);
 
@@ -21,13 +28,17 @@ export async function debugCORSIssue() {
     const optionsResponse = await fetch(url, {
       method: 'OPTIONS',
       headers: {
-        'Origin': window.location.origin,
+        Origin: window.location.origin,
         'Access-Control-Request-Method': 'POST',
         'Access-Control-Request-Headers': 'authorization, content-type',
       },
     });
 
-    console.log('  Status:', optionsResponse.status, optionsResponse.statusText);
+    console.log(
+      '  Status:',
+      optionsResponse.status,
+      optionsResponse.statusText,
+    );
     console.log('  CORS Headers:');
     for (const [key, value] of optionsResponse.headers.entries()) {
       if (key.toLowerCase().includes('access-control')) {
@@ -39,7 +50,6 @@ export async function debugCORSIssue() {
       console.log('  ❌ OPTIONS failed');
       return { success: false, error: 'OPTIONS request failed' };
     }
-
   } catch (error) {
     console.log('  ❌ OPTIONS Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -52,7 +62,7 @@ export async function debugCORSIssue() {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
+        Authorization: `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -64,7 +74,10 @@ export async function debugCORSIssue() {
     console.log('  Status:', response.status, response.statusText);
     console.log('  Response Headers:');
     for (const [key, value] of response.headers.entries()) {
-      if (key.toLowerCase().includes('access-control') || key.toLowerCase().includes('content-type')) {
+      if (
+        key.toLowerCase().includes('access-control') ||
+        key.toLowerCase().includes('content-type')
+      ) {
         console.log('    ' + key + ':', value);
       }
     }
@@ -78,17 +91,21 @@ export async function debugCORSIssue() {
       console.log('  ❌ Error Response:', text);
       return { success: false, error: `HTTP ${response.status}: ${text}` };
     }
-
   } catch (error) {
     console.log('  ❌ POST Error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log('  Error Type:', error instanceof Error ? error.constructor.name : typeof error);
+    console.log(
+      '  Error Type:',
+      error instanceof Error ? error.constructor.name : typeof error,
+    );
     console.log('  Error Message:', errorMessage);
 
     if (errorMessage.includes('CORS')) {
       console.log('  🚨 CORS Error Detected');
       console.log('  This suggests the browser is blocking the request');
-      console.log('  Even though our tests show the server has proper CORS headers');
+      console.log(
+        '  Even though our tests show the server has proper CORS headers',
+      );
     }
 
     return { success: false, error: `POST error: ${errorMessage}` };

@@ -117,7 +117,9 @@ class ConsolidatedPDFWorkflowService {
       this.updateStep(jobId, 0, 'running', 'Uploading PDF to MIVAA...');
 
       // Get workspace ID
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('User not authenticated');
       }
@@ -132,10 +134,16 @@ class ConsolidatedPDFWorkflowService {
         formData.append('category_id', options.categoryId);
       }
       if (options.focusedExtraction !== undefined) {
-        formData.append('focused_extraction', String(options.focusedExtraction));
+        formData.append(
+          'focused_extraction',
+          String(options.focusedExtraction),
+        );
       }
       if (options.extractCategories) {
-        formData.append('extract_categories', JSON.stringify(options.extractCategories));
+        formData.append(
+          'extract_categories',
+          JSON.stringify(options.extractCategories),
+        );
       }
 
       const uploadResponse = await mivaaApi.uploadPDF(formData);
@@ -144,17 +152,26 @@ class ConsolidatedPDFWorkflowService {
         throw new Error(uploadResponse.error || 'Upload failed');
       }
 
-      const { job_id: mivaaJobId, document_id: documentId } = uploadResponse.data;
+      const { job_id: mivaaJobId, document_id: documentId } =
+        uploadResponse.data;
 
-      this.updateStep(jobId, 0, 'completed', `Uploaded successfully. MIVAA Job ID: ${mivaaJobId}`);
+      this.updateStep(
+        jobId,
+        0,
+        'completed',
+        `Uploaded successfully. MIVAA Job ID: ${mivaaJobId}`,
+      );
       this.updateStep(jobId, 1, 'running', 'Processing PDF in MIVAA...');
 
       // Poll for status
       await this.pollMivaaJobStatus(jobId, mivaaJobId, documentId);
-
     } catch (error) {
       console.error(`Processing failed for job ${jobId}:`, error);
-      this.updateJobStatus(jobId, 'failed', error instanceof Error ? error.message : 'Unknown error');
+      this.updateJobStatus(
+        jobId,
+        'failed',
+        error instanceof Error ? error.message : 'Unknown error',
+      );
     }
   }
 
@@ -176,7 +193,8 @@ class ConsolidatedPDFWorkflowService {
           return;
         }
 
-        const { status, progress, current_stage, result, error } = statusResponse.data;
+        const { status, progress, current_stage, result, error } =
+          statusResponse.data;
 
         // Update job progress
         const job = this.jobs.get(jobId);
@@ -200,7 +218,12 @@ class ConsolidatedPDFWorkflowService {
             ...result,
           };
 
-          this.updateStep(jobId, job.steps.length - 1, 'completed', 'PDF processing completed successfully!');
+          this.updateStep(
+            jobId,
+            job.steps.length - 1,
+            'completed',
+            'PDF processing completed successfully!',
+          );
           this.notifySubscribers(job);
         } else if (status === 'failed') {
           clearInterval(pollInterval);
@@ -210,10 +233,14 @@ class ConsolidatedPDFWorkflowService {
           job.error = error || 'Processing failed';
           job.endTime = new Date();
 
-          this.updateStep(jobId, job.currentStepIndex, 'failed', error || 'Processing failed');
+          this.updateStep(
+            jobId,
+            job.currentStepIndex,
+            'failed',
+            error || 'Processing failed',
+          );
           this.notifySubscribers(job);
         }
-
       } catch (error) {
         console.error('Error polling job status:', error);
       }
@@ -225,18 +252,22 @@ class ConsolidatedPDFWorkflowService {
   /**
    * Update step based on MIVAA stage
    */
-  private updateStepFromMivaaStage(jobId: string, stage: string, progress: number): void {
+  private updateStepFromMivaaStage(
+    jobId: string,
+    stage: string,
+    progress: number,
+  ): void {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
     const stageMap: Record<string, number> = {
-      'uploading': 0,
-      'extracting': 1,
-      'chunking': 2,
-      'analyzing': 3,
-      'embedding': 4,
-      'products': 5,
-      'completed': 6,
+      uploading: 0,
+      extracting: 1,
+      chunking: 2,
+      analyzing: 3,
+      embedding: 4,
+      products: 5,
+      completed: 6,
     };
 
     const stepIndex = stageMap[stage] || job.currentStepIndex;
@@ -249,7 +280,13 @@ class ConsolidatedPDFWorkflowService {
 
       // Update current step
       job.currentStepIndex = stepIndex;
-      this.updateStep(jobId, stepIndex, 'running', `Processing: ${stage}`, progress);
+      this.updateStep(
+        jobId,
+        stepIndex,
+        'running',
+        `Processing: ${stage}`,
+        progress,
+      );
     } else {
       // Update progress of current step
       this.updateStep(jobId, stepIndex, 'running', undefined, progress);
@@ -308,11 +345,14 @@ class ConsolidatedPDFWorkflowService {
     ];
   }
 
-
   /**
    * Update job status
    */
-  private updateJobStatus(jobId: string, status: WorkflowJob['status'], error?: string): void {
+  private updateJobStatus(
+    jobId: string,
+    status: WorkflowJob['status'],
+    error?: string,
+  ): void {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
@@ -403,8 +443,9 @@ class ConsolidatedPDFWorkflowService {
   }
 
   private notifySubscribers(job: WorkflowJob): void {
-    this.subscribers.forEach(callback => callback(job));
+    this.subscribers.forEach((callback) => callback(job));
   }
 }
 
-export const consolidatedPDFWorkflowService = new ConsolidatedPDFWorkflowService();
+export const consolidatedPDFWorkflowService =
+  new ConsolidatedPDFWorkflowService();

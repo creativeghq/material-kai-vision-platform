@@ -6,16 +6,28 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Activity, CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import {
+  Activity,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Clock,
+} from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { healthCheck, readinessCheck, type HealthStatus, type ReadinessStatus } from '@/api/health';
+import {
+  healthCheck,
+  readinessCheck,
+  type HealthStatus,
+  type ReadinessStatus,
+} from '@/api/health';
 
 const HealthPage: React.FC = () => {
   const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
-  const [readinessStatus, setReadinessStatus] = useState<ReadinessStatus | null>(null);
+  const [readinessStatus, setReadinessStatus] =
+    useState<ReadinessStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
@@ -75,8 +87,12 @@ const HealthPage: React.FC = () => {
       );
     }
 
-    const variant = status === 'healthy' ? 'default' :
-                   status === 'degraded' ? 'secondary' : 'destructive';
+    const variant =
+      status === 'healthy'
+        ? 'default'
+        : status === 'degraded'
+          ? 'secondary'
+          : 'destructive';
 
     return (
       <Badge variant={variant}>
@@ -98,7 +114,11 @@ const HealthPage: React.FC = () => {
               Last checked: {lastChecked.toLocaleTimeString()}
             </span>
           )}
-          <Button onClick={runHealthCheck} onKeyDown={(e) => e.key === 'Enter' && runHealthCheck()} disabled={loading}>
+          <Button
+            onClick={runHealthCheck}
+            onKeyDown={(e) => e.key === 'Enter' && runHealthCheck()}
+            disabled={loading}
+          >
             {loading ? 'Checking...' : 'Refresh'}
           </Button>
         </div>
@@ -126,7 +146,9 @@ const HealthPage: React.FC = () => {
                     <span>Database:</span>
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(healthStatus.checks.database)}
-                      <span className="text-sm">{healthStatus.checks.database}</span>
+                      <span className="text-sm">
+                        {healthStatus.checks.database}
+                      </span>
                     </div>
                   </div>
 
@@ -134,7 +156,9 @@ const HealthPage: React.FC = () => {
                     <span>Memory:</span>
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(healthStatus.checks.memory)}
-                      <span className="text-sm">{healthStatus.checks.memory}</span>
+                      <span className="text-sm">
+                        {healthStatus.checks.memory}
+                      </span>
                     </div>
                   </div>
 
@@ -142,7 +166,9 @@ const HealthPage: React.FC = () => {
                     <span>Dependencies:</span>
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(healthStatus.checks.dependencies)}
-                      <span className="text-sm">{healthStatus.checks.dependencies}</span>
+                      <span className="text-sm">
+                        {healthStatus.checks.dependencies}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -150,7 +176,10 @@ const HealthPage: React.FC = () => {
                 <div className="pt-4 border-t space-y-1 text-sm text-muted-foreground">
                   <div>Version: {healthStatus.version}</div>
                   <div>Uptime: {Math.floor(healthStatus.uptime)}s</div>
-                  <div>Timestamp: {new Date(healthStatus.timestamp).toLocaleString()}</div>
+                  <div>
+                    Timestamp:{' '}
+                    {new Date(healthStatus.timestamp).toLocaleString()}
+                  </div>
                 </div>
 
                 {healthStatus.details && (
@@ -162,7 +191,9 @@ const HealthPage: React.FC = () => {
                       )}
                       {healthStatus.details.memory && (
                         <div>
-                          Memory: {Math.round(healthStatus.details.memory.percentage)}% used
+                          Memory:{' '}
+                          {Math.round(healthStatus.details.memory.percentage)}%
+                          used
                         </div>
                       )}
                     </div>
@@ -200,7 +231,9 @@ const HealthPage: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(readinessStatus.checks.database)}
                       <span className="text-sm">
-                        {readinessStatus.checks.database ? 'Ready' : 'Not Ready'}
+                        {readinessStatus.checks.database
+                          ? 'Ready'
+                          : 'Not Ready'}
                       </span>
                     </div>
                   </div>
@@ -210,7 +243,9 @@ const HealthPage: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(readinessStatus.checks.configuration)}
                       <span className="text-sm">
-                        {readinessStatus.checks.configuration ? 'Ready' : 'Not Ready'}
+                        {readinessStatus.checks.configuration
+                          ? 'Ready'
+                          : 'Not Ready'}
                       </span>
                     </div>
                   </div>
@@ -220,14 +255,19 @@ const HealthPage: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(readinessStatus.checks.dependencies)}
                       <span className="text-sm">
-                        {readinessStatus.checks.dependencies ? 'Ready' : 'Not Ready'}
+                        {readinessStatus.checks.dependencies
+                          ? 'Ready'
+                          : 'Not Ready'}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-4 border-t space-y-1 text-sm text-muted-foreground">
-                  <div>Timestamp: {new Date(readinessStatus.timestamp).toLocaleString()}</div>
+                  <div>
+                    Timestamp:{' '}
+                    {new Date(readinessStatus.timestamp).toLocaleString()}
+                  </div>
                 </div>
 
                 {readinessStatus.details && (
@@ -238,7 +278,9 @@ const HealthPage: React.FC = () => {
                         <div>Database: {readinessStatus.details.database}</div>
                       )}
                       {readinessStatus.details.configuration && (
-                        <div>Config: {readinessStatus.details.configuration}</div>
+                        <div>
+                          Config: {readinessStatus.details.configuration}
+                        </div>
                       )}
                     </div>
                   </div>

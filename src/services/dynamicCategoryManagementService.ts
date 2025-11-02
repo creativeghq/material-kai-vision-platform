@@ -70,7 +70,8 @@ class DynamicCategoryManagementService {
 
   public static getInstance(): DynamicCategoryManagementService {
     if (!DynamicCategoryManagementService.instance) {
-      DynamicCategoryManagementService.instance = new DynamicCategoryManagementService();
+      DynamicCategoryManagementService.instance =
+        new DynamicCategoryManagementService();
     }
     return DynamicCategoryManagementService.instance;
   }
@@ -107,9 +108,11 @@ class DynamicCategoryManagementService {
   /**
    * Get categories by display group (products, core_materials, etc.)
    */
-  public async getCategoriesByGroup(displayGroup: string): Promise<CategoryHierarchy[]> {
+  public async getCategoriesByGroup(
+    displayGroup: string,
+  ): Promise<CategoryHierarchy[]> {
     const allCategories = await this.getCategoriesHierarchy();
-    return allCategories.filter(cat => cat.displayGroup === displayGroup);
+    return allCategories.filter((cat) => cat.displayGroup === displayGroup);
   }
 
   /**
@@ -129,7 +132,9 @@ class DynamicCategoryManagementService {
   /**
    * Create a new category
    */
-  public async createCategory(request: CategoryCreationRequest): Promise<CategoryHierarchy | null> {
+  public async createCategory(
+    request: CategoryCreationRequest,
+  ): Promise<CategoryHierarchy | null> {
     try {
       const { data, error } = await supabase
         .from('material_categories')
@@ -168,7 +173,10 @@ class DynamicCategoryManagementService {
   /**
    * Update an existing category
    */
-  public async updateCategory(categoryKey: string, updates: CategoryUpdateRequest): Promise<boolean> {
+  public async updateCategory(
+    categoryKey: string,
+    updates: CategoryUpdateRequest,
+  ): Promise<boolean> {
     try {
       const { error } = await supabase
         .from('material_categories')
@@ -253,8 +261,12 @@ class DynamicCategoryManagementService {
   /**
    * Ensure a category exists, create if not found
    */
-  private async ensureCategoryExists(extraction: CategoryExtractionResult): Promise<void> {
-    const existingCategory = await this.getCategoryByKey(extraction.categoryKey);
+  private async ensureCategoryExists(
+    extraction: CategoryExtractionResult,
+  ): Promise<void> {
+    const existingCategory = await this.getCategoryByKey(
+      extraction.categoryKey,
+    );
 
     if (!existingCategory) {
       // Auto-create category based on extraction
@@ -276,15 +288,19 @@ class DynamicCategoryManagementService {
   /**
    * Get category by key
    */
-  public async getCategoryByKey(categoryKey: string): Promise<CategoryHierarchy | null> {
+  public async getCategoryByKey(
+    categoryKey: string,
+  ): Promise<CategoryHierarchy | null> {
     const categories = await this.getCategoriesHierarchy();
     return this.findCategoryInHierarchy(categories, categoryKey);
   }
 
   // Private helper methods
   private isCacheValid(): boolean {
-    return this.cacheTimestamp !== null &&
-           (Date.now() - this.cacheTimestamp) < this.CACHE_DURATION;
+    return (
+      this.cacheTimestamp !== null &&
+      Date.now() - this.cacheTimestamp < this.CACHE_DURATION
+    );
   }
 
   private clearCache(): void {
@@ -297,13 +313,13 @@ class DynamicCategoryManagementService {
     const rootCategories: CategoryHierarchy[] = [];
 
     // First pass: create all category objects
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       const hierarchy = this.mapToHierarchy(cat);
       categoryMap.set((cat as any).id, hierarchy);
     });
 
     // Second pass: build parent-child relationships
-    categories.forEach(cat => {
+    categories.forEach((cat) => {
       const hierarchy = categoryMap.get((cat as any).id)!;
 
       if ((cat as any).parent_category_id) {
@@ -340,13 +356,19 @@ class DynamicCategoryManagementService {
     };
   }
 
-  private findCategoryInHierarchy(categories: CategoryHierarchy[], categoryKey: string): CategoryHierarchy | null {
+  private findCategoryInHierarchy(
+    categories: CategoryHierarchy[],
+    categoryKey: string,
+  ): CategoryHierarchy | null {
     for (const category of categories) {
       if (category.categoryKey === categoryKey) {
         return category;
       }
       if (category.children) {
-        const found = this.findCategoryInHierarchy(category.children, categoryKey);
+        const found = this.findCategoryInHierarchy(
+          category.children,
+          categoryKey,
+        );
         if (found) return found;
       }
     }
@@ -354,9 +376,10 @@ class DynamicCategoryManagementService {
   }
 
   private formatCategoryName(categoryKey: string): string {
-    return categoryKey.split('_').map(word =>
-      word.charAt(0).toUpperCase() + word.slice(1),
-    ).join(' ');
+    return categoryKey
+      .split('_')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   }
 
   private formatCategoryDisplayName(categoryKey: string): string {
@@ -364,23 +387,32 @@ class DynamicCategoryManagementService {
   }
 
   private determineCategoryGroup(categoryKey: string): string {
-    const productKeywords = ['tile', 'decor', 'lighting', 'furniture', 'fixture'];
+    const productKeywords = [
+      'tile',
+      'decor',
+      'lighting',
+      'furniture',
+      'fixture',
+    ];
     const materialKeywords = ['wood', 'metal', 'ceramic', 'glass', 'plastic'];
 
     const key = categoryKey.toLowerCase();
 
-    if (productKeywords.some(keyword => key.includes(keyword))) {
+    if (productKeywords.some((keyword) => key.includes(keyword))) {
       return 'products';
-    } else if (materialKeywords.some(keyword => key.includes(keyword))) {
+    } else if (materialKeywords.some((keyword) => key.includes(keyword))) {
       return 'core_materials';
     }
 
     return 'other';
   }
 
-  private async updateDocumentCategories(documentId: string, categories: CategoryExtractionResult[]): Promise<void> {
+  private async updateDocumentCategories(
+    documentId: string,
+    categories: CategoryExtractionResult[],
+  ): Promise<void> {
     try {
-      const categoryData = categories.map(cat => ({
+      const categoryData = categories.map((cat) => ({
         category_key: cat.categoryKey,
         confidence: cat.confidence,
         extracted_from: cat.extractedFrom,
@@ -403,7 +435,8 @@ class DynamicCategoryManagementService {
 }
 
 // Export singleton instance
-export const dynamicCategoryManagementService = DynamicCategoryManagementService.getInstance();
+export const dynamicCategoryManagementService =
+  DynamicCategoryManagementService.getInstance();
 
 // Convenience functions
 export async function getCategoriesHierarchy(): Promise<CategoryHierarchy[]> {
@@ -418,10 +451,18 @@ export async function getMaterialCategories(): Promise<CategoryHierarchy[]> {
   return await dynamicCategoryManagementService.getMaterialCategories();
 }
 
-export async function createCategory(request: CategoryCreationRequest): Promise<CategoryHierarchy | null> {
+export async function createCategory(
+  request: CategoryCreationRequest,
+): Promise<CategoryHierarchy | null> {
   return await dynamicCategoryManagementService.createCategory(request);
 }
 
-export async function autoUpdateCategoriesFromDocument(documentId: string, extractedData: any): Promise<void> {
-  return await dynamicCategoryManagementService.autoUpdateCategoriesFromDocument(documentId, extractedData);
+export async function autoUpdateCategoriesFromDocument(
+  documentId: string,
+  extractedData: any,
+): Promise<void> {
+  return await dynamicCategoryManagementService.autoUpdateCategoriesFromDocument(
+    documentId,
+    extractedData,
+  );
 }

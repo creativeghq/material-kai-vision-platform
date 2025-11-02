@@ -9,10 +9,7 @@ export { DeviceDetector } from './deviceDetector';
 export type * from './types';
 
 // Convenience exports for common use cases
-export {
-  type MLResult,
-  type DeviceType,
-} from './types';
+export { type MLResult, type DeviceType } from './types';
 
 // NOTE: Style analysis, texture analysis, and embedding services have been removed.
 // Use MIVAA API instead:

@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Building2, Plus, Edit, Trash2, Search } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -65,8 +71,10 @@ export const CRMManagement: React.FC = () => {
       // Calculate stats
       const stats = {
         total: data?.length || 0,
-        active: data?.filter((u: UserProfile) => u.status === 'active').length || 0,
-        inactive: data?.filter((u: UserProfile) => u.status === 'inactive').length || 0,
+        active:
+          data?.filter((u: UserProfile) => u.status === 'active').length || 0,
+        inactive:
+          data?.filter((u: UserProfile) => u.status === 'inactive').length || 0,
       };
       setUserStats(stats);
     } catch (error) {
@@ -144,7 +152,8 @@ export const CRMManagement: React.FC = () => {
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete user',
+        description:
+          error instanceof Error ? error.message : 'Failed to delete user',
         variant: 'destructive',
       });
     }
@@ -163,19 +172,21 @@ export const CRMManagement: React.FC = () => {
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete contact',
+        description:
+          error instanceof Error ? error.message : 'Failed to delete contact',
         variant: 'destructive',
       });
     }
   };
 
-  const filteredUsers = users.filter(user =>
+  const filteredUsers = users.filter((user) =>
     user.user_id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    contact.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+  const filteredContacts = contacts.filter(
+    (contact) =>
+      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -184,27 +195,39 @@ export const CRMManagement: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Users
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{userStats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">Registered users</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Registered users
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Users</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Users
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{userStats.active}</div>
-            <p className="text-xs text-muted-foreground mt-1">Currently active</p>
+            <div className="text-2xl font-bold text-green-600">
+              {userStats.active}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Currently active
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Contacts</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Contacts
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{contacts.length}</div>
@@ -231,7 +254,9 @@ export const CRMManagement: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage platform users, roles, and subscriptions</CardDescription>
+              <CardDescription>
+                Manage platform users, roles, and subscriptions
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search */}
@@ -278,20 +303,28 @@ export const CRMManagement: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredUsers.map(user => (
+                      filteredUsers.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell className="font-mono text-sm">
                             {user.user_id.substring(0, 8)}...
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">{user.roles?.name || 'unknown'}</Badge>
+                            <Badge variant="outline">
+                              {user.roles?.name || 'unknown'}
+                            </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="secondary">{user.subscription_tier}</Badge>
+                            <Badge variant="secondary">
+                              {user.subscription_tier}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={user.status === 'active' ? 'default' : 'secondary'}
+                              variant={
+                                user.status === 'active'
+                                  ? 'default'
+                                  : 'secondary'
+                              }
                             >
                               {user.status}
                             </Badge>
@@ -342,7 +375,9 @@ export const CRMManagement: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle>CRM Contacts</CardTitle>
-              <CardDescription>Manage non-user contacts and relationships</CardDescription>
+              <CardDescription>
+                Manage non-user contacts and relationships
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search */}
@@ -389,12 +424,17 @@ export const CRMManagement: React.FC = () => {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredContacts.map(contact => (
+                      filteredContacts.map((contact) => (
                         <TableRow key={contact.id}>
-                          <TableCell className="font-medium">{contact.name}</TableCell>
+                          <TableCell className="font-medium">
+                            {contact.name}
+                          </TableCell>
                           <TableCell>
                             {contact.email ? (
-                              <a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">
+                              <a
+                                href={`mailto:${contact.email}`}
+                                className="text-blue-600 hover:underline"
+                              >
                                 {contact.email}
                               </a>
                             ) : (
@@ -403,7 +443,10 @@ export const CRMManagement: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             {contact.phone ? (
-                              <a href={`tel:${contact.phone}`} className="text-blue-600 hover:underline">
+                              <a
+                                href={`tel:${contact.phone}`}
+                                className="text-blue-600 hover:underline"
+                              >
                                 {contact.phone}
                               </a>
                             ) : (
@@ -467,7 +510,12 @@ export const CRMManagement: React.FC = () => {
                   <label className="text-sm font-medium">Name</label>
                   <Input
                     value={editingContact.name}
-                    onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                    onChange={(e) =>
+                      setEditingContact({
+                        ...editingContact,
+                        name: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div>
@@ -475,28 +523,48 @@ export const CRMManagement: React.FC = () => {
                   <Input
                     type="email"
                     value={editingContact.email || ''}
-                    onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                    onChange={(e) =>
+                      setEditingContact({
+                        ...editingContact,
+                        email: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Phone</label>
                   <Input
                     value={editingContact.phone || ''}
-                    onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                    onChange={(e) =>
+                      setEditingContact({
+                        ...editingContact,
+                        phone: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Company</label>
                   <Input
                     value={editingContact.company || ''}
-                    onChange={(e) => setEditingContact({ ...editingContact, company: e.target.value })}
+                    onChange={(e) =>
+                      setEditingContact({
+                        ...editingContact,
+                        company: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium">Notes</label>
                   <Input
                     value={editingContact.notes || ''}
-                    onChange={(e) => setEditingContact({ ...editingContact, notes: e.target.value })}
+                    onChange={(e) =>
+                      setEditingContact({
+                        ...editingContact,
+                        notes: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -523,4 +591,3 @@ export const CRMManagement: React.FC = () => {
 };
 
 export default CRMManagement;
-

@@ -7,15 +7,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Tag, Folder, Package } from 'lucide-react';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
   CategoryHierarchy,
@@ -39,12 +58,19 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
 }) => {
   const { toast } = useToast();
   const [categories, setCategories] = useState<CategoryHierarchy[]>([]);
-  const [productCategories, setProductCategories] = useState<CategoryHierarchy[]>([]);
-  const [materialCategories, setMaterialCategories] = useState<CategoryHierarchy[]>([]);
+  const [productCategories, setProductCategories] = useState<
+    CategoryHierarchy[]
+  >([]);
+  const [materialCategories, setMaterialCategories] = useState<
+    CategoryHierarchy[]
+  >([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryHierarchy | null>(null);
+  const [selectedCategory, setSelectedCategory] =
+    useState<CategoryHierarchy | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newCategory, setNewCategory] = useState<Partial<CategoryCreationRequest>>({
+  const [newCategory, setNewCategory] = useState<
+    Partial<CategoryCreationRequest>
+  >({
     hierarchyLevel: 0,
     sortOrder: 100,
     displayGroup: 'products',
@@ -84,7 +110,11 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
   }, [loadCategories]);
 
   const handleCreateCategory = async () => {
-    if (!newCategory.categoryKey || !newCategory.name || !newCategory.displayName) {
+    if (
+      !newCategory.categoryKey ||
+      !newCategory.name ||
+      !newCategory.displayName
+    ) {
       toast({
         title: 'Validation Error',
         description: 'Category key, name, and display name are required',
@@ -94,7 +124,9 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
     }
 
     try {
-      const created = await dynamicCategoryManagementService.createCategory(newCategory as CategoryCreationRequest);
+      const created = await dynamicCategoryManagementService.createCategory(
+        newCategory as CategoryCreationRequest,
+      );
 
       if (created) {
         toast({
@@ -172,7 +204,9 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               </div>
             </div>
             {category.description && (
-              <p className="text-sm text-gray-600 mt-1">{category.description}</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {category.description}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -219,10 +253,16 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="categoryKey">Category Key</Label><Input
+                  <Label htmlFor="categoryKey">Category Key</Label>
+                  <Input
                     id="categoryKey"
                     value={newCategory.categoryKey || ''}
-                    onChange={(e) => setNewCategory({ ...newCategory, categoryKey: e.target.value })}
+                    onChange={(e) =>
+                      setNewCategory({
+                        ...newCategory,
+                        categoryKey: e.target.value,
+                      })
+                    }
                     placeholder="e.g., smart_lighting"
                   />
                 </div>
@@ -231,15 +271,23 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
                   <Input
                     id="name"
                     value={newCategory.name || ''}
-                    onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                    onChange={(e) =>
+                      setNewCategory({ ...newCategory, name: e.target.value })
+                    }
                     placeholder="e.g., Smart Lighting"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="displayName">Display Name</Label><Input
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
                     id="displayName"
                     value={newCategory.displayName || ''}
-                    onChange={(e) => setNewCategory({ ...newCategory, displayName: e.target.value })}
+                    onChange={(e) =>
+                      setNewCategory({
+                        ...newCategory,
+                        displayName: e.target.value,
+                      })
+                    }
                     placeholder="e.g., Smart Lighting Solutions"
                   />
                 </div>
@@ -248,24 +296,36 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
                   <Textarea
                     id="description"
                     value={newCategory.description || ''}
-                    onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                    onChange={(e) =>
+                      setNewCategory({
+                        ...newCategory,
+                        description: e.target.value,
+                      })
+                    }
                     placeholder="Brief description of the category"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="displayGroup">Display Group</Label><Select
+                  <Label htmlFor="displayGroup">Display Group</Label>
+                  <Select
                     value={newCategory.displayGroup}
-                    onValueChange={(value) => setNewCategory({ ...newCategory, displayGroup: value })}
+                    onValueChange={(value) =>
+                      setNewCategory({ ...newCategory, displayGroup: value })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="products">Products</SelectItem>
-                      <SelectItem value="core_materials">Core Materials</SelectItem>
+                      <SelectItem value="core_materials">
+                        Core Materials
+                      </SelectItem>
                       <SelectItem value="tile_types">Tile Types</SelectItem>
                       <SelectItem value="decor_types">Decor Types</SelectItem>
-                      <SelectItem value="lighting_types">Lighting Types</SelectItem>
+                      <SelectItem value="lighting_types">
+                        Lighting Types
+                      </SelectItem>
                       <SelectItem value="other">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -320,7 +380,9 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               {categories.length > 0 ? (
                 renderCategoryTree(categories)
               ) : (
-                <p className="text-gray-500 text-center py-4">No categories found</p>
+                <p className="text-gray-500 text-center py-4">
+                  No categories found
+                </p>
               )}
             </CardContent>
           </Card>
@@ -341,7 +403,9 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               {productCategories.length > 0 ? (
                 renderCategoryTree(productCategories)
               ) : (
-                <p className="text-gray-500 text-center py-4">No product categories found</p>
+                <p className="text-gray-500 text-center py-4">
+                  No product categories found
+                </p>
               )}
             </CardContent>
           </Card>
@@ -362,7 +426,9 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               {materialCategories.length > 0 ? (
                 renderCategoryTree(materialCategories)
               ) : (
-                <p className="text-gray-500 text-center py-4">No material categories found</p>
+                <p className="text-gray-500 text-center py-4">
+                  No material categories found
+                </p>
               )}
             </CardContent>
           </Card>
@@ -373,11 +439,14 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
         <Card>
           <CardHeader>
             <CardTitle>Category Details</CardTitle>
-          </CardHeader><CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Category Key</Label>
-                <p className="font-mono text-sm">{selectedCategory.categoryKey}</p>
+                <p className="font-mono text-sm">
+                  {selectedCategory.categoryKey}
+                </p>
               </div>
               <div>
                 <Label>Display Group</Label>
@@ -389,7 +458,11 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
               </div>
               <div>
                 <Label>AI Extraction</Label>
-                <p>{selectedCategory.aiExtractionEnabled ? 'Enabled' : 'Disabled'}</p>
+                <p>
+                  {selectedCategory.aiExtractionEnabled
+                    ? 'Enabled'
+                    : 'Disabled'}
+                </p>
               </div>
               <div>
                 <Label>Confidence Threshold</Label>
@@ -403,7 +476,9 @@ export const DynamicCategoryManager: React.FC<DynamicCategoryManagerProps> = ({
             {selectedCategory.description && (
               <div className="mt-4">
                 <Label>Description</Label>
-                <p className="text-sm text-gray-600">{selectedCategory.description}</p>
+                <p className="text-sm text-gray-600">
+                  {selectedCategory.description}
+                </p>
               </div>
             )}
           </CardContent>

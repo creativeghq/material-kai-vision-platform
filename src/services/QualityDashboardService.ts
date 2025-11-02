@@ -76,7 +76,9 @@ class QualityDashboardServiceImpl extends BaseService {
     super({
       name: 'QualityDashboardService',
       version: '1.0.0',
-      environment: process.env.NODE_ENV as 'development' | 'production' | 'test' || 'development',
+      environment:
+        (process.env.NODE_ENV as 'development' | 'production' | 'test') ||
+        'development',
       enabled: true,
       timeout: 30000,
     });
@@ -106,31 +108,37 @@ class QualityDashboardServiceImpl extends BaseService {
   async getQualityMetrics(workspaceId: string): Promise<QualityMetrics> {
     return this.executeOperation(async () => {
       // Get image validation stats
-      const imageStats = await this.imageValidationService.getValidationStats(workspaceId);
+      const imageStats =
+        await this.imageValidationService.getValidationStats(workspaceId);
 
       // Get product enrichment stats
-      const enrichmentStats = await this.productEnrichmentService.getEnrichmentStats(workspaceId);
+      const enrichmentStats =
+        await this.productEnrichmentService.getEnrichmentStats(workspaceId);
 
       // Get validation rules stats
-      const validationStats = await this.validationRulesService.getValidationStats(workspaceId);
+      const validationStats =
+        await this.validationRulesService.getValidationStats(workspaceId);
 
       // Calculate overall quality score (weighted average)
       const imageQualityWeight = 0.3;
       const enrichmentQualityWeight = 0.35;
       const validationQualityWeight = 0.35;
 
-      const imageQualityScore = imageStats.total_images > 0
-        ? imageStats.valid_images / imageStats.total_images
-        : 0;
+      const imageQualityScore =
+        imageStats.total_images > 0
+          ? imageStats.valid_images / imageStats.total_images
+          : 0;
 
-      const enrichmentQualityScore = (enrichmentStats as any).total_chunks > 0
-        ? (enrichmentStats as any).enriched_chunks / (enrichmentStats as any).total_chunks
-        : 0;
+      const enrichmentQualityScore =
+        (enrichmentStats as any).total_chunks > 0
+          ? (enrichmentStats as any).enriched_chunks /
+            (enrichmentStats as any).total_chunks
+          : 0;
 
       const overallQualityScore =
-        (imageQualityScore * imageQualityWeight) +
-        (enrichmentQualityScore * enrichmentQualityWeight) +
-        (validationStats.pass_rate * validationQualityWeight);
+        imageQualityScore * imageQualityWeight +
+        enrichmentQualityScore * enrichmentQualityWeight +
+        validationStats.pass_rate * validationQualityWeight;
 
       const metrics: QualityMetrics = {
         timestamp: new Date().toISOString(),
@@ -139,7 +147,8 @@ class QualityDashboardServiceImpl extends BaseService {
         valid_images: imageStats.valid_images,
         invalid_images: imageStats.invalid_images,
         images_needing_review: (imageStats as any).needs_review || 0,
-        average_image_quality_score: (imageStats as any).avg_quality_score || imageStats.avg_quality_score,
+        average_image_quality_score:
+          (imageStats as any).avg_quality_score || imageStats.avg_quality_score,
         total_chunks_enriched: (enrichmentStats as any).total_chunks || 0,
         enriched_chunks: enrichmentStats.enriched_count,
         unenriched_chunks: (enrichmentStats as any).unenriched_chunks || 0,
@@ -159,20 +168,26 @@ class QualityDashboardServiceImpl extends BaseService {
   /**
    * Get quality trends over time
    */
-  async getQualityTrends(workspaceId: string, days: number = 30): Promise<QualityTrend[]> {
+  async getQualityTrends(
+    workspaceId: string,
+    days: number = 30,
+  ): Promise<QualityTrend[]> {
     return this.executeOperation(async () => {
       const { data, error } = await supabase
         .from('quality_metrics')
         .select('*')
         .eq('workspace_id', workspaceId)
-        .gte('created_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        .gte(
+          'created_at',
+          new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+        )
         .order('created_at', { ascending: true });
 
       if (error) {
         throw new Error(`Failed to fetch quality trends: ${error.message}`);
       }
 
-      return (data || []).map(row => ({
+      return (data || []).map((row) => ({
         date: row.created_at,
         overall_score: row.overall_quality_score,
         image_quality: row.average_image_quality_score,
@@ -199,7 +214,8 @@ class QualityDashboardServiceImpl extends BaseService {
           title: 'High Invalid Image Rate',
           description: `${metrics.invalid_images} images failed validation`,
           affected_count: metrics.invalid_images,
-          recommendation: 'Review image validation rules and improve source image quality',
+          recommendation:
+            'Review image validation rules and improve source image quality',
           created_at: new Date().toISOString(),
         });
       }
@@ -261,7 +277,10 @@ class QualityDashboardServiceImpl extends BaseService {
   /**
    * Broadcast quality metrics via WebSocket for real-time updates
    */
-  async broadcastQualityMetrics(jobId: string, workspaceId: string): Promise<void> {
+  async broadcastQualityMetrics(
+    jobId: string,
+    workspaceId: string,
+  ): Promise<void> {
     try {
       const metrics = await this.getQualityMetrics(workspaceId);
 
@@ -282,13 +301,19 @@ class QualityDashboardServiceImpl extends BaseService {
   /**
    * Subscribe to real-time quality updates for a job
    */
-  subscribeToQualityUpdates(jobId: string, callback: (data: any) => void): () => void {
+  subscribeToQualityUpdates(
+    jobId: string,
+    callback: (data: any) => void,
+  ): () => void {
     // Subscribe to WebSocket messages for this job
-    const unsubscribe = pdfProcessingWebSocketService.subscribe('quality-metrics-update', (data) => {
-      if (data.jobId === jobId) {
-        callback(data);
-      }
-    });
+    const unsubscribe = pdfProcessingWebSocketService.subscribe(
+      'quality-metrics-update',
+      (data) => {
+        if (data.jobId === jobId) {
+          callback(data);
+        }
+      },
+    );
 
     return unsubscribe;
   }
@@ -304,15 +329,22 @@ class QualityDashboardServiceImpl extends BaseService {
     return 'stable';
   }
 
-  private generateRecommendations(metrics: QualityMetrics, issues: QualityIssue[]): string[] {
+  private generateRecommendations(
+    metrics: QualityMetrics,
+    issues: QualityIssue[],
+  ): string[] {
     const recommendations: string[] = [];
 
     if (metrics.average_image_quality_score < 0.7) {
-      recommendations.push('Improve image quality by enforcing stricter validation rules');
+      recommendations.push(
+        'Improve image quality by enforcing stricter validation rules',
+      );
     }
 
     if (metrics.average_enrichment_score < 0.7) {
-      recommendations.push('Enhance product enrichment with better metadata extraction');
+      recommendations.push(
+        'Enhance product enrichment with better metadata extraction',
+      );
     }
 
     if (metrics.validation_pass_rate < 0.8) {
@@ -320,7 +352,9 @@ class QualityDashboardServiceImpl extends BaseService {
     }
 
     if (issues.length > 0) {
-      recommendations.push(`Address ${issues.length} identified quality issues`);
+      recommendations.push(
+        `Address ${issues.length} identified quality issues`,
+      );
     }
 
     return recommendations;
@@ -328,4 +362,3 @@ class QualityDashboardServiceImpl extends BaseService {
 }
 
 export const QualityDashboardService = QualityDashboardServiceImpl;
-

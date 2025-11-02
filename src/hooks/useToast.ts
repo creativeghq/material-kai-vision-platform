@@ -16,7 +16,7 @@ const toastState: ToastState = { toasts: [] };
 let listeners: Array<(state: ToastState) => void> = [];
 
 const notify = () => {
-  listeners.forEach(listener => listener(toastState));
+  listeners.forEach((listener) => listener(toastState));
 };
 
 const addToast = (toast: Omit<Toast, 'id'>) => {
@@ -41,7 +41,7 @@ const addToast = (toast: Omit<Toast, 'id'>) => {
 };
 
 const removeToast = (id: string) => {
-  toastState.toasts = toastState.toasts.filter(toast => toast.id !== id);
+  toastState.toasts = toastState.toasts.filter((toast) => toast.id !== id);
   notify();
 };
 
@@ -51,7 +51,7 @@ export const useToast = () => {
   const subscribe = useCallback((listener: (state: ToastState) => void) => {
     listeners.push(listener);
     return () => {
-      listeners = listeners.filter(l => l !== listener);
+      listeners = listeners.filter((l) => l !== listener);
     };
   }, []);
 

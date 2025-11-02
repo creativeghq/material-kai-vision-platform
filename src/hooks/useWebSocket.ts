@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-import { WebSocketManager, WebSocketConfig, WebSocketMessage, WebSocketState, WebSocketEventHandlers } from '@/services/websocket/WebSocketManager';
+import {
+  WebSocketManager,
+  WebSocketConfig,
+  WebSocketMessage,
+  WebSocketState,
+  WebSocketEventHandlers,
+} from '@/services/websocket/WebSocketManager';
 
 export interface UseWebSocketOptions extends Omit<WebSocketConfig, 'url'> {
   autoConnect?: boolean;
@@ -30,7 +36,10 @@ export interface UseWebSocketReturn {
  * Provides a simple interface for components to connect to WebSocket servers
  * with automatic reconnection and state management.
  */
-export function useWebSocket(url: string, options: UseWebSocketOptions = {}): UseWebSocketReturn {
+export function useWebSocket(
+  url: string,
+  options: UseWebSocketOptions = {},
+): UseWebSocketReturn {
   const {
     autoConnect = true,
     onMessage,
@@ -40,7 +49,9 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
   } = options;
 
   const wsManagerRef = useRef<WebSocketManager | null>(null);
-  const [state, setState] = useState<WebSocketState>(WebSocketState.DISCONNECTED);
+  const [state, setState] = useState<WebSocketState>(
+    WebSocketState.DISCONNECTED,
+  );
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
@@ -155,16 +166,19 @@ export function useWebSocket(url: string, options: UseWebSocketOptions = {}): Us
     }
   }, []);
 
-  const send = useCallback((message: Omit<WebSocketMessage, 'timestamp' | 'id'>): boolean => {
-    if (!wsManagerRef.current) {
-      console.warn('WebSocket manager not initialized');
-      return false;
-    }
+  const send = useCallback(
+    (message: Omit<WebSocketMessage, 'timestamp' | 'id'>): boolean => {
+      if (!wsManagerRef.current) {
+        console.warn('WebSocket manager not initialized');
+        return false;
+      }
 
-    const success = wsManagerRef.current.send(message);
-    updateStats();
-    return success;
-  }, [updateStats]);
+      const success = wsManagerRef.current.send(message);
+      updateStats();
+      return success;
+    },
+    [updateStats],
+  );
 
   const isConnected = state === WebSocketState.CONNECTED;
 
@@ -212,7 +226,10 @@ export function useRealTimeStatus(
   const { send, isConnected } = useWebSocket(url, {
     ...options,
     onMessage: (message) => {
-      if (message.type === 'status_update' && message.payload.entityId === entityId) {
+      if (
+        message.type === 'status_update' &&
+        message.payload.entityId === entityId
+      ) {
         setStatus(message.payload.status);
         setLastUpdate(new Date());
       }
