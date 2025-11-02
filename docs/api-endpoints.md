@@ -6,15 +6,38 @@
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (API Consolidation - Phase 1):**
+**Recent Updates (API Consolidation - Complete):**
 - ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
 - ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
 - ✅ **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
 - ✅ **REMOVED:** All deprecated endpoints (`/process`, `/process-url`, `/unified-search`)
 - ✅ **REMOVED:** All test endpoints (4 from documents, 1 from main)
+- ✅ **REMOVED:** All legacy `/api/documents/*` endpoints (18 total) - replaced by `/api/rag/*`
 - ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
+
+**Total API Endpoints:** 106 endpoints across 25 categories
 - ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
+
+---
+
+## ⚠️ Important: Legacy Endpoints Removed
+
+**All `/api/documents/*` endpoints have been removed** (except `/api/document-entities/*` which are valid).
+
+**Removed Endpoints (Use `/api/rag/*` instead):**
+- `POST /api/documents/{document_id}/query` → Use `POST /api/rag/query`
+- `GET /api/documents/{document_id}/related` → Use `GET /api/rag/search?strategy=semantic`
+- `POST /api/documents/{document_id}/summarize` → Not implemented
+- `POST /api/documents/{document_id}/extract-entities` → Not implemented
+- `POST /api/documents/compare` → Not implemented
+- `POST /api/documents/process` → Use `POST /api/rag/documents/upload`
+- `POST /api/documents/process-url` → Use `POST /api/rag/documents/upload` with URL
+- `POST /api/documents/analyze` → Use `POST /api/rag/documents/upload`
+- `GET /api/documents/documents` → Use `GET /api/rag/documents`
+- `GET /api/documents/documents/{id}` → Use `GET /api/rag/documents/{id}`
+- `GET /api/documents/documents/{id}/content` → Use `GET /api/rag/documents/documents/{id}/content`
+- `DELETE /api/documents/documents/{id}` → Use `DELETE /api/rag/documents/{id}`
 
 ---
 
@@ -44,7 +67,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 ### 1.1 GET /health
 
 **Purpose:** Unified health check for all MIVAA services
-**Replaces:** 10+ individual health check endpoints (`/api/pdf/health`, `/api/documents/health`, `/api/search/health`, etc.)
+**Replaces:** 10+ individual health check endpoints (`/api/pdf/health`, `/api/rag/health`, `/api/search/health`, etc.)
 
 **Request:**
 ```http
@@ -84,16 +107,18 @@ GET /health
 **Purpose:** Core RAG (Retrieval-Augmented Generation) functionality for document processing, querying, and management
 **Philosophy:** One endpoint per function with parameters for different modes/strategies
 
-### 2.1 POST /documents/upload
+### 2.1 POST /api/rag/documents/upload
 
 **Purpose:** CONSOLIDATED upload endpoint for all document processing scenarios
 **Replaces:**
-- `/api/documents/process` (deprecated)
-- `/api/documents/process-url` (deprecated)
-- `/api/documents/upload` (old version)
-- `/api/rag/documents/upload-with-discovery` (merged)
-- `/api/rag/documents/upload-async` (merged)
-- `/api/rag/documents/upload-focused` (merged)
+- `/api/documents/process` (removed)
+- `/api/documents/process-url` (removed)
+- `/api/documents/upload` (removed)
+- `/api/documents/{document_id}/query` (removed)
+- `/api/documents/{document_id}/related` (removed)
+- `/api/documents/{document_id}/summarize` (removed)
+- `/api/documents/{document_id}/extract-entities` (removed)
+- `/api/documents/compare` (removed)
 
 **Used In:** Main PDF upload modal, Product catalog processing, Simple document upload
 **Flow:** User uploads PDF → AI discovery → Category extraction → Chunking → Image processing → Product creation
@@ -172,20 +197,20 @@ Parameters (Form Data):
 
 **Frontend Integration:**
 - Used in: `PDFUploadModal.tsx`
-- Polls: `GET /documents/job/{job_id}` for progress
+- Polls: `GET /api/rag/documents/job/{job_id}` for progress
 - Displays: Real-time progress with stage indicators
 
 ---
 
-### 1.2 POST /documents/upload-async
+### 2.2 GET /api/rag/documents/job/{job_id}
 
-**Purpose:** Upload PDF with standard async processing (no product discovery)
-**Used In:** Simple document upload without product extraction
-**Flow:** User uploads PDF → Chunking → Embeddings → Complete
+**Purpose:** Get job status and metadata for async processing
+**Used In:** Progress tracking, completion detection, error handling
+**Flow:** Frontend polls this endpoint every 2 seconds during processing
 
 **Request:**
 ```http
-POST /api/rag/documents/upload-async
+GET /api/rag/documents/job/{job_id}
 Content-Type: multipart/form-data
 
 Parameters:
@@ -1363,74 +1388,17 @@ Response: Server-Sent Events with real-time progress
 
 ---
 
-### 2. Document Management (13 endpoints)
+### 2. Document Management - DEPRECATED ⚠️
 
-**Process Document**
-```http
-POST /api/documents/process
-Content-Type: multipart/form-data
+**All `/api/documents/*` endpoints have been removed. Use `/api/rag/*` endpoints instead.**
 
-Parameters:
-- file: PDF file
-- extract_text: boolean
-- extract_images: boolean
-- extract_tables: boolean
-- extract_metadata: boolean
-- page_range: Optional "1-5" or "1,3,5"
-- async_processing: boolean
-
-Response: { success, message, job_id, async_processing }
-```
-
-**Process from URL**
-```http
-POST /api/documents/process-url
-Content-Type: application/json
-
-Body: { url, async_processing }
-Response: { success, message, job_id }
-```
-
-**Analyze Document**
-```http
-POST /api/documents/analyze
-Content-Type: multipart/form-data
-
-Response: { structure, metadata, content_type }
-```
-
-**List Documents**
-```http
-GET /api/documents/documents
-
-Query Parameters:
-- workspace_id: Filter by workspace
-- limit: Results per page (default: 20)
-- offset: Pagination offset
-
-Response: { documents: [...], total_count }
-```
-
-**Get Document**
-```http
-GET /api/documents/documents/{id}
-
-Response: { id, filename, content_type, metadata, created_at }
-```
-
-**Get Document Content**
-```http
-GET /api/documents/documents/{id}/content
-
-Response: { content, format, page_count }
-```
-
-**Delete Document**
-```http
-DELETE /api/documents/documents/{id}
-
-Response: { success, message }
-```
+See Section 2 (RAG System) for current endpoints:
+- Upload: `POST /api/rag/documents/upload`
+- List: `GET /api/rag/documents`
+- Get: `GET /api/rag/documents/{id}`
+- Delete: `DELETE /api/rag/documents/{id}`
+- Query: `POST /api/rag/query`
+- Search: `GET /api/rag/search`
 
 ---
 
