@@ -1,8 +1,8 @@
 /**
  * MIVAA API Client
- * 
+ *
  * Centralized client for all MIVAA backend API calls.
- * 
+ *
  * Features:
  * - Direct calls to MIVAA backend (no proxy overhead)
  * - Supabase auth token integration
@@ -42,7 +42,7 @@ export class MivaaApiClient {
    */
   private async getAuthToken(): Promise<string> {
     const { data: { session }, error } = await supabase.auth.getSession();
-    
+
     if (error || !session) {
       throw new Error('Not authenticated. Please sign in.');
     }
@@ -55,7 +55,7 @@ export class MivaaApiClient {
    */
   private async request<T = any>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
   ): Promise<MivaaApiResponse<T>> {
     try {
       const token = await this.getAuthToken();
@@ -95,7 +95,7 @@ export class MivaaApiClient {
    */
   private async requestFormData<T = any>(
     endpoint: string,
-    formData: FormData
+    formData: FormData,
   ): Promise<MivaaApiResponse<T>> {
     try {
       const token = await this.getAuthToken();

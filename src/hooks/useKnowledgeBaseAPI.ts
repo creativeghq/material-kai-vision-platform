@@ -121,7 +121,7 @@ export const useKnowledgeBaseMetadata = (workspaceId: string | null, entityType?
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to fetch metadata');
@@ -170,7 +170,7 @@ export const useQualityScores = (workspaceId: string | null) => {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to fetch quality scores');
@@ -219,7 +219,7 @@ export const useEmbeddingsStats = (workspaceId: string | null) => {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to fetch embeddings stats');
@@ -249,7 +249,7 @@ export const useDetections = (
   workspaceId: string | null,
   detectionType?: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
 ) => {
   const [data, setData] = useState<DetectionsResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -278,7 +278,7 @@ export const useDetections = (
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to fetch detections');
@@ -327,7 +327,7 @@ export const useQualityDashboard = (workspaceId: string | null, days: number = 3
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to fetch quality dashboard');
@@ -376,7 +376,7 @@ export const usePatterns = (workspaceId: string | null) => {
             Authorization: `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to fetch patterns');

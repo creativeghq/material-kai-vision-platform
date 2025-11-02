@@ -126,7 +126,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       if (job?.id) {
         try {
           const response = await fetch(
-            `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/v1/ai-metrics/job/${job.id}`
+            `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/v1/ai-metrics/job/${job.id}`,
           );
           if (response.ok) {
             const data = await response.json();
@@ -466,7 +466,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         {aiMetrics && aiMetrics.calls && (() => {
                           const stepCalls = aiMetrics.calls.filter((c: any) =>
                             c.task.toLowerCase().includes(step.id.toLowerCase()) ||
-                            step.name.toLowerCase().includes(c.task.toLowerCase())
+                            step.name.toLowerCase().includes(c.task.toLowerCase()),
                           );
                           if (stepCalls.length > 0) {
                             const stepCost = stepCalls.reduce((sum: number, c: any) => sum + (c.cost || 0), 0);
@@ -590,7 +590,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           name: 'LLAMA (LlamaIndex RAG)',
                           purpose: 'Document parsing, chunking, and semantic analysis',
                           status: '✓ Used',
-                          icon: <Brain className="h-3 w-3 text-blue-600" />
+                          icon: <Brain className="h-3 w-3 text-blue-600" />,
                         });
                       }
 
@@ -602,7 +602,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           name: 'Anthropic Claude 3.5 Sonnet',
                           purpose: 'Image validation, product enrichment, and quality assessment',
                           status: '✓ Used',
-                          icon: <Sparkles className="h-3 w-3 text-purple-600" />
+                          icon: <Sparkles className="h-3 w-3 text-purple-600" />,
                         });
                       }
 
@@ -613,7 +613,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           name: 'OpenAI CLIP',
                           purpose: 'Visual embeddings and image-product similarity matching',
                           status: '✓ Used',
-                          icon: <Eye className="h-3 w-3 text-green-600" />
+                          icon: <Eye className="h-3 w-3 text-green-600" />,
                         });
                       }
 
@@ -624,7 +624,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           name: 'OpenAI text-embedding-3-small',
                           purpose: '1536D text embeddings for semantic search',
                           status: '✓ Used',
-                          icon: <Zap className="h-3 w-3 text-yellow-600" />
+                          icon: <Zap className="h-3 w-3 text-yellow-600" />,
                         });
                       }
 
@@ -637,7 +637,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           name: 'Specialized Embeddings',
                           purpose: 'Color (256D), Texture (256D), Application (512D) embeddings',
                           status: '✓ Generated',
-                          icon: <Target className="h-3 w-3 text-orange-600" />
+                          icon: <Target className="h-3 w-3 text-orange-600" />,
                         });
                       }
 
@@ -779,7 +779,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                             { name: 'Processing Quality', value: '0.90', status: 'excellent' },
                             { name: 'Content Extraction', value: '0.88', status: 'excellent' },
                             { name: 'Metadata Richness', value: '0.85', status: 'good' },
-                          ]
+                          ],
                         });
                       }
 
@@ -842,7 +842,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               label: 'Text Chunks',
                               count: parseInt(chunkMatch[1]),
                               icon: <FileText className="h-3 w-3" />,
-                              color: 'text-blue-600'
+                              color: 'text-blue-600',
                             });
                           }
 
@@ -853,7 +853,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               label: 'Images Extracted',
                               count: parseInt(imageMatch[1]),
                               icon: <Eye className="h-3 w-3" />,
-                              color: 'text-green-600'
+                              color: 'text-green-600',
                             });
                           }
 
@@ -864,7 +864,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               label: 'Products Detected',
                               count: parseInt(productMatch[1]),
                               icon: <Package className="h-3 w-3" />,
-                              color: 'text-purple-600'
+                              color: 'text-purple-600',
                             });
                           }
 
@@ -875,7 +875,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               label: 'Embeddings Generated',
                               count: parseInt(embeddingMatch[1]),
                               icon: <Zap className="h-3 w-3" />,
-                              color: 'text-yellow-600'
+                              color: 'text-yellow-600',
                             });
                           }
 
@@ -886,7 +886,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               label: 'Image-Product Links',
                               count: parseInt(associationMatch[1]),
                               icon: <Link className="h-3 w-3" />,
-                              color: 'text-orange-600'
+                              color: 'text-orange-600',
                             });
                           }
 
@@ -897,7 +897,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                               label: 'Metadata Fields',
                               count: parseInt(metadataMatch[1]),
                               icon: <Hash className="h-3 w-3" />,
-                              color: 'text-pink-600'
+                              color: 'text-pink-600',
                             });
                           }
                         });
@@ -910,7 +910,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           results.push(
                             { label: 'Text Chunks', count: 0, icon: <FileText className="h-3 w-3" />, color: 'text-blue-600' },
                             { label: 'Images Extracted', count: 0, icon: <Eye className="h-3 w-3" />, color: 'text-green-600' },
-                            { label: 'Embeddings Generated', count: 0, icon: <Zap className="h-3 w-3" />, color: 'text-yellow-600' }
+                            { label: 'Embeddings Generated', count: 0, icon: <Zap className="h-3 w-3" />, color: 'text-yellow-600' },
                           );
                         }
                       }

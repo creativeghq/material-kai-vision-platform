@@ -76,7 +76,7 @@ class ConsolidatedPDFWorkflowService {
    */
   async startPDFProcessing(
     file: File,
-    options: PDFProcessingOptions = {}
+    options: PDFProcessingOptions = {},
   ): Promise<string> {
     const jobId = crypto.randomUUID();
 
@@ -109,7 +109,7 @@ class ConsolidatedPDFWorkflowService {
   private async processFile(
     jobId: string,
     file: File,
-    options: PDFProcessingOptions
+    options: PDFProcessingOptions,
   ): Promise<void> {
     try {
       // Update status
@@ -164,7 +164,7 @@ class ConsolidatedPDFWorkflowService {
   private async pollMivaaJobStatus(
     jobId: string,
     mivaaJobId: string,
-    documentId: string
+    documentId: string,
   ): Promise<void> {
     const pollInterval = setInterval(async () => {
       try {
@@ -333,7 +333,7 @@ class ConsolidatedPDFWorkflowService {
     stepIndex: number,
     status?: WorkflowStep['status'],
     message?: string,
-    progress?: number
+    progress?: number,
   ): void {
     const job = this.jobs.get(jobId);
     if (!job || !job.steps[stepIndex]) return;

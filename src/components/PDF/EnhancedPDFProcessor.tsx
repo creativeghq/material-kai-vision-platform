@@ -463,7 +463,7 @@ export function EnhancedPDFProcessor() {
           imageMappingAccuracy: calculateImageMappingAccuracy(extractionResult?.content?.images || []),
           overallQuality: calculateOverallQuality(
             extractionResult?.content?.chunks || [],
-            extractionResult?.content?.images || []
+            extractionResult?.content?.images || [],
           ),
           statistics: {
             totalChunks: extractionResult?.content?.chunks?.length || 1,

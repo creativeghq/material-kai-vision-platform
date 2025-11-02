@@ -32,7 +32,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  
+
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -51,34 +51,34 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       setLongDescription((product as any).long_description || '');
       setCategory(product.category || '');
       setStatus((product as any).status || 'draft');
-      
+
       // Convert properties object to array
       if (product.properties) {
         setProperties(
           Object.entries(product.properties).map(([key, value]) => ({
             key,
             value: String(value),
-          }))
+          })),
         );
       }
-      
+
       // Convert specifications object to array
       if (product.specifications) {
         setSpecifications(
           Object.entries(product.specifications).map(([key, value]) => ({
             key,
             value: String(value),
-          }))
+          })),
         );
       }
-      
+
       // Convert metadata object to array
       if (product.metadata) {
         setMetadata(
           Object.entries(product.metadata).map(([key, value]) => ({
             key,
             value: String(value),
-          }))
+          })),
         );
       }
     } else if (mode === 'create') {
@@ -112,17 +112,17 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
     type: 'properties' | 'specifications' | 'metadata',
     index: number,
     field: 'key' | 'value',
-    value: string
+    value: string,
   ) => {
     const setter = type === 'properties' ? setProperties : type === 'specifications' ? setSpecifications : setMetadata;
     setter((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
     );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation
     if (!name.trim()) {
       toast({
@@ -166,12 +166,12 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
       (productData as any).status = status;
 
       await onSave(productData);
-      
+
       toast({
         title: mode === 'create' ? 'Product Created' : 'Product Updated',
         description: `${name} has been ${mode === 'create' ? 'created' : 'updated'} successfully`,
       });
-      
+
       onOpenChange(false);
       resetForm();
     } catch (error) {
@@ -189,7 +189,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
   const renderPropertyFields = (
     type: 'properties' | 'specifications' | 'metadata',
     fields: PropertyField[],
-    label: string
+    label: string,
   ) => (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -255,7 +255,7 @@ export const ProductFormModal: React.FC<ProductFormModalProps> = ({
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Basic Information</h3>
-            
+
             <div className="space-y-2">
               <Label htmlFor="name">Product Name *</Label>
               <Input

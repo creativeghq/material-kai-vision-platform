@@ -416,7 +416,7 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
                 description,
                 imageBuffer: Buffer.from(image.image_data, 'base64'),
               };
-            })
+            }),
           );
 
           extractedData = {

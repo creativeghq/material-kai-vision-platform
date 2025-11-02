@@ -22,7 +22,6 @@ import { MaterialKnowledgeBase } from './components/Admin/MaterialKnowledgeBase'
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
-import { MetadataFieldsManagement } from './components/Admin/MetadataFieldsManagement';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
 import { AIMonitoringDashboard } from './components/Admin/AIMonitoringDashboard';
 import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
@@ -215,15 +214,6 @@ const App = () => (
                 <AdminGuard>
                   <Layout>
                     <IntegratedRAGManagement />
-                  </Layout>
-                </AdminGuard>
-              </AuthGuard>
-            } />
-            <Route path="/admin/metadata" element={
-              <AuthGuard>
-                <AdminGuard>
-                  <Layout>
-                    <MetadataFieldsManagement />
                   </Layout>
                 </AdminGuard>
               </AuthGuard>

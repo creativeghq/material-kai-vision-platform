@@ -1,6 +1,6 @@
 /**
  * AI Monitoring Dashboard
- * 
+ *
  * Comprehensive admin dashboard for monitoring AI usage across the platform:
  * - Real-time cost tracking
  * - Model usage statistics
@@ -15,17 +15,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  Activity, 
-  DollarSign, 
-  Zap, 
-  TrendingUp, 
+import {
+  Activity,
+  DollarSign,
+  Zap,
+  TrendingUp,
   AlertTriangle,
   Clock,
   CheckCircle,
   XCircle,
   RefreshCw,
-  Download
+  Download,
 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -84,15 +84,15 @@ export const AIMonitoringDashboard: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/v1/ai-metrics/summary?time_period=${timePeriod}`
+        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/v1/ai-metrics/summary?time_period=${timePeriod}`,
       );
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch metrics: ${response.statusText}`);
       }
-      
+
       const data = await response.json();
       setMetrics(data);
     } catch (err) {
@@ -177,7 +177,7 @@ export const AIMonitoringDashboard: React.FC = () => {
             </SelectContent>
           </Select>
           <Button
-            variant={autoRefresh ? "default" : "outline"}
+            variant={autoRefresh ? 'default' : 'outline'}
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
           >
@@ -281,7 +281,7 @@ export const AIMonitoringDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <Badge variant={model.average_confidence > 0.8 ? "default" : "secondary"}>
+                        <Badge variant={model.average_confidence > 0.8 ? 'default' : 'secondary'}>
                           {formatPercentage(model.average_confidence)}
                         </Badge>
                         <div className="text-xs text-muted-foreground mt-1">

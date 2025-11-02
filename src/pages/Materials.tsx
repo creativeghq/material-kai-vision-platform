@@ -11,7 +11,7 @@ import type { Material } from '@/types/materials';
 
 /**
  * Materials Page
- * 
+ *
  * Displays all products from the knowledge base in a searchable, filterable catalog.
  * Integrates with the MaterialCatalogListing component for consistent UI/UX.
  */

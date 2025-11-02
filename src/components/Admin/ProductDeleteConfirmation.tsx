@@ -35,12 +35,12 @@ export const ProductDeleteConfirmation: React.FC<ProductDeleteConfirmationProps>
     setLoading(true);
     try {
       await onConfirm(product.id);
-      
+
       toast({
         title: 'Product Deleted',
         description: `${product.name} has been permanently deleted`,
       });
-      
+
       onOpenChange(false);
     } catch (error) {
       console.error('Error deleting product:', error);
@@ -73,7 +73,7 @@ export const ProductDeleteConfirmation: React.FC<ProductDeleteConfirmationProps>
             </p>
             {product.sourceChunkIds && product.sourceChunkIds.length > 0 && (
               <p className="text-sm text-muted-foreground mt-2">
-                Note: This product is linked to {product.sourceChunkIds.length} chunk(s). 
+                Note: This product is linked to {product.sourceChunkIds.length} chunk(s).
                 The chunks will not be deleted, but the product relationship will be removed.
               </p>
             )}

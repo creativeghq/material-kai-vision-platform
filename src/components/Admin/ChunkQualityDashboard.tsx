@@ -12,7 +12,7 @@ import {
   FileText,
   TrendingUp,
   TrendingDown,
-  Filter
+  Filter,
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -68,7 +68,7 @@ export const ChunkQualityDashboard: React.FC = () => {
   const fetchFlaggedChunks = async (reviewed: boolean) => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/flagged?reviewed=${reviewed}&limit=50`
+        `${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/flagged?reviewed=${reviewed}&limit=50`,
       );
       if (!response.ok) throw new Error('Failed to fetch flagged chunks');
       const data = await response.json();
@@ -85,11 +85,11 @@ export const ChunkQualityDashboard: React.FC = () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action })
-        }
+          body: JSON.stringify({ action }),
+        },
       );
       if (!response.ok) throw new Error('Failed to review chunk');
-      
+
       // Refresh flagged chunks
       await fetchFlaggedChunks(showReviewed);
       await fetchMetrics();
@@ -222,7 +222,7 @@ export const ChunkQualityDashboard: React.FC = () => {
                   const total = metrics.total_chunks;
                   const percentage = total > 0 ? (count / total) * 100 : 0;
                   const isGood = range.startsWith('0.7') || range.startsWith('0.85');
-                  
+
                   return (
                     <div key={range} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
@@ -290,7 +290,7 @@ export const ChunkQualityDashboard: React.FC = () => {
                       <p className="text-muted-foreground mb-1">Content Preview:</p>
                       <p className="line-clamp-2">{chunk.content_preview}</p>
                     </div>
-                    
+
                     {!chunk.reviewed && (
                       <div className="flex gap-2">
                         <Button
@@ -318,7 +318,7 @@ export const ChunkQualityDashboard: React.FC = () => {
                         </Button>
                       </div>
                     )}
-                    
+
                     {chunk.reviewed && (
                       <div className="text-sm text-muted-foreground">
                         Reviewed: {chunk.review_action} on {new Date(chunk.reviewed_at!).toLocaleDateString()}

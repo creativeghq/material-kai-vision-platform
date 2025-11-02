@@ -43,6 +43,86 @@ import {
   usePatterns,
 } from '@/hooks/useKnowledgeBaseAPI';
 
+// Component to display AI cost information for an image
+const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) => {
+  const [aiCost, setAiCost] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    const fetchAICost = async () => {
+      if (imageId) {
+        try {
+          // Query ai_call_logs for this image
+          const { data, error } = await supabase
+            .from('ai_call_logs')
+            .select('*')
+            .or(`request_data->image_id.eq.${imageId},response_data->image_id.eq.${imageId}`)
+            .order('timestamp', { ascending: false });
+
+          if (!error && data && data.length > 0) {
+            const totalCost = data.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0);
+            const clipCalls = data.filter(log => log.task.includes('embedding') || log.model.includes('clip'));
+            const llamaCalls = data.filter(log => log.model.includes('llama'));
+            const claudeCalls = data.filter(log => log.model.includes('claude'));
+
+            setAiCost({
+              total: totalCost,
+              clip: clipCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+              llama: llamaCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+              claude: claudeCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
+              calls: data.length,
+            });
+          }
+        } catch (err) {
+          console.error('Failed to fetch AI cost:', err);
+        }
+      }
+    };
+
+    fetchAICost();
+  }, [imageId]);
+
+  if (!aiCost || aiCost.total <= 0) {
+    return null;
+  }
+
+  return (
+    <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg p-4 border border-green-200 dark:border-green-800">
+      <h4 className="font-semibold mb-3 text-green-900 dark:text-green-100 flex items-center gap-2">
+        <DollarSign className="h-4 w-4" />
+        AI Processing Cost
+      </h4>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-green-700 dark:text-green-300">Total Cost:</span>
+          <span className="font-bold text-green-900 dark:text-green-100">${aiCost.total.toFixed(4)}</span>
+        </div>
+        {aiCost.clip > 0 && (
+          <div className="flex justify-between">
+            <span className="text-green-700 dark:text-green-300">CLIP Embedding:</span>
+            <span className="font-medium text-green-900 dark:text-green-100">${aiCost.clip.toFixed(4)}</span>
+          </div>
+        )}
+        {aiCost.llama > 0 && (
+          <div className="flex justify-between">
+            <span className="text-green-700 dark:text-green-300">Llama Analysis:</span>
+            <span className="font-medium text-green-900 dark:text-green-100">${aiCost.llama.toFixed(4)}</span>
+          </div>
+        )}
+        {aiCost.claude > 0 && (
+          <div className="flex justify-between">
+            <span className="text-green-700 dark:text-green-300">Claude Vision:</span>
+            <span className="font-medium text-green-900 dark:text-green-100">${aiCost.claude.toFixed(4)}</span>
+          </div>
+        )}
+        <div className="flex justify-between pt-2 border-t border-green-200 dark:border-green-700">
+          <span className="text-green-700 dark:text-green-300">AI Calls:</span>
+          <span className="font-medium text-green-900 dark:text-green-100">{aiCost.calls}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 interface DocumentChunk {
   id: string;
   document_id: string;
@@ -723,7 +803,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
     return chunks.filter(chunk =>
       chunk.content?.toLowerCase().includes(query) ||
       chunk.chunk_index?.toString().includes(query) ||
-      getDocumentDisplayName(chunk).toLowerCase().includes(query)
+      getDocumentDisplayName(chunk).toLowerCase().includes(query),
     );
   }, [chunks, debouncedSearchQuery]);
 
@@ -733,7 +813,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
     return images.filter(image =>
       image.caption?.toLowerCase().includes(query) ||
       image.contextual_name?.toLowerCase().includes(query) ||
-      image.nearest_heading?.toLowerCase().includes(query)
+      image.nearest_heading?.toLowerCase().includes(query),
     );
   }, [images, debouncedSearchQuery]);
 
@@ -742,7 +822,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
     const query = debouncedSearchQuery.toLowerCase();
     return products.filter(product =>
       product.name?.toLowerCase().includes(query) ||
-      product.description?.toLowerCase().includes(query)
+      product.description?.toLowerCase().includes(query),
     );
   }, [products, debouncedSearchQuery]);
 
@@ -1400,7 +1480,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                         <div className="space-y-2 max-h-64 overflow-y-auto">
                                           {relatedChunks.map((chunk) => {
                                             const relationship = imageChunkRelationships.find(
-                                              r => r.image_id === image.id && r.chunk_id === chunk.id
+                                              r => r.image_id === image.id && r.chunk_id === chunk.id,
                                             );
                                             return (
                                               <div key={chunk.id} className="bg-white dark:bg-gray-900 rounded p-3 border border-amber-100 dark:border-amber-800">
@@ -1489,83 +1569,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   )}
 
                                   {/* AI Cost Information */}
-                                  {(() => {
-                                    const [aiCost, setAiCost] = React.useState<any>(null);
-
-                                    React.useEffect(() => {
-                                      const fetchAICost = async () => {
-                                        if (image.id) {
-                                          try {
-                                            // Query ai_call_logs for this image
-                                            const { data, error } = await supabase
-                                              .from('ai_call_logs')
-                                              .select('*')
-                                              .or(`request_data->image_id.eq.${image.id},response_data->image_id.eq.${image.id}`)
-                                              .order('timestamp', { ascending: false });
-
-                                            if (!error && data && data.length > 0) {
-                                              const totalCost = data.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0);
-                                              const clipCalls = data.filter(log => log.task.includes('embedding') || log.model.includes('clip'));
-                                              const llamaCalls = data.filter(log => log.model.includes('llama'));
-                                              const claudeCalls = data.filter(log => log.model.includes('claude'));
-
-                                              setAiCost({
-                                                total: totalCost,
-                                                clip: clipCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
-                                                llama: llamaCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
-                                                claude: claudeCalls.reduce((sum, log) => sum + (parseFloat(log.cost) || 0), 0),
-                                                calls: data.length
-                                              });
-                                            }
-                                          } catch (err) {
-                                            console.error('Failed to fetch AI cost:', err);
-                                          }
-                                        }
-                                      };
-
-                                      fetchAICost();
-                                    }, [image.id]);
-
-                                    if (aiCost && aiCost.total > 0) {
-                                      return (
-                                        <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 rounded-lg p-4 border border-green-200 dark:border-green-800">
-                                          <h4 className="font-semibold mb-3 text-green-900 dark:text-green-100 flex items-center gap-2">
-                                            <DollarSign className="h-4 w-4" />
-                                            AI Processing Cost
-                                          </h4>
-                                          <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                              <span className="text-green-700 dark:text-green-300">Total Cost:</span>
-                                              <span className="font-bold text-green-900 dark:text-green-100">${aiCost.total.toFixed(4)}</span>
-                                            </div>
-                                            {aiCost.clip > 0 && (
-                                              <div className="flex justify-between">
-                                                <span className="text-green-700 dark:text-green-300">CLIP Embedding:</span>
-                                                <span className="font-medium text-green-900 dark:text-green-100">${aiCost.clip.toFixed(4)}</span>
-                                              </div>
-                                            )}
-                                            {aiCost.llama > 0 && (
-                                              <div className="flex justify-between">
-                                                <span className="text-green-700 dark:text-green-300">Llama Analysis:</span>
-                                                <span className="font-medium text-green-900 dark:text-green-100">${aiCost.llama.toFixed(4)}</span>
-                                              </div>
-                                            )}
-                                            {aiCost.claude > 0 && (
-                                              <div className="flex justify-between">
-                                                <span className="text-green-700 dark:text-green-300">Claude Vision:</span>
-                                                <span className="font-medium text-green-900 dark:text-green-100">${aiCost.claude.toFixed(4)}</span>
-                                              </div>
-                                            )}
-                                            <div className="flex justify-between pt-2 border-t border-green-200 dark:border-green-700">
-                                              <span className="text-green-700 dark:text-green-300">AI Calls:</span>
-                                              <span className="font-medium text-green-900 dark:text-green-100">{aiCost.calls}</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
+                                  <ImageAICostDisplay imageId={image.id} />
 
                                   {image.metadata && (
                                     <div className="bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-950 dark:to-rose-900 rounded-lg p-4 border border-rose-200 dark:border-rose-800">
@@ -2643,7 +2647,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                   style={{
                                     width: `${Math.min(
                                       100,
-                                      ((count as number) / Math.max(...Object.values(detectionsData.timeline!))) * 100
+                                      ((count as number) / Math.max(...Object.values(detectionsData.timeline!))) * 100,
                                     )}%`,
                                   }}
                                 />

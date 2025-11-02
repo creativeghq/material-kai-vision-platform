@@ -28,7 +28,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 
 // RAGManagementPanel removed - functionality consolidated into IntegratedRAGManagement
-import { MetadataFieldsManagement } from './MetadataFieldsManagement';
 import { AITestingPanel } from './AITestingPanel';
 import { QualityMetricsDashboard } from './QualityMetricsDashboard';
 import { HumanReviewPanel } from './HumanReviewPanel';
@@ -255,7 +254,6 @@ export const AdminPanel: React.FC = () => {
           <TabsTrigger value="rag">RAG System</TabsTrigger>
           <TabsTrigger value="quality">Quality Metrics</TabsTrigger>
           <TabsTrigger value="review">Human Review</TabsTrigger>
-          <TabsTrigger value="metadata">Metadata Fields</TabsTrigger>
           <TabsTrigger value="testing">AI Testing</TabsTrigger>
         </TabsList>
 
@@ -433,10 +431,6 @@ export const AdminPanel: React.FC = () => {
 
         <TabsContent value="review" className="space-y-4">
           <HumanReviewPanel />
-        </TabsContent>
-
-        <TabsContent value="metadata" className="space-y-4">
-          <MetadataFieldsManagement />
         </TabsContent>
 
         <TabsContent value="testing" className="space-y-4">

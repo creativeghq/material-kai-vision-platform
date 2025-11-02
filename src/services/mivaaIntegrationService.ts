@@ -209,7 +209,7 @@ export class MivaaIntegrationService {
             if (!response.ok) {
               // Throw error for retry logic to handle
               const error = new Error(
-                `MIVAA API error: ${response.status} - ${responseData.message || 'Unknown error'}`
+                `MIVAA API error: ${response.status} - ${responseData.message || 'Unknown error'}`,
               );
               (error as any).status = response.status;
               (error as any).details = responseData;
@@ -239,7 +239,7 @@ export class MivaaIntegrationService {
               }
               return true;
             },
-          }
+          },
         );
       });
     } catch (error) {

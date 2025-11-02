@@ -37,7 +37,7 @@ export const PDFDocumentDetails: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [document, setDocument] = useState<DocumentDetails | null>(null);
 
