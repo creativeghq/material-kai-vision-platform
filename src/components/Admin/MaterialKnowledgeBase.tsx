@@ -18,8 +18,9 @@ import {
   Edit,
   Trash2,
   DollarSign,
+  ExternalLink,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ProductFormModal } from './ProductFormModal';
 import { ProductDeleteConfirmation } from './ProductDeleteConfirmation';
 import { ProductPreviewModal } from './ProductPreviewModal';
@@ -114,6 +115,7 @@ interface KnowledgeBaseStats {
 }
 
 export const MaterialKnowledgeBase: React.FC = () => {
+  const navigate = useNavigate();
   const [chunks, setChunks] = useState<DocumentChunk[]>([]);
   const [images, setImages] = useState<DocumentImage[]>([]);
   const [embeddings, setEmbeddings] = useState<Embedding[]>([]);
@@ -989,11 +991,16 @@ export const MaterialKnowledgeBase: React.FC = () => {
                       const doc = (firstChunk as any).documents;
 
                       return (
-                        <div key={docId} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                        <div
+                          key={docId}
+                          className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
+                          onClick={() => navigate(`/admin/documents/${docId}`)}
+                        >
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
-                              <p className="font-semibold">
+                              <p className="font-semibold flex items-center gap-2 group-hover:text-primary">
                                 {getDocumentDisplayName(firstChunk)}
+                                <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
                                 📄 {doc?.filename || 'Unknown filename'}
@@ -1023,7 +1030,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
                             </Badge>
                           </div>
 
-
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/admin/documents/${docId}`);
+                            }}
+                          >
+                            View Details
+                            <ChevronRight className="h-4 w-4 ml-2" />
+                          </Button>
                         </div>
                       );
                     })}
