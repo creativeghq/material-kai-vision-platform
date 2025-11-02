@@ -113,13 +113,13 @@ export default [
       'jsx-a11y/click-events-have-key-events': 'off',
       'jsx-a11y/no-static-element-interactions': 'off',
 
-      // Formatting - warnings only
-      'quotes': ['warn', 'single', { avoidEscape: true }],
-      'semi': ['warn', 'always'],
-      'comma-dangle': ['warn', 'always-multiline'],
+      // Formatting - errors for auto-fix
+      'quotes': ['error', 'single', { avoidEscape: true }],
+      'semi': ['error', 'always'],
+      'comma-dangle': ['error', 'always-multiline'],
       'indent': 'off', // Too many conflicts with existing code
-      'no-trailing-spaces': 'warn',
-      'eol-last': 'warn',
+      'no-trailing-spaces': 'error',
+      'eol-last': 'error',
     },
     settings: {
       react: {
