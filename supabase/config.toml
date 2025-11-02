@@ -7,60 +7,34 @@ schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 10000
 
+# ==================== EXISTING FUNCTIONS ====================
+# Only functions that actually exist in supabase/functions/
+
 [functions.crewai-3d-generation]
 verify_jwt = false
 
-[functions.material-agent-orchestrator]
+[functions.crm-contacts-api]
 verify_jwt = false
 
-[functions.huggingface-model-trainer]
+[functions.crm-stripe-api]
 verify_jwt = false
 
-[functions.material-scraper]
+[functions.crm-users-api]
 verify_jwt = false
 
-
-
-[functions.ocr-processing]
+[functions.mivaa-gateway]
 verify_jwt = false
 
 [functions.parse-sitemap]
+verify_jwt = false
+
+[functions.pdf-batch-process]
 verify_jwt = false
 
 [functions.scrape-session-manager]
 verify_jwt = false
 
 [functions.scrape-single-page]
-verify_jwt = false
-
-[functions.spaceformer-analysis]
-verify_jwt = false
-
-[functions.svbrdf-extractor]
-verify_jwt = false
-
-[functions.mivaa-gateway]
-verify_jwt = false
-
-[functions.advanced-search-recommendation]
-verify_jwt = false
-
-[functions.admin-kb-metadata]
-verify_jwt = false
-
-[functions.admin-kb-quality-scores]
-verify_jwt = false
-
-[functions.admin-kb-embeddings-stats]
-verify_jwt = false
-
-[functions.admin-kb-detections]
-verify_jwt = false
-
-[functions.admin-kb-quality-dashboard]
-verify_jwt = false
-
-[functions.admin-kb-patterns]
 verify_jwt = false
 
 [auth]
