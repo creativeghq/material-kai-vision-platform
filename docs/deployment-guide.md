@@ -85,7 +85,7 @@
 The Material Kai Vision Platform uses a multi-service deployment strategy:
 
 1. **Frontend**: Vercel (Static hosting + Edge functions)
-2. **MIVAA Service**: Docker containers (Self-hosted or cloud)
+2. **MIVAA Service**: Systemd service with UV (Self-hosted server)
 3. **Database**: Supabase (Managed PostgreSQL)
 4. **External APIs**: Third-party services (OpenAI, Anthropic, Together AI, Replicate)
 
@@ -95,17 +95,17 @@ The Material Kai Vision Platform uses a multi-service deployment strategy:
 graph TB
     subgraph "Production Environment"
         A[Vercel Frontend<br/>Static + Edge]
-        B[MIVAA Service<br/>Docker Container]
+        B[MIVAA Service<br/>Systemd + UV]
         C[Supabase<br/>Database + Auth]
-        D[External APIs<br/>OpenAI, HuggingFace]
+        D[External APIs<br/>OpenAI, Anthropic, Together AI]
     end
-    
+
     subgraph "Development Environment"
         E[Local Frontend<br/>localhost:5173]
         F[Local MIVAA<br/>localhost:8000]
         G[Supabase Cloud<br/>Shared Instance]
     end
-    
+
     A --> B
     A --> C
     B --> C
@@ -265,21 +265,15 @@ export default defineConfig({
 });
 ```
 
-## 🐳 MIVAA Service Deployment (Docker)
+## ⚙️ MIVAA Service Deployment (Systemd + UV)
 
-### 🚀 Deployment Options
+### 🚀 Deployment Method
 
-#### 🔄 Default Deployment (Recommended)
-- **Automatic**: Triggers on push to `main` or `production` branches
-- **Fast & Reliable**: Optimized for regular deployments (2-3 minutes)
-- **Manual Option**: Available via GitHub Actions workflow_dispatch
-- **Health Monitoring**: Real-time endpoint testing with auto-recovery
-
-#### 🚀 Orchestrated Deployment (Advanced)
-- **On-Demand Only**: Manual trigger via GitHub Actions
-- **Multi-Phase Pipeline**: Intelligence, validation, and comprehensive reporting
-- **Configurable**: Multiple deployment modes (fast-track, intelligent, comprehensive)
-- **Advanced Diagnostics**: Comprehensive system analysis and auto-recovery
+The MIVAA backend service is deployed using:
+- **UV Package Manager**: Fast Python package installer and resolver
+- **Systemd Service**: Linux service manager for process control
+- **GitHub Actions**: Automated CI/CD pipeline
+- **Direct File Deployment**: No containers, optimized for fast updates
 
 ### 🏥 Health Check & Monitoring Features
 
@@ -315,133 +309,111 @@ All MIVAA service endpoints are available at:
 - **AI Analysis**: `https://v1api.materialshub.gr/api/v1/ai/*`
 - **Vector Search**: `https://v1api.materialshub.gr/api/v1/search/*`
 
-### Docker Configuration
+### 📋 Systemd Service Configuration
 
-**Dockerfile**:
-```dockerfile
-FROM python:3.9-slim
+**Service File**: `/etc/systemd/system/mivaa-pdf-extractor.service`
 
-WORKDIR /app
+```ini
+[Unit]
+Description=MIVAA PDF Extractor FastAPI service
+After=network.target
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/mivaa-pdf-extractor
+Environment=SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
+Environment=SUPABASE_SERVICE_KEY=<your-service-key>
+Environment=TOGETHER_AI_API_KEY=<your-together-ai-key>
+Environment=ANTHROPIC_API_KEY=<your-anthropic-key>
+Environment=OPENAI_API_KEY=<your-openai-key>
+ExecStart=/var/www/mivaa-pdf-extractor/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 8000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
-
-# Start application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+[Install]
+WantedBy=multi-user.target
 ```
 
-**Docker Compose** (`docker-compose.yml`):
-```yaml
-version: '3.8'
+### 🚀 Deployment Process
 
-services:
-  mivaa-service:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - ENVIRONMENT=production
-      - DEBUG=false
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-    volumes:
-      - ./logs:/var/log/mivaa
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+#### **Automated Deployment (GitHub Actions)**
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./ssl:/etc/nginx/ssl
-    depends_on:
-      - mivaa-service
-    restart: unless-stopped
-```
+The deployment is fully automated via GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
-### Deployment Options
+1. **Code Push**: Push to `main` branch triggers deployment
+2. **SSH Connection**: Connects to production server (104.248.68.3)
+3. **Code Update**: Pulls latest code from GitHub
+4. **Dependency Installation**: Uses UV to install/update dependencies
+5. **Service Update**: Updates systemd service file with latest environment variables
+6. **Service Restart**: Restarts the mivaa-pdf-extractor service
+7. **Health Check**: Verifies all endpoints are responding correctly
+8. **Auto-Recovery**: Automatically restarts service if health checks fail
 
-#### Option 1: Cloud Provider (AWS/GCP/Azure)
+#### **Manual Deployment**
 
-**AWS ECS Deployment**:
+If you need to deploy manually:
+
 ```bash
-# Build and push to ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin your-account.dkr.ecr.us-east-1.amazonaws.com
+# SSH into server
+ssh root@104.248.68.3
 
-docker build -t mivaa-service .
-docker tag mivaa-service:latest your-account.dkr.ecr.us-east-1.amazonaws.com/mivaa-service:latest
-docker push your-account.dkr.ecr.us-east-1.amazonaws.com/mivaa-service:latest
+# Navigate to project directory
+cd /var/www/mivaa-pdf-extractor
 
-# Deploy to ECS
-aws ecs update-service --cluster mivaa-cluster --service mivaa-service --force-new-deployment
+# Pull latest code
+git pull origin main
+
+# Install/update dependencies with UV
+uv pip install -r requirements.txt
+
+# Restart service
+sudo systemctl restart mivaa-pdf-extractor
+
+# Check service status
+sudo systemctl status mivaa-pdf-extractor
+
+# View logs
+sudo journalctl -u mivaa-pdf-extractor -f
 ```
 
-#### Option 2: VPS/Dedicated Server
+### 🔧 Server Setup (One-Time)
 
-**Setup Script** (`deploy/setup-server.sh`):
+**Initial Server Configuration**:
+
 ```bash
-#!/bin/bash
-
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-sudo usermod -aG docker $USER
+# Install Python 3.11
+sudo apt install python3.11 python3.11-venv python3-pip -y
 
-# Install Docker Compose
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-sudo chmod +x /usr/local/bin/docker-compose
+# Install UV package manager
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Clone repository
-git clone https://github.com/your-org/material-kai-vision-platform.git
-cd material-kai-vision-platform/mivaa-pdf-extractor
+cd /var/www
+git clone https://github.com/creativeghq/mivaa-pdf-extractor.git
+cd mivaa-pdf-extractor
 
-# Set up environment variables for Docker deployment
-# These MUST be available in the shell environment where docker-compose runs
-export SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_ANON_KEY="your-anon-key"
-export OPENAI_API_KEY="your-openai-key"
-export MATERIAL_KAI_API_URL="https://your-platform-url.com"
-export MATERIAL_KAI_API_KEY="your-api-key"
-export SENTRY_DSN="your-sentry-dsn"
+# Create virtual environment
+python3.11 -m venv .venv
 
-# Deploy
-docker-compose -f docker-compose.prod.yml up -d
+# Install dependencies
+uv pip install -r requirements.txt
 
-# Set up SSL with Let's Encrypt
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
+# Create systemd service (see configuration above)
+sudo nano /etc/systemd/system/mivaa-pdf-extractor.service
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable mivaa-pdf-extractor
+sudo systemctl start mivaa-pdf-extractor
+
+# Check status
+sudo systemctl status mivaa-pdf-extractor
 ```
 
 ## 🤖 GitHub Actions Deployment Workflows
@@ -783,20 +755,17 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Deploy to server
-        env:
-          # ⚠️ IMPORTANT: Use GH_TOKEN, not GITHUB_TOKEN as env var name
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.KEY }}
           script: |
-            cd /app/material-kai-vision-platform
+            cd /var/www/mivaa-pdf-extractor
             git pull origin main
-            # Authenticate with GitHub Container Registry
-            echo "$GH_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker-compose -f docker-compose.prod.yml up -d --build
+            uv pip install -r requirements.txt
+            sudo systemctl restart mivaa-pdf-extractor
+            sudo systemctl status mivaa-pdf-extractor
 ```
 
 ### ⚠️ GitHub Actions Security Notes
@@ -805,40 +774,34 @@ jobs:
    - ✅ **Correct**: `GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
    - ❌ **Wrong**: `GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`
 
-2. **Container Registry Authentication**: Always authenticate before pulling private images
-   ```bash
-   echo "$GH_TOKEN" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-   ```
+2. **SSH Key Security**: Always use SSH keys stored in GitHub Secrets for server access
 
 ## 🚨 Deployment Issues & Solutions
 
 ### Common Issues
 
-1. **Missing Docker Environment Variables**:
-   - **Problem**: Docker shows warnings like "variable is not set. Defaulting to a blank string"
-   - **Solution**: Ensure all required environment variables are exported on the deployment server:
-     ```bash
-     export SUPABASE_URL="https://your-project.supabase.co"
-     export SUPABASE_ANON_KEY="your-anon-key"
-     export OPENAI_API_KEY="your-openai-key"
-     export MATERIAL_KAI_API_URL="https://your-platform-url.com"
-     export MATERIAL_KAI_API_KEY="your-api-key"
-     export SENTRY_DSN="your-sentry-dsn"
-     ```
+1. **Missing Environment Variables**:
+   - **Problem**: Service fails to start due to missing environment variables
+   - **Solution**: Ensure all required environment variables are set in systemd service file:
+     - SUPABASE_URL
+     - SUPABASE_SERVICE_KEY
+     - OPENAI_API_KEY
+     - ANTHROPIC_API_KEY
+     - TOGETHER_AI_API_KEY
 
 2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments
    - **Solution**: Configure environment-specific variables in Vercel (Production/Preview/Development)
 
-2. **CORS Errors**:
+3. **CORS Errors**:
    - **Problem**: Frontend can't connect to backend
-   - **Solution**: Configure CORS_ORIGINS properly
+   - **Solution**: Configure CORS_ORIGINS properly in backend environment
 
-3. **Database Connection Issues**:
+4. **Database Connection Issues**:
    - **Problem**: Can't connect to Supabase
    - **Solution**: Verify connection strings and firewall rules
 
-4. **SSL Certificate Issues**:
+5. **SSL Certificate Issues**:
    - **Problem**: HTTPS not working
    - **Solution**: Use Let's Encrypt or proper SSL certificates
 
@@ -846,10 +809,21 @@ jobs:
 
 ```bash
 # Quick rollback for MIVAA service
-docker-compose -f docker-compose.prod.yml down
-docker-compose -f docker-compose.prod.yml up -d --scale mivaa-service=0
-docker tag mivaa-service:previous mivaa-service:latest
-docker-compose -f docker-compose.prod.yml up -d
+ssh root@104.248.68.3
+
+# Navigate to project directory
+cd /var/www/mivaa-pdf-extractor
+
+# Checkout previous commit
+git log --oneline -n 5  # Find previous commit hash
+git checkout <previous-commit-hash>
+
+# Restart service
+sudo systemctl restart mivaa-pdf-extractor
+
+# Verify service is running
+sudo systemctl status mivaa-pdf-extractor
+curl https://v1api.materialshub.gr/health
 ```
 
 ## 📋 Deployment Checklist
@@ -857,7 +831,7 @@ docker-compose -f docker-compose.prod.yml up -d
 ### Pre-Deployment
 - [ ] All tests passing
 - [ ] Environment variables configured in GitHub Secrets
-- [ ] **Docker environment variables exported on server** (SUPABASE_URL, SUPABASE_ANON_KEY, OPENAI_API_KEY, MATERIAL_KAI_API_URL, MATERIAL_KAI_API_KEY, SENTRY_DSN)
+- [ ] Systemd service file updated with latest environment variables
 - [ ] SSL certificates ready
 - [ ] Database migrations prepared
 - [ ] Backup strategy in place
@@ -992,20 +966,31 @@ The platform implements automatic job recovery for PDF processing:
 ### Horizontal Scaling
 
 **MIVAA Service Scaling**:
-```yaml
-# docker-compose.yml
-services:
-  mivaa-service:
-    deploy:
-      replicas: 3  # Scale to 3 instances
+
+For horizontal scaling, you can run multiple instances of the MIVAA service on different ports and use nginx for load balancing:
+
+```bash
+# Create multiple systemd services
+sudo cp /etc/systemd/system/mivaa-pdf-extractor.service /etc/systemd/system/mivaa-pdf-extractor-8001.service
+sudo cp /etc/systemd/system/mivaa-pdf-extractor.service /etc/systemd/system/mivaa-pdf-extractor-8002.service
+
+# Edit each service to use different ports
+# mivaa-pdf-extractor.service uses port 8000
+# mivaa-pdf-extractor-8001.service uses port 8001
+# mivaa-pdf-extractor-8002.service uses port 8002
+
+# Start all services
+sudo systemctl start mivaa-pdf-extractor
+sudo systemctl start mivaa-pdf-extractor-8001
+sudo systemctl start mivaa-pdf-extractor-8002
 ```
 
-**Load Balancing**:
+**Load Balancing with Nginx**:
 ```nginx
 upstream mivaa_backend {
-    server mivaa-service:8000;
-    server mivaa-service:8001;
-    server mivaa-service:8002;
+    server localhost:8000;
+    server localhost:8001;
+    server localhost:8002;
 }
 
 server {
