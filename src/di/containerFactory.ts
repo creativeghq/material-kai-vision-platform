@@ -86,19 +86,18 @@ export class ContainerFactory {
      * Register business services with their interface contracts and proper configuration injection
      */
     private registerBusinessServices(container: IServiceContainer): void {
-        // Register DocumentChunkingService with health check
+        // NOTE: DocumentChunkingService removed - chunking now handled by MIVAA API
+        // Use mivaaApi.uploadDocument() for PDF processing instead
         container.register({
             identifier: 'IDocumentChunkingService',
             factory: () => {
-                // Import and instantiate the actual service
-                // Note: This would need to be updated when the actual service classes are available
-                // For now, we're setting up the registration structure
-                throw new Error('DocumentChunkingService implementation not yet available');
+                // DocumentChunkingService has been removed - use MIVAA API instead
+                throw new Error('DocumentChunkingService removed - use mivaaApi.uploadDocument() instead');
             },
             lifetime: ServiceLifetime.Singleton,
             dependencies: ['DocumentChunkingConfig', 'Logger'],
             healthCheck: async (service: unknown) => {
-                try {
+                try{
                     // Basic health check - verify service is available and responsive
                     if (!service) {
                         return false;

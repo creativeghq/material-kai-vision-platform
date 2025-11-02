@@ -6,15 +6,10 @@ import { dynamicCategoryManagementService } from './dynamicCategoryManagementSer
 import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocketService';
 import { chunkQualityService } from './chunkQualityService';
 import { EntityRelationshipService } from './entityRelationshipService';
-import { MultiModalImageProductAssociationService } from './multiModalImageProductAssociationService';
-import multiVectorGenerationService from './multiVectorGenerationService';
-import enhancedClipIntegrationService from './enhancedClipIntegrationService';
 import { ProductEnrichmentService } from './ProductEnrichmentService';
 import { ImageValidationService } from './ImageValidationService';
-import { colorEmbeddingService } from './colorEmbeddingService';
-import { textureEmbeddingService } from './textureEmbeddingService';
-import { applicationEmbeddingService } from './applicationEmbeddingService';
 import { ValidationRulesService } from './ValidationRulesService';
+import { mivaaApi } from './mivaaApiClient';
 
 
 // Define interfaces locally to avoid importing from React components

@@ -5,8 +5,18 @@
  * across the Material Kai Vision Platform. All services should import from here.
  */
 
-import { DocumentChunk } from '../services/documentChunkingService';
 import { ProcessedTableData, ProcessedImageData, DocumentStructure, QualityMetrics } from '../services/mivaaToRagTransformer';
+
+/**
+ * Document Chunk Interface
+ * NOTE: documentChunkingService was removed - chunking now handled by MIVAA API
+ */
+export interface DocumentChunk {
+  id: string;
+  content: string;
+  metadata?: Record<string, any>;
+  embedding?: number[];
+}
 
 /**
  * RAG-compatible document structure - Unified interface for all RAG operations

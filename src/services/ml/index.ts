@@ -1,9 +1,6 @@
 // Main ML services exports - CONSOLIDATED
-// Note: unifiedMLService removed - use MIVAA API directly via mivaaApiClient
-
-// Style analysis services (client-side)
-export { styleAnalysisService, StyleAnalysisService } from './styleAnalysisService';
-export { hybridStyleAnalysisService, HybridStyleAnalysisService } from './hybridStyleAnalysisService';
+// Note: All ML/AI services now use MIVAA API directly via mivaaApiClient
+// Client-side ML services have been removed to eliminate duplicates
 
 // Utility services
 export { DeviceDetector } from './deviceDetector';
@@ -17,14 +14,8 @@ export {
   type DeviceType,
 } from './types';
 
-
-
-export {
-  type HybridStyleAnalysisOptions,
-  type HybridStyleResult,
-} from './hybridStyleAnalysisService';
-
-export {
-  type StyleAnalysisResult,
-  type StyleAnalysisOptions,
-} from './styleAnalysisService';
+// NOTE: Style analysis, texture analysis, and embedding services have been removed.
+// Use MIVAA API instead:
+// - Style analysis: mivaaApiClient.analyzeMaterial()
+// - Embeddings: mivaaApiClient.generateEmbedding()
+// - Material analysis: mivaaApiClient.analyzeMaterial()
