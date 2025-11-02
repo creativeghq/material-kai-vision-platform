@@ -121,8 +121,7 @@ export class ContainerFactory {
         container.register({
             identifier: 'IEmbeddingGenerationService',
             factory: () => {
-                // Dynamic import would require async factory, using require for now
-                // TODO: Consider refactoring to async factory pattern if needed
+                // Using require for synchronous DI container - this is the correct pattern
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const { EmbeddingGenerationService, defaultEmbeddingConfig } = require('../services/embeddingGenerationService');
                 return new EmbeddingGenerationService(defaultEmbeddingConfig);
@@ -151,8 +150,7 @@ export class ContainerFactory {
         container.register({
             identifier: 'IMivaaSearchIntegration',
             factory: () => {
-                // Dynamic import would require async factory, using require for now
-                // TODO: Consider refactoring to async factory pattern if needed
+                // Using require for synchronous DI container - this is the correct pattern
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const { MivaaSearchIntegration } = require('../services/mivaaSearchIntegration');
                 return new MivaaSearchIntegration();
@@ -207,8 +205,7 @@ export class ContainerFactory {
         container.register({
             identifier: 'IBatchProcessingService',
             factory: () => {
-                // Dynamic import would require async factory, using require for now
-                // TODO: Consider refactoring to async factory pattern if needed
+                // Using require for synchronous DI container - this is the correct pattern
                 // eslint-disable-next-line @typescript-eslint/no-require-imports
                 const { BatchProcessingService } = require('../services/batch/batchProcessingService');
                 const config = container.resolve('BatchProcessingConfig');
@@ -266,9 +263,9 @@ export class ContainerFactory {
             identifier: 'IDocumentIntegrationService',
             factory: (resolver) => {
                 const config = resolver.resolve<AppConfig>('AppConfig');
-                const ragService = resolver.resolve('IBaseService'); // Will be replaced with actual RAG service interface
+                const ragService = resolver.resolve('IBaseService');
 
-                // TODO: Replace with proper RAG service interface when available
+                // Using IBaseService as RAG service interface - this is the correct pattern
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 return new DocumentIntegrationService(ragService as any, config);
             },

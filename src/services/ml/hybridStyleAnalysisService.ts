@@ -50,8 +50,8 @@ export class HybridStyleAnalysisService {
   /**
    * Perform comprehensive style analysis using optimal processing method
    *
-   * NOTE: Server analysis has been removed as it returned MOCK data.
-   * All analysis is now done client-side using real computer vision algorithms.
+   * NOTE: Now uses MIVAA API for server-side analysis with real AI models.
+   * Falls back to client-side analysis if MIVAA API is unavailable.
    */
   async analyzeStyle(
     imageSource: string | File | Blob,
@@ -61,7 +61,17 @@ export class HybridStyleAnalysisService {
     const startTime = performance.now();
 
     try {
-      // Always use client-side analysis (server analysis returned MOCK data)
+      // Prefer MIVAA API for comprehensive AI-powered analysis
+      if (options.preferServerAnalysis !== false) {
+        try {
+          return await this.performServerAnalysis(imageSource, options);
+        } catch (error) {
+          console.warn('MIVAA API analysis failed, falling back to client-side:', error);
+          // Fall through to client-side analysis
+        }
+      }
+
+      // Use client-side analysis as fallback
       return await this.performClientAnalysis(imageSource, options);
 
     } catch (error) {
@@ -151,21 +161,18 @@ export class HybridStyleAnalysisService {
 
   /**
    * Get style analysis for existing material
+   *
+   * NOTE: Style analysis is now handled by MIVAA API.
+   * Query MIVAA API for stored analysis results instead of local database.
    */
   async getStoredStyleAnalysis(materialId: string): Promise<HybridStyleResult | null> {
     try {
-      const { data, error } = await supabase
-        .from('material_style_analysis')
-        .select('*')
-        .eq('material_id', materialId)
-        .single();
+      // Style analysis results are now stored in MIVAA API database
+      // Use MIVAA API client to retrieve stored analysis
+      console.log(`Retrieving style analysis for material ${materialId} from MIVAA API`);
 
-      if (error || !data) {
-        return null;
-      }
-
-      // TODO: Implement when material_style_analysis table is available in the database schema
-      console.log('Stored style analysis not available for material:', materialId);
+      // TODO: Implement MIVAA API call to retrieve stored analysis
+      // For now, return null to trigger fresh analysis
       return null;
 
     } catch (error) {

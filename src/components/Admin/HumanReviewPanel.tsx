@@ -77,14 +77,26 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
 
       // Calculate stats
       const pending = tasks.filter(t => t.status === 'pending').length;
-      const completed = tasks.filter(t => t.status === 'completed').length;
+      const completedTasks = tasks.filter(t => t.status === 'completed');
       const escalated = tasks.filter(t => t.status === 'escalated').length;
+
+      // Calculate average completion time from completed tasks
+      const avgCompletionTime = completedTasks.length > 0
+        ? completedTasks.reduce((sum, task) => {
+            if (task.completed_at && task.created_at) {
+              const completedAt = new Date(task.completed_at).getTime();
+              const createdAt = new Date(task.created_at).getTime();
+              return sum + (completedAt - createdAt);
+            }
+            return sum;
+          }, 0) / completedTasks.length / 1000 / 60 // Convert to minutes
+        : 0;
 
       setStats({
         pending,
-        completed,
+        completed: completedTasks.length,
         escalated,
-        avgCompletionTime: 0, // TODO: Calculate from completed tasks
+        avgCompletionTime: Math.round(avgCompletionTime),
       });
 
     } catch (error) {
@@ -107,11 +119,24 @@ export const HumanReviewPanel: React.FC<HumanReviewPanelProps> = ({
 
     try {
       setSubmitting(true);
+
+      // Get current user ID from Supabase auth
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: 'Authentication Error',
+          description: 'You must be logged in to complete reviews',
+          variant: 'destructive',
+        });
+        setSubmitting(false);
+        return;
+      }
+
       await QualityControlService.completeReviewTask(
         selectedTask.id,
         decision,
         reviewNotes,
-        'current-user', // TODO: Get actual user ID
+        user.id,
       );
 
       toast({

@@ -356,31 +356,71 @@ export class MivaaIntegrationService extends BaseService<MivaaIntegrationConfig>
         case 'tables': {
           const response = await this.extractTables(request);
           extractedData = {
-            tables: response.tables.map(table => ({
-              id: `table_${table.table_index}`,
-              pageNumber: table.page_number,
-              csvData: table.csv_data,
-              rowCount: 0, // TODO: Calculate from CSV data
-              columnCount: 0, // TODO: Calculate from CSV data
-              headers: [], // TODO: Extract from CSV data
-            })),
+            tables: response.tables.map(table => {
+              // Parse CSV data to extract metadata
+              const csvLines = table.csv_data.split('\n').filter(line => line.trim());
+              const headers = csvLines.length > 0 ? csvLines[0].split(',').map(h => h.trim()) : [];
+              const rowCount = csvLines.length;
+              const columnCount = headers.length;
+
+              return {
+                id: `table_${table.table_index}`,
+                pageNumber: table.page_number,
+                csvData: table.csv_data,
+                rowCount,
+                columnCount,
+                headers,
+              };
+            }),
             metadata: undefined,
           };
           break;
         }
         case 'images': {
           const response = await this.extractImages(request);
+
+          // Generate descriptions for images using MIVAA API if requested
+          const imagesWithDescriptions = await Promise.all(
+            response.images.map(async (image) => {
+              let description = '';
+
+              // Generate description using MIVAA semantic analysis if enabled
+              if (request.options.generateDescriptions) {
+                try {
+                  const analysisResponse = await this.mivaaClient.request('/api/semantic-analysis', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                      image_data: image.image_data,
+                      analysis_type: 'description',
+                    }),
+                  });
+
+                  if (analysisResponse.success && analysisResponse.data?.analysis) {
+                    description = analysisResponse.data.analysis;
+                  }
+                } catch (error) {
+                  console.warn(`Failed to generate description for image on page ${image.page_number}:`, error);
+                  description = `Image from page ${image.page_number}`;
+                }
+              } else {
+                description = `Image from page ${image.page_number}`;
+              }
+
+              return {
+                id: `image_${image.page_number}`,
+                pageNumber: image.page_number,
+                base64Data: image.image_data,
+                format: image.format,
+                width: image.width,
+                height: image.height,
+                description,
+                imageBuffer: Buffer.from(image.image_data, 'base64'),
+              };
+            })
+          );
+
           extractedData = {
-            images: response.images.map(image => ({
-              id: `image_${image.page_number}`,
-              pageNumber: image.page_number,
-              base64Data: image.image_data,
-              format: image.format,
-              width: image.width,
-              height: image.height,
-              description: '', // TODO: Add image description
-              imageBuffer: Buffer.from(image.image_data, 'base64'), // Convert base64 to Buffer
-            })),
+            images: imagesWithDescriptions,
             metadata: undefined,
           };
           break;

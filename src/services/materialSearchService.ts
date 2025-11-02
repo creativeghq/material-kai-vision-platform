@@ -212,27 +212,25 @@ export class MaterialSearchService {
         throw new Error(response.error || 'Failed to upload image');
       }
 
-      // Note: This endpoint may need to be updated to support image upload
-      // For now, we'll use the search endpoint
-      const data = response.data;
-
-      // TODO: Implement proper image upload endpoint in MIVAA
-      // This is a placeholder that needs to be replaced with actual upload logic
-      const uploadData = {
-        material_id: materialId,
-        image_data: base64Data,
-        image_type: options.imageType || 'primary',
-        is_featured: options.isFeatured || false,
-        display_order: options.displayOrder || 0,
-        file_name: imageFile.name,
-        metadata: options.metadata || {},
-        },
+      // Upload image to MIVAA API using the images upload endpoint
+      const uploadResponse = await this.mivaaClient.request('/api/images/upload-and-analyze', {
+        method: 'POST',
+        body: JSON.stringify({
+          image_data: base64Data,
+          material_id: materialId,
+          image_type: options.imageType || 'primary',
+          is_featured: options.isFeatured || false,
+          display_order: options.displayOrder || 0,
+          file_name: imageFile.name,
+          metadata: options.metadata || {},
+          analysis_types: ['description', 'material_recognition'],
+        }),
       });
 
-      if (error) {
+      if (!uploadResponse.success) {
         return {
           success: false,
-          error: error.message || 'Failed to upload image',
+          error: uploadResponse.error || 'Failed to upload image to MIVAA',
         };
       }
 

@@ -223,16 +223,106 @@ export class TextureNetSVD {
     return matrix.map(val => val - mean);
   }
 
-  private computeSVD(_matrix: Float32Array, rows: number, cols: number): SVDTextureFeatures {
-    // Simplified SVD - use proper library like ml-matrix in production
-    // TODO: Implement actual SVD computation using the matrix parameter
+  private computeSVD(matrix: Float32Array, rows: number, cols: number): SVDTextureFeatures {
+    // Implement power iteration method for SVD computation
+    // This is a simplified but functional SVD implementation
     const rank = Math.min(rows, cols, this.config.svdRank);
 
+    const singularValues = new Float32Array(rank);
+    const leftSingularVectors = new Float32Array(rows * rank);
+    const rightSingularVectors = new Float32Array(cols * rank);
+
+    // Create working copy of matrix
+    const A = new Float32Array(matrix);
+
+    // Compute SVD using power iteration for each singular value
+    for (let k = 0; k < rank; k++) {
+      // Initialize random vector
+      const v = new Float32Array(cols);
+      for (let i = 0; i < cols; i++) {
+        v[i] = Math.random() - 0.5;
+      }
+
+      // Power iteration to find dominant singular vector
+      const maxIter = 20;
+      for (let iter = 0; iter < maxIter; iter++) {
+        // Compute A^T * A * v
+        const Av = new Float32Array(rows);
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            Av[i] += A[i * cols + j] * v[j];
+          }
+        }
+
+        const ATAv = new Float32Array(cols);
+        for (let j = 0; j < cols; j++) {
+          for (let i = 0; i < rows; i++) {
+            ATAv[j] += A[i * cols + j] * Av[i];
+          }
+        }
+
+        // Normalize
+        let norm = 0;
+        for (let j = 0; j < cols; j++) {
+          norm += ATAv[j] * ATAv[j];
+        }
+        norm = Math.sqrt(norm);
+
+        if (norm > 1e-10) {
+          for (let j = 0; j < cols; j++) {
+            v[j] = ATAv[j] / norm;
+          }
+        }
+      }
+
+      // Compute singular value and left singular vector
+      const Av = new Float32Array(rows);
+      for (let i = 0; i < rows; i++) {
+        for (let j = 0; j < cols; j++) {
+          Av[i] += A[i * cols + j] * v[j];
+        }
+      }
+
+      let sigma = 0;
+      for (let i = 0; i < rows; i++) {
+        sigma += Av[i] * Av[i];
+      }
+      sigma = Math.sqrt(sigma);
+
+      singularValues[k] = sigma;
+
+      // Store right singular vector
+      for (let j = 0; j < cols; j++) {
+        rightSingularVectors[k * cols + j] = v[j];
+      }
+
+      // Store left singular vector
+      if (sigma > 1e-10) {
+        for (let i = 0; i < rows; i++) {
+          leftSingularVectors[k * rows + i] = Av[i] / sigma;
+        }
+
+        // Deflate matrix: A = A - sigma * u * v^T
+        for (let i = 0; i < rows; i++) {
+          for (let j = 0; j < cols; j++) {
+            A[i * cols + j] -= sigma * leftSingularVectors[k * rows + i] * v[j];
+          }
+        }
+      }
+    }
+
+    // Calculate reconstruction error
+    let reconstructionError = 0;
+    for (let i = 0; i < A.length; i++) {
+      reconstructionError += A[i] * A[i];
+    }
+    reconstructionError = Math.sqrt(reconstructionError) / Math.sqrt(rows * cols);
+
     return {
-      singularValues: new Float32Array(rank),
-      leftSingularVectors: new Float32Array(rows * rank),
-      rightSingularVectors: new Float32Array(cols * rank),
-      reconstructionError: 0.1, // Placeholder
+      singularValues,
+      leftSingularVectors,
+      rightSingularVectors,
+      reconstructionError,
       rank,
     };
   }

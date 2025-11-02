@@ -460,18 +460,68 @@ export class StyleAnalysisService extends BaseService<StyleAnalysisServiceConfig
     return edgeCount / pixelCount > 0.1 ? 0.7 : 0.3;
   }
 
-  private extractDominantColors(_imageData: ImageData, count: number): Array<{r: number, g: number, b: number}> {
-    // Simplified dominant color extraction
-    // TODO: Implement actual color clustering algorithm using imageData
-    const colors = [];
-    for (let i = 0; i < count; i++) {
-      colors.push({
-        r: Math.floor(Math.random() * 255),
-        g: Math.floor(Math.random() * 255),
-        b: Math.floor(Math.random() * 255),
+  private extractDominantColors(imageData: ImageData, count: number): Array<{r: number, g: number, b: number}> {
+    // Implement k-means clustering for dominant color extraction
+    const pixels: Array<{r: number, g: number, b: number}> = [];
+
+    // Sample pixels (every 4th pixel to reduce computation)
+    for (let i = 0; i < imageData.data.length; i += 16) {
+      pixels.push({
+        r: imageData.data[i],
+        g: imageData.data[i + 1],
+        b: imageData.data[i + 2],
       });
     }
-    return colors;
+
+    // Initialize centroids randomly
+    const centroids: Array<{r: number, g: number, b: number}> = [];
+    for (let i = 0; i < count; i++) {
+      const randomPixel = pixels[Math.floor(Math.random() * pixels.length)];
+      centroids.push({ ...randomPixel });
+    }
+
+    // K-means iterations
+    const maxIterations = 10;
+    for (let iter = 0; iter < maxIterations; iter++) {
+      // Assign pixels to nearest centroid
+      const clusters: Array<Array<{r: number, g: number, b: number}>> = Array(count).fill(null).map(() => []);
+
+      for (const pixel of pixels) {
+        let minDist = Infinity;
+        let closestCentroid = 0;
+
+        for (let c = 0; c < centroids.length; c++) {
+          const dist = Math.sqrt(
+            Math.pow(pixel.r - centroids[c].r, 2) +
+            Math.pow(pixel.g - centroids[c].g, 2) +
+            Math.pow(pixel.b - centroids[c].b, 2)
+          );
+          if (dist < minDist) {
+            minDist = dist;
+            closestCentroid = c;
+          }
+        }
+
+        clusters[closestCentroid].push(pixel);
+      }
+
+      // Update centroids
+      for (let c = 0; c < centroids.length; c++) {
+        if (clusters[c].length > 0) {
+          const sumR = clusters[c].reduce((sum, p) => sum + p.r, 0);
+          const sumG = clusters[c].reduce((sum, p) => sum + p.g, 0);
+          const sumB = clusters[c].reduce((sum, p) => sum + p.b, 0);
+
+          centroids[c] = {
+            r: Math.round(sumR / clusters[c].length),
+            g: Math.round(sumG / clusters[c].length),
+            b: Math.round(sumB / clusters[c].length),
+          };
+        }
+      }
+    }
+
+    return centroids;
   }
 
   private calculateWarmthScore(colors: Array<{r: number, g: number, b: number}>): number {

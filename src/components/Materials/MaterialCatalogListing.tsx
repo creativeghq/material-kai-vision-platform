@@ -32,11 +32,11 @@ import {
   Material,
   MaterialCategory,
   MATERIAL_CATEGORIES,
-  // getMaterialCategoriesAsync, // TODO: Implement async filter loading
-  // getAllMaterialFinishes, // TODO: Implement async filter loading
-  // getAllMaterialSizes, // TODO: Implement async filter loading
-  // getAllMaterialInstallationMethods, // TODO: Implement async filter loading
-  // getAllMaterialApplications, // TODO: Implement async filter loading
+  getMaterialCategoriesAsync,
+  getAllMaterialFinishes,
+  getAllMaterialSizes,
+  getAllMaterialInstallationMethods,
+  getAllMaterialApplications,
 } from '@/types/materials';
 
 interface MaterialCatalogListingProps {
@@ -89,15 +89,47 @@ export const MaterialCatalogListing: React.FC<MaterialCatalogListingProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
   const [showFilters, setShowFilters] = useState(false);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [filterOptions, setFilterOptions] = useState<{
+    categories: any[];
+    finishes: string[];
+    sizes: string[];
+    installationMethods: string[];
+    applications: string[];
+  }>({
+    categories: [],
+    finishes: [],
+    sizes: [],
+    installationMethods: [],
+    applications: [],
+  });
 
-  // Get all available filter options from the materials and type system
-  const filterOptions = useMemo(() => ({
-    categories: [], // TODO: Fix getMaterialCategoriesAsync usage
-    finishes: [], // TODO: Fix getAllMaterialFinishes async usage
-    sizes: [], // TODO: Fix getAllMaterialSizes async usage
-    installationMethods: [], // TODO: Fix getAllMaterialInstallationMethods async usage
-    applications: [], // TODO: Fix getAllMaterialApplications async usage
-  }), []);
+  // Load filter options asynchronously
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        const [categories, finishes, sizes, installationMethods, applications] = await Promise.all([
+          getMaterialCategoriesAsync(),
+          getAllMaterialFinishes(),
+          getAllMaterialSizes(),
+          getAllMaterialInstallationMethods(),
+          getAllMaterialApplications(),
+        ]);
+
+        setFilterOptions({
+          categories,
+          finishes,
+          sizes,
+          installationMethods,
+          applications,
+        });
+      } catch (error) {
+        console.error('Failed to load filter options:', error);
+        // Fallback to empty arrays - already set in initial state
+      }
+    };
+
+    loadFilterOptions();
+  }, []);
 
   // Filter and sort materials based on current filter state
   const filteredAndSortedMaterials = useMemo(() => {

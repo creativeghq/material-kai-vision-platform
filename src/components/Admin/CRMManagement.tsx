@@ -52,6 +52,8 @@ export const CRMManagement: React.FC = () => {
     active: 0,
     inactive: 0,
   });
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Load users
   const loadUsers = async () => {
@@ -94,6 +96,33 @@ export const CRMManagement: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle edit contact
+  const handleEditContact = (contact: Contact) => {
+    setEditingContact(contact);
+    setShowEditModal(true);
+  };
+
+  // Handle save edited contact
+  const handleSaveContact = async (updatedContact: Contact) => {
+    try {
+      await contactsAPI.updateContact(updatedContact.id, updatedContact);
+      toast({
+        title: 'Success',
+        description: 'Contact updated successfully',
+      });
+      setShowEditModal(false);
+      setEditingContact(null);
+      await loadContacts();
+    } catch (error) {
+      console.error('Error updating contact:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update contact',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -275,12 +304,10 @@ export const CRMManagement: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  // TODO: Open edit modal
-                                }}
+                                onClick={() => handleEditContact(contact)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
-                                    // TODO: Open edit modal
+                                    handleEditContact(contact);
                                   }
                                 }}
                               >
@@ -392,12 +419,10 @@ export const CRMManagement: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  // TODO: Open edit modal
-                                }}
+                                onClick={() => handleEditContact(contact)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
-                                    // TODO: Open edit modal
+                                    handleEditContact(contact);
                                   }
                                 }}
                               >
@@ -427,6 +452,72 @@ export const CRMManagement: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Edit Contact Modal */}
+      {showEditModal && editingContact && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Edit Contact</CardTitle>
+              <CardDescription>Update contact information</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium">Name</label>
+                  <Input
+                    value={editingContact.name}
+                    onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Email</label>
+                  <Input
+                    type="email"
+                    value={editingContact.email || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Phone</label>
+                  <Input
+                    value={editingContact.phone || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Company</label>
+                  <Input
+                    value={editingContact.company || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, company: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Notes</label>
+                  <Input
+                    value={editingContact.notes || ''}
+                    onChange={(e) => setEditingContact({ ...editingContact, notes: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingContact(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={() => handleSaveContact(editingContact)}>
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };
