@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { monitoringService } from '@/services/monitoring/monitoringService';
+import * as Sentry from '@sentry/react';
 
 import { ImageModal } from './ImageModal';
 import { ThreeJsViewer } from './ThreeJsViewer';
@@ -341,6 +341,9 @@ export const Designer3DPage: React.FC = () => {
       // Call Supabase Edge Function directly
       // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: About to call API with request data');
+      // eslint-disable-next-line no-console
+      console.log('🔍 DEBUG: Request body being sent:', JSON.stringify(requestData, null, 2));
+
       const { data, error: functionError } = await supabase.functions.invoke(
         'crewai-3d-generation',
         {
@@ -360,9 +363,15 @@ export const Designer3DPage: React.FC = () => {
           fullError: functionError,
         });
 
-        throw new Error(
-          functionError.message || 'Failed to invoke 3D generation function',
-        );
+        // Also log the data response which might contain validation errors
+        // eslint-disable-next-line no-console
+        console.error('Edge Function Response Data:', data);
+
+        // Try to extract validation error details if available
+        const errorMessage = data?.error || data?.details || functionError.message || 'Failed to invoke 3D generation function';
+        const errorDetails = data?.details ? `\nDetails: ${JSON.stringify(data.details)}` : '';
+
+        throw new Error(errorMessage + errorDetails);
       }
 
       // Type assertion for the response data
@@ -396,11 +405,11 @@ export const Designer3DPage: React.FC = () => {
       console.error('Generation error:', error);
 
       // Capture error in Sentry
-      monitoringService.captureError(error as Error, {
+      Sentry.captureException(error, {
         level: 'error',
-        component: '3D Designer',
-        action: 'generate_3d_interior',
         tags: {
+          component: '3D Designer',
+          action: 'generate_3d_interior',
           feature: '3d-generation',
           roomType: roomType || 'unknown',
           style: style || 'unknown',
@@ -587,11 +596,11 @@ export const Designer3DPage: React.FC = () => {
         console.error('Polling error:', error);
 
         // Capture error in Sentry
-        monitoringService.captureError(error as Error, {
+        Sentry.captureException(error, {
           level: 'error',
-          component: '3D Designer',
-          action: 'poll_generation_results',
           tags: {
+            component: '3D Designer',
+            action: 'poll_generation_results',
             feature: '3d-generation',
             stage: 'polling',
           },
