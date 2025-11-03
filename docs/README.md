@@ -78,6 +78,15 @@
 - Storage capacity
 - Backup & recovery
 
+**[relevancy-system.md](relevancy-system.md)** - Relevancy & entity linking
+- Chunk → Product relationships
+- Product → Image relationships
+- Chunk → Image relationships
+- Relevance scoring algorithms (3 algorithms)
+- Relationship types and priorities
+- Implementation details
+- Best practices
+
 **[job-queue-system.md](job-queue-system.md)** - Job queue & async processing
 - Supabase-native job queue
 - Checkpoint-based recovery

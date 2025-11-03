@@ -28,6 +28,7 @@ import {
   Download,
   Sparkles,
   Filter,
+  Bug,
   MoreHorizontal,
   Package,
 } from 'lucide-react';
@@ -453,12 +454,20 @@ const AdminDashboard: React.FC = () => {
         count: 'Web scraping',
       },
       {
-        title: 'Metadata Fields',
-        description: 'Configure material metadata fields and properties',
+        title: 'Metadata Management',
+        description: 'View and manage extracted metadata with scope detection and filtering',
         icon: Settings,
         path: '/admin/metadata',
         status: 'active',
-        count: 'Field config',
+        count: 'AI-powered',
+      },
+      {
+        title: 'Relevancy Management',
+        description: 'Manage entity relationships and relevance scoring algorithms',
+        icon: Link,
+        path: '/admin/relevancy',
+        status: 'active',
+        count: '3 algorithms',
       },
       {
         title: 'API Gateway Admin',
@@ -557,6 +566,15 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/chunk-quality',
         status: 'active',
         count: 'Quality Control',
+      },
+      {
+        title: 'Sentry Error Tracking',
+        description:
+          'Test Sentry integration and error tracking functionality',
+        icon: Bug,
+        path: '/admin/sentry-test',
+        status: 'active',
+        count: 'Testing',
       },
     ],
   };

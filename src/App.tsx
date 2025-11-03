@@ -48,6 +48,8 @@ import {
 import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
 import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMetricsPanel';
 import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
+import { MetadataManagement } from './components/Admin/MetadataManagement';
+import { RelevancyManagement } from './components/Admin/RelevancyManagement';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
@@ -55,6 +57,7 @@ import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
+import SentryTest from './pages/SentryTest';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -448,6 +451,30 @@ const App = () => (
                 }
               />
               <Route
+                path="/admin/metadata"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <MetadataManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/relevancy"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <RelevancyManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
                 path="/admin/async-queue-monitor"
                 element={
                   <AuthGuard>
@@ -455,6 +482,16 @@ const App = () => (
                       <Layout>
                         <AsyncJobQueueMonitor />
                       </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/sentry-test"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <SentryTest />
                     </AdminGuard>
                   </AuthGuard>
                 }
