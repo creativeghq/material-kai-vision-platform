@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+import { monitoringService } from '@/services/monitoring/monitoringService';
 
 import { ImageModal } from './ImageModal';
 import { ThreeJsViewer } from './ThreeJsViewer';
@@ -338,25 +338,32 @@ export const Designer3DPage: React.FC = () => {
         requestDataStringified: JSON.stringify(requestData, null, 2),
       });
 
-      // Use the new centralized API integration service
-      const apiService = BrowserApiIntegrationService.getInstance();
+      // Call Supabase Edge Function directly
       // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: About to call API with request data');
-      const result = await apiService.callSupabaseFunction(
+      const { data, error: functionError } = await supabase.functions.invoke(
         'crewai-3d-generation',
-        requestData,
+        {
+          body: requestData,
+        },
       );
       // eslint-disable-next-line no-console
-      console.log('Generation response received:', result);
+      console.log('Generation response received:', { data, error: functionError });
+
+      if (functionError) {
+        throw new Error(
+          functionError.message || 'Failed to invoke 3D generation function',
+        );
+      }
 
       // Type assertion for the response data
-      const responseData = result.data as {
+      const responseData = data as {
         generationId?: string;
         generation_status?: string;
         image_urls?: string[];
       } | null;
 
-      if (result.success && responseData?.generationId) {
+      if (responseData?.generationId) {
         if (isAdmin) {
           // Show workflow modal for admins
           setCurrentGenerationId(responseData.generationId);
@@ -378,6 +385,23 @@ export const Designer3DPage: React.FC = () => {
     } catch (error: unknown) {
       // eslint-disable-next-line no-console
       console.error('Generation error:', error);
+
+      // Capture error in Sentry
+      monitoringService.captureError(error as Error, {
+        level: 'error',
+        component: '3D Designer',
+        action: 'generate_3d_interior',
+        tags: {
+          feature: '3d-generation',
+          roomType,
+          style,
+        },
+        extra: {
+          prompt: prompt.substring(0, 100), // First 100 chars only
+          selectedModels: selectedModels,
+        },
+      });
+
       toast({
         title: 'Generation Failed',
         description:
@@ -552,6 +576,21 @@ export const Designer3DPage: React.FC = () => {
       } catch (error: unknown) {
         // eslint-disable-next-line no-console
         console.error('Polling error:', error);
+
+        // Capture error in Sentry
+        monitoringService.captureError(error as Error, {
+          level: 'error',
+          component: '3D Designer',
+          action: 'poll_generation_results',
+          tags: {
+            feature: '3d-generation',
+            stage: 'polling',
+          },
+          extra: {
+            generationId: _generationId,
+          },
+        });
+
         setIsGenerating(false);
         setIsUploading(false);
         toast({

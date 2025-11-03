@@ -57,7 +57,6 @@ import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
-import SentryTest from './pages/SentryTest';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -179,18 +178,7 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-              <Route
-                path="/admin/pdf-processing-monitor"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <PDFProcessingMonitor />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
+
               <Route
                 path="/admin/knowledge-base"
                 element={

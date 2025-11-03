@@ -420,28 +420,20 @@ const AdminDashboard: React.FC = () => {
         count: 'Enhanced search',
       },
       {
-        title: '3D Material Suggestions',
-        description: 'AI-powered material recommendations for 3D generation',
+        title: 'Agent Configs',
+        description: 'Manage AI agents, prompts, rules, and role-based access control',
         icon: Brain,
-        path: '/admin/3d-suggestions',
+        path: '/admin/agent-configs',
         status: 'active',
-        count: 'PDF-integrated',
+        count: 'Agent Management',
       },
       {
-        title: 'Agent ML Coordination',
-        description: 'Coordinate multiple AI agents for material intelligence',
-        icon: Brain,
+        title: 'AI Settings Control',
+        description: 'Configure AI prompts, NLP patterns, extraction settings, and agent tools',
+        icon: Settings,
         path: '/admin/agent-ml',
         status: 'active',
-        count: 'Multi-agent',
-      },
-      {
-        title: 'AI Testing Panel',
-        description: 'Test and validate AI model responses and performance',
-        icon: Sparkles,
-        path: '/admin/material-analysis',
-        status: 'active',
-        count: 'Testing suite',
+        count: 'AI Configuration',
       },
     ],
     'Data Management': [
@@ -499,15 +491,6 @@ const AdminDashboard: React.FC = () => {
         count: 'Real-time',
       },
       {
-        title: 'PDF Processing Monitor',
-        description:
-          'Monitor PDF processing pipeline - embeddings, images, products, and metrics',
-        icon: Activity,
-        path: '/admin/pdf-processing-monitor',
-        status: 'active',
-        count: 'Real-time',
-      },
-      {
         title: 'Analytics Dashboard',
         description: 'System performance metrics and usage analytics',
         icon: BarChart3,
@@ -539,33 +522,6 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/mivaa-docs',
         status: 'active',
         count: 'Documentation',
-      },
-      {
-        title: 'Quality & Stability Metrics',
-        description:
-          'Monitor PDF chunk quality scoring and embedding stability analysis',
-        icon: BarChart3,
-        path: '/admin/quality-stability-metrics',
-        status: 'active',
-        count: 'Phase 2',
-      },
-      {
-        title: 'Phase 3 Validation Metrics',
-        description:
-          'Monitor chunk relationships, retrieval quality, and response quality',
-        icon: BarChart3,
-        path: '/admin/phase3-metrics',
-        status: 'active',
-        count: 'Phase 3',
-      },
-      {
-        title: 'Chunk Quality Dashboard',
-        description:
-          'Monitor chunk quality, deduplication, and validation metrics',
-        icon: BarChart3,
-        path: '/admin/chunk-quality',
-        status: 'active',
-        count: 'Quality Control',
       },
       {
         title: 'Sentry Error Tracking',
