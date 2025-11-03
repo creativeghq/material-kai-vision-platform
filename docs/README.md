@@ -124,6 +124,14 @@
 - API endpoints for entity management
 - Future extensibility (marketing, bank statements)
 
+**[metadata-management-system.md](metadata-management-system.md)** - Metadata management system
+- Dynamic metadata extraction (250+ attributes)
+- Scope detection (product-specific vs catalog-general)
+- Implicit catalog-general metadata detection
+- Override logic and processing order
+- Metadata API endpoints
+- Integration with PDF processing pipeline
+
 ---
 
 ## 🎓 Learning Paths
@@ -232,9 +240,9 @@ For questions or issues:
 
 ---
 
-**Last Updated**: October 31, 2025
-**Version**: 1.0.1
+**Last Updated**: November 3, 2025
+**Version**: 1.1.0
 **Status**: Production
-**Total Documentation**: 11 comprehensive guides
-**Total Lines**: 6,000+
+**Total Documentation**: 12 comprehensive guides
+**Total Lines**: 6,500+
 **Coverage**: 100% of platform features

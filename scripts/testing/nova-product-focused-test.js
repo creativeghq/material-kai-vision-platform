@@ -60,33 +60,55 @@ function logSection(title) {
 // Main test function
 async function runNovaProductTest() {
   logSection('NOVA PRODUCT FOCUSED END-TO-END TEST');
-  
+
   console.log(`Product: ${NOVA_PRODUCT.name} by ${NOVA_PRODUCT.designer}`);
   console.log(`PDF: ${HARMONY_PDF_URL}`);
   console.log(`Workspace: ${WORKSPACE_ID}`);
   console.log(`MIVAA API: ${MIVAA_API}\n`);
 
   try {
-    // Step 1: Upload PDF with async processing
-    log('UPLOAD', 'Starting PDF processing from Harmony catalog', 'step');
-    const uploadResult = await uploadPDFForNovaExtraction();
-    const jobId = uploadResult.job_id;
-    const documentId = uploadResult.document_id;
+    // Step 1: Check for existing job
+    log('CHECK', 'Checking for existing jobs for this PDF', 'step');
+    const existingJob = await findExistingJob();
 
-    log('UPLOAD', `Job ID: ${jobId}`, 'info');
-    log('UPLOAD', `Document ID: ${documentId}`, 'info');
+    let jobId, documentId;
 
-    // Step 2: Monitor async job processing
-    log('MONITOR', `Monitoring job: ${jobId}`, 'step');
-    const jobResult = await monitorProcessingJob(jobId, documentId);
+    if (existingJob) {
+      log('CHECK', `Found existing job: ${existingJob.id} (${existingJob.status})`, 'info');
+      jobId = existingJob.id;
+      documentId = existingJob.document_id;
 
-    // Step 3: Retrieve and validate ALL product data
+      if (existingJob.status === 'completed') {
+        log('CHECK', 'Job already completed, skipping to data retrieval', 'success');
+      } else if (existingJob.status === 'processing') {
+        log('CHECK', 'Job is currently processing, monitoring progress', 'info');
+      } else {
+        log('CHECK', `Job status: ${existingJob.status}, will monitor`, 'warning');
+      }
+    } else {
+      // Step 2: Upload PDF with async processing
+      log('UPLOAD', 'No existing job found, starting new PDF processing', 'step');
+      const uploadResult = await uploadPDFForNovaExtraction();
+      jobId = uploadResult.job_id;
+      documentId = uploadResult.document_id;
+
+      log('UPLOAD', `Job ID: ${jobId}`, 'info');
+      log('UPLOAD', `Document ID: ${documentId}`, 'info');
+    }
+
+    // Step 3: Monitor async job processing (skip if already completed)
+    if (!existingJob || existingJob.status !== 'completed') {
+      log('MONITOR', `Monitoring job: ${jobId}`, 'step');
+      await monitorProcessingJob(jobId, documentId);
+    }
+
+    // Step 4: Retrieve and validate ALL product data
     log('VALIDATE', 'Retrieving ALL product data from document', 'step');
     const allData = await retrieveNovaProductData(documentId);
 
-    // Step 4: Generate comprehensive report
+    // Step 5: Generate comprehensive report
     log('REPORT', 'Generating detailed report', 'step');
-    await generateDetailedReport(allData, jobResult);
+    await generateDetailedReport(allData, { job_id: jobId, document_id: documentId });
 
     log('COMPLETE', '✅ PDF processing test completed successfully!', 'success');
 
@@ -97,40 +119,57 @@ async function runNovaProductTest() {
   }
 }
 
-async function uploadPDFForNovaExtraction() {
-  log('UPLOAD', `Downloading PDF from: ${HARMONY_PDF_URL}`, 'info');
+async function findExistingJob() {
+  try {
+    // Get recent jobs (last 50)
+    const response = await fetch(`${MIVAA_API}/api/rag/documents/jobs?limit=50&sort=created_at:desc`);
 
-  // Download PDF file
-  const pdfResponse = await fetch(HARMONY_PDF_URL);
-  if (!pdfResponse.ok) {
-    throw new Error(`Failed to download PDF: ${pdfResponse.statusText}`);
+    if (!response.ok) {
+      log('CHECK', 'Failed to fetch jobs list', 'warning');
+      return null;
+    }
+
+    const data = await response.json();
+    const jobs = data.jobs || [];
+
+    // Find job for harmony-signature-book-24-25.pdf
+    const harmonyJob = jobs.find(job => {
+      const filename = job.metadata?.filename || job.filename || '';
+      return filename.includes('harmony-signature-book-24-25');
+    });
+
+    return harmonyJob || null;
+  } catch (error) {
+    log('CHECK', `Error checking for existing jobs: ${error.message}`, 'warning');
+    return null;
   }
+}
 
-  const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
-  log('UPLOAD', `Downloaded ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`, 'success');
+async function uploadPDFForNovaExtraction() {
+  log('UPLOAD', `Using URL-based upload: ${HARMONY_PDF_URL}`, 'info');
 
-  // Create form data with file and processing options
+  // Create form data with URL and processing options
   const formData = new FormData();
-  formData.append('file', pdfBuffer, {
-    filename: 'harmony-signature-book-24-25.pdf',
-    contentType: 'application/pdf'
-  });
 
-  // Add processing parameters
+  // Use file_url parameter instead of downloading file
+  formData.append('file_url', HARMONY_PDF_URL);
+
+  // Add processing parameters using latest API specification
   formData.append('title', 'NOVA Product Extraction - Focused Test');
   formData.append('description', 'Extract all products from Harmony catalog');
   formData.append('tags', 'nova,harmony,test');
-  formData.append('categories', 'products');
-  formData.append('discovery_model', 'claude');
+  formData.append('categories', 'products');  // Extract only products
+  formData.append('processing_mode', 'deep');  // Deep mode for complete analysis
+  formData.append('discovery_model', 'claude');  // Claude Sonnet 4.5 for best quality
   formData.append('chunk_size', '1024');
   formData.append('chunk_overlap', '128');
   formData.append('enable_prompt_enhancement', 'true');
   formData.append('workspace_id', WORKSPACE_ID);
 
-  log('UPLOAD', `Triggering Unified Upload via MIVAA API: ${MIVAA_API}/documents/upload`, 'info');
-  log('UPLOAD', `Categories: products | Discovery: claude | Async: enabled`, 'info');
+  log('UPLOAD', `Triggering Consolidated Upload via MIVAA API: ${MIVAA_API}/api/rag/documents/upload`, 'info');
+  log('UPLOAD', `Mode: deep | Categories: products | Discovery: claude | Async: enabled`, 'info');
 
-  const uploadResponse = await fetch(`${MIVAA_API}/documents/upload`, {
+  const uploadResponse = await fetch(`${MIVAA_API}/api/rag/documents/upload`, {
     method: 'POST',
     body: formData,
     headers: formData.getHeaders()
@@ -167,44 +206,36 @@ async function validateDataSaved(documentId, jobData) {
     chunks: 0,
     images: 0,
     products: 0,
-    embeddings: 0,
-    metafield_values: 0
+    embeddings: 0
   };
 
   try {
-    // Check chunks using correct endpoint
-    const chunksResponse = await fetch(`${MIVAA_API}/api/chunks?document_id=${documentId}&limit=1000`);
+    // Check chunks using consolidated RAG endpoint
+    const chunksResponse = await fetch(`${MIVAA_API}/api/rag/chunks?document_id=${documentId}&limit=1000`);
     if (chunksResponse.ok) {
       const chunksData = await chunksResponse.json();
       validation.chunks = Array.isArray(chunksData) ? chunksData.length : (chunksData.chunks?.length || 0);
     }
 
-    // Check images using correct endpoint
-    const imagesResponse = await fetch(`${MIVAA_API}/api/images?document_id=${documentId}&limit=1000`);
+    // Check images using consolidated RAG endpoint
+    const imagesResponse = await fetch(`${MIVAA_API}/api/rag/images?document_id=${documentId}&limit=1000`);
     if (imagesResponse.ok) {
       const imagesData = await imagesResponse.json();
       validation.images = Array.isArray(imagesData) ? imagesData.length : (imagesData.images?.length || 0);
     }
 
-    // Check products using correct endpoint
-    const productsResponse = await fetch(`${MIVAA_API}/api/products?document_id=${documentId}&limit=1000`);
+    // Check products using consolidated RAG endpoint
+    const productsResponse = await fetch(`${MIVAA_API}/api/rag/products?document_id=${documentId}&limit=1000`);
     if (productsResponse.ok) {
       const productsData = await productsResponse.json();
       validation.products = Array.isArray(productsData) ? productsData.length : (productsData.products?.length || 0);
     }
 
-    // Check embeddings using correct endpoint
-    const embeddingsResponse = await fetch(`${MIVAA_API}/api/embeddings?document_id=${documentId}&limit=1000`);
+    // Check embeddings using consolidated RAG endpoint
+    const embeddingsResponse = await fetch(`${MIVAA_API}/api/rag/embeddings?document_id=${documentId}&limit=1000`);
     if (embeddingsResponse.ok) {
       const embeddingsData = await embeddingsResponse.json();
       validation.embeddings = Array.isArray(embeddingsData) ? embeddingsData.length : (embeddingsData.embeddings?.length || 0);
-    }
-
-    // Check metafield values using correct endpoint
-    const metafieldsResponse = await fetch(`${MIVAA_API}/api/metafields/values?document_id=${documentId}&limit=1000`);
-    if (metafieldsResponse.ok) {
-      const metafieldsData = await metafieldsResponse.json();
-      validation.metafield_values = Array.isArray(metafieldsData) ? metafieldsData.length : (metafieldsData.metafield_values?.length || 0);
     }
 
     // Compare with job metadata
@@ -220,7 +251,6 @@ async function validateDataSaved(documentId, jobData) {
     log('VALIDATE', `Images: ${validation.images}/${jobImages} ${imagesMatch ? '✅' : '❌'}`, imagesMatch ? 'success' : 'error');
     log('VALIDATE', `Products: ${validation.products}/${jobProducts} ${productsMatch ? '✅' : '❌'}`, productsMatch ? 'success' : 'error');
     log('VALIDATE', `Embeddings: ${validation.embeddings}`, 'info');
-    log('VALIDATE', `Metafield Values: ${validation.metafield_values}`, 'info');
 
     return {
       valid: chunksMatch && imagesMatch && productsMatch,
@@ -321,8 +351,8 @@ async function monitorProcessingJob(jobId, documentId) {
 
     if (status === 'interrupted') {
       log('MONITOR', '⚠️ Job interrupted! Attempting to resume...', 'warning');
-      // Try to resume the job using correct endpoint
-      const resumeResponse = await fetch(`${MIVAA_API}/api/documents/job/${jobId}/resume`, {
+      // Try to resume the job using consolidated RAG endpoint
+      const resumeResponse = await fetch(`${MIVAA_API}/api/rag/documents/job/${jobId}/resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -349,66 +379,72 @@ async function retrieveNovaProductData(documentId) {
     products: [],
     embeddings: {
       text: [],
-      image: []
-    },
-    metafield_values: []
+      image: [],
+      visual: [],
+      multimodal: []
+    }
   };
 
-  // Retrieve ALL chunks using correct endpoint
-  const chunksResponse = await fetch(`${MIVAA_API}/api/chunks?document_id=${documentId}&limit=10000`);
+  // Retrieve ALL chunks using consolidated RAG endpoint
+  const chunksResponse = await fetch(`${MIVAA_API}/api/rag/chunks?document_id=${documentId}&limit=10000`);
   if (chunksResponse.ok) {
     const chunksData = await chunksResponse.json();
     allData.chunks = Array.isArray(chunksData) ? chunksData : (chunksData.chunks || []);
     log('RETRIEVE', `Found ${allData.chunks.length} total chunks`, 'success');
+  } else {
+    log('RETRIEVE', `Failed to fetch chunks: ${chunksResponse.status} ${chunksResponse.statusText}`, 'error');
   }
 
-  // Retrieve ALL images using correct endpoint
-  const imagesResponse = await fetch(`${MIVAA_API}/api/images?document_id=${documentId}&limit=10000`);
+  // Retrieve ALL images using consolidated RAG endpoint
+  const imagesResponse = await fetch(`${MIVAA_API}/api/rag/images?document_id=${documentId}&limit=10000`);
   if (imagesResponse.ok) {
     const imagesData = await imagesResponse.json();
     allData.images = Array.isArray(imagesData) ? imagesData : (imagesData.images || []);
     log('RETRIEVE', `Found ${allData.images.length} total images`, 'success');
+  } else {
+    log('RETRIEVE', `Failed to fetch images: ${imagesResponse.status} ${imagesResponse.statusText}`, 'error');
   }
 
-  // Retrieve ALL products using correct endpoint
-  const productsResponse = await fetch(`${MIVAA_API}/api/products?document_id=${documentId}&limit=10000`);
+  // Retrieve ALL products using consolidated RAG endpoint
+  const productsResponse = await fetch(`${MIVAA_API}/api/rag/products?document_id=${documentId}&limit=10000`);
   if (productsResponse.ok) {
     const productsData = await productsResponse.json();
     allData.products = Array.isArray(productsData) ? productsData : (productsData.products || []);
     log('RETRIEVE', `Found ${allData.products.length} total products`, 'success');
+  } else {
+    log('RETRIEVE', `Failed to fetch products: ${productsResponse.status} ${productsResponse.statusText}`, 'error');
   }
 
-  // Retrieve ALL embeddings using correct endpoint
-  const embeddingsResponse = await fetch(`${MIVAA_API}/api/embeddings?document_id=${documentId}&limit=10000`);
+  // Retrieve ALL embeddings using consolidated RAG endpoint
+  const embeddingsResponse = await fetch(`${MIVAA_API}/api/rag/embeddings?document_id=${documentId}&limit=10000`);
   if (embeddingsResponse.ok) {
     const embeddingsData = await embeddingsResponse.json();
     const embeddings = Array.isArray(embeddingsData) ? embeddingsData : (embeddingsData.embeddings || []);
 
-    allData.embeddings.text = embeddings.filter(e => e.content_type === 'text' || e.embedding_type === 'text');
-    allData.embeddings.image = embeddings.filter(e => e.content_type === 'image' || e.embedding_type === 'image');
+    // Categorize embeddings by type
+    allData.embeddings.text = embeddings.filter(e => e.embedding_type === 'text');
+    allData.embeddings.image = embeddings.filter(e => e.embedding_type === 'image');
+    allData.embeddings.visual = embeddings.filter(e => e.embedding_type === 'visual');
+    allData.embeddings.multimodal = embeddings.filter(e => e.embedding_type === 'multimodal');
 
     log('RETRIEVE', `Found ${allData.embeddings.text.length} text embeddings`, 'success');
     log('RETRIEVE', `Found ${allData.embeddings.image.length} image embeddings`, 'success');
+    log('RETRIEVE', `Found ${allData.embeddings.visual.length} visual embeddings`, 'success');
+    log('RETRIEVE', `Found ${allData.embeddings.multimodal.length} multimodal embeddings`, 'success');
+  } else {
+    log('RETRIEVE', `Failed to fetch embeddings: ${embeddingsResponse.status} ${embeddingsResponse.statusText}`, 'error');
   }
-
-  // Retrieve ALL metafield values using correct endpoint
-  const metafieldsResponse = await fetch(`${MIVAA_API}/api/metafields/values?document_id=${documentId}&limit=10000`);
-  if (metafieldsResponse.ok) {
-    const metafieldsData = await metafieldsResponse.json();
-    allData.metafield_values = Array.isArray(metafieldsData) ? metafieldsData : (metafieldsData.metafield_values || []);
-    log('RETRIEVE', `Found ${allData.metafield_values.length} total metafield values`, 'success');
-  }
-
   return allData;
 }
 
 async function generateDetailedReport(allData, jobResult) {
   logSection('DETAILED PDF PROCESSING REPORT');
 
-  // Calculate metafield values linked to chunks
-  const metafieldsLinkedToChunks = allData.metafield_values.filter(mf =>
-    mf.chunk_id || mf.entity_type === 'chunk'
-  ).length;
+  const totalEmbeddings =
+    allData.embeddings.text.length +
+    allData.embeddings.image.length +
+    allData.embeddings.visual.length +
+    allData.embeddings.multimodal.length;
 
   const report = {
     timestamp: new Date().toISOString(),
@@ -424,9 +460,13 @@ async function generateDetailedReport(allData, jobResult) {
       total_chunks: allData.chunks.length,
       total_images: allData.images.length,
       total_products: allData.products.length,
-      total_embeddings: allData.embeddings.text.length + allData.embeddings.image.length,
-      total_metafield_values: allData.metafield_values.length,
-      metafields_linked_to_chunks: metafieldsLinkedToChunks
+      total_embeddings: totalEmbeddings,
+      embeddings_by_type: {
+        text: allData.embeddings.text.length,
+        image: allData.embeddings.image.length,
+        visual: allData.embeddings.visual.length,
+        multimodal: allData.embeddings.multimodal.length
+      }
     }
   };
 
@@ -438,8 +478,8 @@ async function generateDetailedReport(allData, jobResult) {
   console.log(`✅ Total Embeddings: ${report.summary.total_embeddings}`);
   console.log(`   - Text Embeddings: ${allData.embeddings.text.length}`);
   console.log(`   - Image Embeddings: ${allData.embeddings.image.length}`);
-  console.log(`✅ Total Metafield Values: ${report.summary.total_metafield_values}`);
-  console.log(`✅ Metafields Linked to Chunks: ${report.summary.metafields_linked_to_chunks}`);
+  console.log(`   - Visual Embeddings: ${allData.embeddings.visual.length}`);
+  console.log(`   - Multimodal Embeddings: ${allData.embeddings.multimodal.length}`);
 
   // Print sample chunks (first 3)
   console.log('\n📝 SAMPLE CHUNKS (First 3):');
@@ -468,7 +508,7 @@ async function generateDetailedReport(allData, jobResult) {
     }
   });
 
-  // Print all products
+  // Print all products with detailed metadata
   console.log('\n🏷️  ALL PRODUCTS:');
   allData.products.forEach((product, idx) => {
     console.log(`\nProduct ${idx + 1}:`);
@@ -479,17 +519,18 @@ async function generateDetailedReport(allData, jobResult) {
     if (product.metadata) {
       console.log(`  Metadata: ${JSON.stringify(product.metadata, null, 2)}`);
     }
+    if (product.page_ranges) {
+      console.log(`  Page Ranges: ${JSON.stringify(product.page_ranges)}`);
+    }
   });
 
-  // Print sample metafield values (first 5)
-  console.log('\n🏷️  SAMPLE METAFIELD VALUES (First 5):');
-  allData.metafield_values.slice(0, 5).forEach((mf, idx) => {
-    console.log(`\nMetafield ${idx + 1}:`);
-    console.log(`  Field: ${mf.field_name || mf.metafield_name}`);
-    console.log(`  Value: ${mf.value_text || mf.value_number || mf.value_boolean}`);
-    console.log(`  Entity Type: ${mf.entity_type || 'N/A'}`);
-    console.log(`  Chunk ID: ${mf.chunk_id || 'N/A'}`);
-  });
+  // Print AI model usage if available
+  if (jobResult.metadata?.ai_usage) {
+    console.log('\n🤖 AI MODEL USAGE:');
+    Object.entries(jobResult.metadata.ai_usage).forEach(([model, count]) => {
+      console.log(`  ${model}: ${count} calls`);
+    });
+  }
 
   // Save report to file
   const reportPath = `pdf-processing-report-${Date.now()}.json`;

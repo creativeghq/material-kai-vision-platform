@@ -1,23 +1,25 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-02
-**Total Endpoints:** ~70 (Consolidated from 113)
-**Status:** ✅ Production-Ready - API Consolidation Complete
+**Last Updated:** 2025-11-03
+**Total Endpoints:** 110 (Consolidated from 113)
+**Status:** ✅ Production-Ready - API Consolidation Complete + Metadata Management
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (API Consolidation - Complete):**
+**Recent Updates (API Consolidation + Metadata Management - Complete):**
 - ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
 - ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
 - ✅ **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
+- ✅ **METADATA MANAGEMENT:** 4 new endpoints for scope detection, application, listing, and statistics
 - ✅ **REMOVED:** All deprecated endpoints (`/process`, `/process-url`, `/unified-search`)
 - ✅ **REMOVED:** All test endpoints (4 from documents, 1 from main)
 - ✅ **REMOVED:** All legacy `/api/documents/*` endpoints (18 total) - replaced by `/api/rag/*`
 - ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
 
-**Total API Endpoints:** 106 endpoints across 25 categories
+**Total API Endpoints:** 110 endpoints across 15 categories
 - ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
+- ✅ **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
 
 ---
 
@@ -1214,6 +1216,218 @@ GET /api/admin/jobs?status=processing&limit=20&offset=0
 
 **Database Operations:** UPDATE document_images, document_chunks
 **Frontend Integration:** ImageViewer.tsx (reprocess button)
+
+---
+
+### 2.19 POST /api/rag/metadata/detect-scope
+
+**Purpose:** Detect metadata scope for text chunks (product-specific vs catalog-general)
+**Used In:** PDF processing pipeline, metadata classification
+**Flow:** Analyze chunk → Classify scope → Return scope with confidence
+
+**Request:**
+```http
+POST /api/rag/metadata/detect-scope
+Content-Type: application/json
+
+Body:
+{
+  "chunk_content": "Available in 15×38 dimensions",
+  "product_names": ["NOVA", "HARMONY", "ESSENCE"],
+  "document_context": "Tile catalog with multiple products"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "scope": "catalog_general_implicit",
+    "confidence": 0.92,
+    "reasoning": "Dimensions mentioned without specific product reference",
+    "applies_to": ["NOVA", "HARMONY", "ESSENCE"],
+    "extracted_metadata": {
+      "dimensions": "15×38"
+    },
+    "is_override": false
+  }
+}
+```
+
+**Scope Types:**
+- `product_specific` - Mentions specific product name
+- `catalog_general_explicit` - Explicitly says "all products"
+- `catalog_general_implicit` - Metadata mentioned without product context
+- `category_specific` - Applies to product category
+
+**Database Operations:** None (AI-powered classification)
+**Frontend Integration:** Admin metadata management, PDF processing monitoring
+
+---
+
+### 2.20 POST /api/rag/metadata/apply-to-products
+
+**Purpose:** Apply metadata to products with scope-aware override logic
+**Used In:** PDF processing pipeline (Stage 4), metadata management
+**Flow:** Detect scope → Apply in order → Track overrides → Update database
+
+**Request:**
+```http
+POST /api/rag/metadata/apply-to-products
+Content-Type: application/json
+
+Body:
+{
+  "document_id": "uuid",
+  "chunks_with_scope": [
+    {
+      "chunk_id": "uuid",
+      "content": "Available in 15×38",
+      "scope": "catalog_general_implicit",
+      "metadata": {"dimensions": "15×38"},
+      "applies_to": ["NOVA", "HARMONY", "ESSENCE"]
+    },
+    {
+      "chunk_id": "uuid",
+      "content": "HARMONY dimensions: 20×40",
+      "scope": "product_specific",
+      "metadata": {"dimensions": "20×40"},
+      "applies_to": ["HARMONY"]
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "products_updated": 3,
+    "metadata_fields_applied": 5,
+    "overrides_tracked": 1,
+    "catalog_general_count": 1,
+    "product_specific_count": 1,
+    "processing_time_ms": 245
+  }
+}
+```
+
+**Processing Order:**
+1. Catalog-general (explicit) - Lowest priority
+2. Catalog-general (implicit) - Low priority
+3. Category-specific - Medium priority
+4. Product-specific - Highest priority (can override)
+
+**Database Operations:**
+- UPDATE products SET metadata = metadata || new_metadata
+- Track overrides in `_overrides` array
+
+**Frontend Integration:** PDF processing pipeline, admin metadata management
+
+---
+
+### 2.21 GET /api/rag/metadata/list
+
+**Purpose:** List metadata with filtering and pagination
+**Used In:** Admin metadata viewer, metadata analytics
+**Flow:** Query database → Filter → Paginate → Return results
+
+**Request:**
+```http
+GET /api/rag/metadata/list?document_id=uuid&scope=catalog_general_implicit&limit=50&offset=0
+```
+
+**Query Parameters:**
+- `document_id` (optional) - Filter by document
+- `product_id` (optional) - Filter by product
+- `scope` (optional) - Filter by scope type
+- `metadata_key` (optional) - Filter by specific metadata field
+- `limit` (optional) - Results per page (default: 50)
+- `offset` (optional) - Pagination offset (default: 0)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "product_id": "uuid",
+        "product_name": "NOVA",
+        "metadata_key": "dimensions",
+        "metadata_value": "15×38",
+        "scope": "catalog_general_implicit",
+        "source_chunk_id": "uuid",
+        "is_override": false,
+        "created_at": "2025-11-03T10:00:00Z"
+      }
+    ],
+    "total": 125,
+    "limit": 50,
+    "offset": 0
+  }
+}
+```
+
+**Database Operations:**
+- SELECT FROM products WHERE document_id = ?
+- JOIN with document_chunks for source tracking
+
+**Frontend Integration:** Admin metadata management page, metadata analytics dashboard
+
+---
+
+### 2.22 GET /api/rag/metadata/statistics
+
+**Purpose:** Get metadata statistics and analytics
+**Used In:** Admin dashboard, metadata analytics
+**Flow:** Aggregate metadata → Calculate stats → Return summary
+
+**Request:**
+```http
+GET /api/rag/metadata/statistics?document_id=uuid
+```
+
+**Query Parameters:**
+- `document_id` (optional) - Filter by document
+- `product_id` (optional) - Filter by product
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "total_products": 14,
+    "total_metadata_fields": 156,
+    "catalog_general_count": 45,
+    "product_specific_count": 98,
+    "category_specific_count": 13,
+    "override_count": 8,
+    "most_common_fields": [
+      {"field": "dimensions", "count": 14},
+      {"field": "material_category", "count": 14},
+      {"field": "factory_name", "count": 14},
+      {"field": "slip_resistance", "count": 12},
+      {"field": "finish", "count": 10}
+    ],
+    "scope_distribution": {
+      "catalog_general_implicit": 45,
+      "catalog_general_explicit": 12,
+      "product_specific": 98,
+      "category_specific": 13
+    }
+  }
+}
+```
+
+**Database Operations:**
+- SELECT COUNT(*) FROM products
+- Aggregate metadata fields across products
+- Calculate scope distribution
+
+**Frontend Integration:** Admin dashboard, metadata analytics page
 
 ---
 

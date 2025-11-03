@@ -34,7 +34,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 
 **Backend**:
 - MIVAA API: FastAPI + Python 3.11
-- 113 REST API endpoints (14 categories)
+- 110 REST API endpoints (15 categories)
 - Docker containerized
 - Self-hosted on dedicated server
 
@@ -368,21 +368,24 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ## API Ecosystem
 
-### 74+ REST API Endpoints
+### 110 REST API Endpoints
 
 **Categories**:
-1. RAG & Document Processing (15 endpoints)
+1. RAG & Document Processing (27 endpoints - includes metadata management)
 2. Search APIs (6 endpoints)
 3. Embedding APIs (5 endpoints)
 4. Products API (8 endpoints)
 5. Images API (6 endpoints)
-6. AI Services (7 endpoints)
-7. Background Jobs (5 endpoints)
-8. Admin & Monitoring (12 endpoints)
-9. Document Management (13 endpoints)
+6. AI Services (10 endpoints)
+7. Background Jobs (7 endpoints)
+8. Admin & Monitoring (10 endpoints)
+9. Document Entities (5 endpoints - certificates, logos, specifications)
 10. Anthropic APIs (3 endpoints)
 11. Together AI APIs (3 endpoints)
 12. Health & Monitoring (4 endpoints)
+13. PDF Routes (8 endpoints)
+14. Monitoring Routes (5 endpoints)
+15. AI Metrics Routes (3 endpoints)
 
 **Documentation**:
 - Swagger UI: `https://v1api.materialshub.gr/docs`

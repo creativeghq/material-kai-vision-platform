@@ -23,12 +23,12 @@ Complete technical architecture of Material Kai Vision Platform.
 │ API TIER (MIVAA - FastAPI)                                  │
 │ Python 3.11 + FastAPI + Uvicorn                            │
 │ Deployed: v1api.materialshub.gr                            │
-│ - 74+ REST API endpoints                                    │
+│ - 110 REST API endpoints (15 categories)                   │
 │ - 14-stage PDF processing pipeline                          │
 │ - RAG system (LlamaIndex)                                   │
 │ - Search APIs (Semantic, Vector, Hybrid)                   │
 │ - AI Services (Claude, GPT, Llama, CLIP)                   │
-│ - Product Management                                        │
+│ - Product Management + Metadata Management                 │
 │ - Admin & Monitoring                                        │
 │ - Background job processing                                 │
 └─────────────────────────────────────────────────────────────┘
@@ -165,58 +165,96 @@ USING (workspace_id = auth.uid());
 
 ---
 
-## 🚀 API Endpoints (74+)
+## 🚀 API Endpoints (110)
 
-### 9 Categories
+### 15 Categories
 
-1. **PDF Processing** (12 endpoints)
+1. **RAG & Document Processing** (27 endpoints)
    - Upload, extract, process PDFs
    - Job status tracking
    - Progress streaming
+   - Metadata management (scope detection, application, listing, statistics)
+   - Document upload, query, chat
+   - Search with multiple strategies
 
-2. **Document Management** (13 endpoints)
-   - CRUD operations
-   - Batch processing
-   - Content retrieval
-
-3. **Search APIs** (8 endpoints)
+2. **Search APIs** (6 endpoints)
    - Semantic search
    - Vector search
    - Hybrid search
    - Visual search
+   - Material search
+   - Multi-vector search
 
-4. **Image Analysis** (5 endpoints)
+3. **Image Analysis** (6 endpoints)
    - Image analysis
    - Batch processing
    - Similarity search
+   - OCR processing
 
-5. **RAG System** (7 endpoints)
-   - Document upload
-   - Query interface
-   - Chat functionality
-   - Statistics
-
-6. **Embeddings** (3 endpoints)
+4. **Embeddings** (5 endpoints)
    - Text embeddings
    - Batch embeddings
    - CLIP embeddings
+   - Multi-modal embeddings
 
-7. **Products** (6 endpoints)
+5. **Products** (8 endpoints)
    - CRUD operations
    - Similarity search
    - Listing
+   - Product creation
 
-8. **Admin & Monitoring** (8 endpoints)
+6. **Document Entities** (5 endpoints)
+   - Certificates management
+   - Logos management
+   - Specifications management
+   - Entity relationships
+
+7. **Admin & Monitoring** (10 endpoints)
    - Job monitoring
    - Progress tracking
    - Health checks
    - Metrics
+   - Chunk quality analysis
+   - Extraction configuration
 
-9. **AI Services** (11 endpoints)
+8. **AI Services** (10 endpoints)
    - Classification
    - Boundary detection
    - Validation
    - Enrichment
+   - Product discovery
+
+9. **Background Jobs** (7 endpoints)
+   - Job creation
+   - Status tracking
+   - Progress updates
+   - Statistics
+
+10. **PDF Routes** (8 endpoints)
+    - PDF extraction
+    - Page processing
+    - Text extraction
+
+11. **Anthropic APIs** (3 endpoints)
+    - Claude integration
+    - Vision analysis
+
+12. **Together AI APIs** (3 endpoints)
+    - Llama integration
+    - Vision analysis
+
+13. **Health & Monitoring** (4 endpoints)
+    - System health
+    - Service status
+    - Performance metrics
+
+14. **Monitoring Routes** (5 endpoints)
+    - Real-time monitoring
+    - Performance tracking
+
+15. **AI Metrics Routes** (3 endpoints)
+    - Model performance
+    - Usage statistics
 
 ---
 
@@ -406,7 +444,7 @@ USING (workspace_id = auth.uid());
 ## 📈 Production Metrics
 
 - **Uptime**: 99.5%+
-- **API Endpoints**: 74+
+- **API Endpoints**: 110 (15 categories)
 - **Processing Speed**: 1-15 minutes per PDF
 - **Accuracy**: 95%+ product detection
 - **Scalability**: 5,000+ concurrent users
@@ -414,7 +452,7 @@ USING (workspace_id = auth.uid());
 
 ---
 
-**Last Updated**: October 31, 2025  
+**Last Updated**: November 3, 2025
 **Version**: 1.0.0  
 **Status**: Production
 
