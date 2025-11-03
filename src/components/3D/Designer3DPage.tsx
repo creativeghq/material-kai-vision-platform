@@ -260,7 +260,7 @@ export const Designer3DPage: React.FC = () => {
       ];
 
       const textOnlyModels = [
-        'black-forest-labs/flux-schnell',
+        'black-forest-labs/FLUX.1-schnell',
         'stabilityai/stable-diffusion-xl-base-1.0',
         'stabilityai/stable-diffusion-2-1',
         'julian-at/interiorly-gen1-dev',
@@ -367,9 +367,31 @@ export const Designer3DPage: React.FC = () => {
         // eslint-disable-next-line no-console
         console.error('Edge Function Response Data:', data);
 
+        // Try to get the actual error response from the Response object
+        let actualErrorData = data;
+        if (functionError.context instanceof Response) {
+          try {
+            const responseClone = functionError.context.clone();
+            const responseText = await responseClone.text();
+            // eslint-disable-next-line no-console
+            console.error('🔍 Edge Function Raw Response Text:', responseText);
+            try {
+              actualErrorData = JSON.parse(responseText);
+              // eslint-disable-next-line no-console
+              console.error('🔍 Edge Function Parsed Error Data:', actualErrorData);
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.error('Could not parse error response as JSON');
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Could not read response text:', e);
+          }
+        }
+
         // Try to extract validation error details if available
-        const errorMessage = data?.error || data?.details || functionError.message || 'Failed to invoke 3D generation function';
-        const errorDetails = data?.details ? `\nDetails: ${JSON.stringify(data.details)}` : '';
+        const errorMessage = actualErrorData?.error || data?.error || data?.details || functionError.message || 'Failed to invoke 3D generation function';
+        const errorDetails = actualErrorData?.details || data?.details ? `\nDetails: ${JSON.stringify(actualErrorData?.details || data?.details)}` : '';
 
         throw new Error(errorMessage + errorDetails);
       }
