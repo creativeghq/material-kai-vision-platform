@@ -475,16 +475,6 @@ const App = () => (
                 }
               />
               <Route
-                path="/admin/sentry-test"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <SentryTest />
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
                 path="/scraper"
                 element={
                   <AuthGuard>
