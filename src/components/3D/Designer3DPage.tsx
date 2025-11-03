@@ -250,35 +250,39 @@ export const Designer3DPage: React.FC = () => {
         setIsUploading(false);
       }
 
-      // Define models that require images vs text-only models
+      // Define models based on backend categorization (matching Edge Function exactly)
+
+      // IMAGE_TO_IMAGE_MODELS - REQUIRE reference images (won't work without)
       const imageRequiredModels = [
-        'adirik/interior-design',
-        'davisbrown/designer-architecture',
         'erayyavuz/interior-ai',
         'jschoormans/comfyui-interior-remodel',
+        'julian-at/interiorly-gen1-dev',
+        'jschoormans/interior-v2',
         'rocketdigitalai/interior-design-sdxl',
       ];
 
-      const textOnlyModels = [
-        'black-forest-labs/FLUX.1-schnell',
+      // TEXT_TO_IMAGE_MODELS - CAN work without reference images (some also support images)
+      const textToImageModels = [
+        'adirik/interior-design', // Hybrid: supports both text-only AND text+image
+        'davisbrown/designer-architecture',
         'stabilityai/stable-diffusion-xl-base-1.0',
+        'black-forest-labs/FLUX.1-schnell',
         'stabilityai/stable-diffusion-2-1',
-        'julian-at/interiorly-gen1-dev',
-        'jschoormans/interior-v2',
       ];
 
       // Determine which models to use based on whether we have an image
       let selectedModels: string[];
       if (imageUrl) {
-        // If we have an image, use all image-capable models
-        selectedModels = imageRequiredModels;
+        // If we have an image, use ALL models (both image-required and text-to-image)
+        // The backend will handle which ones to use based on image availability
+        selectedModels = [...imageRequiredModels, ...textToImageModels];
         // eslint-disable-next-line no-console
-        console.log('🔍 DEBUG: Using image-capable models:', selectedModels);
+        console.log('🔍 DEBUG: Using all models (with image):', selectedModels);
       } else {
-        // If no image, use all text-only models
-        selectedModels = textOnlyModels;
+        // If no image, use ONLY text-to-image models (skip image-required ones)
+        selectedModels = textToImageModels;
         // eslint-disable-next-line no-console
-        console.log('🔍 DEBUG: Using text-only models:', selectedModels);
+        console.log('🔍 DEBUG: Using text-to-image models (no image):', selectedModels);
       }
 
       // Build request data with required model field
