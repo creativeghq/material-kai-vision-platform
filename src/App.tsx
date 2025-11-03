@@ -7,7 +7,6 @@ import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/Layout/AuthGuard';
-import { monitoringService } from '@/services/monitoring/monitoringService';
 
 import { AdminGuard } from './components/Layout/AdminGuard';
 
@@ -70,14 +69,6 @@ const CoveragePage = () => (
 );
 
 const queryClient = new QueryClient();
-
-// Initialize monitoring service with basic config
-monitoringService.initialize({
-  enabled: false,
-  environment: 'development',
-  version: '1.0.0',
-  providers: {},
-});
 
 const App = () => (
   <CriticalErrorBoundary name="Application Root">

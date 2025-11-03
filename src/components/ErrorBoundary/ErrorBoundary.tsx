@@ -7,11 +7,11 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import * as Sentry from '@sentry/react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { monitoringService } from '@/services/monitoring/monitoringService';
 
 interface Props {
   children: ReactNode;
@@ -70,13 +70,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private reportError = (error: Error, errorInfo: ErrorInfo) => {
-    // Report to monitoring service
-    monitoringService.captureError(error, {
+    // Report to Sentry
+    Sentry.captureException(error, {
       level: 'error',
-      component: this.props.name || 'Unknown Component',
       tags: {
+        component: this.props.name || 'Unknown Component',
         errorBoundary: 'true',
-        level: this.props.level || 'component',
+        errorBoundaryLevel: this.props.level || 'component',
       },
       extra: {
         componentStack: errorInfo.componentStack,
@@ -86,11 +86,11 @@ export class ErrorBoundary extends Component<Props, State> {
     });
 
     // Add breadcrumb for debugging
-    monitoringService.addBreadcrumb(
-      `Error boundary caught error: ${error.message}`,
-      'error_boundary',
-      'error',
-    );
+    Sentry.addBreadcrumb({
+      message: `Error boundary caught error: ${error.message}`,
+      category: 'error_boundary',
+      level: 'error',
+    });
   };
 
   private handleRetry = () => {
