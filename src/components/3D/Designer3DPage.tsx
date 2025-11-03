@@ -268,7 +268,7 @@ export const Designer3DPage: React.FC = () => {
       ];
 
       // Determine which models to use based on whether we have an image
-      let selectedModels;
+      let selectedModels: string[];
       if (imageUrl) {
         // If we have an image, use all image-capable models
         selectedModels = imageRequiredModels;
@@ -329,7 +329,7 @@ export const Designer3DPage: React.FC = () => {
         models: selectedModels, // Send all available models instead of just one
         room_type: roomType || undefined,
         style: style || undefined,
-        ...(imageUrl && { image_url: imageUrl }), // Only include image_url if we have one
+        ...(imageUrl && { reference_image_url: imageUrl }), // Edge function expects reference_image_url
       };
 
       // eslint-disable-next-line no-console
@@ -351,6 +351,15 @@ export const Designer3DPage: React.FC = () => {
       console.log('Generation response received:', { data, error: functionError });
 
       if (functionError) {
+        // Log detailed error information
+        // eslint-disable-next-line no-console
+        console.error('Edge Function Error Details:', {
+          message: functionError.message,
+          context: functionError.context,
+          status: functionError.status,
+          fullError: functionError,
+        });
+
         throw new Error(
           functionError.message || 'Failed to invoke 3D generation function',
         );
@@ -380,7 +389,7 @@ export const Designer3DPage: React.FC = () => {
           await pollForResults(responseData.generationId);
         }
       } else {
-        throw new Error(result.error?.message || 'Failed to start generation');
+        throw new Error('Failed to start generation - no generation ID returned');
       }
     } catch (error: unknown) {
       // eslint-disable-next-line no-console
@@ -393,12 +402,12 @@ export const Designer3DPage: React.FC = () => {
         action: 'generate_3d_interior',
         tags: {
           feature: '3d-generation',
-          roomType,
-          style,
+          roomType: roomType || 'unknown',
+          style: style || 'unknown',
         },
         extra: {
-          prompt: prompt.substring(0, 100), // First 100 chars only
-          selectedModels: selectedModels,
+          prompt: prompt ? prompt.substring(0, 100) : 'no prompt',
+          hasImage: !!selectedImage,
         },
       });
 
