@@ -74,8 +74,8 @@ export const Designer3DPage: React.FC = () => {
     },
     {
       name: '⚡ FLUX-Schnell',
-      id: 'black-forest-labs/flux-schnell',
-      provider: 'replicate',
+      id: 'black-forest-labs/FLUX.1-schnell',
+      provider: 'huggingface',
     },
     {
       name: '🏠 Interior Design Model',

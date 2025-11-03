@@ -21,14 +21,51 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   integrations: [
+    // Browser performance tracking
     Sentry.browserTracingIntegration(),
+
+    // Session replay - records user sessions when errors occur
     Sentry.replayIntegration({
       maskAllText: false,
       blockAllMedia: false,
     }),
+
+    // Automatically capture console.error() calls
+    Sentry.captureConsoleIntegration({
+      levels: ['error', 'assert'],
+    }),
+
+    // Capture HTTP client errors (fetch, XHR)
+    Sentry.httpClientIntegration({
+      failedRequestStatusCodes: [[400, 599]], // Capture 4xx and 5xx errors
+    }),
   ],
+
   // Environment tracking
   environment: import.meta.env.MODE,
+
+  // Automatically capture unhandled errors and promise rejections
+  beforeSend(event, hint) {
+    // Log errors to console in development
+    if (import.meta.env.MODE === 'development' && event.exception) {
+      console.error('Error captured by Sentry:', hint.originalException || hint.syntheticException);
+    }
+    return event;
+  },
+
+  // Ignore certain errors that are not actionable
+  ignoreErrors: [
+    // Browser extensions
+    'top.GLOBALS',
+    'chrome-extension://',
+    'moz-extension://',
+    // Network errors that are expected
+    'NetworkError',
+    'Failed to fetch',
+    // ResizeObserver errors (harmless)
+    'ResizeObserver loop limit exceeded',
+    'ResizeObserver loop completed with undelivered notifications',
+  ],
 });
 
 const container = document.getElementById('root');
