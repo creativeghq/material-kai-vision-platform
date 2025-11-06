@@ -47,18 +47,21 @@ export const Designer3DPage: React.FC = () => {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        const { data } = await (
-          supabase as unknown as {
-            rpc: (
-              name: string,
-              params: Record<string, unknown>,
-            ) => Promise<{ data: unknown }>;
-          }
-        ).rpc('has_role', {
-          _user_id: user.id,
-          _role: 'admin',
+        // Check if user has admin role in metadata
+        const userRole = user.user_metadata?.role || user.raw_user_meta_data?.role;
+        const isAdminUser = userRole === 'admin';
+
+        // eslint-disable-next-line no-console
+        console.log('🔍 Admin check:', {
+          userId: user.id,
+          email: user.email,
+          role: userRole,
+          isAdmin: isAdminUser,
+          metadata: user.user_metadata,
+          rawMetadata: user.raw_user_meta_data,
         });
-        setIsAdmin(data === true);
+
+        setIsAdmin(isAdminUser);
       }
     };
 
