@@ -13,7 +13,10 @@
     "test:integration:material-kai": "node tests/material-kai-integration-test.js",
     "test:qa": "node scripts/testing/qa-comprehensive-test.js",
     "test:e2e-workflow": "node scripts/testing/end-to-end-workflow.js",
-    "test:workflow:comprehensive": "node scripts/testing/comprehensive-workflow-testing.js"
+    "test:workflow:comprehensive": "node scripts/testing/comprehensive-workflow-testing.js",
+    "types:generate": "supabase gen types typescript --project-id bgbavxtjlbvgplozizxu > src/integrations/supabase/types.ts",
+    "types:generate:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts",
+    "types:check": "node scripts/check-supabase-types.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",
@@ -130,6 +133,7 @@
     "lovable-tagger": "^1.1.10",
     "lucide-react": "^0.544.0",
     "postcss": "^8.5.6",
+    "supabase": "^1.200.3",
     "tailwindcss": "^3.4.18",
     "ts-jest": "^29.4.1",
     "typescript": "^5.9.3",
