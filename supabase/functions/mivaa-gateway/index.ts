@@ -135,10 +135,7 @@ const MIVAA_ENDPOINTS = {
   'monitoring_health': { path: '/api/monitoring/health', method: 'GET' },  // Monitoring health
   'monitoring_storage_estimate': { path: '/api/monitoring/storage-estimate', method: 'GET' },  // Storage estimate
 
-  // ==================== PDF EXTRACTION (SIMPLE) ====================
-  'pdf_extract_markdown': { path: '/api/pdf/extract/markdown', method: 'POST' },  // Extract markdown only
-  'pdf_extract_tables': { path: '/api/pdf/extract/tables', method: 'POST' },  // Extract tables only
-  'pdf_extract_images': { path: '/api/pdf/extract/images', method: 'POST' },  // Extract images only
+  // ==================== PDF HEALTH ====================
   'pdf_health': { path: '/api/pdf/health', method: 'GET' },  // PDF service health
 
   // ==================== SEARCH (LEGACY - Use /api/rag/search instead) ====================

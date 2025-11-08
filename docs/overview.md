@@ -34,7 +34,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 
 **Backend**:
 - MIVAA API: FastAPI + Python 3.11
-- 110 REST API endpoints (15 categories)
+- 108 REST API endpoints (14 categories) - Consolidated from 113
 - Docker containerized
 - Self-hosted on dedicated server
 
@@ -368,24 +368,27 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ## API Ecosystem
 
-### 110 REST API Endpoints
+### 108 REST API Endpoints (Consolidated from 113)
 
-**Categories**:
-1. RAG & Document Processing (27 endpoints - includes metadata management)
-2. Search APIs (6 endpoints)
-3. Embedding APIs (5 endpoints)
-4. Products API (8 endpoints)
-5. Images API (6 endpoints)
-6. AI Services (10 endpoints)
-7. Background Jobs (7 endpoints)
-8. Admin & Monitoring (10 endpoints)
-9. Document Entities (5 endpoints - certificates, logos, specifications)
-10. Anthropic APIs (3 endpoints)
-11. Together AI APIs (3 endpoints)
-12. Health & Monitoring (4 endpoints)
-13. PDF Routes (8 endpoints)
-14. Monitoring Routes (5 endpoints)
-15. AI Metrics Routes (3 endpoints)
+**Categories** (14 total):
+1. RAG & Document Processing (27 endpoints - includes metadata management, PDF extraction consolidated)
+2. Search APIs (6 endpoints - semantic, vector, hybrid, visual, material, multi-vector)
+3. Admin Routes (18 endpoints - job management, system monitoring, metadata management)
+4. Document Entities (5 endpoints - certificates, logos, specifications)
+5. Products API (3 endpoints - product management)
+6. Images API (5 endpoints - image analysis and processing)
+7. Embeddings APIs (3 endpoints - embedding generation)
+8. AI Services (10 endpoints - AI model integration)
+9. Background Jobs (7 endpoints - async job tracking)
+10. Anthropic APIs (3 endpoints - Claude integration)
+11. Together AI APIs (3 endpoints - Llama integration)
+12. Monitoring Routes (3 endpoints - health checks, metrics)
+13. AI Metrics Routes (2 endpoints - AI performance tracking)
+
+**Consolidation Summary**:
+- ✅ PDF Extraction: `/api/pdf/extract/*` (3 endpoints) → `/api/rag/documents/upload` with `processing_mode="quick"`
+- ✅ Document Management: `/api/documents/*` (18 endpoints) → `/api/rag/*` (27 endpoints)
+- ✅ Health Checks: 10+ individual endpoints → Single `/health` endpoint
 
 **Documentation**:
 - Swagger UI: `https://v1api.materialshub.gr/docs`

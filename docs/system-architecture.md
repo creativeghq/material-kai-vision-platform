@@ -165,12 +165,12 @@ USING (workspace_id = auth.uid());
 
 ---
 
-## 🚀 API Endpoints (110)
+## 🚀 API Endpoints (108 - Consolidated from 113)
 
-### 15 Categories
+### 14 Categories
 
 1. **RAG & Document Processing** (27 endpoints)
-   - Upload, extract, process PDFs
+   - Upload, extract, process PDFs (consolidated from `/api/pdf/extract/*`)
    - Job status tracking
    - Progress streaming
    - Metadata management (scope detection, application, listing, statistics)
@@ -185,76 +185,62 @@ USING (workspace_id = auth.uid());
    - Material search
    - Multi-vector search
 
-3. **Image Analysis** (6 endpoints)
-   - Image analysis
-   - Batch processing
-   - Similarity search
-   - OCR processing
+3. **Admin Routes** (18 endpoints)
+   - Job management and monitoring
+   - System health and metrics
+   - Data backup and cleanup
+   - Metadata management
 
-4. **Embeddings** (5 endpoints)
-   - Text embeddings
-   - Batch embeddings
-   - CLIP embeddings
-   - Multi-modal embeddings
-
-5. **Products** (8 endpoints)
-   - CRUD operations
-   - Similarity search
-   - Listing
-   - Product creation
-
-6. **Document Entities** (5 endpoints)
+4. **Document Entities** (5 endpoints)
    - Certificates management
    - Logos management
    - Specifications management
    - Entity relationships
 
-7. **Admin & Monitoring** (10 endpoints)
-   - Job monitoring
-   - Progress tracking
-   - Health checks
-   - Metrics
-   - Chunk quality analysis
-   - Extraction configuration
+5. **Products** (3 endpoints)
+   - Product management
+   - Product relationships
 
-8. **AI Services** (10 endpoints)
+6. **Images** (5 endpoints)
+   - Image analysis
+   - Batch processing
+   - Similarity search
+   - OCR processing
+
+7. **AI Services** (10 endpoints)
    - Classification
    - Boundary detection
    - Validation
    - Enrichment
    - Product discovery
 
-9. **Background Jobs** (7 endpoints)
+8. **Background Jobs** (7 endpoints)
    - Job creation
    - Status tracking
    - Progress updates
    - Statistics
 
-10. **PDF Routes** (8 endpoints)
-    - PDF extraction
-    - Page processing
-    - Text extraction
+9. **Anthropic APIs** (3 endpoints)
+   - Claude integration
+   - Vision analysis
 
-11. **Anthropic APIs** (3 endpoints)
-    - Claude integration
-    - Vision analysis
-
-12. **Together AI APIs** (3 endpoints)
+10. **Together AI APIs** (3 endpoints)
     - Llama integration
     - Vision analysis
 
-13. **Health & Monitoring** (4 endpoints)
+11. **Monitoring Routes** (3 endpoints)
     - System health
     - Service status
     - Performance metrics
 
-14. **Monitoring Routes** (5 endpoints)
-    - Real-time monitoring
-    - Performance tracking
-
-15. **AI Metrics Routes** (3 endpoints)
+12. **AI Metrics Routes** (2 endpoints)
     - Model performance
     - Usage statistics
+
+**Consolidation Notes:**
+- ✅ PDF Extraction endpoints (`/api/pdf/extract/*`) consolidated into `/api/rag/documents/upload`
+- ✅ All extraction functionality available via RAG pipeline with `processing_mode="quick"`
+- ✅ Internal utilities preserved in `app/core/extractor.py`
 
 ---
 

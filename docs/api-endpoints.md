@@ -1,12 +1,13 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-03
-**Total Endpoints:** 110 (Consolidated from 113)
-**Status:** ✅ Production-Ready - API Consolidation Complete + Metadata Management
+**Last Updated:** 2025-11-07
+**Total Endpoints:** 108 (Consolidated from 113)
+**Status:** ✅ Production-Ready - API Consolidation Complete + PDF Extraction Consolidation
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (API Consolidation + Metadata Management - Complete):**
+**Recent Updates (API Consolidation + PDF Extraction Consolidation - Complete):**
+- ✅ **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
 - ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
 - ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
 - ✅ **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
@@ -14,12 +15,14 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - ✅ **REMOVED:** All deprecated endpoints (`/process`, `/process-url`, `/unified-search`)
 - ✅ **REMOVED:** All test endpoints (4 from documents, 1 from main)
 - ✅ **REMOVED:** All legacy `/api/documents/*` endpoints (18 total) - replaced by `/api/rag/*`
+- ✅ **REMOVED:** All `/api/pdf/extract/*` endpoints (3 total) - replaced by `/api/rag/documents/upload`
 - ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
 
-**Total API Endpoints:** 110 endpoints across 15 categories
+**Total API Endpoints:** 108 endpoints across 14 categories
 - ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
 - ✅ **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
+- ✅ **PDF EXTRACTION:** Unified through RAG pipeline with optional quick mode
 
 ---
 
@@ -50,17 +53,15 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 1. [Core Endpoints](#1-core-endpoints) - Health, Status
 2. [RAG Routes](#2-rag-routes) - Document Upload, Search, Query (CONSOLIDATED)
 3. [Admin Routes](#3-admin-routes) - Admin management
-4. [Documents Routes](#4-documents-routes) - Document management
-5. [AI Services Routes](#5-ai-services-routes) - AI processing
-6. [Images Routes](#6-images-routes) - Image processing
-7. [Document Entities Routes](#7-document-entities-routes) - Certificates, Logos, Specifications
-8. [PDF Routes](#8-pdf-routes) - PDF extraction
-9. [Products Routes](#9-products-routes) - Product management
-10. [Embeddings Routes](#10-embeddings-routes) - Embedding generation
-11. [Together AI Routes](#11-together-ai-routes) - TogetherAI integration
-12. [Anthropic Routes](#12-anthropic-routes) - Anthropic integration
-13. [Monitoring Routes](#13-monitoring-routes) - System monitoring
-14. [AI Metrics Routes](#14-ai-metrics-routes) - AI performance metrics
+4. [Search Routes](#3-search-routes) - Semantic, Vector, Hybrid Search (CONSOLIDATED)
+5. [Document Entities Routes](#7-document-entities-routes) - Certificates, Logos, Specifications
+6. [Products Routes](#9-products-routes) - Product management
+7. [Images Routes](#6-images-routes) - Image processing
+8. [Embeddings Routes](#10-embeddings-routes) - Embedding generation
+9. [Together AI Routes](#11-together-ai-routes) - TogetherAI integration
+10. [Anthropic Routes](#12-anthropic-routes) - Anthropic integration
+11. [Monitoring Routes](#13-monitoring-routes) - System monitoring
+12. [AI Metrics Routes](#14-ai-metrics-routes) - AI performance metrics
 
 ---
 
@@ -1570,35 +1571,39 @@ Content-Type: application/json
 }
 ```
 
-**Extract Tables**
+---
+
+### PDF Extraction - DEPRECATED ⚠️ (REMOVED)
+
+**All `/api/pdf/extract/*` endpoints have been removed as of November 7, 2025.**
+
+**Removed Endpoints:**
+- `POST /api/pdf/extract/markdown` ❌ DELETED
+- `POST /api/pdf/extract/tables` ❌ DELETED
+- `POST /api/pdf/extract/images` ❌ DELETED
+
+**Replacement:** Use `POST /api/rag/documents/upload` with `processing_mode="quick"`
+
+The RAG endpoint provides identical functionality using the same PyMuPDF4LLM library:
 ```http
-POST /api/v1/extract/tables
+POST /api/rag/documents/upload
 Content-Type: multipart/form-data
 
-Response: { tables: [{ page, content, format }] }
+Body:
+{
+  "file": <PDF file>,
+  "processing_mode": "quick",  // Fast extraction without RAG
+  "workspace_id": "uuid"
+}
+
+Response: { markdown, tables, images, status }
 ```
 
-**Extract Images**
-```http
-POST /api/v1/extract/images
-Content-Type: multipart/form-data
-
-Response: { images: [{ page, filename, base64, metadata }] }
-```
-
-**Get Job Status**
-```http
-GET /api/v1/documents/job/{job_id}
-
-Response: { status, progress, current_stage, checkpoint, error }
-```
-
-**Stream Job Progress**
-```http
-GET /api/v1/documents/job/{job_id}/progress/stream
-
-Response: Server-Sent Events with real-time progress
-```
+**Benefits of consolidation:**
+- ✅ Single endpoint for all extraction needs
+- ✅ Optional RAG pipeline for enhanced processing
+- ✅ Unified job tracking and progress monitoring
+- ✅ Consistent error handling and response format
 
 ---
 

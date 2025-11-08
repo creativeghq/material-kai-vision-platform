@@ -29,7 +29,7 @@
 - Hybrid architecture pattern
 - Technology stack
 - Authentication & security
-- API endpoints (113)
+- API endpoints (108)
 - Scalability & monitoring
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
@@ -51,17 +51,16 @@
 - API endpoint
 
 **[api-endpoints.md](api-endpoints.md)** - API reference
-- 113 endpoints across 14 categories
-- RAG Routes (25)
+- 108 endpoints across 14 categories
+- RAG Routes (27)
 - Admin Routes (18)
-- Search Routes (18)
-- Documents Routes (11)
-- AI Services Routes (10)
-- Images Routes (5)
-- Document Entities Routes (5) ✨ NEW
-- PDF Routes (4)
+- Search Routes (6)
+- Document Entities Routes (5)
 - Products Routes (3)
+- Images Routes (5)
 - Embeddings Routes (3)
+- AI Services Routes (10)
+- Background Jobs (7)
 - Together AI Routes (3)
 - Anthropic Routes (3)
 - Monitoring Routes (3)
