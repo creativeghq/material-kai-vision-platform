@@ -1,7 +1,7 @@
-const { Octokit } = require('@octokit/rest');
-const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
+import { Octokit } from '@octokit/rest';
+import OpenAI from 'openai';
+import fs from 'fs';
+import path from 'path';
 
 // Initialize clients
 const octokit = new Octokit({
