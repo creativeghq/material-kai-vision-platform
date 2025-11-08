@@ -126,6 +126,14 @@
 - Monitoring & alerts
 - Rollback procedures
 
+**[supabase-types-automation.md](supabase-types-automation.md)** - Supabase types automation ✅
+- Automated TypeScript type generation
+- GitHub Actions integration
+- Weekly scheduled updates
+- Type validation scripts
+- Manual generation commands
+- Setup instructions
+
 **[troubleshooting-guide.md](troubleshooting-guide.md)** - Common issues & solutions
 - Critical issues (API down, database, OOM)
 - Common issues (PDF processing, search, latency, auth)
