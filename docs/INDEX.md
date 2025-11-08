@@ -33,6 +33,14 @@ Complete documentation for Material Kai Vision Platform.
 - Security features
 - Analytics & reporting
 
+**[search-strategies.md](search-strategies.md)** - Complete search system guide ✅
+- 6 search strategies (100% implemented)
+- Semantic, Vector, Multi-Vector, Hybrid, Material, Image
+- All strategies combined mode
+- Database schema and indexes
+- Performance metrics and benchmarks
+- Usage examples and best practices
+
 ---
 
 ### 🏗️ Architecture & Design

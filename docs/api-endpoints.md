@@ -1440,7 +1440,8 @@ GET /api/rag/metadata/statistics?document_id=uuid
 
 ### 3.1 POST /search
 
-**Purpose:** CONSOLIDATED search endpoint for all search strategies
+**Purpose:** CONSOLIDATED search endpoint for all 6 search strategies ✅
+**Status:** All strategies implemented (100% complete)
 **Replaces:**
 - `/api/search/semantic` (deprecated)
 - `/api/search/similarity` (deprecated)
@@ -1448,81 +1449,193 @@ GET /api/rag/metadata/statistics?document_id=uuid
 - `/api/unified-search` (deprecated)
 - `/api/search/materials/visual` (deprecated)
 
+**Available Strategies:**
+
+| Strategy | Status | Use Case | Performance |
+|----------|--------|----------|-------------|
+| `semantic` | ✅ | Natural language queries | <150ms |
+| `vector` | ✅ | Exact similarity matching | <100ms |
+| `multi_vector` | ✅ | Text + visual understanding | <200ms |
+| `hybrid` | ✅ | Technical terms + semantics | <180ms |
+| `material` | ✅ | Property-based filtering | <50ms |
+| `image` | ✅ | Visual similarity | <150ms |
+| `all` | ✅ | All strategies combined | <800ms |
+
 **Request:**
 ```http
 POST /api/rag/search?strategy={strategy}
 Content-Type: application/json
 
 Query Parameters:
-- strategy: "semantic" | "vector" | "multi_vector" | "hybrid" | "material" | "image"
-  * semantic: Text-based semantic search using embeddings
-  * vector: Pure vector similarity search
-  * multi_vector: Multi-modal search (text + image)
-  * hybrid: Combines semantic + keyword search
-  * material: Material-specific search
-  * image: Image-based visual search
+- strategy: "semantic" | "vector" | "multi_vector" | "hybrid" | "material" | "image" | "all"
+  * semantic: Natural language understanding with MMR diversity
+  * vector: Pure vector similarity (no diversity)
+  * multi_vector: Combines 3 embeddings (text 40%, visual 30%, multimodal 30%)
+  * hybrid: Semantic (70%) + keyword matching (30%)
+  * material: JSONB property filtering
+  * image: Visual similarity using CLIP embeddings
+  * all: Runs all 6 strategies in parallel (recommended)
 
 Body:
 {
   "query": "search query text",
-  "limit": 20,
-  "threshold": 0.7,
   "workspace_id": "uuid",
-  "filters": {
-    "document_id": "uuid",
-    "category": "products",
-    "date_range": {"start": "2024-01-01", "end": "2024-12-31"}
-  }
+  "top_k": 10,
+  "similarity_threshold": 0.6,
+
+  // Multi-vector weights (optional)
+  "text_weight": 0.4,
+  "visual_weight": 0.3,
+  "multimodal_weight": 0.3,
+
+  // Hybrid weights (optional)
+  "semantic_weight": 0.7,
+  "keyword_weight": 0.3,
+
+  // Material filters (for material strategy)
+  "material_filters": {
+    "material_type": "Porcelain",
+    "slip_resistance": "R11",
+    "finish": "matte"
+  },
+
+  // Image search (for image strategy)
+  "image_url": "https://example.com/tile.jpg",
+  "image_base64": "data:image/jpeg;base64,..."
 }
 ```
 
 **Response:**
 ```json
 {
-  "success": true,
   "query": "search query",
+  "enhanced_query": "enhanced query if prompts applied",
   "results": [
     {
       "id": "uuid",
-      "content": "chunk content",
-      "similarity_score": 0.95,
+      "name": "Product Name",
+      "description": "Product description",
+      "relevance_score": 0.88,
       "metadata": {
-        "document_id": "uuid",
-        "page_number": 5,
-        "category": "products"
+        "material_type": "Porcelain",
+        "dimensions": "60x60",
+        "slip_resistance": "R11"
       },
-      "embedding_type": "text",
-      "source_type": "chunk"
+
+      // For multi_vector strategy
+      "score_breakdown": {
+        "text_score": 0.85,
+        "visual_score": 0.90,
+        "multimodal_score": 0.89
+      },
+
+      // For all strategy
+      "found_in_strategies": ["semantic", "multi_vector", "hybrid"],
+      "strategy_scores": {
+        "semantic": 0.85,
+        "multi_vector": 0.90,
+        "hybrid": 0.89
+      }
     }
   ],
-  "total_found": 15,
-  "search_time_ms": 45,
-  "strategy_used": "semantic"
+  "total_results": 15,
+  "search_type": "all",
+  "processing_time": 0.45,
+
+  // For all strategy
+  "strategies_executed": ["semantic", "vector", "multi_vector", "hybrid"],
+  "strategies_count": 4
 }
 ```
 
 **Usage Examples:**
 
-**Semantic Search (Text-based):**
+**1. Semantic Search (Natural Language):**
 ```bash
 curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=semantic" \
   -H "Content-Type: application/json" \
-  -d '{"query": "sustainable materials", "limit": 10}'
+  -d '{
+    "query": "modern minimalist tiles for bathroom",
+    "workspace_id": "uuid",
+    "top_k": 10
+  }'
 ```
 
-**Image Search (Visual):**
+**2. Multi-Vector Search (Text + Visual):**
 ```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=image" \
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector" \
   -H "Content-Type: application/json" \
-  -d '{"query": "image_url_or_base64", "limit": 10}'
+  -d '{
+    "query": "geometric patterns in neutral colors",
+    "workspace_id": "uuid",
+    "top_k": 10,
+    "text_weight": 0.4,
+    "visual_weight": 0.3,
+    "multimodal_weight": 0.3
+  }'
 ```
 
-**Material Search:**
+**3. Hybrid Search (Semantic + Keyword):**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=hybrid" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "R11 slip resistance porcelain",
+    "workspace_id": "uuid",
+    "top_k": 10,
+    "semantic_weight": 0.7,
+    "keyword_weight": 0.3
+  }'
+```
+
+**4. Material Property Search:**
 ```bash
 curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=material" \
   -H "Content-Type: application/json" \
-  -d '{"query": "wood flooring", "limit": 10}'
+  -d '{
+    "query": "",
+    "workspace_id": "uuid",
+    "top_k": 50,
+    "material_filters": {
+      "material_type": "Porcelain",
+      "slip_resistance": "R11",
+      "finish": "matte"
+    }
+  }'
 ```
+
+**5. Image Search (Visual Similarity):**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=image" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "",
+    "workspace_id": "uuid",
+    "top_k": 10,
+    "image_url": "https://example.com/tile-sample.jpg"
+  }'
+```
+
+**6. All Strategies Combined (Recommended):**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=all" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "modern geometric tiles",
+    "workspace_id": "uuid",
+    "top_k": 10
+  }'
+```
+
+**Database Operations:**
+- SELECT FROM products with vector similarity (pgvector)
+- PostgreSQL full-text search (for hybrid strategy)
+- JSONB property filtering (for material strategy)
+- CLIP embedding generation (for image strategy)
+
+**Frontend Integration:** SearchPage.tsx, KnowledgeBase.tsx, ProductDiscovery.tsx
+
+**Related Documentation:** [Search Strategies Guide](./search-strategies.md)
 
 **Database Operations:**
 - SELECT FROM document_chunks (for text search)

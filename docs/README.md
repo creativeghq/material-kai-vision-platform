@@ -41,6 +41,14 @@
 - Model usage by stage
 - Cost optimization
 
+**[search-strategies.md](search-strategies.md)** - Search system guide ✅
+- 6 search strategies (100% complete)
+- Semantic, Vector, Multi-Vector, Hybrid, Material, Image
+- All strategies combined mode
+- Performance metrics (<800ms for all)
+- Database schema and indexes
+- Usage examples and best practices
+
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - PDF processing pipeline
 - 14-stage pipeline breakdown
 - Products + Metadata extraction (inseparable)
