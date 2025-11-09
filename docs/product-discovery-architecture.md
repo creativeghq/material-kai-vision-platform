@@ -337,16 +337,53 @@ class BankStatementExtractionService:
 
 ---
 
-## 📋 Next Steps
+## Implementation Components
 
-1. **Create document_entities table** in Supabase
-2. **Create product_document_relationships table** in Supabase
-3. **Update ProductDiscoveryService** to store metadata in product.metadata JSONB
-4. **Create DocumentEntityDiscoveryService** for optional document extraction
-5. **Create "Docs" Admin Page** to manage document entities
-6. **Implement AI-based entity linking** to connect documents to products
+### Database Schema
+
+The product discovery architecture requires the following database components:
+
+**document_entities Table:**
+- Stores certificates, logos, specifications, and other document entities
+- Includes factory/manufacturer identification fields
+- Supports entity-specific metadata in JSONB format
+- Enables category-based filtering and retrieval
+
+**product_document_relationships Table:**
+- Links document entities to products
+- Tracks relationship types (certification, specification, logo, marketing)
+- Includes relevance scoring for relationship strength
+- Supports AI-based linking metadata
+
+### Service Architecture
+
+**ProductDiscoveryService:**
+- Stores all product metadata in product.metadata JSONB field
+- Maintains inseparable product-metadata relationship
+- Supports dynamic metadata extraction from PDFs
+- Provides high-confidence product identification
+
+**DocumentEntityDiscoveryService:**
+- Handles optional document entity extraction
+- Supports configurable extraction categories
+- Enables async processing after product extraction
+- Provides extensibility for new entity types
+
+### Admin Interface
+
+**Docs Admin Page:**
+- Manages document entities (certificates, logos, specifications)
+- Displays entity-product relationships
+- Supports filtering by factory/manufacturer
+- Enables manual entity management and linking
+
+### AI Integration
+
+**Entity Linking System:**
+- Uses AI to identify relationships between entities and products
+- Analyzes content context for relationship detection
+- Assigns confidence scores to relationships
+- Supports manual override and validation
 
 ---
-
-**Would you like me to proceed with implementing these changes?**
 

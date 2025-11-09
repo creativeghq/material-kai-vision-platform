@@ -412,10 +412,10 @@ export const MaterialAgentSearchInterface: React.FC<
 
       // If RAG is enabled, perform knowledge base search first
       let ragResults: RAGResults | null = null;
-      if (hybridConfig.useRAG && input.trim()) {
+      if (hybridConfig.useRAG && input.trim().length > 2) {
         try {
           // eslint-disable-next-line no-console
-          console.log('🧠 Performing RAG search...');
+          console.log('🧠 Performing RAG search with query:', input);
 
           // Get workspace_id from user's session
           const { data: { user } } = await supabase.auth.getUser();
@@ -435,10 +435,12 @@ export const MaterialAgentSearchInterface: React.FC<
           }
 
           const ragResponse = await UnifiedSearchService.search({
-            query: input,
+            query: input.trim(),
             workspace_id: workspaceData.workspace_id,
-            strategy: 'hybrid',
+            strategy: 'semantic',
             top_k: 5,
+            similarity_threshold: 0.7,
+            include_content: true,
           });
 
           if (ragResponse.success && ragResponse.results) {
@@ -453,10 +455,8 @@ export const MaterialAgentSearchInterface: React.FC<
                 }),
               ),
               materialResults: [],  // Material results are now included in main results
-              totalResults:
-                (ragResponse.results.knowledgeBase || []).length +
-                (ragResponse.results.materialKnowledge || []).length,
-              searchTime: ragResponse.performance?.totalTime || 0,
+              totalResults: (ragResponse.results || []).length,
+              searchTime: 0,
             };
             // eslint-disable-next-line no-console
             console.log('✅ RAG search completed:', ragResults);
@@ -699,47 +699,54 @@ export const MaterialAgentSearchInterface: React.FC<
             '⚠️ Hybrid AI failed, falling back to standard Material Agent:',
             hybridError,
           );
-          // Fallback to standard Material Agent
-          const apiService = BrowserApiIntegrationService.getInstance();
-          const response = await apiService.callSupabaseFunction(
-            'material-agent-orchestrator',
+          // Fallback to agent-chat Edge Function
+          const { data: agentData, error: agentError } = await supabase.functions.invoke(
+            'agent-chat',
             {
-              user_id: session.user.id,
-              task_type: 'comprehensive_design',
-              input_data: {
-                query: input,
-                sessionId: sessionId,
+              body: {
+                messages: [
+                  {
+                    role: 'user',
+                    content: input,
+                  },
+                ],
                 context: enhancedContext,
-                hybridConfig: hybridConfig,
-                attachments:
-                  attachedFiles.length > 0 ? attachedFiles : undefined,
               },
             },
           );
-          data = response.data as APIResponse;
-          error = response.error?.message || null;
+
+          if (agentError) {
+            throw new Error(agentError.message || 'Agent chat failed');
+          }
+
+          data = agentData as APIResponse;
+          error = null;
         }
       } else {
         // eslint-disable-next-line no-console
-        console.log('🤖 Using standard Material Agent...');
-        // Use standard Material Agent endpoint
-        const apiService = BrowserApiIntegrationService.getInstance();
-        const response = await apiService.callSupabaseFunction(
-          'material-agent-orchestrator',
+        console.log('🤖 Using agent-chat Edge Function...');
+        // Use agent-chat Edge Function
+        const { data: agentData, error: agentError } = await supabase.functions.invoke(
+          'agent-chat',
           {
-            user_id: session.user.id,
-            task_type: 'comprehensive_design',
-            input_data: {
-              query: input,
-              sessionId: sessionId,
+            body: {
+              messages: [
+                {
+                  role: 'user',
+                  content: input,
+                },
+              ],
               context: enhancedContext,
-              hybridConfig: hybridConfig,
-              attachments: attachedFiles.length > 0 ? attachedFiles : undefined,
             },
           },
         );
-        data = response.data as APIResponse;
-        error = response.error?.message || null;
+
+        if (agentError) {
+          throw new Error(agentError.message || 'Agent chat failed');
+        }
+
+        data = agentData as APIResponse;
+        error = null;
       }
 
       if (error) {

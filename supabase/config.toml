@@ -10,7 +10,7 @@ max_rows = 10000
 # ==================== EXISTING FUNCTIONS ====================
 # Only functions that actually exist in supabase/functions/
 
-[functions.crewai-3d-generation]
+[functions.mastra-3d-generation]
 verify_jwt = false
 
 [functions.crm-contacts-api]

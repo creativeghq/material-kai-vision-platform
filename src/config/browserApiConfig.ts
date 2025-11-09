@@ -147,8 +147,8 @@ export const browserSupabaseConfig: SupabaseConfig = {
   timeout: 30000,
   retries: 3,
   functions: {
-    'crewai-3d-generation': {
-      description: 'CrewAI 3D generation coordination',
+    'mastra-3d-generation': {
+      description: 'Mastra 3D generation coordination',
       category: '3d-generation',
     },
     'material-recognition': {

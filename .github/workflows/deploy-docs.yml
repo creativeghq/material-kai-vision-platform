@@ -109,12 +109,12 @@ jobs:
                   <div class="stats">
                       <div class="stats-grid">
                           <div class="stat-item">
-                              <div class="stat-value">113</div>
-                              <div class="stat-label">API Endpoints</div>
+                              <div class="stat-value">24</div>
+                              <div class="stat-label">Documentation Files</div>
                           </div>
                           <div class="stat-item">
-                              <div class="stat-value">14</div>
-                              <div class="stat-label">Endpoint Categories</div>
+                              <div class="stat-value">113</div>
+                              <div class="stat-label">API Endpoints</div>
                           </div>
                           <div class="stat-item">
                               <div class="stat-value">12</div>
@@ -226,9 +226,11 @@ jobs:
 
           ## 📊 Platform Stats
 
+          - **24** Comprehensive Documentation Files
           - **113** API Endpoints across **14** categories
-          - **12** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-4o, Llama 4 Scout 17B Vision, CLIP, etc.)
+          - **12** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Llama 4 Scout 17B Vision, CLIP, etc.)
           - **6** Embedding Types (text, visual, color, texture, application, multimodal)
+          - **14-Stage** PDF Processing Pipeline with checkpoint recovery
           - **5,000+** Active Users
           - **99.5%+** Uptime
 
@@ -263,12 +265,15 @@ jobs:
 
           ## 🚀 Key Features
 
-          - **PDF Processing**: 14-stage AI pipeline with checkpoint recovery
-          - **Products + Metadata**: Inseparable extraction with JSONB storage
+          - **PDF Processing**: 14-stage AI pipeline with checkpoint recovery and async job queuing
+          - **Product Discovery**: AI-powered dynamic product identification with metadata extraction
           - **Document Entities**: Certificates, logos, specifications as separate knowledge base
-          - **Multi-Vector Search**: 6 specialized embeddings for comprehensive search
-          - **Agentic Queries**: Factory/group filtering for intelligent queries
-          - **Material Recognition**: Llama 4 Scout 17B Vision (69.4% MMMU, #1 OCR)
+          - **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)
+          - **Duplicate Detection**: Smart material deduplication with factory/manufacturer matching
+          - **Search Suggestions**: AI-powered auto-complete, trending searches, and typo correction
+          - **Material Recognition**: Llama 4 Scout 17B Vision (69.4% MMMU, #1 OCR performance)
+          - **Prompt Enhancement**: Admin-configurable extraction prompts with version control
+          - **Relevancy System**: Multi-source linking between chunks, images, and products
 
           ---
 

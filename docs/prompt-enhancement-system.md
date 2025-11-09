@@ -352,9 +352,11 @@ POST /api/admin/extraction-prompts/test
 
 ## Future Enhancements
 
-- [ ] A/B testing for prompts
-- [ ] Auto-optimization based on results
-- [ ] Multi-language prompt support
-- [ ] Prompt templates marketplace
-- [ ] AI-assisted prompt generation
+The following enhancements are planned for future releases:
+
+- **A/B Testing for Prompts**: Test multiple prompt variations to optimize extraction quality
+- **Auto-Optimization**: Automatically improve prompts based on extraction results and feedback
+- **Multi-Language Support**: Support for prompts in multiple languages for international documents
+- **Prompt Templates Marketplace**: Community-driven marketplace for sharing and discovering prompt templates
+- **AI-Assisted Prompt Generation**: Use AI to automatically generate and refine extraction prompts
 
