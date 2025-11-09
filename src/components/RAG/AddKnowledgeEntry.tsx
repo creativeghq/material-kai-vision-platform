@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { EnhancedRAGService } from '@/services/enhancedRAGService';
+import { ragKnowledgeService } from '@/services/ragKnowledgeService';
 
 interface AddKnowledgeEntryProps {
   onEntryAdded?: (entry: Record<string, unknown>) => void;
@@ -88,17 +88,12 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({
 
     setIsSubmitting(true);
     try {
-      const entry = await EnhancedRAGService.addKnowledgeEntry({
+      await ragKnowledgeService.addKnowledgeEntry({
         title: formData.title,
         content: formData.content,
-        contentType: formData.contentType,
-        ...(formData.sourceUrl && { sourceUrl: formData.sourceUrl }),
-        ...(formData.pdfUrl && { pdfUrl: formData.pdfUrl }),
-        materialCategories: formData.materialCategories,
-        semanticTags: formData.semanticTags,
-        language: formData.language,
-        readingLevel: formData.readingLevel,
-        technicalComplexity: formData.technicalComplexity,
+        content_type: formData.contentType as 'material_spec' | 'technical_doc' | 'expert_knowledge',
+        tags: [...formData.materialCategories, ...formData.semanticTags],
+        source_url: formData.sourceUrl || formData.pdfUrl || undefined,
       });
 
       toast({

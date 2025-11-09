@@ -33,11 +33,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import {
-  EnhancedRAGService,
-  type EnhancedRAGRequest,
-  type EnhancedRAGResponse,
-} from '@/services/enhancedRAGService';
+import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import {
   MaterialFiltersPanel,
   type MaterialFilters,
@@ -55,11 +51,10 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] =
-    useState<EnhancedRAGResponse | null>(null);
+  const [searchResults, setSearchResults] = useState<any | null>(null);
   const [searchType, setSearchType] = useState<
-    'comprehensive' | 'semantic' | 'hybrid' | 'perplexity' | 'all'
-  >('comprehensive');
+    'semantic' | 'hybrid' | 'multi_vector' | 'all'
+  >('semantic');
   const [includeRealTime, setIncludeRealTime] = useState(true);
   const [maxResults, setMaxResults] = useState(10);
   const [context, setContext] = useState({
@@ -94,7 +89,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 
   const loadAnalytics = async () => {
     try {
-      const data = await EnhancedRAGService.getSearchAnalytics('30 days');
+      const data = await UnifiedSearchService.getSearchAnalytics('30 days');
       setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -103,7 +98,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 
   const loadQueryHistory = async () => {
     try {
-      await EnhancedRAGService.getQueryHistory(10);
+      await UnifiedSearchService.getQueryHistory(10);
     } catch (error) {
       console.error('Error loading query history:', error);
     }
@@ -184,38 +179,22 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
           }
         : undefined;
 
-      const request: EnhancedRAGRequest = {
+      const results = await UnifiedSearchService.search({
         query: query.trim(),
-        context: {
-          ...(context.roomType && { roomType: context.roomType }),
-          ...(context.stylePreferences.length > 0 && {
-            stylePreferences: context.stylePreferences,
-          }),
-          ...(context.materialCategories.length > 0 && {
-            materialCategories: context.materialCategories,
-          }),
-        },
-        searchType,
-        maxResults,
-        includeRealTime,
-        ...(workspaceId && { workspaceId }),
-        ...(apiMaterialFilters && { materialFilters: apiMaterialFilters }),
-      };
+        workspace_id: workspaceId,
+        strategy: searchType as any,
+        top_k: maxResults,
+        material_filters: apiMaterialFilters,
+      });
 
-      const results = await EnhancedRAGService.search(request);
       setSearchResults(results);
 
-      // Combine all results for callback
-      const allResults = [
-        ...results.results.knowledgeBase,
-        ...results.results.materialKnowledge,
-        ...results.results.recommendations,
-      ];
-      onResultsFound?.(allResults as unknown as Record<string, unknown>[]);
+      // Pass results for callback
+      onResultsFound?.(results.results as unknown as Record<string, unknown>[]);
 
       toast({
         title: 'Enhanced Search Completed',
-        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`,
+        description: `Found ${results.total_results} results using ${results.search_type} strategy`,
       });
 
       // Refresh analytics and history
@@ -241,8 +220,8 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     if (!searchResults) return;
 
     try {
-      await EnhancedRAGService.provideFeedback(
-        searchResults.analytics.sessionId,
+      await UnifiedSearchService.provideFeedback(
+        searchResults.analytics?.sessionId || '',
         {
           satisfaction,
           clickedResults,

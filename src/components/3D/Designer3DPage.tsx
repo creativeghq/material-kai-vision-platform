@@ -345,14 +345,14 @@ export const Designer3DPage: React.FC = () => {
         requestDataStringified: JSON.stringify(requestData, null, 2),
       });
 
-      // Call Supabase Edge Function directly
+      // Call Mastra 3D Generation (replaced CrewAI)
       // eslint-disable-next-line no-console
-      console.log('🔍 DEBUG: About to call API with request data');
+      console.log('🚀 DEBUG: Calling mastra-3d-generation with request data');
       // eslint-disable-next-line no-console
       console.log('🔍 DEBUG: Request body being sent:', JSON.stringify(requestData, null, 2));
 
       const { data, error: functionError } = await supabase.functions.invoke(
-        'crewai-3d-generation',
+        'mastra-3d-generation',
         {
           body: requestData,
         },

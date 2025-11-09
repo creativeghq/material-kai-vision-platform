@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Search, X, Clock, TrendingUp, Loader2, Sparkles } from 'lucide-react';
+import { Search, X, Clock, TrendingUp, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { supabase } from '@/integrations/supabase/client';
+import { getSearchSuggestionsService } from '@/services/searchSuggestionsService';
+import type { SearchSuggestion as APISuggestion } from '@/services/searchSuggestionsService';
 
 // Types for semantic search functionality
 export interface SearchSuggestion {
@@ -53,97 +54,65 @@ export interface SearchOptions {
   filters?: Record<string, unknown>;
 }
 
-// Database-driven search suggestions and history
+// Convert API suggestion to component suggestion format
+const convertAPISuggestion = (apiSuggestion: APISuggestion): SearchSuggestion => {
+  // Map API suggestion types to component types
+  const typeMap: Record<string, 'semantic' | 'recent' | 'trending' | 'completion'> = {
+    'product': 'semantic',
+    'material': 'semantic',
+    'category': 'semantic',
+    'property': 'semantic',
+    'trending': 'trending',
+    'recent': 'recent',
+    'popular': 'trending',
+  };
+
+  return {
+    id: apiSuggestion.id,
+    text: apiSuggestion.suggestion_text,
+    type: typeMap[apiSuggestion.suggestion_type] || 'completion',
+    confidence: apiSuggestion.confidence || apiSuggestion.popularity_score,
+    category: apiSuggestion.category,
+    metadata: {
+      ...apiSuggestion.metadata,
+      click_count: apiSuggestion.click_count,
+      ctr: apiSuggestion.ctr,
+      source: 'api',
+    },
+  };
+};
+
+// Fetch search suggestions using the new SearchSuggestionsService
 const fetchSearchSuggestions = async (
   query: string,
   categories: string[] = [],
   threshold: number = 0.7,
+  userId?: string,
 ): Promise<SearchSuggestion[]> => {
   try {
-    const suggestions: SearchSuggestion[] = [];
+    const suggestionsService = getSearchSuggestionsService();
 
-    // Get semantic suggestions from processing results
-    const { data: processingData } = await supabase
-      .from('processing_results')
-      .select('id, extraction_type, metadata, created_at')
-      .ilike('extraction_type', `%${query}%`)
-      .limit(5);
+    // Get auto-complete suggestions from the API
+    const response = await suggestionsService.getAutoCompleteSuggestions({
+      query,
+      limit: 10,
+      user_id: userId,
+      include_trending: true,
+      include_recent: true,
+      include_popular: true,
+      categories: categories.length > 0 ? categories : undefined,
+    });
 
-    if (processingData) {
-      processingData.forEach((item: unknown) => {
-        // eslint-disable-line @typescript-eslint/no-explicit-any
-        suggestions.push({
-          id: `processing_${(item as any).id}`,
-          text: `${(item as any).extraction_type} analysis`,
-          type: 'semantic',
-          confidence: 0.85 + Math.random() * 0.15,
-          category: 'analysis',
-          metadata: {
-            relatedTerms: [
-              (item as any).extraction_type,
-              'processing',
-              'analysis',
-            ],
-            source: 'processing_results',
-          },
-        });
-      });
+    if (!response.success || !response.suggestions) {
+      console.warn('Failed to get suggestions from API, falling back to empty array');
+      return [];
     }
 
-    // Get trending suggestions from materials catalog
-    const { data: materialsData } = await supabase
-      .from('materials_catalog')
-      .select('id, name, category, created_at')
-      .ilike('name', `%${query}%`)
-      .limit(3);
-
-    if (materialsData) {
-      materialsData.forEach((item: unknown) => {
-        // eslint-disable-line @typescript-eslint/no-explicit-any
-        suggestions.push({
-          id: `material_${(item as any).id}`,
-          text: `${(item as any).name} materials`,
-          type: 'trending',
-          category: (item as any).category || 'materials',
-          metadata: {
-            popularity: 'high',
-            source: 'materials_catalog',
-          },
-        });
-      });
-    }
-
-    // Add query completion suggestions
-    if (query.length > 2) {
-      const completions: SearchSuggestion[] = [
-        {
-          id: `completion-${query}-analysis`,
-          text: `${query} analysis`,
-          type: 'completion',
-          category: 'analysis',
-          metadata: { source: 'completion' },
-        },
-        {
-          id: `completion-${query}-processing`,
-          text: `${query} processing`,
-          type: 'completion',
-          category: 'processing',
-          metadata: { source: 'completion' },
-        },
-      ];
-      suggestions.push(...completions);
-    }
-
-    // Filter by categories if specified
-    const filtered =
-      categories.length > 0
-        ? suggestions.filter(
-            (s) => s.category && categories.includes(s.category),
-          )
-        : suggestions;
+    // Convert API suggestions to component format
+    const suggestions = response.suggestions.map(convertAPISuggestion);
 
     // Filter by confidence threshold
-    return filtered.filter((s) => !s.confidence || s.confidence >= threshold);
+    return suggestions.filter((s) => !s.confidence || s.confidence >= threshold);
   } catch (error) {
     console.error('Error fetching search suggestions:', error);
     return [];
@@ -172,38 +141,53 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   const [history, setHistory] = useState<SearchHistory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [typoCorrection, setTypoCorrection] = useState<string | null>(null);
+  const [showTypoCorrection, setShowTypoCorrection] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const suggestionsService = getSearchSuggestionsService();
 
-  // Debounced suggestion fetching
+  // Debounced suggestion fetching with typo correction
   const fetchSuggestions = useCallback(
     async (query: string) => {
       if (!query.trim() || !enableSemanticSuggestions) {
         setSuggestions([]);
+        setTypoCorrection(null);
+        setShowTypoCorrection(false);
         return;
       }
 
       setIsLoading(true);
 
       try {
-        // Simulate API call for semantic suggestions
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        // Check for typos in parallel with fetching suggestions
+        const [suggestionsResult, typoResult] = await Promise.all([
+          fetchSearchSuggestions(query, categories, semanticThreshold),
+          suggestionsService.checkTypoCorrection(query, 0.85, 1),
+        ]);
 
-        const suggestions = await fetchSearchSuggestions(
-          query,
-          categories,
-          semanticThreshold,
-        );
-        setSuggestions(suggestions.slice(0, maxSuggestions));
+        // Set suggestions
+        setSuggestions(suggestionsResult.slice(0, maxSuggestions));
+
+        // Set typo correction if available
+        if (typoResult.success && typoResult.recommended_correction) {
+          setTypoCorrection(typoResult.recommended_correction.corrected_query);
+          setShowTypoCorrection(true);
+        } else {
+          setTypoCorrection(null);
+          setShowTypoCorrection(false);
+        }
       } catch (error) {
         console.error('Error fetching suggestions:', error);
         setSuggestions([]);
+        setTypoCorrection(null);
+        setShowTypoCorrection(false);
       } finally {
         setIsLoading(false);
       }
     },
-    [enableSemanticSuggestions, categories, semanticThreshold, maxSuggestions],
+    [enableSemanticSuggestions, categories, semanticThreshold, maxSuggestions, suggestionsService],
   );
 
   // Debounce suggestion fetching
@@ -252,10 +236,25 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   };
 
   // Handle suggestion selection
-  const handleSuggestionSelect = (suggestion: SearchSuggestion) => {
+  const handleSuggestionSelect = async (suggestion: SearchSuggestion, position: number) => {
     onChange(suggestion.text);
     setIsOpen(false);
     onSuggestionSelect?.(suggestion);
+
+    // Track suggestion click
+    try {
+      await suggestionsService.trackSuggestionClick(
+        suggestion.id,
+        value, // original query
+        position,
+        'clicked',
+        undefined, // user_id - can be added if available
+        undefined, // result_count - will be updated after search
+        undefined  // user_satisfied - can be tracked later
+      );
+    } catch (error) {
+      console.error('Error tracking suggestion click:', error);
+    }
 
     // Auto-search on suggestion select
     handleSearch(suggestion.text, {
@@ -307,7 +306,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
           if (selectedIndex < suggestions.length) {
             const suggestion = suggestions[selectedIndex];
             if (suggestion) {
-              handleSuggestionSelect(suggestion);
+              handleSuggestionSelect(suggestion, selectedIndex);
             }
           } else {
             const historyIndex = selectedIndex - suggestions.length;
@@ -438,6 +437,38 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         >
           <CardContent className="p-0">
             <div className="max-h-96 overflow-y-auto">
+              {/* Typo Correction Banner */}
+              {showTypoCorrection && typoCorrection && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-amber-900 dark:text-amber-100">
+                        Did you mean:{' '}
+                        <button
+                          onClick={() => {
+                            onChange(typoCorrection);
+                            setShowTypoCorrection(false);
+                            handleSearch(typoCorrection);
+                          }}
+                          className="font-semibold underline hover:no-underline"
+                        >
+                          {typoCorrection}
+                        </button>
+                        ?
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowTypoCorrection(false)}
+                      className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-200"
+                      aria-label="Dismiss correction"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Suggestions */}
               {suggestions.length > 0 && (
                 <div className="p-2">
@@ -447,7 +478,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                   {suggestions.map((suggestion, index) => (
                     <button
                       key={suggestion.id}
-                      onClick={() => handleSuggestionSelect(suggestion)}
+                      onClick={() => handleSuggestionSelect(suggestion, index)}
                       className={cn(
                         'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors',
                         selectedIndex === index && 'bg-accent',

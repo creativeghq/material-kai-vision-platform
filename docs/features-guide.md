@@ -413,6 +413,51 @@ POST /api/images/upload-and-analyze
 
 ---
 
+### 15. Duplicate Detection & Merging
+
+**Purpose**: Maintain data quality by identifying and consolidating duplicate products
+
+**Key Features**:
+- ✅ Factory-based duplicate detection (CRITICAL: same factory only)
+- ✅ Multi-metric similarity scoring (name, description, metadata)
+- ✅ Confidence levels (high, medium, low)
+- ✅ Product merging with data consolidation
+- ✅ Merge history tracking with full audit trail
+- ✅ Undo capability with snapshot restoration
+- ✅ Batch duplicate scanning
+- ✅ Caching for performance
+
+**Detection Rules**:
+- **MUST have same factory/manufacturer** (primary filter)
+- Visual similarity alone does NOT create duplicates
+- Different factories = NOT duplicates (even if identical)
+
+**Similarity Scoring**:
+- Name similarity: 50% weight
+- Description similarity: 30% weight
+- Metadata similarity: 20% weight
+- Overall score: 0.0-1.0
+
+**Confidence Levels**:
+- High: 85%+ (very likely duplicate)
+- Medium: 70-85% (possible duplicate)
+- Low: 55-70% (review needed)
+
+**API Endpoints** (7 total):
+- `POST /api/duplicates/detect` - Detect for single product
+- `POST /api/duplicates/batch-detect` - Scan workspace
+- `GET /api/duplicates/cached` - Get cached results
+- `POST /api/duplicates/update-status` - Update status
+- `POST /api/duplicates/merge` - Merge products
+- `POST /api/duplicates/undo-merge` - Undo merge
+- `GET /api/duplicates/merge-history` - Get history
+
+**Database Tables**:
+- `product_merge_history` - Merge operations with snapshots
+- `duplicate_detection_cache` - Pre-computed duplicate pairs
+
+---
+
 ## 📱 User Interface Features
 
 **Frontend Components**:
@@ -434,7 +479,7 @@ POST /api/images/upload-and-analyze
 
 ---
 
-**Last Updated**: October 31, 2025  
-**Version**: 1.0.0  
+**Last Updated**: November 9, 2025
+**Version**: 1.1.0
 **Status**: Production
 

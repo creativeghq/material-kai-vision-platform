@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
-import { EnhancedRAGService } from '@/services/enhancedRAGService';
+import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import { HybridAIService } from '@/services/hybridAIService';
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 
@@ -416,38 +416,43 @@ export const MaterialAgentSearchInterface: React.FC<
         try {
           // eslint-disable-next-line no-console
           console.log('🧠 Performing RAG search...');
-          const ragResponse = await EnhancedRAGService.search({
+
+          // Get workspace_id from user's session
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            throw new Error('User not authenticated');
+          }
+
+          // Get user's workspace
+          const { data: workspaceData } = await supabase
+            .from('workspace_members')
+            .select('workspace_id')
+            .eq('user_id', user.id)
+            .single();
+
+          if (!workspaceData?.workspace_id) {
+            throw new Error('No workspace found for user');
+          }
+
+          const ragResponse = await UnifiedSearchService.search({
             query: input,
-            context: {
-              projectType: 'interior_design',
-              roomType: 'general',
-              materialCategories: ['all'],
-            },
-            searchType: 'hybrid',
-            maxResults: 5,
-            includeRealTime: false,
+            workspace_id: workspaceData.workspace_id,
+            strategy: 'hybrid',
+            top_k: 5,
           });
 
           if (ragResponse.success && ragResponse.results) {
             ragResults = {
-              knowledgeResults: (ragResponse.results.knowledgeBase || []).map(
-                (kb) => ({
-                  id: kb.id,
-                  title: kb.title,
-                  content: kb.content.substring(0, 500) + '...', // Truncate for context
-                  relevanceScore: kb.relevanceScore,
-                  source: kb.source,
+              knowledgeResults: (ragResponse.results || []).map(
+                (result) => ({
+                  id: result.chunk_id,
+                  title: result.document_name,
+                  content: result.content.substring(0, 500) + '...', // Truncate for context
+                  relevanceScore: result.similarity_score,
+                  source: result.filename || 'knowledge_base',
                 }),
               ),
-              materialResults: (
-                ragResponse.results.materialKnowledge || []
-              ).map((mk) => ({
-                id: mk.materialId,
-                title: mk.materialName,
-                content: mk.extractedKnowledge,
-                relevanceScore: mk.relevanceScore,
-                source: 'material_knowledge',
-              })),
+              materialResults: [],  // Material results are now included in main results
               totalResults:
                 (ragResponse.results.knowledgeBase || []).length +
                 (ragResponse.results.materialKnowledge || []).length,

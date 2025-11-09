@@ -29,8 +29,16 @@
 - Hybrid architecture pattern
 - Technology stack
 - Authentication & security
-- API endpoints (108)
+- API endpoints (115)
 - Scalability & monitoring
+
+**[duplicate-detection-merging.md](duplicate-detection-merging.md)** - Duplicate detection & merging
+- Factory-based duplicate detection
+- Product merging with undo capability
+- Similarity scoring algorithm
+- Merge history tracking
+- 7 API endpoints
+- Database schema
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
 - 12 AI models overview
@@ -59,7 +67,7 @@
 - API endpoint
 
 **[api-endpoints.md](api-endpoints.md)** - API reference
-- 108 endpoints across 14 categories
+- 115 endpoints across 15 categories
 - RAG Routes (27)
 - Admin Routes (18)
 - Search Routes (6)
@@ -73,6 +81,7 @@
 - Anthropic Routes (3)
 - Monitoring Routes (3)
 - AI Metrics Routes (2)
+- Duplicate Detection Routes (7)
 
 **[database-schema-complete.md](database-schema-complete.md)** - Database schema
 - Core tables (products, chunks, images, document_entities)

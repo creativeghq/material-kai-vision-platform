@@ -150,6 +150,13 @@ const MIVAA_ENDPOINTS = {
   'search_analytics': { path: '/api/search/analytics', method: 'POST' },  // Search analytics
   'search_health': { path: '/api/search/health', method: 'GET' },  // Search service health
 
+  // ==================== SEARCH SUGGESTIONS (Feature #49) ====================
+  'autocomplete': { path: '/api/search/autocomplete', method: 'POST' },  // Auto-complete suggestions
+  'trending_searches': { path: '/api/search/trending', method: 'GET' },  // Trending searches
+  'typo_correction': { path: '/api/search/typo-correction', method: 'POST' },  // Typo correction
+  'query_expansion': { path: '/api/search/query-expansion', method: 'POST' },  // Query expansion
+  'track_suggestion_click': { path: '/api/search/track-click', method: 'POST' },  // Track suggestion click
+
   // ==================== DOCUMENTATION ====================
   'docs': { path: '/docs', method: 'GET' },  // Swagger UI
   'redoc': { path: '/redoc', method: 'GET' },  // ReDoc

@@ -23,12 +23,13 @@ Complete technical architecture of Material Kai Vision Platform.
 │ API TIER (MIVAA - FastAPI)                                  │
 │ Python 3.11 + FastAPI + Uvicorn                            │
 │ Deployed: v1api.materialshub.gr                            │
-│ - 110 REST API endpoints (15 categories)                   │
+│ - 115 REST API endpoints (15 categories)                   │
 │ - 14-stage PDF processing pipeline                          │
 │ - RAG system (LlamaIndex)                                   │
 │ - Search APIs (Semantic, Vector, Hybrid)                   │
 │ - AI Services (Claude, GPT, Llama, CLIP)                   │
 │ - Product Management + Metadata Management                 │
+│ - Duplicate Detection & Merging (factory-based)            │
 │ - Admin & Monitoring                                        │
 │ - Background job processing                                 │
 └─────────────────────────────────────────────────────────────┘
