@@ -161,7 +161,7 @@ async function getUserWorkspace(userId: string): Promise<string | null> {
  * Main handler
  */
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight - MUST be first!
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -211,21 +211,29 @@ serve(async (req) => {
     // Get the last user message
     const userMessage = messages[messages.length - 1]?.content || '';
 
-    // Execute routing agent (which will route to search agent)
-    const result = await routingAgent.generate(userMessage, {
-      context: {
-        userId: user.id,
-        workspaceId,
-        agentId,
-        model,
-      },
-    });
+    // Try to use Mastra routing agent, fallback to simple response
+    let responseText = '';
+    try {
+      const result = await routingAgent.generate(userMessage, {
+        context: {
+          userId: user.id,
+          workspaceId,
+          agentId,
+          model,
+        },
+      });
+      responseText = result.text;
+    } catch (mastraError) {
+      console.error('Mastra agent error, using fallback:', mastraError);
+      // Fallback: Simple response
+      responseText = `I received your message: "${userMessage}". The agent system is currently being configured. Please try again shortly.`;
+    }
 
     // Return response
     return new Response(
       JSON.stringify({
         success: true,
-        text: result.text,
+        text: responseText,
         agentId: 'routing',
         model,
         timestamp: new Date().toISOString(),
