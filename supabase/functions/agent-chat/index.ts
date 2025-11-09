@@ -8,9 +8,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
 // Mastra imports - using npm: specifier for Deno
-import { Agent } from 'npm:@mastra/core@0.1.70/agent';
-import { createTool } from 'npm:@mastra/core@0.1.70/tools';
-import { z } from 'npm:zod@3.22.4';
+import { Agent } from 'npm:@mastra/core/agent';
+import { createTool } from 'npm:@mastra/core/tools';
+import { z } from 'npm:zod';
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
