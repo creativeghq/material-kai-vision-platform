@@ -29,6 +29,10 @@ import {
   MaterialSearchResult,
 } from '@/services/materialSearchService';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  MaterialFiltersPanel,
+  type MaterialFilters,
+} from '@/components/Search/MaterialFiltersPanel';
 
 // Using MaterialSearchResult from our service as base, with additional UI fields
 type SearchResult = MaterialSearchResult & {
@@ -95,6 +99,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       people: [],
     },
   );
+  const [materialFilters, setMaterialFilters] = useState<MaterialFilters>({
+    materialTypes: [],
+    colors: [],
+    priceRange: [0, 10000],
+    durabilityRating: [],
+    availabilityStatus: [],
+    suppliers: [],
+    applications: [],
+    textures: [],
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -902,6 +916,25 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           )}
         </Card>
       )}
+
+      {/* Material Property Filters */}
+      <MaterialFiltersPanel
+        filters={materialFilters}
+        onFiltersChange={setMaterialFilters}
+        onClearFilters={() =>
+          setMaterialFilters({
+            materialTypes: [],
+            colors: [],
+            priceRange: [0, 10000],
+            durabilityRating: [],
+            availabilityStatus: [],
+            suppliers: [],
+            applications: [],
+            textures: [],
+          })
+        }
+        collapsible={true}
+      />
 
       {/* Search Results */}
       {results.length > 0 && (

@@ -36,6 +36,10 @@ import {
   type EnhancedRAGRequest,
   type EnhancedRAGResponse,
 } from '@/services/enhancedRAGService';
+import {
+  MaterialFiltersPanel,
+  type MaterialFilters,
+} from '@/components/Search/MaterialFiltersPanel';
 
 interface EnhancedRAGInterfaceProps {
   onResultsFound?: (results: Record<string, unknown>[]) => void;
@@ -57,6 +61,16 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     roomType: '',
     stylePreferences: [] as string[],
     materialCategories: [] as string[],
+  });
+  const [materialFilters, setMaterialFilters] = useState<MaterialFilters>({
+    materialTypes: [],
+    colors: [],
+    priceRange: [0, 10000],
+    durabilityRating: [],
+    availabilityStatus: [],
+    suppliers: [],
+    applications: [],
+    textures: [],
   });
   const [analytics, setAnalytics] = useState<{
     totalSearches?: number;
@@ -139,6 +153,30 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
         workspaceId = workspaceData.workspace_id;
       }
 
+      // Build material filters object for API
+      const hasActiveFilters =
+        materialFilters.materialTypes.length > 0 ||
+        materialFilters.colors.length > 0 ||
+        materialFilters.durabilityRating.length > 0 ||
+        materialFilters.availabilityStatus.length > 0 ||
+        materialFilters.applications.length > 0 ||
+        materialFilters.textures.length > 0 ||
+        materialFilters.priceRange[0] > 0 ||
+        materialFilters.priceRange[1] < 10000;
+
+      const apiMaterialFilters = hasActiveFilters
+        ? {
+            material_type: materialFilters.materialTypes,
+            color: materialFilters.colors,
+            durability_rating: materialFilters.durabilityRating,
+            availability_status: materialFilters.availabilityStatus,
+            application: materialFilters.applications,
+            texture: materialFilters.textures,
+            price_min: materialFilters.priceRange[0],
+            price_max: materialFilters.priceRange[1],
+          }
+        : undefined;
+
       const request: EnhancedRAGRequest = {
         query: query.trim(),
         context: {
@@ -154,6 +192,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
         maxResults,
         includeRealTime,
         ...(workspaceId && { workspaceId }),
+        ...(apiMaterialFilters && { materialFilters: apiMaterialFilters }),
       };
 
       const results = await EnhancedRAGService.search(request);
@@ -452,6 +491,25 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Material Filters Panel */}
+      <MaterialFiltersPanel
+        filters={materialFilters}
+        onFiltersChange={setMaterialFilters}
+        onClearFilters={() =>
+          setMaterialFilters({
+            materialTypes: [],
+            colors: [],
+            priceRange: [0, 10000],
+            durabilityRating: [],
+            availabilityStatus: [],
+            suppliers: [],
+            applications: [],
+            textures: [],
+          })
+        }
+        collapsible={true}
+      />
 
       {/* Search Results */}
       {searchResults && (
