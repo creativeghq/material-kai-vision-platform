@@ -67,13 +67,13 @@ const parseRequestTool = createTool({
 
     try {
       // Call MIVAA API for parsing (same as CrewAI)
-      const response = await fetch(`${mivaaGatewayUrl}/api/mivaa/gateway`, {
+      const response = await fetch(`${mivaaGatewayUrl}/functions/v1/mivaa-gateway`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          action: 'chat_completion',
+          action: 'rag_chat',
           payload: {
             messages: [
               {
@@ -84,7 +84,7 @@ const parseRequestTool = createTool({
                 3. Specific materials mentioned (oak, marble, steel, etc.)
                 4. Key furniture or features
                 5. Layout specifications (L-shape, open concept, etc.)
-                
+
                 Respond in JSON format with: room_type, style, materials, features, layout, enhanced_prompt`,
               },
               {
@@ -92,10 +92,8 @@ const parseRequestTool = createTool({
                 content: `Parse this interior design request: "${prompt}"`,
               },
             ],
-            options: {
-              max_tokens: 500,
-              temperature: 0.2,
-            },
+            max_tokens: 500,
+            temperature: 0.2,
           },
         }),
       });

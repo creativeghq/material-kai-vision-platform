@@ -292,9 +292,9 @@ export const AITestingPanel: React.FC = () => {
         payload.image_url = multiModalTestImage;
       }
 
-      // Call multi-modal analysis endpoint
+      // Call RAG query endpoint (auto-detecting modality)
       const result = await apiService.callSupabaseFunction('mivaa-gateway', {
-        action: 'multimodal_analysis',
+        action: 'rag_query',
         payload: payload,
       });
 

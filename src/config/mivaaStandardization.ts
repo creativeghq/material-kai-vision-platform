@@ -120,9 +120,10 @@ export const MIVAA_ACTION_MAP: Record<
   pdf_extract_tables: { path: '/api/v1/extract/tables', method: 'POST' },
   pdf_extract_images: { path: '/api/v1/extract/images', method: 'POST' },
 
-  // Material Recognition
-  material_recognition: { path: '/api/vision/analyze', method: 'POST' },
-  llama_vision_analysis: { path: '/api/vision/llama-analyze', method: 'POST' },
+  // Material Recognition - Use valid mivaa-gateway actions
+  // REMOVED: material_recognition - Use together_analyze_image instead
+  // REMOVED: llama_vision_analysis - Use together_analyze_image instead
+  together_analyze_image: { path: '/api/together-ai/analyze-image', method: 'POST' },
 
   // Embeddings
   generate_embedding: { path: '/api/embeddings/generate', method: 'POST' },
@@ -137,11 +138,13 @@ export const MIVAA_ACTION_MAP: Record<
   vector_search: { path: '/api/search/vector', method: 'POST' },
   hybrid_search: { path: '/api/search/hybrid', method: 'POST' },
 
-  // Chat & AI
-  chat_completion: { path: '/api/chat/completions', method: 'POST' },
-  contextual_response: { path: '/api/chat/contextual', method: 'POST' },
-  semantic_analysis: { path: '/api/semantic-analysis', method: 'POST' },
-  multimodal_analysis: { path: '/api/analyze/multimodal', method: 'POST' },
+  // Chat & AI - Use valid mivaa-gateway actions
+  // REMOVED: chat_completion - Use rag_chat instead
+  // REMOVED: contextual_response - Use rag_query instead
+  // REMOVED: semantic_analysis - Use together_analyze_image or rag_query instead
+  // REMOVED: multimodal_analysis - Use rag_query instead
+  rag_chat: { path: '/api/rag/chat', method: 'POST' },
+  rag_query: { path: '/api/rag/query', method: 'POST' },
 
   // Health & Status
   health_check: { path: '/health', method: 'GET' },

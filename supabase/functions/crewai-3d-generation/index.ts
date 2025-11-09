@@ -503,7 +503,7 @@ async function parseWithMIVAA(prompt: string) {
     throw new Error('MIVAA API key not configured');
   }
 
-  const response = await fetch(`${mivaaGatewayUrl}/api/mivaa/gateway`, {
+  const response = await fetch(`${mivaaGatewayUrl}/functions/v1/mivaa-gateway`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${mivaaApiKey}`,
@@ -511,7 +511,7 @@ async function parseWithMIVAA(prompt: string) {
       'User-Agent': 'Material-Kai-Vision-Platform-Supabase/1.0',
     },
     body: JSON.stringify({
-      action: 'chat_completion',
+      action: 'rag_chat',
       payload: {
         messages: [
           {
@@ -522,7 +522,7 @@ async function parseWithMIVAA(prompt: string) {
             3. Specific materials mentioned (oak, marble, steel, etc.)
             4. Key furniture or features
             5. Layout specifications (L-shape, open concept, etc.)
-            
+
             Respond in JSON format with: room_type, style, materials, features, layout, enhanced_prompt`,
           },
           {
@@ -530,10 +530,8 @@ async function parseWithMIVAA(prompt: string) {
             content: `Parse this interior design request: "${prompt}"`,
           },
         ],
-        options: {
-          max_tokens: 500,
-          temperature: 0.2,
-        },
+        max_tokens: 500,
+        temperature: 0.2,
       },
     }),
   });

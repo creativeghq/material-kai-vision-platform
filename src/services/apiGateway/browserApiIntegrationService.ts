@@ -205,14 +205,13 @@ export class BrowserApiIntegrationService {
       const base64Image = await this.fileToBase64(imageFile);
 
       return this.callSupabaseFunction('mivaa-gateway', {
-        action: 'material_recognition',
+        action: 'together_analyze_image',
         payload: {
           image_data: base64Image,
-          analysis_options: {
-            include_properties: true,
-            include_composition: true,
-            confidence_threshold: 0.8,
-          },
+          analysis_type: 'material_analysis',
+          include_properties: true,
+          include_composition: true,
+          confidence_threshold: 0.8,
         },
       });
     } catch (error) {
