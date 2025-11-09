@@ -12,9 +12,13 @@ export interface EnhancedRAGRequest {
     stylePreferences?: string[];
     materialCategories?: string[];
   };
-  searchType?: 'semantic' | 'hybrid' | 'perplexity' | 'comprehensive';
+  searchType?: 'semantic' | 'hybrid' | 'perplexity' | 'comprehensive' | 'all';
   maxResults?: number;
   includeRealTime?: boolean;
+  workspaceId?: string; // Required for 'all' strategy
+  materialFilters?: any; // Optional for 'all' strategy
+  imageUrl?: string; // Optional for 'all' strategy
+  imageBase64?: string; // Optional for 'all' strategy
 }
 
 export interface EnhancedRAGResponse {
@@ -134,6 +138,11 @@ export interface QueryIntelligence {
 export class EnhancedRAGService {
   /**
    * Perform enhanced RAG search with ML-powered query understanding
+   *
+   * Supports multiple search strategies:
+   * - 'semantic': Semantic search with MMR diversity
+   * - 'hybrid': Semantic + keyword search
+   * - 'all': ALL STRATEGIES in parallel (3-4x faster!) ⚡
    */
   static async search(
     request: EnhancedRAGRequest,
@@ -143,11 +152,30 @@ export class EnhancedRAGService {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const response = await mivaaApi.searchSemantic({
-        query: request.query,
-        limit: request.maxResults || 10,
-        filters: request.context,
-      });
+      let response: any;
+
+      // Use parallel "all strategies" mode if requested
+      if (request.searchType === 'all') {
+        if (!request.workspaceId) {
+          throw new Error('workspaceId is required for "all" search strategy');
+        }
+
+        response = await mivaaApi.searchAllStrategies({
+          query: request.query,
+          workspace_id: request.workspaceId,
+          limit: request.maxResults || 10,
+          material_filters: request.materialFilters,
+          image_url: request.imageUrl,
+          image_base64: request.imageBase64,
+        });
+      } else {
+        // Use default semantic search
+        response = await mivaaApi.searchSemantic({
+          query: request.query,
+          limit: request.maxResults || 10,
+          filters: request.context,
+        });
+      }
 
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Enhanced RAG search failed');

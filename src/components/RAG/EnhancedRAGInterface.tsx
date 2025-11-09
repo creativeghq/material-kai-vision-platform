@@ -49,7 +49,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
   const [searchResults, setSearchResults] =
     useState<EnhancedRAGResponse | null>(null);
   const [searchType, setSearchType] = useState<
-    'comprehensive' | 'semantic' | 'hybrid' | 'perplexity'
+    'comprehensive' | 'semantic' | 'hybrid' | 'perplexity' | 'all'
   >('comprehensive');
   const [includeRealTime, setIncludeRealTime] = useState(true);
   const [maxResults, setMaxResults] = useState(10);
@@ -100,6 +100,45 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 
     setIsSearching(true);
     try {
+      // Get workspace_id if using "all" strategy
+      let workspaceId: string | undefined;
+      if (searchType === 'all') {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          toast({
+            title: 'Authentication Required',
+            description: 'Please log in to use All Strategies search',
+            variant: 'destructive',
+          });
+          setIsSearching(false);
+          return;
+        }
+
+        // Get user's workspace
+        const { data: workspaceData, error: workspaceError } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (workspaceError || !workspaceData) {
+          toast({
+            title: 'Workspace Error',
+            description: 'Could not load workspace for All Strategies search',
+            variant: 'destructive',
+          });
+          setIsSearching(false);
+          return;
+        }
+
+        workspaceId = workspaceData.workspace_id;
+      }
+
       const request: EnhancedRAGRequest = {
         query: query.trim(),
         context: {
@@ -114,6 +153,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
         searchType,
         maxResults,
         includeRealTime,
+        ...(workspaceId && { workspaceId }),
       };
 
       const results = await EnhancedRAGService.search(request);
@@ -241,7 +281,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
               <Select
                 value={searchType}
                 onValueChange={(
-                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity',
+                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity' | 'all',
                 ) => setSearchType(value)}
               >
                 <SelectTrigger>
@@ -259,6 +299,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
                   </SelectItem>
                   <SelectItem value="perplexity">
                     🌐 Real-time (Perplexity)
+                  </SelectItem>
+                  <SelectItem value="all">
+                    🚀 All Strategies (Parallel - 3-4x Faster!)
                   </SelectItem>
                 </SelectContent>
               </Select>

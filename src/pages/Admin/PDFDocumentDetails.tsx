@@ -10,6 +10,7 @@ import {
   Sparkles,
   FileCheck,
   Loader2,
+  Download,
 } from 'lucide-react';
 
 import {
@@ -120,6 +121,70 @@ export const PDFDocumentDetails: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportImages = async () => {
+    if (!documentId) return;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to export images',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Exporting Images',
+        description: 'Preparing ZIP file...',
+      });
+
+      const response = await fetch(
+        `https://v1api.materialshub.gr/api/images/export/${documentId}?format=PNG&quality=95&include_metadata=true`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Export failed: ${response.status} ${response.statusText}\n${errorText}`,
+        );
+      }
+
+      // Download the ZIP file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `images_${documentId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Complete',
+        description: 'Images downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast({
+        title: 'Export Failed',
+        description:
+          error instanceof Error ? error.message : 'Failed to export images',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -415,10 +480,24 @@ export const PDFDocumentDetails: React.FC = () => {
         <TabsContent value="images" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Extracted Images</CardTitle>
-              <CardDescription>
-                Images extracted from this document with metadata
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Extracted Images</CardTitle>
+                  <CardDescription>
+                    Images extracted from this document with metadata
+                  </CardDescription>
+                </div>
+                {document.images.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportImages}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export All ({document.images.length})
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {document.images.length === 0 ? (
