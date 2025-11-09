@@ -7,9 +7,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Mastra imports (ESM compatible)
-import { Agent } from 'https://esm.sh/@mastra/core@0.24.0';
-import { z } from 'https://esm.sh/zod@3.22.4';
+// Mastra imports - using npm: specifier for Deno
+import { Agent } from 'npm:@mastra/core@0.1.70/agent';
+import { createTool } from 'npm:@mastra/core@0.1.70/tools';
+import { z } from 'npm:zod@3.22.4';
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -20,21 +21,29 @@ const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.mate
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
- * Search Agent Tool - Material Search
+ * Search Tool - Material Search using MIVAA API
  */
-const searchTool = {
+const searchTool = createTool({
   id: 'material-search',
   description: 'Search for materials, products, and technical information using RAG',
   inputSchema: z.object({
     query: z.string().describe('Search query'),
     strategy: z
       .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
-      .default('hybrid')
+      .default('semantic')
       .describe('Search strategy'),
     limit: z.number().default(10).describe('Maximum results'),
+    workspaceId: z.string().describe('Workspace ID'),
   }),
-  execute: async ({ context }: { context: any }) => {
-    const { query, strategy, limit } = context;
+  outputSchema: z.object({
+    success: z.boolean(),
+    results: z.array(z.any()).optional(),
+    total: z.number().optional(),
+    strategy: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    const { query, strategy, limit, workspaceId } = context;
 
     try {
       // Call MIVAA API for search
@@ -46,7 +55,7 @@ const searchTool = {
         body: JSON.stringify({
           query,
           top_k: limit,
-          workspace_id: context.workspace_id,
+          workspace_id: workspaceId,
         }),
       });
 
@@ -70,7 +79,7 @@ const searchTool = {
       };
     }
   },
-};
+});
 
 /**
  * Search Agent - Public agent for material search
