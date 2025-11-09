@@ -484,24 +484,19 @@ export const MaterialAgentSearchInterface: React.FC<
 
           for (const imageFile of imageFiles) {
             try {
-              // Call the visual search API endpoint
+              // Call the RAG search API with visual strategy
               const apiService = BrowserApiIntegrationService.getInstance();
               const visualResponse = await apiService.callSupabaseFunction(
-                'visual-search',
+                'mivaa-gateway',
                 {
-                  user_id: session.user.id,
-                  search_type: input.trim() ? 'hybrid' : 'visual', // Hybrid if text + image, pure visual if just image
-                  query_text: input.trim() || 'Find similar materials',
-                  image_data: {
-                    name: imageFile.name,
-                    type: imageFile.type,
-                    url: imageFile.url,
-                    preview: imageFile.preview,
+                  action: 'rag_search',
+                  payload: {
+                    query: input.trim() || 'Find similar materials',
+                    top_k: 20,
+                    strategy: input.trim() ? 'hybrid' : 'visual',
+                    image_url: imageFile.url,
+                    include_metadata: true,
                   },
-                  search_filters: {},
-                  similarity_threshold: 0.75,
-                  max_results: 20,
-                  session_id: sessionId,
                 },
               );
 
@@ -590,13 +585,12 @@ export const MaterialAgentSearchInterface: React.FC<
           const similarityResponse = await apiService.callSupabaseFunction(
             'mivaa-gateway',
             {
-              action: 'vector_similarity_search',
+              action: 'rag_search',
               payload: {
-                query_text: input.trim(),
-                similarity_threshold: similarityThreshold,
-                limit: 20,
+                query: input.trim(),
+                top_k: 20,
+                strategy: 'semantic',
                 include_metadata: true,
-                search_type: 'semantic',
               },
             },
           );

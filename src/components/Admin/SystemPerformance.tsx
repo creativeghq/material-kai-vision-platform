@@ -144,11 +144,9 @@ export const SystemPerformance: React.FC = () => {
         const apiService = BrowserApiIntegrationService.getInstance();
 
         const result = await apiService.callSupabaseFunction('mivaa-gateway', {
-          action: 'get_job_details',
+          action: 'admin_get_job',
           payload: {
             job_id: jobId,
-            include_stages: true,
-            include_progress: true,
           },
         });
 
@@ -188,12 +186,8 @@ export const SystemPerformance: React.FC = () => {
         const apiService = BrowserApiIntegrationService.getInstance();
 
         const result = await apiService.callSupabaseFunction('mivaa-gateway', {
-          action: 'get_document_analysis_metrics',
-          payload: {
-            time_range: '24h',
-            include_trends: true,
-            include_stage_breakdown: true,
-          },
+          action: 'admin_system_metrics',
+          payload: {},
         });
 
         if (!result.success) {

@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+import { HybridAIService } from '@/services/hybridAIService';
 
 // ✅ Standardized AI Test Response Interface
 interface UnifiedAITestResponse {
@@ -393,13 +394,12 @@ export const AITestingPanel: React.FC = () => {
       const apiService = BrowserApiIntegrationService.getInstance();
 
       const result = await apiService.callSupabaseFunction('mivaa-gateway', {
-        action: 'vector_similarity_search',
+        action: 'rag_search',
         payload: {
-          query_text: similarityQuery,
-          similarity_threshold: similarityThreshold,
-          limit: 10,
+          query: similarityQuery,
+          top_k: 10,
+          strategy: 'semantic',
           include_metadata: true,
-          search_type: 'semantic',
         },
       });
 
@@ -509,18 +509,14 @@ export const AITestingPanel: React.FC = () => {
         );
       }
 
-      // Test hybrid analysis
-      const apiService = BrowserApiIntegrationService.getInstance();
-      const result = await apiService.callSupabaseFunction(
-        'hybrid-material-analysis',
-        {
-          file_id: testFile.id,
-          analysis_type: 'comprehensive',
-          include_similar: false,
-          minimum_score: 0.5,
-          max_retries: 2,
-        },
-      );
+      // Test hybrid analysis using HybridAIService
+      const result = await HybridAIService.callHybridAnalysis({
+        prompt: `Analyze this material: ${testFile.name}`,
+        type: 'material-analysis',
+        imageUrl: testFile.url,
+        minimumScore: 0.5,
+        maxRetries: 2,
+      });
 
       if (!result.success) {
         throw new Error(
