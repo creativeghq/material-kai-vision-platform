@@ -73,6 +73,14 @@ export interface CreateSavedSearchData {
   is_public?: boolean;
   tags?: string[];
   recommendation_frequency?: 'daily' | 'weekly' | 'never';
+  checkForDuplicates?: boolean; // Enable smart deduplication
+}
+
+export interface MergeSuggestion {
+  existing_search: SavedSearch;
+  similarity_score: number;
+  reason: string;
+  new_query: string;
 }
 
 export interface UpdateSavedSearchData {
@@ -101,6 +109,51 @@ export interface SimilarSearch {
 // ==================== SERVICE CLASS ====================
 
 class SavedSearchesService {
+  /**
+   * Check for duplicate/similar searches before creating
+   */
+  async checkForDuplicates(
+    query: string,
+    filters: Record<string, any>,
+    materialFilters: MaterialFilters
+  ): Promise<MergeSuggestion | null> {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        return null;
+      }
+
+      // Call backend deduplication API
+      const response = await fetch(`${import.meta.env.VITE_MIVAA_API_URL}/api/saved-searches/check-duplicates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: session.session.user.id,
+          query,
+          filters,
+          material_filters: materialFilters,
+        }),
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const result = await response.json();
+
+      if (result.merge_suggestion) {
+        return result.merge_suggestion;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      return null;
+    }
+  }
+
   /**
    * Create a new saved search
    */
@@ -134,6 +187,47 @@ class SavedSearchesService {
 
     if (error) throw error;
     return savedSearch;
+  }
+
+  /**
+   * Merge new search into existing one
+   */
+  async mergeIntoExisting(
+    existingId: string,
+    newQuery: string,
+    newFilters: Record<string, any>,
+    newMaterialFilters: MaterialFilters
+  ): Promise<SavedSearch> {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Call backend merge API
+      const response = await fetch(`${import.meta.env.VITE_MIVAA_API_URL}/api/saved-searches/${existingId}/merge`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: session.session.user.id,
+          new_query: newQuery,
+          new_filters: newFilters,
+          new_material_filters: newMaterialFilters,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to merge search');
+      }
+
+      const result = await response.json();
+      return result.search;
+    } catch (error) {
+      console.error('Error merging search:', error);
+      throw error;
+    }
   }
 
   /**

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Save, Tag, Globe, Lock, Bell, BellOff } from 'lucide-react';
 import {
   Dialog,
@@ -21,8 +21,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { savedSearchesService, CreateSavedSearchData } from '@/services/savedSearchesService';
+import { savedSearchesService, CreateSavedSearchData, MergeSuggestion } from '@/services/savedSearchesService';
 import { MaterialFilters } from './MaterialFiltersPanel';
+import { MergeSearchModal } from './MergeSearchModal';
 
 interface SaveSearchModalProps {
   open: boolean;
@@ -55,7 +56,39 @@ export const SaveSearchModal = ({
     'daily' | 'weekly' | 'never'
   >('daily');
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [mergeSuggestion, setMergeSuggestion] = useState<MergeSuggestion | null>(null);
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const { toast } = useToast();
+
+  // Check for duplicates when modal opens
+  useEffect(() => {
+    if (open && searchData.query) {
+      checkForDuplicates();
+    }
+  }, [open, searchData.query]);
+
+  const checkForDuplicates = async () => {
+    setChecking(true);
+    try {
+      const suggestion = await savedSearchesService.checkForDuplicates(
+        searchData.query,
+        searchData.filters || {},
+        searchData.materialFilters || {}
+      );
+
+      if (suggestion) {
+        setMergeSuggestion(suggestion);
+        setShowMergeModal(true);
+        onOpenChange(false); // Close save modal, show merge modal
+      }
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      // Continue with normal save if check fails
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -246,15 +279,70 @@ export const SaveSearchModal = ({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving || checking}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Search'}
+          <Button onClick={handleSave} disabled={saving || checking}>
+            {checking ? 'Checking...' : saving ? 'Saving...' : 'Save Search'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+};
+
+// Wrapper component that includes merge modal
+export const SaveSearchModalWithDeduplication = (props: SaveSearchModalProps) => {
+  const [mergeSuggestion, setMergeSuggestion] = useState<MergeSuggestion | null>(null);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(props.open);
+
+  useEffect(() => {
+    setShowSaveModal(props.open);
+  }, [props.open]);
+
+  const handleMerge = async () => {
+    if (!mergeSuggestion) return;
+
+    try {
+      await savedSearchesService.mergeIntoExisting(
+        mergeSuggestion.existing_search.id,
+        mergeSuggestion.new_query,
+        props.searchData.filters || {},
+        props.searchData.materialFilters || ({} as MaterialFilters)
+      );
+
+      if (props.onSaved) {
+        props.onSaved();
+      }
+    } catch (error) {
+      console.error('Error merging search:', error);
+    }
+  };
+
+  const handleSaveNew = () => {
+    setShowMergeModal(false);
+    setShowSaveModal(true);
+  };
+
+  return (
+    <>
+      <SaveSearchModal
+        {...props}
+        open={showSaveModal}
+        onOpenChange={(open) => {
+          setShowSaveModal(open);
+          props.onOpenChange(open);
+        }}
+      />
+      <MergeSearchModal
+        open={showMergeModal}
+        onOpenChange={setShowMergeModal}
+        mergeSuggestion={mergeSuggestion}
+        onMerge={handleMerge}
+        onSaveNew={handleSaveNew}
+      />
+    </>
   );
 };
 
