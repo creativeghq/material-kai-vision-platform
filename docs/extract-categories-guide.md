@@ -41,10 +41,10 @@ Controls whether to filter content by categories.
 Comma-separated list of categories to extract.
 
 **Available Categories**:
-- `products` - Product pages (✅ **Fully Implemented**)
-- `certificates` - Certification pages (⚠️ **TODO**)
-- `logos` - Logo/branding pages (⚠️ **TODO**)
-- `specifications` - Technical specification pages (⚠️ **TODO**)
+- `products` - Product pages (Fully Implemented)
+- `certificates` - Certification pages (Planned)
+- `logos` - Logo/branding pages (Planned)
+- `specifications` - Technical specification pages (Planned)
 - `all` - All content (same as `focused_extraction=False`)
 
 **Examples**:
@@ -71,11 +71,11 @@ POST /api/rag/documents/upload-with-discovery
 ```
 
 **Result**:
-- ✅ Chunks from product pages only
-- ✅ Images from product pages only
-- ✅ Products created from discovery
-- ❌ Marketing content skipped
-- ❌ Company history skipped
+- Chunks from product pages only
+- Images from product pages only
+- Products created from discovery
+- Marketing content skipped
+- Company history skipped
 
 ---
 
@@ -92,12 +92,12 @@ POST /api/rag/documents/upload-with-discovery
 ```
 
 **Result** (when certificates category is implemented):
-- ✅ Chunks from product pages
-- ✅ Chunks from certificate pages
-- ✅ Images from product pages
-- ✅ Images from certificate pages
-- ✅ Products created
-- ✅ Certificates extracted and linked to products
+- Chunks from product pages
+- Chunks from certificate pages
+- Images from product pages
+- Images from certificate pages
+- Products created
+- Certificates extracted and linked to products
 
 ---
 
@@ -124,16 +124,16 @@ POST /api/rag/documents/upload-with-discovery
 ```
 
 **Result**:
-- ✅ Chunks from all pages
-- ✅ Images from all pages
-- ✅ Products created from discovery
-- ✅ All content processed
+- Chunks from all pages
+- Images from all pages
+- Products created from discovery
+- All content processed
 
 ---
 
 ## Implementation Status
 
-### **✅ Fully Implemented: Products Category**
+### Fully Implemented: Products Category
 
 **How it works**:
 1. Claude analyzes PDF → identifies products on pages 5-11
@@ -149,22 +149,19 @@ POST /api/rag/documents/upload-with-discovery
 
 ---
 
-### **⚠️ TODO: Other Categories**
+### Planned Categories
 
-**Certificates, Logos, Specifications** are not yet implemented.
+**Certificates, Logos, Specifications** are planned for future implementation.
 
-**What needs to be done**:
-1. **Update Product Discovery Service** to classify content into categories
-2. **Add category-specific page sets** (like `product_pages`, add `certificate_pages`, `logo_pages`, etc.)
-3. **Update image filtering logic** to handle multiple categories
-4. **Create database tables** for certificates, logos, specifications
-5. **Add API endpoints** to retrieve category-specific content
+**Implementation Requirements**:
+1. Update Product Discovery Service to classify content into categories
+2. Add category-specific page sets (like `product_pages`, add `certificate_pages`, `logo_pages`, etc.)
+3. Update image filtering logic to handle multiple categories
+4. Create database tables for certificates, logos, specifications
+5. Add API endpoints to retrieve category-specific content
 
-**Placeholder Code** (Lines 2220-2223):
-```python
-# TODO: Add support for other categories (certificates, logos, specifications)
-# For now, only 'products' category is fully implemented
-```
+**Current Implementation**:
+The codebase includes placeholder support for additional categories. The `products` category is fully functional and serves as the template for implementing additional categories.
 
 ---
 
@@ -192,24 +189,24 @@ Images now include category information:
 
 ## Migration Path
 
-### **Phase 1: Products Only (Current)**
-- ✅ Extract products
-- ✅ Filter images by product pages
-- ✅ Skip non-product content
+### Phase 1: Products Only (Current)
+- Extract products
+- Filter images by product pages
+- Skip non-product content
 
-### **Phase 2: Add Certificates**
+### Phase 2: Add Certificates
 - Update Claude prompt to identify certificate pages
 - Create `certificates` table
 - Link certificates to products
 - Filter images by certificate pages
 
-### **Phase 3: Add Logos & Specifications**
+### Phase 3: Add Logos & Specifications
 - Identify logo pages (usually first few pages)
 - Identify specification pages (technical details)
 - Create appropriate database tables
 - Link to products
 
-### **Phase 4: Advanced Classification**
+### Phase 4: Advanced Classification
 - AI-powered content classification
 - Automatic category detection
 - Smart filtering based on user preferences
@@ -247,23 +244,23 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/documents/upload-with-discov
 
 ## Summary
 
-### **Current Behavior**:
-- ✅ `extract_categories="products"` → Only product pages processed
-- ✅ `focused_extraction=True` → Filtering enabled
-- ✅ `focused_extraction=False` → All content processed
-- ✅ Image metadata includes category information
+### Current Behavior
+- `extract_categories="products"` → Only product pages processed
+- `focused_extraction=True` → Filtering enabled
+- `focused_extraction=False` → All content processed
+- Image metadata includes category information
 
-### **Future Enhancements**:
-- ⚠️ Implement `certificates` category
-- ⚠️ Implement `logos` category
-- ⚠️ Implement `specifications` category
-- ⚠️ Add category-specific database tables
-- ⚠️ Add category-specific API endpoints
+### Future Enhancements
+- Implement `certificates` category
+- Implement `logos` category
+- Implement `specifications` category
+- Add category-specific database tables
+- Add category-specific API endpoints
 
-### **Key Benefits**:
-- 🎯 **Focused Processing**: Only extract what you need
-- 💰 **Cost Savings**: Skip irrelevant content (fewer AI calls)
-- ⚡ **Faster Processing**: Less content to process
-- 🗄️ **Cleaner Data**: No marketing/admin clutter
+### Key Benefits
+- **Focused Processing**: Only extract what you need
+- **Cost Savings**: Skip irrelevant content (fewer AI calls)
+- **Faster Processing**: Less content to process
+- **Cleaner Data**: No marketing/admin clutter
 - 🔧 **Configurable**: Choose what to extract per upload
 

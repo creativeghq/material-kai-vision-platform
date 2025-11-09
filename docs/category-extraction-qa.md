@@ -282,41 +282,54 @@ RAG Search:
 
 ---
 
-## Action Items
+## Implementation Requirements
 
-### Immediate (Before Continuing):
+### Database Schema
 
-1. ✅ Update discovery service documentation (DONE)
-2. ⏳ Seed default prompts to database
-3. ⏳ Create certificates/logos/specifications tables
-4. ⏳ Add factory/manufacturer fields to dataclasses
-5. ⏳ Create relationship tables
-6. ⏳ Add RAG search endpoint (no PDF required)
+The following database components are required for full category extraction functionality:
 
-### Next Phase:
+**Completed Components:**
+- Discovery service documentation
+- extraction_prompts tables for admin-configurable prompts
 
-7. Update chunking stage to use category tags
-8. Update embedding generation to handle all categories
-9. Create entity records (products, certificates, logos, specifications)
-10. Link entities to chunks via relationship tables
+**Required Components:**
+- Database tables for certificates, logos, and specifications
+- Factory/manufacturer fields in dataclasses
+- Relationship tables linking entities to products
+- RAG search endpoint for queries without PDF upload
+
+### Processing Pipeline Enhancements
+
+The chunking and embedding stages require updates to support category-based extraction:
+
+- Chunking stage must use category tags for proper content classification
+- Embedding generation must handle all content categories (products, certificates, logos, specifications)
+- Entity records must be created for all discovered content types
+- Relationship linking between entities and chunks must be established
 
 ---
 
 ## Summary
 
-**Key Insights:**
-- ✅ Confidence scores are set correctly (0.0 is just default)
-- ❌ Certificates/logos/specs need factory/manufacturer fields
-- ❌ Certificates/logos/specs need product relationships
-- ❌ Prompt templates are NEW, not currently used
-- ❌ Need RAG search endpoint for queries without PDF
-- ✅ extraction_prompts tables exist
-- ❌ certificates/logos/specifications tables don't exist yet
-- ✅ **CHUNKS-FIRST** approach is correct - everything stored as semantic chunks, not metafields
+### Key Architectural Decisions
 
-**Next Steps:**
-1. Create missing database tables
-2. Seed default prompts
-3. Add RAG search capability
-4. Continue with Phase 3 (Processing Pipeline)
+**Confidence Scoring:**
+- Default confidence scores (0.0) are placeholder values in dataclass definitions
+- Actual confidence scores are set during AI parsing (typically 0.8-0.98)
+
+**Entity Relationships:**
+- Certificates, logos, and specifications require factory/manufacturer identification
+- Product relationships must be established for all entity types
+- Prompt templates are stored in database for admin customization
+
+**Search Capabilities:**
+- RAG search endpoint enables queries without PDF upload
+- Existing chunks and embeddings can be searched directly
+- Category filtering allows targeted content retrieval
+
+**Storage Architecture:**
+- CHUNKS-FIRST approach: All content stored as semantic chunks
+- Metadata stored within chunks, not in separate metafield tables
+- Category tags enable content classification and filtering
+- Embeddings support semantic search across all content types
 

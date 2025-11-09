@@ -182,7 +182,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
 
       const apiService = BrowserApiIntegrationService.getInstance();
       const result = await apiService.callSupabaseFunction(
-        'crewai-3d-generation',
+        'mastra-3d-generation',
         {
           user_id: user.id,
           prompt: config.prompt,

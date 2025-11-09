@@ -37,11 +37,8 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { ragKnowledgeService as ragService } from '@/services/ragKnowledgeService';
-import {
-  EnhancedRAGService,
-  type EnhancedRAGRequest,
-  type EnhancedRAGResponse,
-} from '@/services/enhancedRAGService';
+import { UnifiedSearchService } from '@/services/unifiedSearchService';
+import { supabase } from '@/integrations/supabase/client';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
@@ -62,11 +59,10 @@ export const IntegratedRAGManagement: React.FC = () => {
   // Enhanced RAG Interface State
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] =
-    useState<EnhancedRAGResponse | null>(null);
+  const [searchResults, setSearchResults] = useState<any | null>(null);
   const [searchType, setSearchType] = useState<
-    'comprehensive' | 'semantic' | 'hybrid' | 'perplexity'
-  >('comprehensive');
+    'semantic' | 'hybrid' | 'multi_vector' | 'all'
+  >('semantic');
   const [includeRealTime, setIncludeRealTime] = useState(true);
   const [maxResults, setMaxResults] = useState(10);
   const [context, setContext] = useState({
@@ -208,7 +204,7 @@ export const IntegratedRAGManagement: React.FC = () => {
   // Enhanced RAG Methods
   const loadAnalytics = async () => {
     try {
-      const data = await EnhancedRAGService.getSearchAnalytics('30 days');
+      const data = await UnifiedSearchService.getSearchAnalytics('30 days');
       setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -217,7 +213,7 @@ export const IntegratedRAGManagement: React.FC = () => {
 
   const loadQueryHistory = async () => {
     try {
-      const history = await EnhancedRAGService.getQueryHistory(10);
+      const history = await UnifiedSearchService.getQueryHistory(10);
       setQueryHistory(
         history as unknown as Array<{
           query: string;
@@ -243,36 +239,57 @@ export const IntegratedRAGManagement: React.FC = () => {
 
     setIsSearching(true);
     try {
-      const request: EnhancedRAGRequest = {
+      // Get workspace_id if using "all" strategy
+      let workspaceId: string | undefined;
+      if (searchType === 'all') {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          toast({
+            title: 'Authentication Required',
+            description: 'Please log in to use All Strategies search',
+            variant: 'destructive',
+          });
+          setIsSearching(false);
+          return;
+        }
+
+        // Get user's workspace
+        const { data: workspaceData, error: workspaceError } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (workspaceError || !workspaceData) {
+          toast({
+            title: 'Workspace Error',
+            description: 'Could not load workspace for All Strategies search',
+            variant: 'destructive',
+          });
+          setIsSearching(false);
+          return;
+        }
+
+        workspaceId = workspaceData.workspace_id;
+      }
+
+      const results = await UnifiedSearchService.search({
         query: query.trim(),
-        context: {
-          roomType: context.roomType || undefined,
-          stylePreferences:
-            context.stylePreferences.length > 0
-              ? context.stylePreferences
-              : undefined,
-          materialCategories:
-            context.materialCategories.length > 0
-              ? context.materialCategories
-              : undefined,
-        },
-        searchType,
-        maxResults,
-        includeRealTime,
-      };
+        workspace_id: workspaceId,
+        strategy: searchType as any,
+        top_k: maxResults,
+      });
 
-      const results = await EnhancedRAGService.search(request);
       setSearchResults(results);
-
-      const allResults = [
-        ...results.results.knowledgeBase,
-        ...results.results.materialKnowledge,
-        ...results.results.recommendations,
-      ];
 
       toast({
         title: 'Enhanced Search Completed',
-        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`,
+        description: `Found ${results.total_results} results using ${results.search_type} strategy`,
       });
 
       loadAnalytics();
@@ -297,8 +314,8 @@ export const IntegratedRAGManagement: React.FC = () => {
     if (!searchResults) return;
 
     try {
-      await EnhancedRAGService.provideFeedback(
-        searchResults.analytics.sessionId,
+      await UnifiedSearchService.provideFeedback(
+        searchResults.analytics?.sessionId || '',
         {
           satisfaction,
           clickedResults,
@@ -425,7 +442,8 @@ export const IntegratedRAGManagement: React.FC = () => {
                           | 'comprehensive'
                           | 'semantic'
                           | 'hybrid'
-                          | 'perplexity',
+                          | 'perplexity'
+                          | 'all',
                       ) => setSearchType(value)}
                     >
                       <SelectTrigger>
@@ -443,6 +461,9 @@ export const IntegratedRAGManagement: React.FC = () => {
                         </SelectItem>
                         <SelectItem value="perplexity">
                           🌐 Real-time (Perplexity)
+                        </SelectItem>
+                        <SelectItem value="all">
+                          🚀 All Strategies (Parallel - 3-4x Faster!)
                         </SelectItem>
                       </SelectContent>
                     </Select>

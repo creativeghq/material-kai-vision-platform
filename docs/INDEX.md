@@ -33,6 +33,13 @@ Complete documentation for Material Kai Vision Platform.
 - Security features
 - Analytics & reporting
 
+**[duplicate-detection-merging.md](duplicate-detection-merging.md)** - Duplicate detection system
+- Factory-based duplicate detection
+- Product merging with undo
+- Similarity scoring
+- Merge history tracking
+- API endpoints (7 total)
+
 **[search-strategies.md](search-strategies.md)** - Complete search system guide ✅
 - 6 search strategies (100% implemented)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image

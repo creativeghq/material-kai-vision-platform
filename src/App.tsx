@@ -34,6 +34,7 @@ import { Layout } from './components/Layout/Layout';
 import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
 import PDFProcessing from './pages/PDFProcessing';
 import SearchHub from './pages/SearchHub';
+import AgentHub from './pages/AgentHub';
 import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
 import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
 import PackagesPanel from './components/Admin/PackagesPanel';
@@ -331,6 +332,16 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <SearchHub />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/agent-hub"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <AgentHub />
                     </Layout>
                   </AuthGuard>
                 }

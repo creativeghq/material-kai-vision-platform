@@ -704,6 +704,68 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }
   };
 
+  const handleExportDocumentImages = async (documentId: string) => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to export images',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Exporting Images',
+        description: 'Preparing ZIP file...',
+      });
+
+      const response = await fetch(
+        `https://v1api.materialshub.gr/api/images/export/${documentId}?format=PNG&quality=95&include_metadata=true`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Export failed: ${response.status} ${response.statusText}\n${errorText}`,
+        );
+      }
+
+      // Download the ZIP file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `images_${documentId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Complete',
+        description: 'Images downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast({
+        title: 'Export Failed',
+        description:
+          error instanceof Error ? error.message : 'Failed to export images',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const getChunksByDocument = (documentId: string) => {
     return chunks.filter((chunk) => chunk.document_id === documentId);
   };
@@ -1296,18 +1358,32 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               </Badge>
                             </div>
 
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/admin/documents/${docId}`);
-                              }}
-                            >
-                              View Details
-                              <ChevronRight className="h-4 w-4 ml-2" />
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/admin/documents/${docId}`);
+                                }}
+                              >
+                                View Details
+                                <ChevronRight className="h-4 w-4 ml-2" />
+                              </Button>
+                              {docImages.length > 0 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleExportDocumentImages(docId);
+                                  }}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         );
                       },

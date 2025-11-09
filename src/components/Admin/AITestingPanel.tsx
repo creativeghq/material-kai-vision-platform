@@ -589,7 +589,7 @@ export const AITestingPanel: React.FC = () => {
     try {
       const apiService = BrowserApiIntegrationService.getInstance();
       const result = await apiService.callSupabaseFunction(
-        'crewai-3d-generation',
+        'mastra-3d-generation',
         {
           user_id: (await supabase.auth.getUser()).data.user?.id,
           prompt: testPrompt,

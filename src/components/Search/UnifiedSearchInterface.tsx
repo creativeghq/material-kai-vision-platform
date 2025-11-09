@@ -24,14 +24,16 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
-import {
-  materialSearchService,
-  MaterialSearchResult,
-} from '@/services/materialSearchService';
+import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  MaterialFiltersPanel,
+  type MaterialFilters,
+} from '@/components/Search/MaterialFiltersPanel';
 
-// Using MaterialSearchResult from our service as base, with additional UI fields
-type SearchResult = MaterialSearchResult & {
+// Search result type based on UnifiedSearchService response
+type SearchResult = {
+  id: string;
   title: string;
   content: string;
   type: 'material' | 'knowledge' | 'pdf_content';
@@ -39,6 +41,11 @@ type SearchResult = MaterialSearchResult & {
   source?: string;
   metadata?: Record<string, unknown>;
   extracted_entities?: EntityData[];
+  // Additional fields from backend
+  chunk_id?: string;
+  document_id?: string;
+  document_name?: string;
+  page_number?: number;
 };
 
 interface EntityData {
@@ -95,6 +102,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
       people: [],
     },
   );
+  const [materialFilters, setMaterialFilters] = useState<MaterialFilters>({
+    materialTypes: [],
+    colors: [],
+    priceRange: [0, 10000],
+    durabilityRating: [],
+    availabilityStatus: [],
+    suppliers: [],
+    applications: [],
+    textures: [],
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -283,83 +300,73 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     const actualSearchType = detectQueryType(query);
 
     try {
-      // let _searchResults: SearchResult[]; // Currently unused
+      // Get workspace_id from user's session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
 
-      let materialSearchResponse;
+      // Get user's workspace
+      const { data: workspaceData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!workspaceData?.workspace_id) {
+        throw new Error('No workspace found for user');
+      }
+
+      let searchResponse;
 
       if (actualSearchType === 'text') {
-        // Enhanced text search using unified MaterialSearchService
-        materialSearchResponse = await materialSearchService.search({
+        // Text search using semantic strategy
+        searchResponse = await UnifiedSearchService.search({
           query: query.trim(),
-          searchType: 'text',
-          limit: 15,
-          includeImages: true,
-          includeMetafields: true,
-          includeRelationships: false,
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'semantic',
+          top_k: 15,
         });
       } else if (actualSearchType === 'image') {
-        // Image-based search using MaterialSearchService with image analysis
-        materialSearchResponse = await materialSearchService.search({
-          query: `image_analysis_search:${selectedImage?.name || 'uploaded_image'}`,
-          searchType: 'semantic',
-          limit: 12,
-          includeImages: true,
-          includeMetafields: true,
-          includeRelationships: false,
+        // Image-based search using visual strategy
+        searchResponse = await UnifiedSearchService.search({
+          query: selectedImage?.name || 'uploaded_image',
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'visual',
+          top_k: 12,
+          // TODO: Add image_url or image_base64 when image upload is implemented
         });
       } else {
-        // Hybrid search (text + image) using MaterialSearchService
-        materialSearchResponse = await materialSearchService.search({
+        // Hybrid search (text + semantic)
+        searchResponse = await UnifiedSearchService.search({
           query: query.trim(),
-          searchType: 'hybrid',
-          limit: 20,
-          includeImages: true,
-          includeMetafields: true,
-          includeRelationships: false,
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'hybrid',
+          top_k: 20,
         });
       }
 
-      if (!materialSearchResponse.success) {
-        throw new Error(materialSearchResponse.error || 'Search failed');
+      if (!searchResponse.success) {
+        throw new Error(searchResponse.error || 'Search failed');
       }
 
-      // Transform MaterialSearchResult to SearchResult format and fetch entity data
-      const resultIds = materialSearchResponse.data.map((result) => result.id);
-
-      // Fetch entity data for the search results
-      let entityDataMap: Record<string, EntityData[]> = {};
-      if (resultIds.length > 0) {
-        try {
-          const { data: entityData } = await supabase
-            .from('materials_catalog')
-            .select('id, extracted_entities')
-            .in('id', resultIds)
-            .not('extracted_entities', 'is', null);
-
-          entityData?.forEach((item: unknown) => {
-            if ((item as any).extracted_entities) {
-              entityDataMap[(item as any).id] = (item as any)
-                .extracted_entities as EntityData[];
-            }
-          });
-        } catch (entityError) {
-          console.warn('Failed to fetch entity data:', entityError);
-        }
-      }
-
-      const unifiedResults: SearchResult[] = materialSearchResponse.data.map(
+      // Transform UnifiedSearchService results to SearchResult format
+      const unifiedResults: SearchResult[] = searchResponse.results.map(
         (result) => ({
-          ...result,
-          title: result.name,
-          content: result.description || 'No description available',
-          type: 'material' as const,
-          similarity_score: result.search_score || 0.8,
-          source: 'unified_search',
-          extracted_entities: entityDataMap[result.id] || [],
+          id: result.chunk_id,
+          title: result.document_name,
+          content: result.content,
+          type: 'pdf_content' as const,
+          similarity_score: result.similarity_score,
+          source: result.filename || 'knowledge_base',
+          chunk_id: result.chunk_id,
+          document_id: result.document_id,
+          document_name: result.document_name,
+          page_number: result.page_number,
           metadata: {
-            category: result.category,
-            properties: result.properties,
-            metafield_values: result.metafield_values,
+            chunk_metadata: result.chunk_metadata,
+            document_tags: result.document_tags,
+            source_metadata: result.source_metadata,
           },
         }),
       );
@@ -400,30 +407,48 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       setIsSearching(true);
       try {
-        // Quick text-based search using unified material search
-        const quickResponse = await materialSearchService.search({
+        // Get workspace_id from user's session
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error('User not authenticated');
+        }
+
+        // Get user's workspace
+        const { data: workspaceData } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!workspaceData?.workspace_id) {
+          throw new Error('No workspace found for user');
+        }
+
+        // Quick text-based search using semantic strategy
+        const quickResponse = await UnifiedSearchService.search({
           query: searchQuery,
-          searchType: 'text',
-          limit: 8,
-          includeImages: false,
-          includeMetafields: false,
-          includeRelationships: false,
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'semantic',
+          top_k: 8,
         });
 
         if (!quickResponse.success) {
           throw new Error(quickResponse.error || 'Quick search failed');
         }
 
-        const formatted: SearchResult[] = quickResponse.data.map((result) => ({
-          ...result,
-          title: result.name,
-          content: result.description || 'No description available',
-          type: 'material' as const,
-          similarity_score: result.search_score || 0.8,
+        const formatted: SearchResult[] = quickResponse.results.map((result) => ({
+          id: result.chunk_id,
+          title: result.document_name,
+          content: result.content,
+          type: 'pdf_content' as const,
+          similarity_score: result.similarity_score,
           source: 'quick_search',
+          chunk_id: result.chunk_id,
+          document_id: result.document_id,
+          document_name: result.document_name,
+          page_number: result.page_number,
           metadata: {
-            category: result.category,
-            properties: result.properties,
+            chunk_metadata: result.chunk_metadata,
           },
         }));
 
@@ -902,6 +927,25 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           )}
         </Card>
       )}
+
+      {/* Material Property Filters */}
+      <MaterialFiltersPanel
+        filters={materialFilters}
+        onFiltersChange={setMaterialFilters}
+        onClearFilters={() =>
+          setMaterialFilters({
+            materialTypes: [],
+            colors: [],
+            priceRange: [0, 10000],
+            durabilityRating: [],
+            availabilityStatus: [],
+            suppliers: [],
+            applications: [],
+            textures: [],
+          })
+        }
+        collapsible={true}
+      />
 
       {/* Search Results */}
       {results.length > 0 && (

@@ -47,6 +47,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
+import { SearchAnalyticsDashboard } from './SearchAnalyticsDashboard';
 
 // Types for our data structures
 type SystemMetrics = {
@@ -593,10 +594,11 @@ const AdminDashboard: React.FC = () => {
       <div className="p-6 space-y-6">
         {/* Enhanced Admin Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="monitoring">System Monitoring</TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
+            <TabsTrigger value="analytics">Search Analytics</TabsTrigger>
             <TabsTrigger value="config">Configuration</TabsTrigger>
           </TabsList>
 
@@ -1147,6 +1149,11 @@ const AdminDashboard: React.FC = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* Search Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <SearchAnalyticsDashboard />
           </TabsContent>
         </Tabs>
       </div>

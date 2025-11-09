@@ -13,6 +13,8 @@ import {
   Lightbulb,
   ExternalLink,
   BarChart3,
+  Save,
+  Star,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,11 +33,14 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import {
-  EnhancedRAGService,
-  type EnhancedRAGRequest,
-  type EnhancedRAGResponse,
-} from '@/services/enhancedRAGService';
+  MaterialFiltersPanel,
+  type MaterialFilters,
+} from '@/components/Search/MaterialFiltersPanel';
+import { SavedSearchesPanel } from '@/components/Search/SavedSearchesPanel';
+import { SaveSearchModal } from '@/components/Search/SaveSearchModal';
+import { SavedSearch } from '@/services/savedSearchesService';
 
 interface EnhancedRAGInterfaceProps {
   onResultsFound?: (results: Record<string, unknown>[]) => void;
@@ -46,11 +51,10 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] =
-    useState<EnhancedRAGResponse | null>(null);
+  const [searchResults, setSearchResults] = useState<any | null>(null);
   const [searchType, setSearchType] = useState<
-    'comprehensive' | 'semantic' | 'hybrid' | 'perplexity'
-  >('comprehensive');
+    'semantic' | 'hybrid' | 'multi_vector' | 'all'
+  >('semantic');
   const [includeRealTime, setIncludeRealTime] = useState(true);
   const [maxResults, setMaxResults] = useState(10);
   const [context, setContext] = useState({
@@ -58,11 +62,23 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     stylePreferences: [] as string[],
     materialCategories: [] as string[],
   });
+  const [materialFilters, setMaterialFilters] = useState<MaterialFilters>({
+    materialTypes: [],
+    colors: [],
+    priceRange: [0, 10000],
+    durabilityRating: [],
+    availabilityStatus: [],
+    suppliers: [],
+    applications: [],
+    textures: [],
+  });
   const [analytics, setAnalytics] = useState<{
     totalSearches?: number;
     avgSatisfaction?: number;
     avgResponseTime?: number;
   } | null>(null);
+  const [saveSearchModalOpen, setSaveSearchModalOpen] = useState(false);
+  const [showSavedSearches, setShowSavedSearches] = useState(false);
 
   const { toast } = useToast();
 
@@ -73,7 +89,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 
   const loadAnalytics = async () => {
     try {
-      const data = await EnhancedRAGService.getSearchAnalytics('30 days');
+      const data = await UnifiedSearchService.getSearchAnalytics('30 days');
       setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -82,7 +98,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 
   const loadQueryHistory = async () => {
     try {
-      await EnhancedRAGService.getQueryHistory(10);
+      await UnifiedSearchService.getQueryHistory(10);
     } catch (error) {
       console.error('Error loading query history:', error);
     }
@@ -100,36 +116,85 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
 
     setIsSearching(true);
     try {
-      const request: EnhancedRAGRequest = {
-        query: query.trim(),
-        context: {
-          ...(context.roomType && { roomType: context.roomType }),
-          ...(context.stylePreferences.length > 0 && {
-            stylePreferences: context.stylePreferences,
-          }),
-          ...(context.materialCategories.length > 0 && {
-            materialCategories: context.materialCategories,
-          }),
-        },
-        searchType,
-        maxResults,
-        includeRealTime,
-      };
+      // Get workspace_id if using "all" strategy
+      let workspaceId: string | undefined;
+      if (searchType === 'all') {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          toast({
+            title: 'Authentication Required',
+            description: 'Please log in to use All Strategies search',
+            variant: 'destructive',
+          });
+          setIsSearching(false);
+          return;
+        }
 
-      const results = await EnhancedRAGService.search(request);
+        // Get user's workspace
+        const { data: workspaceData, error: workspaceError } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (workspaceError || !workspaceData) {
+          toast({
+            title: 'Workspace Error',
+            description: 'Could not load workspace for All Strategies search',
+            variant: 'destructive',
+          });
+          setIsSearching(false);
+          return;
+        }
+
+        workspaceId = workspaceData.workspace_id;
+      }
+
+      // Build material filters object for API
+      const hasActiveFilters =
+        materialFilters.materialTypes.length > 0 ||
+        materialFilters.colors.length > 0 ||
+        materialFilters.durabilityRating.length > 0 ||
+        materialFilters.availabilityStatus.length > 0 ||
+        materialFilters.applications.length > 0 ||
+        materialFilters.textures.length > 0 ||
+        materialFilters.priceRange[0] > 0 ||
+        materialFilters.priceRange[1] < 10000;
+
+      const apiMaterialFilters = hasActiveFilters
+        ? {
+            material_type: materialFilters.materialTypes,
+            color: materialFilters.colors,
+            durability_rating: materialFilters.durabilityRating,
+            availability_status: materialFilters.availabilityStatus,
+            application: materialFilters.applications,
+            texture: materialFilters.textures,
+            price_min: materialFilters.priceRange[0],
+            price_max: materialFilters.priceRange[1],
+          }
+        : undefined;
+
+      const results = await UnifiedSearchService.search({
+        query: query.trim(),
+        workspace_id: workspaceId,
+        strategy: searchType as any,
+        top_k: maxResults,
+        material_filters: apiMaterialFilters,
+      });
+
       setSearchResults(results);
 
-      // Combine all results for callback
-      const allResults = [
-        ...results.results.knowledgeBase,
-        ...results.results.materialKnowledge,
-        ...results.results.recommendations,
-      ];
-      onResultsFound?.(allResults as unknown as Record<string, unknown>[]);
+      // Pass results for callback
+      onResultsFound?.(results.results as unknown as Record<string, unknown>[]);
 
       toast({
         title: 'Enhanced Search Completed',
-        description: `Found ${allResults.length} results with ${results.semanticAnalysis.queryComplexity.toFixed(2)} complexity score`,
+        description: `Found ${results.total_results} results using ${results.search_type} strategy`,
       });
 
       // Refresh analytics and history
@@ -155,8 +220,8 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     if (!searchResults) return;
 
     try {
-      await EnhancedRAGService.provideFeedback(
-        searchResults.analytics.sessionId,
+      await UnifiedSearchService.provideFeedback(
+        searchResults.analytics?.sessionId || '',
         {
           satisfaction,
           clickedResults,
@@ -193,6 +258,27 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     }
   };
 
+  const handleLoadSavedSearch = (search: SavedSearch) => {
+    setQuery(search.query);
+    setSearchType(search.search_strategy as any);
+    if (search.material_filters) {
+      setMaterialFilters(search.material_filters);
+    }
+    setShowSavedSearches(false);
+    toast({
+      title: 'Search Loaded',
+      description: `Loaded: ${search.name}`,
+    });
+  };
+
+  const handleExecuteSavedSearch = async (search: SavedSearch) => {
+    handleLoadSavedSearch(search);
+    // Wait a bit for state to update, then execute
+    setTimeout(() => {
+      handleSearch();
+    }, 100);
+  };
+
   return (
     <div className="space-y-6">
       {/* Enhanced Search Interface */}
@@ -213,16 +299,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
               placeholder="Ask about materials, styles, properties, or design concepts..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="flex-1"
             />
             <Button
               onClick={handleSearch}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
               disabled={isSearching}
             >
               {isSearching ? (
@@ -231,6 +312,24 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
                 <Sparkles className="h-4 w-4" />
               )}
               Enhanced Search
+            </Button>
+            {searchResults && (
+              <Button
+                variant="outline"
+                onClick={() => setSaveSearchModalOpen(true)}
+                title="Save this search"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setShowSavedSearches(!showSavedSearches)}
+              title="View saved searches"
+            >
+              <Star className="h-4 w-4 mr-2" />
+              Saved
             </Button>
           </div>
 
@@ -241,7 +340,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
               <Select
                 value={searchType}
                 onValueChange={(
-                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity',
+                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity' | 'all',
                 ) => setSearchType(value)}
               >
                 <SelectTrigger>
@@ -259,6 +358,9 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
                   </SelectItem>
                   <SelectItem value="perplexity">
                     🌐 Real-time (Perplexity)
+                  </SelectItem>
+                  <SelectItem value="all">
+                    🚀 All Strategies (Parallel - 3-4x Faster!)
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -409,6 +511,25 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      {/* Material Filters Panel */}
+      <MaterialFiltersPanel
+        filters={materialFilters}
+        onFiltersChange={setMaterialFilters}
+        onClearFilters={() =>
+          setMaterialFilters({
+            materialTypes: [],
+            colors: [],
+            priceRange: [0, 10000],
+            durabilityRating: [],
+            availabilityStatus: [],
+            suppliers: [],
+            applications: [],
+            textures: [],
+          })
+        }
+        collapsible={true}
+      />
 
       {/* Search Results */}
       {searchResults && (
@@ -796,6 +917,39 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
           </CardContent>
         </Card>
       )}
+
+      {/* Saved Searches Panel */}
+      {showSavedSearches && (
+        <SavedSearchesPanel
+          onLoadSearch={handleLoadSavedSearch}
+          onExecuteSearch={handleExecuteSavedSearch}
+        />
+      )}
+
+      {/* Save Search Modal */}
+      <SaveSearchModal
+        open={saveSearchModalOpen}
+        onOpenChange={setSaveSearchModalOpen}
+        searchData={{
+          query,
+          searchStrategy: searchType,
+          filters: {},
+          materialFilters,
+          resultsSnapshot: searchResults
+            ? [
+                ...searchResults.results.knowledgeBase,
+                ...searchResults.results.materialKnowledge,
+                ...searchResults.results.recommendations,
+              ]
+            : [],
+        }}
+        onSaved={() => {
+          toast({
+            title: 'Success',
+            description: 'Search saved successfully',
+          });
+        }}
+      />
 
       {/* Analytics Dashboard */}
       {analytics && (

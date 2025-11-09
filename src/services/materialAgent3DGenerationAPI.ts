@@ -72,7 +72,7 @@ export class MaterialAgent3DGenerationAPI {
         throw new Error('User not authenticated');
       }
 
-      console.log('Calling edge function with request:', {
+      console.log('Calling Mastra 3D generation with request:', {
         user_id: user.id,
         prompt: request.prompt,
         room_type: request.room_type,
@@ -81,7 +81,7 @@ export class MaterialAgent3DGenerationAPI {
       });
 
       const { data, error } = await supabase.functions.invoke(
-        'crewai-3d-generation',
+        'mastra-3d-generation',
         {
           body: {
             user_id: user.id,

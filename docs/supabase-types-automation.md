@@ -320,15 +320,3 @@ export type TablesUpdate<T extends keyof Database['public']['Tables']> = Databas
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 
 ---
-
-## ✅ Checklist
-
-- [x] Supabase CLI installed as dev dependency
-- [x] npm scripts configured (`types:generate`, `types:check`)
-- [x] GitHub Actions workflow created
-- [x] Type check script implemented
-- [x] Documentation complete
-- [ ] GitHub secrets configured (manual step)
-- [ ] Test type generation locally
-- [ ] Test GitHub Actions workflow
-

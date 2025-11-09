@@ -177,7 +177,7 @@ export const supabaseConfig: SupabaseApiConfig = {
   },
   environment: 'development', // Will be overridden by registry
   functions: {
-    'crewai-3d-generation': {
+    'mastra-3d-generation': {
       inputSchema: crewai3DGenerationInputSchema,
       outputSchema: crewai3DGenerationOutputSchema,
       timeout: 300000, // 5 minutes for AI generation

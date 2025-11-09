@@ -1,12 +1,13 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-07
-**Total Endpoints:** 108 (Consolidated from 113)
-**Status:** ✅ Production-Ready - API Consolidation Complete + PDF Extraction Consolidation
+**Last Updated:** 2025-11-09
+**Total Endpoints:** 115 (Consolidated from 113 + Duplicate Detection)
+**Status:** ✅ Production-Ready - API Consolidation Complete + PDF Extraction Consolidation + Duplicate Detection
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (API Consolidation + PDF Extraction Consolidation - Complete):**
+**Recent Updates (API Consolidation + PDF Extraction Consolidation + Duplicate Detection):**
+- ✅ **DUPLICATE DETECTION:** 7 new endpoints for duplicate detection and product merging (factory-based only)
 - ✅ **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
 - ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
 - ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
@@ -18,11 +19,12 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - ✅ **REMOVED:** All `/api/pdf/extract/*` endpoints (3 total) - replaced by `/api/rag/documents/upload`
 - ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
 
-**Total API Endpoints:** 108 endpoints across 14 categories
+**Total API Endpoints:** 115 endpoints across 15 categories
 - ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
 - ✅ **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
 - ✅ **PDF EXTRACTION:** Unified through RAG pipeline with optional quick mode
+- ✅ **DUPLICATE DETECTION:** Factory-based duplicate detection and product merging (ready for integration)
 
 ---
 
@@ -62,6 +64,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 10. [Anthropic Routes](#12-anthropic-routes) - Anthropic integration
 11. [Monitoring Routes](#13-monitoring-routes) - System monitoring
 12. [AI Metrics Routes](#14-ai-metrics-routes) - AI performance metrics
+13. [Duplicate Detection Routes](#15-duplicate-detection-routes) - Duplicate detection and product merging
 
 ---
 
@@ -2378,7 +2381,181 @@ All endpoints return JSON:
 
 ---
 
-**Total Endpoints**: 113
-**Last Updated**: November 2, 2025
+## 15. Duplicate Detection Routes
+
+**Purpose:** Detect and merge duplicate products from the same factory/manufacturer
+
+**CRITICAL RULE:** Duplicates are ONLY detected when products have the same factory/manufacturer in metadata. Visual similarity alone does NOT constitute a duplicate.
+
+### 15.1 POST /api/duplicates/detect
+
+**Purpose:** Detect potential duplicates for a specific product
+
+**Request:**
+```json
+{
+  "product_id": "uuid",
+  "workspace_id": "uuid",
+  "similarity_threshold": 0.60
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "product_id": "uuid",
+  "duplicates_found": 3,
+  "duplicates": [
+    {
+      "product_id": "uuid",
+      "name": "Product Name",
+      "factory": "Factory Name",
+      "overall_similarity": 0.92,
+      "confidence_level": "high"
+    }
+  ]
+}
+```
+
+---
+
+### 15.2 POST /api/duplicates/batch-detect
+
+**Purpose:** Scan entire workspace for duplicate products
+
+**Request:**
+```json
+{
+  "workspace_id": "uuid",
+  "similarity_threshold": 0.75,
+  "limit": 1000
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "workspace_id": "uuid",
+  "duplicate_pairs_found": 15,
+  "duplicate_pairs": [...]
+}
+```
+
+---
+
+### 15.3 GET /api/duplicates/cached
+
+**Purpose:** Get cached duplicate detections
+
+**Query Parameters:**
+- `workspace_id` (required)
+- `status` (optional): 'pending', 'reviewed', 'merged', 'dismissed'
+- `min_similarity` (optional): default 0.60
+
+**Response:**
+```json
+{
+  "success": true,
+  "workspace_id": "uuid",
+  "cached_duplicates": 42,
+  "duplicates": [...]
+}
+```
+
+---
+
+### 15.4 POST /api/duplicates/update-status
+
+**Purpose:** Update duplicate detection status
+
+**Request:**
+```json
+{
+  "cache_id": "uuid",
+  "status": "reviewed",
+  "user_id": "uuid"
+}
+```
+
+**Valid Statuses:** 'pending', 'reviewed', 'merged', 'dismissed'
+
+---
+
+### 15.5 POST /api/duplicates/merge
+
+**Purpose:** Merge duplicate products into a single product
+
+**Request:**
+```json
+{
+  "target_product_id": "uuid",
+  "source_product_ids": ["uuid1", "uuid2"],
+  "workspace_id": "uuid",
+  "user_id": "uuid",
+  "merge_strategy": "manual",
+  "merge_reason": "Duplicate from same factory"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "history_id": "uuid",
+  "target_product": {...},
+  "merged_count": 2,
+  "message": "Successfully merged 2 products"
+}
+```
+
+---
+
+### 15.6 POST /api/duplicates/undo-merge
+
+**Purpose:** Undo a product merge operation
+
+**Request:**
+```json
+{
+  "history_id": "uuid",
+  "user_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Merge successfully undone",
+  "restored_products": 2
+}
+```
+
+---
+
+### 15.7 GET /api/duplicates/merge-history
+
+**Purpose:** Get merge history for a workspace
+
+**Query Parameters:**
+- `workspace_id` (required)
+- `limit` (optional): default 50
+
+**Response:**
+```json
+{
+  "success": true,
+  "workspace_id": "uuid",
+  "merge_count": 12,
+  "merges": [...]
+}
+```
+
+---
+
+**Total Endpoints**: 115
+**Last Updated**: November 9, 2025
 **API Version**: v1
 
