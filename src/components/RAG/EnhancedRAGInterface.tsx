@@ -13,6 +13,8 @@ import {
   Lightbulb,
   ExternalLink,
   BarChart3,
+  Save,
+  Star,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,6 +42,9 @@ import {
   MaterialFiltersPanel,
   type MaterialFilters,
 } from '@/components/Search/MaterialFiltersPanel';
+import { SavedSearchesPanel } from '@/components/Search/SavedSearchesPanel';
+import { SaveSearchModal } from '@/components/Search/SaveSearchModal';
+import { SavedSearch } from '@/services/savedSearchesService';
 
 interface EnhancedRAGInterfaceProps {
   onResultsFound?: (results: Record<string, unknown>[]) => void;
@@ -77,6 +82,8 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     avgSatisfaction?: number;
     avgResponseTime?: number;
   } | null>(null);
+  const [saveSearchModalOpen, setSaveSearchModalOpen] = useState(false);
+  const [showSavedSearches, setShowSavedSearches] = useState(false);
 
   const { toast } = useToast();
 
@@ -272,6 +279,27 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
     }
   };
 
+  const handleLoadSavedSearch = (search: SavedSearch) => {
+    setQuery(search.query);
+    setSearchType(search.search_strategy as any);
+    if (search.material_filters) {
+      setMaterialFilters(search.material_filters);
+    }
+    setShowSavedSearches(false);
+    toast({
+      title: 'Search Loaded',
+      description: `Loaded: ${search.name}`,
+    });
+  };
+
+  const handleExecuteSavedSearch = async (search: SavedSearch) => {
+    handleLoadSavedSearch(search);
+    // Wait a bit for state to update, then execute
+    setTimeout(() => {
+      handleSearch();
+    }, 100);
+  };
+
   return (
     <div className="space-y-6">
       {/* Enhanced Search Interface */}
@@ -292,16 +320,11 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
               placeholder="Ask about materials, styles, properties, or design concepts..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               className="flex-1"
             />
             <Button
               onClick={handleSearch}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
               disabled={isSearching}
             >
               {isSearching ? (
@@ -310,6 +333,24 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
                 <Sparkles className="h-4 w-4" />
               )}
               Enhanced Search
+            </Button>
+            {searchResults && (
+              <Button
+                variant="outline"
+                onClick={() => setSaveSearchModalOpen(true)}
+                title="Save this search"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => setShowSavedSearches(!showSavedSearches)}
+              title="View saved searches"
+            >
+              <Star className="h-4 w-4 mr-2" />
+              Saved
             </Button>
           </div>
 
@@ -897,6 +938,39 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
           </CardContent>
         </Card>
       )}
+
+      {/* Saved Searches Panel */}
+      {showSavedSearches && (
+        <SavedSearchesPanel
+          onLoadSearch={handleLoadSavedSearch}
+          onExecuteSearch={handleExecuteSavedSearch}
+        />
+      )}
+
+      {/* Save Search Modal */}
+      <SaveSearchModal
+        open={saveSearchModalOpen}
+        onOpenChange={setSaveSearchModalOpen}
+        searchData={{
+          query,
+          searchStrategy: searchType,
+          filters: {},
+          materialFilters,
+          resultsSnapshot: searchResults
+            ? [
+                ...searchResults.results.knowledgeBase,
+                ...searchResults.results.materialKnowledge,
+                ...searchResults.results.recommendations,
+              ]
+            : [],
+        }}
+        onSaved={() => {
+          toast({
+            title: 'Success',
+            description: 'Search saved successfully',
+          });
+        }}
+      />
 
       {/* Analytics Dashboard */}
       {analytics && (
