@@ -759,21 +759,18 @@ export const MaterialAgentSearchInterface: React.FC<
       const transformedData = {
         success: true,
         response:
-          data.coordinated_result?.content ||
-          data.coordinated_result?.analysis ||
-          String(data.coordinated_result) ||
+          data.data?.text ||
+          data.text ||
+          data.response ||
           'Analysis completed successfully',
-        thinking:
-          data.coordination_summary ||
-          'Task processed through Material Agent coordination',
-        suggestions: data.coordinated_result?.recommendations || [],
-        materials: data.coordinated_result?.materials || [],
+        thinking: data.thinking || 'Processed using hybrid AI models with fallback support',
+        suggestions: [],
+        materials: [],
         metadata: {
-          taskId: data.task_id,
+          provider: data.provider,
           processingTime: data.total_processing_time_ms,
-          overallConfidence: data.overall_confidence,
-          agentCount: data.agent_executions?.length || 0,
-          crewAI: true,
+          finalScore: data.final_score,
+          attempts: data.attempts?.length || 0,
         },
       };
 
