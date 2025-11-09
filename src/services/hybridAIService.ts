@@ -181,16 +181,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
     request: HybridRequest,
   ): Promise<HybridResponse> {
     // Use agent-chat Edge Function for AI chat (Mastra agents)
-    const { createClient } = await import('@supabase/supabase-js');
-
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase configuration not found');
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { supabase } = await import('@/integrations/supabase/client');
 
     const systemPrompt = HybridAIService.getSystemPrompt(request.type);
 
