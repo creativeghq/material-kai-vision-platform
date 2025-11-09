@@ -245,11 +245,11 @@ export class BrowserApiIntegrationService {
     } = {},
   ): Promise<StandardizedApiResponse> {
     return this.callSupabaseFunction('mivaa-gateway', {
-      action: 'semantic_search',
+      action: 'rag_search',
       payload: {
         query,
-        limit: options.limit ?? 10,
-        similarity_threshold: 0.7,
+        top_k: options.limit ?? 10,
+        strategy: 'semantic',
         include_metadata: true,
       },
     });

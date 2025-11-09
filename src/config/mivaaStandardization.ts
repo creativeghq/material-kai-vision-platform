@@ -114,11 +114,13 @@ export const MIVAA_ACTION_MAP: Record<
   string,
   { path: string; method: string }
 > = {
-  // PDF Processing
-  pdf_process_document: { path: '/api/documents/process-url', method: 'POST' },
-  pdf_extract_markdown: { path: '/api/v1/extract/markdown', method: 'POST' },
-  pdf_extract_tables: { path: '/api/v1/extract/tables', method: 'POST' },
-  pdf_extract_images: { path: '/api/v1/extract/images', method: 'POST' },
+  // PDF Processing - Use valid mivaa-gateway actions
+  // REMOVED: pdf_process_document - Use rag_upload instead
+  // REMOVED: pdf_extract_markdown - Use rag_upload instead
+  // REMOVED: pdf_extract_tables - Use rag_upload instead
+  // REMOVED: pdf_extract_images - Use rag_upload instead
+  rag_upload: { path: '/api/rag/documents/upload', method: 'POST' },
+  admin_bulk_process: { path: '/api/admin/bulk/process', method: 'POST' },
 
   // Material Recognition - Use valid mivaa-gateway actions
   // REMOVED: material_recognition - Use together_analyze_image instead
@@ -220,20 +222,13 @@ export class MivaaPayloadTransformer {
     }
 
     // Handle different endpoint requirements
-    if (action === 'pdf_process_document') {
+    if (action === 'rag_upload') {
       return {
-        url: resourceUrl,
-        async_processing: false,
-        options: {
-          extract_images: true,
-          extract_tables: true,
-          timeout_seconds: options.timeout
-            ? Math.floor(options.timeout / 1000)
-            : 300,
-          quality: options.quality || 'standard',
-          language: options.language || 'auto',
-          ...options,
-        },
+        file_url: resourceUrl,
+        processing_mode: 'standard',
+        categories: 'all',
+        workspace_id: standardPayload.workspace_id,
+        user_id: standardPayload.user_id,
         document_name: resourceName || 'Uploaded Document',
         tags: standardPayload.tags || [],
         metadata: standardPayload.metadata || {},
