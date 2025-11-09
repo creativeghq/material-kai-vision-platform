@@ -30,7 +30,7 @@ const searchTool = createTool({
     query: z.string().describe('Search query'),
     strategy: z
       .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
-      .default('semantic')
+      .default('all')
       .describe('Search strategy'),
     limit: z.number().default(10).describe('Maximum results'),
     workspaceId: z.string().describe('Workspace ID'),
