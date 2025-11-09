@@ -15,18 +15,20 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 import Replicate from 'https://esm.sh/replicate@0.25.2';
-import { z } from 'https://esm.sh/zod@3.22.4';
-import { Agent, createTool, createWorkflow, createStep } from 'https://esm.sh/@mastra/core@0.24.0';
+import { z } from 'npm:zod';
+import { Agent } from 'npm:@mastra/core/agent';
+import { createTool } from 'npm:@mastra/core/tools';
+import { createWorkflow, createStep } from 'npm:@mastra/core/workflows';
 import { corsHeaders } from '../_shared/cors.ts';
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN')!;
 const replicateToken = Deno.env.get('REPLICATE_API_TOKEN')!;
 const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
+// Mastra auto-detects ANTHROPIC_API_KEY from environment
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Request validation schema (same as CrewAI)
