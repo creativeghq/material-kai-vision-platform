@@ -15,9 +15,9 @@ import { z } from 'npm:zod';
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
+// Mastra auto-detects ANTHROPIC_API_KEY from environment
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
@@ -33,7 +33,6 @@ const searchTool = createTool({
       .default('all')
       .describe('Search strategy'),
     limit: z.number().default(10).describe('Maximum results'),
-    workspaceId: z.string().describe('Workspace ID'),
   }),
   outputSchema: z.object({
     success: z.boolean(),
@@ -42,8 +41,9 @@ const searchTool = createTool({
     strategy: z.string().optional(),
     error: z.string().optional(),
   }),
-  execute: async ({ context }) => {
-    const { query, strategy, limit, workspaceId } = context;
+  execute: async ({ context, runtimeContext }) => {
+    const { query, strategy, limit } = context;
+    const workspaceId = runtimeContext?.get('workspaceId');
 
     try {
       // Call MIVAA API for search
@@ -220,16 +220,19 @@ serve(async (req) => {
     // Get the last user message
     const userMessage = messages[messages.length - 1]?.content || '';
 
+    // Create runtime context for Mastra
+    const { RuntimeContext } = await import('npm:@mastra/core/runtime-context');
+    const runtimeContext = new RuntimeContext();
+    runtimeContext.set('userId', user.id);
+    runtimeContext.set('workspaceId', workspaceId);
+    runtimeContext.set('agentId', agentId);
+    runtimeContext.set('model', model);
+
     // Try to use Mastra routing agent, fallback to simple response
     let responseText = '';
     try {
       const result = await routingAgent.generate(userMessage, {
-        context: {
-          userId: user.id,
-          workspaceId,
-          agentId,
-          model,
-        },
+        runtimeContext,
       });
       responseText = result.text;
     } catch (mastraError) {
