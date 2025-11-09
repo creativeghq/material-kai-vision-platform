@@ -190,68 +190,50 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   private static async callMIVAA(
     request: HybridRequest,
   ): Promise<HybridResponse> {
-    // Note: Using Supabase MIVAA gateway instead of direct calls
+    // Use agent-chat Edge Function for AI chat (Mastra agents)
+    const { createClient } = await import('@supabase/supabase-js');
 
-    // Map request type to MIVAA action
-    // llama_vision_analysis uses LLaMA 4 Scout (69.4% MMMU, #1 OCR)
-    let mivaaAction: string;
-    switch (request.type) {
-      case 'material-analysis':
-        mivaaAction = request.imageUrl
-          ? 'llama_vision_analysis'
-          : 'chat_completion';
-        break;
-      case '3d-generation':
-        mivaaAction = 'chat_completion';
-        break;
-      case 'text-processing':
-        mivaaAction = 'chat_completion';
-        break;
-      default:
-        mivaaAction = 'chat_completion';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Supabase configuration not found');
     }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const systemPrompt = HybridAIService.getSystemPrompt(request.type);
 
-    const payload: Record<string, unknown> = {
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: request.prompt },
-      ],
-      options: {
-        max_tokens: 2000,
-        temperature: 0.1,
+    // Call agent-chat Edge Function
+    const { data, error } = await supabase.functions.invoke('agent-chat', {
+      body: {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: request.prompt },
+        ],
+        agentId: 'search', // Use Search Agent (public, default)
+        model: 'anthropic/claude-sonnet-4-20250514',
+        images: request.imageUrl ? [request.imageUrl] : [],
       },
-    };
+    });
 
-    // Add image data for vision analysis
-    if (request.imageUrl && mivaaAction === 'llama_vision_analysis') {
-      payload.image_data = request.imageUrl;
-      payload.analysis_type = 'material_analysis';
-    }
-
-    // Use direct MIVAA gateway call
-    const response = await callMivaaGatewayDirect(mivaaAction, payload);
-
-    if (!response.success) {
+    if (error) {
       throw new Error(
-        `MIVAA gateway error: ${response.error?.message || 'Unknown error'}`,
+        `Agent chat error: ${error.message || 'Unknown error'}`,
       );
     }
 
-    const result = response.data;
-    if (!result) {
-      throw new Error(`MIVAA ${mivaaAction} error: No data returned`);
+    if (!data || !data.success) {
+      throw new Error(`Agent chat failed: ${data?.error || 'No response'}`);
     }
 
     // Return standardized response format
     return {
       success: true,
       data: {
-        text:
-          result.data.content || result.data.response || result.data.analysis,
-        raw_response: result.data,
-        action: mivaaAction,
+        text: data.text || data.response || '',
+        raw_response: data,
+        action: 'agent-chat',
       },
       provider: 'mivaa',
       attempts: [
