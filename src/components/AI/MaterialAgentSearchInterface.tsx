@@ -756,21 +756,20 @@ export const MaterialAgentSearchInterface: React.FC<
       }
 
       // Transform Material Agent response to expected format
+      const hybridData = data as any; // HybridResponse type
       const transformedData = {
         success: true,
-        response:
-          data.data?.text ||
-          data.text ||
-          data.response ||
-          'Analysis completed successfully',
-        thinking: data.thinking || 'Processed using hybrid AI models with fallback support',
+        response: typeof hybridData.data === 'string'
+          ? hybridData.data
+          : hybridData.data?.text || hybridData.text || hybridData.response || 'Analysis completed successfully',
+        thinking: hybridData.thinking || 'Processed using hybrid AI models with fallback support',
         suggestions: [],
         materials: [],
         metadata: {
-          provider: data.provider,
-          processingTime: data.total_processing_time_ms,
-          finalScore: data.final_score,
-          attempts: data.attempts?.length || 0,
+          provider: hybridData.provider,
+          processingTime: hybridData.total_processing_time_ms,
+          finalScore: hybridData.final_score,
+          attempts: hybridData.attempts?.length || 0,
         },
       };
 
@@ -837,13 +836,10 @@ export const MaterialAgentSearchInterface: React.FC<
         suggestions: transformedData.suggestions || [],
         materials: transformedData.materials || [],
         metadata: {
-          ...(transformedData.metadata?.taskId && {
-            taskId: transformedData.metadata.taskId,
-          }),
+          provider: transformedData.metadata?.provider,
           processingTime: transformedData.metadata?.processingTime,
-          overallConfidence: transformedData.metadata?.overallConfidence,
-          agentCount: transformedData.metadata?.agentCount,
-          crewAI: transformedData.metadata?.crewAI,
+          finalScore: transformedData.metadata?.finalScore,
+          attempts: transformedData.metadata?.attempts,
           ...(enhanced3DContent && {
             has3DContent: true,
             designGeneration: enhanced3DContent,

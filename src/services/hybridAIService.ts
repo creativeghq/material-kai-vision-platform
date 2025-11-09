@@ -179,7 +179,7 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
   // MIVAA API calls (primary provider)
   private static async callMIVAA(
     request: HybridRequest,
-  ): Promise<HybridResponse> {
+  ): Promise<string> {
     // Use agent-chat Edge Function for AI chat (Mastra agents)
     const { supabase } = await import('@/integrations/supabase/client');
 
@@ -208,30 +208,12 @@ export class HybridAIService extends BaseService<HybridAIServiceConfig> {
       throw new Error(`Agent chat failed: ${data?.error || 'No response'}`);
     }
 
-    // Return standardized response format
-    return {
-      success: true,
-      data: {
-        text: data.text || data.response || '',
-        raw_response: data,
-        action: 'agent-chat',
-      },
-      provider: 'mivaa',
-      attempts: [
-        {
-          provider: 'mivaa',
-          success: true,
-          processing_time_ms: 0,
-        },
-      ],
-      final_score: 0.9,
-      validation: {},
-      total_processing_time_ms: 0,
-    };
+    // Return just the text response
+    return data.text || data.response || 'Analysis completed successfully';
   }
 
   // Claude API calls (for client-side use)
-  private static async callClaude(_request: HybridRequest): Promise<unknown> {
+  private static async callClaude(_request: HybridRequest): Promise<string> {
     // This would be called from edge function, not client
     throw new Error('Use callHybridAnalysis instead for client-side calls');
   }
