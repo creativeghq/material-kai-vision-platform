@@ -35,74 +35,90 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Modern Mint/Sage Theme - Inspired by Fintech Design */
-    --background: 160 25% 92%;  /* Light mint/sage background */
-    --foreground: 160 10% 15%;  /* Dark text */
+    /* Professional Teal/Slate Theme - Based on Worklytics Design */
+    --background: 200 20% 50%;  /* Medium teal-slate background */
+    --foreground: 200 5% 98%;  /* Very light text for high contrast */
 
-    --card: 160 30% 96%;  /* Lighter mint for cards */
-    --card-foreground: 160 10% 15%;
+    --card: 200 15% 55%;  /* Lighter teal for cards */
+    --card-foreground: 200 5% 98%;
 
-    --popover: 160 30% 96%;
-    --popover-foreground: 160 10% 15%;
+    --popover: 200 15% 55%;
+    --popover-foreground: 200 5% 98%;
 
-    --primary: 60 100% 75%;  /* Bright yellow accent */
-    --primary-foreground: 160 10% 15%;
+    --primary: 200 25% 45%;  /* Darker teal for primary actions */
+    --primary-foreground: 200 5% 98%;
 
-    --secondary: 160 8% 20%;  /* Dark for secondary elements */
-    --secondary-foreground: 160 25% 92%;
+    --secondary: 200 20% 60%;  /* Light teal for secondary */
+    --secondary-foreground: 200 5% 98%;
 
-    --muted: 160 20% 88%;  /* Muted sage */
-    --muted-foreground: 160 8% 45%;
+    --muted: 200 15% 65%;  /* Muted teal */
+    --muted-foreground: 200 5% 85%;
 
-    --accent: 60 100% 75%;  /* Yellow accent */
-    --accent-foreground: 160 10% 15%;
+    --accent: 200 25% 45%;  /* Teal accent */
+    --accent-foreground: 200 5% 98%;
 
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 160 30% 96%;
+    --destructive: 0 65% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 160 15% 82%;  /* Subtle sage borders */
-    --input: 160 25% 95%;  /* Light sage input backgrounds */
-    --ring: 60 100% 75%;  /* Yellow focus ring */
+    --border: 200 15% 60%;  /* Subtle teal borders */
+    --input: 200 18% 58%;  /* Input backgrounds */
+    --ring: 200 25% 45%;  /* Teal focus ring */
 
-    --radius: 1.25rem;  /* Rounded corners */
+    --radius: 1rem;  /* Rounded corners */
 
-    /* Modern Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(160 25% 92%), hsl(160 20% 88%));
-    --gradient-secondary: linear-gradient(135deg, hsl(160 8% 20%), hsl(160 8% 16%));
-    --gradient-accent: linear-gradient(135deg, hsl(60 100% 75%), hsl(55 95% 70%));
-    --gradient-warm: linear-gradient(135deg, hsl(160 30% 96%), hsl(160 25% 92%));
+    /* Modern Gradients - Worklytics inspired */
+    --gradient-primary: linear-gradient(135deg, hsl(195 25% 48%), hsl(200 30% 52%));
+    --gradient-secondary: linear-gradient(135deg, hsl(200 15% 30%), hsl(200 20% 25%));
+    --gradient-accent: linear-gradient(135deg, hsl(200 25% 45%), hsl(200 30% 40%));
+    --gradient-background: linear-gradient(135deg, hsl(195 22% 48%) 0%, hsl(200 25% 52%) 50%, hsl(205 20% 50%) 100%);
 
-    /* Glass morphism */
-    --glass-bg: rgba(230, 245, 240, 0.7);
-    --glass-border: rgba(100, 150, 130, 0.15);
+    /* Glass morphism - stat cards */
+    --glass-bg: rgba(255, 255, 255, 0.08);
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-hover: rgba(255, 255, 255, 0.12);
 
     /* Shadows */
-    --shadow-glow: 0 0 30px hsl(60 100% 75% / 0.3);
-    --shadow-subtle: 0 2px 8px hsl(160 10% 15% / 0.08);
-    --shadow-medium: 0 8px 20px hsl(160 10% 15% / 0.12);
-    --shadow-card: 0 4px 12px hsl(160 10% 15% / 0.1);
+    --shadow-glow: 0 0 30px hsl(200 25% 45% / 0.3);
+    --shadow-subtle: 0 2px 8px hsl(200 30% 20% / 0.15);
+    --shadow-medium: 0 8px 20px hsl(200 30% 20% / 0.2);
+    --shadow-card: 0 4px 12px hsl(200 30% 20% / 0.18);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    /* Sidebar colors - Dark with mint undertones */
-    --sidebar-background: 160 8% 20%;  /* Dark sidebar with mint undertone */
-    --sidebar-foreground: 160 25% 92%;  /* Light text */
-    --sidebar-primary: 60 100% 75%;  /* Yellow accent */
-    --sidebar-primary-foreground: 160 10% 15%;
-    --sidebar-accent: 160 8% 28%;  /* Slightly lighter for hover */
-    --sidebar-accent-foreground: 160 25% 92%;
-    --sidebar-border: 160 8% 16%;  /* Darker border */
-    --sidebar-ring: 60 100% 75%;
+    /* Sidebar colors - Darker teal slate */
+    --sidebar-background: 200 20% 35%;  /* Darker teal sidebar */
+    --sidebar-foreground: 200 5% 98%;  /* Light text */
+    --sidebar-primary: 200 25% 45%;  /* Teal accent */
+    --sidebar-primary-foreground: 200 5% 98%;
+    --sidebar-accent: 200 20% 42%;  /* Slightly lighter for hover */
+    --sidebar-accent-foreground: 200 5% 98%;
+    --sidebar-border: 200 20% 30%;  /* Darker border */
+    --sidebar-ring: 200 25% 45%;
 
-    /* Status colors */
-    --success: 142 76% 36%;
-    --success-foreground: 40 40% 97%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 30 10% 15%;
-    --info: 199 89% 48%;
-    --info-foreground: 40 40% 97%;
+    /* Status colors - Worklytics inspired badges */
+    --success: 142 70% 45%;  /* Green badges - like "+12%" */
+    --success-foreground: 142 70% 15%;  /* Dark green text */
+    --success-bg: 142 65% 92%;  /* Light green background */
+
+    --warning: 38 95% 55%;  /* Orange for warnings */
+    --warning-foreground: 38 90% 20%;  /* Dark orange text */
+    --warning-bg: 38 90% 92%;  /* Light orange background */
+
+    --error: 0 75% 55%;  /* Red for errors */
+    --error-foreground: 0 70% 20%;  /* Dark red text */
+    --error-bg: 0 70% 92%;  /* Light red background */
+
+    --info: 200 75% 50%;  /* Teal for info */
+    --info-foreground: 200 70% 20%;  /* Dark teal text */
+    --info-bg: 200 70% 92%;  /* Light teal background */
+
+    /* Priority/Category badge colors */
+    --badge-high: 0 75% 55%;  /* Red for high priority */
+    --badge-medium: 38 95% 55%;  /* Orange for medium */
+    --badge-low: 142 70% 45%;  /* Green for low */
+    --badge-neutral: 200 10% 60%;  /* Gray for neutral */
   }
 
 .dark {
@@ -116,11 +132,26 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: var(--gradient-background);
   }
 }
 
 @layer components {
+  /* Glass morphism stat cards - Worklytics style */
+  .stat-card-glass {
+    @apply rounded-2xl backdrop-blur-md transition-all duration-300;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .stat-card-glass:hover {
+    background: var(--glass-hover);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+  }
+
   /* Glass morphism utilities */
   .glass-card {
     background: var(--glass-bg);
@@ -142,8 +173,8 @@ All colors MUST be HSL.
     background: var(--gradient-accent);
   }
 
-  .gradient-warm {
-    background: var(--gradient-warm);
+  .gradient-background {
+    background: var(--gradient-background);
   }
 
   /* Modern card styles */
@@ -169,6 +200,55 @@ All colors MUST be HSL.
     box-shadow: var(--shadow-medium);
     transform: translateY(-4px);
     border-color: hsl(var(--primary) / 0.4);
+  }
+
+  /* Badge variants - Worklytics style */
+  .badge-success {
+    background-color: hsl(var(--success-bg));
+    color: hsl(var(--success-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-warning {
+    background-color: hsl(var(--warning-bg));
+    color: hsl(var(--warning-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-error {
+    background-color: hsl(var(--error-bg));
+    color: hsl(var(--error-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-info {
+    background-color: hsl(var(--info-bg));
+    color: hsl(var(--info-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-high {
+    background-color: hsl(var(--error-bg));
+    color: hsl(var(--error-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-medium {
+    background-color: hsl(var(--warning-bg));
+    color: hsl(var(--warning-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-low {
+    background-color: hsl(var(--success-bg));
+    color: hsl(var(--success-foreground));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  }
+
+  .badge-neutral {
+    background-color: hsl(200 10% 90%);
+    color: hsl(var(--badge-neutral));
+    @apply font-semibold px-3 py-1 rounded-full text-xs;
   }
 
   /* Yellow accent button */

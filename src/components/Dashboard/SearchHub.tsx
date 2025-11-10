@@ -4,9 +4,6 @@ import {
   Clock,
   Star,
   ArrowRight,
-  Package,
-  BookOpen,
-  Sparkles,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -194,75 +191,6 @@ export const SearchHub: React.FC<SearchHubProps> = ({
           </CardContent>
         </Card>
       </div>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>What would you like to do next?</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button
-              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => handleQuickAction('3d')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleQuickAction('3d');
-                }
-              }}
-            >
-              <Sparkles className="h-6 w-6" />
-              <span className="text-sm">Generate 3D</span>
-            </Button>
-
-            <Button
-              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => handleQuickAction('moodboard')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleQuickAction('moodboard');
-                }
-              }}
-            >
-              <Star className="h-6 w-6" />
-              <span className="text-sm">Create Moodboard</span>
-            </Button>
-            <Button
-              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => {
-                // Open catalog view
-                window.location.href = '/catalog';
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  // Open catalog view
-                  window.location.href = '/catalog';
-                }
-              }}
-            >
-              <Package className="h-6 w-6" />
-              <span className="text-sm">Browse Catalog</span>
-            </Button>
-
-            <Button
-              className="h-20 flex flex-col items-center gap-2 border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-              onClick={() => {
-                // Open knowledge base
-                window.location.href = '/rag';
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  // Open knowledge base
-                  window.location.href = '/rag';
-                }
-              }}
-            >
-              <BookOpen className="h-6 w-6" />
-              <span className="text-sm">Knowledge Base</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

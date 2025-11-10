@@ -1,8 +1,5 @@
 import React from 'react';
 
-import { Card } from '@/components/ui/card';
-
-import styles from './Dashboard.module.css';
 import { metricsConfig, type Metric } from './dashboardData';
 
 export const MetricsGrid: React.FC = () => {
@@ -20,22 +17,22 @@ export const MetricsGrid: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {metricsConfig.metrics.map((metric: Metric) => (
-            <Card key={metric.id} className="modern-card p-6 hover:shadow-xl transition-all duration-300">
+            <div key={metric.id} className="stat-card-glass p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-2xl ${metric.iconColor} bg-opacity-10`}>
-                  <metric.icon className={`h-6 w-6 ${metric.iconColor}`} />
+                <div className={`p-3 rounded-xl bg-white/10 backdrop-blur-sm`}>
+                  <metric.icon className={`h-6 w-6 text-white`} />
                 </div>
-                <div className={`text-sm font-medium px-3 py-1 rounded-full ${
-                  metric.change.startsWith('+') ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+                <div className={`${
+                  metric.change.startsWith('+') ? 'badge-success' : 'badge-neutral'
                 }`}>
                   {metric.change}
                 </div>
               </div>
-              <div className={`text-4xl font-bold mb-2 ${metric.valueColor}`}>
+              <div className="text-4xl font-bold mb-2 text-white">
                 {metric.value}
               </div>
-              <div className="text-sm text-muted-foreground font-medium">{metric.label}</div>
-            </Card>
+              <div className="text-sm text-white/70 font-medium">{metric.label}</div>
+            </div>
           ))}
         </div>
       </div>

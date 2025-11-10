@@ -491,17 +491,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     <div className="space-y-6">
       {/* Unified Search Interface */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5" />
-            Intelligent Material Search
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Search by text specifications, upload images, or combine both for
-            enhanced results
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           {/* Main Search Input */}
           <div className="flex gap-2">
             <div className="flex-1 relative">
@@ -621,26 +611,10 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
         </CardContent>
       </Card>
 
-      {/* Entity Filters */}
-      {results.length > 0 && (
+      {/* Filters */}
+      {results.length > 0 && showEntityFilters && (
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                Entity Filters
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowEntityFilters(!showEntityFilters)}
-              >
-                {showEntityFilters ? 'Hide Filters' : 'Show Filters'}
-              </Button>
-            </div>
-          </CardHeader>
-          {showEntityFilters && (
-            <CardContent>
+          <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Material Filters */}
                 <div className="space-y-2">
@@ -923,8 +897,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                   Clear All Filters
                 </Button>
               </div>
-            </CardContent>
-          )}
+          </CardContent>
         </Card>
       )}
 
