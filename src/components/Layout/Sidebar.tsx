@@ -1,5 +1,5 @@
-import React from 'react';
-import { Home, Palette, Settings, Box, Search, MessageSquare, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, Palette, Settings, Box, Search, MessageSquare, User, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ const navigationItems = [
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -27,24 +28,45 @@ export const Sidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-16 border-r bg-sidebar-background min-h-screen flex flex-col items-center py-4">
-      {/* Logo/Brand */}
-      <div className="mb-6">
-        <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-          <span className="text-primary-foreground font-bold text-lg">K</span>
+    <aside
+      className={`border-r bg-sidebar-background min-h-screen flex flex-col py-4 transition-all duration-300 ${
+        isExpanded ? 'w-64' : 'w-16'
+      }`}
+    >
+      {/* Logo/Brand and Toggle */}
+      <div className="mb-6 px-3">
+        <div className="flex items-center justify-between">
+          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            <span className="text-primary-foreground font-bold text-lg">K</span>
+          </div>
+          {isExpanded && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsExpanded(false)}
+              className="h-8 w-8"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
         </div>
+        {isExpanded && (
+          <div className="mt-2">
+            <h2 className="font-semibold text-sm">KAI Platform</h2>
+            <p className="text-xs text-muted-foreground">Material Intelligence</p>
+          </div>
+        )}
       </div>
 
       {/* Navigation Icons */}
       <TooltipProvider>
-        <nav className="flex-1 flex flex-col items-center space-y-2">
+        <nav className="flex-1 flex flex-col space-y-2 px-2">
           {navigationItems.map((item) => (
-            <Tooltip key={item.id}>
+            <Tooltip key={item.id} delayDuration={isExpanded ? 99999 : 300}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className={`w-12 h-12 rounded-lg ${
+                  className={`${isExpanded ? 'w-full justify-start' : 'w-12'} h-12 rounded-lg ${
                     isActive(item.path)
                       ? 'bg-primary/10 text-primary border-l-2 border-primary'
                       : 'text-sidebar-foreground hover:bg-sidebar-accent'
@@ -53,32 +75,58 @@ export const Sidebar: React.FC = () => {
                 >
                   <Link to={item.path}>
                     <item.icon className="w-5 h-5" />
+                    {isExpanded && <span className="ml-3">{item.label}</span>}
                   </Link>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">
-                <p>{item.label}</p>
-              </TooltipContent>
+              {!isExpanded && (
+                <TooltipContent side="right">
+                  <p>{item.label}</p>
+                </TooltipContent>
+              )}
             </Tooltip>
           ))}
         </nav>
       </TooltipProvider>
 
+      {/* Expand Button (when collapsed) */}
+      {!isExpanded && (
+        <div className="px-2 mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsExpanded(true)}
+            className="w-12 h-12 rounded-lg"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
       {/* User Profile at Bottom */}
       <TooltipProvider>
-        <Tooltip>
+        <Tooltip delayDuration={isExpanded ? 99999 : 300}>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              size="icon"
-              className="w-12 h-12 rounded-full mt-auto"
+              className={`${isExpanded ? 'w-full justify-start mx-2' : 'w-12 mx-auto'} h-12 rounded-lg`}
             >
-              <User className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                <User className="w-4 h-4" />
+              </div>
+              {isExpanded && (
+                <div className="ml-3 text-left">
+                  <p className="text-sm font-medium">Profile</p>
+                  <p className="text-xs text-muted-foreground">Settings</p>
+                </div>
+              )}
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="right">
-            <p>Profile</p>
-          </TooltipContent>
+          {!isExpanded && (
+            <TooltipContent side="right">
+              <p>Profile</p>
+            </TooltipContent>
+          )}
         </Tooltip>
       </TooltipProvider>
     </aside>

@@ -446,7 +446,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         {/* Header */}
         <div className="p-4 border-b">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Chats</h2>
+            <h2 className="text-lg font-semibold">Conversations</h2>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -468,89 +468,48 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-2 text-sm border-b -mb-4">
-            <button className="pb-2 px-1 border-b-2 border-primary font-medium">
-              All
-            </button>
-            <button className="pb-2 px-1 text-muted-foreground hover:text-foreground">
-              Archived
-            </button>
-            <button className="pb-2 px-1 text-muted-foreground hover:text-foreground">
-              Mentions
-            </button>
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search conversations..."
+              className="w-full pl-9 pr-3 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
         </div>
 
-        {/* Agent Groups */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-2">
-            <div className="text-xs font-semibold text-muted-foreground px-3 py-2">
-              Agent Groups
+        {/* Conversations List */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {conversations.length === 0 ? (
+            <div className="p-6 text-center">
+              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">No conversations yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Start a new chat to begin</p>
             </div>
-            <div className="space-y-1">
-              {availableAgents.map((agent) => {
-                const AgentIcon = agent.icon;
-                return (
-                  <button
-                    key={agent.id}
-                    onClick={() => setSelectedAgent(agent.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      selectedAgent === agent.id
-                        ? 'bg-primary/10 border-l-2 border-primary'
-                        : 'hover:bg-accent'
-                    }`}
-                  >
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                      <AgentIcon className={`h-4 w-4 ${agent.color}`} />
+          ) : (
+            <div className="p-2 space-y-1">
+              {conversations.map((convo) => (
+                <button
+                  key={convo.id}
+                  onClick={() => handleLoadConversation(convo.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                    currentConversationId === convo.id
+                      ? 'bg-primary/10 border-l-2 border-primary'
+                      : 'hover:bg-accent'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <div className="font-medium text-sm truncate">{convo.title}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
                     </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="font-medium text-sm truncate">
-                        {agent.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {agent.description}
-                      </div>
-                    </div>
-                    {agent.requiredRole === 'admin' && (
-                      <Settings className="h-3 w-3 text-muted-foreground" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Recent Conversations */}
-          {conversations.length > 0 && (
-            <div className="p-2 mt-2">
-              <div className="text-xs font-semibold text-muted-foreground px-3 py-2">
-                Recent Conversations
-              </div>
-              <div className="space-y-1">
-                {conversations.map((convo) => (
-                  <button
-                    key={convo.id}
-                    onClick={() => handleLoadConversation(convo.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      currentConversationId === convo.id
-                        ? 'bg-primary/10 border-l-2 border-primary'
-                        : 'hover:bg-accent'
-                    }`}
-                  >
-                    <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="font-medium text-sm truncate">{convo.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {convo.messageCount} messages
-                      </div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {new Date(convo.lastMessageAt).toLocaleDateString()}
-                    </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -571,7 +530,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col bg-background">
         {/* Chat Header */}
-        <div className="h-16 border-b bg-card px-6 flex items-center justify-between">
+        <div className="min-h-16 border-b bg-card px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
               <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
@@ -583,27 +542,59 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-[200px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AI_MODELS.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </div>
+
+          {/* Admin Controls */}
+          {userRole === 'admin' && (
+            <div className="flex items-center gap-3">
+              {/* Agent Selection */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Agent:</label>
+                <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableAgents.map((agent) => {
+                      const Icon = agent.icon;
+                      return (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          <div className="flex items-center gap-2">
+                            <Icon className={`h-4 w-4 ${agent.color}`} />
+                            <span>{agent.name}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Model Selection */}
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground">Model:</label>
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger className="w-[200px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AI_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4">
