@@ -449,7 +449,7 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: 'openai/gpt-4o',
 });
 
 /**
