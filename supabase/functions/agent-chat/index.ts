@@ -20,11 +20,24 @@ const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.mate
 // Set environment variables for Mastra (it expects process.env format)
 // Deno doesn't have process.env by default, but Mastra needs it
 // CRITICAL: This must be set BEFORE importing/creating any Mastra agents
-if (typeof (globalThis as any).process === 'undefined') {
-  (globalThis as any).process = { env: {} };
+
+// Declare process as a global variable so we can use process.env directly
+declare global {
+  var process: {
+    env: {
+      ANTHROPIC_API_KEY?: string;
+      OPENAI_API_KEY?: string;
+      [key: string]: string | undefined;
+    };
+  };
 }
-if (typeof (globalThis as any).process.env === 'undefined') {
-  (globalThis as any).process.env = {};
+
+// Initialize process.env
+if (typeof globalThis.process === 'undefined') {
+  globalThis.process = { env: {} };
+}
+if (typeof globalThis.process.env === 'undefined') {
+  globalThis.process.env = {};
 }
 
 const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -37,14 +50,14 @@ console.log('🔑 Setting up API keys:', {
   openaiKeyPrefix: openaiKey?.substring(0, 10),
 });
 
-(globalThis as any).process.env.ANTHROPIC_API_KEY = anthropicKey;
-(globalThis as any).process.env.OPENAI_API_KEY = openaiKey;
+globalThis.process.env.ANTHROPIC_API_KEY = anthropicKey;
+globalThis.process.env.OPENAI_API_KEY = openaiKey;
 
 // Verify it's set
 console.log('✅ Verification:', {
-  processEnvAnthropicExists: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
-  processEnvAnthropicPrefix: (globalThis as any).process.env.ANTHROPIC_API_KEY?.substring(0, 10),
-  processEnvOpenaiExists: !!(globalThis as any).process.env.OPENAI_API_KEY,
+  processEnvAnthropicExists: !!globalThis.process.env.ANTHROPIC_API_KEY,
+  processEnvAnthropicPrefix: globalThis.process.env.ANTHROPIC_API_KEY?.substring(0, 10),
+  processEnvOpenaiExists: !!globalThis.process.env.OPENAI_API_KEY,
 });
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
