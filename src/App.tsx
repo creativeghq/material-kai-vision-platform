@@ -57,6 +57,7 @@ import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
+import DataImportHub from './components/Admin/DataImportHub';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -466,6 +467,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <AsyncJobQueueMonitor />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/data-import"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <DataImportHub />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

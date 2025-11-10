@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalogo>
+  <producto>
+    <nombre>Porcelain Tile Harmony Nova</nombre>
+    <fabricante>Harmony Ceramics</fabricante>
+    <grupo_fabricante>Harmony Group</grupo_fabricante>
+    <tipo>tiles</tipo>
+    <descripcion>High-quality porcelain tile with modern design</descripcion>
+    <precio>€45.50</precio>
+    <color>White</color>
+    <dimensiones>60x60 cm</dimensiones>
+    <acabado>Matte</acabado>
+    <disenador>Studio Harmony</disenador>
+    <coleccion>Nova Collection</coleccion>
+    <imagen_url>https://example.com/harmony-nova-1.jpg</imagen_url>
+    <imagen_url>https://example.com/harmony-nova-2.jpg</imagen_url>
+    <imagen_url>https://example.com/harmony-nova-3.jpg</imagen_url>
+    <codigo_producto>HRM-NV-001</codigo_producto>
+    <stock>150</stock>
+    <peso>1.8 kg</peso>
+  </producto>
+  <producto>
+    <nombre>Marble Effect Wallpaper</nombre>
+    <fabricante>WallArt Studios</fabricante>
+    <tipo>wallpaper</tipo>
+    <descripcion>Luxury marble effect wallpaper for modern interiors</descripcion>
+    <precio>€89.00</precio>
+    <color>Grey Marble</color>
+    <dimensiones>10m x 0.53m</dimensiones>
+    <acabado>Smooth</acabado>
+    <coleccion>Marble Dreams</coleccion>
+    <imagen_url>https://example.com/wallart-marble-1.jpg</imagen_url>
+    <codigo_producto>WA-MD-002</codigo_producto>
+    <stock>75</stock>
+  </producto>
+  <producto>
+    <nombre>Oak Engineered Flooring</nombre>
+    <fabricante>FloorMaster Pro</fabricante>
+    <grupo_fabricante>FloorMaster International</grupo_fabricante>
+    <tipo>flooring</tipo>
+    <descripcion>Premium engineered oak flooring with natural finish</descripcion>
+    <precio>€125.00</precio>
+    <color>Natural Oak</color>
+    <dimensiones>190x14mm</dimensiones>
+    <acabado>Oil Finish</acabado>
+    <disenador>FloorMaster Design Team</disenador>
+    <imagen_url>https://example.com/floormaster-oak-1.jpg</imagen_url>
+    <imagen_url>https://example.com/floormaster-oak-2.jpg</imagen_url>
+    <codigo_producto>FM-OAK-003</codigo_producto>
+    <stock>200</stock>
+    <peso>2.5 kg/m²</peso>
+    <garantia>25 years</garantia>
+  </producto>
+</catalogo>
+

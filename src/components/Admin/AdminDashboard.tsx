@@ -439,6 +439,14 @@ const AdminDashboard: React.FC = () => {
     ],
     'Data Management': [
       {
+        title: 'Data Import Hub',
+        description: 'Import products from XML files and web scraping with AI-assisted field mapping',
+        icon: DatabaseIcon,
+        path: '/admin/data-import',
+        status: 'active',
+        count: 'XML & Web',
+      },
+      {
         title: 'Material Scraper',
         description: 'Scrape material data from websites and external sources',
         icon: Globe,
