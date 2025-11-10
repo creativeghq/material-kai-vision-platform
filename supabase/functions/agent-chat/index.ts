@@ -11,7 +11,6 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { Agent } from 'npm:@mastra/core/agent';
 import { createTool } from 'npm:@mastra/core/tools';
 import { z } from 'npm:zod';
-import { anthropic } from 'https://esm.sh/@ai-sdk/anthropic@1.0.8';
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -434,7 +433,7 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
-  model: anthropic('claude-sonnet-4-20250514'),
+  model: 'anthropic/claude-sonnet-4-20250514',
 });
 
 /**
