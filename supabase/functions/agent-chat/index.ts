@@ -450,8 +450,9 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
   model: {
-    id: 'anthropic/claude-sonnet-4-20250514',
-    apiKey: Deno.env.get('ANTHROPIC_API_KEY'),
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    toolChoice: 'auto',
   },
 });
 
