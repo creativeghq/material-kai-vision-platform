@@ -5,9 +5,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bot } from 'lucide-react';
 
 import { AgentHub as AgentHubComponent } from '@/components/AI/AgentHub';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';
 
 const AgentHubPage: React.FC = () => {
@@ -64,16 +64,20 @@ const AgentHubPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <GlobalAdminHeader
-        title="Agent Hub"
-        description="Multi-agent AI orchestration powered by Mastra framework"
-        breadcrumbs={[
-          { label: 'Dashboard', path: '/' },
-          { label: 'Agent Hub' },
-        ]}
-      />
       <div className="p-6">
-        <div className="max-w-[1800px] mx-auto">
+        <div className="max-w-[1800px] mx-auto space-y-6">
+          {/* Header - User-facing style like MoodBoard */}
+          <div className="flex items-center gap-3">
+            <Bot className="h-8 w-8 text-primary" />
+            <div>
+              <h1 className="text-3xl font-bold">Agent Hub</h1>
+              <p className="text-muted-foreground">
+                Multi-agent AI orchestration powered by Mastra framework
+              </p>
+            </div>
+          </div>
+
+          {/* Agent Hub Component */}
           <AgentHubComponent
             userRole={userRole}
             onMaterialSelect={handleMaterialSelect}
