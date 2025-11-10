@@ -34,7 +34,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 interface DetectedField {
   xml_field: string;
@@ -81,13 +80,36 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   xmlFile,
   onMappingConfirmed,
 }) => {
-  const { currentWorkspace } = useWorkspace();
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [fieldMappings, setFieldMappings] = useState<Record<string, string>>(suggestedMappings);
   const [templateName, setTemplateName] = useState('');
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
   const [category, setCategory] = useState('materials');
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load workspace ID on mount
+  React.useEffect(() => {
+    const loadWorkspace = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: workspaceData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (workspaceData) {
+        setWorkspaceId(workspaceData.workspace_id);
+      }
+    };
+
+    loadWorkspace();
+  }, []);
 
   const handleMappingChange = (xmlField: string, targetField: string) => {
     setFieldMappings((prev) => ({
@@ -137,7 +159,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
   const handleImport = async () => {
     if (!validateMappings()) return;
-    if (!currentWorkspace) return;
+    if (!workspaceId) return;
 
     setIsImporting(true);
     setError(null);
@@ -153,7 +175,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         const { data: template, error: templateError } = await supabase
           .from('xml_mapping_templates')
           .insert({
-            workspace_id: currentWorkspace.id,
+            workspace_id: workspaceId,
             template_name: templateName,
             field_mappings: fieldMappings,
             sample_structure: detectedFields,
@@ -180,7 +202,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         'xml-import-orchestrator',
         {
           body: {
-            workspace_id: currentWorkspace.id,
+            workspace_id: workspaceId,
             category: category,
             xml_content: xmlBase64,
             source_name: xmlFile.name,

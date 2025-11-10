@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import ScheduleImportModal from './ScheduleImportModal';
 
@@ -37,28 +36,51 @@ interface ImportJob {
 }
 
 const ImportHistoryTab: React.FC = () => {
-  const { currentWorkspace } = useWorkspace();
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const { toast } = useToast();
   const [jobs, setJobs] = useState<ImportJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedJobForSchedule, setSelectedJobForSchedule] = useState<ImportJob | null>(null);
   const [isRerunning, setIsRerunning] = useState<string | null>(null);
 
+  // Load workspace ID on mount
   useEffect(() => {
-    if (currentWorkspace) {
+    const loadWorkspace = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: workspaceData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (workspaceData) {
+        setWorkspaceId(workspaceData.workspace_id);
+      }
+    };
+
+    loadWorkspace();
+  }, []);
+
+  useEffect(() => {
+    if (workspaceId) {
       loadImportHistory();
     }
-  }, [currentWorkspace]);
+  }, [workspaceId]);
 
   const loadImportHistory = async () => {
-    if (!currentWorkspace) return;
+    if (!workspaceId) return;
 
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('data_import_jobs')
         .select('*')
-        .eq('workspace_id', currentWorkspace.id)
+        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -111,7 +133,7 @@ const ImportHistoryTab: React.FC = () => {
   };
 
   const handleManualRerun = async (job: ImportJob) => {
-    if (!currentWorkspace || !job.original_xml_content) {
+    if (!workspaceId || !job.original_xml_content) {
       toast({
         title: 'Cannot Re-run',
         description: 'Original XML content not available for this import',
@@ -125,7 +147,7 @@ const ImportHistoryTab: React.FC = () => {
     try {
       const { data, error } = await supabase.functions.invoke('xml-import-orchestrator', {
         body: {
-          workspace_id: currentWorkspace.id,
+          workspace_id: workspaceId,
           category: job.category,
           xml_content: job.original_xml_content,
           source_name: `${job.source_name} (Re-run)`,

@@ -4,12 +4,11 @@
  * Handles XML file upload, field detection, AI-assisted mapping, and import job creation
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 
 interface DetectedField {
@@ -21,13 +20,36 @@ interface DetectedField {
 }
 
 const XMLImportTab: React.FC = () => {
-  const { currentWorkspace } = useWorkspace();
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedFields, setDetectedFields] = useState<DetectedField[]>([]);
   const [suggestedMappings, setSuggestedMappings] = useState<Record<string, string>>({});
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load workspace ID on mount
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: workspaceData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (workspaceData) {
+        setWorkspaceId(workspaceData.workspace_id);
+      }
+    };
+
+    loadWorkspace();
+  }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -44,7 +66,7 @@ const XMLImportTab: React.FC = () => {
   };
 
   const handleDetectFields = async () => {
-    if (!selectedFile || !currentWorkspace) return;
+    if (!selectedFile || !workspaceId) return;
 
     setIsDetecting(true);
     setError(null);
@@ -61,7 +83,7 @@ const XMLImportTab: React.FC = () => {
         'xml-import-orchestrator',
         {
           body: {
-            workspace_id: currentWorkspace.id,
+            workspace_id: workspaceId,
             xml_content: xmlBase64,
             preview_only: true, // Trigger field detection mode
           },
