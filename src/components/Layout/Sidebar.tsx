@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Home, Palette, Settings, Box, Search, MessageSquare, User, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -18,9 +18,25 @@ const navigationItems = [
   { id: 'admin', label: 'Admin Panel', path: '/admin', icon: Settings },
 ];
 
+const SIDEBAR_STORAGE_KEY = 'kai-sidebar-expanded';
+
 export const Sidebar: React.FC = () => {
   const location = useLocation();
-  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Initialize from localStorage
+  const [isExpanded, setIsExpanded] = useState(() => {
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : false;
+  });
+
+  // Persist to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(isExpanded));
+  }, [isExpanded]);
+
+  const toggleSidebar = () => {
+    setIsExpanded(!isExpanded);
+  };
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -43,7 +59,7 @@ export const Sidebar: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setIsExpanded(false)}
+              onClick={toggleSidebar}
               className="h-8 w-8"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -95,7 +111,7 @@ export const Sidebar: React.FC = () => {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsExpanded(true)}
+            onClick={toggleSidebar}
             className="w-12 h-12 rounded-lg"
           >
             <ChevronRight className="h-4 w-4" />

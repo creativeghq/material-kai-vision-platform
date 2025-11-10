@@ -368,6 +368,7 @@ Your role is to analyze user queries and route them to the appropriate specializ
 - **Business/strategy queries** → Business Agent (admin only)
 - **Product/feature queries** → Product Agent (admin only)
 - **System/admin queries** → Admin Agent (owner only)
+- **Demo/showcase queries** → Demo Agent (admin only)
 
 **RBAC Enforcement:**
 - Check user role before routing to admin-only agents
@@ -435,6 +436,7 @@ function hasAgentPermission(agentId: string, userRole: string): boolean {
     business: 2, // admin and above
     product: 2, // admin and above
     admin: 3, // owner only
+    demo: 2, // admin and above
   };
 
   const requiredLevel = agentPermissions[agentId] || 1;

@@ -10,6 +10,7 @@ import { analyticsAgent } from './analyticsAgent';
 import { businessAgent } from './businessAgent';
 import { productAgent } from './productAgent';
 import { adminAgent } from './adminAgent';
+import { demoAgent } from './demoAgent';
 
 /**
  * User roles for role-based access control
@@ -68,6 +69,12 @@ export const agentAccessControl: Record<string, AgentAccessConfig> = {
     description: 'Administrative tasks, system management, and user management',
     allowedRoles: ['admin', 'owner'],
   },
+  demo: {
+    id: 'demo',
+    name: 'Demo Agent',
+    description: 'Showcase platform capabilities with realistic demo data',
+    allowedRoles: ['admin', 'owner'],
+  },
 };
 
 /**
@@ -107,6 +114,7 @@ export const mastra = new Mastra({
     businessAgent,
     productAgent,
     adminAgent,
+    demoAgent,
   ],
   workflows: [],
   // Memory configuration using Supabase
@@ -132,5 +140,6 @@ export {
   businessAgent,
   productAgent,
   adminAgent,
+  demoAgent,
 };
 

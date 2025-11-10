@@ -1,0 +1,235 @@
+{
+  "results": [
+    {
+      "id": "demo-cement-tile-001",
+      "sku": "CT-GREY-8001",
+      "name": "Artisan Grey Cement Tile",
+      "description": "Handcrafted cement tile with geometric pattern in sophisticated grey tones. Perfect for modern interiors and high-traffic areas.",
+      "category": "tile",
+      "type": "cement_tile",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=800&q=80",
+          "alt": "Grey cement tile with geometric pattern",
+          "isPrimary": true
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1604709177225-055f99402ea3?w=800&q=80",
+          "alt": "Close-up of cement tile texture"
+        }
+      ],
+      "metadata": {
+        "color": "Grey",
+        "material_type": "Cement",
+        "finish": "Matte",
+        "thickness": "12mm",
+        "size": "200x200mm",
+        "slip_resistance": "R10",
+        "water_absorption": "< 3%",
+        "fire_rating": "A1",
+        "installation_method": "Adhesive",
+        "application": "Interior/Exterior",
+        "factory": "Artisan Tile Co.",
+        "origin": "Portugal",
+        "collection": "Urban Grey Collection"
+      },
+      "pricing": {
+        "retail": 45.00,
+        "wholesale": 32.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 850,
+        "status": "High",
+        "unit": "m²"
+      },
+      "tags": ["cement", "tile", "grey", "geometric", "handcrafted"],
+      "variants": [
+        { "name": "Light Grey", "sku": "CT-GREY-8001-L" },
+        { "name": "Dark Grey", "sku": "CT-GREY-8001-D" }
+      ]
+    },
+    {
+      "id": "demo-cement-tile-002",
+      "sku": "CT-GREY-8002",
+      "name": "Industrial Concrete Tile",
+      "description": "Modern concrete-effect cement tile with subtle texture variations. Ideal for contemporary commercial and residential spaces.",
+      "category": "tile",
+      "type": "cement_tile",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80",
+          "alt": "Industrial grey concrete tile",
+          "isPrimary": true
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800&q=80",
+          "alt": "Concrete tile installation"
+        }
+      ],
+      "metadata": {
+        "color": "Grey",
+        "material_type": "Cement",
+        "finish": "Semi-Polished",
+        "thickness": "10mm",
+        "size": "300x300mm",
+        "slip_resistance": "R11",
+        "water_absorption": "< 2%",
+        "fire_rating": "A1",
+        "installation_method": "Adhesive",
+        "application": "Interior",
+        "factory": "ModernCrete Industries",
+        "origin": "Italy",
+        "collection": "Industrial Series"
+      },
+      "pricing": {
+        "retail": 52.00,
+        "wholesale": 38.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 420,
+        "status": "Medium",
+        "unit": "m²"
+      },
+      "tags": ["cement", "tile", "grey", "industrial", "modern"],
+      "variants": [
+        { "name": "Smooth", "sku": "CT-GREY-8002-S" },
+        { "name": "Textured", "sku": "CT-GREY-8002-T" }
+      ]
+    },
+    {
+      "id": "demo-cement-tile-003",
+      "sku": "CT-GREY-8003",
+      "name": "Heritage Grey Encaustic Tile",
+      "description": "Traditional encaustic cement tile featuring classic Moroccan-inspired patterns in elegant grey shades.",
+      "category": "tile",
+      "type": "cement_tile",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1604709177225-055f99402ea3?w=800&q=80",
+          "alt": "Moroccan pattern grey cement tile",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Grey",
+        "material_type": "Cement",
+        "finish": "Natural",
+        "thickness": "13mm",
+        "size": "200x200mm",
+        "slip_resistance": "R9",
+        "water_absorption": "< 4%",
+        "fire_rating": "A1",
+        "installation_method": "Adhesive",
+        "application": "Interior",
+        "factory": "Heritage Tiles Ltd",
+        "origin": "Morocco",
+        "collection": "Encaustic Heritage"
+      },
+      "pricing": {
+        "retail": 65.00,
+        "wholesale": 48.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 180,
+        "status": "Low",
+        "unit": "m²"
+      },
+      "tags": ["cement", "tile", "grey", "encaustic", "moroccan", "heritage"]
+    },
+    {
+      "id": "demo-cement-tile-004",
+      "sku": "CT-GREY-8004",
+      "name": "Minimalist Grey Cement Tile",
+      "description": "Clean, minimalist cement tile in uniform grey tone. Perfect for Scandinavian and minimalist design aesthetics.",
+      "category": "tile",
+      "type": "cement_tile",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=800&q=80",
+          "alt": "Minimalist grey cement tile",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Grey",
+        "material_type": "Cement",
+        "finish": "Matte",
+        "thickness": "11mm",
+        "size": "250x250mm",
+        "slip_resistance": "R10",
+        "water_absorption": "< 3%",
+        "fire_rating": "A1",
+        "installation_method": "Adhesive",
+        "application": "Interior",
+        "factory": "Nordic Tile Works",
+        "origin": "Sweden",
+        "collection": "Minimalist Collection"
+      },
+      "pricing": {
+        "retail": 48.00,
+        "wholesale": 35.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 620,
+        "status": "High",
+        "unit": "m²"
+      },
+      "tags": ["cement", "tile", "grey", "minimalist", "scandinavian"]
+    },
+    {
+      "id": "demo-cement-tile-005",
+      "sku": "CT-GREY-8005",
+      "name": "Terrazzo Grey Cement Tile",
+      "description": "Contemporary terrazzo-style cement tile with grey base and white aggregate chips. Adds character to any space.",
+      "category": "tile",
+      "type": "cement_tile",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=800&q=80",
+          "alt": "Terrazzo grey cement tile",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Grey",
+        "material_type": "Cement",
+        "finish": "Polished",
+        "thickness": "12mm",
+        "size": "300x300mm",
+        "slip_resistance": "R11",
+        "water_absorption": "< 2%",
+        "fire_rating": "A1",
+        "installation_method": "Adhesive",
+        "application": "Interior/Exterior",
+        "factory": "Terrazzo Masters",
+        "origin": "Spain",
+        "collection": "Modern Terrazzo"
+      },
+      "pricing": {
+        "retail": 58.00,
+        "wholesale": 42.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 340,
+        "status": "Medium",
+        "unit": "m²"
+      },
+      "tags": ["cement", "tile", "grey", "terrazzo", "polished"],
+      "variants": [
+        { "name": "Small Chips", "sku": "CT-GREY-8005-S" },
+        { "name": "Large Chips", "sku": "CT-GREY-8005-L" }
+      ]
+    }
+  ]
+}
+

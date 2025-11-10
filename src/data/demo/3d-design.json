@@ -1,0 +1,250 @@
+{
+  "design": {
+    "id": "demo-3d-design-001",
+    "title": "Modern Living Room Interior",
+    "description": "Contemporary living room design featuring natural materials, warm tones, and sustainable products from our catalog.",
+    "style": "Modern Scandinavian",
+    "room_type": "Living Room",
+    "image": {
+      "url": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=1200&q=80",
+      "alt": "Modern living room with natural materials"
+    },
+    "materials_used": [
+      {
+        "id": "demo-3d-mat-001",
+        "sku": "WD-OAK-FL-001",
+        "name": "Natural Oak Flooring",
+        "category": "wood",
+        "type": "flooring",
+        "location_in_image": "Floor",
+        "coverage_area": "35 m²",
+        "images": [
+          {
+            "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+            "alt": "Natural oak flooring",
+            "isPrimary": true
+          }
+        ],
+        "metadata": {
+          "color": "Natural Oak",
+          "material_type": "Wood",
+          "wood_species": "Oak",
+          "finish": "Oiled",
+          "thickness": "14mm",
+          "size": "1200x180mm",
+          "installation_method": "Click System",
+          "application": "Interior Flooring",
+          "factory": "Premium Wood Floors",
+          "origin": "Sweden",
+          "certifications": ["FSC", "PEFC"]
+        },
+        "pricing": {
+          "retail": 75.00,
+          "wholesale": 55.00,
+          "currency": "EUR"
+        },
+        "stock": {
+          "quantity": 850,
+          "status": "High",
+          "unit": "m²"
+        },
+        "tags": ["wood", "flooring", "oak", "natural", "sustainable"]
+      },
+      {
+        "id": "demo-3d-mat-002",
+        "sku": "TL-GREY-W-001",
+        "name": "Minimalist Grey Wall Tile",
+        "category": "tile",
+        "type": "wall_tile",
+        "location_in_image": "Feature Wall",
+        "coverage_area": "12 m²",
+        "images": [
+          {
+            "url": "https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=800&q=80",
+            "alt": "Grey wall tile",
+            "isPrimary": true
+          }
+        ],
+        "metadata": {
+          "color": "Grey",
+          "material_type": "Ceramic",
+          "finish": "Matte",
+          "thickness": "8mm",
+          "size": "300x600mm",
+          "installation_method": "Adhesive",
+          "application": "Interior Walls",
+          "factory": "Nordic Ceramics",
+          "origin": "Denmark"
+        },
+        "pricing": {
+          "retail": 42.00,
+          "wholesale": 30.00,
+          "currency": "EUR"
+        },
+        "stock": {
+          "quantity": 520,
+          "status": "High",
+          "unit": "m²"
+        },
+        "tags": ["tile", "wall", "grey", "minimalist", "ceramic"]
+      },
+      {
+        "id": "demo-3d-mat-003",
+        "sku": "HP-ECO-2024",
+        "name": "EcoHeat Pro Heat Pump",
+        "category": "hvac",
+        "type": "heat_pump",
+        "location_in_image": "Climate Control System",
+        "images": [
+          {
+            "url": "https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=800&q=80",
+            "alt": "Modern heat pump unit",
+            "isPrimary": true
+          }
+        ],
+        "metadata": {
+          "model": "EcoHeat Pro 12",
+          "heating_capacity": "12 kW",
+          "cooling_capacity": "10 kW",
+          "energy_efficiency": "A+++",
+          "noise_level": "35 dB(A)",
+          "refrigerant": "R32",
+          "power_supply": "230V/50Hz",
+          "factory": "EcoClimate Systems",
+          "origin": "Germany",
+          "warranty": "5 years",
+          "certifications": ["ErP", "CE"]
+        },
+        "pricing": {
+          "retail": 3200.00,
+          "wholesale": 2400.00,
+          "currency": "EUR"
+        },
+        "stock": {
+          "quantity": 45,
+          "status": "Medium",
+          "unit": "units"
+        },
+        "tags": ["hvac", "heat_pump", "energy_efficient", "climate_control"]
+      },
+      {
+        "id": "demo-3d-mat-004",
+        "sku": "CP-WOOL-BG-001",
+        "name": "Luxury Wool Carpet - Beige",
+        "category": "carpet",
+        "type": "carpet",
+        "location_in_image": "Area Rug",
+        "coverage_area": "8 m²",
+        "images": [
+          {
+            "url": "https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?w=800&q=80",
+            "alt": "Beige wool carpet",
+            "isPrimary": true
+          }
+        ],
+        "metadata": {
+          "color": "Beige",
+          "material_type": "Wool",
+          "pile_height": "12mm",
+          "pile_weight": "1200 g/m²",
+          "backing": "Jute",
+          "installation_method": "Loose Lay",
+          "application": "Interior",
+          "factory": "Wool Weavers Ltd",
+          "origin": "New Zealand",
+          "certifications": ["Woolmark"]
+        },
+        "pricing": {
+          "retail": 95.00,
+          "wholesale": 70.00,
+          "currency": "EUR"
+        },
+        "stock": {
+          "quantity": 280,
+          "status": "High",
+          "unit": "m²"
+        },
+        "tags": ["carpet", "wool", "beige", "luxury", "natural"]
+      },
+      {
+        "id": "demo-3d-mat-005",
+        "sku": "CT-LIN-GR-001",
+        "name": "Linen Curtains - Grey",
+        "category": "textile",
+        "type": "curtains",
+        "location_in_image": "Windows",
+        "images": [
+          {
+            "url": "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=800&q=80",
+            "alt": "Grey linen curtains",
+            "isPrimary": true
+          }
+        ],
+        "metadata": {
+          "color": "Grey",
+          "material_type": "Linen",
+          "fabric_weight": "280 g/m²",
+          "width": "140cm",
+          "length": "280cm",
+          "opacity": "Semi-Transparent",
+          "care": "Machine Washable 30°C",
+          "factory": "Nordic Textiles",
+          "origin": "Lithuania",
+          "certifications": ["OEKO-TEX Standard 100"]
+        },
+        "pricing": {
+          "retail": 85.00,
+          "wholesale": 62.00,
+          "currency": "EUR"
+        },
+        "stock": {
+          "quantity": 150,
+          "status": "Medium",
+          "unit": "pairs"
+        },
+        "tags": ["textile", "curtains", "linen", "grey", "natural"]
+      },
+      {
+        "id": "demo-3d-mat-006",
+        "sku": "WD-WALNUT-P-001",
+        "name": "Walnut Wood Paneling",
+        "category": "wood",
+        "type": "wall_paneling",
+        "location_in_image": "Accent Wall",
+        "coverage_area": "10 m²",
+        "images": [
+          {
+            "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+            "alt": "Walnut wood paneling",
+            "isPrimary": true
+          }
+        ],
+        "metadata": {
+          "color": "Dark Brown",
+          "material_type": "Wood",
+          "wood_species": "Walnut",
+          "finish": "Lacquered",
+          "thickness": "12mm",
+          "size": "2400x200mm",
+          "installation_method": "Mechanical Fixing",
+          "application": "Interior Walls",
+          "factory": "Premium Wood Works",
+          "origin": "USA",
+          "certifications": ["FSC"]
+        },
+        "pricing": {
+          "retail": 145.00,
+          "wholesale": 110.00,
+          "currency": "EUR"
+        },
+        "stock": {
+          "quantity": 95,
+          "status": "Medium",
+          "unit": "m²"
+        },
+        "tags": ["wood", "paneling", "walnut", "premium", "accent_wall"]
+      }
+    ]
+  }
+}
+

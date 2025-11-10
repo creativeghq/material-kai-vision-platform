@@ -34,6 +34,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
+import { DemoAgentResults } from './DemoAgentResults';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -101,6 +102,15 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'owner',
     available: true,
   },
+  {
+    id: 'demo',
+    name: 'Demo Agent',
+    description: 'Platform showcase demos',
+    icon: Package,
+    color: 'text-cyan-500',
+    requiredRole: 'admin',
+    available: true,
+  },
 ];
 
 // AI Models available (format: provider/model-name for Mastra)
@@ -118,6 +128,7 @@ interface Message {
   timestamp: Date;
   agentId?: string;
   model?: string;
+  demoData?: any; // Structured demo data for DemoAgent responses
 }
 
 interface AgentHubProps {
@@ -269,6 +280,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         throw new Error(error.message || 'Agent execution failed');
       }
 
+      // Parse demo data if this is from DemoAgent
+      let demoData = undefined;
+      if (selectedAgent === 'demo' && data.text) {
+        try {
+          // Try to extract JSON from the response
+          const jsonMatch = data.text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            demoData = JSON.parse(jsonMatch[0]);
+          }
+        } catch (e) {
+          // If parsing fails, demoData remains undefined
+          console.log('No structured demo data found in response');
+        }
+      }
+
       // Add assistant response to messages
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-response`,
@@ -277,6 +303,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         timestamp: new Date(),
         agentId: data.agentId || selectedAgent,
         model: data.model || selectedModel,
+        demoData,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -625,13 +652,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   </div>
                 )}
                 <div
-                  className={`max-w-[70%] rounded-lg p-4 ${
+                  className={`${message.demoData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  {message.demoData ? (
+                    <div className="space-y-4">
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <DemoAgentResults result={message.demoData} />
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  )}
                   <p className="text-xs opacity-70 mt-2">
                     {message.timestamp.toLocaleTimeString()}
                   </p>

@@ -1,0 +1,223 @@
+{
+  "results": [
+    {
+      "id": "demo-wood-green-001",
+      "sku": "WD-EGGER-GR-001",
+      "name": "Egger Green Oak Veneer",
+      "description": "Premium green-stained oak veneer from Egger. Sustainable forestry certified wood with rich green finish.",
+      "category": "wood",
+      "type": "veneer",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+          "alt": "Green oak veneer texture",
+          "isPrimary": true
+        },
+        {
+          "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+          "alt": "Close-up of green wood grain"
+        }
+      ],
+      "metadata": {
+        "color": "Green",
+        "material_type": "Wood",
+        "wood_species": "Oak",
+        "finish": "Stained & Lacquered",
+        "thickness": "0.6mm",
+        "size": "2800x2070mm",
+        "grain_pattern": "Natural",
+        "installation_method": "Adhesive",
+        "application": "Interior Furniture",
+        "factory": "Egger",
+        "origin": "Austria",
+        "collection": "ColorCore Collection",
+        "certifications": ["FSC", "PEFC"],
+        "sustainability_rating": "A+"
+      },
+      "pricing": {
+        "retail": 85.00,
+        "wholesale": 62.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 245,
+        "status": "High",
+        "unit": "sheets"
+      },
+      "tags": ["wood", "egger", "green", "oak", "veneer", "sustainable"]
+    },
+    {
+      "id": "demo-wood-green-002",
+      "sku": "WD-EGGER-GR-002",
+      "name": "Egger Emerald Pine Laminate",
+      "description": "High-pressure laminate with emerald green pine wood pattern. Durable and moisture-resistant for kitchen and bathroom applications.",
+      "category": "wood",
+      "type": "laminate",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+          "alt": "Emerald green pine laminate",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Green",
+        "material_type": "Wood Laminate",
+        "wood_species": "Pine",
+        "finish": "Matt",
+        "thickness": "0.8mm",
+        "size": "2800x2070mm",
+        "grain_pattern": "Linear",
+        "installation_method": "Adhesive",
+        "application": "Interior Furniture & Cabinetry",
+        "factory": "Egger",
+        "origin": "Germany",
+        "collection": "Premium Laminate",
+        "water_resistance": "High",
+        "scratch_resistance": "Class 4"
+      },
+      "pricing": {
+        "retail": 72.00,
+        "wholesale": 54.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 380,
+        "status": "High",
+        "unit": "sheets"
+      },
+      "tags": ["wood", "egger", "green", "pine", "laminate", "durable"]
+    },
+    {
+      "id": "demo-wood-green-003",
+      "sku": "WD-EGGER-GR-003",
+      "name": "Egger Forest Green Ash",
+      "description": "Solid ash wood panels with deep forest green stain. Perfect for statement walls and premium furniture pieces.",
+      "category": "wood",
+      "type": "solid_wood",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+          "alt": "Forest green ash wood panel",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Green",
+        "material_type": "Solid Wood",
+        "wood_species": "Ash",
+        "finish": "Oiled",
+        "thickness": "18mm",
+        "size": "2440x1220mm",
+        "grain_pattern": "Straight",
+        "installation_method": "Mechanical Fixing",
+        "application": "Interior Walls & Furniture",
+        "factory": "Egger",
+        "origin": "Romania",
+        "collection": "Solid Wood Premium",
+        "certifications": ["FSC"],
+        "moisture_content": "8-10%"
+      },
+      "pricing": {
+        "retail": 125.00,
+        "wholesale": 95.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 120,
+        "status": "Medium",
+        "unit": "panels"
+      },
+      "tags": ["wood", "egger", "green", "ash", "solid", "premium"]
+    },
+    {
+      "id": "demo-wood-green-004",
+      "sku": "WD-EGGER-GR-004",
+      "name": "Egger Sage Green Birch Plywood",
+      "description": "Multi-layer birch plywood with sage green finish. Excellent for modern furniture and architectural applications.",
+      "category": "wood",
+      "type": "plywood",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+          "alt": "Sage green birch plywood",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Green",
+        "material_type": "Plywood",
+        "wood_species": "Birch",
+        "finish": "Lacquered",
+        "thickness": "15mm",
+        "size": "2500x1250mm",
+        "grain_pattern": "Cross-grain",
+        "installation_method": "Screwed/Adhesive",
+        "application": "Furniture & Construction",
+        "factory": "Egger",
+        "origin": "Finland",
+        "collection": "Birch Plywood Series",
+        "layers": "11-ply",
+        "certifications": ["CARB P2", "FSC"]
+      },
+      "pricing": {
+        "retail": 98.00,
+        "wholesale": 72.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 210,
+        "status": "High",
+        "unit": "sheets"
+      },
+      "tags": ["wood", "egger", "green", "birch", "plywood", "sustainable"]
+    },
+    {
+      "id": "demo-wood-green-005",
+      "sku": "WD-EGGER-GR-005",
+      "name": "Egger Mint Green MDF",
+      "description": "Medium-density fiberboard with mint green coating. Ideal for painted furniture and interior design projects.",
+      "category": "wood",
+      "type": "mdf",
+      "status": "Active",
+      "images": [
+        {
+          "url": "https://images.unsplash.com/photo-1615876234886-fd9a39fda97f?w=800&q=80",
+          "alt": "Mint green MDF board",
+          "isPrimary": true
+        }
+      ],
+      "metadata": {
+        "color": "Green",
+        "material_type": "MDF",
+        "finish": "Painted",
+        "thickness": "16mm",
+        "size": "2800x2070mm",
+        "density": "720 kg/m³",
+        "installation_method": "Screwed/Adhesive",
+        "application": "Interior Furniture",
+        "factory": "Egger",
+        "origin": "UK",
+        "collection": "ColorBoard MDF",
+        "formaldehyde_class": "E1",
+        "fire_rating": "B-s2,d0"
+      },
+      "pricing": {
+        "retail": 55.00,
+        "wholesale": 40.00,
+        "currency": "EUR"
+      },
+      "stock": {
+        "quantity": 450,
+        "status": "High",
+        "unit": "sheets"
+      },
+      "tags": ["wood", "egger", "green", "mdf", "painted", "versatile"]
+    }
+  ]
+}
+
