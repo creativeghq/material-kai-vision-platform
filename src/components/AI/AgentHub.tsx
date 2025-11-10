@@ -284,14 +284,92 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       let demoData = undefined;
       if (selectedAgent === 'demo' && data.text) {
         try {
-          // Try to extract JSON from the response
-          const jsonMatch = data.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            demoData = JSON.parse(jsonMatch[0]);
+          // Detect which demo command was used based on the user input
+          const query = userInput.toLowerCase();
+
+          if (query.includes('cement') || query.includes('tile') || query.includes('grey')) {
+            // Load cement tiles demo data
+            const cementTilesData = await import('@/data/demo/cement-tiles.json');
+            demoData = {
+              type: 'product_list',
+              data: cementTilesData.default,
+              message: 'Showing 5 cement-based tiles in grey color',
+            };
+          } else if (query.includes('green') && query.includes('egger')) {
+            // Load green wood demo data
+            const greenWoodData = await import('@/data/demo/green-wood.json');
+            demoData = {
+              type: 'product_list',
+              data: greenWoodData.default,
+              message: 'Showing 5 Egger wood materials in green',
+            };
+          } else if (query.includes('heatpump') || query.includes('heat pump')) {
+            // Create heat pump table data
+            demoData = {
+              type: 'heat_pump_table',
+              data: {
+                models: [
+                  {
+                    model: 'EcoHeat Pro 8kW',
+                    heating_capacity: '8 kW',
+                    cooling_capacity: '6 kW',
+                    energy_efficiency: 'A++',
+                    noise_level: '42 dB',
+                    price_retail: 3499.00,
+                    price_wholesale: 2799.00,
+                    stock: 45,
+                  },
+                  {
+                    model: 'EcoHeat Pro 12kW',
+                    heating_capacity: '12 kW',
+                    cooling_capacity: '10 kW',
+                    energy_efficiency: 'A+++',
+                    noise_level: '45 dB',
+                    price_retail: 4299.00,
+                    price_wholesale: 3439.00,
+                    stock: 32,
+                  },
+                  {
+                    model: 'EcoHeat Pro 16kW',
+                    heating_capacity: '16 kW',
+                    cooling_capacity: '14 kW',
+                    energy_efficiency: 'A+++',
+                    noise_level: '48 dB',
+                    price_retail: 5199.00,
+                    price_wholesale: 4159.00,
+                    stock: 18,
+                  },
+                  {
+                    model: 'EcoHeat Pro 20kW',
+                    heating_capacity: '20 kW',
+                    cooling_capacity: '18 kW',
+                    energy_efficiency: 'A++',
+                    noise_level: '51 dB',
+                    price_retail: 6299.00,
+                    price_wholesale: 5039.00,
+                    stock: 12,
+                  },
+                ],
+                specifications: {
+                  refrigerant: 'R32',
+                  power_supply: '230V / 50Hz',
+                  warranty: '5 years',
+                  certifications: ['CE', 'ErP', 'EHPA'],
+                },
+              },
+              message: 'Heat pump comparison table',
+            };
+          } else if (query.includes('design') && query.includes('interior')) {
+            // Load 3D design demo data
+            const designData = await import('@/data/demo/3d-design.json');
+            demoData = {
+              type: '3d_design',
+              data: designData.default,
+              message: 'Modern living room 3D design',
+            };
           }
         } catch (e) {
-          // If parsing fails, demoData remains undefined
-          console.log('No structured demo data found in response');
+          console.error('Error loading demo data:', e);
         }
       }
 

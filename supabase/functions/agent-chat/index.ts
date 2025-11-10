@@ -332,6 +332,108 @@ Your role is to support system administration, platform management, and technica
 });
 
 /**
+ * Demo Tool - Returns demo data based on query
+ */
+const demoTool = createTool({
+  id: 'demo-showcase',
+  description: 'Return demo data for platform showcase',
+  inputSchema: z.object({
+    query: z.string().describe('The demo query or command'),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    type: z.string().optional(),
+    data: z.any().optional(),
+    message: z.string(),
+  }),
+  execute: async ({ context }) => {
+    const query = context.query.toLowerCase();
+
+    // Detect demo command and return appropriate response
+    if (query.includes('cement') || query.includes('tile') || query.includes('grey')) {
+      return {
+        success: true,
+        type: 'demo_command',
+        data: { command: 'cement_tiles' },
+        message: 'Showing 5 cement-based tiles in grey color. These are realistic demo products showcasing the platform\'s product display capabilities.',
+      };
+    }
+
+    if (query.includes('green') && query.includes('egger')) {
+      return {
+        success: true,
+        type: 'demo_command',
+        data: { command: 'green_wood' },
+        message: 'Showing 5 Egger wood materials in green color. These demonstrate various wood types including veneer, laminate, solid wood, plywood, and MDF.',
+      };
+    }
+
+    if (query.includes('heatpump') || query.includes('heat pump')) {
+      return {
+        success: true,
+        type: 'demo_command',
+        data: { command: 'heat_pumps' },
+        message: 'Showing heat pump comparison table with 4 EcoHeat models. This demonstrates the platform\'s ability to display technical specifications in table format.',
+      };
+    }
+
+    if (query.includes('design') && query.includes('interior')) {
+      return {
+        success: true,
+        type: 'demo_command',
+        data: { command: '3d_design' },
+        message: 'Showing a modern living room 3D design with 6 materials. This showcases how the platform can display complete interior designs with material specifications.',
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Available demo commands:\n1. "Return for me Cement Based tiles color grey"\n2. "I want Green Egger"\n3. "I want heatpumps"\n4. "Design the interior of a home"',
+    };
+  },
+});
+
+/**
+ * Demo Agent - Platform showcase with realistic demo data (ADMIN ONLY)
+ */
+const demoAgent = new Agent({
+  name: 'demo-agent',
+  description: 'Showcase platform capabilities with realistic demo data',
+  instructions: `You are the Demo Agent for the Material Kai Vision Platform.
+
+Your role is to showcase platform capabilities using pre-configured realistic demo data.
+
+**Available Demo Commands:**
+1. "Return for me Cement Based tiles color grey" → Returns 5 cement tile products
+2. "I want Green Egger" → Returns 5 Egger wood materials in green
+3. "I want heatpumps" → Returns heat pump comparison table
+4. "Design the interior of a home" → Returns 3D design with materials
+
+**How to Use:**
+- Use the demo-showcase tool to detect and respond to demo commands
+- The tool will return a command identifier that the frontend will use to display the appropriate demo data
+- Always explain what the user is seeing and suggest other demo commands
+
+**Response Format:**
+When responding to a demo command:
+1. Use the demo-showcase tool to get the command identifier
+2. Explain what demo data is being shown
+3. Highlight key features being demonstrated
+4. Suggest other demo commands the user can try
+
+**Guidelines:**
+- Be enthusiastic about showcasing platform capabilities
+- Provide context about what each demo represents
+- Help users understand the platform's features through demos
+- Guide users to try different demo scenarios`,
+
+  model: 'anthropic/claude-sonnet-4-20250514',
+  tools: {
+    demoShowcase: demoTool,
+  },
+});
+
+/**
  * Routing Agent - Routes queries to appropriate specialized agent with multimodal support
  */
 const routingAgent = new Agent({
@@ -348,6 +450,7 @@ Your role is to analyze user queries and route them to the appropriate specializ
 4. **Business Agent** - Business strategy and market intelligence (ADMIN ONLY)
 5. **Product Agent** - Product management and UX optimization (ADMIN ONLY)
 6. **Admin Agent** - System administration and platform management (OWNER ONLY)
+7. **Demo Agent** - Platform showcase with realistic demo data (ADMIN ONLY)
 
 **Multimodal Routing Strategy:**
 - **TEXT-ONLY queries** → Route to Search Agent with semantic/hybrid search
@@ -388,6 +491,7 @@ Your role is to analyze user queries and route them to the appropriate specializ
     businessAgent,
     productAgent,
     adminAgent,
+    demoAgent,
   },
 });
 
@@ -530,11 +634,32 @@ serve(async (req) => {
     runtimeContext.set('inputType', inputType);
     runtimeContext.set('images', images);
 
-    // Try to use Mastra routing agent, fallback to simple response
+    // Select the appropriate agent based on agentId
     let responseText = '';
+    let selectedAgentInstance = routingAgent;
+
+    // Map agentId to agent instance
+    const agentMap: Record<string, typeof routingAgent> = {
+      search: searchAgent,
+      research: researchAgent,
+      analytics: analyticsAgent,
+      business: businessAgent,
+      product: productAgent,
+      admin: adminAgent,
+      demo: demoAgent,
+    };
+
+    // Use specific agent if requested, otherwise use routing agent
+    if (agentId && agentMap[agentId]) {
+      selectedAgentInstance = agentMap[agentId];
+      console.log(`Using specific agent: ${agentId}`);
+    } else {
+      console.log('Using routing agent');
+    }
+
     try {
-      console.log('Calling routingAgent.generate with message:', userMessage);
-      const result = await routingAgent.generate(userMessage, {
+      console.log(`Calling ${agentId || 'routing'} agent with message:`, userMessage);
+      const result = await selectedAgentInstance.generate(userMessage, {
         runtimeContext,
       });
       console.log('Mastra agent result:', result);
