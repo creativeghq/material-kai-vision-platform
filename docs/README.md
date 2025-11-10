@@ -40,6 +40,18 @@
 - 7 API endpoints
 - Database schema
 
+**[data-import-system.md](data-import-system.md)** - Data import system ✨ NEW
+- XML import with AI-powered field mapping
+- Dynamic field mapping (Claude Sonnet 4.5)
+- Batch processing (10 products at a time)
+- Concurrent image downloads (5 parallel)
+- Cron-based scheduling for recurring imports
+- Manual re-run functionality
+- Checkpoint recovery
+- Real-time progress tracking
+- 4 API endpoints
+- Phase 1 & 2 complete
+
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
 - 12 AI models overview
 - Claude Sonnet 4.5 & Haiku 4.5
@@ -67,7 +79,7 @@
 - API endpoint
 
 **[api-endpoints.md](api-endpoints.md)** - API reference
-- 115 endpoints across 15 categories
+- 119 endpoints across 16 categories
 - RAG Routes (27)
 - Admin Routes (18)
 - Search Routes (6)
@@ -82,6 +94,7 @@
 - Monitoring Routes (3)
 - AI Metrics Routes (2)
 - Duplicate Detection Routes (7)
+- Data Import Routes (4) ✨ NEW
 
 **[database-schema-complete.md](database-schema-complete.md)** - Database schema
 - Core tables (products, chunks, images, document_entities)

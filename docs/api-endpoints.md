@@ -1,12 +1,13 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-09
-**Total Endpoints:** 115 (Consolidated from 113 + Duplicate Detection)
-**Status:** ✅ Production-Ready - API Consolidation Complete + PDF Extraction Consolidation + Duplicate Detection
+**Last Updated:** 2025-11-10
+**Total Endpoints:** 119 (115 + Data Import)
+**Status:** ✅ Production-Ready - API Consolidation Complete + PDF Extraction Consolidation + Duplicate Detection + Data Import
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (API Consolidation + PDF Extraction Consolidation + Duplicate Detection):**
+**Recent Updates (API Consolidation + PDF Extraction Consolidation + Duplicate Detection + Data Import):**
+- ✅ **DATA IMPORT:** 4 new endpoints for XML import and web scraping with dynamic field mapping
 - ✅ **DUPLICATE DETECTION:** 7 new endpoints for duplicate detection and product merging (factory-based only)
 - ✅ **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
 - ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
@@ -19,12 +20,13 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - ✅ **REMOVED:** All `/api/pdf/extract/*` endpoints (3 total) - replaced by `/api/rag/documents/upload`
 - ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
 
-**Total API Endpoints:** 115 endpoints across 15 categories
+**Total API Endpoints:** 119 endpoints across 16 categories
 - ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
 - ✅ **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
 - ✅ **PDF EXTRACTION:** Unified through RAG pipeline with optional quick mode
 - ✅ **DUPLICATE DETECTION:** Factory-based duplicate detection and product merging (ready for integration)
+- ✅ **DATA IMPORT:** XML import with AI-powered field mapping, batch processing, and scheduling
 
 ---
 
@@ -65,6 +67,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 11. [Monitoring Routes](#13-monitoring-routes) - System monitoring
 12. [AI Metrics Routes](#14-ai-metrics-routes) - AI performance metrics
 13. [Duplicate Detection Routes](#15-duplicate-detection-routes) - Duplicate detection and product merging
+14. [Data Import Routes](#16-data-import-routes) - XML import, web scraping, batch processing ✨ NEW
 
 ---
 
@@ -2555,7 +2558,252 @@ All endpoints return JSON:
 
 ---
 
-**Total Endpoints**: 115
-**Last Updated**: November 9, 2025
+## 16. Data Import Routes
+
+**Category:** Data Import (XML, Web Scraping)
+**Total Endpoints:** 4
+**Status:** ✅ Phase 1 & 2 Complete (XML Import with Dynamic Mapping & Backend Processing)
+
+### 16.1 POST /api/import/process
+
+**Purpose:** Start processing an import job (called by Edge Function)
+
+**Request:**
+```json
+{
+  "job_id": "uuid",
+  "workspace_id": "uuid"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Import job processing started",
+  "job_id": "uuid"
+}
+```
+
+**Features:**
+- Background task processing
+- Batch processing (10 products at a time)
+- Concurrent image downloads (5 parallel)
+- Checkpoint recovery
+- Real-time progress updates
+
+**Database Operations:**
+- Updates `data_import_jobs` status to 'processing'
+- Creates records in `data_import_history`
+- Inserts products into `products` table
+- Links images via `document_images` table
+- Creates chunks in `chunks` table
+
+---
+
+### 16.2 GET /api/import/jobs/{job_id}
+
+**Purpose:** Get import job status and progress
+
+**Path Parameters:**
+- `job_id` (required): Import job ID
+
+**Response:**
+```json
+{
+  "job_id": "uuid",
+  "status": "processing",
+  "import_type": "xml",
+  "source_name": "Supplier Catalog",
+  "total_products": 100,
+  "processed_products": 45,
+  "failed_products": 2,
+  "progress_percentage": 45,
+  "current_stage": "downloading_images",
+  "started_at": "2025-11-10T10:00:00Z",
+  "completed_at": null,
+  "error_message": null,
+  "estimated_time_remaining": 120
+}
+```
+
+**Status Values:**
+- `pending` - Job created, waiting to start
+- `processing` - Job is being processed
+- `completed` - Job completed successfully
+- `failed` - Job failed with errors
+
+**Database Operations:**
+- Reads from `data_import_jobs` table
+- Calculates progress percentage
+- Estimates time remaining based on processing rate
+
+---
+
+### 16.3 GET /api/import/history
+
+**Purpose:** Get import history for a workspace with pagination and filters
+
+**Query Parameters:**
+- `workspace_id` (required): Workspace ID
+- `page` (optional, default: 1): Page number
+- `page_size` (optional, default: 20): Items per page
+- `status` (optional): Filter by status (pending, processing, completed, failed)
+- `import_type` (optional): Filter by import type (xml, web_scraping)
+
+**Response:**
+```json
+{
+  "imports": [
+    {
+      "job_id": "uuid",
+      "import_type": "xml",
+      "source_name": "Supplier Catalog",
+      "status": "completed",
+      "total_products": 100,
+      "processed_products": 98,
+      "failed_products": 2,
+      "created_at": "2025-11-10T10:00:00Z",
+      "completed_at": "2025-11-10T10:15:00Z",
+      "is_scheduled": false,
+      "next_run_at": null
+    }
+  ],
+  "total_count": 50,
+  "page": 1,
+  "page_size": 20
+}
+```
+
+**Database Operations:**
+- Queries `data_import_jobs` table with filters
+- Applies pagination
+- Orders by `created_at DESC`
+
+---
+
+### 16.4 GET /api/import/health
+
+**Purpose:** Health check for data import API
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "data-import-api",
+  "version": "1.0.0",
+  "features": {
+    "xml_import": true,
+    "web_scraping": false,
+    "batch_processing": true,
+    "concurrent_image_downloads": true,
+    "checkpoint_recovery": true,
+    "real_time_progress": true
+  }
+}
+```
+
+**Features Status:**
+- ✅ `xml_import` - XML import with dynamic field mapping
+- ⏳ `web_scraping` - Firecrawl integration (Phase 4)
+- ✅ `batch_processing` - Process 10 products at a time
+- ✅ `concurrent_image_downloads` - Download 5 images in parallel
+- ✅ `checkpoint_recovery` - Resume from last successful batch
+- ✅ `real_time_progress` - Real-time progress updates in database
+
+---
+
+## Edge Function Endpoints
+
+### POST /xml-import-orchestrator
+
+**Purpose:** Parse XML, detect fields, suggest mappings, create import jobs
+
+**Hosted:** Supabase Edge Function (Deno)
+
+**Request:**
+```json
+{
+  "workspace_id": "uuid",
+  "category": "materials",
+  "xml_content": "base64_encoded_xml",
+  "preview_only": false,
+  "field_mappings": {
+    "name": "name",
+    "factory": "factory_name",
+    "category": "material_category"
+  },
+  "mapping_template_id": "uuid",
+  "parent_job_id": "uuid"
+}
+```
+
+**Response (Preview Mode):**
+```json
+{
+  "success": true,
+  "detected_fields": [
+    {
+      "xml_field": "ProductName",
+      "suggested_mapping": "name",
+      "confidence": 0.95,
+      "sample_values": ["Product A", "Product B"]
+    }
+  ],
+  "total_products": 10
+}
+```
+
+**Response (Import Mode):**
+```json
+{
+  "success": true,
+  "job_id": "uuid",
+  "total_products": 10
+}
+```
+
+**Features:**
+- XML parsing with field detection
+- AI-powered field mapping (Claude Sonnet 4.5)
+- Fallback rule-based mapping (multi-language support)
+- Preview mode for field detection only
+- Stores products in job metadata for Python API
+- Calls Python API to start processing
+
+**Database Operations:**
+- Creates record in `data_import_jobs` table
+- Stores original XML content for re-runs
+- Stores field mappings for future use
+- Links to mapping template if provided
+
+---
+
+### POST /scheduled-import-runner
+
+**Purpose:** Run scheduled imports via Supabase Cron
+
+**Hosted:** Supabase Edge Function (Deno)
+
+**Trigger:** Supabase Cron (every 15 minutes)
+
+**Features:**
+- Fetches XML from source URLs
+- Creates new import jobs with same field mappings
+- Updates `next_run_at` timestamps
+- Links to parent job via `parent_job_id`
+
+**Database Operations:**
+- Queries `data_import_jobs` for scheduled imports
+- Creates new job records for each scheduled import
+- Updates `last_run_at` and `next_run_at` timestamps
+
+---
+
+**Total Endpoints**: 119 (115 + 4 Data Import)
+**Last Updated**: November 10, 2025
+
+**See Also:**
+- [Data Import System Documentation](data-import-system.md) - Complete guide to XML import and web scraping
 **API Version**: v1
 

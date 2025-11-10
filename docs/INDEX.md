@@ -40,6 +40,18 @@ Complete documentation for Material Kai Vision Platform.
 - Merge history tracking
 - API endpoints (7 total)
 
+**[data-import-system.md](data-import-system.md)** - Data import system ✨ NEW
+- XML import with AI-powered field mapping
+- Dynamic field mapping (Claude Sonnet 4.5)
+- Batch processing (10 products at a time)
+- Concurrent image downloads (5 parallel)
+- Cron-based scheduling for recurring imports
+- Manual re-run functionality
+- Checkpoint recovery
+- Real-time progress tracking
+- API endpoints (4 total)
+- Phase 1 & 2 complete
+
 **[search-strategies.md](search-strategies.md)** - Complete search system guide ✅
 - 6 search strategies (100% implemented)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image
