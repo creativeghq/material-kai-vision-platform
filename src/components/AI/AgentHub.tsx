@@ -66,7 +66,7 @@ const AGENTS: AgentDefinition[] = [
     icon: Bot,
     color: 'text-purple-500',
     requiredRole: 'admin',
-    available: false, // Not yet implemented
+    available: true,
   },
   {
     id: 'analytics',
@@ -75,7 +75,7 @@ const AGENTS: AgentDefinition[] = [
     icon: BarChart3,
     color: 'text-green-500',
     requiredRole: 'admin',
-    available: false,
+    available: true,
   },
   {
     id: 'business',
@@ -84,7 +84,7 @@ const AGENTS: AgentDefinition[] = [
     icon: Briefcase,
     color: 'text-orange-500',
     requiredRole: 'admin',
-    available: false,
+    available: true,
   },
   {
     id: 'product',
@@ -93,7 +93,7 @@ const AGENTS: AgentDefinition[] = [
     icon: Package,
     color: 'text-pink-500',
     requiredRole: 'admin',
-    available: false,
+    available: true,
   },
   {
     id: 'admin',
@@ -102,7 +102,7 @@ const AGENTS: AgentDefinition[] = [
     icon: Settings,
     color: 'text-red-500',
     requiredRole: 'owner',
-    available: false,
+    available: true,
   },
 ];
 

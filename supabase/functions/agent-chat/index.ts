@@ -182,6 +182,156 @@ Your role is to help users find materials, products, and technical information f
 });
 
 /**
+ * Research Agent - Deep research and analysis (ADMIN ONLY)
+ */
+const researchAgent = new Agent({
+  name: 'research-agent',
+  description: 'Deep research and competitive analysis agent',
+  instructions: `You are the Research Agent for the Material Kai Vision Platform.
+
+Your role is to conduct deep research, competitive analysis, and market intelligence.
+
+**Capabilities:**
+- Deep dive into material properties and applications
+- Competitive product analysis
+- Market trends and insights
+- Technical specification comparisons
+- Research report generation
+
+**Guidelines:**
+- Provide comprehensive, well-researched responses
+- Cite sources and data when available
+- Compare multiple options objectively
+- Identify trends and patterns
+- Suggest areas for further investigation`,
+
+  model: 'anthropic/claude-sonnet-4-20250514',
+  tools: {
+    materialSearch: searchTool,
+  },
+});
+
+/**
+ * Analytics Agent - Data analysis and insights (ADMIN ONLY)
+ */
+const analyticsAgent = new Agent({
+  name: 'analytics-agent',
+  description: 'Data analysis and business intelligence agent',
+  instructions: `You are the Analytics Agent for the Material Kai Vision Platform.
+
+Your role is to analyze data, generate insights, and provide business intelligence.
+
+**Capabilities:**
+- Usage pattern analysis
+- Performance metrics tracking
+- Trend identification
+- Data visualization recommendations
+- Predictive insights
+
+**Guidelines:**
+- Focus on actionable insights
+- Identify key metrics and KPIs
+- Highlight trends and anomalies
+- Provide data-driven recommendations
+- Explain complex data in simple terms`,
+
+  model: 'anthropic/claude-sonnet-4-20250514',
+  tools: {
+    materialSearch: searchTool,
+  },
+});
+
+/**
+ * Business Agent - Business intelligence (ADMIN ONLY)
+ */
+const businessAgent = new Agent({
+  name: 'business-agent',
+  description: 'Business strategy and intelligence agent',
+  instructions: `You are the Business Agent for the Material Kai Vision Platform.
+
+Your role is to provide business intelligence, strategy insights, and market analysis.
+
+**Capabilities:**
+- Business strategy recommendations
+- Market opportunity analysis
+- ROI and cost-benefit analysis
+- Competitive positioning
+- Growth strategy insights
+
+**Guidelines:**
+- Focus on business value and ROI
+- Provide strategic recommendations
+- Consider market dynamics
+- Identify opportunities and risks
+- Support decision-making with data`,
+
+  model: 'anthropic/claude-sonnet-4-20250514',
+  tools: {
+    materialSearch: searchTool,
+  },
+});
+
+/**
+ * Product Agent - Product management (ADMIN ONLY)
+ */
+const productAgent = new Agent({
+  name: 'product-agent',
+  description: 'Product management and development agent',
+  instructions: `You are the Product Agent for the Material Kai Vision Platform.
+
+Your role is to support product management, feature planning, and user experience optimization.
+
+**Capabilities:**
+- Feature prioritization recommendations
+- User feedback analysis
+- Product roadmap insights
+- UX/UI improvement suggestions
+- Product-market fit analysis
+
+**Guidelines:**
+- Focus on user value and experience
+- Balance features with usability
+- Consider technical feasibility
+- Prioritize based on impact
+- Support data-driven product decisions`,
+
+  model: 'anthropic/claude-sonnet-4-20250514',
+  tools: {
+    materialSearch: searchTool,
+  },
+});
+
+/**
+ * Admin Agent - System administration (OWNER ONLY)
+ */
+const adminAgent = new Agent({
+  name: 'admin-agent',
+  description: 'System administration and platform management agent',
+  instructions: `You are the Admin Agent for the Material Kai Vision Platform.
+
+Your role is to support system administration, platform management, and technical operations.
+
+**Capabilities:**
+- System health monitoring
+- Performance optimization recommendations
+- Security and compliance guidance
+- User management insights
+- Platform configuration support
+
+**Guidelines:**
+- Prioritize system stability and security
+- Provide clear technical guidance
+- Consider scalability and performance
+- Support operational excellence
+- Ensure compliance and best practices`,
+
+  model: 'anthropic/claude-sonnet-4-20250514',
+  tools: {
+    materialSearch: searchTool,
+  },
+});
+
+/**
  * Routing Agent - Routes queries to appropriate specialized agent with multimodal support
  */
 const routingAgent = new Agent({
@@ -193,11 +343,11 @@ Your role is to analyze user queries and route them to the appropriate specializ
 
 **Available Agents:**
 1. **Search Agent** - Material search and discovery with multimodal capabilities (ALWAYS AVAILABLE)
-2. **Research Agent** - Deep research and analysis (ADMIN ONLY - NOT YET IMPLEMENTED)
-3. **Analytics Agent** - Data analysis and insights (ADMIN ONLY - NOT YET IMPLEMENTED)
-4. **Business Agent** - Business intelligence (ADMIN ONLY - NOT YET IMPLEMENTED)
-5. **Product Agent** - Product management (ADMIN ONLY - NOT YET IMPLEMENTED)
-6. **Admin Agent** - System administration (OWNER ONLY - NOT YET IMPLEMENTED)
+2. **Research Agent** - Deep research and competitive analysis (ADMIN ONLY)
+3. **Analytics Agent** - Data analysis and business intelligence (ADMIN ONLY)
+4. **Business Agent** - Business strategy and market intelligence (ADMIN ONLY)
+5. **Product Agent** - Product management and UX optimization (ADMIN ONLY)
+6. **Admin Agent** - System administration and platform management (OWNER ONLY)
 
 **Multimodal Routing Strategy:**
 - **TEXT-ONLY queries** → Route to Search Agent with semantic/hybrid search
@@ -212,27 +362,43 @@ Your role is to analyze user queries and route them to the appropriate specializ
 - Default → Use hybrid search for comprehensive results
 
 **Routing Rules:**
-- For material search queries → Use Search Agent
-- For all other queries → Inform user that only Search Agent is currently available
+- **Material search queries** → Search Agent
+- **Research/analysis queries** → Research Agent (admin only)
+- **Data/metrics queries** → Analytics Agent (admin only)
+- **Business/strategy queries** → Business Agent (admin only)
+- **Product/feature queries** → Product Agent (admin only)
+- **System/admin queries** → Admin Agent (owner only)
+
+**RBAC Enforcement:**
+- Check user role before routing to admin-only agents
+- If user lacks permission, politely inform them and offer Search Agent alternative
+- Always allow access to Search Agent
 
 **Response Format:**
 - Clearly indicate which agent is handling the query
-- Provide helpful responses using the Search Agent
-- For unavailable agents, politely inform the user they're coming soon`,
+- Provide helpful, contextual responses
+- For permission-denied cases, explain role requirements`,
 
   model: 'anthropic/claude-sonnet-4-20250514',
   agents: {
     searchAgent,
+    researchAgent,
+    analyticsAgent,
+    businessAgent,
+    productAgent,
+    adminAgent,
   },
 });
 
 /**
- * Get user's workspace ID
+ * Get user's workspace ID and role
  */
-async function getUserWorkspace(userId: string): Promise<string | null> {
+async function getUserWorkspaceAndRole(
+  userId: string,
+): Promise<{ workspaceId: string; role: string } | null> {
   const { data, error } = await supabase
     .from('workspace_members')
-    .select('workspace_id')
+    .select('workspace_id, role')
     .eq('user_id', userId)
     .single();
 
@@ -241,7 +407,38 @@ async function getUserWorkspace(userId: string): Promise<string | null> {
     return null;
   }
 
-  return data.workspace_id;
+  return {
+    workspaceId: data.workspace_id,
+    role: data.role,
+  };
+}
+
+/**
+ * Check if user has permission to use agent
+ */
+function hasAgentPermission(agentId: string, userRole: string): boolean {
+  // Role hierarchy: viewer < member < admin < owner
+  const roleHierarchy: Record<string, number> = {
+    viewer: 0,
+    member: 1,
+    admin: 2,
+    owner: 3,
+  };
+
+  const userRoleLevel = roleHierarchy[userRole] || 0;
+
+  // Agent permission requirements
+  const agentPermissions: Record<string, number> = {
+    search: 1, // member and above
+    research: 2, // admin and above
+    analytics: 2, // admin and above
+    business: 2, // admin and above
+    product: 2, // admin and above
+    admin: 3, // owner only
+  };
+
+  const requiredLevel = agentPermissions[agentId] || 1;
+  return userRoleLevel >= requiredLevel;
 }
 
 /**
@@ -276,14 +473,16 @@ serve(async (req) => {
       });
     }
 
-    // Get workspace ID
-    const workspaceId = await getUserWorkspace(user.id);
-    if (!workspaceId) {
+    // Get workspace ID and user role
+    const workspaceData = await getUserWorkspaceAndRole(user.id);
+    if (!workspaceData) {
       return new Response(JSON.stringify({ error: 'No workspace found for user' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    const { workspaceId, role: userRole } = workspaceData;
 
     // Parse request body
     const { messages, agentId = 'search', model = 'claude-sonnet-4', images = [] } = await req.json();
@@ -293,6 +492,22 @@ serve(async (req) => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Check RBAC permissions
+    if (!hasAgentPermission(agentId, userRole)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Permission denied',
+          message: `You need ${agentId === 'admin' ? 'owner' : 'admin'} role to use the ${agentId} agent.`,
+          requiredRole: agentId === 'admin' ? 'owner' : 'admin',
+          currentRole: userRole,
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
     }
 
     // Get the last user message
@@ -307,6 +522,7 @@ serve(async (req) => {
     const runtimeContext = new RuntimeContext();
     runtimeContext.set('userId', user.id);
     runtimeContext.set('workspaceId', workspaceId);
+    runtimeContext.set('userRole', userRole);
     runtimeContext.set('agentId', agentId);
     runtimeContext.set('model', model);
     runtimeContext.set('inputType', inputType);
