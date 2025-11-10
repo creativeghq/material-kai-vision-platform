@@ -11,7 +11,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { Agent } from 'npm:@mastra/core/agent';
 import { createTool } from 'npm:@mastra/core/tools';
 import { z } from 'npm:zod';
-import { anthropic } from 'npm:@ai-sdk/anthropic';
+import { anthropic } from 'npm:@ai-sdk/anthropic@1';
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
