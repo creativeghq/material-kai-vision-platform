@@ -646,21 +646,43 @@ serve(async (req) => {
       console.log('Using routing agent');
     }
 
-    console.log(`Calling ${agentId || 'routing'} agent with message:`, userMessage);
-    console.log('Selected agent instance:', selectedAgentInstance.name);
-    console.log('Agent tools:', Object.keys(selectedAgentInstance.tools || {}));
+    try {
+      console.log(`Calling ${agentId || 'routing'} agent with message:`, userMessage);
+      console.log('Selected agent instance:', selectedAgentInstance.name);
+      console.log('Agent tools:', Object.keys(selectedAgentInstance.tools || {}));
 
-    const result = await selectedAgentInstance.generate(userMessage, {
-      runtimeContext,
-      maxSteps: 3,
-    });
+      const result = await selectedAgentInstance.generate(userMessage, {
+        runtimeContext,
+        maxSteps: 3,
+      });
 
-    console.log('Mastra agent result:', {
-      text: result.text,
-      steps: result.steps?.length,
-      toolResults: result.toolResults?.length,
-    });
-    responseText = result.text;
+      console.log('Mastra agent result:', {
+        text: result.text,
+        steps: result.steps?.length,
+        toolResults: result.toolResults?.length,
+      });
+      responseText = result.text;
+    } catch (mastraError) {
+      console.error('MASTRA ERROR:', mastraError);
+      console.error('Error message:', mastraError instanceof Error ? mastraError.message : String(mastraError));
+      console.error('Error stack:', mastraError instanceof Error ? mastraError.stack : 'No stack');
+
+      // Return detailed error to frontend
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: mastraError instanceof Error ? mastraError.message : String(mastraError),
+            stack: mastraError instanceof Error ? mastraError.stack : undefined,
+            agentId,
+            agentName: selectedAgentInstance.name,
+          },
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Return response
     return new Response(
