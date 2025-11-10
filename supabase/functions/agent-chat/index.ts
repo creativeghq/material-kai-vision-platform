@@ -594,10 +594,17 @@ serve(async (req) => {
     const { workspaceId, role: userRole } = workspaceData;
 
     // Parse request body
-    const { messages, agentId = 'search', model = 'claude-sonnet-4', images = [] } = await req.json();
+    const body = await req.json();
+    console.log('Request body:', JSON.stringify(body, null, 2));
+
+    const { messages, agentId = 'search', model = 'claude-sonnet-4', images = [] } = body;
 
     if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: 'Invalid messages format' }), {
+      console.error('Invalid messages:', { messages, type: typeof messages, isArray: Array.isArray(messages) });
+      return new Response(JSON.stringify({
+        error: 'Invalid messages format',
+        received: { messages: messages ? 'exists' : 'missing', type: typeof messages }
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
