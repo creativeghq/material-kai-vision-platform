@@ -86,6 +86,13 @@ All colors MUST be HSL.
     /* Icon backgrounds in stat cards - Mocha color */
     --icon-bg-mocha: 30 25% 70%;  /* Mocha/tan for icon containers */
 
+    /* Background gradient - Worklytics style (subtle diagonal gradient) */
+    --gradient-background: linear-gradient(135deg,
+      hsl(190, 20%, 60%) 0%,      /* Top-left: Light teal-blue */
+      hsl(195, 18%, 55%) 50%,     /* Center: Medium slate-blue */
+      hsl(25, 15%, 55%) 100%      /* Bottom-right: Warm gray-brown */
+    );
+
     /* Shadows */
     --shadow-glow: 0 0 30px hsl(200 25% 45% / 0.3);
     --shadow-subtle: 0 2px 8px hsl(200 30% 20% / 0.15);
@@ -134,7 +141,9 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: var(--gradient-background);
+    background-attachment: fixed;
   }
 }
 
