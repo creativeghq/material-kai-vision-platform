@@ -571,7 +571,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           </div>
 
           {/* Admin Controls */}
-          {userRole === 'admin' && (
+          {(userRole === 'admin' || userRole === 'owner') && (
             <div className="flex items-center gap-3">
               {/* Agent Selection */}
               <div className="flex items-center gap-2">
