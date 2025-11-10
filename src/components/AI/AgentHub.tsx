@@ -103,12 +103,12 @@ const AGENTS: AgentDefinition[] = [
   },
 ];
 
-// AI Models available
+// AI Models available (format: provider/model-name for Mastra)
 const AI_MODELS = [
-  { id: 'claude-sonnet-4', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-  { id: 'claude-haiku-4', name: 'Claude Haiku 4.5', provider: 'anthropic' },
-  { id: 'gpt-5', name: 'GPT-5', provider: 'openai' },
-  { id: 'llama-4', name: 'Llama 4 Scout 17B', provider: 'together' },
+  { id: 'anthropic/claude-sonnet-4-20250514', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+  { id: 'anthropic/claude-haiku-4-20250514', name: 'Claude Haiku 4.5', provider: 'anthropic' },
+  { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai' },
+  { id: 'together/meta-llama/Llama-4-Scout-17B-16E-Instruct', name: 'Llama 4 Scout 17B', provider: 'together' },
 ];
 
 interface Message {
@@ -130,7 +130,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   onMaterialSelect,
 }) => {
   const [selectedAgent, setSelectedAgent] = useState<string>('search');
-  const [selectedModel, setSelectedModel] = useState<string>('claude-sonnet-4');
+  const [selectedModel, setSelectedModel] = useState<string>('anthropic/claude-sonnet-4-20250514');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);

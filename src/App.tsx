@@ -1,6 +1,6 @@
 // @ts-ignore - QueryClient types are available at runtime
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -326,15 +326,10 @@ const App = () => (
                   </AuthGuard>
                 }
               />
+              {/* Redirect /search-hub to /agent-hub */}
               <Route
                 path="/search-hub"
-                element={
-                  <AuthGuard>
-                    <Layout>
-                      <SearchHub />
-                    </Layout>
-                  </AuthGuard>
-                }
+                element={<Navigate to="/agent-hub" replace />}
               />
               <Route
                 path="/agent-hub"
