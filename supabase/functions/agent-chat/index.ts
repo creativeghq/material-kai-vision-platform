@@ -3,6 +3,27 @@
  * Supabase Edge Function for AI agent orchestration
  */
 
+// CRITICAL: Set up process.env BEFORE any imports that might use it
+// Deno doesn't have process.env by default, but Mastra needs it
+(globalThis as any).process = (globalThis as any).process || { env: {} };
+(globalThis as any).process.env = (globalThis as any).process.env || {};
+
+// Get API keys from Deno environment
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+
+// Set them in process.env for Mastra
+(globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
+(globalThis as any).process.env.OPENAI_API_KEY = OPENAI_API_KEY;
+
+console.log('🔑 API Keys setup:', {
+  anthropicExists: !!ANTHROPIC_API_KEY,
+  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 10),
+  openaiExists: !!OPENAI_API_KEY,
+  processEnvSet: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
+});
+
+// NOW import everything else
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -16,34 +37,6 @@ import { z } from 'npm:zod';
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-
-// Set environment variables for Mastra (it expects process.env format)
-// Deno doesn't have process.env by default, but Mastra needs it
-// CRITICAL: This must be set BEFORE importing/creating any Mastra agents
-
-// Initialize process.env on globalThis
-(globalThis as any).process = (globalThis as any).process || {};
-(globalThis as any).process.env = (globalThis as any).process.env || {};
-
-const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-const openaiKey = Deno.env.get('OPENAI_API_KEY');
-
-console.log('🔑 Setting up API keys:', {
-  anthropicKeyExists: !!anthropicKey,
-  anthropicKeyPrefix: anthropicKey?.substring(0, 10),
-  openaiKeyExists: !!openaiKey,
-  openaiKeyPrefix: openaiKey?.substring(0, 10),
-});
-
-(globalThis as any).process.env.ANTHROPIC_API_KEY = anthropicKey;
-(globalThis as any).process.env.OPENAI_API_KEY = openaiKey;
-
-// Verify it's set
-console.log('✅ Verification:', {
-  processEnvAnthropicExists: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
-  processEnvAnthropicPrefix: (globalThis as any).process.env.ANTHROPIC_API_KEY?.substring(0, 10),
-  processEnvOpenaiExists: !!(globalThis as any).process.env.OPENAI_API_KEY,
-});
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
