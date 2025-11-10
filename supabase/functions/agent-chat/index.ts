@@ -19,14 +19,18 @@ const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.mate
 
 // Set environment variables for Mastra (it expects process.env format)
 // Deno doesn't have process.env by default, but Mastra needs it
-if (typeof process === 'undefined') {
-  (globalThis as any).process = { env: {} };
+try {
+  if (typeof (globalThis as any).process === 'undefined') {
+    (globalThis as any).process = {};
+  }
+  if (typeof (globalThis as any).process.env === 'undefined') {
+    (globalThis as any).process.env = {};
+  }
+  (globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+  (globalThis as any).process.env.OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+} catch (e) {
+  console.error('Error setting up process.env:', e);
 }
-if (!(globalThis as any).process.env) {
-  (globalThis as any).process.env = {};
-}
-(globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-(globalThis as any).process.env.OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
