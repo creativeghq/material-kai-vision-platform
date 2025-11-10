@@ -450,8 +450,8 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
   model: {
-    id: 'openai/gpt-4o',
-    apiKey: (globalThis as any).process.env.OPENAI_API_KEY,
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: Deno.env.get('ANTHROPIC_API_KEY')!,
   },
 });
 
