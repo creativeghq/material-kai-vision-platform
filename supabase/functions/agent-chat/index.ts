@@ -82,11 +82,69 @@ const searchTool = createTool({
 });
 
 /**
+ * Image Analysis Tool - Analyze images using MIVAA API
+ */
+const imageAnalysisTool = createTool({
+  id: 'image-analysis',
+  description: 'Analyze material images to identify products, materials, and properties',
+  inputSchema: z.object({
+    imageUrl: z.string().describe('Image URL or base64 data'),
+    analysisType: z
+      .enum(['material_recognition', 'visual_search', 'product_identification'])
+      .default('material_recognition')
+      .describe('Type of image analysis'),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    analysis: z.any().optional(),
+    materials: z.array(z.any()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context, runtimeContext }) => {
+    const { imageUrl, analysisType } = context;
+    const workspaceId = runtimeContext?.get('workspaceId');
+
+    try {
+      // Call MIVAA API for image analysis
+      const response = await fetch(`${mivaaGatewayUrl}/api/together-ai/analyze-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          analysis_type: analysisType,
+          workspace_id: workspaceId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Image analysis failed: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      return {
+        success: true,
+        analysis: data.analysis || {},
+        materials: data.materials || [],
+      };
+    } catch (error) {
+      console.error('Image analysis tool error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Image analysis failed',
+      };
+    }
+  },
+});
+
+/**
  * Search Agent - Public agent for material search
  */
 const searchAgent = new Agent({
   name: 'search-agent',
-  description: 'Material search and discovery agent',
+  description: 'Material search and discovery agent with multimodal capabilities',
   instructions: `You are the Search Agent for the Material Kai Vision Platform.
 
 Your role is to help users find materials, products, and technical information from our knowledge base.
@@ -96,12 +154,19 @@ Your role is to help users find materials, products, and technical information f
 - Material property-based search
 - Visual similarity search using images
 - Hybrid search combining multiple strategies
+- Image analysis for material recognition and product identification
+
+**Multimodal Routing:**
+- For TEXT queries → Use material-search tool with appropriate strategy
+- For IMAGE queries → Use image-analysis tool first, then material-search for related items
+- For VOICE queries (transcribed to text) → Treat as text queries
 
 **Guidelines:**
 - Always provide relevant, accurate information from the knowledge base
 - If you're unsure, use the 'hybrid' search strategy for comprehensive results
 - Explain material properties and specifications clearly
 - Suggest related materials when appropriate
+- When analyzing images, describe what you see and identify materials
 
 **Response Format:**
 - Start with a brief summary of findings
@@ -112,26 +177,39 @@ Your role is to help users find materials, products, and technical information f
   model: 'anthropic/claude-sonnet-4-20250514',
   tools: {
     materialSearch: searchTool,
+    imageAnalysis: imageAnalysisTool,
   },
 });
 
 /**
- * Routing Agent - Routes queries to appropriate specialized agent
+ * Routing Agent - Routes queries to appropriate specialized agent with multimodal support
  */
 const routingAgent = new Agent({
   name: 'routing-agent',
-  description: 'Routes user queries to the appropriate specialized agent',
+  description: 'Routes user queries to the appropriate specialized agent with multimodal input support',
   instructions: `You are the Routing Agent for the Material Kai Vision Platform.
 
-Your role is to analyze user queries and route them to the appropriate specialized agent.
+Your role is to analyze user queries and route them to the appropriate specialized agent based on input type and content.
 
 **Available Agents:**
-1. **Search Agent** - Material search and discovery (ALWAYS AVAILABLE)
+1. **Search Agent** - Material search and discovery with multimodal capabilities (ALWAYS AVAILABLE)
 2. **Research Agent** - Deep research and analysis (ADMIN ONLY - NOT YET IMPLEMENTED)
 3. **Analytics Agent** - Data analysis and insights (ADMIN ONLY - NOT YET IMPLEMENTED)
 4. **Business Agent** - Business intelligence (ADMIN ONLY - NOT YET IMPLEMENTED)
 5. **Product Agent** - Product management (ADMIN ONLY - NOT YET IMPLEMENTED)
 6. **Admin Agent** - System administration (OWNER ONLY - NOT YET IMPLEMENTED)
+
+**Multimodal Routing Strategy:**
+- **TEXT-ONLY queries** → Route to Search Agent with semantic/hybrid search
+- **IMAGE queries** → Route to Search Agent with image analysis + visual search
+- **VOICE queries** (transcribed to text) → Route to Search Agent with semantic search
+- **TEXT + IMAGE queries** → Route to Search Agent with multimodal analysis
+
+**Input Type Detection:**
+- Check if images are attached → Use image analysis
+- Check if query mentions visual properties → Consider visual search
+- Check if query is transcribed from voice → Use semantic search
+- Default → Use hybrid search for comprehensive results
 
 **Routing Rules:**
 - For material search queries → Use Search Agent
@@ -208,7 +286,7 @@ serve(async (req) => {
     }
 
     // Parse request body
-    const { messages, agentId = 'search', model = 'claude-sonnet-4' } = await req.json();
+    const { messages, agentId = 'search', model = 'claude-sonnet-4', images = [] } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: 'Invalid messages format' }), {
@@ -220,6 +298,10 @@ serve(async (req) => {
     // Get the last user message
     const userMessage = messages[messages.length - 1]?.content || '';
 
+    // Detect input type for multimodal routing
+    const hasImages = images && images.length > 0;
+    const inputType = hasImages ? 'multimodal' : 'text';
+
     // Create runtime context for Mastra
     const { RuntimeContext } = await import('npm:@mastra/core/runtime-context');
     const runtimeContext = new RuntimeContext();
@@ -227,6 +309,8 @@ serve(async (req) => {
     runtimeContext.set('workspaceId', workspaceId);
     runtimeContext.set('agentId', agentId);
     runtimeContext.set('model', model);
+    runtimeContext.set('inputType', inputType);
+    runtimeContext.set('images', images);
 
     // Try to use Mastra routing agent, fallback to simple response
     let responseText = '';
