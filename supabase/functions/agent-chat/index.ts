@@ -646,33 +646,21 @@ serve(async (req) => {
       console.log('Using routing agent');
     }
 
-    try {
-      console.log(`Calling ${agentId || 'routing'} agent with message:`, userMessage);
-      console.log('Selected agent instance:', selectedAgentInstance.name);
-      console.log('Agent tools:', Object.keys(selectedAgentInstance.tools || {}));
+    console.log(`Calling ${agentId || 'routing'} agent with message:`, userMessage);
+    console.log('Selected agent instance:', selectedAgentInstance.name);
+    console.log('Agent tools:', Object.keys(selectedAgentInstance.tools || {}));
 
-      const result = await selectedAgentInstance.generate(userMessage, {
-        runtimeContext,
-        maxSteps: 3,
-      });
+    const result = await selectedAgentInstance.generate(userMessage, {
+      runtimeContext,
+      maxSteps: 3,
+    });
 
-      console.log('Mastra agent result:', {
-        text: result.text,
-        steps: result.steps?.length,
-        toolResults: result.toolResults?.length,
-      });
-      responseText = result.text;
-    } catch (mastraError) {
-      console.error('Mastra agent error details:', {
-        error: mastraError,
-        message: mastraError instanceof Error ? mastraError.message : String(mastraError),
-        stack: mastraError instanceof Error ? mastraError.stack : undefined,
-        agentId,
-        agentName: selectedAgentInstance.name,
-      });
-      // Fallback: Simple response
-      responseText = `I received your message: "${userMessage}". The agent system is currently being configured. Please try again shortly.`;
-    }
+    console.log('Mastra agent result:', {
+      text: result.text,
+      steps: result.steps?.length,
+      toolResults: result.toolResults?.length,
+    });
+    responseText = result.text;
 
     // Return response
     return new Response(
