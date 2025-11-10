@@ -21,24 +21,9 @@ const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.mate
 // Deno doesn't have process.env by default, but Mastra needs it
 // CRITICAL: This must be set BEFORE importing/creating any Mastra agents
 
-// Declare process as a global variable so we can use process.env directly
-declare global {
-  var process: {
-    env: {
-      ANTHROPIC_API_KEY?: string;
-      OPENAI_API_KEY?: string;
-      [key: string]: string | undefined;
-    };
-  };
-}
-
-// Initialize process.env
-if (typeof globalThis.process === 'undefined') {
-  globalThis.process = { env: {} };
-}
-if (typeof globalThis.process.env === 'undefined') {
-  globalThis.process.env = {};
-}
+// Initialize process.env on globalThis
+(globalThis as any).process = (globalThis as any).process || {};
+(globalThis as any).process.env = (globalThis as any).process.env || {};
 
 const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
 const openaiKey = Deno.env.get('OPENAI_API_KEY');
@@ -50,14 +35,14 @@ console.log('🔑 Setting up API keys:', {
   openaiKeyPrefix: openaiKey?.substring(0, 10),
 });
 
-globalThis.process.env.ANTHROPIC_API_KEY = anthropicKey;
-globalThis.process.env.OPENAI_API_KEY = openaiKey;
+(globalThis as any).process.env.ANTHROPIC_API_KEY = anthropicKey;
+(globalThis as any).process.env.OPENAI_API_KEY = openaiKey;
 
 // Verify it's set
 console.log('✅ Verification:', {
-  processEnvAnthropicExists: !!globalThis.process.env.ANTHROPIC_API_KEY,
-  processEnvAnthropicPrefix: globalThis.process.env.ANTHROPIC_API_KEY?.substring(0, 10),
-  processEnvOpenaiExists: !!globalThis.process.env.OPENAI_API_KEY,
+  processEnvAnthropicExists: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
+  processEnvAnthropicPrefix: (globalThis as any).process.env.ANTHROPIC_API_KEY?.substring(0, 10),
+  processEnvOpenaiExists: !!(globalThis as any).process.env.OPENAI_API_KEY,
 });
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -461,10 +446,7 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
-  model: {
-    id: 'anthropic/claude-sonnet-4-20250514',
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
+  model: 'anthropic/claude-sonnet-4-20250514',
 });
 
 /**
