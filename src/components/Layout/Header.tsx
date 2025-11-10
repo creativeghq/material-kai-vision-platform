@@ -37,49 +37,51 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="border-b bg-card">
-      <div className="flex h-16 items-center px-6">
-        <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
+    <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+      <div className="flex h-20 items-center px-8">
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-md">
+            <Sparkles className="w-6 h-6 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold">KAI Platform</span>
+          <span className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+            KAI Platform
+          </span>
         </div>
 
-        <div className="ml-8 flex-1 max-w-md">
+        <div className="ml-12 flex-1 max-w-xl">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <Input
               placeholder="Search materials, projects, or settings..."
-              className="pl-10"
+              className="pl-12 h-12 bg-background/50 border-border"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="ml-auto flex items-center space-x-4">
-          <Button className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0">
-            <Bell className="w-4 h-4" />
+        <div className="ml-auto flex items-center space-x-3">
+          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-accent/50">
+            <Bell className="w-5 h-5" />
           </Button>
-          <Button className="bg-transparent hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0">
-            <Settings className="w-4 h-4" />
+          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-accent/50">
+            <Settings className="w-5 h-5" />
           </Button>
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button className="bg-transparent hover:bg-accent hover:text-accent-foreground relative h-8 w-8 rounded-full">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent/50">
+                  <Avatar className="h-10 w-10 border-2 border-primary/20">
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                       {user.email ? getInitials(user.email) : 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuItem disabled>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>{user.email}</span>
+              <DropdownMenuContent className="w-56 rounded-xl" align="end" forceMount>
+                <DropdownMenuItem disabled className="py-3">
+                  <User className="mr-3 h-4 w-4" />
+                  <span className="text-sm">{user.email}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleSignOut}
@@ -88,9 +90,10 @@ export const Header: React.FC<HeaderProps> = ({
                       handleSignOut();
                     }
                   }}
+                  className="py-3 text-destructive focus:text-destructive"
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <LogOut className="mr-3 h-4 w-4" />
+                  <span className="text-sm">Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

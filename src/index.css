@@ -35,65 +35,78 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
+    /* Modern Warm Theme - Inspired by Crextio Design */
+    --background: 40 33% 94%;  /* Warm beige/cream background */
+    --foreground: 30 10% 15%;  /* Dark charcoal text */
 
-    --card: 224 71% 4%;
-    --card-foreground: 213 31% 91%;
+    --card: 40 40% 97%;  /* Lighter cream for cards */
+    --card-foreground: 30 10% 15%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 213 31% 91%;
+    --popover: 40 40% 97%;
+    --popover-foreground: 30 10% 15%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 224 71% 4%;
+    --primary: 45 95% 60%;  /* Vibrant yellow/gold accent */
+    --primary-foreground: 30 10% 15%;
 
-    --secondary: 215 28% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 30 15% 25%;  /* Dark charcoal for secondary elements */
+    --secondary-foreground: 40 33% 94%;
 
-    --muted: 215 28% 17%;
-    --muted-foreground: 217 10% 64%;
+    --muted: 40 20% 88%;  /* Muted beige */
+    --muted-foreground: 30 8% 45%;
 
-    --accent: 215 28% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 45 95% 60%;  /* Yellow accent */
+    --accent-foreground: 30 10% 15%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 40 40% 97%;
 
-    --border: 215 28% 17%;
-    --input: 215 28% 17%;
-    --ring: 216 34% 17%;
+    --border: 40 20% 85%;  /* Subtle borders */
+    --input: 40 30% 90%;  /* Light input backgrounds */
+    --ring: 45 95% 60%;  /* Yellow focus ring */
 
-    --radius: 0.75rem;
+    --radius: 1rem;  /* Rounded corners like in design */
 
-    /* Dark AI Agent Theme */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(212 100% 50%));
-    --gradient-secondary: linear-gradient(135deg, hsl(215 28% 17%), hsl(220 30% 20%));
-    --gradient-accent: linear-gradient(135deg, hsl(215 28% 25%), hsl(217 91% 60%));
-    
-    /* Glass morphism */
-    --glass-bg: rgba(0, 0, 0, 0.4);
-    --glass-border: rgba(59, 130, 246, 0.3);
-    
-    /* Shadows */
-    --shadow-glow: 0 0 40px hsl(217 91% 60% / 0.4);
-    --shadow-subtle: 0 2px 10px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 8px 25px hsl(0 0% 0% / 0.5);
+    /* Modern Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(40 33% 94%), hsl(45 40% 88%));
+    --gradient-secondary: linear-gradient(135deg, hsl(30 15% 25%), hsl(30 10% 20%));
+    --gradient-accent: linear-gradient(135deg, hsl(45 95% 60%), hsl(40 90% 55%));
+    --gradient-warm: linear-gradient(135deg, hsl(40 40% 97%), hsl(40 33% 94%));
+
+    /* Glass morphism - lighter for warm theme */
+    --glass-bg: rgba(255, 250, 240, 0.7);
+    --glass-border: rgba(45, 95, 60, 0.15);
+
+    /* Shadows - softer for warm theme */
+    --shadow-glow: 0 0 30px hsl(45 95% 60% / 0.3);
+    --shadow-subtle: 0 2px 8px hsl(30 10% 15% / 0.08);
+    --shadow-medium: 0 8px 20px hsl(30 10% 15% / 0.12);
+    --shadow-card: 0 4px 12px hsl(30 10% 15% / 0.1);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    --sidebar-background: 224 71% 4%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 224 71% 4%;
-    --sidebar-accent: 215 28% 17%;
-    --sidebar-accent-foreground: 213 31% 91%;
-    --sidebar-border: 215 28% 17%;
-    --sidebar-ring: 217 91% 60%;
+    /* Sidebar colors */
+    --sidebar-background: 30 15% 25%;  /* Dark charcoal sidebar */
+    --sidebar-foreground: 40 33% 94%;
+    --sidebar-primary: 45 95% 60%;  /* Yellow accent */
+    --sidebar-primary-foreground: 30 10% 15%;
+    --sidebar-accent: 30 12% 30%;
+    --sidebar-accent-foreground: 40 33% 94%;
+    --sidebar-border: 30 10% 20%;
+    --sidebar-ring: 45 95% 60%;
+
+    /* Status colors */
+    --success: 142 76% 36%;
+    --success-foreground: 40 40% 97%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 30 10% 15%;
+    --info: 199 89% 48%;
+    --info-foreground: 40 40% 97%;
   }
 
 .dark {
-    /* Keep same dark theme since root is now dark by default */
+    /* Keep same theme - we're using light warm theme by default */
   }
 }
 
@@ -129,34 +142,101 @@ All colors MUST be HSL.
     background: var(--gradient-accent);
   }
 
-  /* AI Agent specific components */
-  .hero-gradient {
-    background: linear-gradient(135deg, 
-      hsl(var(--primary)) 0%, 
-      hsl(var(--accent-foreground)) 50%, 
-      hsl(var(--primary)) 100%);
-    background-size: 200% 200%;
-    animation: gradient-shift 6s ease infinite;
+  .gradient-warm {
+    background: var(--gradient-warm);
   }
 
+  /* Modern card styles */
+  .modern-card {
+    @apply bg-card rounded-2xl border border-border;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition-smooth);
+  }
+
+  .modern-card:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+  }
+
+  /* Feature card with warm theme */
   .feature-card {
-    @apply transition-all duration-300 hover:scale-105 hover:shadow-lg;
-    box-shadow: var(--shadow-subtle);
-    border: 1px solid hsl(var(--border));
+    @apply bg-card rounded-2xl p-6 border border-border;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition-bounce);
   }
 
   .feature-card:hover {
     box-shadow: var(--shadow-medium);
-    border-color: hsl(var(--primary) / 0.3);
+    transform: translateY(-4px);
+    border-color: hsl(var(--primary) / 0.4);
   }
 
+  /* Yellow accent button */
+  .btn-yellow {
+    @apply bg-primary text-primary-foreground rounded-full px-8 py-3;
+    @apply font-medium transition-all duration-300;
+    box-shadow: var(--shadow-subtle);
+  }
+
+  .btn-yellow:hover {
+    box-shadow: var(--shadow-medium);
+    transform: translateY(-2px);
+  }
+
+  /* Dark button (like Apple/Google buttons) */
+  .btn-dark {
+    @apply bg-secondary text-secondary-foreground rounded-full px-6 py-3;
+    @apply font-medium transition-all duration-300 border border-border;
+  }
+
+  .btn-dark:hover {
+    @apply bg-secondary/90;
+    transform: translateY(-1px);
+  }
+
+  /* Input field modern style */
+  .input-modern {
+    @apply bg-input border-border rounded-xl px-4 py-3;
+    @apply text-foreground placeholder:text-muted-foreground;
+    @apply transition-all duration-200;
+    box-shadow: var(--shadow-subtle);
+  }
+
+  .input-modern:focus {
+    @apply outline-none ring-2 ring-ring;
+    box-shadow: var(--shadow-medium);
+  }
+
+  /* Status badges */
+  .badge-success {
+    @apply bg-success/10 text-success border border-success/20 rounded-full px-3 py-1 text-sm;
+  }
+
+  .badge-warning {
+    @apply bg-warning/10 text-warning border border-warning/20 rounded-full px-3 py-1 text-sm;
+  }
+
+  .badge-info {
+    @apply bg-info/10 text-info border border-info/20 rounded-full px-3 py-1 text-sm;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply bg-muted rounded-full h-2 overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply bg-primary h-full rounded-full transition-all duration-500;
+  }
+
+  /* Glow effect for yellow accent */
   .glow-effect {
-    box-shadow: var(--shadow-glow);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
   }
 
   /* Text effects */
   .text-gradient {
-    background: var(--gradient-primary);
+    background: var(--gradient-accent);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -170,31 +250,34 @@ All colors MUST be HSL.
 
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
+    50% { transform: translateY(-10px); }
   }
 
   @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 20px hsl(var(--primary) / 0.3); }
-    50% { box-shadow: 0 0 40px hsl(var(--primary) / 0.6); }
+    0%, 100% { box-shadow: 0 0 15px hsl(var(--primary) / 0.3); }
+    50% { box-shadow: 0 0 25px hsl(var(--primary) / 0.5); }
+  }
+
+  @keyframes slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .animate-float {
-    animation: float 6s ease-in-out infinite;
+    animation: float 4s ease-in-out infinite;
   }
 
   .animate-pulse-glow {
-    animation: pulse-glow 3s ease-in-out infinite;
+    animation: pulse-glow 2s ease-in-out infinite;
   }
 
-  /* Modern button styles */
-  .btn-primary-modern {
-    @apply bg-primary text-primary-foreground border-0 rounded-lg px-6 py-3;
-    @apply transition-all duration-300 hover:scale-105;
-    background: var(--gradient-primary);
-    box-shadow: var(--shadow-subtle);
-  }
-
-  .btn-primary-modern:hover {
-    box-shadow: var(--shadow-medium);
+  .animate-slide-in {
+    animation: slide-in 0.3s ease-out;
   }
 }
