@@ -258,6 +258,98 @@ export class AgentChatHistoryService {
   }
 
   /**
+   * Export conversation to JSON
+   */
+  async exportConversation(conversationId: string): Promise<string | null> {
+    try {
+      // Get conversation details
+      const conversation = await this.getConversation(conversationId);
+      if (!conversation) {
+        console.error('Conversation not found');
+        return null;
+      }
+
+      // Get all messages
+      const messages = await this.getConversationMessages(conversationId);
+
+      // Create export object
+      const exportData = {
+        version: '1.0',
+        exportedAt: new Date().toISOString(),
+        conversation: {
+          id: conversation.id,
+          title: conversation.title,
+          description: conversation.description,
+          agentId: conversation.agentId,
+          messageCount: conversation.messageCount,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt,
+        },
+        messages: messages.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          attachmentIds: msg.attachmentIds,
+          metadata: msg.metadata,
+          createdAt: msg.createdAt,
+        })),
+      };
+
+      return JSON.stringify(exportData, null, 2);
+    } catch (error) {
+      console.error('Error exporting conversation:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Import conversation from JSON
+   */
+  async importConversation(
+    jsonData: string,
+    userId: string,
+  ): Promise<ChatConversation | null> {
+    try {
+      const importData = JSON.parse(jsonData);
+
+      // Validate import data
+      if (!importData.conversation || !importData.messages) {
+        console.error('Invalid import data format');
+        return null;
+      }
+
+      // Create new conversation
+      const conversation = await this.createConversation({
+        userId,
+        agentId: importData.conversation.agentId,
+        title: `${importData.conversation.title} (Imported)`,
+        description: importData.conversation.description,
+      });
+
+      if (!conversation) {
+        console.error('Failed to create conversation');
+        return null;
+      }
+
+      // Import messages
+      for (const msg of importData.messages) {
+        await this.saveMessage({
+          conversationId: conversation.id,
+          role: msg.role,
+          content: msg.content,
+          attachmentIds: msg.attachmentIds || [],
+          metadata: msg.metadata || {},
+        });
+      }
+
+      return conversation;
+    } catch (error) {
+      console.error('Error importing conversation:', error);
+      return null;
+    }
+  }
+
+  /**
    * Map database row to ChatConversation
    */
   private mapConversationFromDB(data: any): ChatConversation {

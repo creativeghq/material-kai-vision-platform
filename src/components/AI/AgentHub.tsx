@@ -20,6 +20,8 @@ import {
   MessageSquare,
   Clock,
   User,
+  Download,
+  Upload,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -364,6 +366,81 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setMessages([]);
   }, []);
 
+  const handleExportConversation = useCallback(async () => {
+    if (!currentConversationId) {
+      toast({
+        title: 'No Conversation',
+        description: 'Please select a conversation to export',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const jsonData = await agentChatHistoryService.exportConversation(currentConversationId);
+    if (!jsonData) {
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export conversation',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Download as JSON file
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `conversation-${currentConversationId}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Export Successful',
+      description: 'Conversation exported successfully',
+    });
+  }, [currentConversationId, toast]);
+
+  const handleImportConversation = useCallback(async () => {
+    if (!userId) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const jsonData = event.target?.result as string;
+        const conversation = await agentChatHistoryService.importConversation(jsonData, userId);
+
+        if (!conversation) {
+          toast({
+            title: 'Import Failed',
+            description: 'Failed to import conversation',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // Reload conversations
+        const convos = await agentChatHistoryService.getUserConversations(userId, selectedAgent);
+        setConversations(convos);
+
+        toast({
+          title: 'Import Successful',
+          description: 'Conversation imported successfully',
+        });
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }, [userId, selectedAgent, toast]);
+
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
 
@@ -436,9 +513,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 <Clock className="h-5 w-5" />
                 Recent
               </CardTitle>
-              <Button variant="ghost" size="sm" onClick={handleNewConversation}>
-                New
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleImportConversation}
+                  title="Import conversation"
+                >
+                  <Upload className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExportConversation}
+                  title="Export current conversation"
+                  disabled={!currentConversationId}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleNewConversation}>
+                  New
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-2 overflow-y-auto max-h-[400px]">
