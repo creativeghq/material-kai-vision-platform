@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
+import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -136,8 +137,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get current user ID
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    fetchUserId();
+  }, []);
+
+  // Load conversations when user ID or agent changes
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadConversations = async () => {
+      const convos = await agentChatHistoryService.getUserConversations(userId, selectedAgent);
+      setConversations(convos);
+    };
+
+    loadConversations();
+  }, [userId, selectedAgent]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -155,6 +184,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   const handleSendMessage = useCallback(async () => {
     if (!input.trim() && attachedImages.length === 0) return;
+    if (!userId) return;
 
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
@@ -164,6 +194,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = input;
     setInput('');
     setIsLoading(true);
 
@@ -173,6 +204,30 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) throw new Error('User not authenticated');
+
+      // Create or get conversation
+      let conversationId = currentConversationId;
+      if (!conversationId) {
+        const conversation = await agentChatHistoryService.createConversation({
+          title: userInput.slice(0, 50) + (userInput.length > 50 ? '...' : ''),
+          agentId: selectedAgent,
+          userId: userId,
+        });
+        if (conversation) {
+          conversationId = conversation.id;
+          setCurrentConversationId(conversationId);
+          setConversations((prev) => [conversation, ...prev]);
+        }
+      }
+
+      // Save user message to database
+      if (conversationId) {
+        await agentChatHistoryService.saveMessage({
+          conversationId,
+          role: 'user',
+          content: userInput,
+        });
+      }
 
       // Call Supabase Edge Function for agent execution
       const { data, error } = await supabase.functions.invoke('agent-chat', {
@@ -204,6 +259,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+
+      // Save assistant message to database
+      if (conversationId) {
+        await agentChatHistoryService.saveMessage({
+          conversationId,
+          role: 'assistant',
+          content: data.text || 'No response from agent',
+          metadata: {
+            agentId: data.agentId || selectedAgent,
+            model: data.model || selectedModel,
+          },
+        });
+      }
     } catch (error) {
       console.error('Error executing agent:', error);
       const errorMessage: Message = {
@@ -218,7 +286,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setIsLoading(false);
       setAttachedImages([]);
     }
-  }, [input, selectedAgent, selectedModel, userRole, attachedImages]);
+  }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -242,6 +310,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // TODO: Implement voice recording with Web Speech API
     console.log('Voice input not yet implemented');
   }, [isRecording]);
+
+  const handleLoadConversation = useCallback(
+    async (conversationId: string) => {
+      setCurrentConversationId(conversationId);
+      const msgs = await agentChatHistoryService.getConversationMessages(conversationId);
+      setMessages(
+        msgs.map((msg) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.createdAt),
+          agentId: msg.metadata?.agentId as string,
+          model: msg.metadata?.model as string,
+        }))
+      );
+    },
+    []
+  );
+
+  const handleNewConversation = useCallback(() => {
+    setCurrentConversationId(null);
+    setMessages([]);
+  }, []);
 
   const currentAgent = AGENTS.find((a) => a.id === selectedAgent);
   const AgentIcon = currentAgent?.icon || Bot;
@@ -310,15 +401,39 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         {/* Recent Conversations */}
         <Card className="flex-1 overflow-hidden">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Recent
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 overflow-y-auto">
-            <div className="text-sm text-muted-foreground text-center py-4">
-              No recent conversations
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Recent
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={handleNewConversation}>
+                New
+              </Button>
             </div>
+          </CardHeader>
+          <CardContent className="space-y-2 overflow-y-auto max-h-[400px]">
+            {conversations.length === 0 ? (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                No recent conversations
+              </div>
+            ) : (
+              conversations.map((convo) => (
+                <button
+                  key={convo.id}
+                  onClick={() => handleLoadConversation(convo.id)}
+                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                    currentConversationId === convo.id
+                      ? 'bg-primary/10 border-primary'
+                      : 'hover:bg-muted border-transparent'
+                  }`}
+                >
+                  <div className="font-medium text-sm truncate">{convo.title}</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
+                  </div>
+                </button>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
