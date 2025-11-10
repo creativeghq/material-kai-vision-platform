@@ -35,6 +35,8 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { useToast } from '@/hooks/use-toast';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -130,18 +132,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   userRole = 'member',
   onMaterialSelect,
 }) => {
+  const { toast } = useToast();
   const [selectedAgent, setSelectedAgent] = useState<string>('search');
   const [selectedModel, setSelectedModel] = useState<string>('anthropic/claude-sonnet-4-20250514');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
-  const [isRecording, setIsRecording] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice input hook
+  const {
+    isRecording,
+    transcript,
+    interimTranscript,
+    isSupported: isVoiceSupported,
+    error: voiceError,
+    toggleRecording,
+    resetTranscript,
+  } = useVoiceInput({
+    onTranscript: (text) => {
+      setInput((prev) => prev + ' ' + text);
+    },
+    onError: (error) => {
+      toast({
+        title: 'Voice Input Error',
+        description: error,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Get current user ID
   useEffect(() => {
@@ -306,10 +330,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, []);
 
   const handleVoiceInput = useCallback(() => {
-    setIsRecording(!isRecording);
-    // TODO: Implement voice recording with Web Speech API
-    console.log('Voice input not yet implemented');
-  }, [isRecording]);
+    if (!isVoiceSupported) {
+      toast({
+        title: 'Voice Input Not Supported',
+        description: 'Your browser does not support voice input. Please use Chrome, Edge, or Safari.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    toggleRecording();
+  }, [isVoiceSupported, toggleRecording, toast]);
 
   const handleLoadConversation = useCallback(
     async (conversationId: string) => {
@@ -511,6 +541,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
         {/* Input Area */}
         <div className="border-t p-4">
+          {/* Voice Recording Indicator */}
+          {isRecording && interimTranscript && (
+            <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-sm text-red-700">Listening: {interimTranscript}</span>
+              </div>
+            </div>
+          )}
           {attachedImages.length > 0 && (
             <div className="flex gap-2 mb-2">
               {attachedImages.map((img, idx) => (
@@ -559,7 +598,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               variant="outline"
               size="icon"
               onClick={handleVoiceInput}
-              className={isRecording ? 'bg-red-500 text-white' : ''}
+              className={isRecording ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' : ''}
+              title={
+                !isVoiceSupported
+                  ? 'Voice input not supported in this browser'
+                  : isRecording
+                    ? 'Stop recording'
+                    : 'Start voice input'
+              }
+              disabled={!isVoiceSupported}
             >
               <Mic className="h-4 w-4" />
             </Button>
