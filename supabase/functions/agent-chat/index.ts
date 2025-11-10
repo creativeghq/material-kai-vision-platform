@@ -231,12 +231,18 @@ serve(async (req) => {
     // Try to use Mastra routing agent, fallback to simple response
     let responseText = '';
     try {
+      console.log('Calling routingAgent.generate with message:', userMessage);
       const result = await routingAgent.generate(userMessage, {
         runtimeContext,
       });
+      console.log('Mastra agent result:', result);
       responseText = result.text;
     } catch (mastraError) {
-      console.error('Mastra agent error, using fallback:', mastraError);
+      console.error('Mastra agent error details:', {
+        error: mastraError,
+        message: mastraError instanceof Error ? mastraError.message : String(mastraError),
+        stack: mastraError instanceof Error ? mastraError.stack : undefined,
+      });
       // Fallback: Simple response
       responseText = `I received your message: "${userMessage}". The agent system is currently being configured. Please try again shortly.`;
     }
