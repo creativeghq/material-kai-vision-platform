@@ -19,19 +19,23 @@ export const MetricsGrid: React.FC = () => {
           {metricsConfig.metrics.map((metric: Metric) => (
             <div key={metric.id} className="stat-card-glass p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 rounded-xl bg-white/10 backdrop-blur-sm`}>
-                  <metric.icon className={`h-6 w-6 text-white`} />
+                {/* Mocha-colored icon background */}
+                <div className="stat-icon-mocha">
+                  <metric.icon className="h-5 w-5 text-foreground/70" />
                 </div>
+                {/* Badge with proper colors */}
                 <div className={`${
-                  metric.change.startsWith('+') ? 'badge-success' : 'badge-neutral'
+                  metric.change.startsWith('+') ? 'badge-success' :
+                  metric.change.startsWith('-') ? 'badge-error' : 'badge-neutral'
                 }`}>
                   {metric.change}
                 </div>
               </div>
-              <div className="text-4xl font-bold mb-2 text-white">
+              {/* Dark text on white card */}
+              <div className="text-4xl font-bold mb-2 text-foreground">
                 {metric.value}
               </div>
-              <div className="text-sm text-white/70 font-medium">{metric.label}</div>
+              <div className="text-sm text-muted-foreground font-medium">{metric.label}</div>
             </div>
           ))}
         </div>

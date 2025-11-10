@@ -35,47 +35,56 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Professional Teal/Slate Theme - Based on Worklytics Design */
-    --background: 200 20% 50%;  /* Medium teal-slate background */
-    --foreground: 200 5% 98%;  /* Very light text for high contrast */
+    /* Worklytics Design - Properly Analyzed */
 
-    --card: 200 15% 55%;  /* Lighter teal for cards */
-    --card-foreground: 200 5% 98%;
+    /* Main Background - Grayish-blue slate */
+    --background: 200 15% 65%;  /* Slate gray-blue background #9EADB5 */
+    --foreground: 210 15% 25%;  /* Dark charcoal text for readability */
 
-    --popover: 200 15% 55%;
-    --popover-foreground: 200 5% 98%;
+    /* Cards - White/off-white */
+    --card: 0 0% 98%;  /* White cards #FAFAFA */
+    --card-foreground: 210 15% 25%;  /* Dark text on white cards */
 
-    --primary: 200 25% 45%;  /* Darker teal for primary actions */
-    --primary-foreground: 200 5% 98%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 210 15% 25%;
 
-    --secondary: 200 20% 60%;  /* Light teal for secondary */
-    --secondary-foreground: 200 5% 98%;
+    /* Primary - Dark teal-green (sidebar color) */
+    --primary: 170 20% 30%;  /* Dark teal-green #3D5654 */
+    --primary-foreground: 0 0% 98%;  /* White text on dark teal */
 
-    --muted: 200 15% 65%;  /* Muted teal */
-    --muted-foreground: 200 5% 85%;
+    /* Secondary - Light slate */
+    --secondary: 200 15% 75%;  /* Light slate for secondary elements */
+    --secondary-foreground: 210 15% 25%;  /* Dark text */
 
-    --accent: 200 25% 45%;  /* Teal accent */
-    --accent-foreground: 200 5% 98%;
+    /* Muted - Mocha/tan color (for icon backgrounds and accents) */
+    --muted: 30 25% 70%;  /* Mocha/tan #BFB3A3 */
+    --muted-foreground: 210 15% 35%;  /* Darker text on mocha */
+
+    /* Accent - Medium teal-green */
+    --accent: 160 40% 45%;  /* Medium teal-green for accents */
+    --accent-foreground: 0 0% 98%;  /* White text on accent */
 
     --destructive: 0 65% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 200 15% 60%;  /* Subtle teal borders */
-    --input: 200 18% 58%;  /* Input backgrounds */
-    --ring: 200 25% 45%;  /* Teal focus ring */
+    /* Borders - Subtle light gray */
+    --border: 200 10% 80%;  /* Light gray borders */
+    --input: 0 0% 98%;  /* White input backgrounds */
+    --ring: 170 20% 30%;  /* Dark teal focus ring */
 
     --radius: 1rem;  /* Rounded corners */
 
-    /* Modern Gradients - Worklytics inspired */
-    --gradient-primary: linear-gradient(135deg, hsl(195 25% 48%), hsl(200 30% 52%));
-    --gradient-secondary: linear-gradient(135deg, hsl(200 15% 30%), hsl(200 20% 25%));
-    --gradient-accent: linear-gradient(135deg, hsl(200 25% 45%), hsl(200 30% 40%));
-    --gradient-background: linear-gradient(135deg, hsl(195 22% 48%) 0%, hsl(200 25% 52%) 50%, hsl(205 20% 50%) 100%);
+    /* Sidebar colors */
+    --sidebar-background: 170 20% 30%;  /* Dark teal-green #3D5654 */
+    --sidebar-foreground: 0 0% 98%;  /* White text */
+    --sidebar-accent: 160 40% 45%;  /* Teal highlight for active */
 
-    /* Glass morphism - stat cards */
-    --glass-bg: rgba(255, 255, 255, 0.08);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-hover: rgba(255, 255, 255, 0.12);
+    /* Stat card styling - NO glass morphism, just white cards */
+    --stat-card-bg: 0 0% 98%;  /* White background */
+    --stat-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+    /* Icon backgrounds in stat cards - Mocha color */
+    --icon-bg-mocha: 30 25% 70%;  /* Mocha/tan for icon containers */
 
     /* Shadows */
     --shadow-glow: 0 0 30px hsl(200 25% 45% / 0.3);
@@ -87,37 +96,30 @@ All colors MUST be HSL.
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    /* Sidebar colors - Darker teal slate */
-    --sidebar-background: 200 20% 35%;  /* Darker teal sidebar */
-    --sidebar-foreground: 200 5% 98%;  /* Light text */
-    --sidebar-primary: 200 25% 45%;  /* Teal accent */
-    --sidebar-primary-foreground: 200 5% 98%;
-    --sidebar-accent: 200 20% 42%;  /* Slightly lighter for hover */
-    --sidebar-accent-foreground: 200 5% 98%;
-    --sidebar-border: 200 20% 30%;  /* Darker border */
-    --sidebar-ring: 200 25% 45%;
+    /* Status badges - Worklytics style (like "+4.2%", "-1.8%") */
+    --success: 142 50% 45%;  /* Green for positive badges */
+    --success-foreground: 142 60% 25%;  /* Dark green text */
+    --success-bg: 142 45% 88%;  /* Light green background #D4E8D4 */
 
-    /* Status colors - Worklytics inspired badges */
-    --success: 142 70% 45%;  /* Green badges - like "+12%" */
-    --success-foreground: 142 70% 15%;  /* Dark green text */
-    --success-bg: 142 65% 92%;  /* Light green background */
+    --warning: 15 80% 60%;  /* Coral/salmon for warnings */
+    --warning-foreground: 15 70% 30%;  /* Dark coral text */
+    --warning-bg: 15 70% 90%;  /* Light coral background */
 
-    --warning: 38 95% 55%;  /* Orange for warnings */
-    --warning-foreground: 38 90% 20%;  /* Dark orange text */
-    --warning-bg: 38 90% 92%;  /* Light orange background */
+    --error: 0 65% 55%;  /* Red for negative badges */
+    --error-foreground: 0 70% 30%;  /* Dark red text */
+    --error-bg: 0 60% 92%;  /* Light pink/red background #F5D4D4 */
 
-    --error: 0 75% 55%;  /* Red for errors */
-    --error-foreground: 0 70% 20%;  /* Dark red text */
-    --error-bg: 0 70% 92%;  /* Light red background */
+    --info: 200 50% 60%;  /* Light blue for info */
+    --info-foreground: 200 60% 30%;  /* Dark blue text */
+    --info-bg: 200 50% 90%;  /* Light blue background */
 
-    --info: 200 75% 50%;  /* Teal for info */
-    --info-foreground: 200 70% 20%;  /* Dark teal text */
-    --info-bg: 200 70% 92%;  /* Light teal background */
-
-    /* Priority/Category badge colors */
-    --badge-high: 0 75% 55%;  /* Red for high priority */
-    --badge-medium: 38 95% 55%;  /* Orange for medium */
-    --badge-low: 142 70% 45%;  /* Green for low */
+    /* Priority badges - Worklytics schedule colors */
+    --badge-high: 170 30% 45%;  /* Dark teal for high priority */
+    --badge-high-fg: 0 0% 98%;  /* White text */
+    --badge-medium: 200 50% 70%;  /* Light blue for medium priority */
+    --badge-medium-fg: 200 60% 25%;  /* Dark blue text */
+    --badge-low: 15 70% 65%;  /* Coral for low priority */
+    --badge-low-fg: 15 70% 25%;  /* Dark coral text */
     --badge-neutral: 200 10% 60%;  /* Gray for neutral */
   }
 
@@ -132,24 +134,28 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply text-foreground;
-    background: var(--gradient-background);
+    @apply bg-background text-foreground;
   }
 }
 
 @layer components {
-  /* Glass morphism stat cards - Worklytics style */
+  /* Stat cards - Worklytics style (white cards, NOT glass) */
   .stat-card-glass {
-    @apply rounded-2xl backdrop-blur-md transition-all duration-300;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    @apply rounded-2xl transition-all duration-300;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   }
 
   .stat-card-glass:hover {
-    background: var(--glass-hover);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     transform: translateY(-2px);
+  }
+
+  /* Icon container in stat cards - Mocha background */
+  .stat-icon-mocha {
+    @apply rounded-xl p-3;
+    background: hsl(var(--muted));
   }
 
   /* Glass morphism utilities */

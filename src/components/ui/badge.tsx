@@ -24,11 +24,11 @@ const badgeVariants = cva(
         info:
           'badge-info border-transparent',
         high:
-          'badge-high border-transparent',
+          'border-transparent bg-[hsl(var(--badge-high))] text-[hsl(var(--badge-high-fg))]',
         medium:
-          'badge-medium border-transparent',
+          'border-transparent bg-[hsl(var(--badge-medium))] text-[hsl(var(--badge-medium-fg))]',
         low:
-          'badge-low border-transparent',
+          'border-transparent bg-[hsl(var(--badge-low))] text-[hsl(var(--badge-low-fg))]',
         neutral:
           'badge-neutral border-transparent',
       },

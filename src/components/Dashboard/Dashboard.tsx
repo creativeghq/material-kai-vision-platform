@@ -2,8 +2,6 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { SearchHub } from './SearchHub';
-import { HeroSection } from './HeroSection';
-import { FeatureGrid } from './FeatureGrid';
 import { MetricsGrid } from './MetricsGrid';
 import styles from './Dashboard.module.css';
 import { searchHubConfig } from './dashboardData';
@@ -17,8 +15,8 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      {/* Hero Section */}
-      <HeroSection onNavigate={handleNavigate} />
+      {/* Enhanced System Metrics */}
+      <MetricsGrid />
 
       {/* Main Search Interface */}
       <div className={styles.mainSection}>
@@ -28,12 +26,6 @@ export const Dashboard: React.FC = () => {
           onNavigateTo3D={() => handleNavigate('/3d')}
         />
       </div>
-
-      {/* Feature Cards */}
-      <FeatureGrid onNavigate={handleNavigate} />
-
-      {/* Enhanced System Metrics */}
-      <MetricsGrid />
     </div>
   );
 };
