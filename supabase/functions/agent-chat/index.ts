@@ -19,34 +19,33 @@ const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.mate
 
 // Set environment variables for Mastra (it expects process.env format)
 // Deno doesn't have process.env by default, but Mastra needs it
-try {
-  if (typeof (globalThis as any).process === 'undefined') {
-    (globalThis as any).process = {};
-  }
-  if (typeof (globalThis as any).process.env === 'undefined') {
-    (globalThis as any).process.env = {};
-  }
-
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-  const openaiKey = Deno.env.get('OPENAI_API_KEY');
-
-  console.log('🔑 Environment check:', {
-    anthropicKeyExists: !!anthropicKey,
-    anthropicKeyLength: anthropicKey?.length,
-    openaiKeyExists: !!openaiKey,
-    openaiKeyLength: openaiKey?.length,
-  });
-
-  (globalThis as any).process.env.ANTHROPIC_API_KEY = anthropicKey;
-  (globalThis as any).process.env.OPENAI_API_KEY = openaiKey;
-
-  console.log('✅ process.env setup complete:', {
-    processEnvAnthropicExists: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
-    processEnvOpenaiExists: !!(globalThis as any).process.env.OPENAI_API_KEY,
-  });
-} catch (e) {
-  console.error('❌ Error setting up process.env:', e);
+// CRITICAL: This must be set BEFORE importing/creating any Mastra agents
+if (typeof (globalThis as any).process === 'undefined') {
+  (globalThis as any).process = { env: {} };
 }
+if (typeof (globalThis as any).process.env === 'undefined') {
+  (globalThis as any).process.env = {};
+}
+
+const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+const openaiKey = Deno.env.get('OPENAI_API_KEY');
+
+console.log('🔑 Setting up API keys:', {
+  anthropicKeyExists: !!anthropicKey,
+  anthropicKeyPrefix: anthropicKey?.substring(0, 10),
+  openaiKeyExists: !!openaiKey,
+  openaiKeyPrefix: openaiKey?.substring(0, 10),
+});
+
+(globalThis as any).process.env.ANTHROPIC_API_KEY = anthropicKey;
+(globalThis as any).process.env.OPENAI_API_KEY = openaiKey;
+
+// Verify it's set
+console.log('✅ Verification:', {
+  processEnvAnthropicExists: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
+  processEnvAnthropicPrefix: (globalThis as any).process.env.ANTHROPIC_API_KEY?.substring(0, 10),
+  processEnvOpenaiExists: !!(globalThis as any).process.env.OPENAI_API_KEY,
+});
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -451,7 +450,7 @@ I'm showing you 5 cement-based tiles in grey color with full specifications and 
 
   model: {
     id: 'anthropic/claude-sonnet-4-20250514',
-    apiKey: Deno.env.get('ANTHROPIC_API_KEY')!,
+    apiKey: (globalThis as any).process?.env?.ANTHROPIC_API_KEY,
   },
 });
 
