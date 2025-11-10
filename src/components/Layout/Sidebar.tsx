@@ -23,10 +23,10 @@ const SIDEBAR_STORAGE_KEY = 'kai-sidebar-expanded';
 export const Sidebar: React.FC = () => {
   const location = useLocation();
 
-  // Initialize from localStorage
+  // Initialize from localStorage - default to expanded (true)
   const [isExpanded, setIsExpanded] = useState(() => {
     const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : false;
+    return stored ? JSON.parse(stored) : true;
   });
 
   // Persist to localStorage whenever it changes

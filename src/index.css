@@ -35,66 +35,66 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Modern Warm Theme - Inspired by Crextio Design */
-    --background: 40 33% 94%;  /* Warm beige/cream background */
-    --foreground: 30 10% 15%;  /* Dark charcoal text */
+    /* Modern Mint/Sage Theme - Inspired by Fintech Design */
+    --background: 160 25% 92%;  /* Light mint/sage background */
+    --foreground: 160 10% 15%;  /* Dark text */
 
-    --card: 40 40% 97%;  /* Lighter cream for cards */
-    --card-foreground: 30 10% 15%;
+    --card: 160 30% 96%;  /* Lighter mint for cards */
+    --card-foreground: 160 10% 15%;
 
-    --popover: 40 40% 97%;
-    --popover-foreground: 30 10% 15%;
+    --popover: 160 30% 96%;
+    --popover-foreground: 160 10% 15%;
 
-    --primary: 45 95% 60%;  /* Vibrant yellow/gold accent */
-    --primary-foreground: 30 10% 15%;
+    --primary: 60 100% 75%;  /* Bright yellow accent */
+    --primary-foreground: 160 10% 15%;
 
-    --secondary: 30 15% 25%;  /* Dark charcoal for secondary elements */
-    --secondary-foreground: 40 33% 94%;
+    --secondary: 160 8% 20%;  /* Dark for secondary elements */
+    --secondary-foreground: 160 25% 92%;
 
-    --muted: 40 20% 88%;  /* Muted beige */
-    --muted-foreground: 30 8% 45%;
+    --muted: 160 20% 88%;  /* Muted sage */
+    --muted-foreground: 160 8% 45%;
 
-    --accent: 45 95% 60%;  /* Yellow accent */
-    --accent-foreground: 30 10% 15%;
+    --accent: 60 100% 75%;  /* Yellow accent */
+    --accent-foreground: 160 10% 15%;
 
     --destructive: 0 70% 50%;
-    --destructive-foreground: 40 40% 97%;
+    --destructive-foreground: 160 30% 96%;
 
-    --border: 40 20% 85%;  /* Subtle borders */
-    --input: 40 30% 90%;  /* Light input backgrounds */
-    --ring: 45 95% 60%;  /* Yellow focus ring */
+    --border: 160 15% 82%;  /* Subtle sage borders */
+    --input: 160 25% 95%;  /* Light sage input backgrounds */
+    --ring: 60 100% 75%;  /* Yellow focus ring */
 
-    --radius: 1rem;  /* Rounded corners like in design */
+    --radius: 1.25rem;  /* Rounded corners */
 
     /* Modern Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(40 33% 94%), hsl(45 40% 88%));
-    --gradient-secondary: linear-gradient(135deg, hsl(30 15% 25%), hsl(30 10% 20%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 95% 60%), hsl(40 90% 55%));
-    --gradient-warm: linear-gradient(135deg, hsl(40 40% 97%), hsl(40 33% 94%));
+    --gradient-primary: linear-gradient(135deg, hsl(160 25% 92%), hsl(160 20% 88%));
+    --gradient-secondary: linear-gradient(135deg, hsl(160 8% 20%), hsl(160 8% 16%));
+    --gradient-accent: linear-gradient(135deg, hsl(60 100% 75%), hsl(55 95% 70%));
+    --gradient-warm: linear-gradient(135deg, hsl(160 30% 96%), hsl(160 25% 92%));
 
-    /* Glass morphism - lighter for warm theme */
-    --glass-bg: rgba(255, 250, 240, 0.7);
-    --glass-border: rgba(45, 95, 60, 0.15);
+    /* Glass morphism */
+    --glass-bg: rgba(230, 245, 240, 0.7);
+    --glass-border: rgba(100, 150, 130, 0.15);
 
-    /* Shadows - softer for warm theme */
-    --shadow-glow: 0 0 30px hsl(45 95% 60% / 0.3);
-    --shadow-subtle: 0 2px 8px hsl(30 10% 15% / 0.08);
-    --shadow-medium: 0 8px 20px hsl(30 10% 15% / 0.12);
-    --shadow-card: 0 4px 12px hsl(30 10% 15% / 0.1);
+    /* Shadows */
+    --shadow-glow: 0 0 30px hsl(60 100% 75% / 0.3);
+    --shadow-subtle: 0 2px 8px hsl(160 10% 15% / 0.08);
+    --shadow-medium: 0 8px 20px hsl(160 10% 15% / 0.12);
+    --shadow-card: 0 4px 12px hsl(160 10% 15% / 0.1);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    /* Sidebar colors */
-    --sidebar-background: 30 15% 25%;  /* Dark charcoal sidebar */
-    --sidebar-foreground: 40 33% 94%;
-    --sidebar-primary: 45 95% 60%;  /* Yellow accent */
-    --sidebar-primary-foreground: 30 10% 15%;
-    --sidebar-accent: 30 12% 30%;
-    --sidebar-accent-foreground: 40 33% 94%;
-    --sidebar-border: 30 10% 20%;
-    --sidebar-ring: 45 95% 60%;
+    /* Sidebar colors - Dark with mint undertones */
+    --sidebar-background: 160 8% 20%;  /* Dark sidebar with mint undertone */
+    --sidebar-foreground: 160 25% 92%;  /* Light text */
+    --sidebar-primary: 60 100% 75%;  /* Yellow accent */
+    --sidebar-primary-foreground: 160 10% 15%;
+    --sidebar-accent: 160 8% 28%;  /* Slightly lighter for hover */
+    --sidebar-accent-foreground: 160 25% 92%;
+    --sidebar-border: 160 8% 16%;  /* Darker border */
+    --sidebar-ring: 60 100% 75%;
 
     /* Status colors */
     --success: 142 76% 36%;
