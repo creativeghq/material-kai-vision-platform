@@ -63,27 +63,12 @@ const AgentHubPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="p-6">
-        <div className="max-w-[1800px] mx-auto space-y-6">
-          {/* Header - User-facing style like MoodBoard */}
-          <div className="flex items-center gap-3">
-            <Bot className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-3xl font-bold">Agent Hub</h1>
-              <p className="text-muted-foreground">
-                Multi-agent AI orchestration powered by Mastra framework
-              </p>
-            </div>
-          </div>
-
-          {/* Agent Hub Component */}
-          <AgentHubComponent
-            userRole={userRole}
-            onMaterialSelect={handleMaterialSelect}
-          />
-        </div>
-      </div>
+    <div className="h-screen bg-background flex flex-col">
+      {/* Agent Hub Component - Full Screen */}
+      <AgentHubComponent
+        userRole={userRole}
+        onMaterialSelect={handleMaterialSelect}
+      />
     </div>
   );
 };

@@ -15,18 +15,13 @@ import {
   Image as ImageIcon,
   Mic,
   Paperclip,
-  Sparkles,
-  ChevronDown,
   MessageSquare,
-  Clock,
   User,
   Download,
   Upload,
 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -445,53 +440,152 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const AgentIcon = currentAgent?.icon || Bot;
 
   return (
-    <div className="h-[calc(100vh-12rem)] flex gap-6">
-      {/* Chat Sidebar */}
-      <div className="w-80 flex flex-col gap-4">
-        {/* Agent Selection */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Bot className="h-5 w-5" />
-              Select Agent
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {availableAgents.map((agent) => {
-                  const Icon = agent.icon;
-                  return (
-                    <SelectItem key={agent.id} value={agent.id}>
-                      <div className="flex items-center gap-2">
-                        <Icon className={`h-4 w-4 ${agent.color}`} />
-                        <span>{agent.name}</span>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground mt-2">
-              {currentAgent?.description}
-            </p>
-          </CardContent>
-        </Card>
+    <div className="flex h-[calc(100vh-4rem)] bg-background">
+      {/* Middle Panel - Conversation List */}
+      <div className="w-80 border-r bg-card flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Chats</h2>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleImportConversation}
+                title="Import conversation"
+              >
+                <Upload className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleExportConversation}
+                title="Export current conversation"
+                disabled={!currentConversationId}
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-        {/* Model Selection */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Sparkles className="h-5 w-5" />
-              AI Model
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+          {/* Tabs */}
+          <div className="flex gap-2 text-sm border-b -mb-4">
+            <button className="pb-2 px-1 border-b-2 border-primary font-medium">
+              All
+            </button>
+            <button className="pb-2 px-1 text-muted-foreground hover:text-foreground">
+              Archived
+            </button>
+            <button className="pb-2 px-1 text-muted-foreground hover:text-foreground">
+              Mentions
+            </button>
+          </div>
+        </div>
+
+        {/* Agent Groups */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-2">
+            <div className="text-xs font-semibold text-muted-foreground px-3 py-2">
+              Agent Groups
+            </div>
+            <div className="space-y-1">
+              {availableAgents.map((agent) => {
+                const AgentIcon = agent.icon;
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => setSelectedAgent(agent.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                      selectedAgent === agent.id
+                        ? 'bg-primary/10 border-l-2 border-primary'
+                        : 'hover:bg-accent'
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <AgentIcon className={`h-4 w-4 ${agent.color}`} />
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="font-medium text-sm truncate">
+                        {agent.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {agent.description}
+                      </div>
+                    </div>
+                    {agent.requiredRole === 'admin' && (
+                      <Settings className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Recent Conversations */}
+          {conversations.length > 0 && (
+            <div className="p-2 mt-2">
+              <div className="text-xs font-semibold text-muted-foreground px-3 py-2">
+                Recent Conversations
+              </div>
+              <div className="space-y-1">
+                {conversations.map((convo) => (
+                  <button
+                    key={convo.id}
+                    onClick={() => handleLoadConversation(convo.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                      currentConversationId === convo.id
+                        ? 'bg-primary/10 border-l-2 border-primary'
+                        : 'hover:bg-accent'
+                    }`}
+                  >
+                    <MessageSquare className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="font-medium text-sm truncate">{convo.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {convo.messageCount} messages
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(convo.lastMessageAt).toLocaleDateString()}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* New Conversation Button */}
+        <div className="p-3 border-t">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleNewConversation}
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            New Conversation
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col bg-background">
+        {/* Chat Header */}
+        <div className="h-16 border-b bg-card px-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
+            </div>
+            <div>
+              <h3 className="font-semibold">{currentAgent?.name}</h3>
+              <p className="text-xs text-muted-foreground">
+                {currentAgent?.description}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger>
+              <SelectTrigger className="w-[200px] h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -502,91 +596,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 ))}
               </SelectContent>
             </Select>
-          </CardContent>
-        </Card>
-
-        {/* Recent Conversations */}
-        <Card className="flex-1 overflow-hidden">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Recent
-              </CardTitle>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleImportConversation}
-                  title="Import conversation"
-                >
-                  <Upload className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleExportConversation}
-                  title="Export current conversation"
-                  disabled={!currentConversationId}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={handleNewConversation}>
-                  New
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2 overflow-y-auto max-h-[400px]">
-            {conversations.length === 0 ? (
-              <div className="text-sm text-muted-foreground text-center py-4">
-                No recent conversations
-              </div>
-            ) : (
-              conversations.map((convo) => (
-                <button
-                  key={convo.id}
-                  onClick={() => handleLoadConversation(convo.id)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                    currentConversationId === convo.id
-                      ? 'bg-primary/10 border-primary'
-                      : 'hover:bg-muted border-transparent'
-                  }`}
-                >
-                  <div className="font-medium text-sm truncate">{convo.title}</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
-                  </div>
-                </button>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Chat Area */}
-      <Card className="flex-1 flex flex-col">
-        <CardHeader className="border-b">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AgentIcon className={`h-6 w-6 ${currentAgent?.color}`} />
-              <div>
-                <CardTitle>{currentAgent?.name}</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {currentAgent?.description}
-                </p>
-              </div>
-            </div>
-            <Badge variant="outline">{selectedModel}</Badge>
+            <Button variant="ghost" size="icon" className="h-9 w-9">
+              <Settings className="h-4 w-4" />
+            </Button>
           </div>
-        </CardHeader>
+        </div>
 
-        {/* Messages */}
-        <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center space-y-4">
-                <AgentIcon className={`h-16 w-16 mx-auto ${currentAgent?.color}`} />
+                <div className="w-16 h-16 mx-auto rounded-full bg-primary/20 flex items-center justify-center">
+                  <AgentIcon className={`h-8 w-8 ${currentAgent?.color}`} />
+                </div>
                 <div>
                   <h3 className="text-lg font-semibold">
                     Welcome to {currentAgent?.name}
@@ -633,102 +656,119 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             ))
           )}
           <div ref={messagesEndRef} />
-        </CardContent>
+        </div>
 
         {/* Input Area */}
-        <div className="border-t p-4">
+        <div className="border-t bg-card">
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
-            <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-sm text-red-700">Listening: {interimTranscript}</span>
+            <div className="px-6 pt-3">
+              <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm text-red-700">Listening: {interimTranscript}</span>
+                </div>
               </div>
             </div>
           )}
+
+          {/* Attached Images */}
           {attachedImages.length > 0 && (
-            <div className="flex gap-2 mb-2">
-              {attachedImages.map((img, idx) => (
-                <div key={idx} className="relative w-16 h-16">
-                  <img
-                    src={img}
-                    alt="Attached"
-                    className="w-full h-full object-cover rounded"
-                  />
-                  <button
-                    onClick={() =>
-                      setAttachedImages((prev) => prev.filter((_, i) => i !== idx))
-                    }
-                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+            <div className="px-6 pt-3">
+              <div className="flex gap-2">
+                {attachedImages.map((img, idx) => (
+                  <div key={idx} className="relative w-16 h-16">
+                    <img
+                      src={img}
+                      alt="Attached"
+                      className="w-full h-full object-cover rounded"
+                    />
+                    <button
+                      onClick={() =>
+                        setAttachedImages((prev) => prev.filter((_, i) => i !== idx))
+                      }
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-          <div className="flex gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleImageUpload}
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Paperclip className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <ImageIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleVoiceInput}
-              className={isRecording ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' : ''}
-              title={
-                !isVoiceSupported
-                  ? 'Voice input not supported in this browser'
-                  : isRecording
-                    ? 'Stop recording'
-                    : 'Start voice input'
-              }
-              disabled={!isVoiceSupported}
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
+
+          {/* Input Controls */}
+          <div className="p-4">
+            <div className="flex items-end gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={handleImageUpload}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 w-9"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 w-9"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleVoiceInput}
+                className={`h-9 w-9 ${isRecording ? 'bg-red-500 text-white hover:bg-red-600 animate-pulse' : ''}`}
+                title={
+                  !isVoiceSupported
+                    ? 'Voice input not supported in this browser'
+                    : isRecording
+                      ? 'Stop recording'
+                      : 'Start voice input'
                 }
-              }}
-              placeholder="Type your message... (Shift+Enter for new line)"
-              className="flex-1 min-h-[60px] max-h-[120px]"
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
-              size="icon"
-              className="h-[60px]"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
+                disabled={!isVoiceSupported}
+              >
+                <Mic className="h-4 w-4" />
+              </Button>
+              <div className="flex-1 relative">
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Type your message... (Shift+Enter for new line)"
+                  className="min-h-[44px] max-h-[120px] resize-none pr-12"
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
+                  size="icon"
+                  className="absolute right-2 bottom-2 h-8 w-8 bg-primary hover:bg-primary/90"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">
+              Use ⌘ + K for shortcuts, or '/' for canned messages
+            </div>
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };
