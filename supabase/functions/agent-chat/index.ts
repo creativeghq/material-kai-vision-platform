@@ -26,10 +26,26 @@ try {
   if (typeof (globalThis as any).process.env === 'undefined') {
     (globalThis as any).process.env = {};
   }
-  (globalThis as any).process.env.ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-  (globalThis as any).process.env.OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+  const openaiKey = Deno.env.get('OPENAI_API_KEY');
+
+  console.log('🔑 Environment check:', {
+    anthropicKeyExists: !!anthropicKey,
+    anthropicKeyLength: anthropicKey?.length,
+    openaiKeyExists: !!openaiKey,
+    openaiKeyLength: openaiKey?.length,
+  });
+
+  (globalThis as any).process.env.ANTHROPIC_API_KEY = anthropicKey;
+  (globalThis as any).process.env.OPENAI_API_KEY = openaiKey;
+
+  console.log('✅ process.env setup complete:', {
+    processEnvAnthropicExists: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
+    processEnvOpenaiExists: !!(globalThis as any).process.env.OPENAI_API_KEY,
+  });
 } catch (e) {
-  console.error('Error setting up process.env:', e);
+  console.error('❌ Error setting up process.env:', e);
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
