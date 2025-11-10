@@ -267,7 +267,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           messages: messages.concat({
             id: `msg-${Date.now()}`,
             role: 'user',
-            content: input,
+            content: userInput,
             timestamp: new Date(),
           }),
           agentId: selectedAgent,
