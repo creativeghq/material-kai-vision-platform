@@ -20,17 +20,10 @@ import { tool } from 'npm:@langchain/core@0.3.29/tools';
 import { z } from 'npm:zod@3.24.1';
 import type { BaseMessage } from 'npm:@langchain/core@0.3.29/messages';
 
-// Get API keys from Deno environment
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+// Get environment variables (read at runtime, not module load time)
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-
-console.log('🔑 API Keys loaded:', {
-  anthropicExists: !!ANTHROPIC_API_KEY,
-  openaiExists: !!OPENAI_API_KEY,
-});
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -40,6 +33,15 @@ let chatModel: ChatAnthropic | null = null;
 
 function getChatModel(): ChatAnthropic {
   if (!chatModel) {
+    // Read API key at runtime, not at module load time
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+
+    console.log('🔑 Checking ANTHROPIC_API_KEY:', {
+      exists: !!ANTHROPIC_API_KEY,
+      length: ANTHROPIC_API_KEY?.length || 0,
+      prefix: ANTHROPIC_API_KEY?.substring(0, 7) || 'none',
+    });
+
     if (!ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY environment variable is not set in Supabase Edge Functions. Please add it in Supabase Dashboard > Edge Functions > Secrets.');
     }
@@ -50,7 +52,7 @@ function getChatModel(): ChatAnthropic {
       temperature: 1,
       maxTokens: 4096,
     });
-    console.log('✅ ChatAnthropic model initialized');
+    console.log('✅ ChatAnthropic model initialized with model: claude-sonnet-4-20250514');
   }
   return chatModel;
 }
