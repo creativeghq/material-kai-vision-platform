@@ -501,7 +501,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const AgentIcon = currentAgent?.icon || Bot;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-background">
+    <div className="flex h-[calc(100vh-4rem)]">
       {/* Middle Panel - Conversation List */}
       <div
         className="w-80 flex flex-col m-4 rounded-3xl"

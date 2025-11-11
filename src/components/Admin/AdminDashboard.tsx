@@ -657,7 +657,8 @@ const AdminDashboard: React.FC = () => {
                               </span>
                               <Button
                                 asChild
-                                className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                                variant="ghost"
+                                className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                               >
                                 <Link to={section.path}>Manage</Link>
                               </Button>
@@ -680,19 +681,19 @@ const AdminDashboard: React.FC = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span>PDF Documents</span>
-                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                      <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
                         156 Processed
                       </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Knowledge Entries</span>
-                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                      <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
                         1,247 Active
                       </Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Search Queries</span>
-                      <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                      <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
                         8,432 Total
                       </Badge>
                     </div>
@@ -721,19 +722,22 @@ const AdminDashboard: React.FC = () => {
                 <CardContent className="space-y-2">
                   <Button
                     asChild
-                    className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    variant="ghost"
+                    className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                   >
                     <Link to="/admin/pdf-processing">Process New PDF</Link>
                   </Button>
                   <Button
                     asChild
-                    className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    variant="ghost"
+                    className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                   >
                     <Link to="/admin/search-hub">Test Search System</Link>
                   </Button>
                   <Button
                     asChild
-                    className="w-full px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    variant="ghost"
+                    className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                   >
                     <Link to="/admin/3d-suggestions">
                       Configure 3D Suggestions
@@ -912,11 +916,11 @@ const AdminDashboard: React.FC = () => {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
+                <Button variant="ghost" className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20">
                   <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
-                <Button className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white">
+                <Button className="px-3 py-1 text-sm text-white hover:opacity-90" style={{ background: 'hsl(195, 25%, 45%)' }}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
@@ -933,14 +937,15 @@ const AdminDashboard: React.FC = () => {
                   className="w-full px-3 py-2 border border-input rounded-md"
                 />
               </div>
-              <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
+              <Button variant="ghost" className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20">
                 <Filter className="h-4 w-4 mr-2" />
                 Filter
               </Button>
               {selectedUsers.length > 0 && (
                 <div className="flex items-center gap-2">
                   <Button
-                    className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    variant="ghost"
+                    className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                     onClick={() => handleBulkUserAction('activate')}
                     onKeyDown={(e) =>
                       e.key === 'Enter' && handleBulkUserAction('activate')
@@ -949,7 +954,8 @@ const AdminDashboard: React.FC = () => {
                     Activate ({selectedUsers.length})
                   </Button>
                   <Button
-                    className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                    variant="ghost"
+                    className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                     onClick={() => handleBulkUserAction('deactivate')}
                     onKeyDown={(e) =>
                       e.key === 'Enter' && handleBulkUserAction('deactivate')
@@ -1020,7 +1026,7 @@ const AdminDashboard: React.FC = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
+                            <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
                               {user.role}
                             </Badge>
                           </td>
@@ -1041,7 +1047,8 @@ const AdminDashboard: React.FC = () => {
                           <td className="p-4">
                             <div className="flex items-center gap-2">
                               <Button
-                                className="px-2 py-1 text-sm hover:bg-gray-100"
+                                variant="ghost"
+                                className="px-2 py-1 text-sm hover:bg-white/10"
                                 onClick={() =>
                                   handleUserAction('edit', user.id)
                                 }
@@ -1053,7 +1060,8 @@ const AdminDashboard: React.FC = () => {
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
-                                className="px-2 py-1 text-sm hover:bg-gray-100"
+                                variant="ghost"
+                                className="px-2 py-1 text-sm hover:bg-white/10"
                                 onClick={() =>
                                   handleUserAction('view', user.id)
                                 }
@@ -1065,7 +1073,8 @@ const AdminDashboard: React.FC = () => {
                                 <Eye className="h-4 w-4" />
                               </Button>
                               <Button
-                                className="px-2 py-1 text-sm hover:bg-gray-100"
+                                variant="ghost"
+                                className="px-2 py-1 text-sm hover:bg-white/10"
                                 onClick={() =>
                                   handleUserAction('delete', user.id)
                                 }

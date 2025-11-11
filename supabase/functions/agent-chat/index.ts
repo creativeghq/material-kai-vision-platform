@@ -1,46 +1,147 @@
 /**
  * Agent Chat - LangChain.js Multi-Agent System
  *
+ * Replaces Mastra framework with LangChain.js for Deno Edge Runtime compatibility
+ *
  * Features:
  * - 8 specialized agents with RBAC
- * - Direct Anthropic API integration via LangChain
+ * - LangGraph for agent orchestration
+ * - Direct Anthropic API integration
  * - MIVAA Python API integration for search
  */
 
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Use Anthropic SDK directly instead of LangChain for better Deno compatibility
-import Anthropic from 'npm:@anthropic-ai/sdk@0.32.1';
+// LangChain imports - using correct npm package names for Deno
+import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
+import { tool } from 'npm:@langchain/core@0.3.29/tools';
+import { z } from 'npm:zod@3.24.1';
 
-// Get environment variables at module load
+// Get API keys from Deno environment - READ AT MODULE LOAD TIME
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
-// Set environment variables in a way npm packages can access them
-// This is required for npm: packages in Deno to access environment variables
-if (ANTHROPIC_API_KEY) {
-  (globalThis as any).process = (globalThis as any).process || {};
-  (globalThis as any).process.env = (globalThis as any).process.env || {};
-  (globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
-}
-
-console.log('🔑 Environment variables loaded:', {
-  supabaseUrl: !!SUPABASE_URL,
-  serviceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
-  anthropicKey: !!ANTHROPIC_API_KEY,
-  anthropicKeyLength: ANTHROPIC_API_KEY?.length || 0,
-  anthropicKeyPrefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'MISSING',
-  processEnvSet: !!(globalThis as any).process?.env?.ANTHROPIC_API_KEY,
+console.log('🔑 API Keys loaded:', {
+  anthropicExists: !!ANTHROPIC_API_KEY,
+  anthropicLength: ANTHROPIC_API_KEY?.length || 0,
 });
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// Initialize Claude model AT MODULE LOAD TIME
+const model = new ChatAnthropic({
+  apiKey: ANTHROPIC_API_KEY,
+  model: 'claude-sonnet-4-20250514',
+  temperature: 1,
+  maxTokens: 4096,
+});
 
+console.log('✅ LangChain ChatAnthropic model initialized');
+
+/**
+ * LangChain Tool: Material Search using MIVAA API
+ */
+const createSearchTool = (workspaceId: string) => {
+  return tool(
+    async ({ query, strategy = 'all', limit = 10 }) => {
+      try {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            workspace_id: workspaceId,
+            search_type: strategy,
+            limit,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`MIVAA API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return JSON.stringify(data);
+      } catch (error) {
+        console.error('Material search error:', error);
+        return JSON.stringify({
+          error: error instanceof Error ? error.message : 'Search failed',
+        });
+      }
+    },
+    {
+      name: 'material_search',
+      description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries.',
+      schema: z.object({
+        query: z.string().describe('Search query'),
+        strategy: z
+          .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
+          .default('all')
+          .describe('Search strategy'),
+        limit: z.number().default(10).describe('Maximum results'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Image Analysis using MIVAA API
+ */
+const createImageAnalysisTool = (workspaceId: string) => {
+  return tool(
+    async ({ imageUrl, analysisType = 'material_recognition' }) => {
+      try {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_url: imageUrl,
+            analysis_type: analysisType,
+            workspace_id: workspaceId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Image analysis failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        return JSON.stringify({
+          success: true,
+          analysis: data.analysis || {},
+          materials: data.materials || [],
+        });
+      } catch (error) {
+        console.error('Image analysis tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Image analysis failed',
+        });
+      }
+    },
+    {
+      name: 'image_analysis',
+      description: 'Analyze material images to identify products, materials, and properties',
+      schema: z.object({
+        imageUrl: z.string().describe('Image URL or base64 data'),
+        analysisType: z
+          .enum(['material_recognition', 'visual_search', 'product_identification'])
+          .default('material_recognition')
+          .describe('Type of image analysis'),
+      }),
+    }
+  );
+};
 
 /**
  * Agent Configurations with RBAC
@@ -214,7 +315,7 @@ Your role is to showcase platform capabilities with realistic examples.
 };
 
 /**
- * Execute agent with direct Anthropic SDK
+ * Execute agent with tools using LangChain
  */
 async function executeAgent(
   agentId: string,
@@ -227,43 +328,29 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  console.log('🔑 API Key check:', {
-    moduleLevel: !!ANTHROPIC_API_KEY,
-    length: ANTHROPIC_API_KEY?.length || 0,
-    prefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'MISSING',
-    processEnv: !!(globalThis as any).process?.env?.ANTHROPIC_API_KEY,
-    denoEnv: !!Deno.env.get('ANTHROPIC_API_KEY')
-  });
-
-  // Make absolutely sure the API key is available
-  const apiKey = ANTHROPIC_API_KEY || Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is not available');
-  }
-
-  console.log('🤖 Initializing Anthropic client with key:', apiKey.substring(0, 15));
-
-  // Initialize Anthropic client with explicit API key
-  const anthropic = new Anthropic({
-    apiKey: apiKey,
-  });
-
-  console.log('✅ Anthropic client initialized, creating message...');
-
-  // Create the message with system prompt
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    temperature: 1,
+  // Use the pre-initialized model
+  const response = await model.invoke(messages, {
     system: config.systemPrompt,
-    messages: messages
   });
 
   // Extract text content from response
-  const textContent = response.content
-    .filter((block: any) => block.type === 'text')
-    .map((block: any) => block.text)
-    .join('\n');
+  // LangChain response.content can be a string or array of content blocks
+  let textContent: string;
+  if (typeof response.content === 'string') {
+    textContent = response.content;
+  } else if (Array.isArray(response.content)) {
+    // Extract text from content blocks
+    textContent = response.content
+      .map((block: any) => {
+        if (typeof block === 'string') return block;
+        if (block.type === 'text') return block.text;
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  } else {
+    textContent = String(response.content);
+  }
 
   return textContent;
 }
@@ -345,7 +432,7 @@ async function saveConversation(userId: string, agentId: string, messages: any[]
 /**
  * Main handler
  */
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
