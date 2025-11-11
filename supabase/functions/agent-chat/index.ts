@@ -15,12 +15,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
 // LangChain imports for Deno
-import { ChatAnthropic } from 'npm:@langchain/anthropic';
-import { DynamicStructuredTool } from 'npm:@langchain/core/tools';
-import { z } from 'npm:zod';
-import { HumanMessage, AIMessage, SystemMessage } from 'npm:@langchain/core/messages';
-import { AgentExecutor, createToolCallingAgent } from 'npm:@langchain/agents';
-import { ChatPromptTemplate } from 'npm:@langchain/core/prompts';
+import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
+import { DynamicStructuredTool } from 'npm:@langchain/core@0.3.29/tools';
+import { z } from 'npm:zod@3.24.1';
+import { HumanMessage, AIMessage, SystemMessage } from 'npm:@langchain/core@0.3.29/messages';
+import { ChatPromptTemplate } from 'npm:@langchain/core@0.3.29/prompts';
+import { AgentExecutor } from 'npm:langchain@0.3.12/agents';
+import { pull } from 'npm:langchain@0.3.12/hub';
 
 // Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -346,16 +347,24 @@ async function createAgentExecutor(agentId: string, workspaceId: string) {
     ['placeholder', '{agent_scratchpad}'],
   ]);
 
-  // Create agent
-  const agent = await createToolCallingAgent({
-    llm: model,
-    tools,
-    prompt,
-  });
+  // Bind tools to the model
+  const modelWithTools = model.bindTools(tools);
 
-  // Create executor
+  // Create executor with simple tool calling
   return new AgentExecutor({
-    agent,
+    agent: async (input) => {
+      const messages = [
+        new SystemMessage(config.systemPrompt),
+        ...input.chat_history || [],
+        new HumanMessage(input.input),
+      ];
+
+      const response = await modelWithTools.invoke(messages);
+      return {
+        output: response.content,
+        log: '',
+      };
+    },
     tools,
     verbose: true,
   });
