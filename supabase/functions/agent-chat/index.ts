@@ -27,10 +27,13 @@ const { createAnthropic } = await import('npm:@ai-sdk/anthropic');
 
 // Create Anthropic provider with API key
 const anthropicProvider = createAnthropic({
-  apiKey: ANTHROPIC_API_KEY,
+  apiKey: ANTHROPIC_API_KEY || '',
+  headers: {
+    'x-api-key': ANTHROPIC_API_KEY || '',
+  },
 });
 
-console.log('✅ Anthropic provider created');
+console.log('✅ Anthropic provider created with API key:', ANTHROPIC_API_KEY?.substring(0, 20));
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
