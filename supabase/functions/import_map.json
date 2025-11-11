@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@langchain/anthropic": "https://esm.sh/@langchain/anthropic@0.3.11",
+    "@langchain/core/": "https://esm.sh/@langchain/core@0.3.29/",
+    "zod": "https://esm.sh/zod@3.24.1"
+  }
+}
+

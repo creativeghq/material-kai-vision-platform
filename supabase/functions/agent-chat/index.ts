@@ -1,21 +1,20 @@
 /**
- * Agent Chat - LangChain.js + LangGraph.js Multi-Agent System
- * 
+ * Agent Chat - LangChain.js Multi-Agent System
+ *
  * Features:
  * - 8 specialized agents with RBAC
- * - LangGraph for agent orchestration
- * - Direct Anthropic API integration
+ * - Direct Anthropic API integration via LangChain
  * - MIVAA Python API integration for search
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// LangChain imports - using correct npm package names for Deno
-import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
-import { tool } from 'npm:@langchain/core@0.3.29/tools';
-import { z } from 'npm:zod@3.24.1';
+// LangChain imports - using ESM imports for Supabase Edge Functions
+import { ChatAnthropic } from "@langchain/anthropic";
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
 
 // Get environment variables at module load
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -23,22 +22,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
-// CRITICAL: LangChain's ChatAnthropic expects process.env.ANTHROPIC_API_KEY (Node.js style)
-// In Deno, we need to set it on the global process object that Deno polyfills
-// @ts-ignore - Deno provides process global for Node.js compatibility
-if (typeof process !== 'undefined' && process.env) {
-  // @ts-ignore
-  process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
-}
-
 console.log('🔑 Environment variables loaded:', {
   supabaseUrl: !!SUPABASE_URL,
   serviceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
   anthropicKey: !!ANTHROPIC_API_KEY,
   anthropicKeyLength: ANTHROPIC_API_KEY?.length || 0,
   anthropicKeyPrefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'MISSING',
-  // @ts-ignore
-  processEnvSet: typeof process !== 'undefined' && !!process.env?.ANTHROPIC_API_KEY,
 });
 
 // Initialize Supabase client
@@ -329,8 +318,9 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Initialize model - API key is read from process.env.ANTHROPIC_API_KEY (set at module load)
+  // Initialize ChatAnthropic with explicit API key
   const model = new ChatAnthropic({
+    apiKey: ANTHROPIC_API_KEY,
     model: 'claude-sonnet-4-20250514',
     temperature: 1,
     maxTokens: 4096,
@@ -439,7 +429,7 @@ async function saveConversation(userId: string, agentId: string, messages: any[]
 /**
  * Main handler
  */
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
