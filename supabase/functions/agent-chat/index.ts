@@ -12,9 +12,6 @@ import { Agent } from 'npm:@mastra/core/agent';
 import { createTool } from 'npm:@mastra/core/tools';
 import { z } from 'npm:zod';
 
-// Vercel AI SDK - for direct model access
-import { anthropic } from 'npm:@ai-sdk/anthropic@1.0.8';
-
 // Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -25,10 +22,15 @@ console.log('🔑 API Keys loaded:', {
   openaiExists: !!OPENAI_API_KEY,
 });
 
+// Vercel AI SDK - for direct model access (import after logging to debug)
+const { anthropic } = await import('npm:@ai-sdk/anthropic');
+
 // Create Anthropic client with API key
 const anthropicClient = anthropic({
   apiKey: ANTHROPIC_API_KEY,
 });
+
+console.log('✅ Anthropic client created');
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
