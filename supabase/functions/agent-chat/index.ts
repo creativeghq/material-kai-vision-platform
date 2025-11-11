@@ -20,13 +20,22 @@ import { tool } from 'npm:@langchain/core@0.3.29/tools';
 import { z } from 'npm:zod@3.24.1';
 import type { BaseMessage } from 'npm:@langchain/core@0.3.29/messages';
 
-// Get environment variables (read at runtime, not module load time)
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+// Lazy initialization for Supabase client
+let supabase: any = null;
 
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+function getSupabaseClient() {
+  if (!supabase) {
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
+    }
+
+    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  }
+  return supabase;
+}
 
 // ChatAnthropic model will be initialized lazily on first request
 let chatModel: ChatAnthropic | null = null;
@@ -69,7 +78,8 @@ const createSearchTool = (workspaceId: string) => {
   return tool(
     async ({ query, strategy = 'all', limit = 10 }) => {
       try {
-        const response = await fetch(`${MIVAA_API_URL}/search`, {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -115,6 +125,7 @@ const createImageAnalysisTool = (workspaceId: string) => {
   return tool(
     async ({ imageUrl, analysisType = 'material_recognition' }) => {
       try {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
         const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
           method: 'POST',
           headers: {
@@ -398,6 +409,7 @@ async function executeAgent(
  */
 async function checkAgentAccess(userId: string, agentId: string): Promise<{ allowed: boolean; role: string }> {
   try {
+    const supabase = getSupabaseClient();
     // Get user's workspace role
     const { data: memberData, error } = await supabase
       .from('workspace_members')
@@ -429,6 +441,7 @@ async function checkAgentAccess(userId: string, agentId: string): Promise<{ allo
  */
 async function getUserWorkspaceId(userId: string): Promise<string | null> {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('workspace_members')
       .select('workspace_id')
@@ -451,6 +464,7 @@ async function getUserWorkspaceId(userId: string): Promise<string | null> {
  */
 async function saveConversation(userId: string, agentId: string, messages: any[], response: string) {
   try {
+    const supabase = getSupabaseClient();
     const { error } = await supabase.from('agent_chat_conversations').insert({
       user_id: userId,
       agent_id: agentId,
@@ -487,6 +501,7 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
+    const supabase = getSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
