@@ -2,6 +2,17 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
 serve(async (req) => {
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
+  }
+
   try {
     // Get all environment variables
     const allEnvKeys = Object.keys(Deno.env.toObject());
@@ -39,7 +50,10 @@ serve(async (req) => {
     };
 
     return new Response(JSON.stringify(result, null, 2), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
       status: 200,
     });
   } catch (error) {
@@ -49,7 +63,10 @@ serve(async (req) => {
         stack: error instanceof Error ? error.stack : undefined,
       }),
       {
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
         status: 500,
       }
     );
