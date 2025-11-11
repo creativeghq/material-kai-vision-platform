@@ -20,6 +20,9 @@ import { DynamicStructuredTool } from 'https://esm.sh/@langchain/core@0.3.29/too
 import { z } from 'https://esm.sh/zod@3.24.1';
 import { HumanMessage, AIMessage, SystemMessage } from 'https://esm.sh/@langchain/core@0.3.29/messages';
 
+// Disable LangSmith tracing (optional feature that causes import errors in Deno)
+Deno.env.set('LANGCHAIN_TRACING_V2', 'false');
+
 // Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -40,6 +43,10 @@ let model: ChatAnthropic | null = null;
 
 function getModel(): ChatAnthropic {
   if (!model) {
+    if (!ANTHROPIC_API_KEY) {
+      throw new Error('ANTHROPIC_API_KEY environment variable is not set in Supabase Edge Functions. Please add it in Supabase Dashboard > Edge Functions > Secrets.');
+    }
+
     model = new ChatAnthropic({
       apiKey: ANTHROPIC_API_KEY,
       model: 'claude-sonnet-4-20250514',
