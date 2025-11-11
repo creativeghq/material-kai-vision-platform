@@ -19,9 +19,6 @@ import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
 import { DynamicStructuredTool } from 'npm:@langchain/core@0.3.29/tools';
 import { z } from 'npm:zod@3.24.1';
 import { HumanMessage, AIMessage, SystemMessage } from 'npm:@langchain/core@0.3.29/messages';
-import { ChatPromptTemplate } from 'npm:@langchain/core@0.3.29/prompts';
-import { AgentExecutor } from 'npm:langchain@0.3.12/agents';
-import { pull } from 'npm:langchain@0.3.12/hub';
 
 // Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -322,9 +319,14 @@ Your role is to showcase platform capabilities with realistic examples.
 };
 
 /**
- * Create LangChain Agent Executor
+ * Execute agent with tools
  */
-async function createAgentExecutor(agentId: string, workspaceId: string) {
+async function executeAgent(
+  agentId: string,
+  workspaceId: string,
+  userInput: string,
+  chatHistory: any[]
+) {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
@@ -339,35 +341,52 @@ async function createAgentExecutor(agentId: string, workspaceId: string) {
     tools.push(createImageAnalysisTool(workspaceId));
   }
 
-  // Create prompt template
-  const prompt = ChatPromptTemplate.fromMessages([
-    ['system', config.systemPrompt],
-    ['placeholder', '{chat_history}'],
-    ['human', '{input}'],
-    ['placeholder', '{agent_scratchpad}'],
-  ]);
-
   // Bind tools to the model
   const modelWithTools = model.bindTools(tools);
 
-  // Create executor with simple tool calling
-  return new AgentExecutor({
-    agent: async (input) => {
-      const messages = [
-        new SystemMessage(config.systemPrompt),
-        ...input.chat_history || [],
-        new HumanMessage(input.input),
-      ];
+  // Build messages
+  const messages = [
+    new SystemMessage(config.systemPrompt),
+    ...chatHistory,
+    new HumanMessage(userInput),
+  ];
 
-      const response = await modelWithTools.invoke(messages);
-      return {
-        output: response.content,
-        log: '',
-      };
-    },
-    tools,
-    verbose: true,
-  });
+  // Invoke model with tools
+  const response = await modelWithTools.invoke(messages);
+
+  // Check if model wants to use tools
+  if (response.tool_calls && response.tool_calls.length > 0) {
+    // Execute tool calls
+    const toolResults = [];
+    for (const toolCall of response.tool_calls) {
+      const tool = tools.find((t) => t.name === toolCall.name);
+      if (tool) {
+        try {
+          const result = await tool.func(toolCall.args);
+          toolResults.push({
+            tool: toolCall.name,
+            result,
+          });
+        } catch (error) {
+          console.error(`Tool ${toolCall.name} error:`, error);
+          toolResults.push({
+            tool: toolCall.name,
+            error: error instanceof Error ? error.message : 'Tool execution failed',
+          });
+        }
+      }
+    }
+
+    // Add tool results to messages and get final response
+    const toolMessage = new AIMessage(
+      `Tool results: ${JSON.stringify(toolResults, null, 2)}`
+    );
+    const finalResponse = await model.invoke([...messages, response, toolMessage]);
+    return finalResponse.content;
+  }
+
+  // No tools needed, return direct response
+  return response.content;
 }
 
 /**
@@ -490,9 +509,6 @@ serve(async (req) => {
       throw new Error('No workspace found for user');
     }
 
-    // Create agent executor
-    const executor = await createAgentExecutor(agentId, workspaceId);
-
     // Get last user message
     const lastMessage = messages[messages.length - 1];
     const userInput = lastMessage?.content || '';
@@ -507,18 +523,15 @@ serve(async (req) => {
     });
 
     // Execute agent
-    const result = await executor.invoke({
-      input: userInput,
-      chat_history: chatHistory,
-    });
+    const result = await executeAgent(agentId, workspaceId, userInput, chatHistory);
 
     // Save conversation
-    await saveConversation(user.id, agentId, messages, result.output);
+    await saveConversation(user.id, agentId, messages, result);
 
     // Return response
     return new Response(
       JSON.stringify({
-        text: result.output,
+        text: result,
         agentId,
         model: 'claude-sonnet-4-20250514',
         usage: {
