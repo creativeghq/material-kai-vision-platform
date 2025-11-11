@@ -14,9 +14,11 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Use Anthropic SDK directly (avoids LangChain's LangSmith dependency issues in Deno)
-import Anthropic from 'npm:@anthropic-ai/sdk@0.32.1';
-import { z } from 'https://esm.sh/zod@3.24.1';
+// LangChain imports - using correct npm package names for Deno
+import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
+import { tool } from 'npm:@langchain/core@0.3.29/tools';
+import { z } from 'npm:zod@3.24.1';
+import type { BaseMessage } from 'npm:@langchain/core@0.3.29/messages';
 
 // Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -33,155 +35,122 @@ console.log('🔑 API Keys loaded:', {
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Anthropic client will be initialized lazily on first request
-let anthropic: Anthropic | null = null;
+// ChatAnthropic model will be initialized lazily on first request
+let chatModel: ChatAnthropic | null = null;
 
-function getAnthropicClient(): Anthropic {
-  if (!anthropic) {
+function getChatModel(): ChatAnthropic {
+  if (!chatModel) {
     if (!ANTHROPIC_API_KEY) {
       throw new Error('ANTHROPIC_API_KEY environment variable is not set in Supabase Edge Functions. Please add it in Supabase Dashboard > Edge Functions > Secrets.');
     }
 
-    anthropic = new Anthropic({
+    chatModel = new ChatAnthropic({
       apiKey: ANTHROPIC_API_KEY,
+      model: 'claude-sonnet-4-20250514',
+      temperature: 1,
+      maxTokens: 4096,
     });
-    console.log('✅ Anthropic SDK client initialized');
+    console.log('✅ ChatAnthropic model initialized');
   }
-  return anthropic;
+  return chatModel;
 }
 
 /**
- * Anthropic Tool: Material Search using MIVAA API
+ * LangChain Tool: Material Search using MIVAA API
  */
-const createSearchTool = (workspaceId: string): Anthropic.Tool => {
-  return {
-    name: 'material_search',
-    description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Search query',
-        },
-        strategy: {
-          type: 'string',
-          enum: ['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'],
-          default: 'all',
-          description: 'Search strategy',
-        },
-        limit: {
-          type: 'number',
-          default: 10,
-          description: 'Maximum results',
-        },
-      },
-      required: ['query'],
+const createSearchTool = (workspaceId: string) => {
+  return tool(
+    async ({ query, strategy = 'all', limit = 10 }) => {
+      try {
+        const response = await fetch(`${MIVAA_API_URL}/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            workspace_id: workspaceId,
+            search_type: strategy,
+            limit,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`MIVAA API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        return JSON.stringify(data);
+      } catch (error) {
+        console.error('Material search error:', error);
+        return JSON.stringify({
+          error: error instanceof Error ? error.message : 'Search failed',
+        });
+      }
     },
-  };
-};
-
-/**
- * Execute material search tool
- */
-const executeSearchTool = async (workspaceId: string, input: any) => {
-  const { query, strategy = 'all', limit = 10 } = input;
-  try {
-    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search?strategy=${strategy}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        top_k: limit,
-        workspace_id: workspaceId,
+    {
+      name: 'material_search',
+      description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries.',
+      schema: z.object({
+        query: z.string().describe('Search query'),
+        strategy: z
+          .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
+          .default('all')
+          .describe('Search strategy'),
+        limit: z.number().default(10).describe('Maximum results'),
       }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Search failed: ${response.statusText}`);
     }
-
-    const data = await response.json();
-
-    return JSON.stringify({
-      success: true,
-      results: data.results || [],
-      total: data.total_results || 0,
-      strategy: data.search_type || strategy,
-    });
-  } catch (error) {
-    console.error('Search tool error:', error);
-    return JSON.stringify({
-      success: false,
-      error: error instanceof Error ? error.message : 'Search failed',
-    });
-  }
+  );
 };
 
 /**
- * Anthropic Tool: Image Analysis using MIVAA API
+ * LangChain Tool: Image Analysis using MIVAA API
  */
-const createImageAnalysisTool = (workspaceId: string): Anthropic.Tool => {
-  return {
-    name: 'image_analysis',
-    description: 'Analyze material images to identify products, materials, and properties',
-    input_schema: {
-      type: 'object',
-      properties: {
-        imageUrl: {
-          type: 'string',
-          description: 'Image URL or base64 data',
-        },
-        analysisType: {
-          type: 'string',
-          enum: ['material_recognition', 'visual_search', 'product_identification'],
-          default: 'material_recognition',
-          description: 'Type of image analysis',
-        },
-      },
-      required: ['imageUrl'],
+const createImageAnalysisTool = (workspaceId: string) => {
+  return tool(
+    async ({ imageUrl, analysisType = 'material_recognition' }) => {
+      try {
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_url: imageUrl,
+            analysis_type: analysisType,
+            workspace_id: workspaceId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Image analysis failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        return JSON.stringify({
+          success: true,
+          analysis: data.analysis || {},
+          materials: data.materials || [],
+        });
+      } catch (error) {
+        console.error('Image analysis tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Image analysis failed',
+        });
+      }
     },
-  };
-};
-
-/**
- * Execute image analysis tool
- */
-const executeImageAnalysisTool = async (workspaceId: string, input: any) => {
-  const { imageUrl, analysisType = 'material_recognition' } = input;
-  try {
-    const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        image_url: imageUrl,
-        analysis_type: analysisType,
-        workspace_id: workspaceId,
+    {
+      name: 'image_analysis',
+      description: 'Analyze material images to identify products, materials, and properties',
+      schema: z.object({
+        imageUrl: z.string().describe('Image URL or base64 data'),
+        analysisType: z
+          .enum(['material_recognition', 'visual_search', 'product_identification'])
+          .default('material_recognition')
+          .describe('Type of image analysis'),
       }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Image analysis failed: ${response.statusText}`);
     }
-
-    const data = await response.json();
-
-    return JSON.stringify({
-      success: true,
-      analysis: data.analysis || {},
-      materials: data.materials || [],
-    });
-  } catch (error) {
-    console.error('Image analysis tool error:', error);
-    return JSON.stringify({
-      success: false,
-      error: error instanceof Error ? error.message : 'Image analysis failed',
-    });
-  }
+  );
 };
 
 /**
@@ -356,21 +325,24 @@ Your role is to showcase platform capabilities with realistic examples.
 };
 
 /**
- * Execute agent with tools using Anthropic SDK
+ * Execute agent with tools using LangChain
  */
 async function executeAgent(
   agentId: string,
   workspaceId: string,
   userInput: string,
-  chatHistory: Anthropic.MessageParam[]
+  chatHistory: BaseMessage[]
 ) {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
+  // Get ChatAnthropic model
+  const model = getChatModel();
+
   // Create tools based on agent configuration
-  const tools: Anthropic.Tool[] = [];
+  const tools = [];
   if (config.tools.includes('material_search')) {
     tools.push(createSearchTool(workspaceId));
   }
@@ -378,112 +350,22 @@ async function executeAgent(
     tools.push(createImageAnalysisTool(workspaceId));
   }
 
-  // Get Anthropic client
-  const client = getAnthropicClient();
+  // Bind tools to model if any tools are configured
+  const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
 
-  // Build messages (Anthropic format)
-  const messages: Anthropic.MessageParam[] = [
+  // Build messages array
+  const messages = [
     ...chatHistory,
-    {
-      role: 'user',
-      content: userInput,
-    },
+    { role: 'user', content: userInput },
   ];
 
-  // Create message with tools
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    temperature: 1,
+  // Invoke model with system prompt
+  const response = await modelWithTools.invoke(messages, {
     system: config.systemPrompt,
-    messages,
-    tools: tools.length > 0 ? tools : undefined,
   });
 
-  // Check if model wants to use tools
-  if (response.stop_reason === 'tool_use') {
-    const toolUseBlocks = response.content.filter((block) => block.type === 'tool_use');
-
-    if (toolUseBlocks.length > 0) {
-      // Execute tool calls
-      const toolResults: Anthropic.MessageParam[] = [];
-
-      for (const block of toolUseBlocks) {
-        if (block.type === 'tool_use') {
-          try {
-            let result: string;
-
-            // Execute the appropriate tool
-            if (block.name === 'material_search') {
-              result = await executeSearchTool(workspaceId, block.input);
-            } else if (block.name === 'image_analysis') {
-              result = await executeImageAnalysisTool(workspaceId, block.input);
-            } else {
-              result = JSON.stringify({ error: 'Unknown tool' });
-            }
-
-            toolResults.push({
-              role: 'user',
-              content: [
-                {
-                  type: 'tool_result',
-                  tool_use_id: block.id,
-                  content: result,
-                },
-              ],
-            });
-          } catch (error) {
-            console.error(`Tool ${block.name} error:`, error);
-            toolResults.push({
-              role: 'user',
-              content: [
-                {
-                  type: 'tool_result',
-                  tool_use_id: block.id,
-                  content: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Tool execution failed',
-                  }),
-                  is_error: true,
-                },
-              ],
-            });
-          }
-        }
-      }
-
-      // Get final response with tool results
-      const finalResponse = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
-        temperature: 1,
-        system: config.systemPrompt,
-        messages: [
-          ...messages,
-          {
-            role: 'assistant',
-            content: response.content,
-          },
-          ...toolResults,
-        ],
-      });
-
-      // Extract text content from response
-      const textContent = finalResponse.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.type === 'text' ? block.text : '')
-        .join('\n');
-
-      return textContent;
-    }
-  }
-
-  // No tools needed, return direct response
-  const textContent = response.content
-    .filter((block) => block.type === 'text')
-    .map((block) => block.type === 'text' ? block.text : '')
-    .join('\n');
-
-  return textContent;
+  // Extract text content from response
+  return response.content as string;
 }
 
 /**
@@ -610,11 +492,11 @@ serve(async (req) => {
     const lastMessage = messages[messages.length - 1];
     const userInput = lastMessage?.content || '';
 
-    // Convert messages to Anthropic format (chat history without last message)
-    const chatHistory: Anthropic.MessageParam[] = messages.slice(0, -1).map((msg: any) => ({
+    // Convert messages to LangChain BaseMessage format (chat history without last message)
+    const chatHistory: BaseMessage[] = messages.slice(0, -1).map((msg: any) => ({
       role: msg.role === 'user' ? 'user' : 'assistant',
       content: msg.content,
-    }));
+    })) as BaseMessage[];
 
     // Execute agent
     const result = await executeAgent(agentId, workspaceId, userInput, chatHistory);
