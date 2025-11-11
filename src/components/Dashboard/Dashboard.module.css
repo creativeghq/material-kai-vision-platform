@@ -3,19 +3,12 @@
 /* Layout & Container Styles */
 .container {
   min-height: 100vh;
-  background: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--background)), hsl(var(--accent) / 0.2));
 }
 
 /* Hero Section */
 .heroSection {
   position: relative;
   overflow: hidden;
-}
-
-.heroBackground {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to bottom right, hsl(var(--primary) / 0.1), transparent, hsl(var(--accent) / 0.1));
 }
 
 .heroContent {
@@ -52,16 +45,14 @@
 .heroTitle {
   font-size: 3rem;
   font-weight: bold;
-  background: linear-gradient(to right, hsl(var(--foreground)), hsl(var(--primary)));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: #BFB3A3;
   line-height: 1.2;
 }
 
 .heroSubtitle {
   font-size: 2.5rem;
   font-weight: bold;
+  color: #BFB3A3;
 }
 
 .heroDescription {

@@ -23,12 +23,22 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
+// CRITICAL: LangChain's ChatAnthropic expects process.env.ANTHROPIC_API_KEY (Node.js style)
+// In Deno, we need to set it on the global process object that Deno polyfills
+// @ts-ignore - Deno provides process global for Node.js compatibility
+if (typeof process !== 'undefined' && process.env) {
+  // @ts-ignore
+  process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
+}
+
 console.log('🔑 Environment variables loaded:', {
   supabaseUrl: !!SUPABASE_URL,
   serviceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
   anthropicKey: !!ANTHROPIC_API_KEY,
   anthropicKeyLength: ANTHROPIC_API_KEY?.length || 0,
   anthropicKeyPrefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'MISSING',
+  // @ts-ignore
+  processEnvSet: typeof process !== 'undefined' && !!process.env?.ANTHROPIC_API_KEY,
 });
 
 // Initialize Supabase client
@@ -319,9 +329,8 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Initialize model with API key from module-level constant
+  // Initialize model - API key is read from process.env.ANTHROPIC_API_KEY (set at module load)
   const model = new ChatAnthropic({
-    apiKey: ANTHROPIC_API_KEY,
     model: 'claude-sonnet-4-20250514',
     temperature: 1,
     maxTokens: 4096,

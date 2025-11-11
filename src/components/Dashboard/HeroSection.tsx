@@ -12,7 +12,6 @@ interface HeroSectionProps {
 export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
   return (
     <div className={styles.heroSection}>
-      <div className={styles.heroBackground} />
       <div className={styles.heroContent}>
         <div className={styles.heroFloating}>
           <div className={styles.heroBadge}>
