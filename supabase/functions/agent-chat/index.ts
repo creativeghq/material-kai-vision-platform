@@ -11,10 +11,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// LangChain imports - using npm: prefix for Deno (no import_map.json needed)
-import { ChatAnthropic } from "npm:@langchain/anthropic";
-import { tool } from "npm:@langchain/core/tools";
-import { z } from "npm:zod";
+// Use Anthropic SDK directly instead of LangChain for better Deno compatibility
+import Anthropic from 'npm:@anthropic-ai/sdk@0.32.1';
 
 // Get environment variables at module load
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -33,105 +31,7 @@ console.log('🔑 Environment variables loaded:', {
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-/**
- * LangChain Tool: Material Search using MIVAA API
- */
-const createSearchTool = (workspaceId: string) => {
-  return tool(
-    async ({ query, strategy = 'all', limit = 10 }) => {
-      try {
-        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-        const response = await fetch(`${MIVAA_GATEWAY_URL}/search`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            workspace_id: workspaceId,
-            search_type: strategy,
-            limit,
-          }),
-        });
 
-        if (!response.ok) {
-          throw new Error(`MIVAA API error: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        return JSON.stringify(data);
-      } catch (error) {
-        console.error('Material search error:', error);
-        return JSON.stringify({
-          error: error instanceof Error ? error.message : 'Search failed',
-        });
-      }
-    },
-    {
-      name: 'material_search',
-      description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries.',
-      schema: z.object({
-        query: z.string().describe('Search query'),
-        strategy: z
-          .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
-          .default('all')
-          .describe('Search strategy'),
-        limit: z.number().default(10).describe('Maximum results'),
-      }),
-    }
-  );
-};
-
-/**
- * LangChain Tool: Image Analysis using MIVAA API
- */
-const createImageAnalysisTool = (workspaceId: string) => {
-  return tool(
-    async ({ imageUrl, analysisType = 'material_recognition' }) => {
-      try {
-        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_url: imageUrl,
-            analysis_type: analysisType,
-            workspace_id: workspaceId,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Image analysis failed: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        return JSON.stringify({
-          success: true,
-          analysis: data.analysis || {},
-          materials: data.materials || [],
-        });
-      } catch (error) {
-        console.error('Image analysis tool error:', error);
-        return JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : 'Image analysis failed',
-        });
-      }
-    },
-    {
-      name: 'image_analysis',
-      description: 'Analyze material images to identify products, materials, and properties',
-      schema: z.object({
-        imageUrl: z.string().describe('Image URL or base64 data'),
-        analysisType: z
-          .enum(['material_recognition', 'visual_search', 'product_identification'])
-          .default('material_recognition')
-          .describe('Type of image analysis'),
-      }),
-    }
-  );
-};
 
 /**
  * Agent Configurations with RBAC
@@ -305,7 +205,7 @@ Your role is to showcase platform capabilities with realistic examples.
 };
 
 /**
- * Execute agent with tools using LangChain
+ * Execute agent with direct Anthropic SDK
  */
 async function executeAgent(
   agentId: string,
@@ -318,37 +218,30 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Initialize ChatAnthropic with explicit API key
-  // IMPORTANT: Use 'anthropicApiKey' not 'apiKey' for npm: imports in Deno
-  const model = new ChatAnthropic({
-    anthropicApiKey: ANTHROPIC_API_KEY,
-    model: 'claude-sonnet-4-20250514',
-    temperature: 1,
-    maxTokens: 4096,
+  console.log('🔑 API Key found:', {
+    length: ANTHROPIC_API_KEY.length,
+    prefix: ANTHROPIC_API_KEY.substring(0, 10)
   });
 
-  const response = await model.invoke(messages, {
+  // Initialize Anthropic client with explicit API key
+  const anthropic = new Anthropic({
+    apiKey: ANTHROPIC_API_KEY,
+  });
+
+  // Create the message with system prompt
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 4096,
+    temperature: 1,
     system: config.systemPrompt,
+    messages: messages
   });
 
   // Extract text content from response
-  // LangChain response.content can be a string or array of content blocks
-  let textContent: string;
-  if (typeof response.content === 'string') {
-    textContent = response.content;
-  } else if (Array.isArray(response.content)) {
-    // Extract text from content blocks
-    textContent = response.content
-      .map((block: any) => {
-        if (typeof block === 'string') return block;
-        if (block.type === 'text') return block.text;
-        return '';
-      })
-      .filter(Boolean)
-      .join('\n');
-  } else {
-    textContent = String(response.content);
-  }
+  const textContent = response.content
+    .filter((block: any) => block.type === 'text')
+    .map((block: any) => block.text)
+    .join('\n');
 
   return textContent;
 }
