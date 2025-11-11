@@ -18,49 +18,30 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
 import { tool } from 'npm:@langchain/core@0.3.29/tools';
 import { z } from 'npm:zod@3.24.1';
-import type { BaseMessage } from 'npm:@langchain/core@0.3.29/messages';
 
-// Lazy initialization for Supabase client
-let supabase: any = null;
+// Get API keys from Deno environment - READ AT MODULE LOAD TIME
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
-function getSupabaseClient() {
-  if (!supabase) {
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+console.log('🔑 API Keys loaded:', {
+  anthropicExists: !!ANTHROPIC_API_KEY,
+  anthropicLength: ANTHROPIC_API_KEY?.length || 0,
+});
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
-    }
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  }
-  return supabase;
-}
+// Initialize Claude model
+const model = new ChatAnthropic({
+  apiKey: ANTHROPIC_API_KEY,
+  model: 'claude-sonnet-4-20250514',
+  temperature: 1,
+  maxTokens: 4096,
+});
 
-/**
- * Create ChatAnthropic model with API key from environment
- */
-function createChatModel(): ChatAnthropic {
-  // Read API key at runtime
-  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-
-  console.log('🔑 ANTHROPIC_API_KEY check:', {
-    exists: !!ANTHROPIC_API_KEY,
-    length: ANTHROPIC_API_KEY?.length || 0,
-    prefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'none',
-  });
-
-  if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.trim() === '') {
-    throw new Error(`ANTHROPIC_API_KEY is empty. Length: ${ANTHROPIC_API_KEY?.length || 0}`);
-  }
-
-  return new ChatAnthropic({
-    apiKey: ANTHROPIC_API_KEY,
-    model: 'claude-sonnet-4-20250514',
-    temperature: 1,
-    maxTokens: 4096,
-  });
-}
+console.log('✅ LangChain ChatAnthropic model initialized');
 
 /**
  * LangChain Tool: Material Search using MIVAA API
@@ -347,10 +328,7 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Create ChatAnthropic model (fresh each time to ensure env vars are read)
-  const model = createChatModel();
-
-  // Invoke model with system prompt - simple, no tools for now
+  // Use the pre-initialized model
   const response = await model.invoke(messages, {
     system: config.systemPrompt,
   });
@@ -382,7 +360,6 @@ async function executeAgent(
  */
 async function checkAgentAccess(userId: string, agentId: string): Promise<{ allowed: boolean; role: string }> {
   try {
-    const supabase = getSupabaseClient();
     // Get user's workspace role
     const { data: memberData, error } = await supabase
       .from('workspace_members')
@@ -414,7 +391,6 @@ async function checkAgentAccess(userId: string, agentId: string): Promise<{ allo
  */
 async function getUserWorkspaceId(userId: string): Promise<string | null> {
   try {
-    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('workspace_members')
       .select('workspace_id')
@@ -437,7 +413,6 @@ async function getUserWorkspaceId(userId: string): Promise<string | null> {
  */
 async function saveConversation(userId: string, agentId: string, messages: any[], response: string) {
   try {
-    const supabase = getSupabaseClient();
     const { error } = await supabase.from('agent_chat_conversations').insert({
       user_id: userId,
       agent_id: agentId,
@@ -474,7 +449,6 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const supabase = getSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
