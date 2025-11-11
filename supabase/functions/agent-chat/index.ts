@@ -37,38 +37,29 @@ function getSupabaseClient() {
   return supabase;
 }
 
-// ChatAnthropic model will be initialized lazily on first request
-let chatModel: ChatAnthropic | null = null;
+/**
+ * Create ChatAnthropic model with API key from environment
+ */
+function createChatModel(): ChatAnthropic {
+  // Read API key at runtime
+  const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 
-function getChatModel(): ChatAnthropic {
-  if (!chatModel) {
-    // Read API key at runtime, not at module load time
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+  console.log('🔑 ANTHROPIC_API_KEY check:', {
+    exists: !!ANTHROPIC_API_KEY,
+    length: ANTHROPIC_API_KEY?.length || 0,
+    prefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'none',
+  });
 
-    // Debug: Log all environment variables to see what's available
-    console.log('🔍 All Deno.env keys:', Array.from(Deno.env.toObject()).map(([k]) => k));
-
-    console.log('🔑 Checking ANTHROPIC_API_KEY:', {
-      exists: ANTHROPIC_API_KEY !== undefined && ANTHROPIC_API_KEY !== null,
-      isEmptyString: ANTHROPIC_API_KEY === '',
-      length: ANTHROPIC_API_KEY?.length || 0,
-      prefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'none',
-      type: typeof ANTHROPIC_API_KEY,
-    });
-
-    if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.trim() === '') {
-      throw new Error(`ANTHROPIC_API_KEY environment variable is not set or is empty in Supabase Edge Functions. Value: "${ANTHROPIC_API_KEY}". Please add it in Supabase Dashboard > Edge Functions > Secrets.`);
-    }
-
-    chatModel = new ChatAnthropic({
-      apiKey: ANTHROPIC_API_KEY,
-      model: 'claude-sonnet-4-20250514',
-      temperature: 1,
-      maxTokens: 4096,
-    });
-    console.log('✅ ChatAnthropic model initialized with model: claude-sonnet-4-20250514');
+  if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.trim() === '') {
+    throw new Error(`ANTHROPIC_API_KEY is empty. Length: ${ANTHROPIC_API_KEY?.length || 0}`);
   }
-  return chatModel;
+
+  return new ChatAnthropic({
+    apiKey: ANTHROPIC_API_KEY,
+    model: 'claude-sonnet-4-20250514',
+    temperature: 1,
+    maxTokens: 4096,
+  });
 }
 
 /**
@@ -356,8 +347,8 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Get ChatAnthropic model
-  const model = getChatModel();
+  // Create ChatAnthropic model (fresh each time to ensure env vars are read)
+  const model = createChatModel();
 
   // Invoke model with system prompt - simple, no tools for now
   const response = await model.invoke(messages, {
