@@ -22,19 +22,6 @@ console.log('🔑 API Keys loaded:', {
   openaiExists: !!OPENAI_API_KEY,
 });
 
-// Vercel AI SDK - for direct model access (import after logging to debug)
-const { createAnthropic } = await import('npm:@ai-sdk/anthropic');
-
-// Create Anthropic provider with API key
-const anthropicProvider = createAnthropic({
-  apiKey: ANTHROPIC_API_KEY || '',
-  headers: {
-    'x-api-key': ANTHROPIC_API_KEY || '',
-  },
-});
-
-console.log('✅ Anthropic provider created with API key:', ANTHROPIC_API_KEY?.substring(0, 20));
-
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -196,7 +183,10 @@ Your role is to help users find materials, products, and technical information f
 - Provide technical specifications when available
 - Suggest next steps or related searches`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
     imageAnalysis: imageAnalysisTool,
@@ -227,7 +217,10 @@ Your role is to conduct deep research, competitive analysis, and market intellig
 - Identify trends and patterns
 - Suggest areas for further investigation`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -257,7 +250,10 @@ Your role is to analyze data, generate insights, and provide business intelligen
 - Provide data-driven recommendations
 - Explain complex data in simple terms`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -287,7 +283,10 @@ Your role is to provide business intelligence, strategy insights, and market ana
 - Identify opportunities and risks
 - Support decision-making with data`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -317,7 +316,10 @@ Your role is to support product management, feature planning, and user experienc
 - Prioritize based on impact
 - Support data-driven product decisions`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -347,7 +349,10 @@ Your role is to support system administration, platform management, and technica
 - Support operational excellence
 - Ensure compliance and best practices`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -441,7 +446,10 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
 });
 
 /**
@@ -494,7 +502,10 @@ Your role is to analyze user queries and route them to the appropriate specializ
 - Provide helpful, contextual responses
 - For permission-denied cases, explain role requirements`,
 
-  model: anthropicProvider('claude-sonnet-4-20250514'),
+  model: {
+    id: 'anthropic/claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   agents: {
     searchAgent,
     researchAgent,
