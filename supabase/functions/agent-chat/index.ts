@@ -19,29 +19,22 @@ import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
 import { tool } from 'npm:@langchain/core@0.3.29/tools';
 import { z } from 'npm:zod@3.24.1';
 
-// Get API keys from Deno environment - READ AT MODULE LOAD TIME
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+// Get environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
-console.log('🔑 API Keys loaded:', {
-  anthropicExists: !!ANTHROPIC_API_KEY,
-  anthropicLength: ANTHROPIC_API_KEY?.length || 0,
-});
-
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Initialize Claude model
+// Initialize Claude model - ChatAnthropic automatically reads ANTHROPIC_API_KEY from env
 const model = new ChatAnthropic({
-  apiKey: ANTHROPIC_API_KEY,
   model: 'claude-sonnet-4-20250514',
   temperature: 1,
   maxTokens: 4096,
 });
 
-console.log('✅ LangChain ChatAnthropic model initialized');
+console.log('✅ ChatAnthropic model initialized');
 
 /**
  * LangChain Tool: Material Search using MIVAA API
