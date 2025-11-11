@@ -35,15 +35,21 @@ console.log('🔑 API Keys loaded:', {
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Initialize Claude model
-const model = new ChatAnthropic({
-  apiKey: ANTHROPIC_API_KEY,
-  model: 'claude-sonnet-4-20250514',
-  temperature: 1,
-  maxTokens: 4096,
-});
+// Model will be initialized lazily on first request
+let model: ChatAnthropic | null = null;
 
-console.log('✅ LangChain ChatAnthropic model initialized');
+function getModel(): ChatAnthropic {
+  if (!model) {
+    model = new ChatAnthropic({
+      apiKey: ANTHROPIC_API_KEY,
+      model: 'claude-sonnet-4-20250514',
+      temperature: 1,
+      maxTokens: 4096,
+    });
+    console.log('✅ LangChain ChatAnthropic model initialized');
+  }
+  return model;
+}
 
 /**
  * LangChain Tool: Material Search using MIVAA API
@@ -341,8 +347,9 @@ async function executeAgent(
     tools.push(createImageAnalysisTool(workspaceId));
   }
 
-  // Bind tools to the model
-  const modelWithTools = model.bindTools(tools);
+  // Get model instance and bind tools
+  const currentModel = getModel();
+  const modelWithTools = currentModel.bindTools(tools);
 
   // Build messages
   const messages = [
@@ -381,7 +388,7 @@ async function executeAgent(
     const toolMessage = new AIMessage(
       `Tool results: ${JSON.stringify(toolResults, null, 2)}`
     );
-    const finalResponse = await model.invoke([...messages, response, toolMessage]);
+    const finalResponse = await currentModel.invoke([...messages, response, toolMessage]);
     return finalResponse.content;
   }
 
