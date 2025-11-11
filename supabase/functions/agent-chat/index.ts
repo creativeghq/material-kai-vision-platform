@@ -36,14 +36,19 @@ function getChatModel(): ChatAnthropic {
     // Read API key at runtime, not at module load time
     const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 
+    // Debug: Log all environment variables to see what's available
+    console.log('🔍 All Deno.env keys:', Array.from(Deno.env.toObject()).map(([k]) => k));
+
     console.log('🔑 Checking ANTHROPIC_API_KEY:', {
-      exists: !!ANTHROPIC_API_KEY,
+      exists: ANTHROPIC_API_KEY !== undefined && ANTHROPIC_API_KEY !== null,
+      isEmptyString: ANTHROPIC_API_KEY === '',
       length: ANTHROPIC_API_KEY?.length || 0,
-      prefix: ANTHROPIC_API_KEY?.substring(0, 7) || 'none',
+      prefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'none',
+      type: typeof ANTHROPIC_API_KEY,
     });
 
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY environment variable is not set in Supabase Edge Functions. Please add it in Supabase Dashboard > Edge Functions > Secrets.');
+    if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.trim() === '') {
+      throw new Error(`ANTHROPIC_API_KEY environment variable is not set or is empty in Supabase Edge Functions. Value: "${ANTHROPIC_API_KEY}". Please add it in Supabase Dashboard > Edge Functions > Secrets.`);
     }
 
     chatModel = new ChatAnthropic({
