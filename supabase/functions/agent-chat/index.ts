@@ -7,32 +7,78 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Get API keys from Deno environment FIRST
+// Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
-// Set up process.env for Mastra (Deno-compatible way)
-if (!globalThis.process) {
-  (globalThis as any).process = {
-    env: {},
-  };
-}
-globalThis.process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
-globalThis.process.env.OPENAI_API_KEY = OPENAI_API_KEY;
-
-console.log('🔑 API Keys loaded and set in process.env:', {
+console.log('🔑 API Keys loaded:', {
   anthropicExists: !!ANTHROPIC_API_KEY,
   anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 10),
   openaiExists: !!OPENAI_API_KEY,
-  processEnvSet: !!globalThis.process.env.ANTHROPIC_API_KEY,
 });
 
-// NOW import Mastra (after setting process.env)
+// Import Mastra WITHOUT trying to set process.env (Deno doesn't support it)
 import { Agent } from 'npm:@mastra/core/agent';
 import { createTool } from 'npm:@mastra/core/tools';
 import { z } from 'npm:zod';
 
-console.log('✅ Mastra imported with process.env configured');
+// Create a custom language model that calls Anthropic API directly
+// This bypasses Mastra's model router which requires process.env
+function createAnthropicModel(modelId: string) {
+  return {
+    // Mastra expects these properties
+    specificationVersion: 'v1',
+    provider: 'anthropic',
+    modelId,
+
+    // The actual generation function
+    async doGenerate(options: any) {
+      const { prompt, messages, system, maxTokens = 4096, temperature = 1 } = options;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY!,
+          'Content-Type': 'application/json',
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: modelId,
+          max_tokens: maxTokens,
+          temperature,
+          system: system || '',
+          messages: messages || [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      return {
+        text: data.content[0].text,
+        finishReason: data.stop_reason,
+        usage: {
+          promptTokens: data.usage.input_tokens,
+          completionTokens: data.usage.output_tokens,
+        },
+      };
+    },
+
+    // For streaming (if needed)
+    async doStream(options: any) {
+      // For now, just use doGenerate
+      return this.doGenerate(options);
+    },
+  };
+}
+
+const anthropicModel = createAnthropicModel('claude-sonnet-4-20250514');
+
+console.log('✅ Custom Anthropic model created');
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -195,7 +241,7 @@ Your role is to help users find materials, products, and technical information f
 - Provide technical specifications when available
 - Suggest next steps or related searches`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: anthropicModel,
   tools: {
     materialSearch: searchTool,
     imageAnalysis: imageAnalysisTool,
@@ -226,7 +272,7 @@ Your role is to conduct deep research, competitive analysis, and market intellig
 - Identify trends and patterns
 - Suggest areas for further investigation`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: anthropicModel,
   tools: {
     materialSearch: searchTool,
   },
