@@ -25,9 +25,12 @@ console.log('🔑 API Keys loaded:', {
   openaiExists: !!OPENAI_API_KEY,
 });
 
-// Create Anthropic provider instance with API key
+// Create Anthropic provider instance with API key in headers
 const anthropic = createAnthropic({
   apiKey: ANTHROPIC_API_KEY || '',
+  headers: {
+    'x-api-key': ANTHROPIC_API_KEY || '',
+  },
 });
 
 console.log('✅ Anthropic provider created');
