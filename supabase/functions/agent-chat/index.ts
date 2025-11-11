@@ -28,14 +28,28 @@ const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.ma
 console.log('🔑 API Keys loaded:', {
   anthropicExists: !!ANTHROPIC_API_KEY,
   anthropicLength: ANTHROPIC_API_KEY?.length || 0,
+  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'MISSING',
 });
+
+// CRITICAL: Set ANTHROPIC_API_KEY on process.env for npm: packages
+// npm: packages in Deno expect Node.js process.env, not Deno.env
+if (ANTHROPIC_API_KEY) {
+  (globalThis as any).process = (globalThis as any).process || {};
+  (globalThis as any).process.env = (globalThis as any).process.env || {};
+  (globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
+  console.log('✅ Set ANTHROPIC_API_KEY on process.env for npm packages');
+}
+
+if (!ANTHROPIC_API_KEY) {
+  throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+}
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Initialize Claude model AT MODULE LOAD TIME
+// Don't pass apiKey explicitly - let it read from process.env.ANTHROPIC_API_KEY
 const model = new ChatAnthropic({
-  apiKey: ANTHROPIC_API_KEY,
   model: 'claude-sonnet-4-20250514',
   temperature: 1,
   maxTokens: 4096,
