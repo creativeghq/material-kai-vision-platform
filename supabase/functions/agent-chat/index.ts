@@ -372,7 +372,25 @@ async function executeAgent(
   });
 
   // Extract text content from response
-  return response.content as string;
+  // LangChain response.content can be a string or array of content blocks
+  let textContent: string;
+  if (typeof response.content === 'string') {
+    textContent = response.content;
+  } else if (Array.isArray(response.content)) {
+    // Extract text from content blocks
+    textContent = response.content
+      .map((block: any) => {
+        if (typeof block === 'string') return block;
+        if (block.type === 'text') return block.text;
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n');
+  } else {
+    textContent = String(response.content);
+  }
+
+  return textContent;
 }
 
 /**
