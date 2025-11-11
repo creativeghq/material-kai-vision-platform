@@ -45,22 +45,28 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`border-r border-sidebar-border bg-sidebar-background min-h-screen flex flex-col py-6 transition-all duration-300 shadow-xl ${
+      className={`min-h-screen flex flex-col py-6 transition-all duration-300 m-4 rounded-3xl ${
         isExpanded ? 'w-72' : 'w-20'
       }`}
+      style={{
+        background: 'var(--sidebar-background)',
+        backdropFilter: 'var(--glass-blur)',
+        border: '1px solid var(--sidebar-border)',
+        boxShadow: 'var(--glass-shadow)',
+      }}
     >
       {/* Logo/Brand and Toggle */}
       <div className="mb-8 px-4">
         <div className="flex items-center justify-between">
-          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg">
-            <span className="text-primary-foreground font-bold text-xl">K</span>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'var(--glass-bg)' }}>
+            <span className="text-white font-bold text-xl">K</span>
           </div>
           {isExpanded && (
             <Button
               variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="h-9 w-9 text-sidebar-foreground hover:bg-sidebar-accent"
+              className="h-9 w-9 text-white hover:bg-white/10"
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
@@ -68,8 +74,8 @@ export const Sidebar: React.FC = () => {
         </div>
         {isExpanded && (
           <div className="mt-3">
-            <h2 className="font-bold text-base text-sidebar-foreground">KAI Platform</h2>
-            <p className="text-sm text-sidebar-foreground/60">Material Intelligence</p>
+            <h2 className="font-bold text-base text-white">KAI Platform</h2>
+            <p className="text-sm text-white/70">Material Intelligence</p>
           </div>
         )}
       </div>
@@ -84,9 +90,10 @@ export const Sidebar: React.FC = () => {
                   variant="ghost"
                   className={`${isExpanded ? 'w-full justify-start' : 'w-14'} h-14 rounded-2xl transition-all duration-200 ${
                     isActive(item.path)
-                      ? 'bg-primary text-primary-foreground shadow-lg hover:bg-primary/90'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                      ? 'text-white shadow-lg'
+                      : 'text-white/80 hover:text-white'
                   }`}
+                  style={isActive(item.path) ? { background: 'var(--sidebar-accent)' } : {}}
                   asChild
                 >
                   <Link to={item.path}>

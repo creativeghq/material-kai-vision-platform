@@ -503,17 +503,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Middle Panel - Conversation List */}
-      <div className="w-80 border-r bg-card flex flex-col">
+      <div
+        className="w-80 flex flex-col m-4 rounded-3xl"
+        style={{
+          background: 'var(--glass-bg)',
+          backdropFilter: 'var(--glass-blur)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+        }}
+      >
         {/* Header */}
-        <div className="p-4 border-b">
+        <div className="p-4 border-b border-white/10">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold">Conversations</h2>
+            <h2 className="text-lg font-semibold text-foreground">Conversations</h2>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleImportConversation}
                 title="Import conversation"
+                className="hover:bg-white/10"
               >
                 <Upload className="h-4 w-4" />
               </Button>
@@ -523,6 +532,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 onClick={handleExportConversation}
                 title="Export current conversation"
                 disabled={!currentConversationId}
+                className="hover:bg-white/10"
               >
                 <Download className="h-4 w-4" />
               </Button>
@@ -535,7 +545,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <input
               type="text"
               placeholder="Search conversations..."
-              className="w-full pl-9 pr-3 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              style={{ background: 'rgba(255, 255, 255, 0.1)', borderColor: 'var(--glass-border)' }}
             />
           </div>
         </div>
@@ -576,11 +587,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* New Conversation Button */}
-        <div className="p-3 border-t">
+        <div className="p-3 border-t border-white/10">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full hover:bg-white/10"
             onClick={handleNewConversation}
+            style={{ borderColor: 'var(--glass-border)' }}
           >
             <MessageSquare className="h-4 w-4 mr-2" />
             New Conversation
@@ -591,7 +603,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col bg-background">
         {/* Chat Header */}
-        <div className="min-h-16 border-b bg-card px-6 py-3 flex items-center justify-between">
+        <div
+          className="min-h-16 px-6 py-3 flex items-center justify-between m-4 rounded-3xl"
+          style={{
+            background: 'var(--glass-bg)',
+            backdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow)',
+          }}
+        >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
               <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
@@ -718,11 +738,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Input Area */}
-        <div className="border-t bg-card">
+        <div
+          className="m-4 rounded-3xl"
+          style={{
+            background: 'var(--glass-bg)',
+            backdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: 'var(--glass-shadow)',
+          }}
+        >
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
             <div className="px-6 pt-3">
-              <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+              <div className="p-2 border rounded-lg" style={{ background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
                   <span className="text-sm text-red-700">Listening: {interimTranscript}</span>

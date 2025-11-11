@@ -37,13 +37,21 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+    <header
+      className="sticky top-0 z-50 m-4 rounded-3xl"
+      style={{
+        background: 'var(--glass-bg)',
+        backdropFilter: 'var(--glass-blur)',
+        border: '1px solid var(--glass-border)',
+        boxShadow: 'var(--glass-shadow)',
+      }}
+    >
       <div className="flex h-20 items-center px-8">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary rounded-2xl flex items-center justify-center shadow-md">
-            <Sparkles className="w-6 h-6 text-primary-foreground" />
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center" style={{ background: 'var(--mocha-color)' }}>
+            <Sparkles className="w-6 h-6 text-foreground/70" />
           </div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+          <span className="text-2xl font-bold text-foreground">
             KAI Platform
           </span>
         </div>
@@ -53,7 +61,8 @@ export const Header: React.FC<HeaderProps> = ({
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <Input
               placeholder="Search materials, projects, or settings..."
-              className="pl-12 h-12 bg-background/50 border-border"
+              className="pl-12 h-12 border-white/20"
+              style={{ background: 'rgba(255, 255, 255, 0.1)' }}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />
@@ -61,18 +70,18 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="ml-auto flex items-center space-x-3">
-          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-accent/50">
+          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-white/10">
             <Bell className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-accent/50">
+          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-white/10">
             <Settings className="w-5 h-5" />
           </Button>
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent/50">
-                  <Avatar className="h-10 w-10 border-2 border-primary/20">
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-white/10">
+                  <Avatar className="h-10 w-10 border-2 border-white/20">
+                    <AvatarFallback className="text-foreground font-semibold" style={{ background: 'var(--mocha-color)' }}>
                       {user.email ? getInitials(user.email) : 'U'}
                     </AvatarFallback>
                   </Avatar>

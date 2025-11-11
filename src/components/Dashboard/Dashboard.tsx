@@ -1,10 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { SearchHub } from './SearchHub';
+import { HeroSection } from './HeroSection';
 import { MetricsGrid } from './MetricsGrid';
 import styles from './Dashboard.module.css';
-import { searchHubConfig } from './dashboardData';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -15,17 +14,11 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className={styles.container}>
+      {/* Hero Section with Headline and CTAs */}
+      <HeroSection onNavigate={handleNavigate} />
+
       {/* Enhanced System Metrics */}
       <MetricsGrid />
-
-      {/* Main Search Interface */}
-      <div className={styles.mainSection}>
-        <SearchHub
-          onMaterialSelect={searchHubConfig.onMaterialSelect}
-          onNavigateToMoodboard={() => handleNavigate('/moodboard')}
-          onNavigateTo3D={() => handleNavigate('/3d')}
-        />
-      </div>
     </div>
   );
 };

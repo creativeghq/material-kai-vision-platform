@@ -12,9 +12,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden flex">
-      {/* Fixed gradient background behind everything */}
-      <div className="fixed inset-0 bg-gradient-to-br from-background via-background to-accent/5 -z-10" />
-
       {/* Sidebar */}
       <Sidebar />
 

@@ -312,8 +312,17 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Initialize model inside request handler where env vars are available
+  // Get API key from environment
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY not found in environment');
+  }
+
+  console.log('🔑 API Key found:', { length: apiKey.length, prefix: apiKey.substring(0, 10) });
+
+  // Initialize model with explicit API key
   const model = new ChatAnthropic({
+    anthropicApiKey: apiKey,
     model: 'claude-sonnet-4-20250514',
     temperature: 1,
     maxTokens: 4096,

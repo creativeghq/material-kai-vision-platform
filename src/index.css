@@ -35,63 +35,66 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Worklytics Design - Properly Analyzed */
+    /* Worklytics Design - PROPERLY Analyzed */
 
-    /* Main Background - Grayish-blue slate */
-    --background: 200 15% 65%;  /* Slate gray-blue background #9EADB5 */
-    --foreground: 210 15% 25%;  /* Dark charcoal text for readability */
+    /* Main Background - Complex gradient (see below) */
+    --background: 195 20% 58%;  /* Base color for fallback */
+    --foreground: 0 0% 100%;  /* White text for glass elements */
+    --foreground-dark: 210 15% 20%;  /* Dark text for white cards */
 
-    /* Cards - White/off-white */
-    --card: 0 0% 98%;  /* White cards #FAFAFA */
-    --card-foreground: 210 15% 25%;  /* Dark text on white cards */
+    /* Cards - Pure White (for main content cards) */
+    --card: 0 0% 100%;  /* Pure white #FFFFFF */
+    --card-foreground: 210 15% 20%;  /* Dark text on white cards */
 
-    --popover: 0 0% 98%;
-    --popover-foreground: 210 15% 25%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 15% 20%;
 
-    /* Primary - Dark teal-green (sidebar color) */
-    --primary: 170 20% 30%;  /* Dark teal-green #3D5654 */
-    --primary-foreground: 0 0% 98%;  /* White text on dark teal */
+    /* Primary - Dark teal (sidebar base) */
+    --primary: 195 25% 45%;  /* Teal for primary actions */
+    --primary-foreground: 0 0% 100%;  /* White text */
 
-    /* Secondary - Light slate */
-    --secondary: 200 15% 75%;  /* Light slate for secondary elements */
-    --secondary-foreground: 210 15% 25%;  /* Dark text */
+    /* Secondary - Light elements */
+    --secondary: 195 15% 75%;  /* Light for secondary */
+    --secondary-foreground: 210 15% 20%;  /* Dark text */
 
-    /* Muted - Mocha/tan color (for icon backgrounds and accents) */
-    --muted: 30 25% 70%;  /* Mocha/tan #BFB3A3 */
-    --muted-foreground: 210 15% 35%;  /* Darker text on mocha */
+    /* Muted - Mocha/tan (for subtle backgrounds) */
+    --muted: 30 20% 75%;  /* Lighter mocha for backgrounds */
+    --muted-foreground: 210 15% 35%;  /* Dark text on mocha */
+    --mocha-color: hsl(30, 25%, 70%);  /* Mocha/tan color for icon backgrounds */
 
-    /* Accent - Medium teal-green */
-    --accent: 160 40% 45%;  /* Medium teal-green for accents */
-    --accent-foreground: 0 0% 98%;  /* White text on accent */
+    /* Accent - Teal accent */
+    --accent: 195 30% 50%;  /* Bright teal for accents */
+    --accent-foreground: 0 0% 100%;  /* White text */
 
     --destructive: 0 65% 55%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders - Subtle light gray */
-    --border: 200 10% 80%;  /* Light gray borders */
-    --input: 0 0% 98%;  /* White input backgrounds */
-    --ring: 170 20% 30%;  /* Dark teal focus ring */
+    /* Borders - Very subtle */
+    --border: 0 0% 100% / 0.2;  /* Semi-transparent white borders */
+    --input: 0 0% 100% / 0.1;  /* Semi-transparent input bg */
+    --ring: 195 30% 50%;  /* Teal focus ring */
 
-    --radius: 1rem;  /* Rounded corners */
+    --radius: 1.25rem;  /* Large rounded corners (20px) */
 
-    /* Sidebar colors */
-    --sidebar-background: 170 20% 30%;  /* Dark teal-green #3D5654 */
-    --sidebar-foreground: 0 0% 98%;  /* White text */
-    --sidebar-accent: 160 40% 45%;  /* Teal highlight for active */
+    /* Glass Morphism - For stat bubbles and sidebar */
+    --glass-bg: rgba(255, 255, 255, 0.15);  /* Semi-transparent white */
+    --glass-border: rgba(255, 255, 255, 0.25);  /* Lighter border */
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);  /* Soft shadow */
+    --glass-blur: blur(12px);  /* Backdrop blur amount */
 
-    /* Stat card styling - NO glass morphism, just white cards */
-    --stat-card-bg: 0 0% 98%;  /* White background */
-    --stat-card-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    /* Sidebar - Glass morphism with dark teal tint */
+    --sidebar-background: rgba(74, 95, 92, 0.7);  /* Dark teal with transparency */
+    --sidebar-foreground: 0 0% 100%;  /* White text */
+    --sidebar-accent: rgba(255, 255, 255, 0.15);  /* Light overlay for active */
+    --sidebar-border: rgba(255, 255, 255, 0.1);  /* Subtle border */
 
-    /* Icon backgrounds in stat cards - Mocha color */
-    --icon-bg-mocha: 30 25% 70%;  /* Mocha/tan for icon containers */
-
-    /* Background gradient - Worklytics style (subtle diagonal gradient) */
-    --gradient-background: linear-gradient(135deg,
-      hsl(190, 20%, 60%) 0%,      /* Top-left: Light teal-blue */
-      hsl(195, 18%, 55%) 50%,     /* Center: Medium slate-blue */
-      hsl(25, 15%, 55%) 100%      /* Bottom-right: Warm gray-brown */
-    );
+    /* Complex gradient background - Worklytics style */
+    --gradient-background:
+      radial-gradient(ellipse at top left, hsl(190, 25%, 62%) 0%, transparent 50%),
+      radial-gradient(ellipse at top right, hsl(195, 20%, 58%) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom left, hsl(25, 20%, 58%) 0%, transparent 50%),
+      radial-gradient(ellipse at bottom right, hsl(30, 18%, 55%) 0%, transparent 50%),
+      hsl(195, 18%, 56%);  /* Base color */
 
     /* Shadows */
     --shadow-glow: 0 0 30px hsl(200 25% 45% / 0.3);
@@ -148,23 +151,24 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* Stat cards - Worklytics style (white cards, NOT glass) */
+  /* Stat cards - Worklytics style (glass morphism for stat bubbles) */
   .stat-card-glass {
     @apply rounded-2xl transition-all duration-300;
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
   }
 
   .stat-card-glass:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
   }
 
   /* Icon container in stat cards - Mocha background */
   .stat-icon-mocha {
     @apply rounded-xl p-3;
-    background: hsl(var(--muted));
+    background: var(--mocha-color);
   }
 
   /* Glass morphism utilities */
