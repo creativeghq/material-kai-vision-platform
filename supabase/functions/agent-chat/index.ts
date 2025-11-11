@@ -320,9 +320,9 @@ async function executeAgent(
 
   console.log('🔑 API Key found:', { length: apiKey.length, prefix: apiKey.substring(0, 10) });
 
-  // Initialize model with explicit API key
+  // Initialize model with explicit API key (use 'apiKey' not 'anthropicApiKey')
   const model = new ChatAnthropic({
-    anthropicApiKey: apiKey,
+    apiKey: apiKey,
     model: 'claude-sonnet-4-20250514',
     temperature: 1,
     maxTokens: 4096,
