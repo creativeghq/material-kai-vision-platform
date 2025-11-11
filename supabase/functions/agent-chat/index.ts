@@ -556,10 +556,16 @@ serve(async (req) => {
       },
     );
   } catch (error) {
-    console.error('Agent chat error:', error);
+    console.error('❌ Agent chat error:', error);
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('❌ Error type:', typeof error);
+    console.error('❌ Error details:', JSON.stringify(error, null, 2));
+
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Internal server error',
+        stack: error instanceof Error ? error.stack : undefined,
+        details: String(error),
       }),
       {
         status: 500,
