@@ -227,15 +227,28 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  console.log('🔑 API Key found:', {
-    length: ANTHROPIC_API_KEY.length,
-    prefix: ANTHROPIC_API_KEY.substring(0, 10)
+  console.log('🔑 API Key check:', {
+    moduleLevel: !!ANTHROPIC_API_KEY,
+    length: ANTHROPIC_API_KEY?.length || 0,
+    prefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'MISSING',
+    processEnv: !!(globalThis as any).process?.env?.ANTHROPIC_API_KEY,
+    denoEnv: !!Deno.env.get('ANTHROPIC_API_KEY')
   });
+
+  // Make absolutely sure the API key is available
+  const apiKey = ANTHROPIC_API_KEY || Deno.env.get('ANTHROPIC_API_KEY');
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not available');
+  }
+
+  console.log('🤖 Initializing Anthropic client with key:', apiKey.substring(0, 15));
 
   // Initialize Anthropic client with explicit API key
   const anthropic = new Anthropic({
-    apiKey: ANTHROPIC_API_KEY,
+    apiKey: apiKey,
   });
+
+  console.log('✅ Anthropic client initialized, creating message...');
 
   // Create the message with system prompt
   const response = await anthropic.messages.create({
