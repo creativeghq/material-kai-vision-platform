@@ -1,8 +1,6 @@
 /**
  * Agent Chat - LangChain.js + LangGraph.js Multi-Agent System
  * 
- * Replaces Mastra framework with LangChain.js for Deno Edge Runtime compatibility
- * 
  * Features:
  * - 8 specialized agents with RBAC
  * - LangGraph for agent orchestration
@@ -22,7 +20,16 @@ import { z } from 'npm:zod@3.24.1';
 // Get environment variables at module load
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+
+console.log('🔑 Environment variables loaded:', {
+  supabaseUrl: !!SUPABASE_URL,
+  serviceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
+  anthropicKey: !!ANTHROPIC_API_KEY,
+  anthropicKeyLength: ANTHROPIC_API_KEY?.length || 0,
+  anthropicKeyPrefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'MISSING',
+});
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -312,17 +319,9 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Get API key from environment
-  const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not found in environment');
-  }
-
-  console.log('🔑 API Key found:', { length: apiKey.length, prefix: apiKey.substring(0, 10) });
-
-  // Initialize model with explicit API key (use 'apiKey' not 'anthropicApiKey')
+  // Initialize model with API key from module-level constant
   const model = new ChatAnthropic({
-    apiKey: apiKey,
+    apiKey: ANTHROPIC_API_KEY,
     model: 'claude-sonnet-4-20250514',
     temperature: 1,
     maxTokens: 4096,
