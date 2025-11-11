@@ -319,8 +319,9 @@ async function executeAgent(
   }
 
   // Initialize ChatAnthropic with explicit API key
+  // IMPORTANT: Use 'anthropicApiKey' not 'apiKey' for npm: imports in Deno
   const model = new ChatAnthropic({
-    apiKey: ANTHROPIC_API_KEY,
+    anthropicApiKey: ANTHROPIC_API_KEY,
     model: 'claude-sonnet-4-20250514',
     temperature: 1,
     maxTokens: 4096,
