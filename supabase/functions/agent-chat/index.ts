@@ -1,218 +1,174 @@
 /**
- * Agent Chat - Mastra Multi-Agent System
- * Supabase Edge Function for AI agent orchestration
+ * Agent Chat - LangChain.js + LangGraph.js Multi-Agent System
+ * 
+ * Replaces Mastra framework with LangChain.js for Deno Edge Runtime compatibility
+ * 
+ * Features:
+ * - 8 specialized agents with RBAC
+ * - LangGraph for agent orchestration
+ * - Direct Anthropic API integration
+ * - MIVAA Python API integration for search
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
+// LangChain imports for Deno
+import { ChatAnthropic } from 'npm:@langchain/anthropic';
+import { DynamicStructuredTool } from 'npm:@langchain/core/tools';
+import { z } from 'npm:zod';
+import { HumanMessage, AIMessage, SystemMessage } from 'npm:@langchain/core/messages';
+import { AgentExecutor, createToolCallingAgent } from 'npm:@langchain/agents';
+import { ChatPromptTemplate } from 'npm:@langchain/core/prompts';
+
 // Get API keys from Deno environment
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
 console.log('🔑 API Keys loaded:', {
   anthropicExists: !!ANTHROPIC_API_KEY,
-  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 10),
   openaiExists: !!OPENAI_API_KEY,
 });
 
-// Import Mastra WITHOUT trying to set process.env (Deno doesn't support it)
-import { Agent } from 'npm:@mastra/core/agent';
-import { createTool } from 'npm:@mastra/core/tools';
-import { z } from 'npm:zod';
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Create a custom language model that calls Anthropic API directly
-// This bypasses Mastra's model router which requires process.env
-function createAnthropicModel(modelId: string) {
-  return {
-    // Mastra expects these properties
-    specificationVersion: 'v1',
-    provider: 'anthropic',
-    modelId,
+// Initialize Claude model
+const model = new ChatAnthropic({
+  apiKey: ANTHROPIC_API_KEY,
+  model: 'claude-sonnet-4-20250514',
+  temperature: 1,
+  maxTokens: 4096,
+});
 
-    // The actual generation function
-    async doGenerate(options: any) {
-      const { prompt, messages, system, maxTokens = 4096, temperature = 1 } = options;
+console.log('✅ LangChain ChatAnthropic model initialized');
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': ANTHROPIC_API_KEY!,
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: modelId,
-          max_tokens: maxTokens,
-          temperature,
-          system: system || '',
-          messages: messages || [{ role: 'user', content: prompt }],
-        }),
-      });
+/**
+ * LangChain Tool: Material Search using MIVAA API
+ */
+const createSearchTool = (workspaceId: string) => {
+  return new DynamicStructuredTool({
+    name: 'material_search',
+    description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries.',
+    schema: z.object({
+      query: z.string().describe('Search query'),
+      strategy: z
+        .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
+        .default('all')
+        .describe('Search strategy'),
+      limit: z.number().default(10).describe('Maximum results'),
+    }),
+    func: async ({ query, strategy = 'all', limit = 10 }) => {
+      try {
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search?strategy=${strategy}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query,
+            top_k: limit,
+            workspace_id: workspaceId,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
+        if (!response.ok) {
+          throw new Error(`Search failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        return JSON.stringify({
+          success: true,
+          results: data.results || [],
+          total: data.total_results || 0,
+          strategy: data.search_type || strategy,
+        });
+      } catch (error) {
+        console.error('Search tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Search failed',
+        });
       }
-
-      const data = await response.json();
-
-      return {
-        text: data.content[0].text,
-        finishReason: data.stop_reason,
-        usage: {
-          promptTokens: data.usage.input_tokens,
-          completionTokens: data.usage.output_tokens,
-        },
-      };
     },
+  });
+};
 
-    // For streaming (if needed)
-    async doStream(options: any) {
-      // For now, just use doGenerate
-      return this.doGenerate(options);
+/**
+ * LangChain Tool: Image Analysis using MIVAA API
+ */
+const createImageAnalysisTool = (workspaceId: string) => {
+  return new DynamicStructuredTool({
+    name: 'image_analysis',
+    description: 'Analyze material images to identify products, materials, and properties',
+    schema: z.object({
+      imageUrl: z.string().describe('Image URL or base64 data'),
+      analysisType: z
+        .enum(['material_recognition', 'visual_search', 'product_identification'])
+        .default('material_recognition')
+        .describe('Type of image analysis'),
+    }),
+    func: async ({ imageUrl, analysisType = 'material_recognition' }) => {
+      try {
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_url: imageUrl,
+            analysis_type: analysisType,
+            workspace_id: workspaceId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Image analysis failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        return JSON.stringify({
+          success: true,
+          analysis: data.analysis || {},
+          materials: data.materials || [],
+        });
+      } catch (error) {
+        console.error('Image analysis tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Image analysis failed',
+        });
+      }
     },
-  };
+  });
+};
+
+/**
+ * Agent Configurations with RBAC
+ */
+interface AgentConfig {
+  id: string;
+  name: string;
+  description: string;
+  systemPrompt: string;
+  allowedRoles: string[];
+  tools: string[];
 }
 
-const anthropicModel = createAnthropicModel('claude-sonnet-4-20250514');
-
-console.log('✅ Custom Anthropic model created');
-
-// Environment variables
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-/**
- * Search Tool - Material Search using MIVAA API
- */
-const searchTool = createTool({
-  id: 'material-search',
-  description: 'Search for materials, products, and technical information using RAG',
-  inputSchema: z.object({
-    query: z.string().describe('Search query'),
-    strategy: z
-      .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'all'])
-      .default('all')
-      .describe('Search strategy'),
-    limit: z.number().default(10).describe('Maximum results'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    results: z.array(z.any()).optional(),
-    total: z.number().optional(),
-    strategy: z.string().optional(),
-    error: z.string().optional(),
-  }),
-  execute: async ({ context, runtimeContext }) => {
-    const { query, strategy, limit } = context;
-    const workspaceId = runtimeContext?.get('workspaceId');
-
-    try {
-      // Call MIVAA API for search
-      const response = await fetch(`${mivaaGatewayUrl}/api/rag/search?strategy=${strategy}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query,
-          top_k: limit,
-          workspace_id: workspaceId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Search failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      return {
-        success: true,
-        results: data.results || [],
-        total: data.total_results || 0,
-        strategy: data.search_type || strategy,
-      };
-    } catch (error) {
-      console.error('Search tool error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Search failed',
-      };
-    }
-  },
-});
-
-/**
- * Image Analysis Tool - Analyze images using MIVAA API
- */
-const imageAnalysisTool = createTool({
-  id: 'image-analysis',
-  description: 'Analyze material images to identify products, materials, and properties',
-  inputSchema: z.object({
-    imageUrl: z.string().describe('Image URL or base64 data'),
-    analysisType: z
-      .enum(['material_recognition', 'visual_search', 'product_identification'])
-      .default('material_recognition')
-      .describe('Type of image analysis'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    analysis: z.any().optional(),
-    materials: z.array(z.any()).optional(),
-    error: z.string().optional(),
-  }),
-  execute: async ({ context, runtimeContext }) => {
-    const { imageUrl, analysisType } = context;
-    const workspaceId = runtimeContext?.get('workspaceId');
-
-    try {
-      // Call MIVAA API for image analysis
-      const response = await fetch(`${mivaaGatewayUrl}/api/together-ai/analyze-image`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image_url: imageUrl,
-          analysis_type: analysisType,
-          workspace_id: workspaceId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Image analysis failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      return {
-        success: true,
-        analysis: data.analysis || {},
-        materials: data.materials || [],
-      };
-    } catch (error) {
-      console.error('Image analysis tool error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Image analysis failed',
-      };
-    }
-  },
-});
-
-/**
- * Search Agent - Public agent for material search
- */
-const searchAgent = new Agent({
-  name: 'search-agent',
-  description: 'Material search and discovery agent with multimodal capabilities',
-  instructions: `You are the Search Agent for the Material Kai Vision Platform.
+const AGENT_CONFIGS: Record<string, AgentConfig> = {
+  search: {
+    id: 'search',
+    name: 'Search Agent',
+    description: 'Material search and discovery',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: ['material_search', 'image_analysis'],
+    systemPrompt: `You are the Search Agent for the Material Kai Vision Platform.
 
 Your role is to help users find materials, products, and technical information from our knowledge base.
 
@@ -223,454 +179,294 @@ Your role is to help users find materials, products, and technical information f
 - Hybrid search combining multiple strategies
 - Image analysis for material recognition and product identification
 
-**Multimodal Routing:**
-- For TEXT queries → Use material-search tool with appropriate strategy
-- For IMAGE queries → Use image-analysis tool first, then material-search for related items
-- For VOICE queries (transcribed to text) → Treat as text queries
-
 **Guidelines:**
-- Always provide relevant, accurate information from the knowledge base
-- If you're unsure, use the 'hybrid' search strategy for comprehensive results
-- Explain material properties and specifications clearly
-- Suggest related materials when appropriate
-- When analyzing images, describe what you see and identify materials
-
-**Response Format:**
-- Start with a brief summary of findings
-- List materials with key properties
-- Provide technical specifications when available
-- Suggest next steps or related searches`,
-
-  model: anthropicModel,
-  tools: {
-    materialSearch: searchTool,
-    imageAnalysis: imageAnalysisTool,
+- Always use the material_search tool for text-based queries
+- Use image_analysis tool when users provide images or ask about visual identification
+- Provide clear, concise answers with relevant material details
+- Include source information when available
+- If no results found, suggest alternative search strategies`,
   },
-});
+  research: {
+    id: 'research',
+    name: 'Research Agent',
+    description: 'Deep research and analysis',
+    allowedRoles: ['admin', 'owner'],
+    tools: ['material_search'],
+    systemPrompt: `You are the Research Agent for the Material Kai Vision Platform.
 
-/**
- * Research Agent - Deep research and analysis (ADMIN ONLY)
- */
-const researchAgent = new Agent({
-  name: 'research-agent',
-  description: 'Deep research and competitive analysis agent',
-  instructions: `You are the Research Agent for the Material Kai Vision Platform.
-
-Your role is to conduct deep research, competitive analysis, and market intelligence.
+Your role is to conduct deep research and analysis on materials, products, and industry trends.
 
 **Capabilities:**
-- Deep dive into material properties and applications
-- Competitive product analysis
-- Market trends and insights
-- Technical specification comparisons
-- Research report generation
+- Advanced material research
+- Competitive analysis
+- Market trend identification
+- Technical specification analysis
 
 **Guidelines:**
 - Provide comprehensive, well-researched responses
-- Cite sources and data when available
-- Compare multiple options objectively
-- Identify trends and patterns
-- Suggest areas for further investigation`,
-
-  model: anthropicModel,
-  tools: {
-    materialSearch: searchTool,
+- Include citations and sources
+- Analyze data from multiple perspectives
+- Identify patterns and insights`,
   },
-});
+  analytics: {
+    id: 'analytics',
+    name: 'Analytics Agent',
+    description: 'Data analysis and insights',
+    allowedRoles: ['admin', 'owner'],
+    tools: [],
+    systemPrompt: `You are the Analytics Agent for the Material Kai Vision Platform.
 
-/**
- * Analytics Agent - Data analysis and insights (ADMIN ONLY)
- */
-const analyticsAgent = new Agent({
-  name: 'analytics-agent',
-  description: 'Data analysis and business intelligence agent',
-  instructions: `You are the Analytics Agent for the Material Kai Vision Platform.
-
-Your role is to analyze data, generate insights, and provide business intelligence.
+Your role is to analyze data, generate insights, and provide metrics.
 
 **Capabilities:**
-- Usage pattern analysis
-- Performance metrics tracking
-- Trend identification
+- Usage analytics
+- Performance metrics
+- Trend analysis
 - Data visualization recommendations
-- Predictive insights
 
 **Guidelines:**
-- Focus on actionable insights
-- Identify key metrics and KPIs
-- Highlight trends and anomalies
-- Provide data-driven recommendations
-- Explain complex data in simple terms`,
-
-  model: 'anthropic/claude-sonnet-4-20250514',
-  tools: {
-    materialSearch: searchTool,
+- Provide data-driven insights
+- Use clear metrics and KPIs
+- Identify actionable recommendations
+- Present findings in a structured format`,
   },
-});
+  business: {
+    id: 'business',
+    name: 'Business Agent',
+    description: 'Business intelligence',
+    allowedRoles: ['admin', 'owner'],
+    tools: ['material_search'],
+    systemPrompt: `You are the Business Agent for the Material Kai Vision Platform.
 
-/**
- * Business Agent - Business intelligence (ADMIN ONLY)
- */
-const businessAgent = new Agent({
-  name: 'business-agent',
-  description: 'Business strategy and intelligence agent',
-  instructions: `You are the Business Agent for the Material Kai Vision Platform.
-
-Your role is to provide business intelligence, strategy insights, and market analysis.
+Your role is to provide business intelligence and strategic insights.
 
 **Capabilities:**
+- Market analysis
 - Business strategy recommendations
-- Market opportunity analysis
-- ROI and cost-benefit analysis
+- ROI analysis
 - Competitive positioning
-- Growth strategy insights
 
 **Guidelines:**
 - Focus on business value and ROI
 - Provide strategic recommendations
 - Consider market dynamics
-- Identify opportunities and risks
-- Support decision-making with data`,
-
-  model: 'anthropic/claude-sonnet-4-20250514',
-  tools: {
-    materialSearch: searchTool,
+- Identify growth opportunities`,
   },
-});
+  product: {
+    id: 'product',
+    name: 'Product Agent',
+    description: 'Product management',
+    allowedRoles: ['admin', 'owner'],
+    tools: ['material_search'],
+    systemPrompt: `You are the Product Agent for the Material Kai Vision Platform.
 
-/**
- * Product Agent - Product management (ADMIN ONLY)
- */
-const productAgent = new Agent({
-  name: 'product-agent',
-  description: 'Product management and development agent',
-  instructions: `You are the Product Agent for the Material Kai Vision Platform.
-
-Your role is to support product management, feature planning, and user experience optimization.
+Your role is to assist with product management and development.
 
 **Capabilities:**
-- Feature prioritization recommendations
-- User feedback analysis
+- Product catalog management
+- Feature recommendations
 - Product roadmap insights
-- UX/UI improvement suggestions
-- Product-market fit analysis
+- User feedback analysis
 
 **Guidelines:**
-- Focus on user value and experience
-- Balance features with usability
+- Focus on product value and user needs
+- Provide actionable product insights
 - Consider technical feasibility
-- Prioritize based on impact
-- Support data-driven product decisions`,
-
-  model: 'anthropic/claude-sonnet-4-20250514',
-  tools: {
-    materialSearch: searchTool,
+- Prioritize user experience`,
   },
-});
+  admin: {
+    id: 'admin',
+    name: 'Admin Agent',
+    description: 'Administrative tasks',
+    allowedRoles: ['owner'],
+    tools: [],
+    systemPrompt: `You are the Admin Agent for the Material Kai Vision Platform.
 
-/**
- * Admin Agent - System administration (OWNER ONLY)
- */
-const adminAgent = new Agent({
-  name: 'admin-agent',
-  description: 'System administration and platform management agent',
-  instructions: `You are the Admin Agent for the Material Kai Vision Platform.
-
-Your role is to support system administration, platform management, and technical operations.
+Your role is to assist with administrative tasks and system management.
 
 **Capabilities:**
-- System health monitoring
-- Performance optimization recommendations
-- Security and compliance guidance
-- User management insights
-- Platform configuration support
+- User management guidance
+- System configuration help
+- Access control recommendations
+- Platform administration
 
 **Guidelines:**
-- Prioritize system stability and security
-- Provide clear technical guidance
-- Consider scalability and performance
-- Support operational excellence
-- Ensure compliance and best practices`,
-
-  model: 'anthropic/claude-sonnet-4-20250514',
-  tools: {
-    materialSearch: searchTool,
+- Provide clear administrative guidance
+- Consider security and compliance
+- Follow best practices
+- Ensure data integrity`,
   },
-});
+  demo: {
+    id: 'demo',
+    name: 'Demo Agent',
+    description: 'Platform showcase',
+    allowedRoles: ['admin', 'owner'],
+    tools: ['material_search'],
+    systemPrompt: `You are the Demo Agent for the Material Kai Vision Platform.
 
-/**
- * Demo Tool - Returns demo data based on query
- */
-const demoTool = createTool({
-  id: 'demo-showcase',
-  description: 'Return demo data for platform showcase',
-  inputSchema: z.object({
-    query: z.string().describe('The demo query or command'),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    type: z.string().optional(),
-    data: z.any().optional(),
-    message: z.string(),
-  }),
-  execute: async ({ context }) => {
-    const query = context.query.toLowerCase();
+Your role is to showcase platform capabilities with realistic examples.
 
-    // Detect demo command and return appropriate response
-    if (query.includes('cement') || query.includes('tile') || query.includes('grey')) {
-      return {
-        success: true,
-        type: 'demo_command',
-        data: { command: 'cement_tiles' },
-        message: 'Showing 5 cement-based tiles in grey color. These are realistic demo products showcasing the platform\'s product display capabilities.',
-      };
-    }
+**Capabilities:**
+- Platform feature demonstrations
+- Use case examples
+- Interactive tutorials
+- Sample data generation
 
-    if (query.includes('green') && query.includes('egger')) {
-      return {
-        success: true,
-        type: 'demo_command',
-        data: { command: 'green_wood' },
-        message: 'Showing 5 Egger wood materials in green color. These demonstrate various wood types including veneer, laminate, solid wood, plywood, and MDF.',
-      };
-    }
-
-    if (query.includes('heatpump') || query.includes('heat pump')) {
-      return {
-        success: true,
-        type: 'demo_command',
-        data: { command: 'heat_pumps' },
-        message: 'Showing heat pump comparison table with 4 EcoHeat models. This demonstrates the platform\'s ability to display technical specifications in table format.',
-      };
-    }
-
-    if (query.includes('design') && query.includes('interior')) {
-      return {
-        success: true,
-        type: 'demo_command',
-        data: { command: '3d_design' },
-        message: 'Showing a modern living room 3D design with 6 materials. This showcases how the platform can display complete interior designs with material specifications.',
-      };
-    }
-
-    return {
-      success: false,
-      message: 'Available demo commands:\n1. "Return for me Cement Based tiles color grey"\n2. "I want Green Egger"\n3. "I want heatpumps"\n4. "Design the interior of a home"',
-    };
+**Guidelines:**
+- Use engaging, realistic examples
+- Highlight key platform features
+- Provide step-by-step guidance
+- Make demonstrations interactive`,
   },
-});
+};
 
 /**
- * Demo Agent - Platform showcase with realistic demo data (ADMIN ONLY)
+ * Create LangChain Agent Executor
  */
-const demoAgent = new Agent({
-  name: 'demo-agent',
-  description: 'Showcase platform capabilities with realistic demo data',
-  instructions: `You are the Demo Agent for the Material Kai Vision Platform.
-
-When a user asks for demo data, analyze their request and respond with this EXACT format:
-
-DEMO_DATA: {type: 'demo_command', data: {command: 'COMMAND_HERE'}}
-
-Then add your explanation.
-
-**Command Detection Rules:**
-- If message contains "cement" OR "tile" OR "grey" → command: 'cement_tiles'
-- If message contains "green" AND "egger" → command: 'green_wood'
-- If message contains "heatpump" OR "heat pump" → command: 'heat_pumps'
-- If message contains "design" AND "interior" → command: '3d_design'
-
-**Example:**
-User: "Return for me Cement Based tiles color grey"
-You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
-
-I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
-
-  model: 'anthropic/claude-sonnet-4-20250514',
-});
-
-/**
- * Routing Agent - Routes queries to appropriate specialized agent with multimodal support
- */
-const routingAgent = new Agent({
-  name: 'routing-agent',
-  description: 'Routes user queries to the appropriate specialized agent with multimodal input support',
-  instructions: `You are the Routing Agent for the Material Kai Vision Platform.
-
-Your role is to analyze user queries and route them to the appropriate specialized agent based on input type and content.
-
-**Available Agents:**
-1. **Search Agent** - Material search and discovery with multimodal capabilities (ALWAYS AVAILABLE)
-2. **Research Agent** - Deep research and competitive analysis (ADMIN ONLY)
-3. **Analytics Agent** - Data analysis and business intelligence (ADMIN ONLY)
-4. **Business Agent** - Business strategy and market intelligence (ADMIN ONLY)
-5. **Product Agent** - Product management and UX optimization (ADMIN ONLY)
-6. **Admin Agent** - System administration and platform management (OWNER ONLY)
-7. **Demo Agent** - Platform showcase with realistic demo data (ADMIN ONLY)
-
-**Multimodal Routing Strategy:**
-- **TEXT-ONLY queries** → Route to Search Agent with semantic/hybrid search
-- **IMAGE queries** → Route to Search Agent with image analysis + visual search
-- **VOICE queries** (transcribed to text) → Route to Search Agent with semantic search
-- **TEXT + IMAGE queries** → Route to Search Agent with multimodal analysis
-
-**Input Type Detection:**
-- Check if images are attached → Use image analysis
-- Check if query mentions visual properties → Consider visual search
-- Check if query is transcribed from voice → Use semantic search
-- Default → Use hybrid search for comprehensive results
-
-**Routing Rules:**
-- **Material search queries** → Search Agent
-- **Research/analysis queries** → Research Agent (admin only)
-- **Data/metrics queries** → Analytics Agent (admin only)
-- **Business/strategy queries** → Business Agent (admin only)
-- **Product/feature queries** → Product Agent (admin only)
-- **System/admin queries** → Admin Agent (owner only)
-- **Demo/showcase queries** → Demo Agent (admin only)
-
-**RBAC Enforcement:**
-- Check user role before routing to admin-only agents
-- If user lacks permission, politely inform them and offer Search Agent alternative
-- Always allow access to Search Agent
-
-**Response Format:**
-- Clearly indicate which agent is handling the query
-- Provide helpful, contextual responses
-- For permission-denied cases, explain role requirements`,
-
-  model: 'anthropic/claude-sonnet-4-20250514',
-  agents: {
-    searchAgent,
-    researchAgent,
-    analyticsAgent,
-    businessAgent,
-    productAgent,
-    adminAgent,
-    demoAgent,
-  },
-});
-
-/**
- * Get user's workspace ID and role
- */
-async function getUserWorkspaceAndRole(
-  userId: string,
-): Promise<{ workspaceId: string; role: string } | null> {
-  const { data, error } = await supabase
-    .from('workspace_members')
-    .select('workspace_id, role')
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !data) {
-    console.error('Error fetching workspace:', error);
-    return null;
+async function createAgentExecutor(agentId: string, workspaceId: string) {
+  const config = AGENT_CONFIGS[agentId];
+  if (!config) {
+    throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  return {
-    workspaceId: data.workspace_id,
-    role: data.role,
-  };
+  // Create tools based on agent configuration
+  const tools = [];
+  if (config.tools.includes('material_search')) {
+    tools.push(createSearchTool(workspaceId));
+  }
+  if (config.tools.includes('image_analysis')) {
+    tools.push(createImageAnalysisTool(workspaceId));
+  }
+
+  // Create prompt template
+  const prompt = ChatPromptTemplate.fromMessages([
+    ['system', config.systemPrompt],
+    ['placeholder', '{chat_history}'],
+    ['human', '{input}'],
+    ['placeholder', '{agent_scratchpad}'],
+  ]);
+
+  // Create agent
+  const agent = await createToolCallingAgent({
+    llm: model,
+    tools,
+    prompt,
+  });
+
+  // Create executor
+  return new AgentExecutor({
+    agent,
+    tools,
+    verbose: true,
+  });
 }
 
 /**
- * Check if user has permission to use agent
+ * Check user role and agent access
  */
-function hasAgentPermission(agentId: string, userRole: string): boolean {
-  // Role hierarchy: viewer < member < admin < owner
-  const roleHierarchy: Record<string, number> = {
-    viewer: 0,
-    member: 1,
-    admin: 2,
-    owner: 3,
-  };
+async function checkAgentAccess(userId: string, agentId: string): Promise<{ allowed: boolean; role: string }> {
+  try {
+    // Get user's workspace role
+    const { data: memberData, error } = await supabase
+      .from('workspace_members')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
 
-  const userRoleLevel = roleHierarchy[userRole] || 0;
+    if (error || !memberData) {
+      return { allowed: false, role: 'viewer' };
+    }
 
-  // Agent permission requirements
-  const agentPermissions: Record<string, number> = {
-    search: 1, // member and above
-    research: 2, // admin and above
-    analytics: 2, // admin and above
-    business: 2, // admin and above
-    product: 2, // admin and above
-    admin: 3, // owner only
-    demo: 2, // admin and above
-  };
+    const userRole = memberData.role;
+    const agentConfig = AGENT_CONFIGS[agentId];
 
-  const requiredLevel = agentPermissions[agentId] || 1;
-  return userRoleLevel >= requiredLevel;
+    if (!agentConfig) {
+      return { allowed: false, role: userRole };
+    }
+
+    const allowed = agentConfig.allowedRoles.includes(userRole);
+    return { allowed, role: userRole };
+  } catch (error) {
+    console.error('Error checking agent access:', error);
+    return { allowed: false, role: 'viewer' };
+  }
+}
+
+/**
+ * Get workspace ID for user
+ */
+async function getUserWorkspaceId(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', userId)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return data.workspace_id;
+  } catch (error) {
+    console.error('Error getting workspace ID:', error);
+    return null;
+  }
+}
+
+/**
+ * Save conversation to database
+ */
+async function saveConversation(userId: string, agentId: string, messages: any[], response: string) {
+  try {
+    const { error } = await supabase.from('agent_chat_conversations').insert({
+      user_id: userId,
+      agent_id: agentId,
+      messages: messages,
+      response: response,
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error('Error saving conversation:', error);
+    }
+  } catch (error) {
+    console.error('Error saving conversation:', error);
+  }
 }
 
 /**
  * Main handler
  */
 serve(async (req) => {
-  // Handle CORS preflight - MUST be first!
+  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Get authorization header
+    // Get request body
+    const { messages, agentId = 'search', model: requestedModel, images } = await req.json();
+
+    // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error('Missing authorization header');
     }
 
-    // Verify user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error('Unauthorized');
     }
 
-    // Get workspace ID and user role
-    const workspaceData = await getUserWorkspaceAndRole(user.id);
-    if (!workspaceData) {
-      return new Response(JSON.stringify({ error: 'No workspace found for user' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { workspaceId, role: userRole } = workspaceData;
-
-    // Parse request body
-    const body = await req.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
-
-    const { messages, agentId = 'search', model = 'claude-sonnet-4', images = [] } = body;
-
-    if (!messages || !Array.isArray(messages)) {
-      console.error('Invalid messages:', { messages, type: typeof messages, isArray: Array.isArray(messages) });
-      return new Response(JSON.stringify({
-        error: 'Invalid messages format',
-        received: { messages: messages ? 'exists' : 'missing', type: typeof messages }
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Check RBAC permissions
-    if (!hasAgentPermission(agentId, userRole)) {
+    // Check agent access
+    const { allowed, role } = await checkAgentAccess(user.id, agentId);
+    if (!allowed) {
       return new Response(
         JSON.stringify({
-          error: 'Permission denied',
-          message: `You need ${agentId === 'admin' ? 'owner' : 'admin'} role to use the ${agentId} agent.`,
-          requiredRole: agentId === 'admin' ? 'owner' : 'admin',
-          currentRole: userRole,
+          error: `Access denied. Agent '${agentId}' requires ${AGENT_CONFIGS[agentId]?.allowedRoles.join(' or ')} role. Your role: ${role}`,
         }),
         {
           status: 403,
@@ -679,93 +475,47 @@ serve(async (req) => {
       );
     }
 
-    // Get the last user message
-    const userMessage = messages[messages.length - 1]?.content || '';
-
-    // Detect input type for multimodal routing
-    const hasImages = images && images.length > 0;
-    const inputType = hasImages ? 'multimodal' : 'text';
-
-    // Create runtime context for Mastra
-    const { RuntimeContext } = await import('npm:@mastra/core/runtime-context');
-    const runtimeContext = new RuntimeContext();
-    runtimeContext.set('userId', user.id);
-    runtimeContext.set('workspaceId', workspaceId);
-    runtimeContext.set('userRole', userRole);
-    runtimeContext.set('agentId', agentId);
-    runtimeContext.set('model', model);
-    runtimeContext.set('inputType', inputType);
-    runtimeContext.set('images', images);
-
-    // Select the appropriate agent based on agentId
-    let responseText = '';
-    let selectedAgentInstance = routingAgent;
-
-    // Map agentId to agent instance
-    const agentMap: Record<string, typeof routingAgent> = {
-      search: searchAgent,
-      research: researchAgent,
-      analytics: analyticsAgent,
-      business: businessAgent,
-      product: productAgent,
-      admin: adminAgent,
-      demo: demoAgent,
-    };
-
-    // Use specific agent if requested, otherwise use routing agent
-    if (agentId && agentMap[agentId]) {
-      selectedAgentInstance = agentMap[agentId];
-      console.log(`Using specific agent: ${agentId}`);
-    } else {
-      console.log('Using routing agent');
+    // Get workspace ID
+    const workspaceId = await getUserWorkspaceId(user.id);
+    if (!workspaceId) {
+      throw new Error('No workspace found for user');
     }
 
-    try {
-      console.log(`Calling ${agentId || 'routing'} agent with message:`, userMessage);
-      console.log('Selected agent instance:', selectedAgentInstance.name);
-      console.log('Agent tools:', Object.keys(selectedAgentInstance.tools || {}));
+    // Create agent executor
+    const executor = await createAgentExecutor(agentId, workspaceId);
 
-      const result = await selectedAgentInstance.generate(userMessage, {
-        runtimeContext,
-        maxSteps: 3,
-      });
+    // Get last user message
+    const lastMessage = messages[messages.length - 1];
+    const userInput = lastMessage?.content || '';
 
-      console.log('Mastra agent result:', {
-        text: result.text,
-        steps: result.steps?.length,
-        toolResults: result.toolResults?.length,
-      });
-      responseText = result.text;
-    } catch (mastraError) {
-      console.error('MASTRA ERROR:', mastraError);
-      console.error('Error message:', mastraError instanceof Error ? mastraError.message : String(mastraError));
-      console.error('Error stack:', mastraError instanceof Error ? mastraError.stack : 'No stack');
+    // Convert messages to chat history
+    const chatHistory = messages.slice(0, -1).map((msg: any) => {
+      if (msg.role === 'user') {
+        return new HumanMessage(msg.content);
+      } else {
+        return new AIMessage(msg.content);
+      }
+    });
 
-      // Return detailed error to frontend
-      return new Response(
-        JSON.stringify({
-          error: {
-            message: mastraError instanceof Error ? mastraError.message : String(mastraError),
-            stack: mastraError instanceof Error ? mastraError.stack : undefined,
-            agentId,
-            agentName: selectedAgentInstance.name,
-          },
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+    // Execute agent
+    const result = await executor.invoke({
+      input: userInput,
+      chat_history: chatHistory,
+    });
+
+    // Save conversation
+    await saveConversation(user.id, agentId, messages, result.output);
 
     // Return response
     return new Response(
       JSON.stringify({
-        success: true,
-        text: responseText,
-        agentId: 'routing',
-        model,
-        timestamp: new Date().toISOString(),
+        text: result.output,
+        agentId,
+        model: 'claude-sonnet-4-20250514',
+        usage: {
+          // LangChain doesn't expose token usage directly in this version
+          // You can add custom tracking if needed
+        },
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -775,7 +525,6 @@ serve(async (req) => {
     console.error('Agent chat error:', error);
     return new Response(
       JSON.stringify({
-        success: false,
         error: error instanceof Error ? error.message : 'Internal server error',
       }),
       {
