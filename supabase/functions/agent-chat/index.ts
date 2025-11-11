@@ -349,7 +349,7 @@ async function executeAgent(
   agentId: string,
   workspaceId: string,
   userInput: string,
-  chatHistory: BaseMessage[]
+  messages: any[]
 ) {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
@@ -359,26 +359,8 @@ async function executeAgent(
   // Get ChatAnthropic model
   const model = getChatModel();
 
-  // Create tools based on agent configuration
-  const tools = [];
-  if (config.tools.includes('material_search')) {
-    tools.push(createSearchTool(workspaceId));
-  }
-  if (config.tools.includes('image_analysis')) {
-    tools.push(createImageAnalysisTool(workspaceId));
-  }
-
-  // Bind tools to model if any tools are configured
-  const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
-
-  // Build messages array
-  const messages = [
-    ...chatHistory,
-    { role: 'user', content: userInput },
-  ];
-
-  // Invoke model with system prompt
-  const response = await modelWithTools.invoke(messages, {
+  // Invoke model with system prompt - simple, no tools for now
+  const response = await model.invoke(messages, {
     system: config.systemPrompt,
   });
 
@@ -532,14 +514,14 @@ serve(async (req) => {
     const lastMessage = messages[messages.length - 1];
     const userInput = lastMessage?.content || '';
 
-    // Convert messages to LangChain BaseMessage format (chat history without last message)
-    const chatHistory: BaseMessage[] = messages.slice(0, -1).map((msg: any) => ({
-      role: msg.role === 'user' ? 'user' : 'assistant',
+    // Convert messages to Anthropic API format
+    const anthropicMessages = messages.map((msg: any) => ({
+      role: msg.role,
       content: msg.content,
-    })) as BaseMessage[];
+    }));
 
     // Execute agent
-    const result = await executeAgent(agentId, workspaceId, userInput, chatHistory);
+    const result = await executeAgent(agentId, workspaceId, userInput, anthropicMessages);
 
     // Save conversation
     await saveConversation(user.id, agentId, messages, result);
