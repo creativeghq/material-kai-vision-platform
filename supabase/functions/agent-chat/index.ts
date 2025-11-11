@@ -3,27 +3,6 @@
  * Supabase Edge Function for AI agent orchestration
  */
 
-// CRITICAL: Set up process.env BEFORE any imports that might use it
-// Deno doesn't have process.env by default, but Mastra needs it
-(globalThis as any).process = (globalThis as any).process || { env: {} };
-(globalThis as any).process.env = (globalThis as any).process.env || {};
-
-// Get API keys from Deno environment
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-
-// Set them in process.env for Mastra
-(globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
-(globalThis as any).process.env.OPENAI_API_KEY = OPENAI_API_KEY;
-
-console.log('🔑 API Keys setup:', {
-  anthropicExists: !!ANTHROPIC_API_KEY,
-  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 10),
-  openaiExists: !!OPENAI_API_KEY,
-  processEnvSet: !!(globalThis as any).process.env.ANTHROPIC_API_KEY,
-});
-
-// NOW import everything else
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -32,6 +11,16 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { Agent } from 'npm:@mastra/core/agent';
 import { createTool } from 'npm:@mastra/core/tools';
 import { z } from 'npm:zod';
+
+// Get API keys from Deno environment (we'll pass them directly to models)
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+
+console.log('🔑 API Keys loaded:', {
+  anthropicExists: !!ANTHROPIC_API_KEY,
+  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 10),
+  openaiExists: !!OPENAI_API_KEY,
+});
 
 // Environment variables
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -194,7 +183,11 @@ Your role is to help users find materials, products, and technical information f
 - Provide technical specifications when available
 - Suggest next steps or related searches`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
     imageAnalysis: imageAnalysisTool,
@@ -225,7 +218,11 @@ Your role is to conduct deep research, competitive analysis, and market intellig
 - Identify trends and patterns
 - Suggest areas for further investigation`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -255,7 +252,11 @@ Your role is to analyze data, generate insights, and provide business intelligen
 - Provide data-driven recommendations
 - Explain complex data in simple terms`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -285,7 +286,11 @@ Your role is to provide business intelligence, strategy insights, and market ana
 - Identify opportunities and risks
 - Support decision-making with data`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -315,7 +320,11 @@ Your role is to support product management, feature planning, and user experienc
 - Prioritize based on impact
 - Support data-driven product decisions`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -345,7 +354,11 @@ Your role is to support system administration, platform management, and technica
 - Support operational excellence
 - Ensure compliance and best practices`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   tools: {
     materialSearch: searchTool,
   },
@@ -496,7 +509,11 @@ Your role is to analyze user queries and route them to the appropriate specializ
 - Provide helpful, contextual responses
 - For permission-denied cases, explain role requirements`,
 
-  model: 'anthropic/claude-sonnet-4-20250514',
+  model: {
+    provider: 'ANTHROPIC',
+    name: 'claude-sonnet-4-20250514',
+    apiKey: ANTHROPIC_API_KEY,
+  },
   agents: {
     searchAgent,
     researchAgent,
