@@ -10,6 +10,33 @@
  * - MIVAA Python API integration for search
  */
 
+// ⚠️ CRITICAL: Set up process.env polyfill BEFORE any imports
+// npm: packages in Deno expect Node.js process.env, not Deno.env
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+
+if (!ANTHROPIC_API_KEY) {
+  throw new Error('ANTHROPIC_API_KEY must be set');
+}
+
+console.log('🔑 Environment variables loaded:', {
+  anthropicExists: !!ANTHROPIC_API_KEY,
+  anthropicLength: ANTHROPIC_API_KEY?.length || 0,
+  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'MISSING',
+});
+
+// Polyfill process.env for npm packages
+(globalThis as any).process = {
+  env: {
+    ANTHROPIC_API_KEY: ANTHROPIC_API_KEY
+  }
+};
+
+console.log('✅ process.env polyfill set up for npm packages');
+
+// NOW import dependencies (after polyfill is set up)
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -19,36 +46,11 @@ import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
 import { tool } from 'npm:@langchain/core@0.3.29/tools';
 import { z } from 'npm:zod@3.24.1';
 
-// Get API keys from Deno environment - READ AT MODULE LOAD TIME
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-
-console.log('🔑 API Keys loaded:', {
-  anthropicExists: !!ANTHROPIC_API_KEY,
-  anthropicLength: ANTHROPIC_API_KEY?.length || 0,
-  anthropicPrefix: ANTHROPIC_API_KEY?.substring(0, 15) || 'MISSING',
-});
-
-// CRITICAL: Set ANTHROPIC_API_KEY on process.env for npm: packages
-// npm: packages in Deno expect Node.js process.env, not Deno.env
-if (ANTHROPIC_API_KEY) {
-  (globalThis as any).process = (globalThis as any).process || {};
-  (globalThis as any).process.env = (globalThis as any).process.env || {};
-  (globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
-  console.log('✅ Set ANTHROPIC_API_KEY on process.env for npm packages');
-}
-
-if (!ANTHROPIC_API_KEY) {
-  throw new Error('ANTHROPIC_API_KEY environment variable is not set');
-}
-
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // Initialize Claude model AT MODULE LOAD TIME
-// Don't pass apiKey explicitly - let it read from process.env.ANTHROPIC_API_KEY
+// It will auto-read ANTHROPIC_API_KEY from process.env
 const model = new ChatAnthropic({
   model: 'claude-sonnet-4-20250514',
   temperature: 1,
