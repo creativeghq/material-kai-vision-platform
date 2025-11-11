@@ -20,12 +20,21 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
+// Set environment variables in a way npm packages can access them
+// This is required for npm: packages in Deno to access environment variables
+if (ANTHROPIC_API_KEY) {
+  (globalThis as any).process = (globalThis as any).process || {};
+  (globalThis as any).process.env = (globalThis as any).process.env || {};
+  (globalThis as any).process.env.ANTHROPIC_API_KEY = ANTHROPIC_API_KEY;
+}
+
 console.log('🔑 Environment variables loaded:', {
   supabaseUrl: !!SUPABASE_URL,
   serviceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY,
   anthropicKey: !!ANTHROPIC_API_KEY,
   anthropicKeyLength: ANTHROPIC_API_KEY?.length || 0,
   anthropicKeyPrefix: ANTHROPIC_API_KEY?.substring(0, 10) || 'MISSING',
+  processEnvSet: !!(globalThis as any).process?.env?.ANTHROPIC_API_KEY,
 });
 
 // Initialize Supabase client
