@@ -184,8 +184,7 @@ Your role is to help users find materials, products, and technical information f
 - Suggest next steps or related searches`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   tools: {
@@ -219,8 +218,7 @@ Your role is to conduct deep research, competitive analysis, and market intellig
 - Suggest areas for further investigation`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   tools: {
@@ -253,8 +251,7 @@ Your role is to analyze data, generate insights, and provide business intelligen
 - Explain complex data in simple terms`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   tools: {
@@ -287,8 +284,7 @@ Your role is to provide business intelligence, strategy insights, and market ana
 - Support decision-making with data`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   tools: {
@@ -321,8 +317,7 @@ Your role is to support product management, feature planning, and user experienc
 - Support data-driven product decisions`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   tools: {
@@ -355,8 +350,7 @@ Your role is to support system administration, platform management, and technica
 - Ensure compliance and best practices`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   tools: {
@@ -453,8 +447,7 @@ You: "DEMO_DATA: {type: 'demo_command', data: {command: 'cement_tiles'}}
 I'm showing you 5 cement-based tiles in grey color with full specifications and pricing."`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
 });
@@ -510,8 +503,7 @@ Your role is to analyze user queries and route them to the appropriate specializ
 - For permission-denied cases, explain role requirements`,
 
   model: {
-    provider: 'ANTHROPIC',
-    name: 'claude-sonnet-4-20250514',
+    id: 'anthropic/claude-sonnet-4-20250514',
     apiKey: ANTHROPIC_API_KEY,
   },
   agents: {
