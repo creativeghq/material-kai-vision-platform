@@ -567,22 +567,31 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
+      <div
+        className="px-6 py-4 m-4 rounded-3xl"
+        style={{
+          background: 'var(--glass-bg)',
+          backdropFilter: 'var(--glass-blur)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
+        }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Button
                 onClick={() => navigate('/')}
                 onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-                className="flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50"
+                className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
+                variant="ghost"
               >
                 <Home className="h-4 w-4" />
                 Back to Main
               </Button>
             </div>
-            <div className="h-6 w-px bg-border" />
+            <div className="h-6 w-px bg-white/20" />
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
                 Admin Dashboard
@@ -592,7 +601,7 @@ const AdminDashboard: React.FC = () => {
               </p>
             </div>
           </div>
-          <Badge className="text-sm px-2 py-1 border border-gray-300 bg-white text-gray-700">
+          <Badge className="text-sm px-2 py-1" style={{ background: 'var(--mocha-color)' }}>
             Administrator Access
           </Badge>
         </div>

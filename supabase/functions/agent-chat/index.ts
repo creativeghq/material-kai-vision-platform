@@ -11,10 +11,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// LangChain imports - using ESM imports for Supabase Edge Functions
-import { ChatAnthropic } from "@langchain/anthropic";
-import { tool } from "@langchain/core/tools";
-import { z } from "zod";
+// LangChain imports - using npm: prefix for Deno (no import_map.json needed)
+import { ChatAnthropic } from "npm:@langchain/anthropic";
+import { tool } from "npm:@langchain/core/tools";
+import { z } from "npm:zod";
 
 // Get environment variables at module load
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
