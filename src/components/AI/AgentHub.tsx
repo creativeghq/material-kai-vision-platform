@@ -35,6 +35,7 @@ import { agentChatHistoryService, ChatConversation } from '@/services/agents/age
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
+import { MaterialProductAdapter } from './MaterialProductAdapter';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -129,6 +130,11 @@ interface Message {
   agentId?: string;
   model?: string;
   demoData?: any; // Structured demo data for DemoAgent responses
+  materialData?: {
+    products: any[];
+    images?: Record<string, any[]>;
+    title?: string;
+  }; // Real material/product data from database
 }
 
 interface AgentHubProps {
@@ -329,6 +335,32 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
       }
 
+      // Parse material data from agent responses (for Search Agent, etc.)
+      let materialData = undefined;
+      if (data.materialResults) {
+        // Agent returned structured material data
+        materialData = {
+          products: data.materialResults.products || [],
+          images: data.materialResults.images || {},
+          title: data.materialResults.title || 'Material Results',
+        };
+      } else if (data.text && data.text.includes('MATERIAL_DATA:')) {
+        // Parse embedded material data from response text
+        try {
+          const materialDataMatch = data.text.match(/MATERIAL_DATA:\s*(\{[\s\S]*?\})\s*$/m);
+          if (materialDataMatch) {
+            const parsedData = JSON.parse(materialDataMatch[1]);
+            materialData = {
+              products: parsedData.products || [],
+              images: parsedData.images || {},
+              title: parsedData.title || 'Material Results',
+            };
+          }
+        } catch (e) {
+          console.error('Error parsing material data:', e);
+        }
+      }
+
       // Add assistant response to messages
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-response`,
@@ -338,6 +370,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         agentId: data.agentId || selectedAgent,
         model: data.model || selectedModel,
         demoData,
+        materialData,
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -601,7 +634,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col bg-background">
+      <div className="flex-1 flex flex-col">
         {/* Chat Header */}
         <div
           className="min-h-16 px-6 py-3 flex items-center justify-between m-4 rounded-3xl"
@@ -706,7 +739,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   </div>
                 )}
                 <div
-                  className={`${message.demoData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 ${
+                  className={`${message.demoData || message.materialData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 ${
                     message.role === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
@@ -716,6 +749,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <div className="space-y-4">
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                       <DemoAgentResults result={message.demoData} />
+                    </div>
+                  ) : message.materialData ? (
+                    <div className="space-y-4">
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <MaterialProductAdapter
+                        products={message.materialData.products}
+                        images={message.materialData.images}
+                        title={message.materialData.title}
+                        onProductSelect={onMaterialSelect}
+                      />
                     </div>
                   ) : (
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>

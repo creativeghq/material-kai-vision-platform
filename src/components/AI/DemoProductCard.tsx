@@ -60,9 +60,9 @@ export const DemoProductCard: React.FC<DemoProductCardProps> = ({
         : 'bg-red-100 text-red-800 border-red-300';
 
   return (
-    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 bg-white border border-gray-200">
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
       {/* Product Image */}
-      <div className="relative h-48 bg-gray-100">
+      <div className="relative h-48" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
         {primaryImage && (
           <img
             src={primaryImage.url}
@@ -81,10 +81,10 @@ export const DemoProductCard: React.FC<DemoProductCardProps> = ({
         <div className="mb-3">
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-900 text-base line-clamp-1">
+              <h3 className="font-semibold text-white text-base line-clamp-1">
                 {product.name}
               </h3>
-              <p className="text-sm text-gray-500 mt-0.5">SKU {product.sku}</p>
+              <p className="text-sm text-gray-300 mt-0.5">SKU {product.sku}</p>
             </div>
             <Badge
               className="ml-2"
@@ -123,17 +123,17 @@ export const DemoProductCard: React.FC<DemoProductCardProps> = ({
         </div>
 
         {/* Pricing */}
-        <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-gray-200">
+        <div className="grid grid-cols-2 gap-3 mb-3 pb-3 border-b border-white/20">
           <div>
-            <p className="text-xs text-gray-500 mb-0.5">Retail</p>
-            <p className="font-semibold text-gray-900">
+            <p className="text-xs text-gray-300 mb-0.5">Retail</p>
+            <p className="font-semibold text-white">
               {product.pricing.currency === 'EUR' ? '€' : '$'}
               {product.pricing.retail.toFixed(2)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-gray-500 mb-0.5">Wholesale</p>
-            <p className="font-semibold text-gray-900">
+            <p className="text-xs text-gray-300 mb-0.5">Wholesale</p>
+            <p className="font-semibold text-white">
               {product.pricing.currency === 'EUR' ? '€' : '$'}
               {product.pricing.wholesale.toFixed(2)}
             </p>
@@ -154,7 +154,7 @@ export const DemoProductCard: React.FC<DemoProductCardProps> = ({
 
         {/* Variants */}
         {product.variants && product.variants.length > 0 && (
-          <div className="mb-3 text-xs text-gray-600">
+          <div className="mb-3 text-xs text-gray-300">
             <span className="font-medium">Variants ({product.variants.length}):</span>{' '}
             {product.variants.map((v) => v.name).join(', ')}
           </div>
@@ -163,8 +163,8 @@ export const DemoProductCard: React.FC<DemoProductCardProps> = ({
         {/* View Details Button */}
         <Button
           onClick={() => onViewDetails(product)}
-          variant="outline"
-          className="w-full justify-between hover:bg-gray-50"
+          variant="ghost"
+          className="w-full justify-between hover:bg-white/10 border border-white/20"
           size="sm"
         >
           <span>View Details</span>
