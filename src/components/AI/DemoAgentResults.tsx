@@ -88,18 +88,22 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   if (result.type === '3d_design' && result.data) {
     const design = result.data;
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 bg-white rounded-lg p-6 shadow-lg">
         <div>
-          <h3 className="text-2xl font-bold mb-2">{design.title}</h3>
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">{design.title}</h3>
           <p className="text-gray-600 mb-4">{design.description}</p>
           <div className="flex gap-2 mb-4">
-            <Badge variant="outline">Style: {design.style}</Badge>
-            <Badge variant="outline">Room: {design.room_type}</Badge>
+            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
+              Style: {design.style}
+            </Badge>
+            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
+              Room: {design.room_type}
+            </Badge>
           </div>
         </div>
 
         {/* Design Image */}
-        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100">
+        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-50 border border-gray-200">
           <img
             src={design.image.url}
             alt={design.image.alt}
@@ -109,10 +113,10 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
 
         {/* Materials Used */}
         <div>
-          <h4 className="text-lg font-semibold mb-4">Materials Used in Design</h4>
+          <h4 className="text-lg font-semibold text-gray-900 mb-4">Materials Used in Design</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {design.materials_used.map((material: any) => (
-              <DemoProductCard
+              <ProductCard
                 key={material.id}
                 product={material}
                 onViewDetails={handleViewDetails}
@@ -122,7 +126,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           </div>
         </div>
 
-        <DemoProductDetailModal
+        <ProductDetailModal
           product={selectedProduct}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
@@ -140,82 +144,102 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   if (result.type === 'heat_pump_table' && result.data) {
     const { models, specifications } = result.data;
     return (
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-2xl font-bold mb-2">Heat Pump Models</h3>
-          <p className="text-gray-600">{result.message}</p>
+      <div className="space-y-6 bg-white rounded-lg p-6 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Heat Pump Models</h3>
+            <p className="text-sm text-gray-600 mt-1">{result.message}</p>
+          </div>
+          <Badge
+            variant="secondary"
+            style={{
+              background: 'var(--mocha-color)',
+              color: 'white',
+            }}
+          >
+            {models.length} models
+          </Badge>
         </div>
 
-        {/* Models Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Available Models</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b bg-gray-50">
-                    <th className="text-left p-3 font-semibold">Model</th>
-                    <th className="text-left p-3 font-semibold">Heating</th>
-                    <th className="text-left p-3 font-semibold">Cooling</th>
-                    <th className="text-left p-3 font-semibold">Efficiency</th>
-                    <th className="text-left p-3 font-semibold">Noise</th>
-                    <th className="text-right p-3 font-semibold">Retail</th>
-                    <th className="text-right p-3 font-semibold">Wholesale</th>
-                    <th className="text-center p-3 font-semibold">Stock</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {models.map((model: any, index: number) => (
-                    <tr key={index} className="border-b hover:bg-gray-50">
-                      <td className="p-3 font-medium">{model.model}</td>
-                      <td className="p-3">{model.heating_capacity}</td>
-                      <td className="p-3">{model.cooling_capacity}</td>
-                      <td className="p-3">
-                        <Badge variant="default">{model.energy_efficiency}</Badge>
-                      </td>
-                      <td className="p-3">{model.noise_level}</td>
-                      <td className="p-3 text-right font-semibold">
-                        €{model.price_retail.toFixed(2)}
-                      </td>
-                      <td className="p-3 text-right">
-                        €{model.price_wholesale.toFixed(2)}
-                      </td>
-                      <td className="p-3 text-center">
-                        <Badge
-                          variant={
-                            model.stock > 50
-                              ? 'default'
-                              : model.stock > 20
-                                ? 'secondary'
-                                : 'destructive'
-                          }
-                        >
-                          {model.stock}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Models Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {models.map((model: any, index: number) => (
+            <Card key={index} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-bold text-gray-900">{model.model}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {/* Capacity */}
+                <div className="grid grid-cols-2 gap-3 pb-3 border-b border-gray-200">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-0.5">Heating</p>
+                    <p className="text-sm font-semibold text-gray-900">{model.heating_capacity}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-0.5">Cooling</p>
+                    <p className="text-sm font-semibold text-gray-900">{model.cooling_capacity}</p>
+                  </div>
+                </div>
 
-        {/* Specifications */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Common Specifications</CardTitle>
+                {/* Efficiency & Noise */}
+                <div className="space-y-2 pb-3 border-b border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Efficiency</span>
+                    <Badge className="bg-green-100 text-green-800 border-green-300">
+                      {model.energy_efficiency}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600">Noise Level</span>
+                    <span className="text-sm font-semibold text-gray-900">{model.noise_level}</span>
+                  </div>
+                </div>
+
+                {/* Pricing */}
+                <div className="grid grid-cols-2 gap-3 pb-3 border-b border-gray-200">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-0.5">Retail</p>
+                    <p className="font-semibold text-gray-900">€{model.price_retail.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 mb-0.5">Wholesale</p>
+                    <p className="font-semibold text-gray-900">€{model.price_wholesale.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                {/* Stock */}
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700">Stock:</span>
+                  <Badge
+                    className={`text-sm px-3 py-1 ${
+                      model.stock > 50
+                        ? 'bg-green-100 text-green-800 border-green-300'
+                        : model.stock > 20
+                          ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
+                          : 'bg-red-100 text-red-800 border-red-300'
+                    }`}
+                  >
+                    {model.stock} units
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Common Specifications */}
+        <Card className="bg-gray-50 border-gray-200 mt-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-bold text-gray-900">Common Specifications</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {Object.entries(specifications).map(([key, value]) => (
-                <div key={key} className="border rounded-lg p-3">
-                  <p className="text-xs font-medium text-gray-500 uppercase mb-1">
+                <div key={key} className="bg-white border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                     {key.replace(/_/g, ' ')}
                   </p>
-                  <p className="text-sm font-semibold text-gray-900">
+                  <p className="text-sm font-bold text-gray-900">
                     {Array.isArray(value) ? value.join(', ') : String(value)}
                   </p>
                 </div>

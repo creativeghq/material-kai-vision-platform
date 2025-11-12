@@ -332,7 +332,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               };
             } else if (command === '3d_design') {
               const designData = await import('@/data/demo/3d-design.json');
-              demoData = { type: '3d_design', data: designData.default, message: 'Modern living room 3D design' };
+              demoData = { type: '3d_design', data: designData.default.design, message: 'Modern living room 3D design' };
             }
           }
         } catch (e) {
