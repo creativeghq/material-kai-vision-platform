@@ -731,58 +731,105 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {message.role === 'assistant' && (
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                  </div>
-                )}
+            <>
+              {messages.map((message) => (
                 <div
-                  className={`${message.demoData || message.materialData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
+                  key={message.id}
+                  className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {message.demoData ? (
-                    <div className="space-y-4">
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      <DemoAgentResults result={message.demoData} />
-                    </div>
-                  ) : message.materialData ? (
-                    <div className="space-y-4">
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      {/* Display real materials using DemoAgentResults format */}
-                      <DemoAgentResults
-                        result={{
-                          type: 'product_list',
-                          data: message.materialData.products,
-                          message: message.materialData.title || 'Material Results'
+                  {message.role === 'assistant' && (
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                        style={{
+                          backgroundColor: 'var(--mocha-color)',
+                          borderColor: 'var(--mocha-color)'
                         }}
-                      />
+                      >
+                        <Bot className="h-4 w-4 text-white" />
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                   )}
-                  <p className="text-xs opacity-70 mt-2">
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
+                  <div
+                    className={`${message.demoData || message.materialData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 border-2 ${
+                      message.role === 'user'
+                        ? 'bg-white text-gray-900'
+                        : 'bg-white text-gray-900'
+                    }`}
+                    style={{
+                      borderColor: message.role === 'user' ? '#1f2937' : 'var(--mocha-color)'
+                    }}
+                  >
+                    {message.demoData ? (
+                      <div className="space-y-4">
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <DemoAgentResults result={message.demoData} />
+                      </div>
+                    ) : message.materialData ? (
+                      <div className="space-y-4">
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {/* Display real materials using DemoAgentResults format */}
+                        <DemoAgentResults
+                          result={{
+                            type: 'product_list',
+                            data: message.materialData.products,
+                            message: message.materialData.title || 'Material Results'
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    )}
+                    <p className="text-xs opacity-70 mt-2">
+                      {message.timestamp.toLocaleTimeString()}
+                    </p>
+                  </div>
+                  {message.role === 'user' && (
+                    <div className="flex-shrink-0">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                        style={{
+                          backgroundColor: '#1f2937',
+                          borderColor: '#1f2937'
+                        }}
+                      >
+                        <User className="h-4 w-4 text-white" />
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {message.role === 'user' && (
+              ))}
+
+              {/* Loading/Thinking Animation */}
+              {isLoading && (
+                <div className="flex gap-3 justify-start">
                   <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                      <User className="h-4 w-4 text-primary-foreground" />
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                      style={{
+                        backgroundColor: 'var(--mocha-color)',
+                        borderColor: 'var(--mocha-color)'
+                      }}
+                    >
+                      <Bot className="h-4 w-4 text-white" />
                     </div>
                   </div>
-                )}
-              </div>
-            ))
+                  <div
+                    className="max-w-[70%] rounded-lg p-4 border-2 bg-white"
+                    style={{ borderColor: 'var(--mocha-color)' }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                      <span className="text-sm text-gray-600">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
           <div ref={messagesEndRef} />
         </div>

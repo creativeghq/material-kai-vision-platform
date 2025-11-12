@@ -104,18 +104,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               <Badge
                 key={index}
                 variant="outline"
-                className="text-xs capitalize"
-                style={{
-                  backgroundColor: `${categoryColor}10`,
-                  borderColor: `${categoryColor}40`,
-                  color: categoryColor,
-                }}
+                className="text-xs capitalize bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100"
               >
                 {tag}
               </Badge>
             ))}
             {product.tags.length > 3 && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-300">
                 +{product.tags.length - 3}
               </Badge>
             )}
