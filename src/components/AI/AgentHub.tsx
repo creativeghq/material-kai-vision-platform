@@ -300,14 +300,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               const cementTilesData = await import('@/data/demo/cement-tiles.json');
               demoData = {
                 type: 'product_list',
-                data: cementTilesData.default,
+                data: cementTilesData.default.results || cementTilesData.default,
                 message: 'Showing 5 cement-based tiles in grey color',
               };
             } else if (command === 'green_wood') {
               const greenWoodData = await import('@/data/demo/green-wood.json');
               demoData = {
                 type: 'product_list',
-                data: greenWoodData.default,
+                data: greenWoodData.default.results || greenWoodData.default,
                 message: 'Showing 5 Egger wood materials in green',
               };
             } else if (command === 'heat_pumps') {
