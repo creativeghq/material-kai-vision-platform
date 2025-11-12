@@ -365,7 +365,25 @@ async function executeAgent(
     throw new Error(`Unknown agent: ${agentId}`);
   }
 
-  // Use the pre-initialized model
+  // Special handling for Demo Agent - return structured command
+  if (agentId === 'demo') {
+    const lowerInput = userInput.toLowerCase();
+
+    // Detect what demo data to return based on keywords
+    if (lowerInput.includes('cement') || lowerInput.includes('tile') || lowerInput.includes('grey')) {
+      return "I found 5 cement-based tiles in grey color. These are perfect for modern interiors.\n\nDEMO_DATA: {\"data\":{\"command\":\"cement_tiles\"}}";
+    } else if (lowerInput.includes('wood') || lowerInput.includes('green') || lowerInput.includes('egger')) {
+      return "Here are 5 Egger wood materials in green tones, ideal for sustainable projects.\n\nDEMO_DATA: {\"data\":{\"command\":\"green_wood\"}}";
+    } else if (lowerInput.includes('heat') || lowerInput.includes('pump') || lowerInput.includes('hvac')) {
+      return "Here's a comparison of our heat pump models.\n\nDEMO_DATA: {\"data\":{\"command\":\"heat_pumps\"}}";
+    } else if (lowerInput.includes('3d') || lowerInput.includes('design') || lowerInput.includes('room')) {
+      return "Here's a modern living room 3D design.\n\nDEMO_DATA: {\"data\":{\"command\":\"3d_design\"}}";
+    } else {
+      return "I can show you demo materials. Try asking for:\n- Cement tiles\n- Green wood materials\n- Heat pumps\n- 3D room designs";
+    }
+  }
+
+  // Use the pre-initialized model for other agents
   const response = await model.invoke(messages, {
     system: config.systemPrompt,
   });
