@@ -288,12 +288,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // Parse demo data if this is from DemoAgent
       let demoData = undefined;
       if (selectedAgent === 'demo' && data.text) {
+        console.log('🔍 DemoAgent Response:', data.text);
         try {
           // Look for DEMO_DATA: prefix in the response
           const demoDataMatch = data.text.match(/DEMO_DATA:\s*(\{[^}]+\})/);
+          console.log('🔍 DEMO_DATA Match:', demoDataMatch);
           if (demoDataMatch) {
             const commandData = JSON.parse(demoDataMatch[1]);
             const command = commandData.data?.command;
+            console.log('🔍 Command:', command);
 
             // Load appropriate demo data based on command
             if (command === 'cement_tiles') {
