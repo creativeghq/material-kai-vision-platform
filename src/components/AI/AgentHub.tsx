@@ -287,6 +287,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Parse demo data if this is from DemoAgent
       let demoData = undefined;
+      let cleanedText = data.text;
+
       if (selectedAgent === 'demo' && data.text) {
         try {
           // Look for DEMO_DATA: prefix in the response
@@ -295,7 +297,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
           if (demoDataMatch) {
             const command = demoDataMatch[1]; // Extract command directly from regex
-            console.log('🔍 Command:', command);
+
+            // Remove the DEMO_DATA marker from the text
+            cleanedText = data.text.replace(/\n*DEMO_DATA:\s*\{\"data\":\{\"command\":\"\w+\"\}\}\s*/g, '').trim();
 
             // Load appropriate demo data based on command
             if (command === 'cement_tiles') {
@@ -366,7 +370,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-response`,
         role: 'assistant',
-        content: data.text || 'No response from agent',
+        content: cleanedText || 'No response from agent',
         timestamp: new Date(),
         agentId: data.agentId || selectedAgent,
         model: data.model || selectedModel,

@@ -43,16 +43,16 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   // Product List Display
   if (result.type === 'product_list' && result.data) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 bg-white rounded-lg p-6 shadow-lg">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">
+          <h3 className="text-lg font-semibold text-gray-900">
             {result.message || 'Product Results'}
           </h3>
           <Badge
             variant="secondary"
             style={{
               background: 'var(--mocha-color)',
-              color: 'var(--foreground-dark)',
+              color: 'white',
             }}
           >
             {result.data.length} products
