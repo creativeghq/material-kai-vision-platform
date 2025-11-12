@@ -1,6 +1,6 @@
 /**
- * Demo Product Card Component
- * Displays product information in a card format matching the reference design
+ * Product Card Component
+ * Displays product/material information in a card format
  */
 
 import React from 'react';
@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
 
-export interface DemoProduct {
+export interface Product {
   id: string;
   sku: string;
   name: string;
@@ -40,13 +40,13 @@ export interface DemoProduct {
   }>;
 }
 
-interface DemoProductCardProps {
-  product: DemoProduct;
-  onViewDetails: (product: DemoProduct) => void;
+interface ProductCardProps {
+  product: Product;
+  onViewDetails: (product: Product) => void;
   categoryColor?: string;
 }
 
-export const DemoProductCard: React.FC<DemoProductCardProps> = ({
+export const ProductCard: React.FC<ProductCardProps> = ({
   product,
   onViewDetails,
   categoryColor = '#3b82f6',
@@ -175,5 +175,5 @@ export const DemoProductCard: React.FC<DemoProductCardProps> = ({
   );
 };
 
-export default DemoProductCard;
+export default ProductCard;
 

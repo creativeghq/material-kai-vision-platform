@@ -35,7 +35,6 @@ import { agentChatHistoryService, ChatConversation } from '@/services/agents/age
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
-import { MaterialProductAdapter } from './MaterialProductAdapter';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -753,11 +752,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   ) : message.materialData ? (
                     <div className="space-y-4">
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      <MaterialProductAdapter
-                        products={message.materialData.products}
-                        images={message.materialData.images}
-                        title={message.materialData.title}
-                        onProductSelect={onMaterialSelect}
+                      {/* Display real materials using DemoAgentResults format */}
+                      <DemoAgentResults
+                        result={{
+                          type: 'product_list',
+                          data: message.materialData.products,
+                          message: message.materialData.title || 'Material Results'
+                        }}
                       />
                     </div>
                   ) : (

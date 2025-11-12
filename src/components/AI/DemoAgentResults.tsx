@@ -4,8 +4,8 @@
  */
 
 import React, { useState } from 'react';
-import { DemoProductCard, DemoProduct } from './DemoProductCard';
-import { DemoProductDetailModal } from './DemoProductDetailModal';
+import { ProductCard, Product } from './ProductCard';
+import { ProductDetailModal } from './ProductDetailModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -27,10 +27,10 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   result,
   categoryColors = DEFAULT_CATEGORY_COLORS,
 }) => {
-  const [selectedProduct, setSelectedProduct] = useState<DemoProduct | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleViewDetails = (product: DemoProduct) => {
+  const handleViewDetails = (product: Product) => {
     setSelectedProduct(product);
     setIsModalOpen(true);
   };
@@ -45,15 +45,23 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">
+          <h3 className="text-lg font-semibold text-white">
             {result.message || 'Product Results'}
           </h3>
-          <Badge variant="secondary">{result.data.length} products</Badge>
+          <Badge
+            variant="secondary"
+            style={{
+              background: 'var(--mocha-color)',
+              color: 'var(--foreground-dark)',
+            }}
+          >
+            {result.data.length} products
+          </Badge>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {result.data.map((product: DemoProduct) => (
-            <DemoProductCard
+          {result.data.map((product: Product) => (
+            <ProductCard
               key={product.id}
               product={product}
               onViewDetails={handleViewDetails}
@@ -62,7 +70,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           ))}
         </div>
 
-        <DemoProductDetailModal
+        <ProductDetailModal
           product={selectedProduct}
           isOpen={isModalOpen}
           onClose={handleCloseModal}

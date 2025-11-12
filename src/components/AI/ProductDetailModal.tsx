@@ -1,6 +1,6 @@
 /**
- * Demo Product Detail Modal
- * Displays full product details with image slider and metadata
+ * Product Detail Modal
+ * Displays full product/material details with image slider and metadata
  */
 
 import React, { useState } from 'react';
@@ -14,16 +14,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, ShoppingCart, Package, Factory } from 'lucide-react';
-import { DemoProduct } from './DemoProductCard';
+import { Product } from './ProductCard';
 
-interface DemoProductDetailModalProps {
-  product: DemoProduct | null;
+interface ProductDetailModalProps {
+  product: Product | null;
   isOpen: boolean;
   onClose: () => void;
   categoryColor?: string;
 }
 
-export const DemoProductDetailModal: React.FC<DemoProductDetailModalProps> = ({
+export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   isOpen,
   onClose,
@@ -289,5 +289,5 @@ export const DemoProductDetailModal: React.FC<DemoProductDetailModalProps> = ({
   );
 };
 
-export default DemoProductDetailModal;
+export default ProductDetailModal;
 
