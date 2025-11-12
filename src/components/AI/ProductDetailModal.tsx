@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, ShoppingCart, Package, Factory } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ShoppingCart, Factory } from 'lucide-react';
 import { Product } from './ProductCard';
 
 interface ProductDetailModalProps {
@@ -48,14 +48,155 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const currentImage = product.images[currentImageIndex];
 
-  // Extract key metadata
-  const factory = product.metadata?.factory || 'Unknown Factory';
-  const origin = product.metadata?.origin || '';
-  const collection = product.metadata?.collection || '';
-  const size = product.metadata?.size || 'N/A';
-  const thickness = product.metadata?.thickness || 'N/A';
-  const finish = product.metadata?.finish || 'N/A';
-  const material = product.metadata?.material_type || product.type;
+  // Extract key metadata from all possible sources (metadata, properties, specifications)
+  const allData = {
+    ...product.metadata,
+    ...product.properties,
+    ...product.specifications
+  };
+
+  const factory = allData?.factory || allData?.manufacturer || 'Unknown Factory';
+  const origin = allData?.origin || allData?.country_of_origin || '';
+  const collection = allData?.collection || '';
+  const size = allData?.size || allData?.dimensions || 'N/A';
+  const thickness = allData?.thickness || 'N/A';
+  const finish = allData?.finish || 'N/A';
+  const material = allData?.material_type || allData?.material || product.type;
+
+  // Organize metadata into comprehensive categories matching DynamicMetadataExtractor
+  // Category 1: Material Properties
+  const materialProperties = {
+    'Material Type': material,
+    'Composition': allData?.composition,
+    'Type': allData?.type,
+    'Blend': allData?.blend,
+    'Fiber Content': allData?.fiber_content,
+    'Texture': allData?.texture,
+    'Finish': finish,
+    'Pattern': allData?.pattern,
+    'Weight': allData?.weight,
+    'Density': allData?.density,
+    'Durability Rating': allData?.durability_rating || allData?.durability
+  };
+
+  // Category 2: Dimensions
+  const dimensions = {
+    'Size': size,
+    'Length': allData?.length,
+    'Width': allData?.width,
+    'Height': allData?.height,
+    'Thickness': thickness,
+    'Diameter': allData?.diameter,
+    'Area': allData?.area,
+    'Volume': allData?.volume
+  };
+
+  // Category 3: Appearance
+  const appearance = {
+    'Color': allData?.color,
+    'Color Code': allData?.color_code,
+    'Gloss Level': allData?.gloss_level,
+    'Sheen': allData?.sheen,
+    'Transparency': allData?.transparency,
+    'Grain': allData?.grain,
+    'Visual Effect': allData?.visual_effect
+  };
+
+  // Category 4: Performance
+  const performance = {
+    'Water Resistance': allData?.water_resistance || allData?.water_absorption,
+    'Fire Rating': allData?.fire_rating,
+    'Slip Resistance': allData?.slip_resistance || allData?.class,
+    'Wear Rating': allData?.wear_rating,
+    'Abrasion Resistance': allData?.abrasion_resistance,
+    'Tensile Strength': allData?.tensile_strength,
+    'Breaking Strength': allData?.breaking_strength,
+    'Hardness': allData?.hardness
+  };
+
+  // Category 5: Application
+  const application = {
+    'Recommended Use': allData?.recommended_use || allData?.application,
+    'Installation Method': allData?.installation_method,
+    'Room Type': allData?.room_type,
+    'Traffic Level': allData?.traffic_level,
+    'Care Instructions': allData?.care_instructions,
+    'Maintenance': allData?.maintenance
+  };
+
+  // Category 6: Compliance
+  const compliance = {
+    'Certifications': allData?.certifications,
+    'Standards': allData?.standards,
+    'Eco Friendly': allData?.eco_friendly,
+    'Sustainability Rating': allData?.sustainability_rating,
+    'VOC Rating': allData?.voc_rating,
+    'Safety Rating': allData?.safety_rating
+  };
+
+  // Category 7: Design
+  const design = {
+    'Designer': allData?.designer || allData?.studio,
+    'Studio': allData?.studio,
+    'Collection': collection,
+    'Series': allData?.series,
+    'Aesthetic Style': allData?.aesthetic_style,
+    'Design Era': allData?.design_era
+  };
+
+  // Category 8: Manufacturing
+  const manufacturing = {
+    'Factory': factory,
+    'Manufacturer': allData?.manufacturer || allData?.factory_group,
+    'Factory Group': allData?.factory_group,
+    'Country of Origin': allData?.country_of_origin || origin,
+    'Manufacturing Process': allData?.manufacturing_process,
+    'Construction': allData?.construction
+  };
+
+  // Category 9: Commercial
+  const commercial = {
+    'Pricing': allData?.pricing,
+    'Availability': allData?.availability,
+    'Supplier': allData?.supplier,
+    'SKU': allData?.sku || product.sku,
+    'Warranty': allData?.warranty
+  };
+
+  // Get all other metadata not in the above categories
+  const excludedKeys = new Set([
+    // Material Properties
+    'material_type', 'material', 'composition', 'type', 'blend', 'fiber_content',
+    'texture', 'finish', 'pattern', 'weight', 'density', 'durability_rating', 'durability',
+    // Dimensions
+    'size', 'dimensions', 'length', 'width', 'height', 'thickness', 'diameter', 'area', 'volume',
+    // Appearance
+    'color', 'color_code', 'gloss_level', 'sheen', 'transparency', 'grain', 'visual_effect',
+    // Performance
+    'water_resistance', 'water_absorption', 'fire_rating', 'slip_resistance', 'class',
+    'wear_rating', 'abrasion_resistance', 'tensile_strength', 'breaking_strength', 'hardness',
+    // Application
+    'recommended_use', 'application', 'installation_method', 'room_type', 'traffic_level',
+    'care_instructions', 'maintenance',
+    // Compliance
+    'certifications', 'standards', 'eco_friendly', 'sustainability_rating', 'voc_rating', 'safety_rating',
+    // Design
+    'designer', 'studio', 'collection', 'series', 'aesthetic_style', 'design_era',
+    // Manufacturing
+    'factory', 'manufacturer', 'factory_group', 'country_of_origin', 'origin',
+    'manufacturing_process', 'construction',
+    // Commercial
+    'pricing', 'availability', 'supplier', 'sku', 'warranty',
+    // System fields
+    'thumbnail_url', 'image_url', '_extraction_metadata', 'category'
+  ]);
+
+  const additionalMetadata: Record<string, any> = {};
+  Object.entries(allData || {}).forEach(([key, value]) => {
+    if (!excludedKeys.has(key) && value !== null && value !== undefined && value !== '') {
+      additionalMetadata[key] = value;
+    }
+  });
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -288,31 +429,80 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Technical Specifications Section */}
-        <Card className="mt-6 bg-white border-gray-200">
-          <CardHeader className="bg-gray-50 border-b border-gray-200">
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Factory className="h-5 w-5 text-gray-700" />
-              Technical Specifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(product.metadata)
-                .filter(([key]) => !['factory', 'origin', 'collection'].includes(key))
-                .map(([key, value]) => (
-                  <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                      {key.replace(/_/g, ' ')}
-                    </p>
-                    <p className="text-sm font-bold text-gray-900">
-                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                    </p>
-                  </div>
-                ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Comprehensive Metadata Sections - 9 Categories */}
+        <div className="mt-6 space-y-4">
+          {/* Helper function to render metadata category */}
+          {(() => {
+            const renderMetadataCategory = (title: string, data: Record<string, any>, icon?: React.ReactNode) => {
+              const filteredData = Object.entries(data).filter(([_, value]) => value && value !== 'N/A' && value !== '');
+              if (filteredData.length === 0) return null;
+
+              return (
+                <Card className="bg-white border-gray-200">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200">
+                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      {icon || <Factory className="h-5 w-5 text-gray-700" />}
+                      {title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {filteredData.map(([key, value]) => (
+                        <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            {key}
+                          </p>
+                          <p className="text-sm font-bold text-gray-900">
+                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            };
+
+            return (
+              <>
+                {renderMetadataCategory('Material Properties', materialProperties)}
+                {renderMetadataCategory('Dimensions', dimensions)}
+                {renderMetadataCategory('Appearance', appearance)}
+                {renderMetadataCategory('Performance', performance)}
+                {renderMetadataCategory('Application', application)}
+                {renderMetadataCategory('Compliance & Certifications', compliance)}
+                {renderMetadataCategory('Design', design)}
+                {renderMetadataCategory('Manufacturing', manufacturing)}
+                {renderMetadataCategory('Commercial', commercial)}
+              </>
+            );
+          })()}
+
+          {/* Additional Metadata (if any) */}
+          {Object.keys(additionalMetadata).length > 0 && (
+            <Card className="bg-white border-gray-200">
+              <CardHeader className="bg-gray-50 border-b border-gray-200">
+                <CardTitle className="text-lg font-bold text-gray-900">
+                  Additional Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {Object.entries(additionalMetadata).map(([key, value]) => (
+                    <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                        {key.replace(/_/g, ' ')}
+                      </p>
+                      <p className="text-sm font-bold text-gray-900">
+                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Tags Section */}
         <Card className="mt-4 bg-white border-gray-200">

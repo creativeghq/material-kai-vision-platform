@@ -60,6 +60,17 @@ Complete documentation for Material Kai Vision Platform.
 - Performance metrics and benchmarks
 - Usage examples and best practices
 
+**[comprehensive-metadata-fields-guide.md](comprehensive-metadata-fields-guide.md)** - Comprehensive metadata fields guide ✨ NEW
+- 200+ metadata fields across 9 categories
+- Material Properties, Dimensions, Appearance, Performance
+- Application, Compliance, Design, Manufacturing, Commercial
+- AI-powered dynamic extraction (Claude Sonnet 4.5 / GPT-4o)
+- Complete field reference with examples
+- API usage and frontend display
+- Step-by-step extraction process
+- Confidence scoring system
+- Best practices and troubleshooting
+
 ---
 
 ### 🏗️ Architecture & Design

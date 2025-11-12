@@ -2,24 +2,85 @@
 
 ## Overview
 
-The MIVAA Metadata Management System provides intelligent extraction, classification, and application of metadata from PDF catalogs. The system handles 250+ possible metadata attributes through AI-powered dynamic discovery, scope detection, and override logic.
+The MIVAA Metadata Management System provides comprehensive, AI-powered extraction of 200+ metadata attributes from PDF catalogs. The system uses **DynamicMetadataExtractor** integrated into the Product Discovery pipeline to extract metadata across 9 functional categories during PDF processing.
 
 ## Architecture
 
 ### Core Components
 
-1. **Dynamic Metadata Extractor** - AI-powered extraction of metadata from text chunks
-2. **Metadata Scope Detector** - Classifies metadata as product-specific vs catalog-general
-3. **Metadata Application Service** - Applies metadata to products with override logic
-4. **Metadata API** - RESTful endpoints for metadata management
+1. **DynamicMetadataExtractor** - AI-powered extraction of comprehensive metadata (200+ fields)
+   - Integrated into Product Discovery Service (Stage 0)
+   - Uses Claude Sonnet 4.5 or GPT-4o
+   - Extracts metadata across 9 functional categories
+   - Supports both critical fields and dynamic discovery
+
+2. **Product Discovery Service** - Discovers products and enriches with metadata
+   - Stage 0A: Discover products with basic metadata
+   - Stage 0B: Enrich products with comprehensive metadata via DynamicMetadataExtractor
+   - Single source of truth for all product metadata
+
+3. **Metadata Scope Detector** - Classifies metadata as product-specific vs catalog-general
+4. **Metadata Application Service** - Applies metadata to products with override logic
+5. **Metadata API** - RESTful endpoints for metadata management
 
 ### Key Features
 
-- **Dynamic Discovery**: AI discovers any metadata attributes present in PDFs
+- **Comprehensive Extraction**: 200+ metadata fields across 9 functional categories
+- **AI-Powered Discovery**: Claude/GPT dynamically discovers any metadata present
+- **Organized Categories**: Material Properties, Dimensions, Appearance, Performance, Application, Compliance, Design, Manufacturing, Commercial
+- **Single Source of Truth**: DynamicMetadataExtractor is THE metadata extraction service
 - **Scope Detection**: Automatically classifies metadata scope (product-specific, catalog-general, category-specific)
-- **Implicit Detection**: Identifies catalog-general metadata even when not explicitly stated
 - **Override Logic**: Product-specific metadata can override catalog-general metadata
-- **Relevancy Scoring**: All metadata relationships have confidence scores (0.0-1.0)
+- **Confidence Scoring**: All metadata has confidence scores (0.0-1.0)
+
+## Metadata Categories
+
+The DynamicMetadataExtractor organizes metadata into 9 comprehensive functional categories:
+
+### 1. Material Properties
+- **Fields**: composition, type, blend, fiber_content, texture, finish, pattern, weight, density, durability_rating
+- **Purpose**: Physical and structural characteristics of the material
+- **Examples**: "ceramic", "matte finish", "800 kg/m³ density"
+
+### 2. Dimensions
+- **Fields**: length, width, height, thickness, diameter, size, area, volume
+- **Purpose**: Physical measurements and sizing information
+- **Examples**: "15×38 cm", "8mm thickness", "0.57 m² area"
+
+### 3. Appearance
+- **Fields**: color, color_code, gloss_level, sheen, transparency, grain, visual_effect
+- **Purpose**: Visual and aesthetic characteristics
+- **Examples**: "beige", "RAL 9010", "60% gloss", "wood grain"
+
+### 4. Performance
+- **Fields**: water_resistance, fire_rating, slip_resistance, wear_rating, abrasion_resistance, tensile_strength, breaking_strength, hardness
+- **Purpose**: Technical performance metrics and ratings
+- **Examples**: "R11 slip resistance", "A1 fire rating", "Class 3 water absorption"
+
+### 5. Application
+- **Fields**: recommended_use, installation_method, room_type, traffic_level, care_instructions, maintenance
+- **Purpose**: Usage recommendations and installation guidance
+- **Examples**: "residential flooring", "adhesive installation", "high traffic areas"
+
+### 6. Compliance & Certifications
+- **Fields**: certifications, standards, eco_friendly, sustainability_rating, voc_rating, safety_rating
+- **Purpose**: Regulatory compliance and environmental certifications
+- **Examples**: "ISO 9001:2015", "LEED certified", "low VOC"
+
+### 7. Design
+- **Fields**: designer, studio, collection, series, aesthetic_style, design_era
+- **Purpose**: Design attribution and aesthetic classification
+- **Examples**: "SG NY", "Harmony Collection", "contemporary style"
+
+### 8. Manufacturing
+- **Fields**: factory, manufacturer, factory_group, country_of_origin, manufacturing_process, construction
+- **Purpose**: Production and sourcing information
+- **Examples**: "Castellón Factory", "Harmony Group", "Made in Spain"
+
+### 9. Commercial
+- **Fields**: pricing, availability, supplier, sku, warranty
+- **Purpose**: Business and commercial information
+- **Examples**: "€45/m²", "in stock", "5-year warranty"
 
 ## Metadata Scopes
 
@@ -79,6 +140,67 @@ Relevance: 0.7 (MEDIUM-HIGH)
 ```
 
 ## Processing Flow
+
+### NEW Architecture: Integrated Metadata Extraction
+
+Metadata extraction is now integrated directly into the Product Discovery pipeline (Stage 0):
+
+```
+Stage 0: Product Discovery
+├── 0A: Discover Products (Claude/GPT)
+│   ├── Identify product names
+│   ├── Extract page ranges
+│   ├── Extract basic metadata (designer, dimensions, variants)
+│   └── Classify content by category
+│
+└── 0B: Enrich Products with Comprehensive Metadata
+    ├── For each discovered product:
+    │   ├── Extract product-specific text
+    │   ├── Call DynamicMetadataExtractor
+    │   ├── Extract 200+ metadata fields across 9 categories
+    │   └── Merge with discovery metadata
+    │
+    └── Store enriched products in database
+```
+
+### Metadata Extraction Process
+
+```python
+# 1. Product Discovery discovers products
+catalog = await discovery_service.discover_products(
+    pdf_content=pdf_bytes,
+    pdf_text=pdf_text,
+    extract_categories=["products", "certificates", "logos"]
+)
+
+# 2. Automatic metadata enrichment (happens inside discover_products)
+for product in catalog.products:
+    # Extract product-specific text
+    product_text = extract_product_text(pdf_text, product.page_range)
+
+    # Initialize DynamicMetadataExtractor
+    metadata_extractor = DynamicMetadataExtractor(model="claude", job_id=job_id)
+
+    # Extract comprehensive metadata
+    extracted = await metadata_extractor.extract_metadata(
+        pdf_text=product_text,
+        category_hint=product.metadata.get("category")
+    )
+
+    # Merge metadata (priority: discovery > critical > discovered)
+    product.metadata = {
+        **extracted["discovered"],  # 200+ dynamic fields
+        **extracted["critical"],    # material_category, factory_name, factory_group
+        **product.metadata,         # Original discovery metadata (highest priority)
+    }
+
+# 3. Products are created with comprehensive metadata
+# All 200+ fields are stored in products.metadata JSONB field
+```
+
+### OLD Architecture: Chunk-Based Scope Detection (Still Available)
+
+The legacy chunk-based metadata application is still available for post-processing:
 
 ### Stage 1: Chunk Creation
 

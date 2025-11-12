@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { ProductCard, Product } from './ProductCard';
 import { ProductDetailModal } from './ProductDetailModal';
+import Design3DModal from './Design3DModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -29,6 +30,8 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selected3DDesign, setSelected3DDesign] = useState<any>(null);
+  const [is3DModalOpen, setIs3DModalOpen] = useState(false);
 
   const handleViewDetails = (product: Product) => {
     setSelectedProduct(product);
@@ -87,56 +90,61 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   // 3D Design Display
   if (result.type === '3d_design' && result.data) {
     const design = result.data;
+
+    const handle3DImageClick = () => {
+      setSelected3DDesign(design);
+      setIs3DModalOpen(true);
+    };
+
+    const handle3DModalClose = () => {
+      setIs3DModalOpen(false);
+      setSelected3DDesign(null);
+    };
+
     return (
-      <div className="space-y-6 bg-white rounded-lg p-6 shadow-lg">
-        <div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">{design.title}</h3>
-          <p className="text-gray-600 mb-4">{design.description}</p>
-          <div className="flex gap-2 mb-4">
-            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
-              Style: {design.style}
-            </Badge>
-            <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
-              Room: {design.room_type}
-            </Badge>
+      <>
+        <div className="space-y-4 bg-white rounded-lg p-6 shadow-lg">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{design.title}</h3>
+            <p className="text-gray-600 mb-4">{design.description}</p>
+            <div className="flex gap-2 mb-4">
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
+                Style: {design.style}
+              </Badge>
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
+                Room: {design.room_type}
+              </Badge>
+              <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
+                {design.materials_used.length} Materials
+              </Badge>
+            </div>
           </div>
+
+          {/* Clickable Design Image */}
+          <button
+            onClick={handle3DImageClick}
+            className="relative w-full aspect-video rounded-lg overflow-hidden bg-gray-50 border-2 border-gray-200 hover:border-gray-900 transition-all group cursor-pointer"
+          >
+            <img
+              src={design.image.url}
+              alt={design.image.alt}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+              <div className="bg-white/90 px-6 py-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                <p className="text-sm font-semibold text-gray-900">Click to view details & materials</p>
+              </div>
+            </div>
+          </button>
         </div>
 
-        {/* Design Image */}
-        <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-50 border border-gray-200">
-          <img
-            src={design.image.url}
-            alt={design.image.alt}
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Materials Used */}
-        <div>
-          <h4 className="text-lg font-semibold text-gray-900 mb-4">Materials Used in Design</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {design.materials_used.map((material: any) => (
-              <ProductCard
-                key={material.id}
-                product={material}
-                onViewDetails={handleViewDetails}
-                categoryColor={categoryColors[material.category] || categoryColors[material.type]}
-              />
-            ))}
-          </div>
-        </div>
-
-        <ProductDetailModal
-          product={selectedProduct}
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          categoryColor={
-            selectedProduct
-              ? categoryColors[selectedProduct.category] || categoryColors[selectedProduct.type]
-              : undefined
-          }
+        {/* 3D Design Modal */}
+        <Design3DModal
+          design={selected3DDesign}
+          isOpen={is3DModalOpen}
+          onClose={handle3DModalClose}
         />
-      </div>
+      </>
     );
   }
 

@@ -23,6 +23,8 @@ export interface Product {
     isPrimary?: boolean;
   }>;
   metadata: Record<string, any>;
+  properties?: Record<string, any>; // Additional JSONB field for properties
+  specifications?: Record<string, any>; // Additional JSONB field for specifications
   pricing: {
     retail: number;
     wholesale: number;

@@ -385,10 +385,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         await agentChatHistoryService.saveMessage({
           conversationId,
           role: 'assistant',
-          content: data.text || 'No response from agent',
+          content: cleanedText || 'No response from agent',
           metadata: {
             agentId: data.agentId || selectedAgent,
             model: data.model || selectedModel,
+            demoData, // Save demo data for DemoAgent
+            materialData, // Save material data for Search Agent
           },
         });
       }
@@ -449,6 +451,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           timestamp: new Date(msg.createdAt),
           agentId: msg.metadata?.agentId as string,
           model: msg.metadata?.model as string,
+          demoData: msg.metadata?.demoData as any | undefined,
+          materialData: msg.metadata?.materialData as any | undefined,
         }))
       );
     },
@@ -742,8 +746,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center border-2"
                         style={{
-                          backgroundColor: 'var(--mocha-color)',
-                          borderColor: 'var(--mocha-color)'
+                          backgroundColor: 'hsl(var(--primary))',
+                          borderColor: 'hsl(var(--primary))'
                         }}
                       >
                         <Bot className="h-4 w-4 text-white" />
@@ -751,13 +755,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 border-2 ${
-                      message.role === 'user'
-                        ? 'bg-white text-gray-900'
-                        : 'bg-white text-gray-900'
-                    }`}
+                    className={`${message.demoData || message.materialData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 border-2 text-white`}
                     style={{
-                      borderColor: message.role === 'user' ? '#1f2937' : 'var(--mocha-color)'
+                      background: 'var(--glass-bg)',
+                      backdropFilter: 'var(--glass-blur)',
+                      borderColor: message.role === 'user' ? '#1f2937' : 'hsl(var(--primary))'
                     }}
                   >
                     {message.demoData ? (
@@ -807,24 +809,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center border-2"
                       style={{
-                        backgroundColor: 'var(--mocha-color)',
-                        borderColor: 'var(--mocha-color)'
+                        backgroundColor: 'hsl(var(--primary))',
+                        borderColor: 'hsl(var(--primary))'
                       }}
                     >
                       <Bot className="h-4 w-4 text-white" />
                     </div>
                   </div>
                   <div
-                    className="max-w-[70%] rounded-lg p-4 border-2 bg-white"
-                    style={{ borderColor: 'var(--mocha-color)' }}
+                    className="max-w-[70%] rounded-lg p-4 border-2 text-white"
+                    style={{
+                      background: 'var(--glass-bg)',
+                      backdropFilter: 'var(--glass-blur)',
+                      borderColor: 'hsl(var(--primary))'
+                    }}
                   >
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                       </div>
-                      <span className="text-sm text-gray-600">Thinking...</span>
+                      <span className="text-sm text-white/80">Thinking...</span>
                     </div>
                   </div>
                 </div>

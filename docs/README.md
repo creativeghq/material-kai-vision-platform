@@ -69,6 +69,17 @@
 - Database schema and indexes
 - Usage examples and best practices
 
+**[comprehensive-metadata-fields-guide.md](comprehensive-metadata-fields-guide.md)** - Comprehensive metadata fields guide ✨ NEW
+- 200+ metadata fields across 9 categories
+- Material Properties, Dimensions, Appearance, Performance
+- Application, Compliance, Design, Manufacturing, Commercial
+- AI-powered dynamic extraction (Claude/GPT)
+- Complete field reference with examples
+- API usage and frontend display
+- Step-by-step extraction process
+- Confidence scoring system
+- Best practices and troubleshooting
+
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - PDF processing pipeline
 - 14-stage pipeline breakdown
 - Products + Metadata extraction (inseparable)
