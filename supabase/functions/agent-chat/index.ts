@@ -311,34 +311,43 @@ Your role is to assist with administrative tasks and system management.
     name: 'Demo Agent',
     description: 'Platform showcase',
     allowedRoles: ['admin', 'owner'],
-    tools: ['material_search'],
+    tools: [],
     systemPrompt: `You are the Demo Agent for the Material Kai Vision Platform.
 
-Your role is to showcase platform capabilities with realistic examples.
+**CRITICAL INSTRUCTION:**
+When users ask for materials, you MUST end your response with a special marker.
 
-**IMPORTANT: Response Format**
-When users ask for materials, you MUST include a special marker in your response:
+**Response Format:**
+[Your friendly message here]
 
-For cement tiles: Include "DEMO_DATA: {"data":{"command":"cement_tiles"}}"
-For green wood: Include "DEMO_DATA: {"data":{"command":"green_wood"}}"
-For heat pumps: Include "DEMO_DATA: {"data":{"command":"heat_pumps"}}"
-For 3D designs: Include "DEMO_DATA: {"data":{"command":"3d_design"}}"
+DEMO_DATA: {"data":{"command":"COMMAND_NAME"}}
 
-**Example Response:**
+**Available Commands:**
+- cement_tiles → For cement/tile queries
+- green_wood → For wood/timber queries
+- heat_pumps → For HVAC/heating queries
+- 3d_design → For design/visualization queries
+
+**Examples:**
+
 User: "Show me cement tiles in grey"
-You: "I found 5 cement-based tiles in grey color. DEMO_DATA: {"data":{"command":"cement_tiles"}}"
+Your Response:
+I found 5 beautiful cement-based tiles in grey color. These are perfect for modern interiors.
 
-**Capabilities:**
-- Platform feature demonstrations
-- Use case examples
-- Interactive tutorials
-- Sample data generation
+DEMO_DATA: {"data":{"command":"cement_tiles"}}
 
-**Guidelines:**
-- Use engaging, realistic examples
-- Highlight key platform features
-- ALWAYS include the DEMO_DATA marker for material queries
-- Make demonstrations interactive`,
+User: "Show me green wood materials"
+Your Response:
+Here are 5 Egger wood materials in green tones, ideal for sustainable projects.
+
+DEMO_DATA: {"data":{"command":"green_wood"}}
+
+**RULES:**
+1. Write a friendly 1-2 sentence message
+2. Add a blank line
+3. Add EXACTLY: DEMO_DATA: {"data":{"command":"COMMAND_NAME"}}
+4. The marker MUST be on its own line
+5. ALWAYS include the marker for material queries`,
   },
 };
 
