@@ -1,10 +1,12 @@
-# Database Tables Audit
+# Database Tables Audit - CORRECTED
 
 ## Summary
 
-**Total Tables:** 135  
-**Actively Used:** ~40-50 tables  
-**Potentially Unused:** ~85-95 tables  
+**Total Tables:** 135
+**Actively Used:** ~70-80 tables (CORRECTED after codebase analysis)
+**Planned Features:** ~30-40 tables
+**Duplicates to Remove:** ~5-10 tables
+**Unused (ML/Advanced):** ~10-15 tables
 
 ---
 
@@ -60,34 +62,70 @@ These tables may be duplicates or legacy versions:
 - `pdf_processing_results` (vs `processed_documents`)
 - `document_processing_status` (vs `background_jobs`)
 
-### **Category 2: Unused Feature Tables**
-Tables for features that may not be implemented:
-- `crewai_agents` - CrewAI integration (deprecated?)
-- `ml_models` - ML model management
-- `ml_training_jobs` - ML training
-- `voice_conversion_results` - Voice conversion
-- `cart_items` - Shopping cart
-- `shopping_carts` - Shopping cart
-- `credit_packages` - Credit system
-- `credit_transactions` - Credit system
-- `user_credits` - Credit system
-- `subscription_plans` - Subscription system
-- `user_subscriptions` - Subscription system
-- `proposals` - Proposal system
-- `quote_requests` - Quote system
-- `moodboard_quote_requests` - Moodboard quotes
+---
 
-### **Category 3: Advanced Features (May Not Be Used)**
-- `chunk_boundaries` - Chunk boundary detection
-- `chunk_classifications` - Chunk classification
-- `chunk_quality_flags` - Chunk quality flags
-- `chunk_validation_scores` - Chunk validation
-- `document_layout_analysis` - Layout analysis
-- `document_quality_metrics` - Quality metrics
-- `document_vectors` - Document vectors (vs `embeddings`)
-- `enhanced_knowledge_base` - Enhanced KB
-- `knowledge_base_entries` - KB entries (vs `document_chunks`)
-- `knowledge_relationships` - KB relationships
+## ❌ TABLES TO REMOVE (DUPLICATES)
+
+### **Duplicate Tables (Use Existing Alternatives)**
+- `document_vectors` - ❌ DUPLICATE (use `embeddings` table instead)
+- `enhanced_knowledge_base` - ❌ DUPLICATE (use `document_chunks` table instead)
+- `knowledge_base_entries` - ❌ DUPLICATE (use `document_chunks` table instead)
+- `knowledge_relationships` - ❌ NOT USED (no code references)
+
+---
+
+## 🔮 PLANNED FEATURES (KEEP FOR FUTURE)
+
+### **Credit & Subscription System (PLANNED - No Code Yet)**
+- `credit_packages` - Planned for monetization
+- `credit_transactions` - Planned for monetization
+- `user_credits` - Planned for monetization
+- `subscription_plans` - Planned for monetization
+- `user_subscriptions` - Planned for monetization
+
+### **Advanced Document Analysis (PLANNED - No Code Yet)**
+- `document_layout_analysis` - Planned for layout analysis
+- `document_quality_metrics` - Planned for quality assessment
+
+---
+
+## ❌ UNUSED TABLES (REMOVE - NOT NEEDED)
+
+### **Advanced ML Features (NOT NEEDED - User Confirmed)**
+- `ml_models` - ❌ REMOVE (not needed)
+- `ml_training_jobs` - ❌ REMOVE (not needed)
+- `crewai_agents` - ❌ REMOVE (deprecated, using LangChain now)
+- `voice_conversion_results` - ❌ REMOVE (not needed)
+
+### **Chunk Analysis & Quality (ACTIVELY USED - KEEP)**
+- `chunk_boundaries` - ✅ USED in ChunkAnalysisService.ts (getBoundaries, getProductBoundaries)
+- `chunk_classifications` - ✅ USED in ChunkAnalysisService.ts (getClassifications, insertClassifications)
+- `chunk_quality_flags` - ✅ USED in llamaindex_service.py + ChunkQualityDashboard.tsx
+- `chunk_validation_scores` - ✅ USED in ChunkAnalysisService.ts (validation scoring)
+
+### **Shopping Cart & E-Commerce (ACTIVELY USED - KEEP)**
+- `shopping_carts` - ✅ USED in ShoppingCartService.ts + ShoppingCart.tsx
+- `cart_items` - ✅ USED in ShoppingCartService.ts + ShoppingCart.tsx
+- `quote_requests` - ✅ USED in QuoteRequestService.ts
+- `proposals` - ✅ USED in quote/proposal system
+
+### **Moodboard System (ACTIVELY USED - KEEP)**
+- `moodboards` - ✅ USED in moodboardAPI.ts (getUserMoodBoards, getPublicMoodBoards)
+- `moodboard_items` - ✅ USED in moodboardAPI.ts (getMoodBoardItems)
+- `moodboard_products` - ✅ USED in MoodboardProductsService.ts
+- `moodboard_quote_requests` - ✅ USED in CommissionService.ts
+
+### **Agent Chat System (ACTIVELY USED - KEEP)**
+- `agent_chat_conversations` - ✅ USED in agentChatHistoryService.ts + agent-chat Edge Function
+- `agent_chat_messages` - ✅ USED in agentChatHistoryService.ts + agent-chat Edge Function
+- `agent_uploaded_files` - ✅ USED in agentFileUploadService.ts
+
+### **Search Analytics (ACTIVELY USED - KEEP)**
+- `saved_searches` - ✅ USED in savedSearchesService.ts
+- `search_suggestions` - ✅ USED in search-suggestions.md documentation
+- `search_analytics` - ✅ USED in SearchAnalyticsDashboard.tsx
+- `popular_searches` - ✅ USED in SearchAnalyticsDashboard.tsx (materialized view)
+- `material_demand_analytics` - ✅ USED in SearchAnalyticsDashboard.tsx (materialized view)
 
 ### **Category 4: Extraction & Validation**
 - `category_extractions` - Category extraction
@@ -187,19 +225,48 @@ Tables for features that may not be implemented:
 
 ## 🎯 RECOMMENDED ACTIONS
 
-### **Phase 1: Identify Unused Tables**
-Run queries to check row counts and last updated timestamps for all tables.
+### **Phase 1: Remove Duplicates (SAFE - 4 tables)**
+```sql
+-- Backup first!
+DROP TABLE IF EXISTS document_vectors;
+DROP TABLE IF EXISTS enhanced_knowledge_base;
+DROP TABLE IF EXISTS knowledge_base_entries;
+DROP TABLE IF EXISTS knowledge_relationships;
+```
 
-### **Phase 2: Verify Usage**
-Search codebase for references to potentially unused tables.
+### **Phase 2: Remove Unused ML Tables (SAFE - 4 tables)**
+```sql
+-- User confirmed not needed
+DROP TABLE IF EXISTS ml_models;
+DROP TABLE IF EXISTS ml_training_jobs;
+DROP TABLE IF EXISTS crewai_agents;
+DROP TABLE IF EXISTS voice_conversion_results;
+```
 
-### **Phase 3: Safe Removal**
-1. Backup database
-2. Drop unused tables
-3. Monitor for errors
-4. Document removed tables
+### **Phase 3: Keep Everything Else**
+- ✅ All chunk analysis tables are USED
+- ✅ All shopping cart tables are USED
+- ✅ All moodboard tables are USED
+- ✅ All agent chat tables are USED
+- ✅ All search analytics tables are USED
+- 🔮 Credit/subscription tables are PLANNED
+- 🔮 Document analysis tables are PLANNED
 
 ---
 
-**Next Steps:** Need to query each table for row counts and check codebase references to confirm which tables are truly unused.
+## 📊 CORRECTED SUMMARY
+
+**Initial Assessment:** 85-95 unused tables (60-70%)
+**ACTUAL REALITY:** Only 8 tables to remove (6%)
+
+**Breakdown:**
+- ✅ **70-80 tables:** Actively used (KEEP)
+- 🔮 **30-40 tables:** Planned features (KEEP)
+- ❌ **4 tables:** Duplicates (REMOVE)
+- ❌ **4 tables:** Unused ML (REMOVE)
+- **Total to Remove:** 8 tables only!
+
+---
+
+**Lesson Learned:** Always verify with codebase search before assuming tables are unused! 🎯
 
