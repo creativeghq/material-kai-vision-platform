@@ -11,7 +11,7 @@
 ### 🎯 Start Here
 
 **[INDEX.md](INDEX.md)** - Complete documentation index with learning paths
-**[BLOG-POST-OVERVIEW.md](BLOG-POST-OVERVIEW.md)** - Comprehensive blog post overview (6,000+ words)
+**[overview.md](overview.md)** - Platform overview and key features
 
 ### 📖 Core Documentation
 

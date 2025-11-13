@@ -966,6 +966,22 @@ export const MaterialKnowledgeBase: React.FC = () => {
     }, 100);
   }, []);
 
+  // Calculate total quality items count
+  const getQualityItemsCount = useCallback(() => {
+    if (!qualityData?.kpis) return 0;
+    let total = 0;
+    if (qualityData.kpis.chunks?.total_validated) {
+      total += qualityData.kpis.chunks.total_validated;
+    }
+    if (qualityData.kpis.images?.total_validated) {
+      total += qualityData.kpis.images.total_validated;
+    }
+    if (qualityData.kpis.products?.total_validated) {
+      total += qualityData.kpis.products.total_validated;
+    }
+    return total;
+  }, [qualityData]);
+
   // Manual refresh all admin data (memoized with useCallback)
   const refreshAllAdminData = useCallback(() => {
     console.log('🔄 Manually refreshing all admin data...');
@@ -1251,13 +1267,13 @@ export const MaterialKnowledgeBase: React.FC = () => {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-12">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-9">
+          <TabsTrigger value="overview">📋 Overview</TabsTrigger>
           <TabsTrigger value="chunks">
-            Chunks ({stats?.totalChunks || 0})
+            📄 Chunks ({stats?.totalChunks || 0})
           </TabsTrigger>
           <TabsTrigger value="images">
-            Images ({stats?.totalImages || 0})
+            🖼️ Images ({stats?.totalImages || 0})
           </TabsTrigger>
           <TabsTrigger value="embeddings">
             🧠 Embeddings ({stats?.totalEmbeddings || 0})
@@ -1265,10 +1281,18 @@ export const MaterialKnowledgeBase: React.FC = () => {
           <TabsTrigger value="products">
             📦 Products ({products.length})
           </TabsTrigger>
-          <TabsTrigger value="metadata">📊 Metadata</TabsTrigger>
-          <TabsTrigger value="relationships">🔗 Relationships</TabsTrigger>
-          <TabsTrigger value="quality">⭐ Quality</TabsTrigger>
-          <TabsTrigger value="detections">🔍 Detections</TabsTrigger>
+          <TabsTrigger value="metadata">
+            📊 Metadata ({metadataData?.summary?.total_entities || 0})
+          </TabsTrigger>
+          <TabsTrigger value="relationships">
+            🔗 Relationships ({imageChunkRelationships.length})
+          </TabsTrigger>
+          <TabsTrigger value="quality">
+            ⭐ Quality ({getQualityItemsCount()})
+          </TabsTrigger>
+          <TabsTrigger value="detections">
+            🔍 Detections ({detectionsData?.total_detections || 0})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">

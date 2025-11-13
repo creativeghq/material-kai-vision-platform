@@ -160,19 +160,21 @@ async function uploadPDFForNovaExtraction() {
   formData.append('tags', 'nova,harmony,test');
   formData.append('categories', 'products');  // Extract only products
   formData.append('processing_mode', 'deep');  // Deep mode for complete analysis
-  formData.append('discovery_model', 'claude');  // Claude Sonnet 4.5 for best quality
+  formData.append('discovery_model', 'claude');  // Claude Sonnet 4.5 for product discovery
   formData.append('chunk_size', '1024');
   formData.append('chunk_overlap', '128');
   formData.append('enable_prompt_enhancement', 'true');
   formData.append('workspace_id', WORKSPACE_ID);
 
   log('UPLOAD', `Triggering Consolidated Upload via MIVAA API: ${MIVAA_API}/api/rag/documents/upload`, 'info');
-  log('UPLOAD', `Mode: deep | Categories: products | Discovery: claude | Async: enabled`, 'info');
+  log('UPLOAD', `Mode: deep | Categories: products | Discovery: Claude Sonnet 4.5 | Async: enabled`, 'info');
 
   const uploadResponse = await fetch(`${MIVAA_API}/api/rag/documents/upload`, {
     method: 'POST',
     body: formData,
-    headers: formData.getHeaders()
+    headers: {
+      ...formData.getHeaders()
+    }
   });
 
   if (!uploadResponse.ok) {
@@ -206,7 +208,9 @@ async function validateDataSaved(documentId, jobData) {
     chunks: 0,
     images: 0,
     products: 0,
-    embeddings: 0
+    relevancies: 0,
+    textEmbeddings: 0,
+    imageEmbeddings: 0
   };
 
   try {
@@ -214,28 +218,30 @@ async function validateDataSaved(documentId, jobData) {
     const chunksResponse = await fetch(`${MIVAA_API}/api/rag/chunks?document_id=${documentId}&limit=1000`);
     if (chunksResponse.ok) {
       const chunksData = await chunksResponse.json();
-      validation.chunks = Array.isArray(chunksData) ? chunksData.length : (chunksData.chunks?.length || 0);
+      validation.chunks = chunksData.chunks?.length || 0;
+      validation.textEmbeddings = chunksData.chunks?.filter(c => c.embedding).length || 0;
     }
 
     // Check images using consolidated RAG endpoint
     const imagesResponse = await fetch(`${MIVAA_API}/api/rag/images?document_id=${documentId}&limit=1000`);
     if (imagesResponse.ok) {
       const imagesData = await imagesResponse.json();
-      validation.images = Array.isArray(imagesData) ? imagesData.length : (imagesData.images?.length || 0);
+      validation.images = imagesData.images?.length || 0;
+      validation.imageEmbeddings = imagesData.images?.filter(img => img.clip_embedding).length || 0;
     }
 
     // Check products using consolidated RAG endpoint
     const productsResponse = await fetch(`${MIVAA_API}/api/rag/products?document_id=${documentId}&limit=1000`);
     if (productsResponse.ok) {
       const productsData = await productsResponse.json();
-      validation.products = Array.isArray(productsData) ? productsData.length : (productsData.products?.length || 0);
+      validation.products = productsData.products?.length || 0;
     }
 
-    // Check embeddings using consolidated RAG endpoint
-    const embeddingsResponse = await fetch(`${MIVAA_API}/api/rag/embeddings?document_id=${documentId}&limit=1000`);
-    if (embeddingsResponse.ok) {
-      const embeddingsData = await embeddingsResponse.json();
-      validation.embeddings = Array.isArray(embeddingsData) ? embeddingsData.length : (embeddingsData.embeddings?.length || 0);
+    // Check relevancies
+    const relevanciesResponse = await fetch(`${MIVAA_API}/api/rag/relevancies?document_id=${documentId}&limit=1000`);
+    if (relevanciesResponse.ok) {
+      const relevanciesData = await relevanciesResponse.json();
+      validation.relevancies = relevanciesData.relevancies?.length || 0;
     }
 
     // Compare with job metadata
@@ -248,9 +254,11 @@ async function validateDataSaved(documentId, jobData) {
     const productsMatch = validation.products === jobProducts;
 
     log('VALIDATE', `Chunks: ${validation.chunks}/${jobChunks} ${chunksMatch ? '✅' : '❌'}`, chunksMatch ? 'success' : 'error');
+    log('VALIDATE', `  - With Text Embeddings: ${validation.textEmbeddings}`, 'info');
     log('VALIDATE', `Images: ${validation.images}/${jobImages} ${imagesMatch ? '✅' : '❌'}`, imagesMatch ? 'success' : 'error');
+    log('VALIDATE', `  - With Image Embeddings: ${validation.imageEmbeddings}`, 'info');
     log('VALIDATE', `Products: ${validation.products}/${jobProducts} ${productsMatch ? '✅' : '❌'}`, productsMatch ? 'success' : 'error');
-    log('VALIDATE', `Embeddings: ${validation.embeddings}`, 'info');
+    log('VALIDATE', `Relevancies: ${validation.relevancies}`, 'info');
 
     return {
       valid: chunksMatch && imagesMatch && productsMatch,
@@ -377,62 +385,57 @@ async function retrieveNovaProductData(documentId) {
     chunks: [],
     images: [],
     products: [],
-    embeddings: {
-      text: [],
-      image: [],
-      visual: [],
-      multimodal: []
-    }
+    relevancies: []
   };
 
   // Retrieve ALL chunks using consolidated RAG endpoint
-  const chunksResponse = await fetch(`${MIVAA_API}/api/rag/chunks?document_id=${documentId}&limit=10000`);
+  const chunksResponse = await fetch(`${MIVAA_API}/api/rag/chunks?document_id=${documentId}&limit=1000`);
   if (chunksResponse.ok) {
     const chunksData = await chunksResponse.json();
-    allData.chunks = Array.isArray(chunksData) ? chunksData : (chunksData.chunks || []);
+    allData.chunks = chunksData.chunks || [];
     log('RETRIEVE', `Found ${allData.chunks.length} total chunks`, 'success');
+
+    // Count embeddings in chunks
+    const chunksWithEmbeddings = allData.chunks.filter(c => c.embedding).length;
+    log('RETRIEVE', `  - ${chunksWithEmbeddings} chunks have text embeddings`, 'info');
   } else {
+    const errorText = await chunksResponse.text();
     log('RETRIEVE', `Failed to fetch chunks: ${chunksResponse.status} ${chunksResponse.statusText}`, 'error');
+    log('RETRIEVE', `Error details: ${errorText}`, 'error');
   }
 
   // Retrieve ALL images using consolidated RAG endpoint
-  const imagesResponse = await fetch(`${MIVAA_API}/api/rag/images?document_id=${documentId}&limit=10000`);
+  const imagesResponse = await fetch(`${MIVAA_API}/api/rag/images?document_id=${documentId}&limit=1000`);
   if (imagesResponse.ok) {
     const imagesData = await imagesResponse.json();
-    allData.images = Array.isArray(imagesData) ? imagesData : (imagesData.images || []);
+    allData.images = imagesData.images || [];
     log('RETRIEVE', `Found ${allData.images.length} total images`, 'success');
+
+    // Count image embeddings
+    const imagesWithEmbeddings = allData.images.filter(img => img.clip_embedding).length;
+    log('RETRIEVE', `  - ${imagesWithEmbeddings} images have CLIP embeddings`, 'info');
   } else {
     log('RETRIEVE', `Failed to fetch images: ${imagesResponse.status} ${imagesResponse.statusText}`, 'error');
   }
 
   // Retrieve ALL products using consolidated RAG endpoint
-  const productsResponse = await fetch(`${MIVAA_API}/api/rag/products?document_id=${documentId}&limit=10000`);
+  const productsResponse = await fetch(`${MIVAA_API}/api/rag/products?document_id=${documentId}&limit=1000`);
   if (productsResponse.ok) {
     const productsData = await productsResponse.json();
-    allData.products = Array.isArray(productsData) ? productsData : (productsData.products || []);
+    allData.products = productsData.products || [];
     log('RETRIEVE', `Found ${allData.products.length} total products`, 'success');
   } else {
     log('RETRIEVE', `Failed to fetch products: ${productsResponse.status} ${productsResponse.statusText}`, 'error');
   }
 
-  // Retrieve ALL embeddings using consolidated RAG endpoint
-  const embeddingsResponse = await fetch(`${MIVAA_API}/api/rag/embeddings?document_id=${documentId}&limit=10000`);
-  if (embeddingsResponse.ok) {
-    const embeddingsData = await embeddingsResponse.json();
-    const embeddings = Array.isArray(embeddingsData) ? embeddingsData : (embeddingsData.embeddings || []);
-
-    // Categorize embeddings by type
-    allData.embeddings.text = embeddings.filter(e => e.embedding_type === 'text');
-    allData.embeddings.image = embeddings.filter(e => e.embedding_type === 'image');
-    allData.embeddings.visual = embeddings.filter(e => e.embedding_type === 'visual');
-    allData.embeddings.multimodal = embeddings.filter(e => e.embedding_type === 'multimodal');
-
-    log('RETRIEVE', `Found ${allData.embeddings.text.length} text embeddings`, 'success');
-    log('RETRIEVE', `Found ${allData.embeddings.image.length} image embeddings`, 'success');
-    log('RETRIEVE', `Found ${allData.embeddings.visual.length} visual embeddings`, 'success');
-    log('RETRIEVE', `Found ${allData.embeddings.multimodal.length} multimodal embeddings`, 'success');
+  // Retrieve ALL relevancies
+  const relevanciesResponse = await fetch(`${MIVAA_API}/api/rag/relevancies?document_id=${documentId}&limit=1000`);
+  if (relevanciesResponse.ok) {
+    const relevanciesData = await relevanciesResponse.json();
+    allData.relevancies = relevanciesData.relevancies || [];
+    log('RETRIEVE', `Found ${allData.relevancies.length} total relevancies (chunk-image relationships)`, 'success');
   } else {
-    log('RETRIEVE', `Failed to fetch embeddings: ${embeddingsResponse.status} ${embeddingsResponse.statusText}`, 'error');
+    log('RETRIEVE', `Failed to fetch relevancies: ${relevanciesResponse.status} ${relevanciesResponse.statusText}`, 'error');
   }
   return allData;
 }
@@ -440,11 +443,8 @@ async function retrieveNovaProductData(documentId) {
 async function generateDetailedReport(allData, jobResult) {
   logSection('DETAILED PDF PROCESSING REPORT');
 
-  const totalEmbeddings =
-    allData.embeddings.text.length +
-    allData.embeddings.image.length +
-    allData.embeddings.visual.length +
-    allData.embeddings.multimodal.length;
+  const chunksWithEmbeddings = allData.chunks.filter(c => c.embedding).length;
+  const imagesWithEmbeddings = allData.images.filter(img => img.clip_embedding).length;
 
   const report = {
     timestamp: new Date().toISOString(),
@@ -458,28 +458,22 @@ async function generateDetailedReport(allData, jobResult) {
     data: allData,
     summary: {
       total_chunks: allData.chunks.length,
+      chunks_with_embeddings: chunksWithEmbeddings,
       total_images: allData.images.length,
+      images_with_embeddings: imagesWithEmbeddings,
       total_products: allData.products.length,
-      total_embeddings: totalEmbeddings,
-      embeddings_by_type: {
-        text: allData.embeddings.text.length,
-        image: allData.embeddings.image.length,
-        visual: allData.embeddings.visual.length,
-        multimodal: allData.embeddings.multimodal.length
-      }
+      total_relevancies: allData.relevancies.length
     }
   };
 
   // Print detailed summary
   logSection('📊 FINAL SUMMARY');
   console.log(`\n✅ Total Chunks: ${report.summary.total_chunks}`);
+  console.log(`   - With Text Embeddings: ${chunksWithEmbeddings}`);
   console.log(`✅ Total Images: ${report.summary.total_images}`);
+  console.log(`   - With CLIP Embeddings: ${imagesWithEmbeddings}`);
   console.log(`✅ Total Products: ${report.summary.total_products}`);
-  console.log(`✅ Total Embeddings: ${report.summary.total_embeddings}`);
-  console.log(`   - Text Embeddings: ${allData.embeddings.text.length}`);
-  console.log(`   - Image Embeddings: ${allData.embeddings.image.length}`);
-  console.log(`   - Visual Embeddings: ${allData.embeddings.visual.length}`);
-  console.log(`   - Multimodal Embeddings: ${allData.embeddings.multimodal.length}`);
+  console.log(`✅ Total Relevancies: ${report.summary.total_relevancies}`);
 
   // Print sample chunks (first 3)
   console.log('\n📝 SAMPLE CHUNKS (First 3):');
@@ -522,6 +516,14 @@ async function generateDetailedReport(allData, jobResult) {
     if (product.page_ranges) {
       console.log(`  Page Ranges: ${JSON.stringify(product.page_ranges)}`);
     }
+  });
+
+  // Print sample relevancies
+  console.log('\n🔗 SAMPLE RELEVANCIES (First 10):');
+  allData.relevancies.slice(0, 10).forEach((rel, idx) => {
+    console.log(`\n${idx + 1}. Chunk ${rel.chunk_id} ↔ Image ${rel.image_id}`);
+    console.log(`   Relevance Score: ${rel.relevance_score}`);
+    console.log(`   Relationship Type: ${rel.relationship_type || 'N/A'}`);
   });
 
   // Print AI model usage if available

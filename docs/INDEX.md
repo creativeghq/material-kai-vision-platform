@@ -89,16 +89,13 @@ Complete documentation for Material Kai Vision Platform.
 - Security measures
 - Production metrics
 
-**[database-schema-complete.md](database-schema-complete.md)** - Database schema reference
-- Core tables (workspaces, documents, chunks, products, images, embeddings)
-- Products + Metadata architecture (JSONB)
-- Document entities (certificates, logos, specifications)
-- Product-document relationships
-- Relationship tables (chunk-product, chunk-image, product-image, product-document)
-- Row-Level Security (RLS)
-- Indexes for performance
-- Storage capacity
-- Backup & recovery
+**[metadata-management-system.md](metadata-management-system.md)** - Metadata management system
+- Dynamic metadata extraction
+- JSONB storage architecture
+- Metadata validation and quality scoring
+- Admin panel for metadata management
+- API endpoints for metadata operations
+- Best practices and guidelines
 
 **[job-queue-system.md](job-queue-system.md)** - Job queue & async processing
 - Supabase-native job queue architecture
@@ -222,7 +219,7 @@ Complete documentation for Material Kai Vision Platform.
 
 1. Read **[api-endpoints.md](api-endpoints.md)** - All endpoints
 2. Check **[ai-models-guide.md](ai-models-guide.md)** - AI models used
-3. Review **[database-schema-complete.md](database-schema-complete.md)** - Data structure
+3. Review **[metadata-management-system.md](metadata-management-system.md)** - Data structure
 4. Study **[system-architecture.md](system-architecture.md)** - Authentication
 
 ### For Operations
@@ -230,7 +227,7 @@ Complete documentation for Material Kai Vision Platform.
 1. Read **[deployment-guide.md](deployment-guide.md)** - Deployment process
 2. Study **[troubleshooting-guide.md](troubleshooting-guide.md)** - Common issues
 3. Review **[system-architecture.md](system-architecture.md)** - Monitoring
-4. Check **[database-schema-complete.md](database-schema-complete.md)** - Backup strategy
+4. Check **[job-queue-system.md](job-queue-system.md)** - Job monitoring and recovery
 
 ### For Product Managers
 
@@ -312,10 +309,16 @@ All documentation follows these standards:
 
 ## 🔄 Documentation Updates
 
-**Last Updated**: October 31, 2025  
-**Version**: 1.0.0  
-**Status**: Production  
+**Last Updated**: November 13, 2025
+**Version**: 2.0.0
+**Status**: Production
 **Maintainer**: Development Team
+
+**Recent Changes:**
+- ✅ Moved analysis documents to /planning
+- ✅ Added future features roadmap
+- ✅ Updated performance optimization status
+- ✅ Reorganized documentation structure
 
 ---
 
@@ -329,7 +332,7 @@ For questions or issues:
 
 ---
 
-**Total Documentation**: 10 comprehensive guides  
-**Total Lines**: 5,000+  
+**Total Documentation**: 20+ comprehensive guides
+**Total Lines**: 10,000+
 **Coverage**: 100% of platform features
 
