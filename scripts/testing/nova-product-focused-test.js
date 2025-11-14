@@ -57,6 +57,67 @@ function logSection(title) {
   console.log('='.repeat(100));
 }
 
+// Cleanup function to delete all old test data
+async function cleanupOldTestData() {
+  log('CLEANUP', 'Deleting all old test data from database...', 'step');
+
+  try {
+    // Find all Harmony PDF documents
+    const response = await fetch(`${MIVAA_API}/api/rag/documents/jobs?limit=100&sort=created_at:desc`);
+    if (!response.ok) {
+      log('CLEANUP', 'Failed to fetch jobs list', 'warning');
+      return;
+    }
+
+    const data = await response.json();
+    const jobs = data.jobs || [];
+
+    // Filter for Harmony PDF jobs
+    const harmonyJobs = jobs.filter(job => {
+      const filename = job.metadata?.filename || job.filename || '';
+      return filename.includes('harmony-signature-book-24-25');
+    });
+
+    if (harmonyJobs.length === 0) {
+      log('CLEANUP', 'No old Harmony PDF jobs found', 'info');
+      return;
+    }
+
+    log('CLEANUP', `Found ${harmonyJobs.length} old Harmony PDF jobs to delete`, 'info');
+
+    // Delete each job and its associated data
+    for (const job of harmonyJobs) {
+      const jobId = job.id;
+      const documentId = job.document_id;
+
+      log('CLEANUP', `Deleting job ${jobId} and document ${documentId}...`, 'info');
+
+      try {
+        // Delete job (this should cascade to related data via foreign keys)
+        const deleteResponse = await fetch(`${MIVAA_API}/api/rag/documents/jobs/${jobId}`, {
+          method: 'DELETE'
+        });
+
+        if (deleteResponse.ok) {
+          log('CLEANUP', `✅ Deleted job ${jobId}`, 'success');
+        } else {
+          log('CLEANUP', `⚠️ Failed to delete job ${jobId}: ${deleteResponse.status}`, 'warning');
+        }
+      } catch (error) {
+        log('CLEANUP', `❌ Error deleting job ${jobId}: ${error.message}`, 'error');
+      }
+    }
+
+    log('CLEANUP', '✅ Cleanup complete!', 'success');
+
+    // Wait a bit for database cleanup to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+  } catch (error) {
+    log('CLEANUP', `Error during cleanup: ${error.message}`, 'error');
+  }
+}
+
 // Main test function
 async function runNovaProductTest() {
   logSection('NOVA PRODUCT FOCUSED END-TO-END TEST');
@@ -67,46 +128,27 @@ async function runNovaProductTest() {
   console.log(`MIVAA API: ${MIVAA_API}\n`);
 
   try {
-    // Step 1: Check for existing job
-    log('CHECK', 'Checking for existing jobs for this PDF', 'step');
-    const existingJob = await findExistingJob();
+    // Step 0: Clean up old test data
+    await cleanupOldTestData();
 
-    let jobId, documentId;
+    // Step 1: Upload PDF with async processing (always start fresh)
+    log('UPLOAD', 'Starting new PDF processing', 'step');
+    const uploadResult = await uploadPDFForNovaExtraction();
+    const jobId = uploadResult.job_id;
+    const documentId = uploadResult.document_id;
 
-    if (existingJob) {
-      log('CHECK', `Found existing job: ${existingJob.id} (${existingJob.status})`, 'info');
-      jobId = existingJob.id;
-      documentId = existingJob.document_id;
+    log('UPLOAD', `Job ID: ${jobId}`, 'info');
+    log('UPLOAD', `Document ID: ${documentId}`, 'info');
 
-      if (existingJob.status === 'completed') {
-        log('CHECK', 'Job already completed, skipping to data retrieval', 'success');
-      } else if (existingJob.status === 'processing') {
-        log('CHECK', 'Job is currently processing, monitoring progress', 'info');
-      } else {
-        log('CHECK', `Job status: ${existingJob.status}, will monitor`, 'warning');
-      }
-    } else {
-      // Step 2: Upload PDF with async processing
-      log('UPLOAD', 'No existing job found, starting new PDF processing', 'step');
-      const uploadResult = await uploadPDFForNovaExtraction();
-      jobId = uploadResult.job_id;
-      documentId = uploadResult.document_id;
+    // Step 2: Monitor async job processing
+    log('MONITOR', `Monitoring job: ${jobId}`, 'step');
+    await monitorProcessingJob(jobId, documentId);
 
-      log('UPLOAD', `Job ID: ${jobId}`, 'info');
-      log('UPLOAD', `Document ID: ${documentId}`, 'info');
-    }
-
-    // Step 3: Monitor async job processing (skip if already completed)
-    if (!existingJob || existingJob.status !== 'completed') {
-      log('MONITOR', `Monitoring job: ${jobId}`, 'step');
-      await monitorProcessingJob(jobId, documentId);
-    }
-
-    // Step 4: Retrieve and validate ALL product data
+    // Step 3: Retrieve and validate ALL product data
     log('VALIDATE', 'Retrieving ALL product data from document', 'step');
     const allData = await retrieveNovaProductData(documentId);
 
-    // Step 5: Generate comprehensive report
+    // Step 4: Generate comprehensive report
     log('REPORT', 'Generating detailed report', 'step');
     await generateDetailedReport(allData, { job_id: jobId, document_id: documentId });
 
@@ -116,32 +158,6 @@ async function runNovaProductTest() {
     log('ERROR', `Test failed: ${error.message}`, 'error');
     console.error(error);
     process.exit(1);
-  }
-}
-
-async function findExistingJob() {
-  try {
-    // Get recent jobs (last 50)
-    const response = await fetch(`${MIVAA_API}/api/rag/documents/jobs?limit=50&sort=created_at:desc`);
-
-    if (!response.ok) {
-      log('CHECK', 'Failed to fetch jobs list', 'warning');
-      return null;
-    }
-
-    const data = await response.json();
-    const jobs = data.jobs || [];
-
-    // Find job for harmony-signature-book-24-25.pdf
-    const harmonyJob = jobs.find(job => {
-      const filename = job.metadata?.filename || job.filename || '';
-      return filename.includes('harmony-signature-book-24-25');
-    });
-
-    return harmonyJob || null;
-  } catch (error) {
-    log('CHECK', `Error checking for existing jobs: ${error.message}`, 'warning');
-    return null;
   }
 }
 
