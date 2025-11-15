@@ -109,15 +109,15 @@ export const PDFProcessingDataPage: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="chunks">
-            <ChunksTab onStatsUpdate={loadStats} />
+            <ChunksTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
           </TabsContent>
 
           <TabsContent value="images">
-            <ImagesTab onStatsUpdate={loadStats} />
+            <ImagesTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
           </TabsContent>
 
           <TabsContent value="embeddings">
-            <EmbeddingsTab onStatsUpdate={loadStats} />
+            <EmbeddingsTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
           </TabsContent>
         </Tabs>
       </div>

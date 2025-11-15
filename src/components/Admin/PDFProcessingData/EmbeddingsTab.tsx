@@ -28,10 +28,11 @@ import {
 } from '@/components/ui/dialog';
 
 interface EmbeddingsTabProps {
+  workspaceId: string;
   onStatsUpdate: () => void;
 }
 
-export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ onStatsUpdate }) => {
+export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onStatsUpdate }) => {
   const [embeddings, setEmbeddings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -39,8 +40,10 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ onStatsUpdate }) =
   const { toast } = useToast();
 
   useEffect(() => {
-    loadEmbeddings();
-  }, [typeFilter]);
+    if (workspaceId) {
+      loadEmbeddings();
+    }
+  }, [workspaceId, typeFilter]);
 
   const loadEmbeddings = async () => {
     try {
@@ -48,6 +51,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ onStatsUpdate }) =
       let query = supabase
         .from('embeddings')
         .select('*')
+        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(100);
 

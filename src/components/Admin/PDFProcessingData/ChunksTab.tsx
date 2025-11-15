@@ -22,10 +22,11 @@ import {
 } from '@/components/ui/dialog';
 
 interface ChunksTabProps {
+  workspaceId: string;
   onStatsUpdate: () => void;
 }
 
-export const ChunksTab: React.FC<ChunksTabProps> = ({ onStatsUpdate }) => {
+export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, onStatsUpdate }) => {
   const [chunks, setChunks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,8 +34,10 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ onStatsUpdate }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadChunks();
-  }, []);
+    if (workspaceId) {
+      loadChunks();
+    }
+  }, [workspaceId]);
 
   const loadChunks = async () => {
     try {
@@ -42,6 +45,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ onStatsUpdate }) => {
       const { data, error } = await supabase
         .from('document_chunks')
         .select('*')
+        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(100);
 

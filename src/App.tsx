@@ -176,7 +176,9 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <AdminGuard>
-                      <KnowledgeBaseManagement />
+                      <Layout>
+                        <KnowledgeBaseManagement />
+                      </Layout>
                     </AdminGuard>
                   </AuthGuard>
                 }
@@ -186,7 +188,9 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <AdminGuard>
-                      <PDFProcessingDataPage />
+                      <Layout>
+                        <PDFProcessingDataPage />
+                      </Layout>
                     </AdminGuard>
                   </AuthGuard>
                 }

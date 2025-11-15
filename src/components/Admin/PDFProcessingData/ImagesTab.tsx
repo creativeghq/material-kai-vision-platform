@@ -14,10 +14,11 @@ import {
 } from '@/components/ui/dialog';
 
 interface ImagesTabProps {
+  workspaceId: string;
   onStatsUpdate: () => void;
 }
 
-export const ImagesTab: React.FC<ImagesTabProps> = ({ onStatsUpdate }) => {
+export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate }) => {
   const [images, setImages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,8 +27,10 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ onStatsUpdate }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    loadImages();
-  }, []);
+    if (workspaceId) {
+      loadImages();
+    }
+  }, [workspaceId]);
 
   const loadImages = async () => {
     try {
@@ -35,6 +38,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ onStatsUpdate }) => {
       const { data, error } = await supabase
         .from('document_images')
         .select('*')
+        .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
         .limit(50);
 

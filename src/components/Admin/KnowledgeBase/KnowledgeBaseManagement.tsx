@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { supabase } from '@/integrations/supabase/client';
 
 import { DocumentList } from './DocumentList';
 import { DocumentEditor } from './DocumentEditor';
@@ -49,17 +50,26 @@ export const KnowledgeBaseManagement: React.FC = () => {
   const loadStats = async () => {
     try {
       setIsLoading(true);
-      // Load stats from API
-      const health = await kbService.healthCheck();
-      if (health.success) {
-        // Stats will be loaded from individual components
-        setStats({
-          totalDocs: 0,
-          totalCategories: 0,
-          totalAttachments: 0,
-          totalSearches: 0,
-        });
-      }
+
+      // Load stats directly from Supabase
+      const [
+        { count: docsCount },
+        { count: categoriesCount },
+        { count: attachmentsCount },
+        { count: searchesCount },
+      ] = await Promise.all([
+        supabase.from('kb_docs').select('*', { count: 'exact', head: true }),
+        supabase.from('kb_categories').select('*', { count: 'exact', head: true }),
+        supabase.from('kb_doc_attachments').select('*', { count: 'exact', head: true }),
+        supabase.from('kb_search_analytics').select('*', { count: 'exact', head: true }),
+      ]);
+
+      setStats({
+        totalDocs: docsCount || 0,
+        totalCategories: categoriesCount || 0,
+        totalAttachments: attachmentsCount || 0,
+        totalSearches: searchesCount || 0,
+      });
     } catch (error) {
       console.error('Failed to load stats:', error);
       toast({
