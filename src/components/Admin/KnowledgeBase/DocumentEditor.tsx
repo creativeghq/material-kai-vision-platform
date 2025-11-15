@@ -2,9 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Save,
-  Upload,
-  Sparkles,
-  FileText,
   Eye,
   Code,
 } from 'lucide-react';
@@ -205,161 +202,206 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {documentId ? 'Edit Document' : 'Create New Document'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              value={document.title}
-              onChange={(e) => setDocument({ ...document, title: e.target.value })}
-              placeholder="Enter document title"
-            />
-          </div>
-
-          {/* Category */}
-          <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
-            <Select
-              value={document.category_id}
-              onValueChange={(value) => setDocument({ ...document, category_id: value })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* PDF Upload */}
-          {!documentId && (
-            <div className="space-y-2">
-              <Label htmlFor="pdf">Upload PDF (Optional)</Label>
-              <Input
-                id="pdf"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-              />
-              <p className="text-xs text-muted-foreground">
-                Upload a PDF to automatically extract text content
-              </p>
+      <DialogContent className="max-w-6xl max-h-[90vh] p-0 gap-0">
+        {/* Header */}
+        <div
+          className="px-6 py-4 rounded-t-lg"
+          style={{
+            background: 'var(--glass-bg)',
+            backdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)',
+          }}
+        >
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-2xl font-bold">
+                {documentId ? 'Edit Document' : 'Create New Document'}
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="hover:bg-white/10"
+              >
+                <X className="h-5 w-5" />
+              </Button>
             </div>
-          )}
+          </DialogHeader>
+        </div>
 
-          {/* Content Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="edit">
-                <Code className="h-4 w-4 mr-2" />
-                Edit
-              </TabsTrigger>
-              <TabsTrigger value="preview">
-                <Eye className="h-4 w-4 mr-2" />
-                Preview
-              </TabsTrigger>
-            </TabsList>
+        {/* Content */}
+        <div className="flex h-[calc(90vh-120px)]">
+          {/* Left Sidebar - Settings */}
+          <div
+            className="w-80 p-6 space-y-6 overflow-y-auto border-r"
+            style={{
+              background: 'var(--glass-bg)',
+              backdropFilter: 'var(--glass-blur)',
+            }}
+          >
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg">Document Settings</h3>
 
-            <TabsContent value="edit" className="space-y-4">
+              {/* Title */}
               <div className="space-y-2">
-                <Label htmlFor="content">Content *</Label>
-                <Textarea
-                  id="content"
-                  value={document.content}
-                  onChange={(e) => setDocument({ ...document, content: e.target.value })}
-                  placeholder="Enter document content"
-                  rows={10}
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={document.title}
+                  onChange={(e) => setDocument({ ...document, title: e.target.value })}
+                  placeholder="Enter document title"
                 />
               </div>
 
+              {/* Category */}
               <div className="space-y-2">
-                <Label htmlFor="summary">Summary</Label>
-                <Textarea
-                  id="summary"
-                  value={document.summary}
-                  onChange={(e) => setDocument({ ...document, summary: e.target.value })}
-                  placeholder="Brief summary of the document"
-                  rows={3}
-                />
+                <Label htmlFor="category">Category</Label>
+                <Select
+                  value={document.category_id}
+                  onValueChange={(value) => setDocument({ ...document, category_id: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.icon} {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </TabsContent>
 
-            <TabsContent value="preview">
-              <div className="prose max-w-none p-4 border rounded-md">
-                <h1>{document.title}</h1>
-                {document.summary && (
-                  <p className="text-muted-foreground italic">{document.summary}</p>
-                )}
-                <div className="whitespace-pre-wrap">{document.content}</div>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          {/* Status and Visibility */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={document.status}
-                onValueChange={(value: any) => setDocument({ ...document, status: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="visibility">Visibility</Label>
-              <Select
-                value={document.visibility}
-                onValueChange={(value: any) => setDocument({ ...document, visibility: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Public</SelectItem>
-                  <SelectItem value="workspace">Workspace</SelectItem>
-                  <SelectItem value="private">Private</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <>Saving...</>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Document
-                </>
+              {/* PDF Upload */}
+              {!documentId && (
+                <div className="space-y-2">
+                  <Label htmlFor="pdf">Upload PDF</Label>
+                  <Input
+                    id="pdf"
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileUpload}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Auto-extract text from PDF
+                  </p>
+                </div>
               )}
-            </Button>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={document.status}
+                  onValueChange={(value: any) => setDocument({ ...document, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">📝 Draft</SelectItem>
+                    <SelectItem value="published">✅ Published</SelectItem>
+                    <SelectItem value="archived">📦 Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Visibility */}
+              <div className="space-y-2">
+                <Label htmlFor="visibility">Visibility</Label>
+                <Select
+                  value={document.visibility}
+                  onValueChange={(value: any) => setDocument({ ...document, visibility: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">🌍 Public</SelectItem>
+                    <SelectItem value="workspace">👥 Workspace</SelectItem>
+                    <SelectItem value="private">🔒 Private</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Main Content Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Content Tabs */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+              <div className="border-b px-6 py-2">
+                <TabsList>
+                  <TabsTrigger value="edit">
+                    <Code className="h-4 w-4 mr-2" />
+                    Edit
+                  </TabsTrigger>
+                  <TabsTrigger value="preview">
+                    <Eye className="h-4 w-4 mr-2" />
+                    Preview
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+
+              <TabsContent value="edit" className="flex-1 p-6 space-y-4 overflow-y-auto m-0">
+                <div className="space-y-2">
+                  <Label htmlFor="content">Content *</Label>
+                  <Textarea
+                    id="content"
+                    value={document.content}
+                    onChange={(e) => setDocument({ ...document, content: e.target.value })}
+                    placeholder="Enter document content..."
+                    className="min-h-[300px] font-mono"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="summary">Summary</Label>
+                  <Textarea
+                    id="summary"
+                    value={document.summary}
+                    onChange={(e) => setDocument({ ...document, summary: e.target.value })}
+                    placeholder="Brief summary of the document"
+                    rows={3}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="preview" className="flex-1 p-6 overflow-y-auto m-0">
+                <div className="prose max-w-none">
+                  <h1>{document.title || 'Untitled Document'}</h1>
+                  {document.summary && (
+                    <p className="text-muted-foreground italic">{document.summary}</p>
+                  )}
+                  <div className="whitespace-pre-wrap">{document.content || 'No content yet...'}</div>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            {/* Footer Actions */}
+            <div
+              className="px-6 py-4 border-t flex justify-end gap-2"
+              style={{
+                background: 'var(--glass-bg)',
+                backdropFilter: 'var(--glass-blur)',
+              }}
+            >
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>Saving...</>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Document
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -87,7 +87,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   const loadDocuments = async () => {
     try {
       setIsLoading(true);
-      
+
       // Query kb_docs table directly
       let query = supabase
         .from('kb_docs')
@@ -101,16 +101,29 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        // Check if table doesn't exist
+        if (error.message.includes('relation') && error.message.includes('does not exist')) {
+          toast({
+            title: 'Database Setup Required',
+            description: 'The Knowledge Base tables need to be created in Supabase. Please contact your administrator.',
+            variant: 'destructive',
+          });
+          setDocuments([]);
+          return;
+        }
+        throw error;
+      }
 
       setDocuments(data || []);
     } catch (error) {
       console.error('Failed to load documents:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load documents',
+        description: error instanceof Error ? error.message : 'Failed to load documents',
         variant: 'destructive',
       });
+      setDocuments([]);
     } finally {
       setIsLoading(false);
     }
