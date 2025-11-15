@@ -144,7 +144,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <Card key={image.id}>
                       <CardContent className="p-4">
                         <img
-                          src={image.storage_path}
+                          src={image.image_url}
                           alt={image.filename}
                           className="w-full h-48 object-cover rounded-lg mb-2"
                         />

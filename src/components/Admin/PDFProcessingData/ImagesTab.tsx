@@ -112,7 +112,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
                 <Card key={image.id} className="overflow-hidden">
                   <CardContent className="p-0">
                     <img
-                      src={image.storage_path}
+                      src={image.image_url}
                       alt={image.filename}
                       className="w-full h-48 object-cover"
                     />
@@ -149,7 +149,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
             </DialogHeader>
             <div className="space-y-4">
               <img
-                src={selectedImage.storage_path}
+                src={selectedImage.image_url}
                 alt={selectedImage.filename}
                 className="w-full rounded-lg"
               />
