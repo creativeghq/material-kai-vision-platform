@@ -56,18 +56,28 @@ export const SearchInterface: React.FC = () => {
       setIsSearching(true);
       const startTime = Date.now();
 
-      // Use Supabase RPC function for vector search
-      const { data, error } = await supabase.rpc('search_kb_docs', {
-        search_query: query.trim(),
-        search_workspace_id: workspaceId,
-        search_type: searchType,
-        result_limit: 20,
+      // Call MIVAA API for semantic search (generates query embedding and does vector similarity)
+      const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          query: query.trim(),
+          search_type: searchType,
+          limit: 20,
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Search failed');
+      }
 
+      const data = await response.json();
       const endTime = Date.now();
-      setResults(data || []);
+      setResults(data.results || []);
       setSearchTime(endTime - startTime);
 
       if (!data || data.length === 0) {
