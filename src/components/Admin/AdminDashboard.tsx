@@ -392,13 +392,13 @@ const AdminDashboard: React.FC = () => {
   const adminSections = {
     'Core Systems': [
       {
-        title: 'PDF Knowledge Base',
+        title: 'Knowledge Base & Documentation',
         description:
-          'View and manage processed PDF documents, chunks, and knowledge entries',
+          'Manage documentation with AI embeddings, semantic search, and product attachments',
         icon: DatabaseIcon,
         path: '/admin/knowledge-base',
         status: 'active',
-        count: 'Primary system',
+        count: 'NEW v2.3.0',
       },
       {
         title: 'PDF Processing',

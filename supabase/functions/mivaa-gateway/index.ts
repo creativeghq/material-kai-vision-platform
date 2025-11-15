@@ -14,10 +14,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 };
 
-// Available MIVAA endpoints (COMPREHENSIVE - API Consolidation v2.2.0)
+// Available MIVAA endpoints (COMPREHENSIVE - API Consolidation v2.3.0)
 const MIVAA_ENDPOINTS = {
   // ==================== CORE ENDPOINTS ====================
   'health_check': { path: '/health', method: 'GET' },  // Consolidated health check for all services
+
+  // ==================== KNOWLEDGE BASE ROUTES (NEW v2.3.0) ====================
+  'kb_create_document': { path: '/api/kb/documents', method: 'POST' },  // Create document with embeddings
+  'kb_get_document': { path: '/api/kb/documents/{doc_id}', method: 'GET' },  // Get document by ID
+  'kb_update_document': { path: '/api/kb/documents/{doc_id}', method: 'PATCH' },  // Update document (smart embedding regeneration)
+  'kb_delete_document': { path: '/api/kb/documents/{doc_id}', method: 'DELETE' },  // Delete document
+  'kb_create_from_pdf': { path: '/api/kb/documents/from-pdf', method: 'POST' },  // Create document from PDF
+  'kb_search': { path: '/api/kb/search', method: 'POST' },  // Search documents (semantic/full-text/hybrid)
+  'kb_create_category': { path: '/api/kb/categories', method: 'POST' },  // Create category
+  'kb_list_categories': { path: '/api/kb/categories', method: 'GET' },  // List categories
+  'kb_create_attachment': { path: '/api/kb/attachments', method: 'POST' },  // Attach document to product
+  'kb_get_doc_attachments': { path: '/api/kb/documents/{doc_id}/attachments', method: 'GET' },  // Get document attachments
+  'kb_get_product_docs': { path: '/api/kb/products/{product_id}/documents', method: 'GET' },  // Get product documents
+  'kb_health': { path: '/api/kb/health', method: 'GET' },  // Knowledge Base health check
 
   // ==================== RAG ROUTES (CONSOLIDATED) ====================
   'rag_upload': { path: '/api/rag/documents/upload', method: 'POST' },  // Consolidated upload (file + URL)

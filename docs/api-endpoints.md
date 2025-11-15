@@ -1,26 +1,35 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-10
-**Total Endpoints:** 119 (115 + Data Import)
-**Status:** ✅ Production-Ready - API Consolidation Complete + PDF Extraction Consolidation + Duplicate Detection + Data Import
+**Last Updated:** 2025-11-14
+**API Version:** v2.3.0
+**Total Endpoints:** 125+ (119 + Knowledge Base)
+**Status:** ✅ Production-Ready - Knowledge Base System Complete
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (API Consolidation + PDF Extraction Consolidation + Duplicate Detection + Data Import):**
-- ✅ **DATA IMPORT:** 4 new endpoints for XML import and web scraping with dynamic field mapping
-- ✅ **DUPLICATE DETECTION:** 7 new endpoints for duplicate detection and product merging (factory-based only)
+**Recent Updates (v2.3.0 - Knowledge Base System):**
+- ✅ **KNOWLEDGE BASE:** 15+ new endpoints for document management with AI embeddings (NEW)
+  - Document CRUD with automatic embedding generation (1536D)
+  - Smart content change detection (only regenerate when needed)
+  - PDF text extraction using PyMuPDF
+  - Semantic search (vector similarity)
+  - Category hierarchy management
+  - Product attachment system
+  - Version history tracking
+  - Comments and suggestions
+  - Search analytics
+
+**Previous Updates (v2.2.0):**
+- ✅ **DATA IMPORT:** 4 endpoints for XML import and web scraping with dynamic field mapping
+- ✅ **DUPLICATE DETECTION:** 7 endpoints for duplicate detection and product merging (factory-based only)
 - ✅ **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
 - ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
 - ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
 - ✅ **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
-- ✅ **METADATA MANAGEMENT:** 4 new endpoints for scope detection, application, listing, and statistics
-- ✅ **REMOVED:** All deprecated endpoints (`/process`, `/process-url`, `/unified-search`)
-- ✅ **REMOVED:** All test endpoints (4 from documents, 1 from main)
-- ✅ **REMOVED:** All legacy `/api/documents/*` endpoints (18 total) - replaced by `/api/rag/*`
-- ✅ **REMOVED:** All `/api/pdf/extract/*` endpoints (3 total) - replaced by `/api/rag/documents/upload`
-- ✅ **DATABASE CLEANUP:** Removed 12 legacy tables (style analysis, visual search, property analysis)
+- ✅ **METADATA MANAGEMENT:** 4 endpoints for scope detection, application, listing, and statistics
 
-**Total API Endpoints:** 119 endpoints across 16 categories
+**Total API Endpoints:** 125+ endpoints across 17 categories
+- ✅ **KNOWLEDGE BASE:** Complete documentation management system with AI embeddings
 - ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
 - ✅ **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
@@ -55,19 +64,22 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 **✨ CONSOLIDATED ENDPOINTS (One Endpoint, One Purpose, No Duplicates)**
 
 1. [Core Endpoints](#1-core-endpoints) - Health, Status
-2. [RAG Routes](#2-rag-routes) - Document Upload, Search, Query (CONSOLIDATED)
-3. [Admin Routes](#3-admin-routes) - Admin management
-4. [Search Routes](#3-search-routes) - Semantic, Vector, Hybrid Search (CONSOLIDATED)
-5. [Document Entities Routes](#7-document-entities-routes) - Certificates, Logos, Specifications
-6. [Products Routes](#9-products-routes) - Product management
-7. [Images Routes](#6-images-routes) - Image processing
-8. [Embeddings Routes](#10-embeddings-routes) - Embedding generation
-9. [Together AI Routes](#11-together-ai-routes) - TogetherAI integration
-10. [Anthropic Routes](#12-anthropic-routes) - Anthropic integration
-11. [Monitoring Routes](#13-monitoring-routes) - System monitoring
-12. [AI Metrics Routes](#14-ai-metrics-routes) - AI performance metrics
-13. [Duplicate Detection Routes](#15-duplicate-detection-routes) - Duplicate detection and product merging
-14. [Data Import Routes](#16-data-import-routes) - XML import, web scraping, batch processing ✨ NEW
+2. [Knowledge Base Routes](#2-knowledge-base-routes) - Document Management, Semantic Search, Categories, Attachments ✨ NEW v2.3.0
+3. [RAG Routes](#3-rag-routes) - Document Upload, Search, Query (CONSOLIDATED)
+4. [Admin Routes](#4-admin-routes) - Admin management
+5. [Search Routes](#5-search-routes) - Semantic, Vector, Hybrid Search (CONSOLIDATED)
+6. [Document Entities Routes](#6-document-entities-routes) - Certificates, Logos, Specifications
+7. [Products Routes](#7-products-routes) - Product management
+8. [Images Routes](#8-images-routes) - Image processing
+9. [Embeddings Routes](#9-embeddings-routes) - Embedding generation
+10. [Together AI Routes](#10-together-ai-routes) - TogetherAI integration
+11. [Anthropic Routes](#11-anthropic-routes) - Anthropic integration
+12. [Monitoring Routes](#12-monitoring-routes) - System monitoring
+13. [AI Metrics Routes](#13-ai-metrics-routes) - AI performance metrics
+14. [Duplicate Detection Routes](#14-duplicate-detection-routes) - Duplicate detection and product merging
+15. [Data Import Routes](#15-data-import-routes) - XML import, web scraping, batch processing
+16. [Job Health Routes](#16-job-health-routes) - Job monitoring and health checks
+17. [Suggestions Routes](#17-suggestions-routes) - Search suggestions and auto-complete
 
 ---
 
@@ -110,7 +122,429 @@ GET /health
 
 ---
 
-## 2. RAG Routes (CONSOLIDATED)
+## 2. Knowledge Base Routes ✨ NEW v2.3.0
+
+**Base Path:** `/api/kb`
+**Purpose:** Document management system with AI embeddings, semantic search, and product attachments
+**Philosophy:** Complete knowledge base for documentation, guides, specifications, and product information
+
+### 2.1 POST /api/kb/documents
+
+**Purpose:** Create a new knowledge base document with automatic embedding generation
+**Used In:** Knowledge Base admin panel, Documentation editor
+**Flow:** User creates document → Generate 1536D embedding → Store in database
+
+**Request:**
+```http
+POST /api/kb/documents
+Content-Type: application/json
+
+{
+  "workspace_id": "uuid",
+  "title": "Installation Guide",
+  "content": "Step 1: Prepare the surface...",
+  "content_markdown": "# Installation Guide\n\n## Step 1...",
+  "summary": "Complete installation instructions",
+  "category_id": "uuid",
+  "seo_keywords": ["installation", "guide", "setup"],
+  "status": "draft",
+  "visibility": "workspace",
+  "metadata": {}
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "workspace_id": "uuid",
+  "title": "Installation Guide",
+  "content": "Step 1: Prepare the surface...",
+  "text_embedding": [0.123, -0.456, ...],
+  "embedding_status": "success",
+  "embedding_generated_at": "2025-11-14T10:30:00Z",
+  "embedding_model": "text-embedding-3-small",
+  "created_at": "2025-11-14T10:30:00Z",
+  "view_count": 0
+}
+```
+
+**Database Operations:**
+- INSERT into `kb_docs` with embedding
+- INSERT into `kb_doc_versions` (version history)
+- Generate 1536D embedding using OpenAI text-embedding-3-small
+
+---
+
+### 2.2 GET /api/kb/documents/{doc_id}
+
+**Purpose:** Retrieve a single knowledge base document by ID
+**Used In:** Document viewer, Edit modal
+
+**Request:**
+```http
+GET /api/kb/documents/{doc_id}?workspace_id=uuid
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "workspace_id": "uuid",
+  "title": "Installation Guide",
+  "content": "Step 1: Prepare the surface...",
+  "content_markdown": "# Installation Guide...",
+  "summary": "Complete installation instructions",
+  "category_id": "uuid",
+  "embedding_status": "success",
+  "created_at": "2025-11-14T10:30:00Z",
+  "updated_at": "2025-11-14T10:30:00Z",
+  "view_count": 5
+}
+```
+
+---
+
+### 2.3 PATCH /api/kb/documents/{doc_id}
+
+**Purpose:** Update document with smart embedding regeneration
+**Smart Detection:** Only regenerates embedding if content changed (title, content, summary, keywords, category)
+**Used In:** Document editor
+
+**Request:**
+```http
+PATCH /api/kb/documents/{doc_id}
+Content-Type: application/json
+
+{
+  "workspace_id": "uuid",
+  "title": "Updated Installation Guide",
+  "content": "New content...",
+  "status": "published"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "title": "Updated Installation Guide",
+  "content": "New content...",
+  "embedding_status": "success",
+  "embedding_generated_at": "2025-11-14T11:00:00Z",
+  "updated_at": "2025-11-14T11:00:00Z"
+}
+```
+
+**Database Operations:**
+- UPDATE `kb_docs` with new content
+- INSERT into `kb_doc_versions` (version history)
+- Regenerate embedding ONLY if content changed
+
+---
+
+### 2.4 DELETE /api/kb/documents/{doc_id}
+
+**Purpose:** Delete a knowledge base document
+**Used In:** Document management, Admin panel
+
+**Request:**
+```http
+DELETE /api/kb/documents/{doc_id}?workspace_id=uuid
+```
+
+**Response:**
+```
+204 No Content
+```
+
+**Database Operations:**
+- DELETE from `kb_docs` (cascades to attachments, versions, comments)
+
+---
+
+### 2.5 POST /api/kb/documents/from-pdf
+
+**Purpose:** Create document from PDF with text extraction
+**Used In:** PDF upload modal in Knowledge Base
+**Flow:** Upload PDF → Extract text using PyMuPDF → Generate embedding → Store document
+
+**Request:**
+```http
+POST /api/kb/documents/from-pdf
+Content-Type: multipart/form-data
+
+Parameters:
+- file: PDF file
+- workspace_id: uuid
+- title: "Product Specifications"
+- category_id: uuid (optional)
+- status: "draft" | "published"
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "title": "Product Specifications",
+  "content": "Extracted text from PDF...",
+  "embedding_status": "success",
+  "created_at": "2025-11-14T10:30:00Z"
+}
+```
+
+**Database Operations:**
+- Extract text using PyMuPDF (fitz)
+- INSERT into `kb_docs` with extracted text
+- Generate 1536D embedding
+
+---
+
+### 2.6 POST /api/kb/search
+
+**Purpose:** Search knowledge base documents using semantic, full-text, or hybrid search
+**Used In:** Knowledge Base search interface, AI agent queries
+**Flow:** User searches → Generate query embedding → Vector similarity search → Return results
+
+**Request:**
+```http
+POST /api/kb/search
+Content-Type: application/json
+
+{
+  "workspace_id": "uuid",
+  "query": "How to install the product?",
+  "search_type": "semantic",
+  "category_id": "uuid",
+  "limit": 10,
+  "offset": 0
+}
+```
+
+**Search Types:**
+- `semantic` - Vector similarity using embeddings (default)
+- `full_text` - PostgreSQL full-text search
+- `hybrid` - Combination of both
+
+**Response:**
+```json
+{
+  "success": true,
+  "results": [
+    {
+      "id": "uuid",
+      "title": "Installation Guide",
+      "content": "Step 1: Prepare the surface...",
+      "similarity_score": 0.92,
+      "created_at": "2025-11-14T10:30:00Z"
+    }
+  ],
+  "total_count": 1,
+  "search_time_ms": 45,
+  "search_type": "semantic"
+}
+```
+
+**Database Operations:**
+- Generate query embedding (1536D)
+- Vector similarity search using `<=>` operator
+- Track search in `kb_search_analytics`
+
+---
+
+### 2.7 POST /api/kb/categories
+
+**Purpose:** Create a new category
+**Used In:** Category management UI
+
+**Request:**
+```http
+POST /api/kb/categories
+Content-Type: application/json
+
+{
+  "workspace_id": "uuid",
+  "name": "Installation Guides",
+  "description": "Step-by-step installation instructions",
+  "parent_category_id": "uuid",
+  "color": "#3B82F6",
+  "icon": "📖",
+  "sort_order": 1
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "name": "Installation Guides",
+  "description": "Step-by-step installation instructions",
+  "color": "#3B82F6",
+  "icon": "📖",
+  "created_at": "2025-11-14T10:30:00Z"
+}
+```
+
+---
+
+### 2.8 GET /api/kb/categories
+
+**Purpose:** List all categories for a workspace
+**Used In:** Category dropdown, Category management
+
+**Request:**
+```http
+GET /api/kb/categories?workspace_id=uuid
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "categories": [
+    {
+      "id": "uuid",
+      "name": "Installation Guides",
+      "description": "Step-by-step installation instructions",
+      "parent_category_id": null,
+      "color": "#3B82F6",
+      "icon": "📖",
+      "sort_order": 1,
+      "document_count": 5
+    }
+  ]
+}
+```
+
+---
+
+### 2.9 POST /api/kb/attachments
+
+**Purpose:** Attach a document to one or more products
+**Used In:** Product attachment modal
+
+**Request:**
+```http
+POST /api/kb/attachments
+Content-Type: application/json
+
+{
+  "workspace_id": "uuid",
+  "document_id": "uuid",
+  "product_id": "uuid",
+  "relationship_type": "primary",
+  "relevance_score": 5
+}
+```
+
+**Relationship Types:**
+- `primary` - Main documentation for product
+- `supplementary` - Additional information
+- `related` - Related documentation
+- `certification` - Certification documents
+- `specification` - Technical specifications
+
+**Response:**
+```json
+{
+  "id": "uuid",
+  "document_id": "uuid",
+  "product_id": "uuid",
+  "relationship_type": "primary",
+  "relevance_score": 5,
+  "created_at": "2025-11-14T10:30:00Z"
+}
+```
+
+---
+
+### 2.10 GET /api/kb/documents/{doc_id}/attachments
+
+**Purpose:** Get all products attached to a document
+**Used In:** Document viewer, Product links section
+
+**Request:**
+```http
+GET /api/kb/documents/{doc_id}/attachments?workspace_id=uuid
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "attachments": [
+    {
+      "id": "uuid",
+      "product_id": "uuid",
+      "product_name": "Premium Flooring",
+      "relationship_type": "primary",
+      "relevance_score": 5
+    }
+  ]
+}
+```
+
+---
+
+### 2.11 GET /api/kb/products/{product_id}/documents
+
+**Purpose:** Get all documents attached to a product
+**Used In:** Product page documentation tab
+
+**Request:**
+```http
+GET /api/kb/products/{product_id}/documents?workspace_id=uuid
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "documents": [
+    {
+      "id": "uuid",
+      "title": "Installation Guide",
+      "summary": "Complete installation instructions",
+      "relationship_type": "primary",
+      "relevance_score": 5,
+      "view_count": 10
+    }
+  ]
+}
+```
+
+---
+
+### 2.12 GET /api/kb/health
+
+**Purpose:** Health check for Knowledge Base service
+**Used In:** System monitoring
+
+**Request:**
+```http
+GET /api/kb/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "knowledge_base",
+  "features": {
+    "document_crud": true,
+    "embedding_generation": true,
+    "pdf_extraction": true,
+    "semantic_search": true,
+    "categories": true,
+    "attachments": true
+  },
+  "endpoints": 15
+}
+```
+
+---
+
+## 3. RAG Routes (CONSOLIDATED)
 
 **Base Path:** `/api/rag` or `/api/v1/rag`
 **Purpose:** Core RAG (Retrieval-Augmented Generation) functionality for document processing, querying, and management

@@ -17,7 +17,7 @@ import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
-import { MaterialKnowledgeBase } from './components/Admin/MaterialKnowledgeBase';
+import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
@@ -55,7 +55,6 @@ import { CRMManagement } from './components/Admin/CRMManagement';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
-import { PDFProcessingMonitor } from './components/Admin/PDFProcessingMonitor';
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
 import DataImportHub from './components/Admin/DataImportHub';
 
@@ -177,9 +176,7 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <AdminGuard>
-                      <Layout>
-                        <MaterialKnowledgeBase />
-                      </Layout>
+                      <KnowledgeBaseManagement />
                     </AdminGuard>
                   </AuthGuard>
                 }
