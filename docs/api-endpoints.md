@@ -309,7 +309,7 @@ Parameters:
 **Architecture:**
 1. Frontend calls MIVAA API with search query
 2. MIVAA generates embedding for query using OpenAI (text-embedding-3-small)
-3. MIVAA calls Supabase `match_kb_docs()` RPC function with query embedding
+3. MIVAA calls Supabase `kb_match_docs()` RPC function with query embedding
 4. Supabase performs vector similarity search using pgvector `<=>` operator
 5. Returns ranked results with similarity scores
 

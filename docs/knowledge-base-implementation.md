@@ -156,7 +156,7 @@ Complete implementation of the Knowledge Base & Documentation System with databa
    **Architecture:**
    - Frontend → MIVAA API `/api/kb/search`
    - MIVAA generates query embedding (OpenAI)
-   - MIVAA calls Supabase `match_kb_docs()` RPC function
+   - MIVAA calls Supabase `kb_match_docs()` RPC function
    - Supabase performs vector similarity search using pgvector
    - Returns ranked results with similarity scores
 
