@@ -56,13 +56,13 @@ export const SearchInterface: React.FC = () => {
       setIsSearching(true);
       const startTime = Date.now();
 
-      // Simple text search in Supabase (semantic search requires MIVAA API backend)
-      const { data, error } = await supabase
-        .from('kb_docs')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .or(`title.ilike.%${query.trim()}%,content.ilike.%${query.trim()}%`)
-        .limit(20);
+      // Use Supabase RPC function for vector search
+      const { data, error } = await supabase.rpc('search_kb_docs', {
+        search_query: query.trim(),
+        search_workspace_id: workspaceId,
+        search_type: searchType,
+        result_limit: 20,
+      });
 
       if (error) throw error;
 
