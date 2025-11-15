@@ -99,7 +99,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Knowledge Base & Documentation"
         description="Manage documentation with AI embeddings, semantic search, and product attachments"

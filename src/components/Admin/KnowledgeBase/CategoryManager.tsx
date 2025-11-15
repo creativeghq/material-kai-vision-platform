@@ -72,8 +72,15 @@ export const CategoryManager: React.FC = () => {
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      const result = await kbService.listCategories(workspaceId);
-      setCategories(result.categories || []);
+      // Load categories directly from Supabase instead of API Gateway
+      const { data, error } = await supabase
+        .from('kb_categories')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+      setCategories(data || []);
     } catch (error) {
       console.error('Failed to load categories:', error);
       toast({

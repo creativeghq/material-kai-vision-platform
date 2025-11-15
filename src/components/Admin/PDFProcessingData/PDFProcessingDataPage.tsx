@@ -55,13 +55,16 @@ export const PDFProcessingDataPage: React.FC = () => {
           .eq('workspace_id', wsId),
         supabase
           .from('document_chunks')
-          .select('*', { count: 'exact', head: true }),
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', wsId),
         supabase
           .from('document_images')
-          .select('*', { count: 'exact', head: true }),
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', wsId),
         supabase
           .from('embeddings')
-          .select('*', { count: 'exact', head: true }),
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', wsId),
       ]);
 
       setStats({
@@ -76,7 +79,7 @@ export const PDFProcessingDataPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="PDF Processing Data"
         description="View all products, chunks, images, and embeddings generated from PDF processing"
