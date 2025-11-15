@@ -34,9 +34,29 @@
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 3: Semantic Chunking (40-50%)                             │
-│ Tool: Anthropic Semantic Chunking                              │
-│ Output: 229+ semantic chunks (Harmony PDF example)             │
+│ STAGE 3: Enhanced Semantic Chunking (40-50%)                    │
+│ Tool: UnifiedChunkingService with 5 enhancements               │
+│ Output: High-quality semantic chunks with relationships        │
+│                                                                 │
+│ ✅ Enhancement 1: Product Boundary Detection                    │
+│    - Splits chunks at product boundaries                       │
+│    - Each chunk = ONE product only                             │
+│                                                                 │
+│ ✅ Enhancement 2: Semantic Chunking                             │
+│    - Chunks end at natural boundaries (paragraphs, sentences)  │
+│    - Better semantic completeness                              │
+│                                                                 │
+│ ✅ Enhancement 3: Context Enrichment                            │
+│    - Adds product_id and product_name to metadata              │
+│    - Enables better search filtering                           │
+│                                                                 │
+│ ✅ Enhancement 4: Metadata-First Architecture                   │
+│    - Excludes product metadata pages from chunking             │
+│    - Zero duplication between chunks and metadata              │
+│                                                                 │
+│ ✅ Enhancement 5: Chunk Relationships                           │
+│    - Creates semantic relationships between chunks             │
+│    - Enables "show me everything about X" queries              │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
