@@ -18,7 +18,7 @@ import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
-import { PDFDocumentsManagement } from './components/Admin/PDFDocuments';
+import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
@@ -32,7 +32,6 @@ import { Designer3DPage } from './components/3D/Designer3DPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
-import { IntegratedRAGManagement } from './components/Admin/IntegratedRAGManagement';
 import PDFProcessing from './pages/PDFProcessing';
 import SearchHub from './pages/SearchHub';
 import AgentHub from './pages/AgentHub';
@@ -183,21 +182,11 @@ const App = () => (
                 }
               />
               <Route
-                path="/admin/pdf-documents"
+                path="/admin/pdf-data"
                 element={
                   <AuthGuard>
                     <AdminGuard>
-                      <PDFDocumentsManagement />
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/admin/pdf-documents/:documentId"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <PDFDocumentDetails />
+                      <PDFProcessingDataPage />
                     </AdminGuard>
                   </AuthGuard>
                 }
@@ -262,18 +251,7 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-              <Route
-                path="/admin/rag"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <IntegratedRAGManagement />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
+
               <Route
                 path="/admin/api-gateway"
                 element={

@@ -401,31 +401,22 @@ const AdminDashboard: React.FC = () => {
         count: 'User Docs',
       },
       {
-        title: 'PDF Documents & Extraction',
-        description:
-          'View all processed material catalog PDFs with products, chunks, images, and embeddings',
-        icon: DatabaseIcon,
-        path: '/admin/pdf-documents',
-        status: 'active',
-        count: 'Material Catalogs',
-      },
-      {
         title: 'PDF Processing',
         description:
           'Upload and process new PDF documents for material knowledge extraction',
         icon: FileText,
         path: '/admin/pdf-processing',
         status: 'active',
-        count: 'Upload',
+        count: 'Upload PDFs',
       },
       {
-        title: 'PDF Knowledge & RAG',
+        title: 'PDF Processing Data',
         description:
-          'RAG search interface and training status for AI system',
+          'View all products, chunks, images, and embeddings generated from PDF processing',
         icon: DatabaseIcon,
-        path: '/admin/rag',
+        path: '/admin/pdf-data',
         status: 'active',
-        count: 'RAG System',
+        count: 'Extraction Data',
       },
     ],
     'AI & Intelligence': [

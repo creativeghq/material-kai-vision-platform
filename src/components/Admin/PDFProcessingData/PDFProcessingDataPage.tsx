@@ -1,0 +1,127 @@
+import React, { useState, useEffect } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Package, Grid3X3, Image as ImageIcon, Database } from 'lucide-react';
+import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { ProductsTab } from './ProductsTab';
+import { ChunksTab } from './ChunksTab';
+import { ImagesTab } from './ImagesTab';
+import { EmbeddingsTab } from './EmbeddingsTab';
+import { supabase } from '@/integrations/supabase/client';
+
+export const PDFProcessingDataPage: React.FC = () => {
+  const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [stats, setStats] = useState({
+    products: 0,
+    chunks: 0,
+    images: 0,
+    embeddings: 0,
+  });
+
+  useEffect(() => {
+    loadWorkspaceAndStats();
+  }, []);
+
+  const loadWorkspaceAndStats = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: workspaces } = await supabase
+        .from('workspaces')
+        .select('id')
+        .limit(1)
+        .single();
+
+      if (workspaces) {
+        setWorkspaceId(workspaces.id);
+        await loadStats(workspaces.id);
+      }
+    } catch (error) {
+      console.error('Failed to load workspace:', error);
+    }
+  };
+
+  const loadStats = async (wsId: string) => {
+    try {
+      const [
+        { count: productsCount },
+        { count: chunksCount },
+        { count: imagesCount },
+        { count: embeddingsCount },
+      ] = await Promise.all([
+        supabase
+          .from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('workspace_id', wsId),
+        supabase
+          .from('document_chunks')
+          .select('*', { count: 'exact', head: true }),
+        supabase
+          .from('document_images')
+          .select('*', { count: 'exact', head: true }),
+        supabase
+          .from('embeddings')
+          .select('*', { count: 'exact', head: true }),
+      ]);
+
+      setStats({
+        products: productsCount || 0,
+        chunks: chunksCount || 0,
+        images: imagesCount || 0,
+        embeddings: embeddingsCount || 0,
+      });
+    } catch (error) {
+      console.error('Failed to load stats:', error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="PDF Processing Data"
+        description="View all products, chunks, images, and embeddings generated from PDF processing"
+        badge="Extraction Data"
+      />
+
+      <div className="p-6">
+        <Tabs defaultValue="products" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Products ({stats.products})
+            </TabsTrigger>
+            <TabsTrigger value="chunks" className="flex items-center gap-2">
+              <Grid3X3 className="h-4 w-4" />
+              Chunks ({stats.chunks})
+            </TabsTrigger>
+            <TabsTrigger value="images" className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Images ({stats.images})
+            </TabsTrigger>
+            <TabsTrigger value="embeddings" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Embeddings ({stats.embeddings})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products">
+            <ProductsTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
+          </TabsContent>
+
+          <TabsContent value="chunks">
+            <ChunksTab onStatsUpdate={loadStats} />
+          </TabsContent>
+
+          <TabsContent value="images">
+            <ImagesTab onStatsUpdate={loadStats} />
+          </TabsContent>
+
+          <TabsContent value="embeddings">
+            <EmbeddingsTab onStatsUpdate={loadStats} />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
