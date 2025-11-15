@@ -76,7 +76,7 @@ Complete implementation of the Knowledge Base & Documentation System with databa
 
 ## ✅ Phase 2: Backend API Endpoints (COMPLETE)
 
-### API Routes Created (15+ endpoints)
+### API Routes Created (16+ endpoints)
 
 **Base Path:** `/api/kb`
 
@@ -110,12 +110,55 @@ Complete implementation of the Knowledge Base & Documentation System with databa
 #### Search (1 endpoint)
 
 6. **POST `/api/kb/search`** - Search documents
-   - **Semantic Search:** Vector similarity using embeddings
-   - **Full-Text Search:** Keyword-based search
-   - **Hybrid Search:** Combination of both
-   - Category filtering
-   - Pagination support
-   - Returns: Results with search time metrics
+   - **Semantic Search:** Vector similarity using pgvector cosine distance
+     - Generates embedding for search query using OpenAI (text-embedding-3-small)
+     - Compares against stored document embeddings using `<=>` operator
+     - Returns results with similarity scores (0.0 - 1.0)
+     - Minimum threshold: 0.5 (configurable)
+   - **Full-Text Search:** ILIKE-based keyword matching
+     - Searches title and content fields
+     - Case-insensitive matching
+   - **Hybrid Search:** Combination of semantic + full-text
+     - Weighted scoring for best results
+   - Category filtering (optional)
+   - Pagination support (default: 20 results)
+   - Returns: Results with search time metrics (ms)
+
+   **Request:**
+   ```json
+   {
+     "workspace_id": "uuid",
+     "query": "sustainable wood materials",
+     "search_type": "semantic",  // or "full_text" or "hybrid"
+     "limit": 20
+   }
+   ```
+
+   **Response:**
+   ```json
+   {
+     "results": [
+       {
+         "id": "uuid",
+         "title": "Sustainable Wood Guide",
+         "content": "...",
+         "similarity": 0.87,
+         "category_id": "uuid",
+         "tags": ["wood", "sustainable"],
+         "status": "published"
+       }
+     ],
+     "search_time_ms": 145.3,
+     "total_results": 5
+   }
+   ```
+
+   **Architecture:**
+   - Frontend → MIVAA API `/api/kb/search`
+   - MIVAA generates query embedding (OpenAI)
+   - MIVAA calls Supabase `match_kb_docs()` RPC function
+   - Supabase performs vector similarity search using pgvector
+   - Returns ranked results with similarity scores
 
 #### Categories (2 endpoints)
 

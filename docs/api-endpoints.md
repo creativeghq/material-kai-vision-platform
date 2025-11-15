@@ -304,7 +304,20 @@ Parameters:
 
 **Purpose:** Search knowledge base documents using semantic, full-text, or hybrid search
 **Used In:** Knowledge Base search interface, AI agent queries
-**Flow:** User searches → Generate query embedding → Vector similarity search → Return results
+**Flow:** Frontend → MIVAA API → Generate query embedding → Supabase vector search → Return results
+
+**Architecture:**
+1. Frontend calls MIVAA API with search query
+2. MIVAA generates embedding for query using OpenAI (text-embedding-3-small)
+3. MIVAA calls Supabase `match_kb_docs()` RPC function with query embedding
+4. Supabase performs vector similarity search using pgvector `<=>` operator
+5. Returns ranked results with similarity scores
+
+**Why MIVAA Backend is Required:**
+- Document embeddings already stored in `kb_docs.text_embedding` (generated when doc created)
+- Search only generates ONE embedding (for the query)
+- Cannot generate embeddings in Supabase RPC (requires OpenAI API call)
+- Uses pgvector's optimized cosine similarity for fast search
 
 **Request:**
 ```http
@@ -315,16 +328,21 @@ Content-Type: application/json
   "workspace_id": "uuid",
   "query": "How to install the product?",
   "search_type": "semantic",
-  "category_id": "uuid",
-  "limit": 10,
-  "offset": 0
+  "limit": 20
 }
 ```
 
 **Search Types:**
-- `semantic` - Vector similarity using embeddings (default)
-- `full_text` - PostgreSQL full-text search
-- `hybrid` - Combination of both
+- `semantic` - Vector similarity using pgvector cosine distance (default)
+  - Generates query embedding via OpenAI
+  - Compares against stored document embeddings
+  - Returns results with similarity scores (0.0 - 1.0)
+  - Minimum threshold: 0.5
+- `full_text` - ILIKE-based keyword matching
+  - Searches title and content fields
+  - Case-insensitive
+- `hybrid` - Combination of semantic + full-text
+  - Weighted scoring for best results
 
 **Response:**
 ```json
