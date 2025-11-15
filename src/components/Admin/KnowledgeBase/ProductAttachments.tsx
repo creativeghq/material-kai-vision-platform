@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { KnowledgeBaseService, KBAttachment, KBDocument } from '@/services/knowledgeBaseService';
+import { KBAttachment, KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 export const ProductAttachments: React.FC = () => {
@@ -42,7 +42,6 @@ export const ProductAttachments: React.FC = () => {
   const [workspaceId, setWorkspaceId] = useState<string>('');
 
   const { toast } = useToast();
-  const kbService = KnowledgeBaseService.getInstance();
 
   useEffect(() => {
     loadWorkspace();
@@ -51,6 +50,7 @@ export const ProductAttachments: React.FC = () => {
   useEffect(() => {
     if (workspaceId) {
       loadDocuments();
+      loadAttachments();
     }
   }, [workspaceId]);
 
@@ -91,6 +91,24 @@ export const ProductAttachments: React.FC = () => {
     }
   };
 
+  const loadAttachments = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('kb_doc_attachments')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAttachments(data || []);
+    } catch (error) {
+      console.error('Failed to load attachments:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCreate = () => {
     setNewAttachment({
       relationship_type: 'primary',
@@ -110,15 +128,22 @@ export const ProductAttachments: React.FC = () => {
     }
 
     try {
-      await kbService.createAttachment({
-        ...newAttachment,
-        workspace_id: workspaceId,
-      });
+      // Save directly to Supabase instead of API Gateway
+      const { error } = await supabase
+        .from('kb_doc_attachments')
+        .insert({
+          ...newAttachment,
+          workspace_id: workspaceId,
+        });
+
+      if (error) throw error;
+
       toast({
         title: 'Success',
         description: 'Product attachment created successfully',
       });
       setShowEditor(false);
+      loadAttachments();
     } catch (error) {
       console.error('Failed to create attachment:', error);
       toast({

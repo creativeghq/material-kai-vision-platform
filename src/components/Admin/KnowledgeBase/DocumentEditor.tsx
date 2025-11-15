@@ -25,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { KnowledgeBaseService, KBDocument, KBCategory } from '@/services/knowledgeBaseService';
+import { KBDocument, KBCategory } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DocumentEditorProps {
@@ -53,7 +53,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [activeTab, setActiveTab] = useState('edit');
 
   const { toast } = useToast();
-  const kbService = KnowledgeBaseService.getInstance();
 
   useEffect(() => {
     loadWorkspace();
@@ -95,8 +94,15 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         .single();
 
       if (workspaces) {
-        const result = await kbService.listCategories(workspaces.id);
-        setCategories(result.categories || []);
+        // Load categories directly from Supabase
+        const { data, error } = await supabase
+          .from('kb_categories')
+          .select('*')
+          .eq('workspace_id', workspaces.id)
+          .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        setCategories(data || []);
       }
     } catch (error) {
       console.error('Failed to load categories:', error);
@@ -108,8 +114,16 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
     try {
       setIsLoading(true);
-      const doc = await kbService.getDocument(documentId, workspaceId);
-      setDocument(doc);
+      // Load document directly from Supabase
+      const { data, error } = await supabase
+        .from('kb_docs')
+        .select('*')
+        .eq('id', documentId)
+        .eq('workspace_id', workspaceId)
+        .single();
+
+      if (error) throw error;
+      setDocument(data);
     } catch (error) {
       console.error('Failed to load document:', error);
       toast({
@@ -136,13 +150,34 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setIsSaving(true);
 
       if (documentId) {
-        await kbService.updateDocument(documentId, document);
+        // Update document directly in Supabase
+        const { error } = await supabase
+          .from('kb_docs')
+          .update({
+            ...document,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', documentId)
+          .eq('workspace_id', workspaceId);
+
+        if (error) throw error;
+
         toast({
           title: 'Success',
           description: 'Document updated successfully',
         });
       } else {
-        await kbService.createDocument(document);
+        // Create document directly in Supabase
+        const { error } = await supabase
+          .from('kb_docs')
+          .insert({
+            ...document,
+            workspace_id: workspaceId,
+            embedding_status: 'pending',
+          });
+
+        if (error) throw error;
+
         toast({
           title: 'Success',
           description: 'Document created successfully. Embedding generation in progress...',
@@ -175,29 +210,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       return;
     }
 
-    try {
-      setIsLoading(true);
-      const doc = await kbService.createFromPDF(
-        file,
-        workspaceId,
-        document.title || file.name.replace('.pdf', ''),
-        document.category_id
-      );
-      setDocument(doc);
-      toast({
-        title: 'Success',
-        description: 'PDF text extracted successfully',
-      });
-    } catch (error) {
-      console.error('Failed to upload PDF:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to extract text from PDF',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    // PDF upload feature requires MIVAA API backend
+    toast({
+      title: 'Feature Not Available',
+      description: 'PDF upload feature requires backend API configuration',
+      variant: 'destructive',
+    });
   };
 
   return (

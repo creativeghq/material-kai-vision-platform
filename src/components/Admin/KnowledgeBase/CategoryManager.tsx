@@ -21,7 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { KnowledgeBaseService, KBCategory } from '@/services/knowledgeBaseService';
+import { KBCategory } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 export const CategoryManager: React.FC = () => {
@@ -38,7 +38,6 @@ export const CategoryManager: React.FC = () => {
   const [workspaceId, setWorkspaceId] = useState<string>('');
 
   const { toast } = useToast();
-  const kbService = KnowledgeBaseService.getInstance();
 
   useEffect(() => {
     loadWorkspace();
@@ -115,10 +114,16 @@ export const CategoryManager: React.FC = () => {
     }
 
     try {
-      await kbService.createCategory({
-        ...editingCategory,
-        workspace_id: workspaceId,
-      });
+      // Save directly to Supabase instead of API Gateway
+      const { error } = await supabase
+        .from('kb_categories')
+        .insert({
+          ...editingCategory,
+          workspace_id: workspaceId,
+        });
+
+      if (error) throw error;
+
       toast({
         title: 'Success',
         description: 'Category created successfully',
@@ -204,9 +209,12 @@ export const CategoryManager: React.FC = () => {
 
       {/* Category Editor Dialog */}
       <Dialog open={showEditor} onOpenChange={setShowEditor}>
-        <DialogContent>
+        <DialogContent aria-describedby="category-editor-description">
           <DialogHeader>
             <DialogTitle>Create Category</DialogTitle>
+            <p id="category-editor-description" className="text-sm text-muted-foreground">
+              Create a new category to organize your knowledge base documents
+            </p>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
