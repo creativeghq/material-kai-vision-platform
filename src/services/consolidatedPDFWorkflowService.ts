@@ -47,6 +47,7 @@ export interface WorkflowJob {
   startTime?: Date;
   endTime?: Date;
   error?: string;
+  metadata?: Record<string, any>; // Backend metadata from MIVAA
   result?: {
     documentId?: string;
     productsCreated?: number;
@@ -193,7 +194,7 @@ class ConsolidatedPDFWorkflowService {
           return;
         }
 
-        const { status, progress, current_stage, result, error } =
+        const { status, progress, last_checkpoint, metadata, error } =
           statusResponse.data;
 
         // Update job progress
@@ -202,8 +203,17 @@ class ConsolidatedPDFWorkflowService {
 
         job.progress = progress || 0;
 
+        // Extract current stage from last_checkpoint
+        // Backend returns: last_checkpoint.stage (e.g., "pdf_extracted", "chunks_created")
+        const currentStage = last_checkpoint?.stage || metadata?.current_stage;
+
         // Update current step based on stage
-        this.updateStepFromMivaaStage(jobId, current_stage, progress);
+        this.updateStepFromMivaaStage(jobId, currentStage, progress);
+
+        // Store metadata for display
+        if (metadata) {
+          job.metadata = metadata;
+        }
 
         // Check if completed
         if (status === 'completed') {
@@ -215,7 +225,7 @@ class ConsolidatedPDFWorkflowService {
           job.endTime = new Date();
           job.result = {
             documentId,
-            ...result,
+            ...metadata,
           };
 
           this.updateStep(
@@ -250,32 +260,73 @@ class ConsolidatedPDFWorkflowService {
   }
 
   /**
-   * Update step based on MIVAA stage
+   * Update step based on MIVAA stage - COMPLETE MAPPING OF ALL 9 BACKEND STAGES
+   *
+   * Maps backend checkpoint stages to frontend workflow steps:
+   * - INITIALIZED → upload (0%)
+   * - PDF_EXTRACTED → extract (15%)
+   * - CHUNKS_CREATED → chunk (30%)
+   * - TEXT_EMBEDDINGS_GENERATED → chunk (50%)
+   * - IMAGES_EXTRACTED → images (60%)
+   * - IMAGE_EMBEDDINGS_GENERATED → images (70%)
+   * - PRODUCTS_DETECTED → detect (80%)
+   * - PRODUCTS_CREATED → products (90%)
+   * - COMPLETED → complete (100%)
    */
   private updateStepFromMivaaStage(
     jobId: string,
-    stage: string,
+    stage: string | undefined,
     progress: number,
   ): void {
     const job = this.jobs.get(jobId);
     if (!job) return;
 
+    // Complete mapping of all 9 backend checkpoint stages to 7 frontend steps
     const stageMap: Record<string, number> = {
-      uploading: 0,
-      extracting: 1,
-      chunking: 2,
-      analyzing: 3,
-      embedding: 4,
-      products: 5,
-      completed: 6,
+      // Upload phase
+      'initialized': 0,
+      'uploading': 0,
+
+      // Extract phase
+      'pdf_extracted': 1,
+      'extracting': 1,
+      'extraction': 1,
+
+      // Chunk phase (includes text embeddings)
+      'chunks_created': 2,
+      'chunking': 2,
+      'text_embeddings_generated': 2,
+      'embedding': 2,
+
+      // Image phase (includes visual embeddings)
+      'images_extracted': 3,
+      'image_embeddings_generated': 3,
+      'image_processing': 3,
+
+      // Product detection phase
+      'products_detected': 4,
+      'product_discovery': 4,
+
+      // Product creation phase
+      'products_created': 5,
+      'products': 5,
+      'product_creation': 5,
+
+      // Completion phase
+      'completed': 6,
+      'finalizing': 6,
     };
 
-    const stepIndex = stageMap[stage] || job.currentStepIndex;
+    // Normalize stage name (lowercase, handle underscores)
+    const normalizedStage = stage ? stage.toLowerCase().replace(/\s+/g, '_') : undefined;
+    const stepIndex = normalizedStage ? (stageMap[normalizedStage] ?? job.currentStepIndex) : job.currentStepIndex;
 
     if (stepIndex !== job.currentStepIndex) {
-      // Mark previous step as completed
+      // Mark previous steps as completed
       if (job.currentStepIndex < stepIndex) {
-        this.updateStep(jobId, job.currentStepIndex, 'completed');
+        for (let i = job.currentStepIndex; i < stepIndex; i++) {
+          this.updateStep(jobId, i, 'completed');
+        }
       }
 
       // Update current step
@@ -284,7 +335,7 @@ class ConsolidatedPDFWorkflowService {
         jobId,
         stepIndex,
         'running',
-        `Processing: ${stage}`,
+        `Processing: ${stage || 'unknown'}`,
         progress,
       );
     } else {
@@ -296,49 +347,67 @@ class ConsolidatedPDFWorkflowService {
   }
 
   /**
-   * Create initial workflow steps
+   * Create initial workflow steps - ALIGNED WITH 9 BACKEND CHECKPOINTS
+   *
+   * Backend stages:
+   * 1. INITIALIZED (0%) - Job created
+   * 2. PDF_EXTRACTED (15%) - PDF analysis complete
+   * 3. CHUNKS_CREATED (30%) - Text chunking complete
+   * 4. TEXT_EMBEDDINGS_GENERATED (50%) - Text embeddings complete
+   * 5. IMAGES_EXTRACTED (60%) - Image extraction complete
+   * 6. IMAGE_EMBEDDINGS_GENERATED (70%) - Visual embeddings complete
+   * 7. PRODUCTS_DETECTED (80%) - Products identified
+   * 8. PRODUCTS_CREATED (90%) - Product creation complete
+   * 9. COMPLETED (100%) - All processing complete
    */
   private createInitialSteps(): WorkflowStep[] {
     return [
       {
         id: 'upload',
         name: 'Upload PDF',
+        description: 'Uploading and initializing PDF processing',
         status: 'pending',
         progress: 0,
       },
       {
         id: 'extract',
         name: 'Extract Content',
+        description: 'Extracting text and analyzing PDF structure',
         status: 'pending',
         progress: 0,
       },
       {
         id: 'chunk',
         name: 'Create Chunks',
+        description: 'Creating semantic chunks and generating text embeddings',
         status: 'pending',
         progress: 0,
       },
       {
-        id: 'analyze',
-        name: 'Analyze Content',
+        id: 'images',
+        name: 'Process Images',
+        description: 'Extracting images and generating visual embeddings',
         status: 'pending',
         progress: 0,
       },
       {
-        id: 'embed',
-        name: 'Generate Embeddings',
+        id: 'detect',
+        name: 'Detect Products',
+        description: 'Identifying and detecting products in content',
         status: 'pending',
         progress: 0,
       },
       {
         id: 'products',
         name: 'Create Products',
+        description: 'Creating product records and linking entities',
         status: 'pending',
         progress: 0,
       },
       {
         id: 'complete',
         name: 'Finalize',
+        description: 'Finalizing processing and quality checks',
         status: 'pending',
         progress: 0,
       },

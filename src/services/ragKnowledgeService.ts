@@ -298,6 +298,10 @@ class RAGKnowledgeService {
 
   /**
    * Add entry to knowledge base
+   *
+   * NOTE: This feature has been deprecated. The knowledge_base_entries table was removed.
+   * Knowledge should be stored as document_chunks with proper categorization instead.
+   * This method is kept for backward compatibility but throws an error.
    */
   async addKnowledgeEntry(entry: {
     title: string;
@@ -307,13 +311,10 @@ class RAGKnowledgeService {
     material_ids?: string[];
     source_url?: string;
   }): Promise<void> {
-    const { error } = await supabase
-      .from('knowledge_base_entries')
-      .insert(entry);
-
-    if (error) {
-      throw new Error(`Failed to add knowledge entry: ${error.message}`);
-    }
+    throw new Error(
+      'Knowledge entry feature has been deprecated. The knowledge_base_entries table was removed. ' +
+      'Please use document_chunks with proper categorization instead.'
+    );
   }
 
   /**

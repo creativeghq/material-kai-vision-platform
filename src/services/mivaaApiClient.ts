@@ -555,10 +555,17 @@ export class MivaaApiClient {
   }
 
   /**
-   * Get job status
+   * Get job status - ALIGNED WITH BACKEND ENDPOINT
+   *
+   * Backend endpoint: GET /api/rag/documents/job/{job_id}
+   * Returns: {
+   *   job_id, status, document_id, progress (0-100),
+   *   error, metadata, created_at, updated_at,
+   *   last_checkpoint: { stage, created_at, data }
+   * }
    */
   async getJobStatus(jobId: string): Promise<MivaaApiResponse> {
-    return this.request(`/api/jobs/${jobId}/status`, {
+    return this.request(`/api/rag/documents/job/${jobId}`, {
       method: 'GET',
     });
   }
@@ -567,7 +574,7 @@ export class MivaaApiClient {
    * Get job result
    */
   async getJobResult(jobId: string): Promise<MivaaApiResponse> {
-    return this.request(`/api/jobs/${jobId}/result`, {
+    return this.request(`/api/rag/documents/job/${jobId}/result`, {
       method: 'GET',
     });
   }

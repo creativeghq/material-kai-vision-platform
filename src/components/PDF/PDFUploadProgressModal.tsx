@@ -420,90 +420,21 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             {/* Key Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(() => {
-                // Extract completion data from job steps
-                const mivaaStep = job.steps.find(
-                  (s) => s.id === 'mivaa-processing',
-                );
-                const knowledgeStep = job.steps.find(
-                  (s) => s.id === 'knowledge-storage',
-                );
-                const embeddingStep = job.steps.find(
-                  (s) => s.id === 'embedding-generation',
-                );
+                // Extract completion data from backend metadata
+                const metadata = job.metadata as any || {};
 
-                // Parse details to extract counts
-                let chunksCreated = 0;
-                let imagesExtracted = 0;
-                let embeddingsGenerated = 0;
-                let kbEntriesStored = 0;
-                let pagesProcessed = 0;
-                let categoriesAdded = 0;
+                // Get metrics from backend metadata (source of truth)
+                const chunksCreated = metadata.chunks_created || 0;
+                const imagesExtracted = metadata.images_extracted || 0;
+                const productsCreated = metadata.products_created || 0;
+                const embeddingsGenerated = metadata.embeddings_generated?.total || 0;
 
-                if (mivaaStep?.details) {
-                  mivaaStep.details.forEach((detail: unknown) => {
-                    const detailStr =
-                      typeof detail === 'string'
-                        ? detail
-                        : (detail as any)?.message || '';
-                    const chunkMatch = detailStr.match(
-                      /Generated (\d+) text chunks|Chunks Generated: (\d+)/,
-                    );
-                    const imageMatch = detailStr.match(
-                      /Extracted (\d+) images|Images Extracted: (\d+)/,
-                    );
-                    const pageMatch = detailStr.match(
-                      /Pages: (\d+)\/(\d+)|Processed (\d+) pages?/,
-                    );
-                    if (chunkMatch)
-                      chunksCreated = parseInt(chunkMatch[1] || chunkMatch[2]);
-                    if (imageMatch)
-                      imagesExtracted = parseInt(
-                        imageMatch[1] || imageMatch[2],
-                      );
-                    if (pageMatch)
-                      pagesProcessed = parseInt(pageMatch[1] || pageMatch[3]);
-                  });
-                }
-
-                if (knowledgeStep?.details) {
-                  knowledgeStep.details.forEach((detail: unknown) => {
-                    const detailStr =
-                      typeof detail === 'string'
-                        ? detail
-                        : (detail as any)?.message || '';
-                    const kbMatch = detailStr.match(/Stored (\d+) chunks/);
-                    const catMatch = detailStr.match(
-                      /Added to (\d+) categories?/,
-                    );
-                    if (kbMatch) kbEntriesStored = parseInt(kbMatch[1]);
-                    if (catMatch) categoriesAdded = parseInt(catMatch[1]);
-                  });
-                }
-
-                if (embeddingStep?.details) {
-                  embeddingStep.details.forEach((detail: unknown) => {
-                    const detailStr =
-                      typeof detail === 'string'
-                        ? detail
-                        : (detail as any)?.message || '';
-                    const embeddingMatch = detailStr.match(
-                      /Generated (\d+) embeddings/,
-                    );
-                    if (embeddingMatch)
-                      embeddingsGenerated = parseInt(embeddingMatch[1]);
-                  });
-                }
+                // Get AI usage stats
+                const aiUsage = metadata.ai_usage || {};
+                const totalAICost = metadata.ai_tracking?.total_cost || 0;
 
                 return (
                   <>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
-                        {pagesProcessed}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Pages Processed
-                      </div>
-                    </div>
                     <div className="text-center p-3 bg-card rounded-lg border">
                       <div className="text-2xl font-bold text-primary">
                         {chunksCreated}
@@ -522,26 +453,18 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                     </div>
                     <div className="text-center p-3 bg-card rounded-lg border">
                       <div className="text-2xl font-bold text-primary">
-                        {embeddingsGenerated || chunksCreated}
+                        {productsCreated}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Products Created
+                      </div>
+                    </div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">
+                        {embeddingsGenerated}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         Embeddings Generated
-                      </div>
-                    </div>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
-                        {kbEntriesStored || chunksCreated}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        KB Entries Stored
-                      </div>
-                    </div>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
-                        {categoriesAdded}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Categories Added
                       </div>
                     </div>
                   </>
@@ -624,122 +547,57 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
               </div>
             </div>
 
-            {/* Metafields Information */}
+            {/* Metadata Information from Backend */}
             <div className="space-y-3 mt-4">
-              <h4 className="font-semibold text-sm">Metadata & Fields:</h4>
+              <h4 className="font-semibold text-sm">Processing Metadata:</h4>
               <div className="text-xs space-y-2 p-2 bg-card rounded border">
                 {(() => {
-                  const knowledgeStep = job.steps.find(
-                    (s) => s.id === 'knowledge-storage',
-                  );
-                  const metafields: { name: string; status: string }[] = [];
+                  const metadata = job.metadata as any || {};
+                  const metafields: { name: string; value: string }[] = [];
 
-                  // Extract metafields from knowledge storage step
-                  if (knowledgeStep?.details) {
-                    knowledgeStep.details.forEach((detail: unknown) => {
-                      const detailStr =
-                        typeof detail === 'string'
-                          ? detail
-                          : (detail as any)?.message || '';
-
-                      // Check for various metadata fields
-                      if (detailStr.includes('Document stored'))
-                        metafields.push({
-                          name: 'Document Storage',
-                          status: '✓ Added',
-                        });
-                      if (detailStr.includes('MIVAA processing results'))
-                        metafields.push({
-                          name: 'MIVAA Metadata',
-                          status: '✓ Integrated',
-                        });
-                      if (detailStr.includes('text chunks'))
-                        metafields.push({
-                          name: 'Chunk Metadata',
-                          status: '✓ Added',
-                        });
-                      if (detailStr.includes('images'))
-                        metafields.push({
-                          name: 'Image Metadata',
-                          status: '✓ Added',
-                        });
-                      if (detailStr.includes('embeddings'))
-                        metafields.push({
-                          name: 'Embedding Metadata',
-                          status: '✓ Added',
-                        });
-                      if (detailStr.includes('categories'))
-                        metafields.push({
-                          name: 'Category Metadata',
-                          status: '✓ Added',
-                        });
-                      if (detailStr.includes('Metadata and relationships'))
-                        metafields.push({
-                          name: 'Relationships',
-                          status: '✓ Preserved',
-                        });
-                      if (detailStr.includes('Search indexing'))
-                        metafields.push({
-                          name: 'Search Index',
-                          status: '✓ Completed',
-                        });
+                  // Extract metadata from backend response
+                  if (metadata.document_id)
+                    metafields.push({
+                      name: 'Document ID',
+                      value: metadata.document_id.substring(0, 8) + '...',
                     });
-                  }
-
-                  // Also check upload and validation steps for additional metadata
-                  const uploadStep = job.steps.find((s) => s.id === 'upload');
-                  if (uploadStep?.details) {
-                    uploadStep.details.forEach((detail: unknown) => {
-                      const detailStr =
-                        typeof detail === 'string'
-                          ? detail
-                          : (detail as any)?.message || '';
-                      if (detailStr.includes('File uploaded'))
-                        metafields.push({
-                          name: 'File Upload',
-                          status: '✓ Completed',
-                        });
+                  if (metadata.filename)
+                    metafields.push({
+                      name: 'Filename',
+                      value: metadata.filename,
                     });
-                  }
-
-                  const validationStep = job.steps.find(
-                    (s) => s.id === 'validation',
-                  );
-                  if (validationStep?.details) {
-                    validationStep.details.forEach((detail: unknown) => {
-                      const detailStr =
-                        typeof detail === 'string'
-                          ? detail
-                          : (detail as any)?.message || '';
-                      if (detailStr.includes('PDF structure'))
-                        metafields.push({
-                          name: 'PDF Structure',
-                          status: '✓ Validated',
-                        });
-                      if (detailStr.includes('Content accessibility'))
-                        metafields.push({
-                          name: 'Content Access',
-                          status: '✓ Confirmed',
-                        });
+                  if (metadata.chunks_created)
+                    metafields.push({
+                      name: 'Chunks Created',
+                      value: metadata.chunks_created.toString(),
                     });
-                  }
+                  if (metadata.images_extracted)
+                    metafields.push({
+                      name: 'Images Extracted',
+                      value: metadata.images_extracted.toString(),
+                    });
+                  if (metadata.products_created)
+                    metafields.push({
+                      name: 'Products Created',
+                      value: metadata.products_created.toString(),
+                    });
+                  if (metadata.ai_tracking?.total_cost)
+                    metafields.push({
+                      name: 'Total AI Cost',
+                      value: `$${metadata.ai_tracking.total_cost.toFixed(4)}`,
+                    });
 
-                  // Remove duplicates
-                  const uniqueMetafields = Array.from(
-                    new Map(metafields.map((m) => [m.name, m])).values(),
-                  );
-
-                  if (uniqueMetafields.length === 0) {
+                  if (metafields.length === 0) {
                     return (
                       <div className="text-muted-foreground">
-                        No metadata fields tracked
+                        No metadata available yet
                       </div>
                     );
                   }
 
                   return (
                     <div className="space-y-1">
-                      {uniqueMetafields.map((field, idx) => (
+                      {metafields.map((field, idx) => (
                         <div
                           key={idx}
                           className="flex justify-between items-center"
@@ -747,8 +605,8 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                           <span className="text-muted-foreground">
                             {field.name}:
                           </span>
-                          <span className="text-green-600 font-medium">
-                            {field.status}
+                          <span className="font-medium text-foreground">
+                            {field.value}
                           </span>
                         </div>
                       ))}
