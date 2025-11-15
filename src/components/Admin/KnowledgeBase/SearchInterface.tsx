@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { KnowledgeBaseService, KBDocument } from '@/services/knowledgeBaseService';
+import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 export const SearchInterface: React.FC = () => {
@@ -25,7 +25,6 @@ export const SearchInterface: React.FC = () => {
   const [workspaceId, setWorkspaceId] = useState<string>('');
 
   const { toast } = useToast();
-  const kbService = KnowledgeBaseService.getInstance();
 
   React.useEffect(() => {
     loadWorkspace();
@@ -55,17 +54,23 @@ export const SearchInterface: React.FC = () => {
 
     try {
       setIsSearching(true);
-      const result = await kbService.search({
-        workspace_id: workspaceId,
-        query: query.trim(),
-        search_type: searchType,
-        limit: 20,
-      });
+      const startTime = Date.now();
 
-      setResults(result.results || []);
-      setSearchTime(result.search_time_ms || 0);
+      // Simple text search in Supabase (semantic search requires MIVAA API backend)
+      const { data, error } = await supabase
+        .from('kb_docs')
+        .select('*')
+        .eq('workspace_id', workspaceId)
+        .or(`title.ilike.%${query.trim()}%,content.ilike.%${query.trim()}%`)
+        .limit(20);
 
-      if (result.results.length === 0) {
+      if (error) throw error;
+
+      const endTime = Date.now();
+      setResults(data || []);
+      setSearchTime(endTime - startTime);
+
+      if (!data || data.length === 0) {
         toast({
           title: 'No Results',
           description: 'No documents found matching your query',

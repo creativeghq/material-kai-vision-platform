@@ -49,7 +49,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
       // Load chunks related to this product
       const { data: chunkRelations } = await supabase
-        .from('product_chunk_relationships')
+        .from('chunk_product_relationships')
         .select('chunk_id')
         .eq('product_id', product.id);
 
