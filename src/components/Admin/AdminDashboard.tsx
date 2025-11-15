@@ -394,11 +394,20 @@ const AdminDashboard: React.FC = () => {
       {
         title: 'Knowledge Base & Documentation',
         description:
-          'Manage documentation with AI embeddings, semantic search, and product attachments',
+          'User-created guides, manuals, and documentation with AI embeddings',
         icon: DatabaseIcon,
         path: '/admin/knowledge-base',
         status: 'active',
-        count: 'NEW v2.3.0',
+        count: 'User Docs',
+      },
+      {
+        title: 'PDF Documents & Extraction',
+        description:
+          'View all processed material catalog PDFs with products, chunks, images, and embeddings',
+        icon: DatabaseIcon,
+        path: '/admin/pdf-documents',
+        status: 'active',
+        count: 'Material Catalogs',
       },
       {
         title: 'PDF Processing',
@@ -407,16 +416,16 @@ const AdminDashboard: React.FC = () => {
         icon: FileText,
         path: '/admin/pdf-processing',
         status: 'active',
-        count: 'Upload system',
+        count: 'Upload',
       },
       {
         title: 'PDF Knowledge & RAG',
         description:
-          'View all uploaded PDFs with products, chunks, images, embeddings, and relevancy data',
+          'RAG search interface and training status for AI system',
         icon: DatabaseIcon,
         path: '/admin/rag',
         status: 'active',
-        count: 'Training PDFs',
+        count: 'RAG System',
       },
     ],
     'AI & Intelligence': [

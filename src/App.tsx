@@ -18,6 +18,7 @@ import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
+import { PDFDocumentsManagement } from './components/Admin/PDFDocuments';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
@@ -177,6 +178,26 @@ const App = () => (
                   <AuthGuard>
                     <AdminGuard>
                       <KnowledgeBaseManagement />
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/pdf-documents"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <PDFDocumentsManagement />
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/pdf-documents/:documentId"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <PDFDocumentDetails />
                     </AdminGuard>
                   </AuthGuard>
                 }
