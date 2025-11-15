@@ -3,22 +3,33 @@ import { Home, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface GlobalAdminHeaderProps {
   title: string;
   description?: string;
   breadcrumbs?: { label: string; path?: string }[];
+  badge?: string;
 }
 
 export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   title,
   description,
   breadcrumbs = [],
+  badge,
 }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="border-b bg-card px-6 py-4">
+    <div
+      className="px-6 py-4 m-4 rounded-3xl"
+      style={{
+        background: 'var(--glass-bg)',
+        backdropFilter: 'var(--glass-blur)',
+        border: '1px solid var(--glass-border)',
+        boxShadow: 'var(--glass-shadow)',
+      }}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           {/* Navigation Buttons */}
@@ -26,49 +37,24 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
             <Button
               onClick={() => navigate('/')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-              className="flex items-center gap-2 bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 h-9 px-3 text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
+              variant="ghost"
             >
               <Home className="h-4 w-4" />
-              Main App
+              Back to Main
             </Button>
             <Button
               onClick={() => navigate('/admin')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-              className="flex items-center gap-2 bg-white text-gray-900 border border-gray-300 hover:bg-gray-50 h-9 px-3 text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
+              variant="ghost"
             >
               <ArrowLeft className="h-4 w-4" />
               Admin Dashboard
             </Button>
           </div>
 
-          {/* Breadcrumbs */}
-          {breadcrumbs.length > 0 && (
-            <>
-              <div className="h-6 w-px bg-border" />
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                {breadcrumbs.map((crumb, index) => (
-                  <React.Fragment key={index}>
-                    {crumb.path ? (
-                      <button
-                        onClick={() => navigate(crumb.path)}
-                        onKeyDown={(e) =>
-                          e.key === 'Enter' && navigate(crumb.path)
-                        }
-                        className="hover:text-foreground transition-colors"
-                      >
-                        {crumb.label}
-                      </button>
-                    ) : (
-                      <span>{crumb.label}</span>
-                    )}
-                    {index < breadcrumbs.length - 1 && <span>/</span>}
-                  </React.Fragment>
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="h-6 w-px bg-border" />
+          <div className="h-6 w-px bg-white/20" />
 
           {/* Title and Description */}
           <div>
@@ -78,6 +64,13 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
             )}
           </div>
         </div>
+
+        {/* Badge */}
+        {badge && (
+          <Badge className="text-sm px-2 py-1" style={{ background: 'var(--mocha-color)' }}>
+            {badge}
+          </Badge>
+        )}
       </div>
     </div>
   );

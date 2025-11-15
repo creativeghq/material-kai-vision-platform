@@ -409,6 +409,15 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Upload system',
       },
+      {
+        title: 'PDF Knowledge & RAG',
+        description:
+          'View all uploaded PDFs with products, chunks, images, embeddings, and relevancy data',
+        icon: DatabaseIcon,
+        path: '/admin/rag',
+        status: 'active',
+        count: 'Training PDFs',
+      },
     ],
     'AI & Intelligence': [
       {
@@ -419,14 +428,6 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/search-hub',
         status: 'active',
         count: 'Enhanced search',
-      },
-      {
-        title: 'Agent Configs',
-        description: 'Manage AI agents, prompts, rules, and role-based access control',
-        icon: Brain,
-        path: '/admin/agent-configs',
-        status: 'active',
-        count: 'Agent Management',
       },
       {
         title: 'AI Settings Control',
