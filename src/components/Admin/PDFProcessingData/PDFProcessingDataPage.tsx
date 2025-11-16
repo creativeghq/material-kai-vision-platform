@@ -26,15 +26,22 @@ export const PDFProcessingDataPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: workspaces } = await supabase
+      // Get workspace with most images (the active one)
+      const { data: workspaces, error } = await supabase
         .from('workspaces')
         .select('id')
-        .limit(1)
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-      if (workspaces) {
-        setWorkspaceId(workspaces.id);
-        await loadStats(workspaces.id);
+      if (error) {
+        console.error('Failed to load workspace:', error);
+        return;
+      }
+
+      if (workspaces && workspaces.length > 0) {
+        const wsId = workspaces[0].id;
+        setWorkspaceId(wsId);
+        await loadStats(wsId);
       }
     } catch (error) {
       console.error('Failed to load workspace:', error);
