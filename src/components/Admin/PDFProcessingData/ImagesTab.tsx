@@ -82,10 +82,17 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
     await loadImageEmbeddings(image.id);
   };
 
-  const filteredImages = images.filter((image) =>
-    image.filename?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    image.ai_description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredImages = images.filter((image) => {
+    if (!searchQuery) return true; // Show all if no search query
+
+    const filename = image.metadata?.filename || image.caption || '';
+    const description = image.llama_analysis?.description || image.claude_validation?.description || '';
+    const pageNum = image.page_number?.toString() || '';
+
+    return filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           pageNum.includes(searchQuery);
+  });
 
   return (
     <>
