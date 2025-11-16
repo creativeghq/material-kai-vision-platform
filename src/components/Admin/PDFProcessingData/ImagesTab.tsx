@@ -120,14 +120,19 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
                   <CardContent className="p-0">
                     <img
                       src={image.image_url}
-                      alt={image.filename}
+                      alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                       className="w-full h-48 object-cover"
                     />
                     <div className="p-4 space-y-2">
-                      <p className="text-sm font-medium truncate">{image.filename}</p>
-                      {image.ai_description && (
+                      <p className="text-sm font-medium truncate">
+                        {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Page {image.page_number}
+                      </p>
+                      {image.llama_analysis?.description && (
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          {image.ai_description}
+                          {image.llama_analysis.description}
                         </p>
                       )}
                       <Button
@@ -152,19 +157,33 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
         <Dialog open={true} onOpenChange={() => setSelectedImage(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>{selectedImage.filename}</DialogTitle>
+              <DialogTitle>
+                {selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <img
                 src={selectedImage.image_url}
-                alt={selectedImage.filename}
+                alt={selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
                 className="w-full rounded-lg"
               />
-              
-              {selectedImage.ai_description && (
+
+              <div>
+                <h4 className="font-semibold mb-2">Page Number</h4>
+                <p className="text-sm">{selectedImage.page_number}</p>
+              </div>
+
+              {selectedImage.llama_analysis?.description && (
                 <div>
-                  <h4 className="font-semibold mb-2">AI Description</h4>
-                  <p className="text-sm">{selectedImage.ai_description}</p>
+                  <h4 className="font-semibold mb-2">AI Description (Llama)</h4>
+                  <p className="text-sm">{selectedImage.llama_analysis.description}</p>
+                </div>
+              )}
+
+              {selectedImage.claude_validation?.description && (
+                <div>
+                  <h4 className="font-semibold mb-2">AI Validation (Claude)</h4>
+                  <p className="text-sm">{selectedImage.claude_validation.description}</p>
                 </div>
               )}
 

@@ -153,13 +153,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <CardContent className="p-4">
                         <img
                           src={image.image_url}
-                          alt={image.filename}
+                          alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                           className="w-full h-48 object-cover rounded-lg mb-2"
                         />
-                        <p className="text-sm font-medium truncate">{image.filename}</p>
-                        {image.ai_description && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {image.ai_description}
+                        <p className="text-sm font-medium truncate">
+                          {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Page {image.page_number}
+                        </p>
+                        {image.llama_analysis?.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {image.llama_analysis.description}
                           </p>
                         )}
                       </CardContent>
