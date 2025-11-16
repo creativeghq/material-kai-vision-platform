@@ -15,6 +15,10 @@ import {
   Building,
   MapPin,
   User,
+  Palette,
+  Layers,
+  Wand2,
+  Box,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +34,13 @@ import {
   MaterialFiltersPanel,
   type MaterialFilters,
 } from '@/components/Search/MaterialFiltersPanel';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // Search result type based on UnifiedSearchService response
 type SearchResult = {
@@ -84,7 +95,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [filteredResults, setFilteredResults] = useState<SearchResult[]>([]);
-  // const [_searchType, _setSearchType] = useState<'text' | 'image' | 'hybrid'>('text');
+  // ✅ NEW: Add specialized search type state
+  const [searchType, setSearchType] = useState<'text' | 'image' | 'hybrid' | 'color' | 'texture' | 'style' | 'material'>('text');
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [showEntityFilters, setShowEntityFilters] = useState(false);
@@ -287,17 +299,26 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   }, [results, applyEntityFilters]);
 
   const performSearch = useCallback(async () => {
-    if (!query.trim() && !selectedImage) {
+    // ✅ UPDATED: Validate input based on search type
+    if (searchType === 'text' && !query.trim()) {
       toast({
         title: 'Search Input Required',
-        description: 'Please enter a search query or upload an image',
+        description: 'Please enter a search query',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (['image', 'color', 'texture', 'style', 'material'].includes(searchType) && !selectedImage) {
+      toast({
+        title: 'Image Required',
+        description: `Please upload an image for ${searchType} search`,
         variant: 'destructive',
       });
       return;
     }
 
     setIsSearching(true);
-    const actualSearchType = detectQueryType(query);
 
     try {
       // Get workspace_id from user's session
@@ -319,7 +340,8 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       let searchResponse;
 
-      if (actualSearchType === 'text') {
+      // ✅ UPDATED: Handle all search types including specialized embeddings
+      if (searchType === 'text') {
         // Text search using semantic strategy
         searchResponse = await UnifiedSearchService.search({
           query: query.trim(),
@@ -327,14 +349,45 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
           strategy: 'semantic',
           top_k: 15,
         });
-      } else if (actualSearchType === 'image') {
+      } else if (searchType === 'image') {
         // Image-based search using visual strategy
         searchResponse = await UnifiedSearchService.search({
           query: selectedImage?.name || 'uploaded_image',
           workspace_id: workspaceData.workspace_id,
           strategy: 'visual',
           top_k: 12,
-          // TODO: Add image_url or image_base64 when image upload is implemented
+        });
+      } else if (searchType === 'color') {
+        // ✅ NEW: Color palette search
+        searchResponse = await UnifiedSearchService.search({
+          query: selectedImage?.name || 'color_search',
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'color',
+          top_k: 12,
+        });
+      } else if (searchType === 'texture') {
+        // ✅ NEW: Texture pattern search
+        searchResponse = await UnifiedSearchService.search({
+          query: selectedImage?.name || 'texture_search',
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'texture',
+          top_k: 12,
+        });
+      } else if (searchType === 'style') {
+        // ✅ NEW: Design style search
+        searchResponse = await UnifiedSearchService.search({
+          query: selectedImage?.name || 'style_search',
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'style',
+          top_k: 12,
+        });
+      } else if (searchType === 'material') {
+        // ✅ NEW: Material type search
+        searchResponse = await UnifiedSearchService.search({
+          query: selectedImage?.name || 'material_search',
+          workspace_id: workspaceData.workspace_id,
+          strategy: 'material_type',
+          top_k: 12,
         });
       } else {
         // Hybrid search (text + semantic)
@@ -525,12 +578,75 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             </Button>
           </div>
 
+          {/* ✅ NEW: Search Type Selector */}
+          <div className="flex items-center gap-4">
+            <Label className="text-sm font-medium">Search Type:</Label>
+            <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">
+                  <div className="flex items-center gap-2">
+                    <Type className="h-4 w-4" />
+                    Text Search
+                  </div>
+                </SelectItem>
+                <SelectItem value="image">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Image Search
+                  </div>
+                </SelectItem>
+                <SelectItem value="hybrid">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Multi-Search
+                  </div>
+                </SelectItem>
+                <SelectItem value="color">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4" />
+                    Color Palette
+                  </div>
+                </SelectItem>
+                <SelectItem value="texture">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4" />
+                    Texture Pattern
+                  </div>
+                </SelectItem>
+                <SelectItem value="style">
+                  <div className="flex items-center gap-2">
+                    <Wand2 className="h-4 w-4" />
+                    Design Style
+                  </div>
+                </SelectItem>
+                <SelectItem value="material">
+                  <div className="flex items-center gap-2">
+                    <Box className="h-4 w-4" />
+                    Material Type
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">
+              {searchType === 'text' && 'Natural language processing for material specifications'}
+              {searchType === 'image' && 'AI will analyze the image to identify materials'}
+              {searchType === 'hybrid' && 'Using both text and image for enhanced matching'}
+              {searchType === 'color' && 'Find materials with similar color palettes'}
+              {searchType === 'texture' && 'Find materials with similar texture patterns'}
+              {searchType === 'style' && 'Find materials with similar design styles'}
+              {searchType === 'material' && 'Find materials of similar types'}
+            </span>
+          </div>
+
           {/* Image Upload Section */}
           <div className="border border-dashed border-muted-foreground/25 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
               <Label className="flex items-center gap-2">
                 <ImageIcon className="h-4 w-4" />
-                Material Image (Optional)
+                Material Image {['color', 'texture', 'style', 'material', 'image'].includes(searchType) ? '(Required)' : '(Optional)'}
               </Label>
               {selectedImage && (
                 <Button
@@ -583,31 +699,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
             />
           </div>
 
-          {/* Search Type Indicator */}
-          <div className="flex items-center gap-2">
-            <Badge className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-1">
-              {detectQueryType(query) === 'text' && (
-                <Type className="h-3 w-3" />
-              )}
-              {detectQueryType(query) === 'image' && (
-                <ImageIcon className="h-3 w-3" />
-              )}
-              {detectQueryType(query) === 'hybrid' && (
-                <Sparkles className="h-3 w-3" />
-              )}
-              {detectQueryType(query).charAt(0).toUpperCase() +
-                detectQueryType(query).slice(1)}{' '}
-              Search
-            </Badge>
-            <span className="text-xs text-muted-foreground">
-              {detectQueryType(query) === 'hybrid' &&
-                'Using both text and image for enhanced matching'}
-              {detectQueryType(query) === 'image' &&
-                'AI will analyze the image to identify materials'}
-              {detectQueryType(query) === 'text' &&
-                'Natural language processing for material specifications'}
-            </span>
-          </div>
+
         </CardContent>
       </Card>
 
