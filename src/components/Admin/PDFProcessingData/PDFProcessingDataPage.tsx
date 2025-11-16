@@ -53,38 +53,61 @@ export const PDFProcessingDataPage: React.FC = () => {
 
   const loadStats = async (wsId: string) => {
     try {
-      const [
-        { count: productsCount },
-        { count: chunksCount },
-        { count: imagesCount },
-        { count: embeddingsCount },
-      ] = await Promise.all([
-        supabase
-          .from('products')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', wsId),
-        supabase
-          .from('document_chunks')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', wsId),
-        supabase
-          .from('document_images')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', wsId),
-        supabase
-          .from('embeddings')
-          .select('*', { count: 'exact', head: true })
-          .eq('workspace_id', wsId),
-      ]);
+      // ✅ NEW: Use MIVAA API endpoint that counts VECS embeddings
+      const response = await fetch(
+        `${import.meta.env.VITE_MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch workspace stats');
+      }
+
+      const result = await response.json();
+      const statsData = result.statistics;
 
       setStats({
-        products: productsCount || 0,
-        chunks: chunksCount || 0,
-        images: imagesCount || 0,
-        embeddings: embeddingsCount || 0,
+        products: statsData.products || 0,
+        chunks: statsData.chunks || 0,
+        images: statsData.images || 0,
+        embeddings: statsData.embeddings?.total || 0, // ✅ NEW: Total includes text + image embeddings from VECS
       });
     } catch (error) {
       console.error('Failed to load stats:', error);
+      // Fallback to direct Supabase queries if API fails
+      try {
+        const [
+          { count: productsCount },
+          { count: chunksCount },
+          { count: imagesCount },
+          { count: embeddingsCount },
+        ] = await Promise.all([
+          supabase
+            .from('products')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', wsId),
+          supabase
+            .from('document_chunks')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', wsId),
+          supabase
+            .from('document_images')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', wsId),
+          supabase
+            .from('embeddings')
+            .select('*', { count: 'exact', head: true })
+            .eq('workspace_id', wsId),
+        ]);
+
+        setStats({
+          products: productsCount || 0,
+          chunks: chunksCount || 0,
+          images: imagesCount || 0,
+          embeddings: embeddingsCount || 0,
+        });
+      } catch (fallbackError) {
+        console.error('Fallback stats loading also failed:', fallbackError);
+      }
     }
   };
 
