@@ -15,15 +15,21 @@ import { ErrorHandler } from '../utils/errorHandler';
 /**
  * Search strategies available in Python backend
  * From: mivaa-pdf-extractor/app/services/unified_search_service.py
+ *
+ * RECOMMENDED: Use 'multi_vector' for best accuracy and performance
  */
 export type SearchStrategy =
-  | 'semantic'      // Semantic search using text embeddings
-  | 'visual'        // Visual search using CLIP embeddings
-  | 'multi_vector'  // Multi-vector search combining all embedding types
+  | 'semantic'      // Semantic search using text embeddings only
+  | 'visual'        // Visual search using CLIP embeddings only
+  | 'multi_vector'  // ⭐ RECOMMENDED: Combines 6 embedding types with intelligent weighting (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%)
   | 'hybrid'        // Hybrid search combining semantic and keyword
   | 'material'      // Material property-based search
   | 'keyword'       // Keyword/exact match search
-  | 'all';          // ALL strategies in parallel (3-4x faster!)
+  | 'color'         // Color palette matching using specialized CLIP embeddings
+  | 'texture'       // Texture pattern matching using specialized CLIP embeddings
+  | 'style'         // Design style matching using specialized CLIP embeddings
+  | 'material_type' // Material type matching using specialized CLIP embeddings
+  | 'all';          // ALL 10 strategies in parallel (slower, higher cost - use only when comprehensive search needed)
 
 /**
  * Unified search request matching Python backend SearchRequest schema
