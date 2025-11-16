@@ -34,25 +34,42 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, onStatsUp
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     if (workspaceId) {
-      loadProducts();
+      setCurrentPage(1);
+      loadProducts(1);
     }
   }, [workspaceId]);
 
-  const loadProducts = async () => {
+  useEffect(() => {
+    if (workspaceId) {
+      loadProducts(currentPage);
+    }
+  }, [currentPage]);
+
+  const loadProducts = async (page: number) => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
+
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      const { data, error, count } = await supabase
         .from('products')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
       setProducts(data || []);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Failed to load products:', error);
       toast({
@@ -170,6 +187,40 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, onStatsUp
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {totalCount > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+
+              {Array.from({ length: Math.ceil(totalCount / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / ITEMS_PER_PAGE), p + 1))}
+                disabled={currentPage === Math.ceil(totalCount / ITEMS_PER_PAGE)}
+              >
+                Next
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

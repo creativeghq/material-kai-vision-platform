@@ -37,32 +37,48 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
   const [isLoading, setIsLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [selectedEmbedding, setSelectedEmbedding] = useState<any | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     if (workspaceId) {
-      loadEmbeddings();
+      setCurrentPage(1);
+      loadEmbeddings(1);
     }
   }, [workspaceId, typeFilter]);
 
-  const loadEmbeddings = async () => {
+  useEffect(() => {
+    if (workspaceId) {
+      loadEmbeddings(currentPage);
+    }
+  }, [currentPage]);
+
+  const loadEmbeddings = async (page: number) => {
     try {
       setIsLoading(true);
+
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
       let query = supabase
         .from('embeddings')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
-        .limit(100);
+        .range(from, to);
 
       if (typeFilter !== 'all') {
         query = query.eq('embedding_type', typeFilter);
       }
 
-      const { data, error } = await query;
+      const { data, error, count } = await query;
 
       if (error) throw error;
       setEmbeddings(data || []);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Failed to load embeddings:', error);
       toast({
@@ -144,6 +160,40 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination */}
+          {totalCount > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+
+              {Array.from({ length: Math.ceil(totalCount / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / ITEMS_PER_PAGE), p + 1))}
+                disabled={currentPage === Math.ceil(totalCount / ITEMS_PER_PAGE)}
+              >
+                Next
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

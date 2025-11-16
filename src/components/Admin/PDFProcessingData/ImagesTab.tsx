@@ -24,33 +24,48 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedImage, setSelectedImage] = useState<any | null>(null);
   const [imageEmbeddings, setImageEmbeddings] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  const ITEMS_PER_PAGE = 20;
 
   useEffect(() => {
     if (workspaceId) {
-      loadImages();
+      setCurrentPage(1);
+      loadImages(1);
     }
   }, [workspaceId]);
 
-  const loadImages = async () => {
+  useEffect(() => {
+    if (workspaceId) {
+      loadImages(currentPage);
+    }
+  }, [currentPage]);
+
+  const loadImages = async (page: number) => {
     try {
       setIsLoading(true);
-      console.log('[ImagesTab] Loading images for workspace:', workspaceId);
+      console.log('[ImagesTab] Loading images for workspace:', workspaceId, 'page:', page);
 
-      const { data, error } = await supabase
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      const { data, error, count } = await supabase
         .from('document_images')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .range(from, to);
 
       if (error) {
         console.error('[ImagesTab] Error loading images:', error);
         throw error;
       }
 
-      console.log('[ImagesTab] Loaded images:', data?.length || 0);
+      console.log('[ImagesTab] Loaded images:', data?.length || 0, 'of', count);
       setImages(data || []);
+      setTotalCount(count || 0);
     } catch (error) {
       console.error('Failed to load images:', error);
       toast({
@@ -155,6 +170,40 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalCount > ITEMS_PER_PAGE && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+
+              {Array.from({ length: Math.ceil(totalCount / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
+                <Button
+                  key={page}
+                  variant={currentPage === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / ITEMS_PER_PAGE), p + 1))}
+                disabled={currentPage === Math.ceil(totalCount / ITEMS_PER_PAGE)}
+              >
+                Next
+              </Button>
             </div>
           )}
         </CardContent>
