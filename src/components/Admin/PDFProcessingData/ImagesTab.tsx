@@ -35,6 +35,8 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
   const loadImages = async () => {
     try {
       setIsLoading(true);
+      console.log('[ImagesTab] Loading images for workspace:', workspaceId);
+
       const { data, error } = await supabase
         .from('document_images')
         .select('*')
@@ -42,7 +44,12 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, onStatsUpdate
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[ImagesTab] Error loading images:', error);
+        throw error;
+      }
+
+      console.log('[ImagesTab] Loaded images:', data?.length || 0);
       setImages(data || []);
     } catch (error) {
       console.error('Failed to load images:', error);

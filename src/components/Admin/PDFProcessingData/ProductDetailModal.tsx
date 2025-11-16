@@ -31,19 +31,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const loadProductDetails = async () => {
     try {
       setIsLoading(true);
+      console.log('[ProductDetailModal] Loading details for product:', product.id, product.name);
 
       // Load images related to this product
-      const { data: imageRelations } = await supabase
+      const { data: imageRelations, error: relError } = await supabase
         .from('product_image_relationships')
         .select('image_id')
         .eq('product_id', product.id);
 
+      console.log('[ProductDetailModal] Image relationships found:', imageRelations?.length || 0);
+      if (relError) console.error('[ProductDetailModal] Error loading relationships:', relError);
+
       if (imageRelations && imageRelations.length > 0) {
         const imageIds = imageRelations.map((r) => r.image_id);
-        const { data: imagesData } = await supabase
+        const { data: imagesData, error: imgError } = await supabase
           .from('document_images')
           .select('*')
           .in('id', imageIds);
+
+        console.log('[ProductDetailModal] Images loaded:', imagesData?.length || 0);
+        if (imgError) console.error('[ProductDetailModal] Error loading images:', imgError);
+
         setImages(imagesData || []);
       }
 

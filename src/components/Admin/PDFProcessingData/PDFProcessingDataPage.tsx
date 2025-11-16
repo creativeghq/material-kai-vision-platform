@@ -40,8 +40,11 @@ export const PDFProcessingDataPage: React.FC = () => {
 
       if (workspaces && workspaces.length > 0) {
         const wsId = workspaces[0].id;
+        console.log('[PDFProcessingDataPage] Loading workspace:', wsId);
         setWorkspaceId(wsId);
         await loadStats(wsId);
+      } else {
+        console.error('[PDFProcessingDataPage] No workspaces found!');
       }
     } catch (error) {
       console.error('Failed to load workspace:', error);
