@@ -436,7 +436,7 @@ export class MivaaApiClient {
   }
 
   /**
-   * Generate CLIP embedding
+   * Generate Visual Embedding (SigLIP)
    * Replaces: enhanced-clip-integration Edge Function
    */
   async generateClipEmbedding(payload: {

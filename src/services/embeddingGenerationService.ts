@@ -778,7 +778,7 @@ export const defaultEmbeddingConfig: EmbeddingGenerationConfig = {
       process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
     apiKey: process.env.MIVAA_API_KEY || '',
     timeout: 30000,
-    model: 'clip', // Default to CLIP for embeddings
+    model: 'siglip', // Default to SigLIP for embeddings
   },
   batch: {
     maxSize: 100,

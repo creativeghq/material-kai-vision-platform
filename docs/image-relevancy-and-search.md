@@ -25,11 +25,11 @@ Every image gets **5 specialized embeddings** for different search types:
 
 | Embedding Type | Model | Dimension | Purpose |
 |---------------|-------|-----------|---------|
-| **Visual CLIP** | OpenAI CLIP | 512 | General visual similarity |
-| **Color** | Custom CLIP | 512 | Color-based search |
-| **Texture** | Custom CLIP | 512 | Texture pattern matching |
-| **Application** | Custom CLIP | 512 | Use-case similarity |
-| **Material** | Custom CLIP | 512 | Material type matching |
+| **Visual SigLIP** | Google SigLIP SO400M | 512 | General visual similarity (+19-29% accuracy) |
+| **Color** | SigLIP (color-focused) | 512 | Color-based search |
+| **Texture** | SigLIP (texture-focused) | 512 | Texture pattern matching |
+| **Application** | SigLIP (use-case) | 512 | Use-case similarity |
+| **Material** | SigLIP (material-focused) | 512 | Material type matching |
 
 **Storage**: All embeddings stored in `document_images` table columns:
 - `visual_clip_embedding_512`

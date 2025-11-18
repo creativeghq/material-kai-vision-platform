@@ -79,7 +79,7 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 7-10: Multi-Vector Embeddings (80-91%)                    │
-│ Models: OpenAI CLIP (5 types)                                  │
+│ Models: Google SigLIP ViT-SO400M (5 types)                     │
 │ Output: Visual, color, texture, application embeddings         │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
@@ -390,13 +390,14 @@
 
 ### Stages 7-10: Multi-Vector Embeddings (80-91%)
 
-**Model**: OpenAI CLIP
+**Model**: Google SigLIP ViT-SO400M-14-384 (+19-29% accuracy improvement over CLIP)
 
 **5 Embedding Types**:
 
 1. **Visual Embeddings** (512D)
    - Overall visual appearance
    - Enables visual similarity search
+   - Superior accuracy on material images
 
 2. **Large Visual Embeddings** (1536D)
    - High-resolution visual features

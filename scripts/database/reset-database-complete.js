@@ -91,7 +91,7 @@ const BUCKETS_CONFIG = [
   },
   {
     name: 'pdf-documents',
-    excludeFolders: ['pdf-documents/']  // ⚠️ PRESERVE pdf-documents folder and all files inside
+    excludeFolders: ['*']  // ⚠️ PRESERVE ALL files in pdf-documents bucket (use '*' to match all files)
   },
   {
     name: 'material-images',
@@ -223,7 +223,8 @@ async function clearBucket(bucketConfig) {
       // Check if file is in an excluded folder
       let shouldSkip = false;
       for (const excludedFolder of excludeFolders) {
-        if (filePath.startsWith(excludedFolder)) {
+        // Special case: '*' means preserve ALL files in this bucket
+        if (excludedFolder === '*' || filePath.startsWith(excludedFolder)) {
           shouldSkip = true;
           skipped++;
           break;

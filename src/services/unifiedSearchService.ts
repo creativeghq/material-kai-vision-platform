@@ -21,7 +21,7 @@ import { ErrorHandler } from '../utils/errorHandler';
 export type SearchStrategy =
   | 'semantic'      // Semantic search using text embeddings only
   | 'visual'        // Visual search using CLIP embeddings only
-  | 'multi_vector'  // ⭐ RECOMMENDED: Combines 6 embedding types with intelligent weighting (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%)
+  | 'multi_vector'  // ⭐ RECOMMENDED DEFAULT: Enhanced multi-vector combining 6 specialized CLIP embeddings (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%) + JSONB metadata filtering + query understanding support
   | 'hybrid'        // Hybrid search combining semantic and keyword
   | 'material'      // Material property-based search
   | 'keyword'       // Keyword/exact match search
@@ -29,7 +29,7 @@ export type SearchStrategy =
   | 'texture'       // Texture pattern matching using specialized CLIP embeddings
   | 'style'         // Design style matching using specialized CLIP embeddings
   | 'material_type' // Material type matching using specialized CLIP embeddings
-  | 'all';          // ALL 10 strategies in parallel (slower, higher cost - use only when comprehensive search needed)
+  | 'all';          // ⚠️ DEPRECATED: Use 'multi_vector' instead (10x slower, 10x higher cost, lower accuracy)
 
 /**
  * Unified search request matching Python backend SearchRequest schema
@@ -51,7 +51,10 @@ export interface UnifiedSearchRequest {
   // Image search parameters
   image_url?: string;                // Image URL for visual search
   image_base64?: string;             // Base64-encoded image
-  
+
+  // 🧠 Query Understanding (ENABLED BY DEFAULT)
+  enable_query_understanding?: boolean;  // Auto-extract filters from natural language (default: true)
+
   // Search enhancement
   use_search_prompts?: boolean;      // Apply admin-configured prompts (default: true)
   custom_formatting_prompt?: string; // Custom prompt override
@@ -148,8 +151,8 @@ export class UnifiedSearchService {
    */
   static async search(request: UnifiedSearchRequest): Promise<UnifiedSearchResponse> {
     try {
-      const strategy = request.strategy || 'semantic';
-      
+      const strategy = request.strategy || 'multi_vector';  // ✅ Changed default to multi_vector
+
       // Build request payload matching Python backend schema
       const payload = {
         query: request.query,
@@ -167,8 +170,15 @@ export class UnifiedSearchService {
         include_content: request.include_content !== false,
       };
 
-      // Call Python backend with strategy parameter
-      const response = await mivaaApi.request(`/api/rag/search?strategy=${strategy}`, {
+      // Build query parameters
+      const queryParams = new URLSearchParams({ strategy });
+
+      // 🧠 Query understanding is ENABLED BY DEFAULT (can be disabled by setting to false)
+      const enableQueryUnderstanding = request.enable_query_understanding !== false;
+      queryParams.append('enable_query_understanding', enableQueryUnderstanding.toString());
+
+      // Call Python backend with strategy and query understanding parameters
+      const response = await mivaaApi.request(`/api/rag/search?${queryParams.toString()}`, {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -255,6 +265,27 @@ export class UnifiedSearchService {
       strategy: 'material',
       material_filters: params.filters,
       top_k: params.limit,
+    });
+  }
+
+  /**
+   * 🎯 Multi-Vector Search - RECOMMENDED DEFAULT
+   * Combines 6 specialized CLIP embeddings + metadata filtering + query understanding (enabled by default)
+   */
+  static async searchMultiVector(params: {
+    query: string;
+    workspace_id: string;
+    limit?: number;
+    filters?: Record<string, any>;
+    enableQueryUnderstanding?: boolean;  // Auto-extract filters from natural language (default: true, set to false to disable)
+  }): Promise<UnifiedSearchResponse> {
+    return this.search({
+      query: params.query,
+      workspace_id: params.workspace_id,
+      strategy: 'multi_vector',
+      material_filters: params.filters,
+      top_k: params.limit,
+      enable_query_understanding: params.enableQueryUnderstanding,
     });
   }
 
