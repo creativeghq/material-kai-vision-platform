@@ -401,7 +401,9 @@ async function retrieveNovaProductData(documentId) {
     chunks: [],
     images: [],
     products: [],
-    relevancies: []
+    chunkImageRelevancies: [],
+    productImageRelevancies: [],
+    chunkProductRelevancies: []
   };
 
   // Retrieve ALL chunks using consolidated RAG endpoint
@@ -414,6 +416,10 @@ async function retrieveNovaProductData(documentId) {
     // Count embeddings in chunks
     const chunksWithEmbeddings = allData.chunks.filter(c => c.embedding).length;
     log('RETRIEVE', `  - ${chunksWithEmbeddings} chunks have text embeddings`, 'info');
+
+    // Count chunks with metadata
+    const chunksWithMetadata = allData.chunks.filter(c => c.metadata && Object.keys(c.metadata).length > 0).length;
+    log('RETRIEVE', `  - ${chunksWithMetadata} chunks have metadata`, 'info');
   } else {
     const errorText = await chunksResponse.text();
     log('RETRIEVE', `Failed to fetch chunks: ${chunksResponse.status} ${chunksResponse.statusText}`, 'error');
@@ -427,9 +433,22 @@ async function retrieveNovaProductData(documentId) {
     allData.images = imagesData.images || [];
     log('RETRIEVE', `Found ${allData.images.length} total images`, 'success');
 
-    // Count image embeddings
-    const imagesWithEmbeddings = allData.images.filter(img => img.clip_embedding).length;
-    log('RETRIEVE', `  - ${imagesWithEmbeddings} images have CLIP embeddings`, 'info');
+    // Count CLIP embeddings (5 types per image)
+    const visualEmbeddings = allData.images.filter(img => img.visual_clip_embedding_512).length;
+    const colorEmbeddings = allData.images.filter(img => img.color_clip_embedding_512).length;
+    const textureEmbeddings = allData.images.filter(img => img.texture_clip_embedding_512).length;
+    const applicationEmbeddings = allData.images.filter(img => img.application_clip_embedding_512).length;
+    const materialEmbeddings = allData.images.filter(img => img.material_clip_embedding_512).length;
+
+    const totalClipEmbeddings = visualEmbeddings + colorEmbeddings + textureEmbeddings + applicationEmbeddings + materialEmbeddings;
+
+    log('RETRIEVE', `  - CLIP Embeddings Generated:`, 'info');
+    log('RETRIEVE', `    • Visual: ${visualEmbeddings}`, 'info');
+    log('RETRIEVE', `    • Color: ${colorEmbeddings}`, 'info');
+    log('RETRIEVE', `    • Texture: ${textureEmbeddings}`, 'info');
+    log('RETRIEVE', `    • Application: ${applicationEmbeddings}`, 'info');
+    log('RETRIEVE', `    • Material: ${materialEmbeddings}`, 'info');
+    log('RETRIEVE', `    • TOTAL CLIP Embeddings: ${totalClipEmbeddings}`, 'success');
   } else {
     log('RETRIEVE', `Failed to fetch images: ${imagesResponse.status} ${imagesResponse.statusText}`, 'error');
   }
@@ -440,19 +459,44 @@ async function retrieveNovaProductData(documentId) {
     const productsData = await productsResponse.json();
     allData.products = productsData.products || [];
     log('RETRIEVE', `Found ${allData.products.length} total products`, 'success');
+
+    // Count products with metadata
+    const productsWithMetadata = allData.products.filter(p => p.metadata && Object.keys(p.metadata).length > 0).length;
+    log('RETRIEVE', `  - ${productsWithMetadata} products have metadata`, 'info');
   } else {
     log('RETRIEVE', `Failed to fetch products: ${productsResponse.status} ${productsResponse.statusText}`, 'error');
   }
 
-  // Retrieve ALL relevancies
-  const relevanciesResponse = await fetch(`${MIVAA_API}/api/rag/relevancies?document_id=${documentId}&limit=1000`);
-  if (relevanciesResponse.ok) {
-    const relevanciesData = await relevanciesResponse.json();
-    allData.relevancies = relevanciesData.relevancies || [];
-    log('RETRIEVE', `Found ${allData.relevancies.length} total relevancies (chunk-image relationships)`, 'success');
+  // Retrieve chunk-image relevancies
+  const chunkImageRelResponse = await fetch(`${MIVAA_API}/api/rag/relevancies?document_id=${documentId}&limit=1000`);
+  if (chunkImageRelResponse.ok) {
+    const relData = await chunkImageRelResponse.json();
+    allData.chunkImageRelevancies = relData.relevancies || [];
+    log('RETRIEVE', `Found ${allData.chunkImageRelevancies.length} chunk-image relevancies`, 'success');
   } else {
-    log('RETRIEVE', `Failed to fetch relevancies: ${relevanciesResponse.status} ${relevanciesResponse.statusText}`, 'error');
+    log('RETRIEVE', `Failed to fetch chunk-image relevancies: ${chunkImageRelResponse.status}`, 'error');
   }
+
+  // Retrieve product-image relevancies
+  const productImageRelResponse = await fetch(`${MIVAA_API}/api/rag/product-image-relationships?document_id=${documentId}&limit=1000`);
+  if (productImageRelResponse.ok) {
+    const relData = await productImageRelResponse.json();
+    allData.productImageRelevancies = relData.relationships || [];
+    log('RETRIEVE', `Found ${allData.productImageRelevancies.length} product-image relevancies`, 'success');
+  } else {
+    log('RETRIEVE', `Failed to fetch product-image relevancies: ${productImageRelResponse.status}`, 'warning');
+  }
+
+  // Retrieve chunk-product relevancies
+  const chunkProductRelResponse = await fetch(`${MIVAA_API}/api/rag/chunk-product-relationships?document_id=${documentId}&limit=1000`);
+  if (chunkProductRelResponse.ok) {
+    const relData = await chunkProductRelResponse.json();
+    allData.chunkProductRelevancies = relData.relationships || [];
+    log('RETRIEVE', `Found ${allData.chunkProductRelevancies.length} chunk-product relevancies`, 'success');
+  } else {
+    log('RETRIEVE', `Failed to fetch chunk-product relevancies: ${chunkProductRelResponse.status}`, 'warning');
+  }
+
   return allData;
 }
 
@@ -460,7 +504,17 @@ async function generateDetailedReport(allData, jobResult) {
   logSection('DETAILED PDF PROCESSING REPORT');
 
   const chunksWithEmbeddings = allData.chunks.filter(c => c.embedding).length;
-  const imagesWithEmbeddings = allData.images.filter(img => img.clip_embedding).length;
+  const chunksWithMetadata = allData.chunks.filter(c => c.metadata && Object.keys(c.metadata).length > 0).length;
+
+  // Count CLIP embeddings (5 types per image)
+  const visualEmbeddings = allData.images.filter(img => img.visual_clip_embedding_512).length;
+  const colorEmbeddings = allData.images.filter(img => img.color_clip_embedding_512).length;
+  const textureEmbeddings = allData.images.filter(img => img.texture_clip_embedding_512).length;
+  const applicationEmbeddings = allData.images.filter(img => img.application_clip_embedding_512).length;
+  const materialEmbeddings = allData.images.filter(img => img.material_clip_embedding_512).length;
+  const totalClipEmbeddings = visualEmbeddings + colorEmbeddings + textureEmbeddings + applicationEmbeddings + materialEmbeddings;
+
+  const productsWithMetadata = allData.products.filter(p => p.metadata && Object.keys(p.metadata).length > 0).length;
 
   const report = {
     timestamp: new Date().toISOString(),
@@ -475,21 +529,58 @@ async function generateDetailedReport(allData, jobResult) {
     summary: {
       total_chunks: allData.chunks.length,
       chunks_with_embeddings: chunksWithEmbeddings,
+      chunks_with_metadata: chunksWithMetadata,
       total_images: allData.images.length,
-      images_with_embeddings: imagesWithEmbeddings,
+      clip_embeddings: {
+        visual: visualEmbeddings,
+        color: colorEmbeddings,
+        texture: textureEmbeddings,
+        application: applicationEmbeddings,
+        material: materialEmbeddings,
+        total: totalClipEmbeddings
+      },
       total_products: allData.products.length,
-      total_relevancies: allData.relevancies.length
+      products_with_metadata: productsWithMetadata,
+      relevancies: {
+        chunk_image: allData.chunkImageRelevancies.length,
+        product_image: allData.productImageRelevancies.length,
+        chunk_product: allData.chunkProductRelevancies.length,
+        total: allData.chunkImageRelevancies.length + allData.productImageRelevancies.length + allData.chunkProductRelevancies.length
+      }
     }
   };
 
   // Print detailed summary
   logSection('📊 FINAL SUMMARY');
-  console.log(`\n✅ Total Chunks: ${report.summary.total_chunks}`);
-  console.log(`   - With Text Embeddings: ${chunksWithEmbeddings}`);
-  console.log(`✅ Total Images: ${report.summary.total_images}`);
-  console.log(`   - With CLIP Embeddings: ${imagesWithEmbeddings}`);
-  console.log(`✅ Total Products: ${report.summary.total_products}`);
-  console.log(`✅ Total Relevancies: ${report.summary.total_relevancies}`);
+  console.log(`\n✅ Total Products: ${report.summary.total_products}`);
+  console.log(`   - With Metadata: ${productsWithMetadata}`);
+
+  console.log(`\n✅ Total CLIP Embeddings Generated: ${totalClipEmbeddings}`);
+  console.log(`   - Visual Embeddings: ${visualEmbeddings}`);
+  console.log(`   - Color Embeddings: ${colorEmbeddings}`);
+  console.log(`   - Texture Embeddings: ${textureEmbeddings}`);
+  console.log(`   - Application Embeddings: ${applicationEmbeddings}`);
+  console.log(`   - Material Embeddings: ${materialEmbeddings}`);
+
+  console.log(`\n✅ Total Images Added to DB: ${report.summary.total_images}`);
+
+  console.log(`\n✅ Product-to-Image Relevancies: ${report.summary.relevancies.product_image}`);
+  console.log(`   (${report.summary.total_products} products, ${report.summary.relevancies.product_image} image relationships)`);
+
+  console.log(`\n✅ Text Embeddings: ${chunksWithEmbeddings}`);
+  console.log(`   - Total Chunks: ${report.summary.total_chunks}`);
+  console.log(`   - Chunks with Embeddings: ${chunksWithEmbeddings}`);
+
+  console.log(`\n✅ Metadata Generated: ${chunksWithMetadata + productsWithMetadata}`);
+  console.log(`   - Chunks with Metadata: ${chunksWithMetadata}`);
+  console.log(`   - Products with Metadata: ${productsWithMetadata}`);
+  console.log(`   - Metadata Embeddings: ${chunksWithEmbeddings} (text embeddings include metadata)`);
+
+  console.log(`\n✅ All Relevancies:`);
+  console.log(`   - Chunk-Image: ${report.summary.relevancies.chunk_image}`);
+  console.log(`   - Product-Image: ${report.summary.relevancies.product_image}`);
+  console.log(`   - Chunk-Product: ${report.summary.relevancies.chunk_product}`);
+  console.log(`   - TOTAL: ${report.summary.relevancies.total}`);
 
   // Print sample chunks (first 3)
   console.log('\n📝 SAMPLE CHUNKS (First 3):');
