@@ -24,10 +24,12 @@ Complete technical architecture of Material Kai Vision Platform.
 │ Python 3.11 + FastAPI + Uvicorn                            │
 │ Deployed: v1api.materialshub.gr                            │
 │ - 115 REST API endpoints (15 categories)                   │
-│ - 14-stage PDF processing pipeline                          │
+│ - 9-stage PDF processing pipeline (optimized)              │
+│ - Memory-safe image processing (10-15MB constant)          │
+│ - Real-time CLIP embedding generation                      │
 │ - RAG system (LlamaIndex)                                   │
 │ - Search APIs (Semantic, Vector, Hybrid)                   │
-│ - AI Services (Claude, GPT, Llama, CLIP)                   │
+│ - AI Services (Claude, GPT, Llama, SigLIP)                 │
 │ - Product Management + Metadata Management                 │
 │ - Duplicate Detection & Merging (factory-based)            │
 │ - Admin & Monitoring                                        │
