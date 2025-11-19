@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-github-token-here>"
+      }
+    },
+    "ssh": {
+      "ssh-mcp": {
+            "command": "npx",
+            "args": [
+                "ssh-mcp",
+                "-y",
+                "--",
+                "--host=1.2.3.4",
+                "--port=22",
+                "--user=root",
+                "--password=pass",
+                "--key=path/to/key",
+                "--timeout=30000",
+                "--maxChars=none"
+            ]
+        }
+    }
+  }
+}

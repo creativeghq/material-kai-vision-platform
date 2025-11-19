@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(wmic process where \"name=''node.exe'' or name=''python.exe''\" get processid,commandline 2)",
+      "Bash(nul)",
+      "Bash(node scripts/database/reset-database-complete.js:*)",
+      "Bash(ssh root@104.248.68.3 \"cd /root/material-kai-vision-platform && node scripts/database/reset-database-complete.js\")",
+      "Bash(ssh root@104.248.68.3 \"find /root -name ''material-kai-vision-platform'' -type d 2>/dev/null | head -5\")",
+      "Bash(ssh root@104.248.68.3 \"ls -la /root/ | grep material\")",
+      "Bash(ssh root@104.248.68.3 \"pwd && ls -la\")",
+      "Bash(ssh root@104.248.68.3 \"cd /root && node scripts/database/reset-database-complete.js\")",
+      "Bash(ssh root@104.248.68.3:*)",
+      "Bash(scp:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
