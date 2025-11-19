@@ -550,37 +550,58 @@ async function generateDetailedReport(allData, jobResult) {
     }
   };
 
-  // Print detailed summary
-  logSection('📊 FINAL SUMMARY');
-  console.log(`\n✅ Total Products: ${report.summary.total_products}`);
-  console.log(`   - With Metadata: ${productsWithMetadata}`);
+  // Print detailed summary with requested metrics
+  logSection('📊 FINAL SUMMARY - NOVA PRODUCT TEST RESULTS');
 
-  console.log(`\n✅ Total CLIP Embeddings Generated: ${totalClipEmbeddings}`);
-  console.log(`   - Visual Embeddings: ${visualEmbeddings}`);
-  console.log(`   - Color Embeddings: ${colorEmbeddings}`);
-  console.log(`   - Texture Embeddings: ${textureEmbeddings}`);
-  console.log(`   - Application Embeddings: ${applicationEmbeddings}`);
-  console.log(`   - Material Embeddings: ${materialEmbeddings}`);
+  console.log('\n' + '='.repeat(100));
+  console.log('1️⃣  PRODUCTS');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Total Products: ${report.summary.total_products}`);
+  console.log(`   ✅ Products with Metadata: ${productsWithMetadata}`);
 
-  console.log(`\n✅ Total Images Added to DB: ${report.summary.total_images}`);
+  console.log('\n' + '='.repeat(100));
+  console.log('2️⃣  CLIP EMBEDDINGS GENERATED');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Visual Embeddings: ${visualEmbeddings}`);
+  console.log(`   ✅ Color Embeddings: ${colorEmbeddings}`);
+  console.log(`   ✅ Texture Embeddings: ${textureEmbeddings}`);
+  console.log(`   ✅ Application Embeddings: ${applicationEmbeddings}`);
+  console.log(`   ✅ Material Embeddings: ${materialEmbeddings}`);
+  console.log(`   ✅ TOTAL CLIP Embeddings: ${totalClipEmbeddings}`);
 
-  console.log(`\n✅ Product-to-Image Relevancies: ${report.summary.relevancies.product_image}`);
-  console.log(`   (${report.summary.total_products} products, ${report.summary.relevancies.product_image} image relationships)`);
+  console.log('\n' + '='.repeat(100));
+  console.log('3️⃣  TOTAL IMAGES ADDED TO DB');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Total Images: ${report.summary.total_images}`);
 
-  console.log(`\n✅ Text Embeddings: ${chunksWithEmbeddings}`);
-  console.log(`   - Total Chunks: ${report.summary.total_chunks}`);
-  console.log(`   - Chunks with Embeddings: ${chunksWithEmbeddings}`);
+  console.log('\n' + '='.repeat(100));
+  console.log('4️⃣  PRODUCT RELEVANCIES TO IMAGES');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Total Products: ${report.summary.total_products}`);
+  console.log(`   ✅ Product-Image Relevancies: ${report.summary.relevancies.product_image}`);
+  console.log(`   📊 Example: ${report.summary.total_products} products → ${report.summary.relevancies.product_image} image relationships`);
 
-  console.log(`\n✅ Metadata Generated: ${chunksWithMetadata + productsWithMetadata}`);
-  console.log(`   - Chunks with Metadata: ${chunksWithMetadata}`);
-  console.log(`   - Products with Metadata: ${productsWithMetadata}`);
-  console.log(`   - Metadata Embeddings: ${chunksWithEmbeddings} (text embeddings include metadata)`);
+  console.log('\n' + '='.repeat(100));
+  console.log('5️⃣  TEXT EMBEDDINGS');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Total Chunks: ${report.summary.total_chunks}`);
+  console.log(`   ✅ Chunks with Text Embeddings: ${chunksWithEmbeddings}`);
 
-  console.log(`\n✅ All Relevancies:`);
-  console.log(`   - Chunk-Image: ${report.summary.relevancies.chunk_image}`);
-  console.log(`   - Product-Image: ${report.summary.relevancies.product_image}`);
-  console.log(`   - Chunk-Product: ${report.summary.relevancies.chunk_product}`);
-  console.log(`   - TOTAL: ${report.summary.relevancies.total}`);
+  console.log('\n' + '='.repeat(100));
+  console.log('6️⃣  META GENERATED AND EMBEDDINGS RELATED TO META');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Chunks with Metadata: ${chunksWithMetadata}`);
+  console.log(`   ✅ Products with Metadata: ${productsWithMetadata}`);
+  console.log(`   ✅ Total Metadata Generated: ${chunksWithMetadata + productsWithMetadata}`);
+  console.log(`   ✅ Metadata Embeddings (text embeddings include metadata): ${chunksWithEmbeddings}`);
+
+  console.log('\n' + '='.repeat(100));
+  console.log('📊 ALL RELEVANCIES SUMMARY');
+  console.log('='.repeat(100));
+  console.log(`   ✅ Chunk-Image Relevancies: ${report.summary.relevancies.chunk_image}`);
+  console.log(`   ✅ Product-Image Relevancies: ${report.summary.relevancies.product_image}`);
+  console.log(`   ✅ Chunk-Product Relevancies: ${report.summary.relevancies.chunk_product}`);
+  console.log(`   ✅ TOTAL RELEVANCIES: ${report.summary.relevancies.total}`);
 
   // Print sample chunks (first 3)
   console.log('\n📝 SAMPLE CHUNKS (First 3):');
@@ -626,10 +647,17 @@ async function generateDetailedReport(allData, jobResult) {
   });
 
   // Print sample relevancies
-  console.log('\n🔗 SAMPLE RELEVANCIES (First 10):');
-  allData.relevancies.slice(0, 10).forEach((rel, idx) => {
+  console.log('\n🔗 SAMPLE CHUNK-IMAGE RELEVANCIES (First 10):');
+  allData.chunkImageRelevancies.slice(0, 10).forEach((rel, idx) => {
     console.log(`\n${idx + 1}. Chunk ${rel.chunk_id} ↔ Image ${rel.image_id}`);
     console.log(`   Relevance Score: ${rel.relevance_score}`);
+    console.log(`   Relationship Type: ${rel.relationship_type || 'N/A'}`);
+  });
+
+  console.log('\n🔗 SAMPLE PRODUCT-IMAGE RELEVANCIES (First 10):');
+  allData.productImageRelevancies.slice(0, 10).forEach((rel, idx) => {
+    console.log(`\n${idx + 1}. Product ${rel.product_id} ↔ Image ${rel.image_id}`);
+    console.log(`   Relevance Score: ${rel.relevance_score || 'N/A'}`);
     console.log(`   Relationship Type: ${rel.relationship_type || 'N/A'}`);
   });
 
