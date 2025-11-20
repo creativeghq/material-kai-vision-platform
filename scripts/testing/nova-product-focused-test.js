@@ -26,7 +26,7 @@ import { Blob } from 'buffer';
 
 // Configuration
 const MIVAA_API = 'https://v1api.materialshub.gr';
-const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf';
+const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25%20(1).pdf';
 const WORKSPACE_ID = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e';
 
 // NOVA product search criteria
@@ -183,7 +183,7 @@ async function uploadPDFForNovaExtraction() {
   formData.append('workspace_id', WORKSPACE_ID);
 
   log('UPLOAD', `Triggering Consolidated Upload via MIVAA API: ${MIVAA_API}/api/rag/documents/upload`, 'info');
-  log('UPLOAD', `Mode: deep | Categories: products | Discovery: Claude Sonnet 4.5 | Async: enabled`, 'info');
+  log('UPLOAD', `Mode: deep | Categories: products | Discovery: claude | Async: enabled`, 'info');
 
   const uploadResponse = await fetch(`${MIVAA_API}/api/rag/documents/upload`, {
     method: 'POST',

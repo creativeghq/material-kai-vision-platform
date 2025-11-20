@@ -7,7 +7,7 @@
         "@modelcontextprotocol/server-github"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-github-token-here>"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
       }
     },
     "ssh": {
@@ -17,15 +17,18 @@
                 "ssh-mcp",
                 "-y",
                 "--",
-                "--host=1.2.3.4",
+                "--host=104.248.68.3",
                 "--port=22",
                 "--user=root",
-                "--password=pass",
-                "--key=path/to/key",
+                "--key=C:/Users/basil/.ssh/id_rsa",
                 "--timeout=30000",
                 "--maxChars=none"
             ]
         }
-    }
+    },
+   "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=bgbavxtjlbvgplozizxu"
   }
+}
 }

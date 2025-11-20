@@ -12,7 +12,7 @@
  */
 
 import { SearchResult } from '@/components/Search/SearchResultCard';
-import Anthropic from '@anthropic-ai/sdk';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface RankingWeights {
   relevance: number; // Weight for relevance score (default: 0.4)
@@ -210,91 +210,31 @@ export async function aiReRanking(
   const model = request.model || 'claude-sonnet-4-5';
 
   try {
-    // Initialize Anthropic client
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
-    }
-
-    const anthropic = new Anthropic({ apiKey });
-
-    // Prepare results for analysis
-    const resultsContext = request.results.map((result, index) => ({
-      index,
-      id: result.id,
-      name: result.name,
-      description: result.description,
-      category: result.category,
-      relevanceScore: result.relevanceScore,
-      semanticScore: result.semanticScore,
-      qualityMetrics: result.qualityMetrics,
-    }));
-
-    // Create prompt for Claude
-    const prompt = `You are an expert search relevance analyzer. Analyze these search results for the query: "${request.query}"
-
-Search Results:
-${JSON.stringify(resultsContext, null, 2)}
-
-Task:
-1. Re-rank these results based on semantic relevance to the query
-2. Consider: query intent, semantic similarity, context, and quality metrics
-3. Return a JSON array of result indices in order of relevance (most relevant first)
-${request.includeExplanations ? "4. Provide a brief explanation for each result's ranking" : ''}
-
-Response format:
-{
-  "rankedIndices": [2, 0, 5, 1, ...],
-  ${request.includeExplanations ? '"explanations": { "0": "explanation for result 0", "1": "explanation for result 1", ... }' : ''}
-}`;
-
-    // Call Claude Sonnet
-    const response = await anthropic.messages.create({
-      model:
-        model === 'claude-sonnet-4-5'
-          ? 'claude-sonnet-4-20250514'
-          : 'claude-4-5-haiku-20250514',
-      max_tokens: 4096,
-      temperature: 0.1,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+    // Call Supabase Edge Function (server-side, API key never exposed to client)
+    const { data, error } = await supabase.functions.invoke('ai-rerank', {
+      body: {
+        query: request.query,
+        results: request.results,
+        maxResults: request.maxResults,
+        includeExplanations: request.includeExplanations,
+        model: model,
+      },
     });
 
-    // Parse response
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
+    if (error) {
+      throw new Error(`Edge function error: ${error.message}`);
     }
 
-    const aiResponse = JSON.parse(content.text);
-    const rankedIndices = aiResponse.rankedIndices as number[];
-    const explanations = aiResponse.explanations as
-      | Record<string, string>
-      | undefined;
-
-    // Re-order results based on AI ranking
-    const maxResults = request.maxResults || request.results.length;
-    const rerankedResults = rankedIndices
-      .slice(0, maxResults)
-      .map((index) => request.results[index])
-      .filter(Boolean);
-
-    // Calculate cost (approximate)
-    const inputTokens = response.usage.input_tokens;
-    const outputTokens = response.usage.output_tokens;
-    const costPerMToken = model === 'claude-sonnet-4-5' ? 3.0 : 1.0; // $3/1M for Sonnet, $1/1M for Haiku
-    const cost = ((inputTokens + outputTokens) / 1_000_000) * costPerMToken;
+    if (!data || !data.rerankedResults) {
+      throw new Error('Invalid response from Edge function');
+    }
 
     return {
-      rerankedResults,
-      explanations,
-      processingTimeMs: Date.now() - startTime,
-      model,
-      cost,
+      rerankedResults: data.rerankedResults,
+      explanations: data.explanations,
+      processingTimeMs: data.processingTimeMs || Date.now() - startTime,
+      model: data.model || model,
+      cost: data.cost,
     };
   } catch (error) {
     console.error('AI re-ranking failed:', error);
@@ -369,6 +309,155 @@ export async function hybridReRanking(
   };
 }
 
+/**
+ * Compare AI Re-ranking vs Quality-Based Ranking
+ *
+ * Runs both ranking methods side-by-side and returns comparison metrics
+ * Useful for A/B testing and validating AI ranking quality
+ */
+export interface RankingComparison {
+  query: string;
+  aiRanking: {
+    results: SearchResult[];
+    processingTimeMs: number;
+    model: string;
+    cost?: number;
+  };
+  qualityRanking: {
+    results: SearchResult[];
+    processingTimeMs: number;
+  };
+  metrics: {
+    agreement: number; // % of results in same position
+    topKAgreement: Record<number, number>; // Agreement for top K results (K=3,5,10)
+    rankCorrelation: number; // Spearman's rank correlation
+    positionDifferences: Array<{
+      id: string;
+      name: string;
+      aiPosition: number;
+      qualityPosition: number;
+      difference: number;
+    }>;
+  };
+}
+
+export async function compareRankingMethods(
+  query: string,
+  results: SearchResult[],
+  options: {
+    model?: 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+    weights?: RankingWeights;
+  } = {},
+): Promise<RankingComparison> {
+  const startTime = Date.now();
+
+  // Run both ranking methods in parallel
+  const [aiResponse, qualityResults] = await Promise.all([
+    aiReRanking({
+      query,
+      results,
+      model: options.model,
+      includeExplanations: false,
+    }),
+    Promise.resolve(rankResultsByQuality(results, options.weights)),
+  ]);
+
+  // Calculate agreement metrics
+  const agreement = calculateAgreement(aiResponse.rerankedResults, qualityResults);
+  const topKAgreement = {
+    3: calculateTopKAgreement(aiResponse.rerankedResults, qualityResults, 3),
+    5: calculateTopKAgreement(aiResponse.rerankedResults, qualityResults, 5),
+    10: calculateTopKAgreement(aiResponse.rerankedResults, qualityResults, 10),
+  };
+  const rankCorrelation = calculateRankCorrelation(aiResponse.rerankedResults, qualityResults);
+  const positionDifferences = calculatePositionDifferences(aiResponse.rerankedResults, qualityResults);
+
+  return {
+    query,
+    aiRanking: {
+      results: aiResponse.rerankedResults,
+      processingTimeMs: aiResponse.processingTimeMs,
+      model: aiResponse.model,
+      cost: aiResponse.cost,
+    },
+    qualityRanking: {
+      results: qualityResults,
+      processingTimeMs: Date.now() - startTime - aiResponse.processingTimeMs,
+    },
+    metrics: {
+      agreement,
+      topKAgreement,
+      rankCorrelation,
+      positionDifferences,
+    },
+  };
+}
+
+// Helper functions for comparison metrics
+function calculateAgreement(aiResults: SearchResult[], qualityResults: SearchResult[]): number {
+  let matches = 0;
+  const minLength = Math.min(aiResults.length, qualityResults.length);
+
+  for (let i = 0; i < minLength; i++) {
+    if (aiResults[i].id === qualityResults[i].id) {
+      matches++;
+    }
+  }
+
+  return minLength > 0 ? (matches / minLength) * 100 : 0;
+}
+
+function calculateTopKAgreement(aiResults: SearchResult[], qualityResults: SearchResult[], k: number): number {
+  const aiTopK = new Set(aiResults.slice(0, k).map(r => r.id));
+  const qualityTopK = new Set(qualityResults.slice(0, k).map(r => r.id));
+
+  let matches = 0;
+  aiTopK.forEach(id => {
+    if (qualityTopK.has(id)) matches++;
+  });
+
+  return k > 0 ? (matches / k) * 100 : 0;
+}
+
+function calculateRankCorrelation(aiResults: SearchResult[], qualityResults: SearchResult[]): number {
+  // Spearman's rank correlation coefficient
+  const n = Math.min(aiResults.length, qualityResults.length);
+  if (n === 0) return 0;
+
+  const qualityRankMap = new Map(qualityResults.map((r, i) => [r.id, i]));
+  let sumSquaredDiff = 0;
+
+  for (let i = 0; i < n; i++) {
+    const aiRank = i;
+    const qualityRank = qualityRankMap.get(aiResults[i].id) ?? n;
+    const diff = aiRank - qualityRank;
+    sumSquaredDiff += diff * diff;
+  }
+
+  return 1 - (6 * sumSquaredDiff) / (n * (n * n - 1));
+}
+
+function calculatePositionDifferences(aiResults: SearchResult[], qualityResults: SearchResult[]): Array<{
+  id: string;
+  name: string;
+  aiPosition: number;
+  qualityPosition: number;
+  difference: number;
+}> {
+  const qualityRankMap = new Map(qualityResults.map((r, i) => [r.id, i]));
+
+  return aiResults.map((result, aiPosition) => {
+    const qualityPosition = qualityRankMap.get(result.id) ?? -1;
+    return {
+      id: result.id,
+      name: result.name,
+      aiPosition,
+      qualityPosition,
+      difference: qualityPosition >= 0 ? Math.abs(aiPosition - qualityPosition) : -1,
+    };
+  }).sort((a, b) => b.difference - a.difference); // Sort by largest differences first
+}
+
 export default {
   rankResultsByQuality,
   applyQualityBasedRanking,
@@ -378,4 +467,5 @@ export default {
   calculateRankingScore,
   aiReRanking,
   hybridReRanking,
+  compareRankingMethods,
 };
