@@ -13,7 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { MergeSuggestion } from '@/services/savedSearchesService';
+// REMOVED: savedSearchesService deleted during cleanup
+// import { MergeSuggestion } from '@/services/savedSearchesService';
+type MergeSuggestion = any;
 
 interface MergeSearchModalProps {
   open: boolean;

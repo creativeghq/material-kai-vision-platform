@@ -21,7 +21,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { savedSearchesService, CreateSavedSearchData, MergeSuggestion } from '@/services/savedSearchesService';
+// REMOVED: savedSearchesService deleted during cleanup
+// import { savedSearchesService, CreateSavedSearchData, MergeSuggestion } from '@/services/savedSearchesService';
+type CreateSavedSearchData = any;
+type MergeSuggestion = any;
+const savedSearchesService = {
+  checkForDuplicates: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
+  createSavedSearch: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
+  mergeIntoExisting: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
+};
 import { MaterialFilters } from './MaterialFiltersPanel';
 import { MergeSearchModal } from './MergeSearchModal';
 

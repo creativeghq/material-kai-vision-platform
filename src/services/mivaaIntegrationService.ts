@@ -7,7 +7,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { RetryHelper, RetryOptions } from '@/utils/retryHelper';
-import { CircuitBreaker } from '@/services/circuitBreaker';
+// import { CircuitBreaker } from '@/services/circuitBreaker'; // REMOVED: Service deleted during cleanup
 
 export interface MivaaConfig {
   baseUrl: string;
@@ -61,7 +61,7 @@ export interface PDFProcessingOptions {
 export class MivaaIntegrationService {
   private static instance: MivaaIntegrationService;
   private config: MivaaConfig;
-  private circuitBreaker: CircuitBreaker;
+  // private circuitBreaker: CircuitBreaker; // REMOVED: Service deleted during cleanup
 
   private constructor(config?: MivaaConfig) {
     // Use provided config or load from environment
@@ -74,12 +74,8 @@ export class MivaaIntegrationService {
       retryBackoffMultiplier: 2,
     };
 
-    // Initialize circuit breaker for fault tolerance
-    this.circuitBreaker = new CircuitBreaker({
-      failureThreshold: 5,
-      resetTimeout: 60000,
-      monitoringPeriod: 10000,
-    });
+    // REMOVED: Circuit breaker initialization (service deleted during cleanup)
+    // Fault tolerance now handled by RetryHelper only
   }
 
   /**
@@ -197,10 +193,9 @@ export class MivaaIntegrationService {
     const startTime = Date.now();
 
     try {
-      // Use circuit breaker to prevent cascading failures
-      return await this.circuitBreaker.execute(async () => {
-        // Use retry logic for transient failures
-        return await RetryHelper.withRetry(
+      // REMOVED: Circuit breaker (service deleted during cleanup)
+      // Use retry logic for transient failures
+      return await RetryHelper.withRetry(
           async () => {
             const url = `${this.config.baseUrl}${endpoint}`;
             const headers: Record<string, string> = {
@@ -256,7 +251,6 @@ export class MivaaIntegrationService {
             },
           },
         );
-      });
     } catch (error) {
       const processingTime = Date.now() - startTime;
       return {

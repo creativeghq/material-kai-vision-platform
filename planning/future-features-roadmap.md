@@ -266,6 +266,47 @@ Voice-to-text for material search and AI interactions.
 
 ---
 
+## 🏗️ 3D Spatial Analysis (Spaceformer)
+
+**Status:** Planned
+**Service File:** `spaceformerAnalysisService.ts` (preserved for future integration)
+
+**Description:**
+Advanced 3D spatial reasoning for room layout optimization, material placement, and accessibility analysis.
+
+**Features:**
+- **Room Layout Suggestions:** AI-powered furniture and material placement based on 3D room scans
+- **NeRF Integration:** Analyze NeRF (Neural Radiance Field) reconstructions for spatial understanding
+- **Accessibility Analysis:** ADA compliance checking, barrier-free path detection, accessibility scoring
+- **Traffic Flow Optimization:** Analyze movement patterns, identify bottlenecks, suggest improvements
+- **Material Placement:** Recommend optimal material placement based on spatial context
+- **User Preferences:** Style, budget, color, material, and lighting preferences integration
+
+**Technical Capabilities:**
+- 3D spatial feature detection (walls, windows, doors, furniture)
+- Position and rotation recommendations with confidence scores
+- Alternative placement suggestions
+- Surface area calculations for material applications
+- Clearance and weight limit validation
+- Spatial constraint enforcement
+
+**Use Cases:**
+- Interior designers planning room layouts
+- Accessibility consultants evaluating spaces
+- Material suppliers suggesting optimal product placement
+- Architects optimizing traffic flow
+- Real estate staging recommendations
+
+**Implementation Priority:** Medium (Phase 3)
+
+**Dependencies:**
+- 3D room scanning capability (NeRF or similar)
+- Spatial reasoning AI models
+- 3D visualization frontend
+- Room dimension input system
+
+---
+
 ## 🧠 Advanced ML Features
 
 ### **ML Model Management**

@@ -305,21 +305,7 @@ export class UnifiedSearchService {
     });
   }
 
-  /**
-   * Multi-vector search - Combines all embedding types
-   */
-  static async searchMultiVector(params: {
-    query: string;
-    workspace_id: string;
-    limit?: number;
-  }): Promise<UnifiedSearchResponse> {
-    return this.search({
-      query: params.query,
-      workspace_id: params.workspace_id,
-      strategy: 'multi_vector',
-      top_k: params.limit,
-    });
-  }
+  // REMOVED: Duplicate searchMultiVector method (already defined at line 275)
 
   /**
    * ALL strategies - Parallel execution (3-4x faster!)

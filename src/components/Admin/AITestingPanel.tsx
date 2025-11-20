@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
-import { HybridAIService } from '@/services/hybridAIService';
+// import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 
 // ✅ Standardized AI Test Response Interface
 interface UnifiedAITestResponse {
@@ -509,46 +509,14 @@ export const AITestingPanel: React.FC = () => {
         );
       }
 
-      // Test hybrid analysis using HybridAIService
-      const result = await HybridAIService.callHybridAnalysis({
-        prompt: `Analyze this material: ${testFile.name}`,
-        type: 'material-analysis',
-        imageUrl: testFile.url,
-        minimumScore: 0.5,
-        maxRetries: 2,
-      });
-
-      if (!result.success) {
-        throw new Error(
-          `Hybrid analysis failed: ${result.error?.message || 'Unknown error'}`,
-        );
-      }
-
-      const data = result.data;
+      // REMOVED: HybridAIService deleted during cleanup
+      // This test function is deprecated - use MIVAA API directly instead
+      throw new Error(
+        'Hybrid AI testing is deprecated. Use MIVAA API endpoints directly for material analysis.',
+      );
 
       // Process results
       const testResults: TestResult[] = [];
-
-      if ((data as any).attempts) {
-        (data as any).attempts.forEach(
-          (attempt: {
-            provider: string;
-            score?: number;
-            success: boolean;
-            error?: string;
-            response?: string;
-            processing_time_ms?: number;
-          }) => {
-            testResults.push({
-              provider: attempt.provider,
-              score: attempt.score || 0,
-              success: attempt.success,
-              processing_time_ms: attempt.processing_time_ms || 0,
-              error: attempt.error,
-            });
-          },
-        );
-      }
 
       setResults(testResults);
 

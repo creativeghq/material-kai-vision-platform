@@ -88,13 +88,10 @@ export const AddKnowledgeEntry: React.FC<AddKnowledgeEntryProps> = ({
 
     setIsSubmitting(true);
     try {
-      await ragKnowledgeService.addKnowledgeEntry({
-        title: formData.title,
-        content: formData.content,
-        content_type: formData.contentType as 'material_spec' | 'technical_doc' | 'expert_knowledge',
-        tags: [...formData.materialCategories, ...formData.semanticTags],
-        source_url: formData.sourceUrl || formData.pdfUrl || undefined,
-      });
+      // REMOVED: ragKnowledgeService deleted during cleanup
+      throw new Error(
+        'Knowledge Base feature is deprecated. Use MIVAA API /api/knowledge-base endpoints instead.',
+      );
 
       toast({
         title: 'Knowledge Entry Added',

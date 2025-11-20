@@ -344,25 +344,27 @@ export const MATERIAL_CATEGORIES = {
   },
 } as const;
 
+// REMOVED: dynamicMaterialCategoriesService deleted during cleanup
 // Import dynamic material categories service and types
-import {
-  MaterialCategory as DynamicMaterialCategory,
-  MaterialProperty as DynamicMaterialProperty,
-  LegacyMaterialCategories,
-  getMaterialCategories,
-  getMaterialProperties,
-  dynamicMaterialCategoriesService,
-} from '../services/dynamicMaterialCategoriesService';
+// import {
+//   MaterialCategory as DynamicMaterialCategory,
+//   MaterialProperty as DynamicMaterialProperty,
+//   LegacyMaterialCategories,
+//   getMaterialCategories,
+//   getMaterialProperties,
+//   dynamicMaterialCategoriesService,
+// } from '../services/dynamicMaterialCategoriesService';
 
-// Re-export types for convenience
-export type {
-  DynamicMaterialCategory,
-  DynamicMaterialProperty,
-  LegacyMaterialCategories,
+// Temporary types until migration to MIVAA API
+export type DynamicMaterialCategory = any;
+export type DynamicMaterialProperty = any;
+export type LegacyMaterialCategories = any;
+
+// Export deprecated service stubs
+export const dynamicMaterialCategoriesService = {
+  getMaterialCategories: async () => { throw new Error('Deprecated: Use MIVAA API'); },
+  getMaterialProperties: async () => { throw new Error('Deprecated: Use MIVAA API'); },
 };
-
-// Export the dynamic service instance
-export { dynamicMaterialCategoriesService };
 
 // Type for material category with metadata (legacy format)
 export type MaterialCategoryData = {

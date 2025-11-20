@@ -36,14 +36,22 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import {
-  CategoryHierarchy,
-  CategoryCreationRequest,
-  dynamicCategoryManagementService,
-  getProductCategories,
-  getMaterialCategories,
-  getCategoriesHierarchy,
-} from '@/services/dynamicCategoryManagementService';
+// REMOVED: dynamicCategoryManagementService deleted during cleanup
+// import {
+//   CategoryHierarchy,
+//   CategoryCreationRequest,
+//   dynamicCategoryManagementService,
+//   getProductCategories,
+//   getMaterialCategories,
+//   getCategoriesHierarchy,
+// } from '@/services/dynamicCategoryManagementService';
+
+// Temporary types until migration to MIVAA API
+type CategoryHierarchy = any;
+type CategoryCreationRequest = any;
+const getCategoriesHierarchy = async () => { throw new Error('Deprecated: Use MIVAA API'); };
+const getProductCategories = async () => { throw new Error('Deprecated: Use MIVAA API'); };
+const getMaterialCategories = async () => { throw new Error('Deprecated: Use MIVAA API'); };
 
 interface DynamicCategoryManagerProps {
   onCategorySelect?: (category: CategoryHierarchy) => void;

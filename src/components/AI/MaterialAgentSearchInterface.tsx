@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
-import { HybridAIService } from '@/services/hybridAIService';
+// import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 
 interface AttachedFile {
@@ -645,35 +645,29 @@ export const MaterialAgentSearchInterface: React.FC<
         hybridConfig.primary &&
         hybridConfig.fallback
       ) {
-        // eslint-disable-next-line no-console
-        console.log('🔄 Using Hybrid AI Service...');
+        // REMOVED: HybridAIService deleted during cleanup
+        // Fallback to standard API integration
+        console.log('⚠️ Hybrid AI Service removed - using standard API integration');
         try {
-          // Use HybridAIService for enhanced AI processing
-          const hybridResponse = await (
-            HybridAIService as unknown as {
-              processRequest: (
-                params: Record<string, unknown>,
-              ) => Promise<HybridAIResponse>;
-            }
-          ).processRequest({
-            prompt: input,
-            model: hybridConfig.primary,
-            type: 'general',
-            maxRetries: 2,
-            minimumScore: 0.7,
-          });
+          const response = await apiService.callSupabaseFunction(
+            'mivaa-gateway',
+            {
+              action: 'agent_chat',
+              payload: {
+                message: input,
+                model: hybridConfig.primary,
+              },
+            },
+          );
 
-          if (hybridResponse.success) {
-            // Convert hybrid response to standard format
+          if (response.success) {
+            // Convert response to standard format
             data = {
               success: true,
-              response:
-                hybridResponse.data || 'Processed using hybrid AI models',
-              coordination_summary:
-                'Processed using hybrid AI models with fallback support',
+              response: response.data?.response || 'Processed using MIVAA API',
+              coordination_summary: 'Processed using MIVAA API',
               coordinated_result: {
-                content:
-                  hybridResponse.data || 'Processed using hybrid AI models',
+                content: response.data?.response || 'Processed using MIVAA API',
                 recommendations: [],
                 materials: [],
               },

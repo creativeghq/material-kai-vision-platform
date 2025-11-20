@@ -17,7 +17,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { savedSearchesService, SavedSearch } from '@/services/savedSearchesService';
+// REMOVED: savedSearchesService deleted during cleanup - use MIVAA API instead
+// import { savedSearchesService, SavedSearch } from '@/services/savedSearchesService';
+
+// Temporary types until migration to MIVAA API
+type SavedSearch = any;
+const savedSearchesService = {
+  getSavedSearches: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
+  deleteSavedSearch: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
+  executeSavedSearch: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
+};
 import {
   AlertDialog,
   AlertDialogAction,

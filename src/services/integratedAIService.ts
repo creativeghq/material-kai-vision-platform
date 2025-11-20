@@ -16,7 +16,9 @@ import {
   validateWithGuard as _validateWithGuard,
   isAgentExecutionResult,
 } from '@/types/guards';
-import { UserPreferences } from '@/services/spaceformerAnalysisService';
+// REMOVED: spaceformerAnalysisService moved to planning folder for future integration
+// import { UserPreferences } from '@/services/spaceformerAnalysisService';
+type UserPreferences = any;
 
 // Material Agent Orchestrator Services
 export interface MaterialAgentTaskRequest {
