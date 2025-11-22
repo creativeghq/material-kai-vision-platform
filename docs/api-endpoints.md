@@ -1,13 +1,21 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-14
+**Last Updated:** 2025-11-22
 **API Version:** v2.3.0
-**Total Endpoints:** 125+ (119 + Knowledge Base)
-**Status:** ✅ Production-Ready - Knowledge Base System Complete
+**Total Endpoints:** 127+ (121 + Knowledge Base + 2 New Relationship Endpoints)
+**Status:** ✅ Production-Ready - Knowledge Base System Complete + Relationship Endpoints Added
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (v2.3.0 - Knowledge Base System):**
+**Recent Updates (v2.3.0 - November 22, 2025):**
+- ✅ **NEW ENDPOINTS:** 2 relationship query endpoints for validation and testing
+  - `GET /api/rag/product-image-relationships` - Query product-to-image relationships
+  - `GET /api/rag/chunk-product-relationships` - Query chunk-to-product relationships
+  - Both support filtering by document_id or product_id
+  - Include relationship metadata, scores, and statistics
+  - Used for test validation and admin dashboards
+
+**Previous Updates (v2.3.0 - Knowledge Base System):**
 - ✅ **KNOWLEDGE BASE:** 15+ new endpoints for document management with AI embeddings (NEW)
   - Document CRUD with automatic embedding generation (1536D)
   - Smart content change detection (only regenerate when needed)
@@ -926,6 +934,131 @@ GET /api/rag/products?document_id={uuid}&limit=100&offset=0
 - Used in: `ProductsTab.tsx`, `MaterialsPage.tsx`
 - Displays: Product cards with images, metadata, specifications
 - Actions: View details, edit, delete, export
+
+---
+
+### 1.8 GET /product-image-relationships ✨ NEW
+
+**Purpose:** Get product-to-image relationships for validation and testing
+**Used In:** Test scripts, Admin dashboard, Relationship viewer
+**Flow:** Query relationships → Return product-image links with scores
+
+**Request:**
+```http
+GET /api/rag/product-image-relationships?document_id={uuid}&limit=100&offset=0&min_score=0.0
+```
+
+**Query Parameters:**
+- `document_id` (optional) - Filter by document ID
+- `product_id` (optional) - Filter by product ID
+- `limit` (optional) - Maximum results (default: 100, max: 1000)
+- `offset` (optional) - Pagination offset (default: 0)
+- `min_score` (optional) - Minimum relevance score (default: 0.0, range: 0.0-1.0)
+
+**Response:**
+```json
+{
+  "document_id": "uuid",
+  "product_id": null,
+  "relationships": [
+    {
+      "id": "uuid",
+      "product_id": "uuid",
+      "image_id": "uuid",
+      "relationship_type": "product_image",
+      "relevance_score": 0.88,
+      "created_at": "2025-11-22T14:17:52Z",
+      "products": {
+        "name": "NOVA",
+        "source_document_id": "uuid"
+      },
+      "document_images": {
+        "id": "uuid",
+        "caption": "Image from page 10",
+        "image_url": "https://...",
+        "page_number": 10
+      }
+    }
+  ],
+  "count": 51,
+  "limit": 100,
+  "offset": 0,
+  "statistics": {
+    "total_relationships": 51,
+    "by_relationship_type": {
+      "product_image": 51
+    },
+    "min_score_filter": 0.0
+  }
+}
+```
+
+**Database Operations:**
+- SELECT FROM product_image_relationships JOIN products JOIN document_images
+- Filter by document_id through products.source_document_id
+- Filter by product_id directly
+- Filter by min_score using relevance_score >= ?
+
+**Frontend Integration:**
+- Used in: Test validation scripts, Admin relationship viewer
+- Displays: Product-to-image links with relevance scores
+- Actions: View relationships, validate pipeline output
+
+---
+
+### 1.9 GET /chunk-product-relationships ✨ NEW
+
+**Purpose:** Get chunk-to-product relationships for validation and testing
+**Used In:** Test scripts, Admin dashboard, Content analysis
+**Flow:** Query relationships → Return chunk-product links
+
+**Request:**
+```http
+GET /api/rag/chunk-product-relationships?document_id={uuid}&limit=100&offset=0
+```
+
+**Query Parameters:**
+- `document_id` (optional) - Filter by document ID
+- `product_id` (optional) - Filter by product ID
+- `limit` (optional) - Maximum results (default: 100, max: 1000)
+- `offset` (optional) - Pagination offset (default: 0)
+
+**Response:**
+```json
+{
+  "document_id": "uuid",
+  "product_id": null,
+  "relationships": [
+    {
+      "id": "uuid",
+      "chunk_id": "uuid",
+      "product_id": "uuid",
+      "created_at": "2025-11-22T14:17:53Z",
+      "document_chunks": {
+        "document_id": "uuid",
+        "content": "NOVA collection features modern design..."
+      },
+      "products": {
+        "id": "uuid",
+        "name": "NOVA"
+      }
+    }
+  ],
+  "count": 163,
+  "limit": 100,
+  "offset": 0
+}
+```
+
+**Database Operations:**
+- SELECT FROM chunk_product_relationships JOIN document_chunks JOIN products
+- Filter by document_id through document_chunks.document_id
+- Filter by product_id directly
+
+**Frontend Integration:**
+- Used in: Test validation scripts, Content inspector
+- Displays: Chunk-to-product associations
+- Actions: View content relationships, validate chunking
 
 ---
 
