@@ -1,22 +1,32 @@
 /**
  * NOVA Product Focused End-to-End Test
- * 
+ *
  * Tests the complete PDF processing pipeline for a SINGLE product (NOVA by SG NY)
  * from the Harmony PDF catalog.
- * 
+ *
+ * Pipeline Stages (Internal Endpoints):
+ * 10. classify-images      (10-20%)  - Llama Vision + Claude validation
+ * 20. upload-images        (20-30%)  - Upload to Supabase Storage
+ * 30. save-images-db       (30-50%)  - Save to DB + SigLIP/CLIP embeddings
+ * 40. extract-metadata     (50-60%)  - AI metadata extraction (Claude/GPT)
+ * 50. create-chunks        (60-80%)  - Semantic chunking + text embeddings
+ * 60. create-relationships (80-100%) - Create all relationships
+ *
  * This test will:
  * 1. Extract only NOVA product pages from Harmony PDF
- * 2. Process all related images
- * 3. Run full AI analysis (LLAMA classification, Claude chunking, CLIP embeddings)
- * 4. Generate text and image embeddings
- * 5. Create product record
- * 6. Return COMPLETE detailed results including:
+ * 2. Process all related images with AI classification
+ * 3. Run full AI analysis (Llama classification, Claude validation, SigLIP/CLIP embeddings)
+ * 4. Extract comprehensive metadata using AI (Claude Sonnet 4.5)
+ * 5. Generate text and image embeddings
+ * 6. Create product records with metadata
+ * 7. Return COMPLETE detailed results including:
  *    - Actual Supabase image URLs
  *    - Extracted text content
- *    - All metadata
+ *    - All metadata (AI-extracted)
  *    - AI model outputs and scores
  *    - Processing steps with timings
  *    - Quality metrics
+ *    - Which AI models were used at each stage
  */
 
 import fetch from 'node-fetch';
