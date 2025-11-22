@@ -263,11 +263,11 @@ async function validateDataSaved(documentId, jobData) {
       validation.products = productsData.products?.length || 0;
     }
 
-    // Check relevancies
-    const relevanciesResponse = await fetch(`${MIVAA_API}/api/rag/relevancies?document_id=${documentId}&limit=1000`);
-    if (relevanciesResponse.ok) {
-      const relevanciesData = await relevanciesResponse.json();
-      validation.relevancies = relevanciesData.relevancies?.length || 0;
+    // Check product-image relevancies (FIXED: query correct endpoint)
+    const productImageRelResponse = await fetch(`${MIVAA_API}/api/rag/product-image-relationships?document_id=${documentId}&limit=1000`);
+    if (productImageRelResponse.ok) {
+      const relData = await productImageRelResponse.json();
+      validation.relevancies = relData.count || 0;
     }
 
     // Compare with job metadata
