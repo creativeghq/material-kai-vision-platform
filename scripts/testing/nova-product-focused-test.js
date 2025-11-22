@@ -26,7 +26,7 @@ import { Blob } from 'buffer';
 
 // Configuration
 const MIVAA_API = 'https://v1api.materialshub.gr';
-const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25%20(1).pdf';
+const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf';
 const WORKSPACE_ID = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e';
 
 // NOVA product search criteria
@@ -243,7 +243,7 @@ async function validateDataSaved(documentId, jobData) {
     if (imagesResponse.ok) {
       const imagesData = await imagesResponse.json();
       validation.images = imagesData.images?.length || 0;
-      validation.imageEmbeddings = imagesData.images?.filter(img => img.clip_embedding).length || 0;
+      validation.imageEmbeddings = imagesData.images?.filter(img => img.visual_clip_embedding_512).length || 0;
     }
 
     // Check products using consolidated RAG endpoint
@@ -594,6 +594,26 @@ async function generateDetailedReport(allData, jobResult) {
   console.log(`   ✅ Products with Metadata: ${productsWithMetadata}`);
   console.log(`   ✅ Total Metadata Generated: ${chunksWithMetadata + productsWithMetadata}`);
   console.log(`   ✅ Metadata Embeddings (text embeddings include metadata): ${chunksWithEmbeddings}`);
+
+  console.log('\n' + '='.repeat(100));
+  console.log('7️⃣  ALL RELATIONSHIP COUNTS');
+  console.log('='.repeat(100));
+  console.log(`   📊 EMBEDDINGS TO PRODUCTS:`);
+  console.log(`      • Total Text Embeddings (chunks): ${chunksWithEmbeddings}`);
+  console.log(`      • Total CLIP Embeddings (images): ${totalClipEmbeddings}`);
+  console.log(`      • Products: ${report.summary.total_products}`);
+  console.log(`      • Chunk-Product Relationships: ${report.summary.relevancies.chunk_product}`);
+  console.log(`      • Product-Image Relationships: ${report.summary.relevancies.product_image}`);
+  console.log(``);
+  console.log(`   📊 CHUNKS TO PRODUCTS:`);
+  console.log(`      • Total Chunks: ${report.summary.total_chunks}`);
+  console.log(`      • Total Products: ${report.summary.total_products}`);
+  console.log(`      • Chunk-Product Relationships: ${report.summary.relevancies.chunk_product}`);
+  console.log(``);
+  console.log(`   📊 CHUNKS TO IMAGES:`);
+  console.log(`      • Total Chunks: ${report.summary.total_chunks}`);
+  console.log(`      • Total Images: ${report.summary.total_images}`);
+  console.log(`      • Chunk-Image Relationships: ${report.summary.relevancies.chunk_image}`);
 
   console.log('\n' + '='.repeat(100));
   console.log('📊 ALL RELEVANCIES SUMMARY');

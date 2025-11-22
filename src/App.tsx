@@ -20,6 +20,7 @@ import AdminDashboard from './components/Admin/AdminDashboard';
 import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
 import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
+import { AgentConfigsPage } from './components/Admin/AgentConfigs';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
@@ -214,6 +215,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <AgentMLCoordination />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/agent-configs"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <AgentConfigsPage />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

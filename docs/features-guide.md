@@ -161,6 +161,7 @@ GET /api/products/{id}/similar
 - Document management
 - Product management
 - Metafield management
+- Agent configurations (AI prompts)
 
 **Analytics**:
 - Search analytics

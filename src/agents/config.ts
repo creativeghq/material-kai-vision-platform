@@ -86,6 +86,14 @@ export const agentAccessControl: Record<string, AgentAccessConfig> = {
     icon: 'Sparkles',
     color: 'text-yellow-500',
   },
+  'pdf-processor': {
+    id: 'pdf-processor',
+    name: 'PDF Processing Agent',
+    description: 'Intelligent PDF processing with multi-tool monitoring and diagnostics',
+    allowedRoles: ['admin', 'owner'],
+    icon: 'FileUp',
+    color: 'text-indigo-500',
+  },
 };
 
 /**

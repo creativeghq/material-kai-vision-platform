@@ -61,6 +61,15 @@
 - Model usage by stage
 - Cost optimization
 
+**[agent-system.md](agent-system.md)** - AI Agent system ✨ NEW
+- Database-driven agent prompts
+- 3 specialized agents (PDF Processor, Search, Product)
+- Admin UI for prompt management
+- LangChain.js tool orchestration
+- Real-time updates (no deployment)
+- Role-based access control
+- Best practices & troubleshooting
+
 **[search-strategies.md](search-strategies.md)** - Search system guide ✅
 - 6 search strategies (100% complete)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image
@@ -197,9 +206,10 @@
 1. [overview.md](overview.md) - Understand the platform
 2. [system-architecture.md](system-architecture.md) - Learn the architecture
 3. [pdf-processing-pipeline.md](pdf-processing-pipeline.md) - Understand the pipeline
-4. [job-queue-system.md](job-queue-system.md) - Learn async job processing
-5. [api-endpoints.md](api-endpoints.md) - Learn the API
-6. [deployment-guide.md](deployment-guide.md) - Understand deployment
+4. [agent-system.md](agent-system.md) - Learn the AI agent system
+5. [job-queue-system.md](job-queue-system.md) - Learn async job processing
+6. [api-endpoints.md](api-endpoints.md) - Learn the API
+7. [deployment-guide.md](deployment-guide.md) - Understand deployment
 
 ### For API Integration
 1. [api-endpoints.md](api-endpoints.md) - All endpoints
@@ -297,9 +307,9 @@ For questions or issues:
 
 ---
 
-**Last Updated**: November 3, 2025
-**Version**: 1.1.0
+**Last Updated**: November 21, 2025
+**Version**: 1.2.0
 **Status**: Production
-**Total Documentation**: 12 comprehensive guides
-**Total Lines**: 6,500+
+**Total Documentation**: 13 comprehensive guides
+**Total Lines**: 7,000+
 **Coverage**: 100% of platform features

@@ -129,6 +129,16 @@ Complete documentation for Material Kai Vision Platform.
 - API keys & configuration
 - Performance benchmarks
 
+**[agent-system.md](agent-system.md)** - AI Agent system architecture ✨ NEW
+- Database-driven agent prompts
+- 3 specialized agents (PDF Processor, Search, Product)
+- Admin UI for prompt management (/admin/agent-configs)
+- LangChain.js tool orchestration
+- Real-time prompt updates (no deployment needed)
+- Role-based access control
+- Agent monitoring and analytics
+- Best practices and troubleshooting
+
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing
 - Pipeline overview
 - Stage 0A: Product Discovery (0-10%) - Products + Metadata extraction

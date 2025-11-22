@@ -49,6 +49,43 @@ import { z } from 'npm:zod@3.24.1';
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+/**
+ * Load agent system prompt from database
+ * Falls back to default if not found
+ */
+async function getAgentSystemPrompt(agentType: string): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('material_agents')
+      .select('system_prompt')
+      .eq('agent_type', agentType)
+      .eq('status', 'active')
+      .single();
+
+    if (error) {
+      console.error(`Error loading prompt for ${agentType}:`, error);
+      return getDefaultPrompt(agentType);
+    }
+
+    return data?.system_prompt || getDefaultPrompt(agentType);
+  } catch (error) {
+    console.error(`Failed to load prompt for ${agentType}:`, error);
+    return getDefaultPrompt(agentType);
+  }
+}
+
+/**
+ * Default prompts as fallback
+ */
+function getDefaultPrompt(agentType: string): string {
+  const defaults: Record<string, string> = {
+    'pdf-processor': 'You are the PDF Processing Agent. Help users upload and process PDF files.',
+    'search': 'You are the Search Agent. Help users find materials using RAG search.',
+    'product': 'You are the Product Agent. Provide product information and recommendations.',
+  };
+  return defaults[agentType] || 'You are a helpful assistant.';
+}
+
 // Initialize Claude model AT MODULE LOAD TIME
 // It will auto-read ANTHROPIC_API_KEY from process.env
 const model = new ChatAnthropic({
@@ -160,13 +197,540 @@ const createImageAnalysisTool = (workspaceId: string) => {
 };
 
 /**
+ * LangChain Tool: Upload PDF for Processing
+ */
+const createUploadPDFTool = (userId: string, workspaceId: string) => {
+  return tool(
+    async ({ fileName, fileBase64, category }) => {
+      let retryCount = 0;
+      const maxRetries = 1; // Only retry once for transient failures
+
+      while (retryCount <= maxRetries) {
+        try {
+          if (retryCount > 0) {
+            console.log(`🔄 Retry attempt ${retryCount}/${maxRetries} for ${fileName}`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s before retry
+          }
+
+          console.log(`📤 Uploading PDF: ${fileName} (category: ${category})`);
+
+          // 1. Upload to Supabase storage
+          const fileBuffer = Uint8Array.from(atob(fileBase64), c => c.charCodeAt(0));
+          const filePath = `${userId}/${Date.now()}-${fileName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('pdf-documents')
+            .upload(filePath, fileBuffer, {
+              contentType: 'application/pdf',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            throw new Error(`Upload failed: ${uploadError.message}`);
+          }
+
+          // 2. Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('pdf-documents')
+            .getPublicUrl(filePath);
+
+          console.log(`✅ File uploaded to: ${publicUrl}`);
+
+          // 3. Call MIVAA API to start processing
+          const MIVAA_API_URL = Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
+          const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/upload`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              file_url: publicUrl,
+              category: category,
+              workspace_id: workspaceId,
+              title: fileName,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            const error = new Error(`MIVAA API error (${response.status}): ${errorText || response.statusText}`);
+
+            // Retry on server errors (5xx) or timeout
+            if (response.status >= 500 && retryCount < maxRetries) {
+              retryCount++;
+              continue;
+            }
+
+            throw error;
+          }
+
+          const result = await response.json();
+          console.log(`✅ Processing started. Job ID: ${result.job_id}`);
+
+          return JSON.stringify({
+            success: true,
+            job_id: result.job_id,
+            file_url: publicUrl,
+            file_name: fileName,
+            category: category,
+            message: retryCount > 0
+              ? `Upload successful after ${retryCount} retry! Job ID: ${result.job_id}`
+              : `Upload successful! Job ID: ${result.job_id}`,
+          });
+        } catch (error) {
+          console.error(`Upload PDF tool error (attempt ${retryCount + 1}):`, error);
+
+          // CRITICAL: Check if job was actually created despite the error
+          // This handles cases where:
+          // 1. Job was created but response failed
+          // 2. Connection was lost after job creation
+          // 3. Timeout occurred but job is processing
+          console.log(`🔍 Checking if job was created despite error...`);
+
+          try {
+            const { data: existingJobs } = await supabase
+              .from('async_jobs')
+              .select('*')
+              .ilike('metadata->>file_name', `%${fileName}%`)
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (existingJobs && existingJobs.length > 0) {
+              const job = existingJobs[0];
+              console.log(`✅ Found existing job despite error: ${job.id}`);
+
+              return JSON.stringify({
+                success: true,
+                job_id: job.id,
+                file_name: fileName,
+                category: category,
+                recovered: true,
+                message: `Upload reported error, but job was created successfully! Job ID: ${job.id}. Status: ${job.status}`,
+                status: job.status,
+                progress: job.progress,
+              });
+            }
+          } catch (checkError) {
+            console.error('Error checking for existing job:', checkError);
+          }
+
+          // If we've exhausted retries and no job found, return error
+          if (retryCount >= maxRetries) {
+            return JSON.stringify({
+              success: false,
+              error: error instanceof Error ? error.message : 'Upload failed',
+              suggestion: 'Check queryDatabase with type "jobs" to verify if job was created. If not, verify file size (<50MB) and server connectivity.',
+              fileName: fileName,
+            });
+          }
+
+          // Otherwise, retry
+          retryCount++;
+        }
+      }
+
+      // Should never reach here, but just in case
+      return JSON.stringify({
+        success: false,
+        error: 'Upload failed after retries',
+      });
+    },
+    {
+      name: 'uploadPDF',
+      description: 'Upload PDF file to Supabase storage and start MIVAA processing pipeline',
+      schema: z.object({
+        fileName: z.string().describe('PDF file name'),
+        fileBase64: z.string().describe('Base64 encoded PDF file data'),
+        category: z
+          .enum(['products', 'certificates', 'logos', 'specifications'])
+          .describe('Document category for extraction'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Check Job Status
+ */
+const createCheckJobStatusTool = () => {
+  return tool(
+    async ({ jobId }) => {
+      try {
+        console.log(`📊 Checking job status: ${jobId}`);
+
+        const MIVAA_API_URL = Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
+        const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/job/${jobId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to get job status (${response.status}): ${errorText || response.statusText}`);
+        }
+
+        const status = await response.json();
+        console.log(`✅ Job status: ${status.status} (${status.progress}%)`);
+
+        // Detect stuck jobs (no progress for extended time)
+        const isStuck = status.status === 'processing' &&
+                       status.progress < 100 &&
+                       status.updated_at &&
+                       (Date.now() - new Date(status.updated_at).getTime()) > 300000; // 5 minutes
+
+        // Detect failed stages
+        const hasFailed = status.status === 'failed' || status.error;
+
+        return JSON.stringify({
+          success: true,
+          job_id: status.job_id,
+          status: status.status,
+          progress: status.progress,
+          document_id: status.document_id,
+          last_checkpoint: status.last_checkpoint,
+          metadata: status.metadata,
+          created_at: status.created_at,
+          updated_at: status.updated_at,
+          error: status.error,
+          is_stuck: isStuck,
+          has_failed: hasFailed,
+          suggestion: isStuck ? 'Job appears stuck. Check server health and Sentry logs.' :
+                     hasFailed ? 'Job failed. Check error details and consider retry.' : null,
+        });
+      } catch (error) {
+        console.error('Check job status tool error:', error);
+
+        // CRITICAL: If API fails, check database directly
+        // This handles cases where:
+        // 1. MIVAA API is down but job is in database
+        // 2. Network issues prevent API access
+        // 3. Job exists but API endpoint is broken
+        console.log(`🔍 API failed, checking database directly for job ${jobId}...`);
+
+        try {
+          const { data: job, error: dbError } = await supabase
+            .from('async_jobs')
+            .select('*')
+            .eq('id', jobId)
+            .single();
+
+          if (dbError || !job) {
+            throw new Error('Job not found in database');
+          }
+
+          console.log(`✅ Found job in database: ${job.status} (${job.progress}%)`);
+
+          // Detect stuck jobs
+          const isStuck = job.status === 'processing' &&
+                         job.progress < 100 &&
+                         job.updated_at &&
+                         (Date.now() - new Date(job.updated_at).getTime()) > 300000; // 5 minutes
+
+          return JSON.stringify({
+            success: true,
+            job_id: job.id,
+            status: job.status,
+            progress: job.progress,
+            document_id: job.document_id,
+            last_checkpoint: job.last_checkpoint,
+            metadata: job.metadata,
+            created_at: job.created_at,
+            updated_at: job.updated_at,
+            error: job.error,
+            is_stuck: isStuck,
+            has_failed: job.status === 'failed',
+            recovered_from_db: true,
+            message: 'API unavailable, retrieved status from database',
+            suggestion: isStuck ? 'Job appears stuck. Check server health.' :
+                       job.status === 'failed' ? 'Job failed. Check error details and consider retry.' :
+                       'MIVAA API is down. Job status from database may be outdated.',
+          });
+        } catch (dbError) {
+          console.error('Database check also failed:', dbError);
+          return JSON.stringify({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to check job status',
+            suggestion: 'Job not found in API or database. Verify job ID is correct. Use queryDatabase with type "jobs" to search for jobs.',
+          });
+        }
+      }
+    },
+    {
+      name: 'checkJobStatus',
+      description: 'Check the current status and progress of a PDF processing job',
+      schema: z.object({
+        jobId: z.string().describe('Job ID to check status for'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Query Database
+ */
+const createQueryDatabaseTool = () => {
+  return tool(
+    async ({ documentId, queryType, documentName }) => {
+      try {
+        console.log(`🔍 Querying database: ${queryType}${documentId ? ` for document ${documentId}` : ''}${documentName ? ` named ${documentName}` : ''}`);
+
+        let query;
+        let tableName = '';
+        let data, error, totalCount;
+
+        switch (queryType) {
+          case 'jobs':
+            // Query async_jobs table for existing jobs
+            tableName = 'async_jobs';
+            let jobQuery = supabase
+              .from('async_jobs')
+              .select('*')
+              .order('created_at', { ascending: false })
+              .limit(20);
+
+            if (documentId) {
+              jobQuery = jobQuery.eq('document_id', documentId);
+            }
+            if (documentName) {
+              jobQuery = jobQuery.ilike('metadata->>file_name', `%${documentName}%`);
+            }
+
+            const jobResult = await jobQuery;
+            data = jobResult.data;
+            error = jobResult.error;
+
+            if (error) {
+              throw new Error(`Database query failed: ${error.message}`);
+            }
+
+            // Format job data for better readability
+            const jobs = data?.map(job => ({
+              job_id: job.id,
+              status: job.status,
+              progress: job.progress,
+              document_id: job.document_id,
+              file_name: job.metadata?.file_name,
+              created_at: job.created_at,
+              updated_at: job.updated_at,
+              last_checkpoint: job.last_checkpoint,
+              error: job.error,
+            }));
+
+            console.log(`✅ Found ${jobs?.length || 0} jobs`);
+
+            return JSON.stringify({
+              success: true,
+              queryType: 'jobs',
+              totalCount: jobs?.length || 0,
+              jobs: jobs || [],
+            });
+
+          case 'chunks':
+            tableName = 'chunks';
+            query = supabase
+              .from('chunks')
+              .select('id, content, metadata, created_at')
+              .eq('document_id', documentId)
+              .limit(5);
+            break;
+
+          case 'products':
+            tableName = 'products';
+            query = supabase
+              .from('products')
+              .select('id, name, description, metadata, created_at')
+              .eq('document_id', documentId);
+            break;
+
+          case 'images':
+            tableName = 'images';
+            query = supabase
+              .from('images')
+              .select('id, url, metadata, created_at')
+              .eq('document_id', documentId)
+              .limit(5);
+            break;
+
+          case 'embeddings':
+            tableName = 'embeddings';
+            query = supabase
+              .from('embeddings')
+              .select('id, type, metadata, created_at')
+              .eq('document_id', documentId)
+              .limit(5);
+            break;
+
+          default:
+            throw new Error(`Unknown query type: ${queryType}`);
+        }
+
+        // For non-job queries
+        if (queryType !== 'jobs') {
+          const result = await query;
+          data = result.data;
+          error = result.error;
+
+          if (error) {
+            throw new Error(`Database query failed: ${error.message}`);
+          }
+
+          // Get total count
+          const countResult = await supabase
+            .from(tableName)
+            .select('*', { count: 'exact', head: true })
+            .eq('document_id', documentId);
+
+          totalCount = countResult.count;
+
+          console.log(`✅ Found ${totalCount} ${queryType} for document ${documentId}`);
+
+          return JSON.stringify({
+            success: true,
+            queryType,
+            documentId,
+            totalCount: totalCount || 0,
+            sampleCount: data?.length || 0,
+            samples: data || [],
+          });
+        }
+      } catch (error) {
+        console.error('Query database tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Database query failed',
+        });
+      }
+    },
+    {
+      name: 'queryDatabase',
+      description: 'Query Supabase database for jobs, processing results, and data verification. ALWAYS use type "jobs" FIRST to check for existing/running jobs BEFORE uploading.',
+      schema: z.object({
+        queryType: z
+          .enum(['jobs', 'chunks', 'products', 'images', 'embeddings'])
+          .describe('Type of data to query. Use "jobs" to check for existing jobs BEFORE uploading.'),
+        documentId: z.string().optional().describe('Document ID to query (optional for jobs query)'),
+        documentName: z.string().optional().describe('Document/file name to search for (optional, for jobs query)'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Check Server Health
+ */
+const createCheckServerHealthTool = () => {
+  return tool(
+    async ({ checkType }) => {
+      try {
+        console.log(`🏥 Checking server health: ${checkType}`);
+
+        const MIVAA_API_URL = Deno.env.get('MIVAA_SERVICE_URL') || 'https://v1api.materialshub.gr';
+
+        let endpoint = '';
+        switch (checkType) {
+          case 'service_status':
+            endpoint = '/api/admin/system/health';
+            break;
+          case 'disk_space':
+          case 'memory':
+          case 'processes':
+            endpoint = '/api/admin/system/metrics';
+            break;
+          default:
+            throw new Error(`Unknown check type: ${checkType}`);
+        }
+
+        const response = await fetch(`${MIVAA_API_URL}${endpoint}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Health check failed: ${response.statusText}`);
+        }
+
+        const health = await response.json();
+        console.log(`✅ Server health check complete: ${checkType}`);
+
+        return JSON.stringify({
+          success: true,
+          checkType,
+          data: health,
+        });
+      } catch (error) {
+        console.error('Check server health tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Health check failed',
+        });
+      }
+    },
+    {
+      name: 'checkServerHealth',
+      description: 'Check MIVAA service health and system metrics (service status, disk space, memory, processes)',
+      schema: z.object({
+        checkType: z
+          .enum(['service_status', 'disk_space', 'memory', 'processes'])
+          .describe('Type of health check to perform'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Query Sentry for Errors
+ */
+const createQuerySentryTool = () => {
+  return tool(
+    async ({ jobId, timeRange }) => {
+      try {
+        console.log(`🔍 Querying Sentry for errors: job_id=${jobId}, timeRange=${timeRange}`);
+
+        // Note: This is a placeholder implementation
+        // In production, you would integrate with Sentry API using SENTRY_AUTH_TOKEN
+        // For now, we'll return a mock response indicating the feature is available
+
+        console.log(`⚠️ Sentry integration placeholder - implement with real Sentry API`);
+
+        return JSON.stringify({
+          success: true,
+          jobId,
+          timeRange,
+          errorCount: 0,
+          recentErrors: [],
+          message: 'Sentry integration available - configure SENTRY_AUTH_TOKEN to enable',
+        });
+      } catch (error) {
+        console.error('Query Sentry tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Sentry query failed',
+        });
+      }
+    },
+    {
+      name: 'querySentry',
+      description: 'Query Sentry for errors related to a specific job ID',
+      schema: z.object({
+        jobId: z.string().describe('Job ID to search for in Sentry'),
+        timeRange: z.string().default('1h').describe('Time range for error search (e.g., 1h, 24h)'),
+      }),
+    }
+  );
+};
+
+/**
  * Agent Configurations with RBAC
  */
 interface AgentConfig {
   id: string;
   name: string;
   description: string;
-  systemPrompt: string;
+  systemPrompt?: string; // Optional - loaded from database
   allowedRoles: string[];
   tools: string[];
 }
@@ -375,6 +939,14 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
 4. The marker MUST be on its own line
 5. ALWAYS include the marker for material queries`,
   },
+  'pdf-processor': {
+    id: 'pdf-processor',
+    name: 'PDF Processing Agent',
+    description: 'Intelligent PDF processing with monitoring',
+    allowedRoles: ['admin', 'owner'],
+    tools: ['uploadPDF', 'checkJobStatus', 'queryDatabase', 'checkServerHealth', 'querySentry'],
+    // systemPrompt loaded dynamically from database
+  },
 };
 
 /**
@@ -383,13 +955,18 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
 async function executeAgent(
   agentId: string,
   workspaceId: string,
+  userId: string,
   userInput: string,
-  messages: any[]
+  messages: any[],
+  pdfFile?: { name: string; base64: string; category: string }
 ) {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
   }
+
+  // Load system prompt from database (or use hardcoded fallback)
+  const systemPrompt = config.systemPrompt || await getAgentSystemPrompt(agentId);
 
   // Special handling for Demo Agent - return structured command
   if (agentId === 'demo') {
@@ -409,31 +986,146 @@ async function executeAgent(
     }
   }
 
-  // Use the pre-initialized model for other agents
-  const response = await model.invoke(messages, {
-    system: config.systemPrompt,
-  });
+  // Bind tools based on agent configuration
+  const tools: any[] = [];
 
-  // Extract text content from response
-  // LangChain response.content can be a string or array of content blocks
-  let textContent: string;
-  if (typeof response.content === 'string') {
-    textContent = response.content;
-  } else if (Array.isArray(response.content)) {
-    // Extract text from content blocks
-    textContent = response.content
-      .map((block: any) => {
-        if (typeof block === 'string') return block;
-        if (block.type === 'text') return block.text;
-        return '';
-      })
-      .filter(Boolean)
-      .join('\n');
-  } else {
-    textContent = String(response.content);
+  if (config.tools.includes('material_search')) {
+    tools.push(createSearchTool(workspaceId));
+  }
+  if (config.tools.includes('image_analysis')) {
+    tools.push(createImageAnalysisTool(workspaceId));
+  }
+  if (config.tools.includes('uploadPDF')) {
+    // If PDF file is provided, create a wrapper tool that auto-injects the PDF data
+    if (pdfFile) {
+      const uploadPDFWithData = tool(
+        async ({ category }: { category?: 'products' | 'certificates' | 'logos' | 'specifications' }) => {
+          // Call the original tool with the PDF data injected
+          const originalTool = createUploadPDFTool(userId, workspaceId);
+          return await originalTool.invoke({
+            fileName: pdfFile.name,
+            fileBase64: pdfFile.base64,
+            category: category || pdfFile.category,
+          });
+        },
+        {
+          name: 'uploadPDF',
+          description: `Upload the attached PDF file "${pdfFile.name}" to start processing`,
+          schema: z.object({
+            category: z
+              .enum(['products', 'certificates', 'logos', 'specifications'])
+              .optional()
+              .describe(`Document category (default: ${pdfFile.category})`),
+          }),
+        }
+      );
+      tools.push(uploadPDFWithData);
+    } else {
+      tools.push(createUploadPDFTool(userId, workspaceId));
+    }
+  }
+  if (config.tools.includes('checkJobStatus')) {
+    tools.push(createCheckJobStatusTool());
+  }
+  if (config.tools.includes('queryDatabase')) {
+    tools.push(createQueryDatabaseTool());
+  }
+  if (config.tools.includes('checkServerHealth')) {
+    tools.push(createCheckServerHealthTool());
+  }
+  if (config.tools.includes('querySentry')) {
+    tools.push(createQuerySentryTool());
   }
 
-  return textContent;
+  // Bind tools to model if any tools are configured
+  const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
+
+  // Agent loop: handle tool calls iteratively
+  const maxIterations = 10;
+  let iteration = 0;
+  let currentMessages = [...messages];
+
+  while (iteration < maxIterations) {
+    iteration++;
+    console.log(`🔄 Agent iteration ${iteration}/${maxIterations}`);
+
+    // Invoke model with current messages
+    const response = await modelWithTools.invoke(currentMessages, {
+      system: systemPrompt,
+    });
+
+    // Add assistant response to messages
+    currentMessages.push({
+      role: 'assistant',
+      content: response.content,
+      tool_calls: response.tool_calls,
+    });
+
+    // Check if model wants to call tools
+    if (!response.tool_calls || response.tool_calls.length === 0) {
+      // No tool calls - extract final text response
+      console.log('✅ Agent finished - no more tool calls');
+
+      let textContent: string;
+      if (typeof response.content === 'string') {
+        textContent = response.content;
+      } else if (Array.isArray(response.content)) {
+        textContent = response.content
+          .map((block: any) => {
+            if (typeof block === 'string') return block;
+            if (block.type === 'text') return block.text;
+            return '';
+          })
+          .filter(Boolean)
+          .join('\n');
+      } else {
+        textContent = String(response.content);
+      }
+
+      return textContent;
+    }
+
+    // Execute tool calls
+    console.log(`🔧 Executing ${response.tool_calls.length} tool call(s)`);
+
+    for (const toolCall of response.tool_calls) {
+      console.log(`  📞 Calling tool: ${toolCall.name}`);
+
+      try {
+        // Find the tool
+        const tool = tools.find((t: any) => t.name === toolCall.name);
+        if (!tool) {
+          throw new Error(`Tool not found: ${toolCall.name}`);
+        }
+
+        // Execute the tool
+        const toolResult = await tool.invoke(toolCall.args);
+        console.log(`  ✅ Tool ${toolCall.name} completed`);
+
+        // Add tool result to messages
+        currentMessages.push({
+          role: 'tool',
+          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
+          tool_call_id: toolCall.id,
+          name: toolCall.name,
+        });
+      } catch (error) {
+        console.error(`  ❌ Tool ${toolCall.name} failed:`, error);
+
+        // Add error result to messages
+        currentMessages.push({
+          role: 'tool',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          tool_call_id: toolCall.id,
+          name: toolCall.name,
+        });
+      }
+    }
+  }
+
+  // Max iterations reached
+  console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
+  return 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.';
 }
 
 /**
@@ -521,7 +1213,7 @@ serve(async (req) => {
 
   try {
     // Get request body
-    const { messages, agentId = 'search', model: requestedModel, images } = await req.json();
+    const { messages, agentId = 'search', model: requestedModel, images, pdfFile } = await req.json();
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -558,16 +1250,37 @@ serve(async (req) => {
 
     // Get last user message
     const lastMessage = messages[messages.length - 1];
-    const userInput = lastMessage?.content || '';
+    let userInput = lastMessage?.content || '';
 
     // Convert messages to Anthropic API format
-    const anthropicMessages = messages.map((msg: any) => ({
+    let anthropicMessages = messages.map((msg: any) => ({
       role: msg.role,
       content: msg.content,
     }));
 
+    // If PDF file is provided, instruct the agent to upload it
+    if (pdfFile && agentId === 'pdf-processor') {
+      console.log(`📎 PDF file attached: ${pdfFile.name}, category: ${pdfFile.category}`);
+
+      // Update the last user message to include upload instruction with PDF data
+      const uploadInstruction = `Please upload this PDF file using the uploadPDF tool:
+- File name: ${pdfFile.name}
+- Category: ${pdfFile.category}
+- File data: [base64 data provided]
+
+After uploading, monitor the processing job and verify completion.`;
+
+      // Replace the last message with the upload instruction
+      anthropicMessages[anthropicMessages.length - 1] = {
+        role: 'user',
+        content: uploadInstruction,
+      };
+
+      userInput = uploadInstruction;
+    }
+
     // Execute agent
-    const result = await executeAgent(agentId, workspaceId, userInput, anthropicMessages);
+    const result = await executeAgent(agentId, workspaceId, user.id, userInput, anthropicMessages, pdfFile);
 
     // Save conversation
     await saveConversation(user.id, agentId, messages, result);

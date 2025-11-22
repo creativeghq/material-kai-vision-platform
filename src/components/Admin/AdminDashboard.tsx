@@ -31,6 +31,7 @@ import {
   Bug,
   MoreHorizontal,
   Package,
+  Bot,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -436,6 +437,14 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/agent-ml',
         status: 'active',
         count: 'AI Configuration',
+      },
+      {
+        title: 'Agent Configurations',
+        description: 'Manage AI agent system prompts and behavior settings',
+        icon: Bot,
+        path: '/admin/agent-configs',
+        status: 'active',
+        count: 'Agent Prompts',
       },
     ],
     'Data Management': [

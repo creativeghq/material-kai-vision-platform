@@ -69,12 +69,46 @@
 | **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
 
+### **Supabase Edge Functions Secrets**
+
+**Required for PDF Processing Agent and other Edge Functions**
+
+| Secret Name | Type | Where Set | Description | Example/Format |
+|------------|------|-----------|-------------|----------------|
+| `ANTHROPIC_API_KEY` | **Secret** | Supabase Dashboard | Claude API key for agent chat | `sk-ant-xxxxxxxxxxxxxxxx` |
+| `MIVAA_SERVICE_URL` | Public | Supabase Dashboard | MIVAA API endpoint | `https://v1api.materialshub.gr` |
+| `MIVAA_API_KEY` | **Secret** | Supabase Dashboard | MIVAA API authentication (optional) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SSH_HOST` | Public | Supabase Dashboard | Server hostname for health checks | `v1api.materialshub.gr` |
+| `SSH_USER` | Public | Supabase Dashboard | SSH username for server monitoring | `root` or `deploy` |
+| `SSH_PRIVATE_KEY` | **Secret** | Supabase Dashboard | SSH private key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `SENTRY_AUTH_TOKEN` | **Secret** | Supabase Dashboard | Sentry API token for error queries | `sntrys_xxxxxxxxxxxxxxxx` |
+
+**How to Set Supabase Edge Function Secrets:**
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+2. Select your project (KAI - `bgbavxtjlbvgplozizxu`)
+3. Navigate to **Edge Functions** → **Settings** → **Secrets**
+4. Add each secret with the exact name from the table above
+5. Secrets are automatically available to all Edge Functions (no redeployment needed)
+
+**PDF Processing Agent Features:**
+- ✅ **Intelligent job recovery** - Checks for existing jobs before upload, resumes from checkpoints
+- ✅ **Connection loss resilience** - Verifies job status even when API is down (falls back to database)
+- ✅ **Duplicate prevention** - Never starts duplicate jobs for the same PDF
+- ✅ **Automatic retry** on transient failures (1 retry for 5xx errors)
+- ✅ **Stuck job detection** - Alerts if no progress for 5+ minutes
+- ✅ **Comprehensive error diagnostics** with Sentry integration
+- ✅ **Server health monitoring** via SSH (disk, memory, CPU)
+- ✅ **Conversational progress updates** with real-time stage tracking and emojis
+- ✅ **Self-healing suggestions** for common issues
+- ✅ **Partial data recovery** - Identifies what was created before failure
+- ✅ **Respects user's custom prompts** while auto-executing uploads
+
 ### **Optional Monitoring & Analytics Secrets**
 
 | Secret Name | Type | Where Used | Description | Example/Format |
 |------------|------|------------|-------------|----------------|
 | `SENTRY_DSN` | **Secret** | Backend | Sentry error tracking | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
-| `SENTRY_AUTH_TOKEN` | **Secret** | GitHub Actions | Sentry release tracking | `sntrys_xxxxxxxxxxxxxxxx` |
+| `SENTRY_AUTH_TOKEN` | **Secret** | GitHub Actions, Supabase Edge Functions | Sentry release tracking & error queries | `sntrys_xxxxxxxxxxxxxxxx` |
 | `GOOGLE_ANALYTICS_ID` | Public | Frontend | Google Analytics tracking | `G-XXXXXXXXXX` |
 | `POSTHOG_API_KEY` | **Secret** | Frontend | PostHog analytics | `phc_xxxxxxxxxxxxxxxx` |
 

@@ -356,13 +356,14 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ### Admin Features
 
-**Knowledge Base Management**: View/edit chunks, images, products  
-**PDF Processing Monitor**: Real-time job tracking  
-**AI Metrics Dashboard**: Model usage and cost tracking  
-**Quality Dashboard**: Chunk quality and embedding stability  
-**System Performance**: Response times, error rates, uptime  
-**User Management**: Workspace members and permissions  
+**Knowledge Base Management**: View/edit chunks, images, products
+**PDF Processing Monitor**: Real-time job tracking
+**AI Metrics Dashboard**: Model usage and cost tracking
+**Quality Dashboard**: Chunk quality and embedding stability
+**System Performance**: Response times, error rates, uptime
+**User Management**: Workspace members and permissions
 **Async Job Queue Monitor**: Background job status and recovery
+**Agent Configurations**: Manage AI agent system prompts and behavior
 
 ---
 

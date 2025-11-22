@@ -588,20 +588,74 @@ else:
 
 ---
 
-## 🚀 API Endpoint
+## 🏗️ Modular Architecture (Refactored)
+
+The pipeline has been refactored from a monolithic 2900+ line function into modular services and API endpoints for better debugging, testing, and retry capabilities.
+
+### Service Layer
+
+**ImageProcessingService** (`app/services/image_processing_service.py`)
+- `classify_images()` - Llama Vision + Claude validation
+- `upload_images_to_storage()` - Upload to Supabase Storage
+- `save_images_and_generate_clips()` - DB save + CLIP embeddings
+
+**ChunkingService** (`app/services/chunking_service.py`)
+- `create_chunks_and_embeddings()` - Semantic chunking + text embeddings + relationships
+
+**RelevancyService** (`app/services/relevancy_service.py`)
+- `create_chunk_image_relationships()` - Based on embedding similarity
+- `create_product_image_relationships()` - Based on page ranges
+- `create_all_relationships()` - Orchestrate all relationships
+
+### Internal API Endpoints
+
+Each pipeline stage has a dedicated endpoint for independent testing and retry:
 
 ```http
-POST /api/v1/pdf/upload
+POST /api/internal/classify-images/{job_id}
+POST /api/internal/upload-images/{job_id}
+POST /api/internal/save-images-db/{job_id}
+POST /api/internal/create-chunks/{job_id}
+POST /api/internal/create-relationships/{job_id}
+```
+
+### Main Orchestrator Endpoint
+
+```http
+POST /api/rag/documents/upload
 Content-Type: multipart/form-data
 
 Parameters:
 - file: PDF file
-- title: Optional document title
-- discovery_model: "claude" (default) or "gpt"
+- workspace_id: Workspace UUID
+- category: Extraction category (default: "products")
 - focused_extraction: true (default)
 
-Response: { job_id, status_url, processing_stages }
+Response:
+{
+  "job_id": "uuid",
+  "document_id": "uuid",
+  "status": "processing",
+  "progress": 0,
+  "current_stage": "INITIALIZED"
+}
 ```
+
+**Orchestrator Flow**:
+1. Upload PDF and create job
+2. Call `/api/internal/classify-images/{job_id}`
+3. Call `/api/internal/upload-images/{job_id}`
+4. Call `/api/internal/save-images-db/{job_id}`
+5. Call `/api/internal/create-chunks/{job_id}`
+6. Call `/api/internal/create-relationships/{job_id}`
+7. Update job status to COMPLETED
+
+**Benefits**:
+- Each stage independently testable
+- Failed stages can be retried without reprocessing
+- Clear error boundaries for debugging
+- Progress tracking per stage
+- 200 lines per service vs 2900+ monolith
 
 ---
 

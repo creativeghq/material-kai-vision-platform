@@ -198,6 +198,7 @@ LOG_LEVEL=ERROR
 ### **Admin & Management**
 - [Admin Panel Guide](./docs/admin-panel-guide.md) - Admin interface documentation
 - [Admin Knowledge Base](./docs/admin-knowledge-base-api.md) - Knowledge base management
+- [Agent Configurations](./docs/agent-system.md) - AI agent prompt management
 - [Metadata Inventory](./docs/metadata-inventory-system.md) - 200+ metadata fields
 - [CRM & User Management](./docs/crm-user-management.md) - User administration
 
@@ -281,6 +282,7 @@ curl https://v1api.materialshub.gr/docs
 - **Chunk Quality Dashboard**: Monitor and review chunk quality
 - **Product Management**: Create, edit, and enrich products
 - **Metadata Management**: Define and manage 200+ metadata fields
+- **Agent Configurations**: Manage AI agent system prompts
 - **User Management**: CRM and user administration
 - **Analytics**: Performance metrics and usage statistics
 

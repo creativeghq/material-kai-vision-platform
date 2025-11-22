@@ -19,6 +19,7 @@ import {
   User,
   Download,
   Upload,
+  FileUp,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,15 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'admin',
     available: true,
   },
+  {
+    id: 'pdf-processor',
+    name: 'PDF Processing Agent',
+    description: 'Intelligent PDF processing with multi-tool monitoring',
+    icon: FileUp,
+    color: 'text-indigo-500',
+    requiredRole: 'admin',
+    available: true,
+  },
 ];
 
 // AI Models available (format: provider/model-name for Mastra)
@@ -152,11 +162,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [attachedPDF, setAttachedPDF] = useState<{ name: string; base64: string; category: string } | null>(null);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // Voice input hook
   const {
@@ -266,19 +278,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         });
       }
 
+      // Prepare request body
+      const requestBody: any = {
+        messages: messages.concat({
+          id: `msg-${Date.now()}`,
+          role: 'user',
+          content: userInput,
+          timestamp: new Date(),
+        }),
+        agentId: selectedAgent,
+        model: selectedModel,
+        images: attachedImages,
+      };
+
+      // Add PDF data if attached (for pdf-processor agent)
+      if (attachedPDF && selectedAgent === 'pdf-processor') {
+        requestBody.pdfFile = attachedPDF;
+      }
+
       // Call Supabase Edge Function for agent execution
       const { data, error } = await supabase.functions.invoke('agent-chat', {
-        body: {
-          messages: messages.concat({
-            id: `msg-${Date.now()}`,
-            role: 'user',
-            content: userInput,
-            timestamp: new Date(),
-          }),
-          agentId: selectedAgent,
-          model: selectedModel,
-          images: attachedImages,
-        },
+        body: requestBody,
       });
 
       if (error) {
@@ -407,8 +427,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     } finally {
       setIsLoading(false);
       setAttachedImages([]);
+      setAttachedPDF(null);
     }
-  }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
+  }, [input, selectedAgent, selectedModel, attachedImages, attachedPDF, userId, currentConversationId, messages]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -426,6 +447,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       reader.readAsDataURL(file);
     });
   }, []);
+
+  const handlePDFUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      toast({
+        title: 'Invalid File Type',
+        description: 'Please upload a PDF file',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const base64 = (event.target.result as string).split(',')[1]; // Remove data:application/pdf;base64, prefix
+        setAttachedPDF({
+          name: file.name,
+          base64,
+          category: 'products', // Default category
+        });
+
+        // Auto-populate input with upload instruction
+        setInput(`Upload and process this PDF: ${file.name}`);
+      }
+    };
+    reader.readAsDataURL(file);
+  }, [toast]);
 
   const handleVoiceInput = useCallback(() => {
     if (!isVoiceSupported) {
@@ -887,6 +938,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
 
+          {/* Attached PDF */}
+          {attachedPDF && (
+            <div className="px-6 pt-3">
+              <div className="p-3 border rounded-lg bg-indigo-500/10 border-indigo-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileUp className="h-5 w-5 text-indigo-500" />
+                    <div>
+                      <p className="text-sm font-medium text-white">{attachedPDF.name}</p>
+                      <p className="text-xs text-white/70">Category: {attachedPDF.category}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setAttachedPDF(null)}
+                    className="bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-destructive/90"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Input Controls */}
           <div className="p-4">
             <div className="flex items-end gap-2">
@@ -898,22 +972,49 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 className="hidden"
                 onChange={handleImageUpload}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-9 w-9"
-              >
-                <Paperclip className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-9 w-9"
-              >
-                <ImageIcon className="h-4 w-4" />
-              </Button>
+              <input
+                ref={pdfInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handlePDFUpload}
+              />
+
+              {/* PDF Upload Button (only for pdf-processor agent) */}
+              {selectedAgent === 'pdf-processor' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => pdfInputRef.current?.click()}
+                  className="h-9 w-9 text-indigo-500 hover:text-indigo-600"
+                  title="Upload PDF"
+                >
+                  <FileUp className="h-4 w-4" />
+                </Button>
+              )}
+
+              {/* Image Upload Buttons (hidden for pdf-processor agent) */}
+              {selectedAgent !== 'pdf-processor' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-9 w-9"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-9 w-9"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+
               <Button
                 variant="ghost"
                 size="icon"
