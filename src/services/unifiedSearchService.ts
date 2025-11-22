@@ -321,7 +321,7 @@ export class UnifiedSearchService {
     return this.search({
       query: params.query,
       workspace_id: params.workspace_id,
-      strategy: 'all',
+      strategy: 'multi_vector',
       top_k: params.limit,
       material_filters: params.material_filters,
       image_url: params.image_url,
