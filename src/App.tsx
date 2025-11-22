@@ -21,6 +21,7 @@ import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
 import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AgentConfigsPage } from './components/Admin/AgentConfigs';
+import { PromptTemplatesPage } from './components/Admin/PromptTemplates/PromptTemplatesPage';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
@@ -227,6 +228,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <AgentConfigsPage />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/prompt-templates"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <PromptTemplatesPage />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>
