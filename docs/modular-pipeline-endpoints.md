@@ -2,7 +2,7 @@
 
 ## Overview
 
-The PDF processing pipeline has been refactored into **5 modular internal API endpoints** that work together in sequence. Each endpoint receives the output from the previous stage and processes it further.
+The PDF processing pipeline has been refactored into **6 modular internal API endpoints** that work together in sequence. Each endpoint receives the output from the previous stage and processes it further. All endpoints support **dynamic AI model configuration** via optional `ai_config` parameter.
 
 **Key Concept**: Each endpoint knows what to process because it receives **filtered/processed data** from the previous endpoint, not raw data.
 
@@ -11,23 +11,109 @@ The PDF processing pipeline has been refactored into **5 modular internal API en
 ## 🔄 Data Flow Between Endpoints
 
 ```
-1. classify-images     → Receives: ALL extracted images
-   ↓                     Returns: material_images + non_material_images
-   
-2. upload-images       → Receives: ONLY material_images (from step 1)
-   ↓                     Returns: uploaded_images with storage URLs
-   
-3. save-images-db      → Receives: ONLY uploaded material images (from step 2)
-   ↓                     Returns: images_saved + visual embeddings count (SigLIP/CLIP)
-   
-4. create-chunks       → Receives: Full extracted text + product_ids
-   ↓                     Returns: chunks + text embeddings + relationships
-   
-5. create-relationships → Receives: document_id + product_ids
-                          Returns: chunk-image + product-image relationships
+10. classify-images      → Receives: ALL extracted images
+    ↓                      Returns: material_images + non_material_images
+
+20. upload-images        → Receives: ONLY material_images (from step 10)
+    ↓                      Returns: uploaded_images with storage URLs
+
+30. save-images-db       → Receives: ONLY uploaded material images (from step 20)
+    ↓                      Returns: images_saved + visual embeddings count (SigLIP/CLIP)
+
+40. extract-metadata     → Receives: product_ids + PDF text
+    ↓                      Returns: enriched products with extracted metadata
+
+50. create-chunks        → Receives: Full extracted text + product_ids
+    ↓                      Returns: chunks + text embeddings + relationships
+
+60. create-relationships → Receives: document_id + product_ids
+                           Returns: chunk-image + product-image relationships
 ```
 
 **Important**: Each endpoint receives **pre-filtered data** from the orchestrator, which calls them in sequence and passes the output of one as input to the next.
+
+---
+
+## 🤖 AI Model Configuration
+
+All endpoints support **dynamic AI model configuration** via the optional `ai_config` parameter. This allows you to customize which AI models are used for different stages of the pipeline.
+
+### Configuration Parameters
+
+```typescript
+interface AIModelConfig {
+  // Visual Embedding Models (SigLIP primary, CLIP fallback)
+  visual_embedding_primary?: string;          // Default: "google/siglip-so400m-patch14-384"
+  visual_embedding_fallback?: string;         // Default: "openai/clip-vit-base-patch32"
+
+  // Text Embedding Model
+  text_embedding_model?: string;              // Default: "text-embedding-3-small"
+
+  // Image Classification Models
+  classification_primary_model?: string;      // Default: "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+  classification_validation_model?: string;   // Default: "claude-sonnet-4-20250514"
+  classification_confidence_threshold?: number; // Default: 0.7
+
+  // Product Discovery Model
+  discovery_model?: "claude-sonnet-4-20250514" | "gpt-5" | "gpt-4o"; // Default: "claude-sonnet-4-20250514"
+
+  // Metadata Extraction Model
+  metadata_extraction_model?: "claude" | "gpt"; // Default: "claude"
+
+  // Chunking Model
+  chunking_model?: string;                    // Default: "gpt-4o"
+
+  // Temperature Settings
+  discovery_temperature?: number;             // Default: 0.1
+  classification_temperature?: number;        // Default: 0.1
+  metadata_temperature?: number;              // Default: 0.1
+
+  // Max Tokens
+  discovery_max_tokens?: number;              // Default: 4096
+  classification_max_tokens?: number;         // Default: 512
+  metadata_max_tokens?: number;               // Default: 4096
+}
+```
+
+### Pre-configured Profiles
+
+**DEFAULT_AI_CONFIG** (Balanced):
+- Best overall accuracy and reliability
+- Uses Claude Sonnet 4.5 for discovery and metadata
+- Uses SigLIP for visual embeddings with CLIP fallback
+- Uses Llama Vision for fast classification with Claude validation
+
+**FAST_CONFIG** (Speed Optimized):
+- Uses GPT-4o instead of Claude for faster processing
+- Uses Claude Haiku for validation (faster than Sonnet)
+- Reduced max tokens for faster responses
+
+**HIGH_ACCURACY_CONFIG** (Quality Optimized):
+- Uses GPT-5 for discovery (most accurate)
+- Higher confidence threshold (0.8) for better quality
+- Increased max tokens for more context
+
+**COST_OPTIMIZED_CONFIG** (Budget Friendly):
+- Uses GPT-4o and Claude Haiku (cheaper models)
+- Lower confidence threshold (0.6) to reduce validation calls
+- Reduced max tokens to minimize costs
+
+### Usage Example
+
+```json
+{
+  "job_id": "abc123",
+  "extracted_images": [...],
+  "ai_config": {
+    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_validation_model": "claude-sonnet-4-20250514",
+    "classification_confidence_threshold": 0.8,
+    "visual_embedding_primary": "google/siglip-so400m-patch14-384"
+  }
+}
+```
+
+If `ai_config` is not provided, the endpoint uses `DEFAULT_AI_CONFIG`.
 
 ---
 
@@ -36,7 +122,7 @@ The PDF processing pipeline has been refactored into **5 modular internal API en
 ### Main Orchestrator
 - **Endpoint**: `POST /api/rag/documents/upload`
 - **Purpose**: Main entry point that orchestrates the complete pipeline
-- **Calls**: All 5 internal endpoints sequentially
+- **Calls**: All 6 internal endpoints sequentially
 - **Infrastructure**: Manages ProgressTracker, CheckpointRecoveryService, job_storage, heartbeat monitoring
 
 ### Internal Endpoints
@@ -46,7 +132,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 
 ## 📋 Endpoint Details
 
-### 1. POST /api/internal/classify-images/{job_id}
+### 10. POST /api/internal/classify-images/{job_id} (10-20%)
 
 **Purpose**: Classify ALL extracted images as material or non-material using two-stage AI classification
 
@@ -75,6 +161,22 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
   - Improves accuracy for edge cases
   - Concurrency: 2 parallel calls
 
+**AI Configuration** (Optional):
+All endpoints accept an optional `ai_config` parameter to customize AI models:
+```json
+{
+  "visual_embedding_primary": "google/siglip-so400m-patch14-384",
+  "visual_embedding_fallback": "openai/clip-vit-base-patch32",
+  "text_embedding_model": "text-embedding-3-small",
+  "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+  "classification_validation_model": "claude-sonnet-4-20250514",
+  "classification_confidence_threshold": 0.7,
+  "discovery_model": "claude-sonnet-4-20250514",
+  "metadata_extraction_model": "claude",
+  "chunking_model": "gpt-4o"
+}
+```
+
 **Request**:
 ```json
 {
@@ -88,7 +190,11 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
       "height": 600
     }
   ],
-  "confidence_threshold": 0.7
+  "ai_config": {
+    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_validation_model": "claude-sonnet-4-20250514",
+    "classification_confidence_threshold": 0.7
+  }
 }
 ```
 
@@ -122,16 +228,16 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 ```
 
 **Defaults**:
-- `confidence_threshold`: 0.7 (70% minimum confidence)
+- Uses `DEFAULT_AI_CONFIG` if `ai_config` not provided
 - Timeout: 600s (10 minutes)
 
-**Progress**: Updates job to 60%
+**Progress**: Updates job to 10-20%
 
 **What Happens Next**: The `material_images` list is passed to the next endpoint (upload-images)
 
 ---
 
-### 2. POST /api/internal/upload-images/{job_id}
+### 20. POST /api/internal/upload-images/{job_id} (20-30%)
 
 **Purpose**: Upload material images to Supabase Storage
 
@@ -187,13 +293,13 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Timeout: 600s (10 minutes)
 - Retry: 3 attempts with exponential backoff
 
-**Progress**: Updates job to 65%
+**Progress**: Updates job to 20-30%
 
 **What Happens Next**: The `uploaded_images` list (with storage URLs) is passed to the next endpoint (save-images-db)
 
 ---
 
-### 3. POST /api/internal/save-images-db/{job_id}
+### 30. POST /api/internal/save-images-db/{job_id} (30-50%)
 
 **Purpose**: Save images to database and generate visual embeddings
 
@@ -267,13 +373,74 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Timeout: 600s (10 minutes)
 - Batch processing: All embeddings generated in parallel
 
-**Progress**: Updates job to 75%
+**Progress**: Updates job to 30-50%
 
 **What Happens Next**: Images and embeddings are now in the database, ready for relationship creation
 
 ---
 
-### 4. POST /api/internal/create-chunks/{job_id}
+### 40. POST /api/internal/extract-metadata/{job_id} (50-60%)
+
+**Purpose**: Extract comprehensive metadata from PDF text for products using AI
+
+**What It Receives**:
+- `product_ids`: List of product IDs to enrich with metadata
+- `pdf_text`: Full PDF text content
+- `document_id`: ID of the document being processed
+
+**How It Knows What to Process**:
+- It receives **product IDs** from product discovery stage
+- Extracts product-specific text based on page ranges
+- Uses AI to extract structured metadata from text
+
+**AI Processing**:
+- **Model**: Configurable via `ai_config.metadata_extraction_model`
+  - Default: `claude` (Claude Sonnet 4.5)
+  - Alternative: `gpt` (GPT-4o or GPT-5)
+- **Temperature**: Configurable via `ai_config.metadata_temperature` (default: 0.1)
+- **Max Tokens**: Configurable via `ai_config.metadata_max_tokens` (default: 4096)
+- **Extraction Method**: Dynamic metadata extraction with category hints
+- **Metadata Fields**: Dimensions, colors, patterns, materials, finishes, applications, certifications, etc.
+
+**Request**:
+```json
+{
+  "job_id": "string",
+  "document_id": "uuid",
+  "product_ids": ["uuid1", "uuid2"],
+  "pdf_text": "Full PDF text content...",
+  "ai_config": {
+    "metadata_extraction_model": "claude",
+    "metadata_temperature": 0.1,
+    "metadata_max_tokens": 4096
+  }
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "products_enriched": 7,
+  "metadata_fields_extracted": 42,
+  "extraction_method": "ai_dynamic_claude",
+  "model_used": "claude"
+}
+```
+
+**Defaults**:
+- `metadata_extraction_model`: "claude"
+- `metadata_temperature`: 0.1
+- `metadata_max_tokens`: 4096
+- Timeout: 600s (10 minutes)
+
+**Progress**: Updates job to 50-60%
+
+**What Happens Next**: Products are enriched with metadata, ready for chunking
+
+---
+
+### 50. POST /api/internal/create-chunks/{job_id} (60-80%)
 
 **Purpose**: Create semantic chunks from extracted text and generate text embeddings
 
@@ -334,13 +501,13 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Timeout: 600s (10 minutes)
 - Batch processing: All embeddings generated in parallel
 
-**Progress**: Updates job to 85%
+**Progress**: Updates job to 60-80%
 
 **What Happens Next**: Chunks and text embeddings are in the database, ready for relationship creation
 
 ---
 
-### 5. POST /api/internal/create-relationships/{job_id}
+### 60. POST /api/internal/create-relationships/{job_id} (80-100%)
 
 **Purpose**: Create chunk-image and product-image relationships
 
@@ -390,7 +557,7 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - `similarity_threshold`: 0.5 (50% minimum similarity)
 - Timeout: 600s (10 minutes)
 
-**Progress**: Updates job to 100%
+**Progress**: Updates job to 80-100%
 
 **What Happens Next**: Pipeline complete! All data is in the database with relationships.
 
