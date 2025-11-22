@@ -56,15 +56,16 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 5: Visual Embeddings (5 types)                                   │
-│ Model: SigLIP ViT-SO400M (Google)                                     │
+│ Primary Model: SigLIP ViT-SO400M (Google)                             │
+│ Fallback Model: OpenAI CLIP ViT-B/32 (if SigLIP fails)               │
 │ Purpose: Generate 5 specialized 512D embeddings per image             │
 │ Types:                                                                 │
 │   1. Visual (general appearance)                                       │
 │   2. Color (color palette)                                            │
 │   3. Texture (surface patterns)                                       │
-│   4. Application (use-case)                                           │
+│   4. Style (design aesthetic)                                         │
 │   5. Material (material type)                                         │
-│ Why: +19-29% accuracy over CLIP, same 512D dimension                 │
+│ Why: SigLIP has +19-29% accuracy over CLIP, CLIP is reliable fallback│
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -113,11 +114,11 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 
 ## 🔍 Detailed Model Breakdown
 
-### 1. **Google SigLIP ViT-SO400M** 🎯
+### 1. **Google SigLIP ViT-SO400M (Primary) + OpenAI CLIP ViT-B/32 (Fallback)** 🎯
 
 **File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py`
 
-**Usage**:
+**Primary Model - SigLIP**:
 ```python
 from sentence_transformers import SentenceTransformer
 model = SentenceTransformer('google/siglip-so400m-patch14-384')
@@ -125,19 +126,30 @@ embedding = model.encode(pil_image, convert_to_numpy=True)
 embedding = embedding / np.linalg.norm(embedding)  # L2 normalize
 ```
 
+**Fallback Model - CLIP** (if SigLIP fails):
+```python
+from transformers import CLIPProcessor, CLIPModel
+model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
+processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
+inputs = processor(images=pil_image, return_tensors="pt")
+embedding = model.get_image_features(**inputs)
+embedding = embedding / embedding.norm(dim=-1, keepdim=True)  # Normalize
+```
+
 **Purpose**:
 - Generate 512D visual embeddings for images
-- 5 specialized embeddings per image (visual, color, texture, application, material)
-- OCR filtering (classify images as technical vs lifestyle)
+- 5 specialized embeddings per image (visual, color, texture, style, material)
+- Two-tier approach: Try SigLIP first (better accuracy), fall back to CLIP if needed
 
 **Impact on Flow**:
-- ✅ **PDF Processing**: Filters images before OCR (saves processing time)
-- ✅ **Embedding Generation**: Creates all 5 visual embeddings (Stage 7-10, 80-91%)
+- ✅ **PDF Processing**: Generates all 5 visual embeddings (65-75% progress)
 - ✅ **Search**: Enables visual similarity search
-- ✅ **Accuracy**: +19-29% improvement over CLIP
+- ✅ **Accuracy**: SigLIP has +19-29% improvement over CLIP
+- ✅ **Reliability**: CLIP fallback ensures embeddings are always generated
+- ✅ **Metadata Tracking**: Records which model was actually used
 
-**Cost**: Free (Hugging Face)  
-**Speed**: 150-400ms per image  
+**Cost**: Free (Hugging Face)
+**Speed**: 150-400ms per image (SigLIP), 100-300ms (CLIP)
 **Output**: 512D numpy array → normalized → list
 
 ---
