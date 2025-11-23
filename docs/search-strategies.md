@@ -230,17 +230,17 @@ curl -X POST "http://localhost:8000/api/rag/search?strategy=vector" \
 - **Method:** `_search_multi_vector()`
 - **Embeddings Combined:**
   - text_embedding_1536 (20% weight) - Semantic understanding
-  - visual_clip_embedding_512 (20% weight) - Visual similarity
-  - color_clip_embedding_512 (15% weight) - Color palette matching
-  - texture_clip_embedding_512 (15% weight) - Texture pattern matching
-  - style_clip_embedding_512 (15% weight) - Design style matching
-  - material_clip_embedding_512 (15% weight) - Material type matching
+  - visual_512 (20% weight) - Visual similarity (from VECS image_clip_embeddings)
+  - color_512 (15% weight) - Color palette matching (from VECS image_color_embeddings)
+  - texture_512 (15% weight) - Texture pattern matching (from VECS image_texture_embeddings)
+  - style_512 (15% weight) - Design style matching (from VECS image_style_embeddings)
+  - material_512 (15% weight) - Material type matching (from VECS image_material_embeddings)
 - **Best For:** ALL queries - best balance of accuracy, speed, and cost
 - **Example:** "geometric patterns in neutral colors", "modern minimalist furniture", "oak wood flooring"
 
 **How It Works:**
 1. Generates text embedding from query
-2. Runs **6 parallel searches** across all embedding types using VECS (Supabase Vector Client)
+2. Runs **6 parallel searches** across all embedding types using VECS collections (fast HNSW indexing)
 3. Calculates weighted cosine similarity for each embedding type
 4. Combines scores with intelligent weighting:
    ```
@@ -467,7 +467,7 @@ curl -X POST "http://localhost:8000/api/rag/search?strategy=keyword" \
 
 **How It Works:**
 1. Generates color-focused CLIP embedding from query
-2. Queries `color_clip_embedding_512` column in VECS
+2. Queries `image_color_embeddings` VECS collection for fast similarity search
 3. Returns products with similar color palettes
 4. Optimized for color-specific queries
 
@@ -495,7 +495,7 @@ curl -X POST "http://localhost:8000/api/rag/search?strategy=color" \
 
 **How It Works:**
 1. Generates texture-focused CLIP embedding from query
-2. Queries `texture_clip_embedding_512` column in VECS
+2. Queries `image_texture_embeddings` VECS collection for fast similarity search
 3. Returns products with similar texture patterns
 4. Optimized for texture-specific queries
 

@@ -118,13 +118,23 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 
 **File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py`
 
-**Primary Model - SigLIP**:
+**Primary Model - SigLIP** (using transformers directly):
 ```python
-from sentence_transformers import SentenceTransformer
-model = SentenceTransformer('google/siglip-so400m-patch14-384')
-embedding = model.encode(pil_image, convert_to_numpy=True)
-embedding = embedding / np.linalg.norm(embedding)  # L2 normalize
+from transformers import AutoModel, AutoProcessor
+import torch
+
+model = AutoModel.from_pretrained('google/siglip-so400m-patch14-384')
+processor = AutoProcessor.from_pretrained('google/siglip-so400m-patch14-384')
+model.eval()
+
+with torch.no_grad():
+    inputs = processor(images=pil_image, return_tensors="pt")
+    image_features = model.get_image_features(**inputs)
+    embedding = image_features / image_features.norm(dim=-1, keepdim=True)  # L2 normalize
+    embedding = embedding.squeeze().cpu().numpy()
 ```
+
+**Note**: Using `transformers` directly instead of `sentence-transformers` to avoid `'SiglipConfig' object has no attribute 'hidden_size'` error with SigLIP's composite config structure.
 
 **Fallback Model - CLIP** (if SigLIP fails):
 ```python

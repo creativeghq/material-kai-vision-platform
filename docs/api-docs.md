@@ -22,13 +22,15 @@ The multi-vector search has been **significantly enhanced** to be the single com
 
 ### What's New
 
-✅ **6 Specialized CLIP Embeddings** (previously 3)
+✅ **6 Specialized Embeddings** (previously 3)
 - text_embedding_1536 (20%) - Semantic understanding
-- visual_clip_embedding_512 (20%) - Visual similarity
-- color_clip_embedding_512 (15%) - Color palette matching
-- texture_clip_embedding_512 (15%) - Texture pattern matching
-- style_clip_embedding_512 (15%) - Design style matching
-- material_clip_embedding_512 (15%) - Material type matching
+- visual_512 (20%) - Visual similarity (VECS: image_clip_embeddings)
+- color_512 (15%) - Color palette matching (VECS: image_color_embeddings)
+- texture_512 (15%) - Texture pattern matching (VECS: image_texture_embeddings)
+- style_512 (15%) - Design style matching (VECS: image_style_embeddings)
+- material_512 (15%) - Material type matching (VECS: image_material_embeddings)
+
+**Note**: Embeddings stored in `embeddings` table + VECS collections (not document_images columns)
 
 ✅ **JSONB Metadata Filtering**
 - Filter by material properties (finish, dimensions, etc.)

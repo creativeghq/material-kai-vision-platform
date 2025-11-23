@@ -31,12 +31,17 @@ Every image gets **5 specialized embeddings** for different search types:
 | **Application** | SigLIP (use-case) | 512 | Use-case similarity |
 | **Material** | SigLIP (material-focused) | 512 | Material type matching |
 
-**Storage**: All embeddings stored in `document_images` table columns:
-- `visual_clip_embedding_512`
-- `color_clip_embedding_512`
-- `texture_clip_embedding_512`
-- `application_clip_embedding_512`
-- `material_clip_embedding_512`
+**Storage**: All embeddings stored in two locations:
+1. **`embeddings` table** - For tracking, analytics, JOINs, cross-entity queries
+   - `entity_id` (image_id), `entity_type` ("image")
+   - `embedding_type` ("visual_512", "color_512", "texture_512", "style_512", "material_512")
+   - `embedding` (vector), `dimension`, `model`, `workspace_id`
+2. **VECS collections** - For fast vector similarity search with HNSW indexing
+   - `image_clip_embeddings` (visual)
+   - `image_color_embeddings` (color)
+   - `image_texture_embeddings` (texture)
+   - `image_style_embeddings` (style)
+   - `image_material_embeddings` (material)
 
 ---
 
@@ -153,9 +158,9 @@ Response: { products: [...] }
    - All 5 CLIP embeddings generated
    - Stored in temporary record
 4. **Search Database** → Vector similarity search
-   - Query `document_images` table
-   - Use `visual_clip_embedding_512 <=> query_embedding`
-   - Filter by material_type if detected
+   - Query VECS collections for fast similarity search
+   - Use `image_clip_embeddings` collection with cosine similarity
+   - Filter by material_type if detected (from embeddings table metadata)
 5. **Return Matches** → Top similar materials
    - Include product details
    - Include relevance scores
@@ -191,14 +196,12 @@ CREATE TABLE document_images (
   -- AI Analysis
   llama_analysis JSONB,      -- Llama 4 Scout analysis
   claude_validation JSONB,   -- Claude validation (optional)
-  
-  -- Multi-Vector Embeddings (512D each)
-  visual_clip_embedding_512 vector(512),
-  color_clip_embedding_512 vector(512),
-  texture_clip_embedding_512 vector(512),
-  application_clip_embedding_512 vector(512),
-  material_clip_embedding_512 vector(512),
-  
+
+  -- Note: Multi-Vector Embeddings are now stored in:
+  -- 1. embeddings table (for tracking/analytics/JOINs)
+  -- 2. VECS collections (for fast similarity search)
+  -- Embedding columns removed from document_images to eliminate redundancy
+
   -- Metadata
   metadata JSONB,
   created_at TIMESTAMP DEFAULT NOW()
