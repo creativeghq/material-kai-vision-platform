@@ -1,275 +1,135 @@
-# Image Relevancy & Search System
-
-**Last Updated:** 2025-01-15  
-**Version:** 2.0.0  
-**Status:** ✅ Production
-
----
+# Image Search & Recognition
 
 ## Overview
 
-The MIVAA Image Relevancy System uses **multi-vector embeddings** and **AI-powered analysis** to link images to products, chunks, and enable intelligent image search. This system powers:
+The Material KAI Vision Platform uses advanced AI to understand and search through material images. When you upload a PDF catalog or search with an image, the system automatically analyzes every image to help you find exactly what you're looking for.
 
-1. **Image-to-Product Linking** - Automatically connect images to products they depict
-2. **Image-to-Chunk Linking** - Connect images to text chunks that reference them
-3. **Image Similarity Search** - Find similar materials from uploaded images
-4. **Material Recognition** - Identify materials from images and return similar products
+## What It Does
 
----
+### Intelligent Image Understanding
 
-## 🎯 Core Components
+Every image in your catalogs is analyzed using state-of-the-art AI to understand:
 
-### 1. Multi-Vector Image Embeddings
+- **Visual Appearance** - Overall look and style of the material
+- **Colors** - Dominant colors and color palettes
+- **Textures** - Surface patterns and textures
+- **Material Type** - What kind of material it is (fabric, tile, wood, etc.)
+- **Application** - Where and how the material is typically used
 
-Every image gets **5 specialized embeddings** for different search types:
+This multi-dimensional understanding allows the platform to find materials that match your needs in different ways.
 
-| Embedding Type | Model | Dimension | Purpose |
-|---------------|-------|-----------|---------|
-| **Visual SigLIP** | Google SigLIP SO400M | 512 | General visual similarity (+19-29% accuracy) |
-| **Color** | SigLIP (color-focused) | 512 | Color-based search |
-| **Texture** | SigLIP (texture-focused) | 512 | Texture pattern matching |
-| **Application** | SigLIP (use-case) | 512 | Use-case similarity |
-| **Material** | SigLIP (material-focused) | 512 | Material type matching |
+### Smart Image Search
 
-**Storage**: All embeddings stored in two locations:
-1. **`embeddings` table** - For tracking, analytics, JOINs, cross-entity queries
-   - `entity_id` (image_id), `entity_type` ("image")
-   - `embedding_type` ("visual_512", "color_512", "texture_512", "style_512", "material_512")
-   - `embedding` (vector), `dimension`, `model`, `workspace_id`
-2. **VECS collections** - For fast vector similarity search with HNSW indexing
-   - `image_clip_embeddings` (visual)
-   - `image_color_embeddings` (color)
-   - `image_texture_embeddings` (texture)
-   - `image_style_embeddings` (style)
-   - `image_material_embeddings` (material)
+Upload any image to find similar materials in your catalog:
 
----
+1. **Visual Similarity** - Find materials that look similar overall
+2. **Color Matching** - Find materials with similar color schemes
+3. **Texture Matching** - Find materials with similar surface patterns
+4. **Material Type** - Find materials of the same type
+5. **Application** - Find materials suitable for similar uses
 
-### 2. AI Image Analysis
+### Automatic Product Linking
 
-**Two-Stage Analysis Pipeline**:
+The system automatically connects images to the products they represent:
 
-#### Stage 1: Llama 4 Scout 17B Vision (Primary)
-- **Model**: `meta-llama/Llama-4-Scout-17B-16E-Instruct`
-- **Purpose**: Fast, accurate material detection
-- **Output**: Material type, colors, textures, quality score (0-1)
-- **Storage**: `llama_analysis` JSONB column
+- **Product Images** - Images showing the actual product
+- **Detail Shots** - Close-up images of product features
+- **Application Examples** - Images showing the product in use
+- **Variants** - Images showing different colors or patterns
 
-#### Stage 2: Claude Validation (Optional)
-- **Model**: Claude Sonnet 4.5
-- **Purpose**: Validate low-quality Llama results
-- **Trigger**: Quality score < 0.7
-- **Output**: Enhanced analysis with corrections
-- **Storage**: `claude_validation` JSONB column
+This ensures that when you search or browse, you see all relevant images for each product.
 
----
+## How It Works
 
-## 🔗 Image Relevancy Linking
+### AI-Powered Analysis
 
-### 1. Image → Product Relationships
+The platform uses two advanced AI systems working together:
 
-**Table**: `product_image_relationships`
+**Primary Analysis** - Fast, accurate material detection using Llama 4 Scout Vision AI
+- Identifies material types, colors, and textures
+- Provides quality scores for each analysis
+- Processes images quickly and efficiently
 
-**Relevance Algorithm**:
-```
-relevance_score = (page_overlap × 0.4) + (visual_similarity × 0.4) + (detection_confidence × 0.2)
-```
+**Quality Validation** - Claude AI validates uncertain results
+- Reviews images that need additional analysis
+- Provides enhanced descriptions and corrections
+- Ensures high-quality results
 
-**Components**:
-- **Page Overlap (40%)**: Same page = 0.4, adjacent = 0.2, else 0.0
-- **Visual Similarity (40%)**: From AI detection (default 0.3)
-- **Detection Confidence (20%)**: AI confidence score (default 0.2)
+### Intelligent Relevancy
 
-**Relationship Types**:
-- `depicts` - Image directly shows the product (score > 0.7)
-- `illustrates` - Image illustrates product features (score 0.5-0.7)
-- `variant` - Image shows a product variant (score 0.4-0.6)
-- `related` - Image is related to the product (score < 0.5)
+Images are automatically linked to products and descriptions based on:
 
-**Implementation**: `entity_linking_service.py` → `link_images_to_products()`
+- **Page Location** - Images on the same page as product descriptions
+- **Visual Similarity** - How well the image matches the product
+- **AI Confidence** - How certain the AI is about the connection
 
----
+The system assigns relevancy scores to help you find the most important images first.
 
-### 2. Image → Chunk Relationships
+## Using Image Search
 
-**Table**: `chunk_image_relationships`
+### Search by Uploading an Image
 
-**Relevance Algorithm**:
-```
-relevance_score = 1.0 if same_page else 0.5 if adjacent_page else 0.0
-```
+When you have a material image and want to find similar materials in your catalog:
 
-**Relationship Types**:
-- `page_proximity` - Image and chunk on same/adjacent pages
+1. **Upload Your Image** - Upload any image of a material you're looking for
+2. **AI Analysis** - The system analyzes the image to understand its characteristics
+3. **Find Matches** - Get a list of similar materials from your catalog
+4. **View Results** - See matching products with images and details
 
-**Implementation**: `entity_linking_service.py` → `link_images_to_chunks()`
+The search can find materials based on:
+- Overall visual similarity
+- Matching colors
+- Similar textures
+- Same material type
+- Similar applications
 
----
+### Search from 3D Visualizations
 
-## 🔍 Image Search Workflows
+When working with 3D room visualizations:
 
-### Workflow 1: User Uploads Image from Agency
+1. **Generate 3D Scene** - Create a 3D visualization with materials
+2. **Identify Materials** - The system automatically identifies materials in the scene
+3. **Find Alternatives** - Get suggestions for similar or alternative materials
+4. **Compare Options** - View different material options in context
 
-**Use Case**: Designer uploads material photo, wants similar materials
+This helps you explore material options and find alternatives that work with your design.
 
-**Process**:
-1. **Upload Image** → Supabase Storage (`material-images` bucket)
-2. **Generate Embeddings** → Call `/api/search/material-embeddings`
-   - Generates all 5 CLIP embeddings
-   - Returns embedding vectors
-3. **Search Similar Images** → Call `/api/images/search-similar`
-   - Uses VECS service for vector similarity search
-   - Searches `image_clip_embeddings` collection
-   - Returns top K similar images (default: 10)
-4. **Get Products** → For each similar image:
-   - Query `product_image_relationships` table
-   - Get products with `relevance_score > 0.5`
-   - Return product details with images
+## Benefits
 
-**API Endpoints**:
-```typescript
-// Step 1: Generate embeddings
-POST /api/search/material-embeddings
-Body: { image_url: string, material_properties: {...} }
-Response: { embeddings: { visual: [...], color: [...], ... } }
+### For Designers and Architects
 
-// Step 2: Search similar images
-POST /api/images/search-similar
-Body: { query_embedding: [...], limit: 10 }
-Response: { images: [...], similarity_scores: [...] }
+- **Quick Material Discovery** - Find materials faster than browsing catalogs
+- **Visual Search** - Search using images instead of keywords
+- **Explore Alternatives** - Discover similar materials you might not have considered
+- **Confident Selections** - See all relevant images and details before deciding
 
-// Step 3: Get products for images
-GET /api/products?image_ids=id1,id2,id3
-Response: { products: [...] }
-```
+### For Material Suppliers
 
----
+- **Better Product Visibility** - Your products are found through visual search
+- **Automatic Organization** - Images are automatically linked to products
+- **Rich Product Pages** - All product images are organized and accessible
+- **Enhanced Search** - Customers can find your products in multiple ways
 
-### Workflow 2: 3D Generation Returns Material Image
+## Search Accuracy
 
-**Use Case**: 3D generation service returns rendered material, need to identify it
+The platform uses advanced AI to ensure accurate results:
 
-**Process**:
-1. **Receive 3D Image** → From Mastra 3D Generation service
-2. **Material Recognition** → Call `/api/images/analyze-material`
-   - Uses Llama 4 Scout 17B Vision
-   - Extracts: material_type, colors, textures, finish
-3. **Generate Embeddings** → Automatic during analysis
-   - All 5 CLIP embeddings generated
-   - Stored in temporary record
-4. **Search Database** → Vector similarity search
-   - Query VECS collections for fast similarity search
-   - Use `image_clip_embeddings` collection with cosine similarity
-   - Filter by material_type if detected (from embeddings table metadata)
-5. **Return Matches** → Top similar materials
-   - Include product details
-   - Include relevance scores
-   - Include image URLs
+- **Multi-Dimensional Analysis** - Considers visual appearance, color, texture, and more
+- **Quality Validation** - AI validates uncertain results for accuracy
+- **Relevancy Scoring** - Results are ranked by how well they match your search
+- **Continuous Improvement** - The system learns and improves over time
 
-**API Endpoints**:
-```typescript
-// Combined endpoint for 3D workflow
-POST /api/images/identify-material
-Body: { image_url: string, context: { source: '3d_generation' } }
-Response: {
-  material_type: string,
-  similar_products: [...],
-  confidence: number,
-  embeddings: {...}
-}
-```
+## Performance
 
----
+The image search system is designed for speed and accuracy:
 
-## 📊 Database Schema
+- **Fast Search** - Results typically return in under 100 milliseconds
+- **Efficient Storage** - Images are optimized and cached for quick loading
+- **Scalable** - Handles thousands of images without slowing down
+- **Reliable** - Built on enterprise-grade infrastructure
 
-### document_images Table
-```sql
-CREATE TABLE document_images (
-  id UUID PRIMARY KEY,
-  document_id UUID REFERENCES documents(id),
-  workspace_id UUID REFERENCES workspaces(id),
-  image_url TEXT NOT NULL,  -- Supabase Storage URL
-  storage_path TEXT,         -- Storage bucket path
-  page_number INTEGER,
-  
-  -- AI Analysis
-  llama_analysis JSONB,      -- Llama 4 Scout analysis
-  claude_validation JSONB,   -- Claude validation (optional)
+## Related Features
 
-  -- Note: Multi-Vector Embeddings are now stored in:
-  -- 1. embeddings table (for tracking/analytics/JOINs)
-  -- 2. VECS collections (for fast similarity search)
-  -- Embedding columns removed from document_images to eliminate redundancy
-
-  -- Metadata
-  metadata JSONB,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### product_image_relationships Table
-```sql
-CREATE TABLE product_image_relationships (
-  id UUID PRIMARY KEY,
-  product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-  image_id UUID REFERENCES document_images(id) ON DELETE CASCADE,
-  relationship_type VARCHAR(50),  -- 'depicts', 'illustrates', 'variant', 'related'
-  relevance_score FLOAT CHECK (relevance_score >= 0 AND relevance_score <= 1),
-  created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(product_id, image_id)
-);
-
-CREATE INDEX idx_product_image_relevance ON product_image_relationships(relevance_score DESC);
-```
-
----
-
-## 🚀 Performance Optimization
-
-### VECS Vector Search
-- **Library**: Supabase VECS (pgvector wrapper)
-- **Index**: IVFFlat index on all embedding columns
-- **Query Time**: < 100ms for 10K images
-- **Similarity Metric**: Cosine similarity (1 - distance)
-
-### Caching Strategy
-- **Embedding Cache**: 1 hour TTL
-- **Search Results**: 15 minutes TTL
-- **Product Images**: CDN cached (24 hours)
-
----
-
-## 🔧 Troubleshooting
-
-### Images Not Showing in Frontend
-
-**Common Issues**:
-1. **Missing `image_url`** → Check `document_images.image_url` is populated
-2. **Storage Path Wrong** → Verify `storage_path` points to correct bucket
-3. **No Relationships** → Run entity linking: `entity_linking_service.link_images_to_products()`
-4. **Empty Embeddings** → Check background job processed images
-
-**Fix**:
-```sql
--- Check image URLs
-SELECT id, image_url, storage_path FROM document_images WHERE document_id = 'your-doc-id';
-
--- Check relationships
-SELECT * FROM product_image_relationships WHERE product_id = 'your-product-id';
-
--- Check embeddings
-SELECT id, 
-  visual_clip_embedding_512 IS NOT NULL as has_visual,
-  color_clip_embedding_512 IS NOT NULL as has_color
-FROM document_images WHERE document_id = 'your-doc-id';
-```
-
----
-
-## 📚 Related Documentation
-
-- [Relevancy System](./relevancy-system.md) - Overall relevancy architecture
-- [PDF Processing Pipeline](./pdf-processing-pipeline.md) - Image extraction process
-- [Search Strategies](./search-strategies.md) - Search implementation details
-
+- **Material Search** - Search for materials using text descriptions
+- **PDF Processing** - Automatic extraction of images from PDF catalogs
+- **Product Discovery** - Intelligent product identification and organization
