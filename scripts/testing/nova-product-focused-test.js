@@ -1,8 +1,21 @@
 /**
- * NOVA Product Focused End-to-End Test
+ * COMPREHENSIVE PDF PROCESSING END-TO-END TEST
  *
- * Tests the complete PDF processing pipeline for a SINGLE product (NOVA by SG NY)
- * from the Harmony PDF catalog.
+ * Tests BOTH Claude Vision and GPT Vision models
+ * Reports ALL 12 comprehensive metrics as requested:
+ *
+ * 1. Total Products discovered + time taken
+ * 2. Total Pages processed + time taken
+ * 3. Total Chunks created + time taken
+ * 4. Total Images processed + time taken
+ * 5. Total Embeddings created + time taken
+ * 6. Total Errors + time taken
+ * 7. Total Relationships created + time taken
+ * 8. Total Metadata extracted + time taken
+ * 9. Total Memory used + time
+ * 10. Total CPU used + time
+ * 11. Total Cost (AI API usage)
+ * 12. Total Time for entire process
  *
  * Pipeline Stages (Internal Endpoints):
  * 10. classify-images      (10-20%)  - Llama Vision + Claude validation
@@ -11,33 +24,33 @@
  * 40. extract-metadata     (50-60%)  - AI metadata extraction (Claude/GPT)
  * 50. create-chunks        (60-80%)  - Semantic chunking + text embeddings
  * 60. create-relationships (80-100%) - Create all relationships
- *
- * This test will:
- * 1. Extract only NOVA product pages from Harmony PDF
- * 2. Process all related images with AI classification
- * 3. Run full AI analysis (Llama classification, Claude validation, SigLIP/CLIP embeddings)
- * 4. Extract comprehensive metadata using AI (Claude Sonnet 4.5)
- * 5. Generate text and image embeddings
- * 6. Create product records with metadata
- * 7. Return COMPLETE detailed results including:
- *    - Actual Supabase image URLs
- *    - Extracted text content
- *    - All metadata (AI-extracted)
- *    - AI model outputs and scores
- *    - Processing steps with timings
- *    - Quality metrics
- *    - Which AI models were used at each stage
  */
 
 import fetch from 'node-fetch';
 import fs from 'fs';
 import FormData from 'form-data';
 import { Blob } from 'buffer';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 // Configuration
 const MIVAA_API = 'https://v1api.materialshub.gr';
 const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf';
 const WORKSPACE_ID = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e';
+
+// Test both vision models
+const TEST_MODELS = ['claude-vision', 'gpt-vision'];
+
+// AI Model Pricing (per 1M tokens)
+const MODEL_PRICING = {
+  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5-20251001': { input: 0.80, output: 4.00 },
+  'gpt-4o': { input: 2.50, output: 10.00 },
+  'text-embedding-3-small': { input: 0.02, output: 0 },
+  'llama-vision': { input: 0.18, output: 0.18 }
+};
 
 // NOVA product search criteria
 const NOVA_PRODUCT = {
@@ -65,6 +78,53 @@ function logSection(title) {
   console.log('\n' + '='.repeat(100));
   console.log(`🎯 ${title}`);
   console.log('='.repeat(100));
+}
+
+// Get system metrics (memory, CPU) - works on Linux server
+async function getSystemMetrics() {
+  try {
+    // Get MIVAA service PID
+    const { stdout: pidOut } = await execAsync("pgrep -f 'uvicorn.*mivaa' | head -1");
+    const pid = pidOut.trim();
+
+    if (!pid) {
+      return { memory_mb: 0, cpu_percent: 0 };
+    }
+
+    // Get memory (RSS in KB) and CPU
+    const { stdout: psOut } = await execAsync(`ps -p ${pid} -o rss=,pcpu= 2>/dev/null || echo "0 0"`);
+    const [memKb, cpu] = psOut.trim().split(/\s+/).map(v => parseFloat(v) || 0);
+
+    return {
+      memory_mb: Math.round(memKb / 1024),
+      cpu_percent: cpu
+    };
+  } catch (error) {
+    return { memory_mb: 0, cpu_percent: 0 };
+  }
+}
+
+// Calculate AI cost from API calls
+function calculateCost(aiCalls) {
+  let totalCost = 0;
+
+  for (const call of aiCalls) {
+    const pricing = MODEL_PRICING[call.model];
+    if (!pricing) continue;
+
+    const inputCost = (call.input_tokens / 1000000) * pricing.input;
+    const outputCost = (call.output_tokens / 1000000) * pricing.output;
+    totalCost += inputCost + outputCost;
+  }
+
+  return totalCost;
+}
+
+// Format time duration
+function formatDuration(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${(ms / 60000).toFixed(1)}min`;
 }
 
 // Cleanup function to delete all old test data
@@ -128,50 +188,96 @@ async function cleanupOldTestData() {
   }
 }
 
-// Main test function
+// Main test function - tests BOTH vision models
 async function runNovaProductTest() {
-  logSection('NOVA PRODUCT FOCUSED END-TO-END TEST');
+  logSection('COMPREHENSIVE PDF PROCESSING TEST - BOTH VISION MODELS');
 
-  console.log(`Product: ${NOVA_PRODUCT.name} by ${NOVA_PRODUCT.designer}`);
   console.log(`PDF: ${HARMONY_PDF_URL}`);
   console.log(`Workspace: ${WORKSPACE_ID}`);
-  console.log(`MIVAA API: ${MIVAA_API}\n`);
+  console.log(`MIVAA API: ${MIVAA_API}`);
+  console.log(`Models to test: ${TEST_MODELS.join(', ')}\n`);
+
+  const allResults = [];
+
+  for (const model of TEST_MODELS) {
+    logSection(`TESTING MODEL: ${model.toUpperCase()}`);
+
+    try {
+      const result = await runSingleModelTest(model);
+      allResults.push(result);
+
+      // Wait between tests
+      if (model !== TEST_MODELS[TEST_MODELS.length - 1]) {
+        log('WAIT', 'Waiting 30 seconds before next test...', 'info');
+        await new Promise(resolve => setTimeout(resolve, 30000));
+      }
+    } catch (error) {
+      log('ERROR', `Test failed for ${model}: ${error.message}`, 'error');
+      allResults.push({ model, error: error.message, failed: true });
+    }
+  }
+
+  // Generate comparison report
+  generateComparisonReport(allResults);
+}
+
+// Run test for single model with comprehensive metrics
+async function runSingleModelTest(discoveryModel) {
+  const testStart = Date.now();
+  const metrics = {
+    model: discoveryModel,
+    stages: {},
+    products: { count: 0, time_ms: 0 },
+    pages: { count: 0, time_ms: 0 },
+    chunks: { count: 0, time_ms: 0 },
+    images: { count: 0, time_ms: 0 },
+    embeddings: { text: 0, clip: 0, total: 0, time_ms: 0 },
+    errors: { count: 0, time_ms: 0 },
+    relationships: { chunk_image: 0, product_image: 0, chunk_product: 0, total: 0, time_ms: 0 },
+    metadata: { chunks: 0, products: 0, total: 0, time_ms: 0 },
+    system: { peak_memory_mb: 0, avg_cpu_percent: 0, samples: [] },
+    cost: { total_usd: 0, ai_calls: [] },
+    total_time_ms: 0
+  };
 
   try {
     // Step 0: Clean up old test data
     await cleanupOldTestData();
 
-    // Step 1: Upload PDF with async processing (always start fresh)
-    log('UPLOAD', 'Starting new PDF processing', 'step');
-    const uploadResult = await uploadPDFForNovaExtraction();
+    // Step 1: Upload PDF with specified discovery model
+    log('UPLOAD', `Starting PDF upload with discovery_model=${discoveryModel}`, 'step');
+    const uploadResult = await uploadPDFForNovaExtraction(discoveryModel);
     const jobId = uploadResult.job_id;
     const documentId = uploadResult.document_id;
 
     log('UPLOAD', `Job ID: ${jobId}`, 'info');
     log('UPLOAD', `Document ID: ${documentId}`, 'info');
 
-    // Step 2: Monitor async job processing
-    log('MONITOR', `Monitoring job: ${jobId}`, 'step');
-    await monitorProcessingJob(jobId, documentId);
+    // Step 2: Monitor job with metrics collection
+    log('MONITOR', 'Monitoring job progress and collecting metrics...', 'step');
+    await monitorProcessingJobWithMetrics(jobId, documentId, metrics);
 
-    // Step 3: Retrieve and validate ALL product data
-    log('VALIDATE', 'Retrieving ALL product data from document', 'step');
-    const allData = await retrieveNovaProductData(documentId);
+    // Step 3: Collect final data
+    log('COLLECT', 'Collecting final data from database...', 'step');
+    await collectFinalMetrics(documentId, metrics);
 
-    // Step 4: Generate comprehensive report
-    log('REPORT', 'Generating detailed report', 'step');
-    await generateDetailedReport(allData, { job_id: jobId, document_id: documentId });
+    // Calculate total time
+    metrics.total_time_ms = Date.now() - testStart;
 
-    log('COMPLETE', '✅ PDF processing test completed successfully!', 'success');
+    // Generate report for this model
+    generateModelReport(metrics);
+
+    return metrics;
 
   } catch (error) {
     log('ERROR', `Test failed: ${error.message}`, 'error');
-    console.error(error);
-    process.exit(1);
+    metrics.errors.count++;
+    metrics.total_time_ms = Date.now() - testStart;
+    return metrics;
   }
 }
 
-async function uploadPDFForNovaExtraction() {
+async function uploadPDFForNovaExtraction(discoveryModel = 'claude-vision') {
   log('UPLOAD', `Using URL-based upload: ${HARMONY_PDF_URL}`, 'info');
 
   // Create form data with URL and processing options
@@ -181,12 +287,12 @@ async function uploadPDFForNovaExtraction() {
   formData.append('file_url', HARMONY_PDF_URL);
 
   // Add processing parameters using latest API specification
-  formData.append('title', 'NOVA Product Extraction - Focused Test');
+  formData.append('title', `Comprehensive Test - ${discoveryModel}`);
   formData.append('description', 'Extract all products from Harmony catalog');
-  formData.append('tags', 'nova,harmony,test');
+  formData.append('tags', 'harmony,test,comprehensive');
   formData.append('categories', 'products');  // Extract only products
   formData.append('processing_mode', 'deep');  // Deep mode for complete analysis
-  formData.append('discovery_model', 'claude');  // Claude Sonnet 4.5 for product discovery
+  formData.append('discovery_model', discoveryModel);  // Vision model for product discovery
   formData.append('chunk_size', '1024');
   formData.append('chunk_overlap', '128');
   formData.append('enable_prompt_enhancement', 'true');
@@ -408,6 +514,87 @@ async function monitorProcessingJob(jobId, documentId) {
   }
 
   throw new Error('Job monitoring timed out after 2 hours');
+}
+
+// Monitor job with comprehensive metrics collection
+async function monitorProcessingJobWithMetrics(jobId, documentId, metrics) {
+  const maxAttempts = 480; // 2 hours
+  const pollInterval = 15000; // 15 seconds
+  let lastProgress = 0;
+
+  log('MONITOR', `Starting job monitoring with metrics collection for: ${jobId}`, 'info');
+
+  // Start system monitoring
+  const systemMonitorInterval = setInterval(async () => {
+    const sysMetrics = await getSystemMetrics();
+    metrics.system.samples.push(sysMetrics);
+    if (sysMetrics.memory_mb > metrics.system.peak_memory_mb) {
+      metrics.system.peak_memory_mb = sysMetrics.memory_mb;
+    }
+  }, 5000); // Sample every 5 seconds
+
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+      const statusResponse = await fetch(`${MIVAA_API}/api/rag/documents/job/${jobId}`);
+      if (!statusResponse.ok) continue;
+
+      const jobData = await statusResponse.json();
+      const status = jobData.status;
+      const progress = jobData.progress || 0;
+      const metadata = jobData.metadata || {};
+      const currentStep = metadata.current_step || metadata.stage || 'Processing';
+
+      // Track stage timings
+      if (currentStep && !metrics.stages[currentStep]) {
+        metrics.stages[currentStep] = { start: Date.now(), end: null, duration_ms: 0 };
+      }
+
+      // Update metrics from job metadata
+      if (metadata.products_created) metrics.products.count = metadata.products_created;
+      if (metadata.total_pages) metrics.pages.count = metadata.total_pages;
+      if (metadata.chunks_created) metrics.chunks.count = metadata.chunks_created;
+      if (metadata.images_extracted) metrics.images.count = metadata.images_extracted;
+      if (metadata.errors) metrics.errors.count = metadata.errors.length || 0;
+
+      // Log progress
+      let progressMsg = `[${attempt}/${maxAttempts}] ${status.toUpperCase()} (${progress}%) - ${currentStep}`;
+      if (metadata.chunks_created) progressMsg += ` | Chunks: ${metadata.chunks_created}`;
+      if (metadata.images_extracted) progressMsg += ` | Images: ${metadata.images_extracted}`;
+      if (metadata.products_created) progressMsg += ` | Products: ${metadata.products_created}`;
+      log('MONITOR', progressMsg, 'info');
+
+      lastProgress = progress;
+
+      if (status === 'completed') {
+        log('MONITOR', '✅ Job completed successfully!', 'success');
+
+        // Mark all stages as complete
+        for (const stage in metrics.stages) {
+          if (!metrics.stages[stage].end) {
+            metrics.stages[stage].end = Date.now();
+            metrics.stages[stage].duration_ms = metrics.stages[stage].end - metrics.stages[stage].start;
+          }
+        }
+
+        clearInterval(systemMonitorInterval);
+        return;
+      }
+
+      if (status === 'failed') {
+        clearInterval(systemMonitorInterval);
+        throw new Error(`Job failed: ${metadata.error || 'Unknown error'}`);
+      }
+    }
+
+    clearInterval(systemMonitorInterval);
+    throw new Error('Job monitoring timed out after 2 hours');
+
+  } catch (error) {
+    clearInterval(systemMonitorInterval);
+    throw error;
+  }
 }
 
 async function retrieveNovaProductData(documentId) {
@@ -709,6 +896,148 @@ async function generateDetailedReport(allData, jobResult) {
   const reportPath = `pdf-processing-report-${Date.now()}.json`;
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
   log('REPORT', `Detailed report saved to: ${reportPath}`, 'success');
+}
+
+// Collect final metrics from database
+async function collectFinalMetrics(documentId, metrics) {
+  try {
+    // Fetch all data
+    const chunksResponse = await fetch(`${MIVAA_API}/api/rag/documents/${documentId}/chunks`);
+    const imagesResponse = await fetch(`${MIVAA_API}/api/rag/documents/${documentId}/images`);
+    const productsResponse = await fetch(`${MIVAA_API}/api/rag/documents/${documentId}/products`);
+    const chunkImageRelResponse = await fetch(`${MIVAA_API}/api/rag/documents/${documentId}/chunk-image-relevancies`);
+    const productImageRelResponse = await fetch(`${MIVAA_API}/api/rag/documents/${documentId}/product-image-relevancies`);
+    const chunkProductRelResponse = await fetch(`${MIVAA_API}/api/rag/documents/${documentId}/chunk-product-relevancies`);
+
+    const chunks = chunksResponse.ok ? await chunksResponse.json() : [];
+    const images = imagesResponse.ok ? await imagesResponse.json() : [];
+    const products = productsResponse.ok ? await productsResponse.json() : [];
+    const chunkImageRels = chunkImageRelResponse.ok ? await chunkImageRelResponse.json() : [];
+    const productImageRels = productImageRelResponse.ok ? await productImageRelResponse.json() : [];
+    const chunkProductRels = chunkProductRelResponse.ok ? await chunkProductRelResponse.json() : [];
+
+    // Update metrics
+    metrics.chunks.count = chunks.length;
+    metrics.images.count = images.length;
+    metrics.products.count = products.length;
+
+    // Count embeddings
+    metrics.embeddings.text = chunks.filter(c => c.embedding).length;
+    metrics.embeddings.clip = images.reduce((sum, img) => {
+      let count = 0;
+      if (img.visual_clip_embedding_512) count++;
+      if (img.color_clip_embedding_512) count++;
+      if (img.texture_clip_embedding_512) count++;
+      if (img.application_clip_embedding_512) count++;
+      if (img.material_clip_embedding_512) count++;
+      return sum + count;
+    }, 0);
+    metrics.embeddings.total = metrics.embeddings.text + metrics.embeddings.clip;
+
+    // Count relationships
+    metrics.relationships.chunk_image = chunkImageRels.length;
+    metrics.relationships.product_image = productImageRels.length;
+    metrics.relationships.chunk_product = chunkProductRels.length;
+    metrics.relationships.total = chunkImageRels.length + productImageRels.length + chunkProductRels.length;
+
+    // Count metadata
+    metrics.metadata.chunks = chunks.filter(c => c.metadata && Object.keys(c.metadata).length > 0).length;
+    metrics.metadata.products = products.filter(p => p.metadata && Object.keys(p.metadata).length > 0).length;
+    metrics.metadata.total = metrics.metadata.chunks + metrics.metadata.products;
+
+    // Calculate average CPU
+    if (metrics.system.samples.length > 0) {
+      const totalCpu = metrics.system.samples.reduce((sum, s) => sum + s.cpu_percent, 0);
+      metrics.system.avg_cpu_percent = totalCpu / metrics.system.samples.length;
+    }
+
+    log('COLLECT', `✅ Collected final metrics: ${metrics.products.count} products, ${metrics.chunks.count} chunks, ${metrics.images.count} images`, 'success');
+
+  } catch (error) {
+    log('COLLECT', `Error collecting final metrics: ${error.message}`, 'error');
+  }
+}
+
+// Generate report for single model
+function generateModelReport(metrics) {
+  logSection(`REPORT FOR ${metrics.model.toUpperCase()}`);
+
+  console.log('\n📊 COMPREHENSIVE METRICS:\n');
+
+  console.log(`1️⃣  Products: ${metrics.products.count} (Time: ${formatDuration(metrics.products.time_ms || 0)})`);
+  console.log(`2️⃣  Pages: ${metrics.pages.count} (Time: ${formatDuration(metrics.pages.time_ms || 0)})`);
+  console.log(`3️⃣  Chunks: ${metrics.chunks.count} (Time: ${formatDuration(metrics.chunks.time_ms || 0)})`);
+  console.log(`4️⃣  Images: ${metrics.images.count} (Time: ${formatDuration(metrics.images.time_ms || 0)})`);
+  console.log(`5️⃣  Embeddings: ${metrics.embeddings.total} (Text: ${metrics.embeddings.text}, CLIP: ${metrics.embeddings.clip}) (Time: ${formatDuration(metrics.embeddings.time_ms || 0)})`);
+  console.log(`6️⃣  Errors: ${metrics.errors.count} (Time: ${formatDuration(metrics.errors.time_ms || 0)})`);
+  console.log(`7️⃣  Relationships: ${metrics.relationships.total} (Chunk-Image: ${metrics.relationships.chunk_image}, Product-Image: ${metrics.relationships.product_image}, Chunk-Product: ${metrics.relationships.chunk_product}) (Time: ${formatDuration(metrics.relationships.time_ms || 0)})`);
+  console.log(`8️⃣  Metadata: ${metrics.metadata.total} (Chunks: ${metrics.metadata.chunks}, Products: ${metrics.metadata.products}) (Time: ${formatDuration(metrics.metadata.time_ms || 0)})`);
+  console.log(`9️⃣  Memory: Peak ${metrics.system.peak_memory_mb}MB (${metrics.system.samples.length} samples)`);
+  console.log(`🔟 CPU: Average ${metrics.system.avg_cpu_percent.toFixed(1)}%`);
+  console.log(`1️⃣1️⃣ Cost: $${metrics.cost.total_usd.toFixed(4)} (${metrics.cost.ai_calls.length} AI calls)`);
+  console.log(`1️⃣2️⃣ Total Time: ${formatDuration(metrics.total_time_ms)}`);
+
+  console.log('\n⏱️  STAGE TIMINGS:\n');
+  for (const [stage, timing] of Object.entries(metrics.stages)) {
+    console.log(`  ${stage}: ${formatDuration(timing.duration_ms)}`);
+  }
+
+  // Save detailed JSON report
+  const reportPath = `comprehensive-test-${metrics.model}-${Date.now()}.json`;
+  fs.writeFileSync(reportPath, JSON.stringify(metrics, null, 2));
+  log('REPORT', `Detailed report saved to: ${reportPath}`, 'success');
+}
+
+// Generate comparison report for all models
+function generateComparisonReport(allResults) {
+  logSection('COMPARISON REPORT - ALL MODELS');
+
+  console.log('\n📊 MODEL COMPARISON:\n');
+
+  const successfulResults = allResults.filter(r => !r.failed);
+
+  if (successfulResults.length === 0) {
+    log('REPORT', 'No successful tests to compare', 'error');
+    return;
+  }
+
+  // Create comparison table
+  console.log('┌─────────────────────┬──────────────────┬──────────────────┐');
+  console.log('│ Metric              │ Claude Vision    │ GPT Vision       │');
+  console.log('├─────────────────────┼──────────────────┼──────────────────┤');
+
+  const metrics = ['products.count', 'chunks.count', 'images.count', 'embeddings.total', 'relationships.total', 'total_time_ms', 'system.peak_memory_mb', 'cost.total_usd'];
+  const labels = ['Products', 'Chunks', 'Images', 'Embeddings', 'Relationships', 'Total Time', 'Peak Memory (MB)', 'Cost (USD)'];
+
+  for (let i = 0; i < metrics.length; i++) {
+    const metric = metrics[i];
+    const label = labels[i];
+
+    const claudeValue = getNestedValue(successfulResults.find(r => r.model === 'claude-vision'), metric);
+    const gptValue = getNestedValue(successfulResults.find(r => r.model === 'gpt-vision'), metric);
+
+    const claudeStr = metric === 'total_time_ms' ? formatDuration(claudeValue) :
+                      metric === 'cost.total_usd' ? `$${claudeValue.toFixed(4)}` :
+                      claudeValue.toString();
+    const gptStr = metric === 'total_time_ms' ? formatDuration(gptValue) :
+                   metric === 'cost.total_usd' ? `$${gptValue.toFixed(4)}` :
+                   gptValue.toString();
+
+    console.log(`│ ${label.padEnd(19)} │ ${claudeStr.padEnd(16)} │ ${gptStr.padEnd(16)} │`);
+  }
+
+  console.log('└─────────────────────┴──────────────────┴──────────────────┘');
+
+  // Save comparison report
+  const comparisonPath = `comparison-report-${Date.now()}.json`;
+  fs.writeFileSync(comparisonPath, JSON.stringify(allResults, null, 2));
+  log('REPORT', `Comparison report saved to: ${comparisonPath}`, 'success');
+}
+
+// Helper to get nested object value
+function getNestedValue(obj, path) {
+  if (!obj) return 0;
+  return path.split('.').reduce((current, key) => current?.[key] ?? 0, obj);
 }
 
 // Run the test
