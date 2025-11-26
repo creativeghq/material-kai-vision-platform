@@ -47,26 +47,6 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 
 ---
 
-## ⚠️ Important: Legacy Endpoints Removed
-
-**All `/api/documents/*` endpoints have been removed** (except `/api/document-entities/*` which are valid).
-
-**Removed Endpoints (Use `/api/rag/*` instead):**
-- `POST /api/documents/{document_id}/query` → Use `POST /api/rag/query`
-- `GET /api/documents/{document_id}/related` → Use `GET /api/rag/search?strategy=semantic`
-- `POST /api/documents/{document_id}/summarize` → Not implemented
-- `POST /api/documents/{document_id}/extract-entities` → Not implemented
-- `POST /api/documents/compare` → Not implemented
-- `POST /api/documents/process` → Use `POST /api/rag/documents/upload`
-- `POST /api/documents/process-url` → Use `POST /api/rag/documents/upload` with URL
-- `POST /api/documents/analyze` → Use `POST /api/rag/documents/upload`
-- `GET /api/documents/documents` → Use `GET /api/rag/documents`
-- `GET /api/documents/documents/{id}` → Use `GET /api/rag/documents/{id}`
-- `GET /api/documents/documents/{id}/content` → Use `GET /api/rag/documents/documents/{id}/content`
-- `DELETE /api/documents/documents/{id}` → Use `DELETE /api/rag/documents/{id}`
-
----
-
 ## 📋 Table of Contents
 
 **✨ CONSOLIDATED ENDPOINTS (One Endpoint, One Purpose, No Duplicates)**

@@ -50,15 +50,15 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 const TABLES_TO_CLEAR = [
   // PDF Processing & Knowledge Base (CLEAR)
   // Order matters! Delete child tables before parent tables
+  'job_progress',                  // Job progress tracking (MUST BE FIRST - references processed_documents)
+  'ai_analysis_queue',             // AI analysis queue (must be before processed_documents)
   'embeddings',                    // Text and image embeddings
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
   'products',                      // Extracted products
   'background_jobs',               // Processing jobs
   'documents',                     // PDF documents metadata
-  'ai_analysis_queue',             // AI analysis queue (must be before processed_documents)
   'processed_documents',           // Processed document records
-  'job_progress',                  // Job progress tracking
 
   // Materials & Catalog (CLEAR)
   'materials_catalog',             // Materials catalog entries
