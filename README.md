@@ -46,7 +46,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Service**: MIVAA (Material Intelligence Vision and Analysis Agent)
 - **Package Manager**: UV (ultrafast Python package installer)
 - **Process Management**: systemd
-- **Deployment**: DigitalOcean (104.248.68.3)
+- **Deployment**: DigitalOcean (165.227.31.109)
 - **URL**: https://v1api.materialshub.gr
 
 #### **Database**

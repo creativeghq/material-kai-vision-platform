@@ -378,7 +378,7 @@ WantedBy=multi-user.target
 The deployment is fully automated via GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
 1. **Code Push**: Push to `main` branch triggers deployment
-2. **SSH Connection**: Connects to production server (104.248.68.3)
+2. **SSH Connection**: Connects to production server (165.227.31.109)
 3. **Code Update**: Pulls latest code from GitHub
 4. **Dependency Installation**: Uses UV to install/update dependencies
 5. **Service Update**: Updates systemd service file with latest environment variables
@@ -392,7 +392,7 @@ If you need to deploy manually:
 
 ```bash
 # SSH into server
-ssh root@104.248.68.3
+ssh root@165.227.31.109
 
 # Navigate to project directory
 cd /var/www/mivaa-pdf-extractor
@@ -592,7 +592,7 @@ Set these in GitHub repository secrets:
 ```bash
 # Server Access
 SSH_PRIVATE_KEY=your_ssh_private_key
-DEPLOY_HOST=104.248.68.3
+DEPLOY_HOST=165.227.31.109
 
 # Application Environment
 SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
@@ -843,7 +843,7 @@ jobs:
 
 ```bash
 # Quick rollback for MIVAA service
-ssh root@104.248.68.3
+ssh root@165.227.31.109
 
 # Navigate to project directory
 cd /var/www/mivaa-pdf-extractor
