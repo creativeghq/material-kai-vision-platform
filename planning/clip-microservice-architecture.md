@@ -336,8 +336,34 @@ CLIP_SERVICE_TIMEOUT=60
 
 ---
 
+## Important Considerations
+
+### Admin Control Limitation
+
+**Note:** Unlike other AI prompts in the platform (PDF processing, product discovery, etc.), the CLIP microservice prompts **cannot be controlled dynamically from the admin panel** because:
+
+1. **Separate Service:** CLIP service runs independently from MIVAA
+2. **Different Codebase:** Has its own repository and deployment
+3. **Model-Level Logic:** Prompts are embedded in model inference code, not configurable
+
+**Implications:**
+- ⚠️ Prompt changes require code deployment (not admin UI updates)
+- ⚠️ Cannot A/B test different embedding strategies without redeployment
+- ⚠️ Less flexible than main MIVAA service
+
+**Mitigation Options:**
+1. **Accept limitation:** CLIP embeddings are deterministic (no prompts needed)
+2. **Add config API:** Create endpoint to update model parameters dynamically
+3. **Use feature flags:** Enable/disable SigLIP vs CLIP via environment variables
+4. **Future enhancement:** Build admin UI for CLIP service separately
+
+**Decision:** Pass for now - CLIP embeddings don't use text prompts, so admin control is not critical. Focus on stability and performance first.
+
+---
+
 **Document Status:** Planning
 **Created:** 2025-11-28
+**Updated:** 2025-11-28 (Added admin control note)
 **Author:** AI Assistant
 **Next Review:** After Option 1 testing
 
