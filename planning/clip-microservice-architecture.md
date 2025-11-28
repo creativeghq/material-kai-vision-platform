@@ -104,7 +104,13 @@ This document outlines the architecture for extracting CLIP/SigLIP embedding gen
 POST /embed
 {
     "image_url": "https://...",
-    "embedding_types": ["visual_512", "color_512", "texture_512", "style_512", "material_512"]
+    "embedding_types": ["visual_512", "color_512", "texture_512", "style_512", "material_512"],
+    "prompts": {  // OPTIONAL: Text prompts to guide embedding generation
+        "color": "Focus on color palette and dominant colors",
+        "texture": "Focus on surface texture and material patterns",
+        "style": "Focus on design style and aesthetic",
+        "material": "Focus on material type and properties"
+    }
 }
 
 Response:
@@ -115,7 +121,11 @@ Response:
         ...
     },
     "model_used": "siglip-so400m-patch14-384",
-    "processing_time_ms": 150
+    "processing_time_ms": 150,
+    "prompts_used": {
+        "color": "Focus on color palette and dominant colors",
+        ...
+    }
 }
 
 POST /embed/batch
@@ -124,7 +134,11 @@ POST /embed/batch
         {"id": "img1", "url": "https://..."},
         {"id": "img2", "url": "https://..."}
     ],
-    "embedding_types": ["visual_512", "color_512"]
+    "embedding_types": ["visual_512", "color_512"],
+    "prompts": {  // OPTIONAL: Same prompts for all images in batch
+        "color": "Focus on color palette",
+        "texture": "Focus on surface texture"
+    }
 }
 
 Response:
@@ -137,13 +151,62 @@ Response:
 }
 ```
 
-**1.3 Model Management**
+**1.3 Text-Guided CLIP Embeddings (Prompt Support)**
+
+CLIP models support **text-guided image embeddings** using contrastive learning:
+
+```python
+# Standard visual embedding (no prompt)
+image_features = model.get_image_features(image)
+
+# Text-guided embedding (with prompt)
+text_inputs = processor(text=["Focus on color palette"], return_tensors="pt")
+text_features = model.get_text_features(**text_inputs)
+image_inputs = processor(images=image, return_tensors="pt")
+image_features = model.get_image_features(**image_inputs)
+
+# Combine image and text features for guided embedding
+guided_embedding = (image_features + text_features) / 2
+```
+
+**Prompt Configuration:**
+- Store default prompts in database/config file
+- Allow per-request prompt overrides via API
+- Support multiple prompt strategies:
+  - **Color:** "Focus on color palette, dominant colors, and color relationships"
+  - **Texture:** "Focus on surface texture, material patterns, and tactile qualities"
+  - **Style:** "Focus on design style, aesthetic, and visual composition"
+  - **Material:** "Focus on material type, properties, and characteristics"
+
+**Benefits:**
+- ✅ More accurate specialized embeddings
+- ✅ Better search results for specific aspects
+- ✅ Configurable without code changes
+- ✅ Can A/B test different prompts
+
+**Implementation:**
+```python
+# app/config/clip_prompts.py
+DEFAULT_PROMPTS = {
+    "color": "Focus on color palette, dominant colors, and color relationships",
+    "texture": "Focus on surface texture, material patterns, and tactile qualities",
+    "style": "Focus on design style, aesthetic, and visual composition",
+    "material": "Focus on material type, properties, and characteristics"
+}
+
+# Load from environment or database
+def get_prompts():
+    return os.getenv("CLIP_PROMPTS", DEFAULT_PROMPTS)
+```
+
+**1.4 Model Management**
 - Load models on service startup
 - Keep models in memory (persistent)
 - Implement model unload/reload endpoints
 - Health checks with model status
+- Prompt configuration endpoint
 
-**1.4 Error Handling**
+**1.5 Error Handling**
 - Timeout protection (30s per image)
 - Retry logic for failed embeddings
 - Fallback to CLIP if SigLIP fails
@@ -164,15 +227,22 @@ class CLIPClient:
     async def generate_embeddings(
         self,
         image_url: str,
-        embedding_types: List[str]
+        embedding_types: List[str],
+        prompts: Optional[Dict[str, str]] = None  # NEW: Prompt support
     ) -> Dict[str, Any]:
         async with httpx.AsyncClient(timeout=60.0) as client:
+            payload = {
+                "image_url": image_url,
+                "embedding_types": embedding_types
+            }
+
+            # Add prompts if provided
+            if prompts:
+                payload["prompts"] = prompts
+
             response = await client.post(
                 f"{self.base_url}/embed",
-                json={
-                    "image_url": image_url,
-                    "embedding_types": embedding_types
-                }
+                json=payload
             )
             return response.json()
 ```
@@ -188,6 +258,40 @@ class CLIPClient:
 CLIP_SERVICE_URL=http://clip.materialshub.gr:8001
 CLIP_SERVICE_ENABLED=true
 CLIP_SERVICE_TIMEOUT=60
+
+# CLIP Prompts (optional - can override defaults)
+CLIP_PROMPT_COLOR="Focus on color palette, dominant colors, and color relationships"
+CLIP_PROMPT_TEXTURE="Focus on surface texture, material patterns, and tactile qualities"
+CLIP_PROMPT_STYLE="Focus on design style, aesthetic, and visual composition"
+CLIP_PROMPT_MATERIAL="Focus on material type, properties, and characteristics"
+```
+
+**2.4 Prompt Management**
+```python
+# app/services/clip_prompt_manager.py
+
+class CLIPPromptManager:
+    """Manages CLIP prompts for specialized embeddings."""
+
+    def __init__(self):
+        self.prompts = self._load_prompts()
+
+    def _load_prompts(self) -> Dict[str, str]:
+        """Load prompts from environment or use defaults."""
+        return {
+            "color": os.getenv("CLIP_PROMPT_COLOR",
+                "Focus on color palette, dominant colors, and color relationships"),
+            "texture": os.getenv("CLIP_PROMPT_TEXTURE",
+                "Focus on surface texture, material patterns, and tactile qualities"),
+            "style": os.getenv("CLIP_PROMPT_STYLE",
+                "Focus on design style, aesthetic, and visual composition"),
+            "material": os.getenv("CLIP_PROMPT_MATERIAL",
+                "Focus on material type, properties, and characteristics")
+        }
+
+    def get_prompts(self, types: List[str]) -> Dict[str, str]:
+        """Get prompts for specific embedding types."""
+        return {t: self.prompts[t] for t in types if t in self.prompts}
 ```
 
 ---
@@ -338,26 +442,51 @@ CLIP_SERVICE_TIMEOUT=60
 
 ## Important Considerations
 
-### Admin Control Limitation
+### Prompt Configuration Strategy
 
-**Note:** Unlike other AI prompts in the platform (PDF processing, product discovery, etc.), the CLIP microservice prompts **cannot be controlled dynamically from the admin panel** because:
+**CLIP supports text-guided embeddings** using prompts to focus on specific aspects (color, texture, style, material).
 
-1. **Separate Service:** CLIP service runs independently from MIVAA
-2. **Different Codebase:** Has its own repository and deployment
-3. **Model-Level Logic:** Prompts are embedded in model inference code, not configurable
+**Configuration Options:**
 
-**Implications:**
-- ⚠️ Prompt changes require code deployment (not admin UI updates)
-- ⚠️ Cannot A/B test different embedding strategies without redeployment
-- ⚠️ Less flexible than main MIVAA service
+**Option A: Environment Variables (Simple)**
+```env
+CLIP_PROMPT_COLOR="Focus on color palette and dominant colors"
+CLIP_PROMPT_TEXTURE="Focus on surface texture and patterns"
+```
+- ✅ Easy to implement
+- ✅ Can update via deployment
+- ❌ Requires service restart to change
 
-**Mitigation Options:**
-1. **Accept limitation:** CLIP embeddings are deterministic (no prompts needed)
-2. **Add config API:** Create endpoint to update model parameters dynamically
-3. **Use feature flags:** Enable/disable SigLIP vs CLIP via environment variables
-4. **Future enhancement:** Build admin UI for CLIP service separately
+**Option B: Database/Config File (Flexible)**
+```python
+# Load from database or JSON config
+prompts = load_prompts_from_db()
+```
+- ✅ Can update without restart
+- ✅ Version history
+- ❌ More complex implementation
 
-**Decision:** Pass for now - CLIP embeddings don't use text prompts, so admin control is not critical. Focus on stability and performance first.
+**Option C: API Parameter (Most Flexible)**
+```python
+# Pass prompts per request
+POST /embed {"prompts": {"color": "..."}}
+```
+- ✅ Can override per request
+- ✅ A/B testing support
+- ✅ No restart needed
+- ❌ Requires MIVAA to manage prompts
+
+**Recommended Approach: Hybrid**
+1. **Default prompts:** Environment variables (Option A)
+2. **Override support:** API parameters (Option C)
+3. **Future:** Admin UI to manage defaults (Option B)
+
+**Implementation Plan:**
+- Phase 1: Environment variables with API override
+- Phase 2: Database storage for defaults
+- Phase 3: Admin UI for prompt management (optional)
+
+**Note:** Unlike other MIVAA prompts, CLIP prompts are in a separate service, so admin panel integration requires additional work. For initial implementation, environment variables + API override is sufficient.
 
 ---
 
