@@ -1284,43 +1284,22 @@ WITH (lists = 100);
 
 ### Property Population
 
-The `material_properties` table is populated with 50+ meta fields from the existing system:
+The `material_properties` table is populated with 50+ meta fields organized into categories:
 
-**Actions**:
-1. Create script `scripts/populate_material_properties.py`
-2. Extract property definitions from `DynamicMetadataExtractor.METADATA_CATEGORY_HINTS`
-3. Insert properties with proper configuration:
-   - `property_key`: snake_case identifier (e.g., "material_type", "finish")
-   - `name`: Human-readable name
-   - `data_type`: "string", "number", "enum", "boolean"
-   - `is_ai_extractable`: true (all properties)
-   - `is_searchable`: true (for search integration)
-   - `is_filterable`: true (for filter integration)
+- **Material Properties**: material_type, composition, texture, finish, pattern, weight, density
+- **Dimensions**: length, width, height, thickness, diameter, size
+- **Appearance**: color, color_code, gloss_level, sheen, transparency
+- **Performance**: slip_resistance, fire_rating, water_resistance, wear_rating
+- **Application**: recommended_use, installation_method, room_type, traffic_level
+- **Compliance**: certifications, standards, eco_friendly, sustainability_rating
+- **Design**: designer, studio, collection, series, aesthetic_style
+- **Manufacturing**: factory, manufacturer, country_of_origin
+- **Commercial**: pricing, availability, supplier, sku, warranty
 
-**Properties to Add** (50+ total):
-- Material Properties: material_type, composition, texture, finish, pattern, weight, density
-- Dimensions: length, width, height, thickness, diameter, size
-- Appearance: color, color_code, gloss_level, sheen, transparency
-- Performance: slip_resistance, fire_rating, water_resistance, wear_rating
-- Application: recommended_use, installation_method, room_type, traffic_level
-- Compliance: certifications, standards, eco_friendly, sustainability_rating
-- Design: designer, studio, collection, series, aesthetic_style
-- Manufacturing: factory, manufacturer, country_of_origin
-- Commercial: pricing, availability, supplier, sku, warranty
+### Prototype Definitions
 
-**Verification**: Query `material_properties` table, should have 50+ rows
+The system uses a PROPERTY_PROTOTYPES dictionary with 3-5 descriptions per property value:
 
----
-
-### Phase 3: Define Prototypes (3-4 hours)
-**Task**: Create PROPERTY_PROTOTYPES dictionary with 3-5 descriptions per property value
-
-**Actions**:
-1. Create `app/services/property_prototypes.py`
-2. Define prototypes for top 20 properties first
-3. Structure: `{property_key: {value_name: [descriptions]}}`
-
-**Example Structure**:
 ```python
 PROPERTY_PROTOTYPES = {
     "material_type": {
@@ -1341,20 +1320,10 @@ PROPERTY_PROTOTYPES = {
 }
 ```
 
-**Verification**: Import module, check dictionary has 20+ properties
+### Embedding Generation
 
----
+The system generates CLIP embeddings for all prototype values using averaged embeddings:
 
-### Phase 4: Generate Embeddings (2 hours)
-**Task**: Generate CLIP embeddings for all prototype values
-
-**Actions**:
-1. Create `app/services/prototype_embedding_service.py`
-2. For each property → for each value → generate averaged CLIP embedding
-3. Update `material_properties` table with embeddings
-4. Create API endpoint `/api/metadata/properties/populate-prototypes`
-
-**Algorithm**:
 ```python
 for property_key, values in PROPERTY_PROTOTYPES.items():
     for value_name, descriptions in values.items():
@@ -1366,23 +1335,10 @@ for property_key, values in PROPERTY_PROTOTYPES.items():
         update_property_prototype(property_key, value_name, descriptions, avg_embedding)
 ```
 
-**Verification**: Query `material_properties`, check `text_embedding_512` is populated
+### Validation Service
 
----
+The `MetadataPrototypeValidator` service provides validation logic:
 
-### Phase 5: Validation Service (1 day)
-**Task**: Build `MetadataPrototypeValidator` service
-
-**Actions**:
-1. Create `app/services/metadata_prototype_validator.py`
-2. Implement validation logic:
-   - Generate CLIP embedding for extracted value
-   - Compare to all prototype embeddings for that property
-   - Return best match with confidence score
-3. Add confidence threshold (0.80 default)
-4. Fallback to original value if confidence < threshold
-
-**Key Methods**:
 ```python
 class MetadataPrototypeValidator:
     async def validate_property(self, property_key: str, extracted_value: str) -> Dict
@@ -1390,28 +1346,25 @@ class MetadataPrototypeValidator:
     async def get_property_prototypes(self, property_key: str) -> Dict
 ```
 
-**Verification**: Unit tests for validation logic
+The validator:
+- Generates CLIP embedding for extracted values
+- Compares to all prototype embeddings for that property
+- Returns best match with confidence score
+- Uses confidence threshold (0.80 default)
+- Falls back to original value if confidence < threshold
 
----
+### Pipeline Integration
 
-### Phase 6: Pipeline Integration (1 day)
-**Task**: Integrate validation into PDF processing pipeline
+The validation is integrated into the PDF processing pipeline after metadata extraction:
 
-**Actions**:
-1. Update `app/services/product_discovery_service.py`
-2. Add validation step AFTER `DynamicMetadataExtractor.extract_metadata()`
-3. Preserve original extracted values
-4. Store validation metadata in `products.metadata._validation_metadata`
-
-**Integration Point** (line ~1160 in product_discovery_service.py):
 ```python
-# EXISTING: Extract metadata
+# Extract metadata
 extracted = await metadata_extractor.extract_metadata(
     pdf_text=product_text,
     category_hint=category_hint
 )
 
-# NEW: Validate metadata
+# Validate metadata
 validator = MetadataPrototypeValidator()
 validated = await validator.validate_metadata(extracted)
 
@@ -1424,39 +1377,20 @@ enriched_metadata = {
 }
 ```
 
-**Verification**: Process test PDF, check `products.metadata._validation_metadata` exists
+### Search Integration
 
----
+The system integrates prototype validation into all search endpoints:
 
-### Phase 7: Search Enhancement (1-2 days)
-**Task**: Integrate prototype validation into ALL search endpoints
-
-**Current Search Endpoints Using Metadata**:
 1. `/api/rag/search?strategy=multi_vector` (PRIMARY - enabled by default)
 2. `/api/rag/search?strategy=material`
 3. `/api/rag/search?strategy=all`
 4. `/api/search/multimodal`
 5. `/api/search/material-visual`
 
-**Actions for EACH Endpoint**:
+**Multi-Vector Search Enhancement**:
 
-#### 7.1: Multi-Vector Search (PRIMARY)
-**File**: `app/services/llamaindex_service.py` → `multi_vector_search()` (line 5209)
-
-**Current Implementation**:
 ```python
-# Line 5287-5301: JSONB metadata filtering
-if material_filters:
-    for key, value in material_filters.items():
-        if isinstance(value, list):
-            metadata_conditions.append(f"p.metadata->>'{key}' IN ('{values_str}')")
-        else:
-            metadata_conditions.append(f"p.metadata->>'{key}' = '{value}'")
-```
-
-**NEW Implementation**:
-```python
-# Add prototype-based fuzzy matching
+# Prototype-based fuzzy matching
 if material_filters:
     validator = MetadataPrototypeValidator()
     for key, value in material_filters.items():
@@ -1475,8 +1409,9 @@ if material_filters:
 ```
 
 **Scoring Enhancement**:
+
 ```python
-# Line 5340-5360: Add metadata validation score
+# Add metadata validation score
 for result in results:
     metadata_match_score = 0.0
     if material_filters:
@@ -1489,7 +1424,7 @@ for result in results:
                 metadata_match_score += similarity
         metadata_match_score /= len(material_filters)
 
-    # Update combined score
+    # Update combined score with 10% weight for metadata validation
     result['combined_score'] = (
         text_weight * result['text_score'] +
         visual_weight * result['visual_score'] +
@@ -1497,104 +1432,13 @@ for result in results:
         texture_weight * result['texture_score'] +
         style_weight * result['style_score'] +
         material_weight * result['material_score'] +
-        0.10 * metadata_match_score  # NEW: 10% weight for metadata validation
+        0.10 * metadata_match_score
     )
 ```
 
-#### 7.2: Material Property Search
-**File**: `app/services/llamaindex_service.py` → `material_property_search()` (line 5514)
-
-**Enhancement**: Add semantic matching for property values
-```python
-# Before building WHERE clauses, validate all filter values
-validator = MetadataPrototypeValidator()
-expanded_filters = {}
-
-for key, value in material_filters.items():
-    if isinstance(value, str):
-        # Validate and get similar values
-        validated = await validator.validate_property(key, value)
-        if validated['validated']:
-            # Include exact match + similar values
-            similar = [validated['value']] + validated.get('similar_values', [])
-            expanded_filters[key] = similar
-    else:
-        expanded_filters[key] = value
-
-# Use expanded_filters for WHERE clauses
-```
-
-#### 7.3: All Strategies Search
-**File**: `app/services/llamaindex_service.py` → `all_strategies_search()` (line 5789)
-
-**Enhancement**: Pass validated filters to all strategies
-```python
-# Line 5844: Validate material_filters before passing to strategies
-if material_filters:
-    validator = MetadataPrototypeValidator()
-    validated_filters = await validator.validate_filters(material_filters)
-
-    # Pass validated filters to material search
-    strategy_tasks.append(
-        self.material_property_search(
-            workspace_id=workspace_id,
-            material_filters=validated_filters,  # Use validated
-            top_k=top_k
-        )
-    )
-```
-
-#### 7.4: Multimodal Search
-**File**: `app/api/search.py` → `multimodal_search()` (line 486)
-
-**Enhancement**: Add metadata validation to scoring
-```python
-# After line 585: Add metadata validation scoring
-if hasattr(request, 'material_filters') and request.material_filters:
-    validator = MetadataPrototypeValidator()
-    for result in search_results:
-        metadata_score = await validator.score_metadata_match(
-            result.metadata,
-            request.material_filters
-        )
-        # Boost multimodal score with metadata match
-        result.multimodal_score = (
-            0.85 * result.multimodal_score +
-            0.15 * metadata_score
-        )
-```
-
-#### 7.5: Material Visual Search
-**File**: `app/api/search.py` → `material_visual_search()` (line 1104)
-
-**Enhancement**: Already uses metadata filters, add validation
-```python
-# In MaterialVisualSearchService, add prototype validation
-# Before executing search, validate request.material_filters
-```
-
-**Enable by Default**:
-- Multi-vector search: Already enabled by default ✅
-- Query understanding: Already enabled by default ✅
-- Prototype validation: Enable by default in all endpoints
-
-**Verification**:
-- Test each endpoint with metadata filters
-- Verify fuzzy matching works ("shiny" → "glossy")
-- Check scoring includes validation component
-
 ---
 
-### Phase 8: Documentation ✅ COMPLETE
-- ✅ Created `docs/metadata-prototype-validation-system.md`
-- Next: Update `docs/metadata-management-system.md`
-- Next: Update `docs/comprehensive-metadata-fields-guide.md`
-- Next: Update `docs/api-endpoints.md` with new validation endpoints
-
----
-
-### Phase 9: Delete Categories System (2-3 hours)
-**Task**: Complete removal of `material_categories` system and replace with `metadata.material_type`
+## Benefits
 
 **CRITICAL**: The `material_categories` table was NEVER properly integrated. Here's what we found:
 - ❌ `products.category_id` is ALWAYS NULL (never used)
