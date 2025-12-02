@@ -1,31 +1,24 @@
 # Metadata Prototype Validation System
 
-## 📋 Executive Summary
+## Overview
 
-**What**: Semantic validation system that standardizes AI-extracted material metadata using CLIP text embeddings
-**Why**: Eliminate inconsistent naming, enable fuzzy search, validate AI outputs, improve search accuracy
-**How**: Compare extracted values to prototype embeddings, standardize to canonical values
-**Impact**: Better search results, consistent metadata, semantic matching ("shiny" → "glossy")
+The Metadata Prototype Validation System is a semantic validation system that standardizes AI-extracted material metadata using CLIP text embeddings. It eliminates inconsistent naming, enables fuzzy search, validates AI outputs, and improves search accuracy by comparing extracted values to prototype embeddings and standardizing them to canonical values.
 
-**Key Decisions**:
-- ✅ Use `material_properties` table (single source of truth)
-- ✅ Delete `material_categories` table (unused, redundant)
-- ✅ Integrate with ALL search endpoints (multi-vector, semantic, material, etc.)
-- ✅ Enable by default in multi-vector search (recommended strategy)
-- ✅ Non-breaking integration with existing DynamicMetadataExtractor
+### Key Features
 
-**Search Integration**:
-- ✅ Multi-vector search: Fuzzy metadata matching + validation scoring (enabled by default)
-- ✅ Material property search: Semantic value matching
-- ✅ All strategies search: Validated filters passed to all strategies
-- ✅ Multimodal search: Metadata validation scoring
-- ✅ Material visual search: Prototype-based filtering
+- Uses `material_properties` table as single source of truth
+- Integrates with all search endpoints (multi-vector, semantic, material, etc.)
+- Enabled by default in multi-vector search (recommended strategy)
+- Non-breaking integration with existing DynamicMetadataExtractor
+- Semantic matching capabilities (e.g., "shiny" → "glossy")
 
-**Current State Analysis**:
-- ❌ `material_categories` table EXISTS but is NEVER USED (all `products.category_id` are NULL)
-- ❌ `products.category` field (free text) is used instead of FK to `material_categories`
-- ✅ Search ALREADY uses `metadata.material_type` for filtering (not categories table)
-- ✅ System ALREADY follows metadata-based approach (just needs cleanup)
+### Search Integration
+
+- **Multi-vector search**: Fuzzy metadata matching + validation scoring (enabled by default)
+- **Material property search**: Semantic value matching
+- **All strategies search**: Validated filters passed to all strategies
+- **Multimodal search**: Metadata validation scoring
+- **Material visual search**: Prototype-based filtering
 
 ---
 
@@ -846,26 +839,26 @@ Day 32: New extractions get validated:
 
 ---
 
-## ✅ IMPLEMENTATION STATUS
+## Implementation Status
 
-### Phase 1-5: COMPLETE ✅
-- ✅ Database schema with 3 new columns
-- ✅ 36 material properties populated
-- ✅ 52 prototype values defined for 6 properties
-- ✅ 512D CLIP embeddings generated
-- ✅ MetadataPrototypeValidator service created
-- ✅ Integrated into PDF processing pipeline
+### Core Features
+- Database schema with 3 new columns
+- 36 material properties populated
+- 52 prototype values defined for 6 properties
+- 512D CLIP embeddings generated
+- MetadataPrototypeValidator service created
+- Integrated into PDF processing pipeline
 
-### Search Integration: COMPLETE ✅
-- ✅ Multi-vector search with metadata validation scoring (enabled by default)
-- ✅ Search query tracking for zero-result discovery
-- ✅ Unmatched term frequency analysis
-- ✅ Automatic prototype suggestions
+### Search Integration
+- Multi-vector search with metadata validation scoring (enabled by default)
+- Search query tracking for zero-result discovery
+- Unmatched term frequency analysis
+- Automatic prototype suggestions
 
-### Dynamic Property Creation: COMPLETE ✅
-- ✅ Auto-create material_properties entries for new discovered fields
-- ✅ Integrated with DynamicMetadataExtractor
-- ✅ Support for custom fields with _custom_ prefix
+### Dynamic Property Creation
+- Auto-create material_properties entries for new discovered fields
+- Integrated with DynamicMetadataExtractor
+- Support for custom fields with _custom_ prefix
 
 ---
 
@@ -1269,12 +1262,12 @@ PROTOTYPES = {
 
 ---
 
-## 🚀 Implementation Phases
+## Technical Implementation
 
-### Phase 1: Database Schema (1 hour)
-**Task**: Add prototype validation columns to `material_properties` table
+### Database Schema
 
-**Actions**:
+The system adds prototype validation columns to the `material_properties` table:
+
 ```sql
 -- Add prototype columns
 ALTER TABLE material_properties
@@ -1289,12 +1282,9 @@ USING ivfflat (text_embedding_512 vector_cosine_ops)
 WITH (lists = 100);
 ```
 
-**Verification**: Query table schema to confirm columns exist
+### Property Population
 
----
-
-### Phase 2: Populate Properties (2-3 hours)
-**Task**: Populate `material_properties` table with 50+ meta fields from existing system
+The `material_properties` table is populated with 50+ meta fields from the existing system:
 
 **Actions**:
 1. Create script `scripts/populate_material_properties.py`
