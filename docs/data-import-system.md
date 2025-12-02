@@ -1,8 +1,6 @@
-# Data Import System - XML & Web Scraping
+# Data Import System
 
-**Complete documentation for the Unified Data Import Hub**
-
-**Status:** ✅ Phase 1 & 2 Complete (XML Import with Dynamic Mapping & Backend Processing)
+Complete documentation for the unified data import system supporting XML files and web scraping.
 
 ---
 
@@ -10,48 +8,34 @@
 
 1. [Overview](#overview)
 2. [Architecture](#architecture)
-3. [Phase 1: Frontend & Edge Function](#phase-1-frontend--edge-function)
-4. [Phase 2: Backend Data Processing](#phase-2-backend-data-processing)
-5. [API Reference](#api-reference)
-6. [Database Schema](#database-schema)
-7. [Usage Guide](#usage-guide)
-8. [Testing](#testing)
-9. [Performance](#performance)
-10. [Future Phases](#future-phases)
+3. [Features](#features)
+4. [API Reference](#api-reference)
+5. [Database Schema](#database-schema)
+6. [Usage Guide](#usage-guide)
+7. [Testing](#testing)
+8. [Performance](#performance)
 
 ---
 
 ## Overview
 
-The Data Import System enables ingesting products from multiple sources (XML files, web scraping via Firecrawl, and existing PDF processing) through a unified data import hub. It provides dynamic field mapping, AI-assisted configuration, batch processing, and real-time progress tracking.
+The Data Import System enables ingesting products from multiple sources including XML files, web scraping, and PDF processing through a unified data import hub. It provides dynamic field mapping, AI-assisted configuration, batch processing, and real-time progress tracking.
 
 ### Key Features
 
-**Phase 1 (Complete):**
-- ✅ Dynamic XML field mapping with AI suggestions (Claude Sonnet 4.5)
-- ✅ Reusable mapping templates
-- ✅ Manual re-run functionality
-- ✅ Cron-based scheduling for recurring imports
-- ✅ Real-time progress tracking
-- ✅ Import history with audit trail
-
-**Phase 2 (Complete):**
-- ✅ Backend batch processing (10 products at a time)
-- ✅ Concurrent image downloads (5 parallel)
-- ✅ Direct product creation without PDF pipeline
-- ✅ Image linking to products
-- ✅ Async text processing (chunking, embeddings)
-- ✅ Checkpoint recovery for failed jobs
-- ✅ Comprehensive error handling
-
-**Phase 3 (Planned):**
-- Frontend real-time progress tracking
-- Mapping template management UI
-- Import job monitoring dashboard
-
-**Phase 4 (Planned):**
-- Firecrawl web scraping integration
-- Same dynamic mapping approach as XML
+- Dynamic XML field mapping with AI suggestions (Claude Sonnet 4.5)
+- Reusable mapping templates
+- Manual re-run functionality
+- Cron-based scheduling for recurring imports
+- Real-time progress tracking
+- Import history with audit trail
+- Backend batch processing (10 products at a time)
+- Concurrent image downloads (5 parallel)
+- Direct product creation without PDF pipeline
+- Image linking to products
+- Async text processing (chunking, embeddings)
+- Checkpoint recovery for failed jobs
+- Comprehensive error handling
 
 ### Use Cases
 
@@ -70,7 +54,7 @@ The Data Import System enables ingesting products from multiple sources (XML fil
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND (DataImportHub)                                    │
 │ ├─ XML Import Tab                                           │
-│ ├─ Web Scraping Tab (Phase 4)                               │
+│ ├─ Web Scraping Tab                                         │
 │ └─ Import History Tab                                       │
 └─────────────────────────────────────────────────────────────┘
                             ↓
@@ -128,15 +112,13 @@ The Data Import System enables ingesting products from multiple sources (XML fil
 
 ---
 
-## Phase 1: Frontend & Edge Function
+## Frontend Components
 
-### Components
+### DataImportHub
 
-#### 1. DataImportHub (`src/components/Admin/DataImportHub.tsx`)
-
-Main hub component with 3 tabs:
+Main hub component (`src/components/Admin/DataImportHub.tsx`) with 3 tabs:
 - **XML Import Tab** - Upload and configure XML imports
-- **Web Scraping Tab** - Firecrawl integration (Phase 4)
+- **Web Scraping Tab** - Firecrawl integration for web sources
 - **Import History Tab** - View past imports with re-run and scheduling
 
 #### 2. XMLFieldMappingModal (`src/components/Admin/DataImport/XMLFieldMappingModal.tsx`)
@@ -223,7 +205,7 @@ Configure cron schedules for recurring imports:
 
 ---
 
-## Phase 2: Backend Data Processing
+## Backend Data Processing
 
 ### Services
 
@@ -562,16 +544,16 @@ node scripts/testing/test-xml-import-phase2.js
 
 ---
 
-## Future Phases
+## Future Enhancements
 
-### Phase 3: Frontend Updates
-- Real-time progress tracking in UI
-- Mapping template management
-- Import job monitoring dashboard
+### Frontend Improvements
+- Enhanced real-time progress tracking in UI
+- Advanced mapping template management
+- Comprehensive import job monitoring dashboard
 
-### Phase 4: Web Scraping Integration
-- Firecrawl integration
-- Same dynamic mapping approach as XML
-- Product extraction from websites
-- Flows through same `data_import_jobs` pipeline
+### Web Scraping Expansion
+- Extended Firecrawl integration capabilities
+- Advanced dynamic mapping for complex web structures
+- Automatic product extraction from supplier websites
+- Unified processing through `data_import_jobs` pipeline
 

@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmony Signature Book 2024-25 | Product Catalog</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .stat-bubble {
+            background: rgba(102, 126, 234, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(102, 126, 234, 0.3);
+            padding: 1rem 1.5rem;
+            border-radius: 50px;
+            font-weight: 600;
+        }
+
+        .stat-bubble span {
+            color: #667eea;
+            font-size: 1.3rem;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .product-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .product-images {
+            position: relative;
+            height: 300px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+
+        .image-slider {
+            display: flex;
+            height: 100%;
+            transition: transform 0.5s ease;
+        }
+
+        .product-image {
+            min-width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .slider-controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+        }
+
+        .slider-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .slider-dot.active {
+            background: white;
+        }
+
+        .product-content {
+            padding: 1.5rem;
+        }
+
+        .product-header {
+            margin-bottom: 1rem;
+        }
+
+        .product-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-designer {
+            color: #764ba2;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .product-description {
+            color: #666;
+            margin: 1rem 0;
+            line-height: 1.8;
+        }
+
+        .metadata-section {
+            margin-top: 1.5rem;
+        }
+
+        .metadata-title {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 0.3rem;
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metadata-item {
+            background: #f8f9fa;
+            padding: 0.8rem;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .metadata-label {
+            font-weight: 600;
+            color: #764ba2;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 0.3rem;
+        }
+
+        .metadata-value {
+            color: #333;
+            font-size: 0.95rem;
+        }
+
+        .color-variants {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .color-chip {
+            padding: 0.4rem 0.8rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .confidence-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            background: #28a745;
+            color: white;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .page-range {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        @media (max-width: 768px) {
+            .product-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .stats {
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 Harmony Signature Book 2024-25</h1>
+        <p>Complete Product Catalog - AI Extracted & Analyzed</p>
+        <div class="stats">
+            <div class="stat-bubble">📦 Products: <span id="productCount">11</span></div>
+            <div class="stat-bubble">🖼️ Images: <span>249</span></div>
+            <div class="stat-bubble">📄 Chunks: <span>110</span></div>
+            <div class="stat-bubble">🔗 Embeddings: <span>330</span></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="product-grid" id="productGrid">
+            <!-- Products will be inserted here by JavaScript -->
+        </div>
+    </div>
+
+    <script>
+        const productsData = [
+            {
+                id: "7a5bb6bb-94cd-4d36-9812-0a5c389bc337",
+                name: "VALENOVA by SG NY",
+                designer: "Stacy Garcia",
+                description: "VALENOVA by SG NY is the new Signature collaboration from Harmony. Stacy Garcia, a New York-based designer, draws inspiration from the elegance of folded paper, redefining the aesthetics of wall covering. Each tile captures the unique essence of textures, reliefs, and shapes that only paper can offer, creating a tactile and visual experience.",
+                pageRange: "24-29",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121305_page26_page_26_image_4.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121302_page25_page_25_image_13.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121305_page26_page_26_image_2.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121306_page26_page_26_image_5.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121308_page26_page_26_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121307_page26_page_26_image_7.jpeg"
+                ],
+                metadata: {
+                    material: "Tile",
+                    format: "12x12 cm",
+                    colors: ["Clay", "Sand", "Taupe", "White"],
+                    bodyType: "White body tile",
+                    application: "Resorts and homes, floor to ceiling applications",
+                    industry: "Hospitality industry",
+                    factory: "Not found",
+                    factoryGroup: "Not found",
+                    materialCategory: "Tile",
+                    studio: "Stacy Garcia, Inc.",
+                    aestheticStyle: "Folded paper inspired",
+                    skuCodes: ["39659 (Clay)", "39660 (Sand)", "39661 (Taupe)", "39656 (White)"],
+                    groutMapei: "ULTRACOLOR PLUS (132, 100)",
+                    groutKerakoll: "FUGABELLA (40, 43)"
+                }
+            },
+            {
+                id: "3fd04231-8612-4013-81d0-889f89a88f3a",
+                name: "FOLD by Estudi[H]ac",
+                designer: "José Manuel Ferrero",
+                description: "FOLD is designed by José Manuel Ferrero from estudi{H}ac. The collection draws inspiration from the pleats and accordion-like movement of pleated fabric, creating a volumetric interplay for maximum depth. Available in White, Clay, and Green with both matt and gloss finishes.",
+                pageRange: "32-37",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121311_page26_page_26_image_3.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121314_page28_page_28_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121316_page29_page_29_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121317_page28_page_28_image_1.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121311_page26_page_26_image_1.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121312_page26_page_26_image_6.jpeg"
+                ],
+                metadata: {
+                    material: "White body tile",
+                    format: "15x38 cm / 7x14.8 cm",
+                    colors: ["VALENOVA CLAY", "VALENOVA SAND", "VALENOVA TAUPE", "VALENOVA WHITE"],
+                    bodyType: "White body tile",
+                    finish: "Matt and gloss available",
+                    patterns: "12 patterns",
+                    application: "Wall tile, shower wall suitable, shower floor suitable, floor traffic applicable",
+                    factory: "Not found",
+                    factoryGroup: "Not found",
+                    materialCategory: "Tile",
+                    studio: "estudi{H}ac (founded 2003)",
+                    aestheticStyle: "Color and simplicity of shape and texture",
+                    skuCodes: ["39659 (Clay)", "39660 (Sand)", "39661 (Taupe)", "39656 (White)"],
+                    groutMapei: "ULTRACOLOR PLUS - Color codes: 132 (Clay), 100 (White)",
+                    groutKerakoll: "FUGABELLA - Color codes: 40 (Clay), 43 (Taupe)",
+                    shadeVariation: "Present",
+                    collection: "VALENOVA"
+                }
+            },
+            {
+                id: "dcddb814-3da3-4114-a091-7fcb8bbf93b7",
+                name: "PIQUÉ by Estudi[H]ac",
+                designer: "Estudi{H}ac",
+                description: "PIQUÉ by Estudi{H}ac features a contemporary design with natural movement, inspired by pleats and accordion-like movement of pleated fabric. The collection creates an illusion of depth from pleats with minimal volumetric interplay.",
+                pageRange: "38-49",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121320_page33_page_33_image_7.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121319_page33_page_33_image_5.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121327_page32_page_32_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121326_page33_page_33_image_6.jpeg"
+                ],
+                metadata: {
+                    material: "Ceramic",
+                    format: "15x38 cm (H48) / 7x14.8 cm (H22)",
+                    colors: ["White", "Clay", "Green"],
+                    bodyType: "White body tile",
+                    finish: "Matt",
+                    texture: "Stone textures with pleated/accordion-like movement",
+                    application: "Wall tile, shower wall suitable (not recommended for floor)",
+                    factory: "HARMONY",
+                    factoryGroup: "Not found",
+                    materialCategory: "Tile",
+                    studio: "Estudi{H}ac",
+                    aestheticStyle: "Contemporary with natural movement",
+                    inspiration: "Pleats and accordion-like movement of pleated fabric",
+                    skuCodes: ["37885 (FOLD White)", "37888 (FOLD Green)", "37889 (FOLD Clay)", "38341 (TRI-FOLD Clay)", "38342 (TRI-FOLD Green)", "38343 (TRI-FOLD White)"],
+                    productCodes: "H48, H22",
+                    groutMapei: "ULTRACOLOR PLUS - Color codes: 100 (White), 145 (Clay), 19 (Green)",
+                    groutKerakoll: "FUGABELLA",
+                    shadeVariation: "V2",
+                    packaging: "17 pieces/box, 55 boxes/pallet, 1.00 m²/box, 9.10 kg/box (20.07 lb)",
+                    visualEffect: "Illusion of depth from pleats"
+                }
+            },
+            {
+                id: "36f268e3-48f6-45cd-be4f-2441cf304564",
+                name: "ONA by Dsignio",
+                designer: "Dsignio",
+                description: "ONA BY DSIGNIO is designed to conjure up all the beauty and hypnotic flow of the sea's waves. This wall tile collection is inspired by the way in which waves merge with one another, recreating the harmonious restful appearance of moving water. Each tile simulates the fluid crest and trough of a wave.",
+                pageRange: "52-57",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121337_page37_page_37_image_9.png",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121336_page37_page_37_image_5.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121335_page37_page_37_image_7.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121334_page37_page_37_image_4.jpeg"
+                ],
+                metadata: {
+                    material: "Full body ceramics",
+                    format: "12x45 cm",
+                    colors: ["Anthracite", "Brown", "White", "Sand"],
+                    bodyType: "Full body ceramics",
+                    finish: "Matt",
+                    texture: "Cloth",
+                    application: "Wall tile",
+                    factory: "Estudi{H}ac",
+                    factoryGroup: "Not found",
+                    materialCategory: "Ceramic",
+                    studio: "DSIGNIO (founded 2002, Madrid)",
+                    designers: "Alberto Bejerano, Patxi Cotarelo",
+                    collection: "PIQUÉ CLOTH",
+                    skuCodes: ["33888 (Anthracite)", "33889 (Brown)", "33890 (Sand)", "33891 (White)"],
+                    productCode: "H40",
+                    shadeVariation: "V3",
+                    awards: "Delta Awards (3 nominations), Elle Decor nomination, Decotech winner, Smoking Chair Design winner, British TTA Award winner"
+                }
+            },
+            {
+                id: "abef9592-dd4b-4a52-999e-9f0065d7b97a",
+                name: "CASTELLO by Dsignio",
+                designer: "Dsignio",
+                description: "CASTELLO is a ceramic screen inspired by medieval castle defensive openings. The design features off-centre and off-axis openings that create light and shade interplay with reflected rectangles of light. Available in 8 different positioning options for endless pattern variations.",
+                pageRange: "58-63",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121344_page37_page_37_image_2.png",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121343_page37_page_37_image_8.png",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121341_page36_page_36_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121342_page37_page_37_image_1.png"
+                ],
+                metadata: {
+                    material: "Full body ceramics / White body tile",
+                    format: "20x20 cm",
+                    colors: ["White", "Grey", "Clay"],
+                    bodyType: "Full body ceramics",
+                    finish: "Matt",
+                    application: "Wall tile, ceramic screen/lattice, shower wall suitable",
+                    factory: "HARMONY",
+                    factoryGroup: "Not found",
+                    materialCategory: "Ceramic tile",
+                    studio: "Dsignio",
+                    aestheticStyle: "Nature-inspired, fluid wave pattern",
+                    inspiration: "Medieval castle defensive openings",
+                    skuCodes: ["37871 (White)", "37875 (Green)", "37876 (Mint)"],
+                    productCode: "H48",
+                    groutMapei: "ULTRACOLOR PLUS - Color codes: 100 (White, Mint)",
+                    groutKerakoll: "FUGABELLA - Color code: 19 (Green)",
+                    installation: "8 different positioning options",
+                    visualEffect: "Light and shade interplay, reflected rectangles"
+                }
+            },
+            {
+                id: "18b516ef-3201-400c-a5b7-d0c8125a4704",
+                name: "MARE by Dsignio",
+                designer: "Dsignio",
+                description: "MARE by DSIGNIO is inspired by Mediterranean woven fibres–wickerwork baskets, straw hats, cane roofs, brushwood fences and esparto rope–, natural fibres traditionally used to create a wide variety of objects. The collection conjures up the very essence of these woven fibres in an artisanal design with a warm, natural allure.",
+                pageRange: "64-71",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121353_page41_page_41_image_1.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121354_page40_page_40_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121356_page42_page_42_image_12.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121357_page42_page_42_image_0.jpeg"
+                ],
+                metadata: {
+                    material: "Full body ceramics",
+                    format: "32x90 cm",
+                    colors: ["White", "Silver", "Sand"],
+                    bodyType: "White body tile",
+                    finish: "Matt",
+                    texture: "Woven fibres inspired",
+                    application: "Wall tile, vertical or horizontal installation, shower resistant",
+                    factory: "HARMONY",
+                    factoryGroup: "Not found",
+                    materialCategory: "Ceramic",
+                    studio: "Dsignio",
+                    inspiration: "Mediterranean woven fibres (wickerwork baskets, straw hats, cane roofs, brushwood fences, esparto rope)",
+                    collection: "MARE / CASTELLO",
+                    skuCodes: ["34825 (CASTELLO White)", "34826 (CASTELLO Grey)", "34827 (CASTELLO Clay)"],
+                    productCode: "H41",
+                    shadeVariation: "V3",
+                    installation: "8 different positions, no apparent repetitions in large surfaces",
+                    visualEffect: "Light and shade interplay, reflected rectangles of light"
+                }
+            },
+            {
+                id: "43563ca4-c762-4a22-9fca-2ea19ab35ae8",
+                name: "LOG by ALT Design",
+                designer: "Alexandre Touguet",
+                description: "The LOG by ALT DESIGN collection is directly inspired by woodworking techniques and, more particularly, by the construction of mountain cabins, whose walls are assembled by logs. The curved part of each tile echoes wood-turning techniques, while the ends evoke mitre cuts. The collection features an uneven grooved texture reminiscent of tree bark.",
+                pageRange: "74-81",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121403_page42_page_42_image_5.png",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121403_page42_page_42_image_13.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121401_page42_page_42_image_1.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121402_page42_page_42_image_9.jpeg"
+                ],
+                metadata: {
+                    material: "White body tile",
+                    format: "12.5x50 cm",
+                    colors: ["Sand", "White", "Silver"],
+                    bodyType: "White body tile",
+                    finish: "Matt",
+                    patterns: "5 patterns",
+                    application: "Wall tile, shower suitable",
+                    factory: "Not found",
+                    factoryGroup: "Not found",
+                    materialCategory: "Tile",
+                    studio: "ALT Design (Nantes, France)",
+                    designer: "Alexandre Touguet (French, graduated 2010 from Kedge Design School)",
+                    philosophy: "Form follows function",
+                    collection: "MARE",
+                    skuCodes: ["33151 (White Plain)", "33152 (White Decor)", "33153 (White Mix)", "33154 (Silver Plain)", "33155 (Silver Mix)", "33156 (Silver Decor)", "33157 (Sand Plain)", "33158 (Sand Decor)", "33159 (Sand Mix)"],
+                    productCodes: "Q46 (Plain), Q47 (Decor/Mix)",
+                    groutMapei: "MAPEI ULTRACOLOR PLUS - Color codes: 100 (White), 103 (Silver), 2 (Sand)",
+                    groutKerakoll: "KERAKOLL FUGABELLA"
+                }
+            },
+            {
+                id: "48c3a94f-0cd7-446b-9b8d-4f43410ebd67",
+                name: "BOW by MUT",
+                designer: "MUT Design (Alberto Sánchez & Eduardo Villalón)",
+                description: "BOW by MUT is inspired by the typical roofs found in Mediterranean cities in a modern new take on traditional roof tiles. BOW stands out for its relief pattern and characteristic volume, with interplay between reflected light and shade. Winner of the 2020 Archiproducts Design Awards.",
+                pageRange: "84-95",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121422_page49_page_49_image_7.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121423_page48_page_48_image_5.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121415_page46_page_46_image_1.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121413_page44_page_44_image_1.jpeg"
+                ],
+                metadata: {
+                    material: "White body tile",
+                    format: "15x45 cm",
+                    colors: ["White", "Sand", "Taupe", "Green", "Silver", "Anthracite"],
+                    bodyType: "White body tile",
+                    finish: "Matt/Gloss options",
+                    application: "Wall tile, interior, shower pieces available",
+                    factory: "Not explicitly mentioned",
+                    factoryGroup: "Not mentioned",
+                    materialCategory: "Tile",
+                    studio: "MUT Design (founded 2010)",
+                    designers: "Alberto Sánchez, Eduardo Villalón",
+                    philosophy: "Emotive design",
+                    collection: "LOG",
+                    skuCodes: ["36699 (White)", "36706 (Sand)", "36707 (Silver)", "36708 (Taupe)", "36709 (Green)", "36710 (Anthracite)"],
+                    productCode: "H45",
+                    groutMapei: "MAPEI ULTRACOLOR PLUS - Color codes: 1 (White), 43 (Sand), 5 (Silver), 44 (Taupe), 19 (Green), 10 (Anthracite)",
+                    groutKerakoll: "KERAKOLL FUGABELLA - Color codes: 43 (Sand), 5 (Silver), 44 (Taupe), 19 (Green), 10 (Anthracite), 1 (White)"
+                }
+            },
+            {
+                id: "b2669b29-1570-4c5f-aadf-4eed4a86f491",
+                name: "LINS by YONOH",
+                designer: "YONOH (Alex Selma & Clara del Portillo)",
+                description: "New colours have been added to LINS by YONOH. Navy, Green and Bordeaux's crisscrossing lines and interplay with light transform wall surfaces into huge murals. LINS by YONOH focuses on the subtle delicacy of lines, using shadow play on the 20x20 cm tile surface to trigger ongoing volumetric effects.",
+                pageRange: "98-107",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121430_page49_page_49_image_14.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121425_page48_page_48_image_1.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121426_page49_page_49_image_9.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121427_page48_page_48_image_4.jpeg"
+                ],
+                metadata: {
+                    material: "White body tile",
+                    format: "20x20 cm",
+                    colors: ["BOW CLAY", "BOW WHITE", "BOW BORDEAUX", "BOW BROWN", "BOW SILVER", "BOW TEAL", "BOW GREEN"],
+                    bodyType: "White body",
+                    finish: "Crackle glaze, Matt",
+                    application: "Wall tile, interior (Blue and Green colors not suitable for wet areas)",
+                    factory: "Not found",
+                    factoryGroup: "Not found",
+                    materialCategory: "Ceramic tile",
+                    studio: "YONOH (founded 2006, Valencia, Spain)",
+                    designers: "Alex Selma, Clara del Portillo",
+                    philosophy: "Simplicity and functionality, freshness and uniqueness",
+                    skuCodes: ["29090 (BOW CLAY)", "29092 (BOW WHITE)", "29884 (BOW BORDEAUX)", "29885 (BOW TEAL)", "29886 (BOW SILVER)", "31560 (BOW GREEN)", "31925 (BOW BROWN)"],
+                    groutMapei: "MAPEI ULTRACOLOR PLUS",
+                    groutKerakoll: "KERAKOLL FUGABELLA",
+                    shadeVariation: "V2",
+                    packaging: "14.71 pieces/box, 55 boxes/pallet, 0.68 m²/box (7.32 sq ft), 10.10 kg/box (22.27 lb)",
+                    adhesiveType: "C1 - Interior white body tiles"
+                }
+            },
+            {
+                id: "ee024f45-59bb-4d79-8ce4-b35e408da220",
+                name: "RAS by FRAN SILVESTRE",
+                designer: "Fran Silvestre",
+                description: "RAS is a collection designed by Fran Silvestre, the founder of internationally acclaimed architects' studio Fran Silvestre Arquitectos. It can be used to create tiled wall surfaces that spark off interplay with the light, leading to chameleonic settings with a dual sense of depth. Features LAYER TECH and DEEP TECH technologies.",
+                pageRange: "110-117",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121442_page53_page_53_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121441_page52_page_52_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121437_page49_page_49_image_0.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121439_page48_page_48_image_2.jpeg"
+                ],
+                metadata: {
+                    material: "White body tile",
+                    format: "20x40 cm",
+                    colors: ["LINS SUNSET", "LINS PUMPKIN", "LINS MINT", "LINS TEAL", "LINS TAUPE", "LINS BROWN", "LINS MOONLIGHT", "LINS GREY"],
+                    bodyType: "White body tile",
+                    finish: "MATT GLOSS",
+                    patterns: "4 patterns (random designs in box)",
+                    application: "Wall tile",
+                    factory: "Not found",
+                    factoryGroup: "Not found",
+                    materialCategory: "Tile",
+                    studio: "Fran Silvestre Arquitectos (FSA, founded 2005)",
+                    designer: "Fran Silvestre",
+                    collection: "LINS",
+                    skuCodes: ["21019 (LINS SUNSET)", "21020 (LINS PUMPKIN)", "21021 (LINS MINT)", "21022 (LINS TEAL)", "21023 (LINS TAUPE)", "21024 (LINS BROWN)", "21717 (LINS MOONLIGHT)", "21718 (LINS GREY)"],
+                    groutMapei: "MAPEI ULTRACOLOR PLUS - Color codes: 111, 112, 123, 134",
+                    groutKerakoll: "KERAKOLL FUGABELLA - Color codes: 18, 44, 9"
+                }
+            },
+            {
+                id: "c833fbf9-14b9-40ea-8dca-e6976be3eb68",
+                name: "MAISON by ONSET",
+                designer: "Francisco Segarra",
+                description: "Collection by furniture and interior designer Francisco Segarra for HARMONY. This porcelain tile collection has transformed aged looking ceramic tiles into a chic upper class design tool. Sold by the square metre, the collection's white field tiles have a worn-looking charm combined with geometrically patterned decors featuring triangles, circles or squares.",
+                pageRange: "120-125",
+                confidence: 0.80,
+                images: [
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121448_page54_page_54_image_11.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121446_page55_page_55_image_35.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121450_page54_page_54_image_6.jpeg",
+                    "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/b42fa662-04f7-4a91-991e-31011bd0076c/20251202_121450_page55_page_55_image_60.jpeg"
+                ],
+                metadata: {
+                    material: "Porcelain tile / White body tile",
+                    format: "9x9 cm (sold by m²)",
+                    colors: ["RAS BLUE", "RAS WHITE", "RAS SILVER", "RAS ANTHRACITE"],
+                    bodyType: "Porcelain tile / White body tile",
+                    finish: "Matt gloss",
+                    texture: "Worn-looking charm",
+                    application: "Wall tile, sold by square metre",
+                    factory: "HARMONY",
+                    factoryGroup: "Not found",
+                    materialCategory: "Ceramic tile",
+                    studio: "Francisco Segarra",
+                    designer: "FRAN SILVESTRE",
+                    brand: "ONSET",
+                    collection: "RAS",
+                    aestheticStyle: "Vintage and industrial",
+                    visualEffects: "Aged looking",
+                    designElements: "Geometrically patterned decors with triangles, circles or squares",
+                    skuCodes: ["31092 (RAS WHITE)", "31093 (RAS SILVER)", "31490 (RAS BLUE)", "31491 (RAS ANTHRACITE)"],
+                    productCode: "Q42",
+                    groutMapei: "ULTRACOLOR PLUS",
+                    groutKerakoll: "FUGABELLA",
+                    patterns: "12 patterns available"
+                }
+            }
+        ];
+
+        // Render products
+        function renderProducts() {
+            const grid = document.getElementById('productGrid');
+
+            productsData.forEach(product => {
+                const card = document.createElement('div');
+                card.className = 'product-card';
+
+                // Create image slider
+                const imagesHTML = product.images.map((img, idx) =>
+                    `<img src="${img}" alt="${product.name}" class="product-image" style="display: ${idx === 0 ? 'block' : 'none'}">`
+                ).join('');
+
+                const dotsHTML = product.images.map((_, idx) =>
+                    `<div class="slider-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>`
+                ).join('');
+
+                // Extract metadata
+                const colors = product.metadata.colors || [];
+                const colorsHTML = colors.map(color =>
+                    `<span class="color-chip">${color}</span>`
+                ).join('');
+
+                card.innerHTML = `
+                    <div class="product-images">
+                        <div class="image-slider">
+                            ${imagesHTML}
+                        </div>
+                        <div class="slider-controls">
+                            ${dotsHTML}
+                        </div>
+                    </div>
+                    <div class="product-content">
+                        <div class="product-header">
+                            <h2 class="product-name">${product.name}</h2>
+                            <p class="product-designer">by ${product.designer}</p>
+                        </div>
+
+                        <p class="product-description">${product.description}</p>
+
+                        <div class="page-range">📄 Pages ${product.pageRange}</div>
+
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🎨 Colors & Variants</h3>
+                            <div class="color-variants">
+                                ${colorsHTML}
+                            </div>
+                        </div>
+
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🏭 Factory & Origin</h3>
+                            <div class="metadata-grid">
+                                ${product.metadata.factory ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Factory</div>
+                                    <div class="metadata-value">${product.metadata.factory}</div>
+                                </div>` : ''}
+                                ${product.metadata.factoryGroup ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Factory Group</div>
+                                    <div class="metadata-value">${product.metadata.factoryGroup}</div>
+                                </div>` : ''}
+                                ${product.metadata.materialCategory ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Material Category</div>
+                                    <div class="metadata-value">${product.metadata.materialCategory}</div>
+                                </div>` : ''}
+                                ${product.metadata.studio ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Design Studio</div>
+                                    <div class="metadata-value">${product.metadata.studio}</div>
+                                </div>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">📐 Technical Specifications</h3>
+                            <div class="metadata-grid">
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Material</div>
+                                    <div class="metadata-value">${product.metadata.material}</div>
+                                </div>
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Format</div>
+                                    <div class="metadata-value">${product.metadata.format}</div>
+                                </div>
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Body Type</div>
+                                    <div class="metadata-value">${product.metadata.bodyType}</div>
+                                </div>
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Finish</div>
+                                    <div class="metadata-value">${product.metadata.finish}</div>
+                                </div>
+                                ${product.metadata.patterns ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Patterns</div>
+                                    <div class="metadata-value">${product.metadata.patterns}</div>
+                                </div>` : ''}
+                                ${product.metadata.texture ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Texture</div>
+                                    <div class="metadata-value">${product.metadata.texture}</div>
+                                </div>` : ''}
+                            </div>
+                        </div>
+
+                        ${product.metadata.skuCodes && product.metadata.skuCodes.length > 0 ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🏷️ SKU Codes</h3>
+                            <div class="metadata-grid">
+                                ${product.metadata.skuCodes.map(sku => `
+                                <div class="metadata-item">
+                                    <div class="metadata-value">${sku}</div>
+                                </div>`).join('')}
+                            </div>
+                        </div>` : ''}
+
+                        ${product.metadata.groutMapei || product.metadata.groutKerakoll ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🔧 Grout Recommendations</h3>
+                            <div class="metadata-grid">
+                                ${product.metadata.groutMapei ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Mapei</div>
+                                    <div class="metadata-value">${product.metadata.groutMapei}</div>
+                                </div>` : ''}
+                                ${product.metadata.groutKerakoll ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Kerakoll</div>
+                                    <div class="metadata-value">${product.metadata.groutKerakoll}</div>
+                                </div>` : ''}
+                            </div>
+                        </div>` : ''}
+
+                        ${product.metadata.productCode || product.metadata.productCodes ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🔢 Product Codes</h3>
+                            <div class="metadata-item">
+                                <div class="metadata-value">${product.metadata.productCode || product.metadata.productCodes}</div>
+                            </div>
+                        </div>` : ''}
+
+                        ${product.metadata.packaging ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">📦 Packaging Details</h3>
+                            <div class="metadata-item">
+                                <div class="metadata-value">${product.metadata.packaging}</div>
+                            </div>
+                        </div>` : ''}
+
+                        ${product.metadata.awards ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🏆 Awards & Recognition</h3>
+                            <div class="metadata-item">
+                                <div class="metadata-value">${product.metadata.awards}</div>
+                            </div>
+                        </div>` : ''}
+
+                        ${product.metadata.inspiration || product.metadata.philosophy || product.metadata.visualEffect || product.metadata.visualEffects ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">💡 Design Inspiration & Philosophy</h3>
+                            <div class="metadata-grid">
+                                ${product.metadata.inspiration ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Inspiration</div>
+                                    <div class="metadata-value">${product.metadata.inspiration}</div>
+                                </div>` : ''}
+                                ${product.metadata.philosophy ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Philosophy</div>
+                                    <div class="metadata-value">${product.metadata.philosophy}</div>
+                                </div>` : ''}
+                                ${product.metadata.visualEffect || product.metadata.visualEffects ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Visual Effect</div>
+                                    <div class="metadata-value">${product.metadata.visualEffect || product.metadata.visualEffects}</div>
+                                </div>` : ''}
+                                ${product.metadata.aestheticStyle ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Aesthetic Style</div>
+                                    <div class="metadata-value">${product.metadata.aestheticStyle}</div>
+                                </div>` : ''}
+                            </div>
+                        </div>` : ''}
+
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">🏗️ Application</h3>
+                            <div class="metadata-item">
+                                <div class="metadata-value">${product.metadata.application}</div>
+                            </div>
+                        </div>
+
+                        ${product.metadata.shadeVariation || product.metadata.collection || product.metadata.installation ? `
+                        <div class="metadata-section">
+                            <h3 class="metadata-title">ℹ️ Additional Information</h3>
+                            <div class="metadata-grid">
+                                ${product.metadata.shadeVariation ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Shade Variation</div>
+                                    <div class="metadata-value">${product.metadata.shadeVariation}</div>
+                                </div>` : ''}
+                                ${product.metadata.collection ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Collection</div>
+                                    <div class="metadata-value">${product.metadata.collection}</div>
+                                </div>` : ''}
+                                ${product.metadata.installation ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Installation</div>
+                                    <div class="metadata-value">${product.metadata.installation}</div>
+                                </div>` : ''}
+                            </div>
+                        </div>` : ''}
+
+                        <div class="confidence-badge">
+                            ✓ AI Confidence: ${(product.confidence * 100).toFixed(0)}%
+                        </div>
+                    </div>
+                `;
+
+                grid.appendChild(card);
+
+                // Add image slider functionality
+                const dots = card.querySelectorAll('.slider-dot');
+                const images = card.querySelectorAll('.product-image');
+
+                dots.forEach(dot => {
+                    dot.addEventListener('click', () => {
+                        const index = parseInt(dot.dataset.index);
+
+                        // Hide all images
+                        images.forEach(img => img.style.display = 'none');
+                        // Show selected image
+                        images[index].style.display = 'block';
+
+                        // Update dots
+                        dots.forEach(d => d.classList.remove('active'));
+                        dot.classList.add('active');
+                    });
+                });
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderProducts();
+            document.getElementById('productCount').textContent = productsData.length;
+        });
+    </script>
+</body>
+</html>
