@@ -40,8 +40,8 @@ const MIVAA_API = 'https://v1api.materialshub.gr';
 const HARMONY_PDF_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-documents/harmony-signature-book-24-25.pdf';
 const WORKSPACE_ID = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e';
 
-// Test both vision models
-const TEST_MODELS = ['claude-vision', 'gpt-vision'];
+// Test Claude Vision by default (GPT Vision is fallback only when Claude fails)
+const TEST_MODELS = ['claude-vision'];
 
 // AI Model Pricing (per 1M tokens)
 const MODEL_PRICING = {
