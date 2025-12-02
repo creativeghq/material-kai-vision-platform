@@ -97,6 +97,14 @@ Complete documentation for Material Kai Vision Platform.
 - API endpoints for metadata operations
 - Best practices and guidelines
 
+**[metadata-normalization-system.md](metadata-normalization-system.md)** - Metadata normalization system ✨ NEW
+- Two-layer normalization architecture (prevention + correction)
+- Semantic similarity-based field standardization (60% threshold)
+- Automatic consolidation (individual fields → objects, single → arrays)
+- Integrated into extraction pipeline
+- Migration script for existing products
+- 95%+ field standardization accuracy
+
 **[job-queue-system.md](job-queue-system.md)** - Job queue & async processing
 - Supabase-native job queue architecture
 - Checkpoint-based recovery system
@@ -115,21 +123,19 @@ Complete documentation for Material Kai Vision Platform.
 ### 🤖 AI & Processing
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
-- 12 AI models overview
-- Claude Sonnet 4.5 (product discovery, enrichment)
-- Claude Haiku 4.5 (fast validation)
-- GPT-4o (alternative discovery)
-- OpenAI embeddings (text-embedding-3-small)
-- Llama 4 Scout 17B Vision (image analysis, OCR)
-- OpenAI CLIP (5 embedding types)
-- Anthropic Semantic Chunking
-- LlamaIndex RAG system
+- 8 AI models across 4 providers
+- Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
+- OpenAI: GPT-4o, GPT-5, text-embedding-3-small
+- Google: SigLIP ViT-SO400M (primary CLIP)
+- TogetherAI: Llama 4 Scout 17B Vision
+- OpenAI CLIP ViT-B/32 (fallback)
+- 6 embedding types (text, visual, color, texture, style, material)
 - Model usage by pipeline stage
 - Cost optimization
 - API keys & configuration
 - Performance benchmarks
 
-**[agent-system.md](agent-system.md)** - AI Agent system architecture ✨ NEW
+**[agent-system.md](agent-system.md)** - AI Agent system architecture
 - Database-driven agent prompts
 - 3 specialized agents (PDF Processor, Search, Product)
 - Admin UI for prompt management (/admin/agent-configs)
@@ -138,6 +144,15 @@ Complete documentation for Material Kai Vision Platform.
 - Role-based access control
 - Agent monitoring and analytics
 - Best practices and troubleshooting
+
+**[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
+- Database-driven extraction prompts (extraction_prompts table)
+- Custom vs default prompt priority (is_custom flag)
+- Version control and workspace isolation
+- 4 stages: discovery, chunking, image_analysis, entity_creation
+- 4 categories: products, certificates, logos, specifications
+- Automatic placeholder replacement
+- Phase 1 complete (metadata extraction), Phases 2-4 pending
 
 **[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing
 - Pipeline overview
@@ -254,10 +269,9 @@ Complete documentation for Material Kai Vision Platform.
 
 - **5,000+** users in production
 - **99.5%+** uptime SLA
-- **12** AI models integrated
+- **8** AI models across 4 providers
 - **14** processing pipeline stages
-- **74+** API endpoints
-- **9** API categories
+- **108** API endpoints (14 categories)
 - **6** embedding types
 - **200+** metafield types
 - **95%+** product detection accuracy
@@ -319,16 +333,18 @@ All documentation follows these standards:
 
 ## 🔄 Documentation Updates
 
-**Last Updated**: November 13, 2025
+**Last Updated**: December 2, 2025
 **Version**: 2.0.0
 **Status**: Production
 **Maintainer**: Development Team
 
 **Recent Changes:**
-- ✅ Moved analysis documents to /planning
-- ✅ Added future features roadmap
-- ✅ Updated performance optimization status
-- ✅ Reorganized documentation structure
+- ✅ Added metadata normalization system documentation
+- ✅ Added dynamic prompt system documentation (Phase 1 complete)
+- ✅ Removed temporary analysis documents (metadata-inconsistency-analysis.md, overview-general.md)
+- ✅ Moved RESTART_PROTECTION_SUMMARY.md to /planning
+- ✅ Complete platform audit (PLATFORM-AUDIT-2025-12-02.md)
+- ✅ Updated documentation format and consistency
 
 ---
 
@@ -342,7 +358,8 @@ For questions or issues:
 
 ---
 
-**Total Documentation**: 20+ comprehensive guides
+**Total Documentation**: 33 comprehensive guides (3 removed, 2 added)
 **Total Lines**: 10,000+
 **Coverage**: 100% of platform features
+**Planning Documents**: 10 files in /planning directory
 

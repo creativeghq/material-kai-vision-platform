@@ -18,7 +18,7 @@
 **[overview.md](overview.md)** - Complete platform overview
 - Executive summary with key metrics
 - Architecture overview
-- AI models integration (12 models)
+- AI models integration (8 models across 4 providers)
 - 14-stage PDF processing pipeline
 - Multi-modal search capabilities
 - Database architecture
@@ -53,11 +53,12 @@
 - Phase 1 & 2 complete
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
-- 12 AI models overview
-- Claude Sonnet 4.5 & Haiku 4.5
-- GPT-4o & embeddings
-- Llama 4 Scout 17B Vision
-- OpenAI CLIP (5 types)
+- 8 AI models across 4 providers
+- Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
+- OpenAI: GPT-4o, GPT-5, text-embedding-3-small
+- Google: SigLIP ViT-SO400M (primary CLIP)
+- TogetherAI: Llama 4 Scout 17B Vision
+- OpenAI CLIP ViT-B/32 (fallback)
 - Model usage by stage
 - Cost optimization
 
@@ -198,6 +199,23 @@
 - Metadata API endpoints
 - Integration with PDF processing pipeline
 
+**[metadata-normalization-system.md](metadata-normalization-system.md)** - Metadata normalization system ✨ NEW
+- Two-layer normalization architecture (prevention + correction)
+- Semantic similarity-based field standardization (60% threshold)
+- Automatic consolidation (individual fields → objects, single → arrays)
+- Integrated into extraction pipeline
+- Migration script for existing products
+- 95%+ field standardization accuracy
+
+**[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
+- Database-driven extraction prompts (extraction_prompts table)
+- Custom vs default prompt priority (is_custom flag)
+- Version control and workspace isolation
+- 4 stages: discovery, chunking, image_analysis, entity_creation
+- 4 categories: products, certificates, logos, specifications
+- Automatic placeholder replacement
+- Phase 1 complete (metadata extraction), Phases 2-4 pending
+
 ---
 
 ## 🎓 Learning Paths
@@ -237,10 +255,9 @@
 ### Key Numbers
 - **5,000+** users in production
 - **99.5%+** uptime SLA
-- **12** AI models integrated
+- **8** AI models across 4 providers
 - **14** processing pipeline stages
-- **74+** API endpoints
-- **9** API categories
+- **108** API endpoints (14 categories)
 - **6** embedding types
 - **200+** metafield types
 - **95%+** product detection accuracy
@@ -307,9 +324,10 @@ For questions or issues:
 
 ---
 
-**Last Updated**: November 21, 2025
-**Version**: 1.2.0
+**Last Updated**: December 2, 2025
+**Version**: 2.0.0
 **Status**: Production
-**Total Documentation**: 13 comprehensive guides
-**Total Lines**: 7,000+
+**Total Documentation**: 33 comprehensive guides (3 removed, 2 added)
+**Total Lines**: 10,000+
 **Coverage**: 100% of platform features
+**Planning Documents**: 10 files in /planning directory

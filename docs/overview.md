@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalog PDFs into searchable, intelligent knowledge using 12 AI models across a sophisticated 14-stage processing pipeline.
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalog PDFs into searchable, intelligent knowledge using 8 AI models across 4 providers in a sophisticated 14-stage processing pipeline.
 
 ---
 
@@ -13,7 +13,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **12 AI models** integrated
+- **8 AI models** across 4 providers (Anthropic, OpenAI, Google, TogetherAI)
 - **14-stage processing pipeline**
 - **6 embedding types** for multi-modal search
 - **95%+ product detection accuracy**
@@ -84,7 +84,7 @@ Real-time updates → Frontend displays results
 
 ## AI Models & Intelligence
 
-### 12 AI Models Across 7 Pipeline Stages
+### 8 AI Models Across 4 Providers
 
 #### 1. Anthropic Claude Models
 
