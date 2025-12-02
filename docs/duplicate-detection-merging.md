@@ -11,9 +11,9 @@ The Duplicate Material Detection & Merging system helps maintain data quality by
 ### Key Principle
 
 **Duplicates are defined by factory/manufacturer match, NOT visual similarity:**
-- ✅ Same factory + similar name = DUPLICATE
-- ❌ Different factory + identical appearance = NOT duplicate
-- ❌ Same factory + different color/pattern = NOT duplicate (different variants)
+- Same factory + similar name = DUPLICATE
+- Different factory + identical appearance = NOT duplicate
+- Same factory + different color/pattern = NOT duplicate (different variants)
 
 ---
 
