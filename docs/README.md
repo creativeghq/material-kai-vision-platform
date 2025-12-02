@@ -71,7 +71,7 @@
 - Role-based access control
 - Best practices & troubleshooting
 
-**[search-strategies.md](search-strategies.md)** - Search system guide ✅
+**[search-strategies.md](search-strategies.md)** - Search system guide
 - 6 search strategies (100% complete)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image
 - All strategies combined mode
@@ -169,7 +169,7 @@
 - Monitoring & alerts
 - Rollback procedures
 
-**[supabase-types-automation.md](supabase-types-automation.md)** - Supabase types automation ✅
+**[supabase-types-automation.md](supabase-types-automation.md)** - Supabase types automation
 - Automated TypeScript type generation
 - GitHub Actions integration
 - Weekly scheduled updates
@@ -304,13 +304,13 @@
 ## 📝 Documentation Standards
 
 All documentation follows these standards:
-- ✅ Clear, concise language
-- ✅ Code examples where applicable
-- ✅ Structured with headers
-- ✅ Links to related docs
-- ✅ No task lists or planning documents
-- ✅ Production-focused content
-- ✅ Updated regularly
+- Clear, concise language
+- Code examples where applicable
+- Structured with headers
+- Links to related docs
+- No task lists or planning documents
+- Production-focused content
+- Updated regularly
 
 ---
 

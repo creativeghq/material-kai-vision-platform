@@ -3,12 +3,12 @@
 **Last Updated:** 2025-11-22
 **API Version:** v2.3.0
 **Total Endpoints:** 127+ (121 + Knowledge Base + 2 New Relationship Endpoints)
-**Status:** ✅ Production-Ready - Knowledge Base System Complete + Relationship Endpoints Added
+
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
 **Recent Updates (v2.3.0 - November 22, 2025):**
-- ✅ **NEW ENDPOINTS:** 2 relationship query endpoints for validation and testing
+- **NEW ENDPOINTS:** 2 relationship query endpoints for validation and testing
   - `GET /api/rag/product-image-relationships` - Query product-to-image relationships
   - `GET /api/rag/chunk-product-relationships` - Query chunk-to-product relationships
   - Both support filtering by document_id or product_id
@@ -16,7 +16,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
   - Used for test validation and admin dashboards
 
 **Previous Updates (v2.3.0 - Knowledge Base System):**
-- ✅ **KNOWLEDGE BASE:** 15+ new endpoints for document management with AI embeddings (NEW)
+- **KNOWLEDGE BASE:** 15+ new endpoints for document management with AI embeddings (NEW)
   - Document CRUD with automatic embedding generation (1536D)
   - Smart content change detection (only regenerate when needed)
   - PDF text extraction using PyMuPDF
@@ -28,22 +28,22 @@ Complete reference of all consolidated API endpoints with detailed usage informa
   - Search analytics
 
 **Previous Updates (v2.2.0):**
-- ✅ **DATA IMPORT:** 4 endpoints for XML import and web scraping with dynamic field mapping
-- ✅ **DUPLICATE DETECTION:** 7 endpoints for duplicate detection and product merging (factory-based only)
-- ✅ **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
-- ✅ **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
-- ✅ **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
-- ✅ **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
-- ✅ **METADATA MANAGEMENT:** 4 endpoints for scope detection, application, listing, and statistics
+- **DATA IMPORT:** 4 endpoints for XML import and web scraping with dynamic field mapping
+- **DUPLICATE DETECTION:** 7 endpoints for duplicate detection and product merging (factory-based only)
+- **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
+- **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
+- **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
+- **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
+- **METADATA MANAGEMENT:** 4 endpoints for scope detection, application, listing, and statistics
 
 **Total API Endpoints:** 125+ endpoints across 17 categories
-- ✅ **KNOWLEDGE BASE:** Complete documentation management system with AI embeddings
-- ✅ **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
-- ✅ **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
-- ✅ **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
-- ✅ **PDF EXTRACTION:** Unified through RAG pipeline with optional quick mode
-- ✅ **DUPLICATE DETECTION:** Factory-based duplicate detection and product merging (ready for integration)
-- ✅ **DATA IMPORT:** XML import with AI-powered field mapping, batch processing, and scheduling
+- **KNOWLEDGE BASE:** Complete documentation management system with AI embeddings
+- **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
+- **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
+- **METADATA SYSTEM:** Dynamic metadata extraction with scope detection and override logic
+- **PDF EXTRACTION:** Unified through RAG pipeline with optional quick mode
+- **DUPLICATE DETECTION:** Factory-based duplicate detection and product merging (ready for integration)
+- **DATA IMPORT:** XML import with AI-powered field mapping, batch processing, and scheduling
 
 ---
 
