@@ -4,17 +4,17 @@ Complete guide to the AI Agent system with database-driven prompts and configura
 
 ---
 
-## 🤖 Overview
+## Overview
 
 The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js and Anthropic Claude models. Agents are specialized AI assistants that help users with specific tasks like PDF processing, search, and product information.
 
 **Key Features**:
-- ✅ Database-driven system prompts (no code deployment needed)
-- ✅ Admin UI for prompt management
-- ✅ Real-time prompt updates
-- ✅ Fallback to default prompts
-- ✅ Role-based access control
-- ✅ Tool orchestration with LangChain.js
+- Database-driven system prompts (no code deployment needed)
+- Admin UI for prompt management
+- Real-time prompt updates
+- Fallback to default prompts
+- Role-based access control
+- Tool orchestration with LangChain.js
 
 ---
 

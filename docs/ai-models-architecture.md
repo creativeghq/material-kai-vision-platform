@@ -1,6 +1,6 @@
 # AI Models Architecture - Complete Overview
 
-## 🎯 Executive Summary
+## Executive Summary
 
 MIVAA Platform uses **8 different AI models** across **4 providers** for different purposes:
 
@@ -13,7 +13,7 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 
 ---
 
-## 📊 Complete Model Flow Diagram
+## Complete Model Flow Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐

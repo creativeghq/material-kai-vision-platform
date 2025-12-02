@@ -4,7 +4,7 @@ Complete reference of 12 AI models used across the platform.
 
 ---
 
-## 🤖 AI Models Overview
+## AI Models Overview
 
 | Model | Provider | Purpose | Capability | Cost |
 |-------|----------|---------|-----------|------|
@@ -23,7 +23,7 @@ Complete reference of 12 AI models used across the platform.
 
 ---
 
-## 🔍 Model Details
+## Model Details
 
 ### 1. Claude Sonnet 4.5 (Anthropic)
 

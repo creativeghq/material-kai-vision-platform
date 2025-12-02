@@ -1,38 +1,14 @@
-# Image Embedding Generation Improvements
+# Image Embedding Generation
 
-**Last Updated:** 2025-11-22
-**Version:** v2.3.0
-**Status:** ✅ Production-Ready
+Image embedding generation system with batching, retry logic, and checkpoint recovery for reliable CLIP embedding coverage.
+
+---
 
 ## Overview
 
-Comprehensive improvements to image embedding generation with batching, retry logic, and checkpoint recovery to ensure 100% embedding coverage for all processed images.
+The image embedding system generates visual embeddings for all processed images using CLIP models. The system includes batch processing, automatic retry with exponential backoff, and checkpoint recovery to ensure complete embedding coverage.
 
-## Problem Statement
-
-### Original Issues
-
-1. **Sequential Processing** - No batching, processed images one-by-one
-2. **No Retry Logic** - Failed embeddings were silently skipped
-3. **Silent Failures** - Errors logged but processing continued without retry
-4. **No Checkpoint Recovery** - No way to resume from failure point
-5. **Incomplete Coverage** - Only 51.6% of images had embeddings (132/256 in NOVA test)
-
-### Root Cause
-
-The original `save_images_and_generate_clips()` method used sequential processing with a simple `continue` statement on errors:
-
-```python
-for idx, img_data in enumerate(material_images):
-    try:
-        # Save image and generate embeddings
-        ...
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        continue  # ❌ CRITICAL: Silently skips failed images
-```
-
-## Solution Architecture
+## Features
 
 ### 1. Batch Processing
 
