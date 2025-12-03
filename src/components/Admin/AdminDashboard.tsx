@@ -749,8 +749,8 @@ const AdminDashboard: React.FC = () => {
                     variant="ghost"
                     className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
                   >
-                    <Link to="/admin/3d-suggestions">
-                      Configure 3D Suggestions
+                    <Link to="/agent-hub?agent=interior-designer">
+                      Interior Designer Agent
                     </Link>
                   </Button>
                 </CardContent>

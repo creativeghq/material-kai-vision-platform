@@ -206,12 +206,16 @@ export class MivaaApiClient {
 
   /**
    * Spaceformer spatial analysis
-   * Replaces: spaceformer-analysis Edge Function
+   * AI-powered room layout optimization, material placement, and accessibility analysis
    */
   async analyzeSpaceformer(payload: {
     image_url?: string;
     image_data?: string;
-    room_type?: string;
+    room_type: string;
+    room_dimensions?: { width: number; height: number; depth: number };
+    user_preferences?: any;
+    constraints?: any;
+    analysis_type?: 'full' | 'layout' | 'materials' | 'accessibility';
   }): Promise<MivaaApiResponse> {
     return this.request('/api/spaceformer/analyze', {
       method: 'POST',

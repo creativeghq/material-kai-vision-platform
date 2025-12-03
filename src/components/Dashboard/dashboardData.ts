@@ -61,19 +61,19 @@ export const featuresConfig = {
       path: '/pdf-processing',
     },
     {
-      id: '3d-generation',
+      id: 'interior-designer-agent',
       icon: Sparkles,
       iconColor: 'purple' as const,
       badge: 'AI Designer',
-      title: '3D Generation Studio',
+      title: 'Interior Designer Agent',
       description:
-        'Generate photorealistic 3D designs with intelligent material suggestions and real-time optimization',
+        'AI-powered interior design with 3D generation, spatial analysis, and intelligent material matching',
       action: {
         icon: Brain,
-        text: 'Create Design →',
+        text: 'Start Designing →',
         color: 'purple' as const,
       },
-      path: '/3d',
+      path: '/agent-hub?agent=interior-designer',
     },
     {
       id: 'moodboard',

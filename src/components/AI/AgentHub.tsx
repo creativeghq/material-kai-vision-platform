@@ -20,6 +20,7 @@ import {
   Download,
   Upload,
   FileUp,
+  Sparkles,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -36,6 +37,9 @@ import { agentChatHistoryService, ChatConversation } from '@/services/agents/age
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
+import { DesignCanvas } from './DesignCanvas';
+import { MaterialMatchingModal } from './MaterialMatchingModal';
+import { PromptLibrary } from './PromptLibrary';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -121,6 +125,15 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'admin',
     available: true,
   },
+  {
+    id: 'interior-designer',
+    name: 'Interior Designer Agent',
+    description: 'AI-powered interior design with 3D generation and material matching',
+    icon: Sparkles,
+    color: 'text-violet-500',
+    requiredRole: 'member',
+    available: true,
+  },
 ];
 
 // AI Models available (format: provider/model-name for Mastra)
@@ -144,6 +157,19 @@ interface Message {
     images?: Record<string, any[]>;
     title?: string;
   }; // Real material/product data from database
+  designData?: {
+    images?: string[];
+    spatialAnalysis?: any;
+    matchedMaterials?: any[];
+    parsedRequest?: any;
+    qualityAssessment?: any;
+    processingTimeMs?: number;
+    costEstimate?: {
+      materials: any[];
+      total_cost: number;
+      currency: string;
+    };
+  }; // Interior design results (3D images, spatial analysis, materials, cost)
 }
 
 interface AgentHubProps {
@@ -166,6 +192,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -806,7 +833,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 border-2 text-white`}
+                    className={`${message.demoData || message.materialData || message.designData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 border-2 text-white`}
                     style={{
                       background: 'var(--glass-bg)',
                       backdropFilter: 'var(--glass-blur)',
@@ -829,6 +856,45 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             message: message.materialData.title || 'Material Results'
                           }}
                         />
+                      </div>
+                    ) : message.designData ? (
+                      <div className="space-y-4">
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {/* Display design results with DesignCanvas */}
+                        <DesignCanvas
+                          images={message.designData.images}
+                          spatialAnalysis={message.designData.spatialAnalysis}
+                          matchedMaterials={message.designData.matchedMaterials}
+                          parsedRequest={message.designData.parsedRequest}
+                          qualityAssessment={message.designData.qualityAssessment}
+                          processingTimeMs={message.designData.processingTimeMs}
+                          onMaterialClick={(materialId) => {
+                            console.log('Material clicked:', materialId);
+                            // Could open material details modal or navigate
+                          }}
+                        />
+                        {/* Display cost estimate if available */}
+                        {message.designData.costEstimate && (
+                          <div className="bg-blue-50 rounded-lg p-4 text-gray-900">
+                            <h4 className="font-semibold mb-2">Cost Estimate</h4>
+                            <div className="space-y-2">
+                              {message.designData.costEstimate.materials.map((material: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-sm">
+                                  <span>{material.name}</span>
+                                  <span className="font-medium">
+                                    ${material.subtotal.toFixed(2)}
+                                  </span>
+                                </div>
+                              ))}
+                              <div className="border-t border-gray-300 pt-2 flex justify-between font-bold">
+                                <span>Total</span>
+                                <span className="text-blue-600">
+                                  ${message.designData.costEstimate.total_cost.toFixed(2)} {message.designData.costEstimate.currency}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -1015,6 +1081,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </>
               )}
 
+              {/* Prompt Library Button (Interior Designer Agent only) */}
+              {selectedAgent === 'interior-designer' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowPromptLibrary(true)}
+                  className="h-9 w-9"
+                  title="Open Prompt Library"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="icon"
@@ -1060,6 +1139,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Prompt Library Modal */}
+      {showPromptLibrary && (
+        <PromptLibrary
+          onSelectPrompt={(promptText) => {
+            setInput(promptText);
+          }}
+          onClose={() => setShowPromptLibrary(false)}
+        />
+      )}
     </div>
   );
 };

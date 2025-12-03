@@ -1,6 +1,6 @@
 /**
  * Spaceformer Analysis Service
- * Integrates with the spaceformer-analysis edge function for spatial reasoning
+ * AI-powered spatial reasoning for room layout optimization, material placement, and accessibility analysis
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -25,7 +25,8 @@ export interface AnalysisConstraints {
 }
 
 export interface SpaceformerRequest {
-  nerf_reconstruction_id?: string;
+  image_url?: string;
+  image_data?: string;
   room_type: string;
   room_dimensions?: {
     width: number;
@@ -105,7 +106,7 @@ export interface SpaceformerResult {
 
 class SpaceformerAnalysisService {
   /**
-   * Perform spatial analysis using Spaceformer AI
+   * Perform spatial analysis using Spaceformer AI (Claude Vision)
    */
   async analyzeSpace(request: SpaceformerRequest): Promise<SpaceformerResult> {
     try {
@@ -115,6 +116,10 @@ class SpaceformerAnalysisService {
         image_url: request.image_url,
         image_data: request.image_data,
         room_type: request.room_type,
+        room_dimensions: request.room_dimensions,
+        user_preferences: request.user_preferences,
+        constraints: request.constraints,
+        analysis_type: request.analysis_type,
       });
 
       if (!response.success || !response.data) {
@@ -124,7 +129,7 @@ class SpaceformerAnalysisService {
         );
       }
 
-      return data as SpaceformerResult;
+      return response.data as SpaceformerResult;
     } catch (error) {
       console.error('Error in spaceformer analysis:', error);
       throw error;
@@ -133,15 +138,22 @@ class SpaceformerAnalysisService {
 
   /**
    * Get spatial analysis results by ID
-   * Note: spatial_analysis table doesn't exist in current schema
    */
   async getAnalysisResults(
-    _analysisId: string,
+    analysisId: string,
   ): Promise<SpaceformerResult | null> {
     try {
-      // TODO: Implement when spatial_analysis table is available
-      console.warn('spatial_analysis table not available in current schema');
-      return null;
+      const { data, error } = await supabase
+        .from('spatial_analysis')
+        .select('*')
+        .eq('id', analysisId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data as SpaceformerResult;
     } catch (error) {
       console.error('Error getting analysis results:', error);
       throw error;
@@ -150,31 +162,32 @@ class SpaceformerAnalysisService {
 
   /**
    * List spatial analyses for a user
-   * Note: spatial_analysis table doesn't exist in current schema
    */
-  async listUserAnalyses(_userId?: string): Promise<SpaceformerResult[]> {
+  async listUserAnalyses(limit = 20): Promise<SpaceformerResult[]> {
     try {
-      // TODO: Implement when spatial_analysis table is available
-      console.warn('spatial_analysis table not available in current schema');
-      return [];
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const { data, error } = await supabase
+        .from('spatial_analysis')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        throw error;
+      }
+
+      return (data || []) as SpaceformerResult[];
     } catch (error) {
       console.error('Error listing analyses:', error);
       throw error;
     }
-  }
-
-  /**
-   * Analyze space from NeRF reconstruction
-   */
-  async analyzeFromNeRF(
-    nerfId: string,
-    roomType: string,
-  ): Promise<SpaceformerResult> {
-    return this.analyzeSpace({
-      nerf_reconstruction_id: nerfId,
-      room_type: roomType,
-      analysis_type: 'full',
-    });
   }
 
   /**
@@ -183,8 +196,12 @@ class SpaceformerAnalysisService {
   async quickLayoutAnalysis(
     roomType: string,
     dimensions: { width: number; height: number; depth: number },
+    imageUrl?: string,
+    imageData?: string,
   ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
+      image_url: imageUrl,
+      image_data: imageData,
       room_type: roomType,
       room_dimensions: dimensions,
       analysis_type: 'layout',
@@ -195,13 +212,17 @@ class SpaceformerAnalysisService {
    * Material placement optimization
    */
   async optimizeMaterialPlacements(
-    spatialFeatures: SpatialFeature[],
     roomType: string,
+    imageUrl?: string,
+    imageData?: string,
+    userPreferences?: UserPreferences,
   ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
+      image_url: imageUrl,
+      image_data: imageData,
       room_type: roomType,
       analysis_type: 'materials',
-      user_preferences: { spatial_features: spatialFeatures },
+      user_preferences: userPreferences,
     });
   }
 
@@ -209,13 +230,15 @@ class SpaceformerAnalysisService {
    * Accessibility analysis
    */
   async analyzeAccessibility(
-    spatialFeatures: SpatialFeature[],
     roomType: string,
+    imageUrl?: string,
+    imageData?: string,
   ): Promise<SpaceformerResult> {
     return this.analyzeSpace({
+      image_url: imageUrl,
+      image_data: imageData,
       room_type: roomType,
       analysis_type: 'accessibility',
-      user_preferences: { spatial_features: spatialFeatures },
     });
   }
 }
@@ -223,3 +246,4 @@ class SpaceformerAnalysisService {
 // Export singleton instance
 export const spaceformerAnalysisService = new SpaceformerAnalysisService();
 export { SpaceformerAnalysisService };
+

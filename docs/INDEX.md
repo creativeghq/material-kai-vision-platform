@@ -33,6 +33,15 @@ Complete documentation for Material Kai Vision Platform.
 - Security features
 - Analytics & reporting
 
+**[platform-flows.md](platform-flows.md)** - User workflows & feature flows ✨ NEW
+- PDF Processing Flow
+- Search & Discovery Flow
+- Spatial Analysis Flow (Spaceformer)
+- Data Import Flow
+- 3D Generation Flow
+- Knowledge Base Flow
+- Agent Chat Flow
+
 **[duplicate-detection-merging.md](duplicate-detection-merging.md)** - Duplicate detection system
 - Factory-based duplicate detection
 - Product merging with undo
@@ -96,6 +105,14 @@ Complete documentation for Material Kai Vision Platform.
 - Admin panel for metadata management
 - API endpoints for metadata operations
 - Best practices and guidelines
+
+**[meta-field-aggregation.md](meta-field-aggregation.md)** - Meta field aggregation system ✨ NEW
+- **3-source redundancy strategy** for maximum coverage
+- Product Discovery + AI Extraction + Chunk Aggregation
+- Case-insensitive deduplication
+- Comprehensive metadata collection (colors, textures, finishes, materials, applications)
+- Same architecture as dimension aggregation
+- Prevents data loss from scattered information
 
 **[metadata-normalization-system.md](metadata-normalization-system.md)** - Metadata normalization system ✨ NEW
 - Two-layer normalization architecture (prevention + correction)

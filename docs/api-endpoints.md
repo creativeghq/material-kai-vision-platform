@@ -1,13 +1,22 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-11-22
-**API Version:** v2.3.0
-**Total Endpoints:** 127+ (121 + Knowledge Base + 2 New Relationship Endpoints)
+**Last Updated:** 2025-12-03
+**API Version:** v2.4.0
+**Total Endpoints:** 128+ (127 + Spaceformer Spatial Analysis)
 
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (v2.3.0 - November 22, 2025):**
+**Recent Updates (v2.4.0 - December 3, 2025):**
+- **SPACEFORMER SPATIAL ANALYSIS:** 1 new endpoint for AI-powered room analysis (NEW)
+  - `POST /api/spaceformer/analyze` - Comprehensive spatial analysis using Claude Vision
+  - Room layout optimization with furniture placement suggestions
+  - Material placement recommendations for surfaces
+  - Accessibility compliance analysis (ADA)
+  - Traffic flow optimization and bottleneck detection
+  - Supports 4 analysis types: full, layout, materials, accessibility
+
+**Previous Updates (v2.3.0 - November 22, 2025):**
 - **NEW ENDPOINTS:** 2 relationship query endpoints for validation and testing
   - `GET /api/rag/product-image-relationships` - Query product-to-image relationships
   - `GET /api/rag/chunk-product-relationships` - Query chunk-to-product relationships
@@ -68,6 +77,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 15. [Data Import Routes](#15-data-import-routes) - XML import, web scraping, batch processing
 16. [Job Health Routes](#16-job-health-routes) - Job monitoring and health checks
 17. [Suggestions Routes](#17-suggestions-routes) - Search suggestions and auto-complete
+18. [Spaceformer Routes](#18-spaceformer-routes) - Spatial analysis, room layout, accessibility ✨ NEW v2.4.0
 
 ---
 
@@ -2187,6 +2197,161 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=image" \
   }'
 ```
 
+---
+
+### 3.X POST /api/rag/search/knowledge-base ✨ NEW
+
+**Purpose:** Search existing knowledge base without uploading a PDF
+**Added:** 2025-12-03 (v2.4.0)
+**Used In:** Knowledge base search, entity discovery, product search
+**Flow:** User searches → Multi-vector search across products/entities/chunks → Return unified results
+
+**Features:**
+- Uses same **multi-vector search** as main search endpoint
+- Combines 6 specialized CLIP embeddings (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%)
+- Searches across products, entities, chunks, and images
+- Supports category filtering and entity type filtering
+- Returns comprehensive results with all metadata and embeddings
+
+**Request:**
+```http
+POST /api/rag/search/knowledge-base
+Content-Type: application/json
+
+{
+  "query": "waterproof ceramic tiles with matte finish",
+  "workspace_id": "uuid",
+  "search_types": ["products", "entities", "chunks", "images"],
+  "categories": ["product", "certificate"],
+  "entity_types": ["certificate", "logo", "specification"],
+  "top_k": 10,
+  "similarity_threshold": 0.7
+}
+```
+
+**Parameters:**
+- `query` (required): Search query text
+- `workspace_id` (required): Workspace ID to search within
+- `search_types` (optional): Array of types to search - `["products", "entities", "chunks", "images"]` (default: all)
+- `categories` (optional): Filter by categories - `["product", "certificate", "logo", "specification", "general"]`
+- `entity_types` (optional): Filter by entity types - `["certificate", "logo", "specification"]`
+- `top_k` (optional): Number of results per type (default: 10)
+- `similarity_threshold` (optional): Minimum similarity score (default: 0.7)
+
+**Response:**
+```json
+{
+  "query": "waterproof ceramic tiles with matte finish",
+  "total_results": 25,
+  "products": [
+    {
+      "id": "uuid",
+      "name": "NOVA",
+      "description": "Waterproof porcelain tiles...",
+      "metadata": {
+        "material_type": "Porcelain",
+        "finish": "matte",
+        "waterproof": true
+      },
+      "relevance_score": 0.92,
+      "type": "product",
+      "embeddings": {
+        "text": true,
+        "visual": true,
+        "color": true,
+        "texture": true,
+        "style": true,
+        "material": true
+      }
+    }
+  ],
+  "entities": [
+    {
+      "id": "uuid",
+      "entity_type": "certificate",
+      "name": "ISO 9001:2015",
+      "description": "Quality Management System",
+      "metadata": {
+        "issuer": "TÜV SÜD",
+        "standards": ["ISO 9001:2015"]
+      },
+      "relevance_score": 0.85,
+      "type": "entity"
+    }
+  ],
+  "chunks": [
+    {
+      "id": "uuid",
+      "content": "NOVA tiles are waterproof and suitable for...",
+      "category": "product",
+      "metadata": {},
+      "relevance_score": 0.88,
+      "type": "chunk"
+    }
+  ],
+  "images": [],
+  "processing_time": 0.45,
+  "search_metadata": {
+    "search_types": ["products", "entities", "chunks"],
+    "categories_filter": ["product"],
+    "entity_types_filter": null,
+    "similarity_threshold": 0.7
+  }
+}
+```
+
+**Database Operations:**
+- SELECT FROM products (with multi-vector search)
+- SELECT FROM document_entities (with embedding search)
+- SELECT FROM document_chunks (with category filtering)
+- SELECT FROM document_images (with CLIP embeddings)
+
+**Frontend Integration:**
+- KnowledgeBaseSearch.tsx
+- EntityDiscovery.tsx
+- ProductSearch.tsx
+
+**Usage Examples:**
+
+**1. Search for products only:**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search/knowledge-base" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "waterproof ceramic tiles",
+    "workspace_id": "uuid",
+    "search_types": ["products"],
+    "top_k": 10
+  }'
+```
+
+**2. Search for certificates:**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search/knowledge-base" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "ISO 9001",
+    "workspace_id": "uuid",
+    "search_types": ["entities"],
+    "entity_types": ["certificate"],
+    "top_k": 5
+  }'
+```
+
+**3. Search across all types with category filter:**
+```bash
+curl -X POST "https://v1api.materialshub.gr/api/rag/search/knowledge-base" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "matte finish tiles",
+    "workspace_id": "uuid",
+    "search_types": ["products", "chunks"],
+    "categories": ["product"],
+    "top_k": 20,
+    "similarity_threshold": 0.75
+  }'
+```
+
 **6. All Strategies Combined (Recommended):**
 ```bash
 curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=all" \
@@ -3372,3 +3537,228 @@ All endpoints return JSON:
 - [Data Import System Documentation](data-import-system.md) - Complete guide to XML import and web scraping
 **API Version**: v1
 
+
+
+
+---
+
+## 18. Spaceformer Routes
+
+**Base Path:** `/api/spaceformer`
+**Purpose:** AI-powered spatial analysis for room layout optimization, material placement, and accessibility compliance
+**AI Model:** Claude Vision (Claude Sonnet 4.5)
+**Database Table:** `spatial_analysis`
+
+### 18.1 POST /api/spaceformer/analyze
+
+**Purpose:** Comprehensive spatial analysis using Claude Vision AI
+
+**Request:**
+```json
+{
+  "image_url": "https://example.com/room.jpg",
+  "image_data": "base64_encoded_image_data",
+  "room_type": "living_room",
+  "room_dimensions": {
+    "width": 5.0,
+    "height": 3.0,
+    "depth": 4.0
+  },
+  "user_preferences": {
+    "style": "modern",
+    "budget_range": {"min": 1000, "max": 5000},
+    "accessibility_requirements": ["wheelchair_accessible"],
+    "color_preferences": ["white", "beige"],
+    "material_preferences": ["wood", "ceramic"],
+    "lighting_preferences": "natural"
+  },
+  "constraints": {
+    "max_items": 10,
+    "excluded_areas": [
+      {"x": 0.0, "y": 0.0, "z": 0.0, "radius": 1.0}
+    ],
+    "required_clearances": {"doorway": 0.9},
+    "accessibility_compliance": true
+  },
+  "analysis_type": "full"
+}
+```
+
+**Parameters:**
+- `image_url` (optional): URL of room image
+- `image_data` (optional): Base64-encoded image data
+- `room_type` (required): Type of room (living_room, bedroom, kitchen, bathroom, etc.)
+- `room_dimensions` (optional): Physical dimensions in meters
+- `user_preferences` (optional): User style and material preferences
+- `constraints` (optional): Physical and accessibility constraints
+- `analysis_type` (optional): Type of analysis - `full`, `layout`, `materials`, or `accessibility` (default: `full`)
+
+**Response:**
+```json
+{
+  "success": true,
+  "analysis_id": "uuid",
+  "spatial_features": [
+    {
+      "type": "window",
+      "position": {"x": 0.0, "y": 1.5, "z": 0.0},
+      "dimensions": {"width": 1.2, "height": 1.5, "depth": 0.1},
+      "importance": 0.9,
+      "accessibility_rating": 0.8
+    }
+  ],
+  "layout_suggestions": [
+    {
+      "item_type": "sofa",
+      "position": {"x": 2.5, "y": 0.0, "z": 1.0},
+      "rotation": 90,
+      "reasoning": "Optimal viewing angle to window with natural light",
+      "confidence": 0.85,
+      "alternative_positions": [
+        {"x": 3.0, "y": 0.0, "z": 1.5}
+      ]
+    }
+  ],
+  "material_placements": [
+    {
+      "material_id": "ceramic_tile_001",
+      "position": {"x": 0.0, "y": 0.0, "z": 0.0},
+      "surface_area": 20.0,
+      "application_method": "tile",
+      "confidence": 0.9,
+      "reasoning": "Durable and easy to clean for high-traffic area"
+    }
+  ],
+  "accessibility_analysis": {
+    "compliance_score": 0.85,
+    "accessibility_features": ["wide_doorway", "level_floor"],
+    "recommendations": ["Add grab bars near entrance", "Widen pathway to 0.9m"],
+    "barrier_free_paths": [
+      {
+        "start": {"x": 0.0, "y": 0.0},
+        "end": {"x": 5.0, "y": 4.0},
+        "width": 1.2
+      }
+    ],
+    "ada_compliance": true
+  },
+  "flow_optimization": {
+    "traffic_patterns": [
+      {
+        "path": [{"x": 0.0, "y": 0.0}, {"x": 5.0, "y": 4.0}],
+        "frequency": 0.8,
+        "purpose": "entry"
+      }
+    ],
+    "bottlenecks": [
+      {
+        "position": {"x": 2.5, "y": 2.0},
+        "severity": 0.6,
+        "recommendation": "Relocate furniture to widen pathway"
+      }
+    ],
+    "efficiency_score": 0.75,
+    "suggested_improvements": [
+      "Widen main pathway",
+      "Relocate coffee table"
+    ]
+  },
+  "reasoning_explanation": "Detailed explanation of all recommendations...",
+  "confidence_score": 0.82,
+  "processing_time_ms": 3500
+}
+```
+
+**Analysis Types:**
+
+1. **`full`** - Complete analysis including all features
+   - Spatial features detection
+   - Layout suggestions
+   - Material placements
+   - Accessibility analysis
+   - Flow optimization
+
+2. **`layout`** - Focus on furniture placement and room layout
+   - Spatial features detection
+   - Layout suggestions only
+   - Quick analysis (~2-3 seconds)
+
+3. **`materials`** - Focus on material selection and placement
+   - Material placements
+   - Surface area calculations
+   - Application methods
+
+4. **`accessibility`** - Focus on accessibility compliance
+   - ADA compliance check
+   - Barrier-free path analysis
+   - Accessibility recommendations
+
+**Features:**
+- ✅ Claude Vision AI for accurate spatial understanding
+- ✅ Multiple analysis types for different use cases
+- ✅ Comprehensive accessibility compliance (ADA)
+- ✅ Traffic flow optimization
+- ✅ Material placement recommendations
+- ✅ Furniture layout suggestions with alternatives
+- ✅ Confidence scores for all recommendations
+- ✅ Detailed reasoning explanations
+
+**Database Operations:**
+- Saves analysis results to `spatial_analysis` table
+- Links to user via `user_id`
+- Links to workspace via `workspace_id`
+- Stores all analysis data as JSONB
+- Tracks processing time and confidence scores
+
+**AI Integration:**
+- Uses Claude Sonnet 4.5 (claude-sonnet-4-20250514)
+- Structured JSON response format
+- Temperature: 0.1 (deterministic)
+- Max tokens: 8000
+- Comprehensive logging via AI Logger
+
+**Use Cases:**
+- Interior design planning
+- Accessibility compliance verification
+- Material selection and placement
+- Furniture layout optimization
+- Traffic flow analysis
+- Space utilization optimization
+
+**Error Responses:**
+```json
+{
+  "success": false,
+  "error": "Error message",
+  "detail": "Detailed error information"
+}
+```
+
+**Common Errors:**
+- `400 Bad Request` - Missing required fields or invalid parameters
+- `401 Unauthorized` - User not authenticated
+- `500 Internal Server Error` - AI model error or database error
+
+---
+
+## Summary
+
+**Total Endpoints:** 128+
+**Latest Version:** v2.4.0
+**Last Updated:** December 3, 2025
+
+**New in v2.4.0:**
+- ✨ Spaceformer Spatial Analysis with Claude Vision
+- ✨ Room layout optimization
+- ✨ Material placement recommendations
+- ✨ Accessibility compliance analysis (ADA)
+- ✨ Traffic flow optimization
+
+**Key Features:**
+- ✅ Consolidated endpoints (no duplicates)
+- ✅ Comprehensive AI integration (Claude, GPT, Llama)
+- ✅ Complete Knowledge Base system
+- ✅ Advanced duplicate detection
+- ✅ Data import with AI field mapping
+- ✅ Spatial analysis with Claude Vision
+- ✅ Full FastAPI documentation at `/docs` and `/redoc`

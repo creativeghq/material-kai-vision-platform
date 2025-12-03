@@ -16,9 +16,11 @@ import {
   validateWithGuard as _validateWithGuard,
   isAgentExecutionResult,
 } from '@/types/guards';
-// REMOVED: spaceformerAnalysisService moved to planning folder for future integration
-// import { UserPreferences } from '@/services/spaceformerAnalysisService';
-type UserPreferences = any;
+import {
+  spaceformerAnalysisService,
+  type UserPreferences,
+  type SpaceformerResult,
+} from '@/services/spaceformerAnalysisService';
 
 // Material Agent Orchestrator Services
 export interface MaterialAgentTaskRequest {
@@ -299,6 +301,10 @@ export class MaterialAgentOrchestratorAPI {
   }
 }
 
+/**
+ * SpaceFormer API - Wrapper around spaceformerAnalysisService
+ * @deprecated Use spaceformerAnalysisService directly instead
+ */
 export class SpaceFormerAPI {
   /**
    * Analyze spatial context and generate layout suggestions
@@ -306,83 +312,29 @@ export class SpaceFormerAPI {
   static async analyzeSpatialContext(
     request: SpaceFormerRequest,
   ): Promise<SpaceFormerResult> {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      const response = await mivaaApi.analyzeSpaceformer({
-        image_url: request.image_url,
-        image_data: request.image_data,
-        room_type: request.room_type,
-      });
-
-      if (!response.success || !response.data) {
-        throw new Error(response.error || 'Spaceformer analysis failed');
-      }
-
-      const data = response.data;
-
-      return data as SpaceFormerResult;
-    } catch (error) {
-      console.error('Error analyzing spatial context:', error);
-      throw error;
-    }
+    return spaceformerAnalysisService.analyzeSpace({
+      image_url: request.image_url,
+      image_data: request.image_data,
+      room_type: request.room_type,
+      room_dimensions: request.room_dimensions,
+      user_preferences: request.user_preferences,
+      constraints: request.constraints,
+      analysis_type: request.analysis_type,
+    });
   }
 
   /**
    * Get user's spatial analyses
    */
   static async getUserAnalyses(limit = 20) {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      const { data, error } = await supabase
-        .from('spatial_analysis')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        throw error;
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching spatial analyses:', error);
-      throw error;
-    }
+    return spaceformerAnalysisService.listUserAnalyses(limit);
   }
 
   /**
    * Get analysis by ID
    */
   static async getAnalysis(analysisId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('spatial_analysis')
-        .select('*')
-        .eq('id', analysisId)
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      return data;
-    } catch (error) {
-      console.error('Error fetching analysis:', error);
-      throw error;
-    }
+    return spaceformerAnalysisService.getAnalysisResults(analysisId);
   }
 
   /**
@@ -393,30 +345,14 @@ export class SpaceFormerAPI {
     svbrdfExtractionIds?: string[],
     userPreferences?: UserPreferences,
   ): Promise<SpaceFormerResult> {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      // Prepare comprehensive request with all available data
-      const request: SpaceFormerRequest = {
-        user_id: user.id,
-        room_type: roomType,
-
-        user_preferences: userPreferences,
-        constraints: {
-          svbrdf_extraction_ids: svbrdfExtractionIds,
-        },
-      };
-
-      return await this.analyzeSpatialContext(request);
-    } catch (error) {
-      console.error('Error in complete room analysis:', error);
-      throw error;
-    }
+    return spaceformerAnalysisService.analyzeSpace({
+      room_type: roomType,
+      user_preferences: userPreferences,
+      constraints: {
+        svbrdf_extraction_ids: svbrdfExtractionIds,
+      },
+      analysis_type: 'full',
+    });
   }
 }
 

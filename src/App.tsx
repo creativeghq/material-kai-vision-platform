@@ -30,7 +30,6 @@ import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
 import { SystemPerformance } from './components/Admin/SystemPerformance';
 import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
 import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
-import { Designer3DPage } from './components/3D/Designer3DPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
@@ -116,16 +115,6 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <MoodBoardPage />
-                    </Layout>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/3d"
-                element={
-                  <AuthGuard>
-                    <Layout>
-                      <Designer3DPage />
                     </Layout>
                   </AuthGuard>
                 }

@@ -197,6 +197,185 @@ const createImageAnalysisTool = (workspaceId: string) => {
 };
 
 /**
+ * LangChain Tool: Spaceformer Spatial Analysis
+ */
+const createSpaceformerTool = (workspaceId: string) => {
+  return tool(
+    async ({ imageUrl, roomType, analysisType = 'full' }) => {
+      try {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/spaceformer/analyze`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_url: imageUrl,
+            room_type: roomType,
+            analysis_type: analysisType,
+            workspace_id: workspaceId,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Spaceformer analysis failed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        return JSON.stringify({
+          success: true,
+          analysis_id: data.analysis_id,
+          room_type: data.room_type,
+          layout_analysis: data.layout_analysis || {},
+          material_suggestions: data.material_suggestions || [],
+          accessibility_report: data.accessibility_report || {},
+          spatial_metrics: data.spatial_metrics || {},
+        });
+      } catch (error) {
+        console.error('Spaceformer tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Spatial analysis failed',
+        });
+      }
+    },
+    {
+      name: 'spaceformer_analysis',
+      description: 'Analyze room layout, material placement, and accessibility using Claude Vision AI. Provides spatial metrics, layout optimization suggestions, and material recommendations based on room analysis.',
+      schema: z.object({
+        imageUrl: z.string().describe('Room image URL'),
+        roomType: z.string().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
+        analysisType: z
+          .enum(['full', 'layout', 'materials', 'accessibility'])
+          .default('full')
+          .describe('Type of spatial analysis - full (complete analysis), layout (room structure only), materials (material suggestions only), accessibility (accessibility compliance only)'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: 3D Interior Design Generation
+ */
+const create3DGenerationTool = (userId: string, workspaceId: string) => {
+  return tool(
+    async ({ prompt, roomType, style, referenceImageUrl }) => {
+      try {
+        const { data, error } = await supabase.functions.invoke('mastra-3d-generation', {
+          body: {
+            user_id: userId,
+            workspace_id: workspaceId,
+            prompt,
+            room_type: roomType,
+            style,
+            reference_image_url: referenceImageUrl,
+          },
+        });
+
+        if (error) {
+          throw new Error(`3D generation failed: ${error.message}`);
+        }
+
+        return JSON.stringify({
+          success: true,
+          generation_id: data.generationId,
+          image_urls: data.image_urls || [],
+          parsed_request: data.parsed_request || {},
+          matched_materials: data.matched_materials || [],
+          quality_assessment: data.quality_assessment || {},
+          processing_time_ms: data.processing_time_ms,
+        });
+      } catch (error) {
+        console.error('3D generation tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : '3D generation failed',
+        });
+      }
+    },
+    {
+      name: 'generate_3d',
+      description: 'Generate 3D interior design images using AI models. Supports text-to-image and image-to-image generation with 10 different AI models. Can match materials from the catalog and provide quality assessments.',
+      schema: z.object({
+        prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
+        roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
+        style: z.string().optional().describe('Design style (modern, minimalist, industrial, scandinavian, traditional, etc.)'),
+        referenceImageUrl: z.string().optional().describe('Reference image URL for image-to-image generation'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Material Cost Estimation
+ */
+const createCostEstimationTool = (workspaceId: string) => {
+  return tool(
+    async ({ materialIds }) => {
+      try {
+        // Query products table for pricing information
+        const { data: products, error } = await supabase
+          .from('products')
+          .select('id, name, metadata')
+          .eq('workspace_id', workspaceId)
+          .in('id', materialIds);
+
+        if (error) {
+          throw new Error(`Failed to fetch materials: ${error.message}`);
+        }
+
+        if (!products || products.length === 0) {
+          return JSON.stringify({
+            success: false,
+            error: 'No materials found with the provided IDs',
+          });
+        }
+
+        // Calculate total cost from metadata
+        const materialsWithPrices = products.map(product => {
+          const price = product.metadata?.price || product.metadata?.cost || 0;
+          const unit = product.metadata?.unit || 'unit';
+          const quantity = product.metadata?.quantity || 1;
+
+          return {
+            id: product.id,
+            name: product.name,
+            price: parseFloat(price.toString()),
+            unit,
+            quantity: parseFloat(quantity.toString()),
+            subtotal: parseFloat(price.toString()) * parseFloat(quantity.toString()),
+          };
+        });
+
+        const totalCost = materialsWithPrices.reduce((sum, item) => sum + item.subtotal, 0);
+
+        return JSON.stringify({
+          success: true,
+          materials: materialsWithPrices,
+          total_cost: totalCost,
+          currency: 'USD',
+          material_count: materialsWithPrices.length,
+        });
+      } catch (error) {
+        console.error('Cost estimation tool error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Cost estimation failed',
+        });
+      }
+    },
+    {
+      name: 'estimate_cost',
+      description: 'Estimate total cost of selected materials from the catalog. Calculates pricing based on material metadata (price, quantity, unit).',
+      schema: z.object({
+        materialIds: z.array(z.string()).describe('Array of material/product IDs to estimate cost for'),
+      }),
+    }
+  );
+};
+
+/**
  * LangChain Tool: Upload PDF for Processing
  */
 const createUploadPDFTool = (userId: string, workspaceId: string) => {
@@ -947,6 +1126,14 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
     tools: ['uploadPDF', 'checkJobStatus', 'queryDatabase', 'checkServerHealth', 'querySentry'],
     // systemPrompt loaded dynamically from database
   },
+  'interior-designer': {
+    id: 'interior-designer',
+    name: 'Interior Designer Agent',
+    description: 'AI-powered interior design with 3D generation, spatial analysis, and material matching',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'generate_3d', 'estimate_cost'],
+    // systemPrompt loaded dynamically from database
+  },
 };
 
 /**
@@ -1035,6 +1222,15 @@ async function executeAgent(
   }
   if (config.tools.includes('querySentry')) {
     tools.push(createQuerySentryTool());
+  }
+  if (config.tools.includes('spaceformer_analysis')) {
+    tools.push(createSpaceformerTool(workspaceId));
+  }
+  if (config.tools.includes('generate_3d')) {
+    tools.push(create3DGenerationTool(userId, workspaceId));
+  }
+  if (config.tools.includes('estimate_cost')) {
+    tools.push(createCostEstimationTool(workspaceId));
   }
 
   // Bind tools to model if any tools are configured
