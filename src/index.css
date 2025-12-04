@@ -35,106 +35,99 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Worklytics Design - PROPERLY Analyzed */
+    /* Dark Dashboard Design System - Based on provided screenshot */
 
-    /* Main Background - Complex gradient (see below) */
-    --background: 195 20% 58%;  /* Base color for fallback */
-    --foreground: 0 0% 100%;  /* White text for glass elements */
-    --foreground-dark: 210 15% 20%;  /* Dark text for white cards */
+    /* Main Background - Dark navy/slate */
+    --background: 222 47% 11%;  /* #0F172A - Dark navy background */
+    --foreground: 210 40% 98%;  /* #F8FAFC - Almost white text */
 
-    /* Cards - Pure White (for main content cards) */
-    --card: 0 0% 100%;  /* Pure white #FFFFFF */
-    --card-foreground: 210 15% 20%;  /* Dark text on white cards */
+    /* Cards - Dark with subtle transparency */
+    --card: 217 33% 17%;  /* #1E293B - Dark slate for cards */
+    --card-foreground: 210 40% 98%;  /* White text on cards */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 210 15% 20%;
+    --popover: 217 33% 17%;
+    --popover-foreground: 210 40% 98%;
 
-    /* Primary - Dark teal (sidebar base) */
-    --primary: 195 25% 45%;  /* Teal for primary actions */
+    /* Primary - Emerald green accent (like in the logo and positive metrics) */
+    --primary: 160 84% 39%;  /* #10B981 - Emerald green */
     --primary-foreground: 0 0% 100%;  /* White text */
 
-    /* Secondary - Light elements */
-    --secondary: 195 15% 75%;  /* Light for secondary */
-    --secondary-foreground: 210 15% 20%;  /* Dark text */
+    /* Secondary - Lighter slate for secondary elements */
+    --secondary: 215 25% 27%;  /* #334155 - Lighter slate */
+    --secondary-foreground: 210 40% 98%;  /* White text */
 
-    /* Muted - Mocha/tan (for subtle backgrounds) */
-    --muted: 30 20% 75%;  /* Lighter mocha for backgrounds */
-    --muted-foreground: 210 15% 35%;  /* Dark text on mocha */
-    --mocha-color: hsl(30, 25%, 70%);  /* Mocha/tan color for icon backgrounds */
+    /* Muted - Even darker for subtle backgrounds */
+    --muted: 217 33% 17%;  /* Same as card */
+    --muted-foreground: 215 20% 65%;  /* #94A3B8 - Muted text */
 
-    /* Accent - Teal accent */
-    --accent: 195 30% 50%;  /* Bright teal for accents */
+    /* Accent - Blue accent (for charts and highlights) */
+    --accent: 217 91% 60%;  /* #3B82F6 - Blue accent */
     --accent-foreground: 0 0% 100%;  /* White text */
 
-    --destructive: 0 65% 55%;
+    --destructive: 0 84% 60%;  /* #EF4444 - Red */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders - Very subtle */
-    --border: 0 0% 100% / 0.2;  /* Semi-transparent white borders */
-    --input: 0 0% 100% / 0.1;  /* Semi-transparent input bg */
-    --ring: 195 30% 50%;  /* Teal focus ring */
+    /* Borders - Subtle dark borders */
+    --border: 217 33% 23%;  /* #293548 - Subtle border */
+    --input: 217 33% 20%;  /* Slightly lighter for inputs */
+    --ring: 160 84% 39%;  /* Emerald focus ring */
 
-    --radius: 1.25rem;  /* Large rounded corners (20px) */
+    --radius: 0.75rem;  /* 12px rounded corners (more subtle than before) */
 
-    /* Glass Morphism - For stat bubbles and sidebar */
-    --glass-bg: rgba(255, 255, 255, 0.15);  /* Semi-transparent white */
-    --glass-border: rgba(255, 255, 255, 0.25);  /* Lighter border */
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);  /* Soft shadow */
-    --glass-blur: blur(12px);  /* Backdrop blur amount */
+    /* Glass Morphism - Dark glass effect */
+    --glass-bg: rgba(30, 41, 59, 0.7);  /* Dark slate with transparency */
+    --glass-border: rgba(255, 255, 255, 0.1);  /* Subtle white border */
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);  /* Darker shadow */
+    --glass-blur: blur(12px);  /* Backdrop blur */
 
-    /* Sidebar - Glass morphism with dark teal tint */
-    --sidebar-background: rgba(74, 95, 92, 0.7);  /* Dark teal with transparency */
-    --sidebar-foreground: 0 0% 100%;  /* White text */
-    --sidebar-accent: rgba(255, 255, 255, 0.15);  /* Light overlay for active */
-    --sidebar-border: rgba(255, 255, 255, 0.1);  /* Subtle border */
+    /* Sidebar - Dark with emerald accent */
+    --sidebar-background: 222 47% 11%;  /* Same as main background */
+    --sidebar-foreground: 210 40% 98%;  /* White text */
+    --sidebar-accent: 160 84% 39%;  /* Emerald for active items */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 217 33% 23%;  /* Subtle border */
 
-    /* Complex gradient background - Worklytics style */
-    --gradient-background:
-      radial-gradient(ellipse at top left, hsl(190, 25%, 62%) 0%, transparent 50%),
-      radial-gradient(ellipse at top right, hsl(195, 20%, 58%) 0%, transparent 50%),
-      radial-gradient(ellipse at bottom left, hsl(25, 20%, 58%) 0%, transparent 50%),
-      radial-gradient(ellipse at bottom right, hsl(30, 18%, 55%) 0%, transparent 50%),
-      hsl(195, 18%, 56%);  /* Base color */
+    /* Gradients - For charts (green/blue like in screenshot) */
+    --gradient-green: linear-gradient(180deg, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.05) 100%);
+    --gradient-blue: linear-gradient(180deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.05) 100%);
+    --gradient-background: #0F172A;  /* Solid dark background */
 
     /* Shadows */
-    --shadow-glow: 0 0 30px hsl(200 25% 45% / 0.3);
-    --shadow-subtle: 0 2px 8px hsl(200 30% 20% / 0.15);
-    --shadow-medium: 0 8px 20px hsl(200 30% 20% / 0.2);
-    --shadow-card: 0 4px 12px hsl(200 30% 20% / 0.18);
+    --shadow-glow: 0 0 30px rgba(16, 185, 129, 0.2);  /* Emerald glow */
+    --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-medium: 0 8px 20px rgba(0, 0, 0, 0.4);
+    --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.3);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    /* Status badges - Worklytics style (like "+4.2%", "-1.8%") */
-    --success: 142 50% 45%;  /* Green for positive badges */
-    --success-foreground: 142 60% 25%;  /* Dark green text */
-    --success-bg: 142 45% 88%;  /* Light green background #D4E8D4 */
+    /* Status colors */
+    --success: 160 84% 39%;  /* Emerald green */
+    --success-foreground: 0 0% 100%;
+    --success-bg: 160 84% 15%;  /* Dark emerald background */
 
-    --warning: 15 80% 60%;  /* Coral/salmon for warnings */
-    --warning-foreground: 15 70% 30%;  /* Dark coral text */
-    --warning-bg: 15 70% 90%;  /* Light coral background */
+    --warning: 38 92% 50%;  /* Orange */
+    --warning-foreground: 0 0% 100%;
+    --warning-bg: 38 92% 15%;  /* Dark orange background */
 
-    --error: 0 65% 55%;  /* Red for negative badges */
-    --error-foreground: 0 70% 30%;  /* Dark red text */
-    --error-bg: 0 60% 92%;  /* Light pink/red background #F5D4D4 */
+    --error: 0 84% 60%;  /* Red */
+    --error-foreground: 0 0% 100%;
+    --error-bg: 0 84% 15%;  /* Dark red background */
 
-    --info: 200 50% 60%;  /* Light blue for info */
-    --info-foreground: 200 60% 30%;  /* Dark blue text */
-    --info-bg: 200 50% 90%;  /* Light blue background */
+    --info: 217 91% 60%;  /* Blue */
+    --info-foreground: 0 0% 100%;
+    --info-bg: 217 91% 15%;  /* Dark blue background */
 
-    /* Priority badges - Worklytics schedule colors */
-    --badge-high: 170 30% 45%;  /* Dark teal for high priority */
-    --badge-high-fg: 0 0% 98%;  /* White text */
-    --badge-medium: 200 50% 70%;  /* Light blue for medium priority */
-    --badge-medium-fg: 200 60% 25%;  /* Dark blue text */
-    --badge-low: 15 70% 65%;  /* Coral for low priority */
-    --badge-low-fg: 15 70% 25%;  /* Dark coral text */
-    --badge-neutral: 200 10% 60%;  /* Gray for neutral */
+    /* Chart colors (matching screenshot) */
+    --chart-green: 160 84% 39%;  /* Emerald for positive/total */
+    --chart-blue: 217 91% 60%;  /* Blue for in-transit */
+    --chart-orange: 38 92% 50%;  /* Orange for warnings */
+    --chart-red: 0 84% 60%;  /* Red for errors */
   }
 
 .dark {
-    /* Keep same theme - we're using light warm theme by default */
+    /* Already dark by default */
   }
 }
 
@@ -151,202 +144,215 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* Stat cards - Worklytics style (glass morphism for stat bubbles) */
-  .stat-card-glass {
-    @apply rounded-2xl transition-all duration-300;
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-  }
-
-  .stat-card-glass:hover {
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
-  }
-
-  /* Icon container in stat cards - Mocha background */
-  .stat-icon-mocha {
-    @apply rounded-xl p-3;
-    background: var(--mocha-color);
-  }
-
-  /* Glass morphism utilities */
-  .glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-subtle);
-  }
-
-  /* Gradient utilities */
-  .gradient-primary {
-    background: var(--gradient-primary);
-  }
-
-  .gradient-secondary {
-    background: var(--gradient-secondary);
-  }
-
-  .gradient-accent {
-    background: var(--gradient-accent);
-  }
-
-  .gradient-background {
-    background: var(--gradient-background);
-  }
-
-  /* Modern card styles */
-  .modern-card {
-    @apply bg-card rounded-2xl border border-border;
+  /* Dark Dashboard Card - Main content cards */
+  .dashboard-card {
+    @apply bg-card rounded-xl border border-border p-6;
     box-shadow: var(--shadow-card);
     transition: var(--transition-smooth);
   }
 
-  .modern-card:hover {
+  .dashboard-card:hover {
     box-shadow: var(--shadow-medium);
     transform: translateY(-2px);
   }
 
-  /* Feature card with warm theme */
-  .feature-card {
-    @apply bg-card rounded-2xl p-6 border border-border;
-    box-shadow: var(--shadow-card);
-    transition: var(--transition-bounce);
+  /* Glass morphism card - For overlays and special sections */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    @apply rounded-xl;
   }
 
-  .feature-card:hover {
-    box-shadow: var(--shadow-medium);
-    transform: translateY(-4px);
-    border-color: hsl(var(--primary) / 0.4);
+  /* Stat card - For metrics/statistics */
+  .stat-card {
+    @apply dashboard-card;
   }
 
-  /* Badge variants - Worklytics style */
-  .badge-success {
-    background-color: hsl(var(--success-bg));
-    color: hsl(var(--success-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  /* Section container - For grouping content */
+  .section-container {
+    @apply bg-card rounded-xl border border-border p-6 space-y-4;
   }
 
-  .badge-warning {
-    background-color: hsl(var(--warning-bg));
-    color: hsl(var(--warning-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  /* Sidebar item */
+  .sidebar-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200;
+    @apply text-muted-foreground hover:text-foreground hover:bg-secondary/50;
   }
 
-  .badge-error {
-    background-color: hsl(var(--error-bg));
-    color: hsl(var(--error-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
+  .sidebar-item.active {
+    @apply bg-primary text-primary-foreground;
+    box-shadow: var(--shadow-glow);
   }
 
-  .badge-info {
-    background-color: hsl(var(--info-bg));
-    color: hsl(var(--info-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
-  }
-
-  .badge-high {
-    background-color: hsl(var(--error-bg));
-    color: hsl(var(--error-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
-  }
-
-  .badge-medium {
-    background-color: hsl(var(--warning-bg));
-    color: hsl(var(--warning-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
-  }
-
-  .badge-low {
-    background-color: hsl(var(--success-bg));
-    color: hsl(var(--success-foreground));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
-  }
-
-  .badge-neutral {
-    background-color: hsl(200 10% 90%);
-    color: hsl(var(--badge-neutral));
-    @apply font-semibold px-3 py-1 rounded-full text-xs;
-  }
-
-  /* Yellow accent button */
-  .btn-yellow {
-    @apply bg-primary text-primary-foreground rounded-full px-8 py-3;
+  /* Primary button - Emerald green */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
     box-shadow: var(--shadow-subtle);
   }
 
-  .btn-yellow:hover {
-    box-shadow: var(--shadow-medium);
-    transform: translateY(-2px);
-  }
-
-  /* Dark button (like Apple/Google buttons) */
-  .btn-dark {
-    @apply bg-secondary text-secondary-foreground rounded-full px-6 py-3;
-    @apply font-medium transition-all duration-300 border border-border;
-  }
-
-  .btn-dark:hover {
-    @apply bg-secondary/90;
+  .btn-primary:hover {
+    @apply brightness-110;
+    box-shadow: var(--shadow-glow);
     transform: translateY(-1px);
   }
 
-  /* Input field modern style */
-  .input-modern {
-    @apply bg-input border-border rounded-xl px-4 py-3;
+  /* Secondary button - Slate */
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground rounded-lg px-6 py-2.5;
+    @apply font-medium transition-all duration-300 border border-border;
+  }
+
+  .btn-secondary:hover {
+    @apply bg-secondary/80;
+    transform: translateY(-1px);
+  }
+
+  /* Outline button */
+  .btn-outline {
+    @apply bg-transparent text-foreground rounded-lg px-6 py-2.5;
+    @apply font-medium transition-all duration-300 border border-border;
+  }
+
+  .btn-outline:hover {
+    @apply bg-secondary/30;
+  }
+
+  /* Input field - Dark theme */
+  .input-dark {
+    @apply bg-input border-border rounded-lg px-4 py-2.5;
     @apply text-foreground placeholder:text-muted-foreground;
     @apply transition-all duration-200;
-    box-shadow: var(--shadow-subtle);
   }
 
-  .input-modern:focus {
-    @apply outline-none ring-2 ring-ring;
-    box-shadow: var(--shadow-medium);
+  .input-dark:focus {
+    @apply outline-none ring-2 ring-primary border-primary;
   }
 
-  /* Status badges */
+  /* Search input - Like in the screenshot */
+  .search-input {
+    @apply input-dark pl-10;
+    background-color: hsl(var(--input));
+  }
+
+  /* Badge variants */
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-semibold;
+  }
+
   .badge-success {
-    @apply bg-success/10 text-success border border-success/20 rounded-full px-3 py-1 text-sm;
+    @apply badge bg-success/20 text-success border border-success/30;
   }
 
   .badge-warning {
-    @apply bg-warning/10 text-warning border border-warning/20 rounded-full px-3 py-1 text-sm;
+    @apply badge bg-warning/20 text-warning border border-warning/30;
+  }
+
+  .badge-error {
+    @apply badge bg-error/20 text-error border border-error/30;
   }
 
   .badge-info {
-    @apply bg-info/10 text-info border border-info/20 rounded-full px-3 py-1 text-sm;
+    @apply badge bg-info/20 text-info border border-info/30;
+  }
+
+  .badge-neutral {
+    @apply badge bg-muted text-muted-foreground border border-border;
+  }
+
+  /* Status indicator dot */
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot-success {
+    @apply status-dot bg-success;
+    box-shadow: 0 0 8px hsl(var(--success) / 0.5);
+  }
+
+  .status-dot-warning {
+    @apply status-dot bg-warning;
+    box-shadow: 0 0 8px hsl(var(--warning) / 0.5);
+  }
+
+  .status-dot-error {
+    @apply status-dot bg-error;
+    box-shadow: 0 0 8px hsl(var(--error) / 0.5);
   }
 
   /* Progress bar */
   .progress-bar {
-    @apply bg-muted rounded-full h-2 overflow-hidden;
+    @apply bg-secondary rounded-full h-2 overflow-hidden;
   }
 
   .progress-fill {
-    @apply bg-primary h-full rounded-full transition-all duration-500;
+    @apply h-full rounded-full transition-all duration-500;
   }
 
-  /* Glow effect for yellow accent */
-  .glow-effect {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+  .progress-fill-success {
+    @apply progress-fill bg-success;
   }
 
-  /* Text effects */
-  .text-gradient {
-    background: var(--gradient-accent);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
+  .progress-fill-warning {
+    @apply progress-fill bg-warning;
+  }
+
+  .progress-fill-info {
+    @apply progress-fill bg-info;
+  }
+
+  /* Table styles - Dark theme */
+  .table-dark {
+    @apply w-full;
+  }
+
+  .table-dark thead {
+    @apply border-b border-border;
+  }
+
+  .table-dark th {
+    @apply px-4 py-3 text-left text-sm font-medium text-muted-foreground;
+  }
+
+  .table-dark td {
+    @apply px-4 py-4 text-sm text-foreground border-b border-border;
+  }
+
+  .table-dark tr:hover {
+    @apply bg-secondary/30;
+  }
+
+  /* Chart container */
+  .chart-container {
+    @apply dashboard-card;
+  }
+
+  /* Gradient overlays for charts */
+  .chart-gradient-green {
+    background: var(--gradient-green);
+  }
+
+  .chart-gradient-blue {
+    background: var(--gradient-blue);
+  }
+
+  /* Glow effects */
+  .glow-emerald {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+
+  /* Divider */
+  .divider {
+    @apply border-t border-border my-6;
   }
 
   /* Animations */
-  @keyframes gradient-shift {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
-
   @keyframes float {
     0%, 100% { transform: translateY(0px); }
     50% { transform: translateY(-10px); }
@@ -368,6 +374,11 @@ All colors MUST be HSL.
     }
   }
 
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
   .animate-float {
     animation: float 4s ease-in-out infinite;
   }
@@ -378,5 +389,9 @@ All colors MUST be HSL.
 
   .animate-slide-in {
     animation: slide-in 0.3s ease-out;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
   }
 }
