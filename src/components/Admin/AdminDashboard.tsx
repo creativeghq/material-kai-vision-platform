@@ -498,6 +498,22 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'CRM System',
       },
+      {
+        title: 'Quote Requests',
+        description: 'View and manage customer quote requests with pricing',
+        icon: FileText,
+        path: '/quotes/requests',
+        status: 'active',
+        count: 'Quote System',
+      },
+      {
+        title: 'Proposals',
+        description: 'Create and send proposals to customers',
+        icon: FileText,
+        path: '/quotes/proposals',
+        status: 'active',
+        count: 'Proposals',
+      },
     ],
     'System Monitoring': [
       {

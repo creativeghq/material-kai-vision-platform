@@ -1,24 +1,22 @@
 /**
- * Mastra 3D Generation - Replaced CrewAI
+ * 3D Generation - AI-Powered Interior Design
  *
- * Complete migration from CrewAI to Mastra framework for 3D interior generation.
+ * LangChain.js-based 3D interior generation system.
  *
  * Features:
- * - 3 Mastra agents (Request Parser, Material Matcher, Image Generator)
+ * - LangChain.js agent orchestration
  * - 4-step workflow (Parse → Match → Generate → Store)
  * - 10 AI models (3 Hugging Face + 7 Replicate)
  * - Database workflow tracking
- * - 100% API compatibility with previous CrewAI implementation
+ * - Claude Sonnet 4.5 for intelligent coordination
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
 import Replicate from 'https://esm.sh/replicate@0.25.2';
-import { z } from 'npm:zod';
-import { Agent } from 'npm:@mastra/core/agent';
-import { createTool } from 'npm:@mastra/core/tools';
-import { createWorkflow, createStep } from 'npm:@mastra/core/workflows';
+import { ChatAnthropic } from 'npm:@langchain/anthropic';
+import { DynamicStructuredTool } from 'npm:@langchain/core/tools';
 import { corsHeaders } from '../_shared/cors.ts';
 
 // Environment variables
@@ -26,9 +24,9 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN')!;
 const replicateToken = Deno.env.get('REPLICATE_API_TOKEN')!;
+const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
 const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
-// Mastra auto-detects ANTHROPIC_API_KEY from environment
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Request validation schema (same as CrewAI)
