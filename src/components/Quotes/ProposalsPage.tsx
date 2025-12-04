@@ -102,23 +102,23 @@ export const ProposalsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-purple-400" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <FileCheck className="h-10 w-10" />
+            <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
+              <FileCheck className="h-10 w-10 text-primary" />
               Proposals
             </h1>
-            <p className="text-white/60 text-lg mt-1">
+            <p className="text-muted-foreground text-lg mt-1">
               Review and manage supplier proposals
             </p>
           </div>
@@ -128,20 +128,20 @@ export const ProposalsPage: React.FC = () => {
       {/* Proposals Table */}
       <div className="max-w-7xl mx-auto">
         {proposals.length === 0 ? (
-          <Card className="bg-white/10 border-white/20">
+          <Card className="bg-card border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileCheck className="h-16 w-16 text-white/40 mb-4" />
-              <p className="text-white/60 text-lg">No proposals yet</p>
-              <p className="text-white/40 text-sm mt-2">
+              <FileCheck className="h-16 w-16 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-lg">No proposals yet</p>
+              <p className="text-muted-foreground/60 text-sm mt-2">
                 Proposals will appear here once suppliers respond to your quote requests
               </p>
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-white/10 border-white/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">All Proposals</CardTitle>
-              <CardDescription className="text-white/60">
+              <CardTitle className="text-card-foreground">All Proposals</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 {proposals.length} total proposal{proposals.length !== 1 ? 's' : ''}
               </CardDescription>
             </CardHeader>
@@ -149,29 +149,29 @@ export const ProposalsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-white/10">
-                      <TableHead className="text-white/80">ID</TableHead>
-                      <TableHead className="text-white/80">Status</TableHead>
-                      <TableHead className="text-white/80">Total</TableHead>
-                      <TableHead className="text-white/80">Created</TableHead>
-                      <TableHead className="text-white/80">Sent</TableHead>
-                      <TableHead className="text-white/80 text-right">Actions</TableHead>
+                    <TableRow className="border-border">
+                      <TableHead className="text-muted-foreground">ID</TableHead>
+                      <TableHead className="text-muted-foreground">Status</TableHead>
+                      <TableHead className="text-muted-foreground">Total</TableHead>
+                      <TableHead className="text-muted-foreground">Created</TableHead>
+                      <TableHead className="text-muted-foreground">Sent</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {proposals.map((proposal) => (
-                      <TableRow key={proposal.id} className="border-white/10">
-                        <TableCell className="text-white/80 font-mono text-sm">
+                      <TableRow key={proposal.id} className="border-border">
+                        <TableCell className="text-card-foreground font-mono text-sm">
                           {proposal.id.substring(0, 8)}...
                         </TableCell>
                         <TableCell>{getStatusBadge(proposal.status)}</TableCell>
-                        <TableCell className="text-white/80 font-semibold">
+                        <TableCell className="text-card-foreground font-semibold">
                           {formatPrice(proposal.total)}
                         </TableCell>
-                        <TableCell className="text-white/80">
+                        <TableCell className="text-card-foreground">
                           {formatDate(proposal.created_at)}
                         </TableCell>
-                        <TableCell className="text-white/80">
+                        <TableCell className="text-card-foreground">
                           {proposal.sent_at ? formatDate(proposal.sent_at) : '-'}
                         </TableCell>
                         <TableCell className="text-right">
@@ -179,7 +179,7 @@ export const ProposalsPage: React.FC = () => {
                             onClick={() => handleViewProposal(proposal.id)}
                             variant="outline"
                             size="sm"
-                            className="border-white/20 text-white hover:bg-white/10"
+                            className="border-border text-primary hover:bg-accent"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View

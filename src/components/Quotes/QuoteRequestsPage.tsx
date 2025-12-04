@@ -102,23 +102,23 @@ export const QuoteRequestsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-purple-400" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
+    <div className="min-h-screen bg-background p-6">
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
-              <FileText className="h-10 w-10" />
+            <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
+              <FileText className="h-10 w-10 text-primary" />
               Quote Requests
             </h1>
-            <p className="text-white/60 text-lg mt-1">
+            <p className="text-muted-foreground text-lg mt-1">
               Manage your material quote requests
             </p>
           </div>
@@ -130,7 +130,7 @@ export const QuoteRequestsPage: React.FC = () => {
                 description: 'Add items to cart first to request a quote',
               });
             }}
-            className="bg-purple-600 hover:bg-purple-700 text-white"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Quote Request
@@ -141,10 +141,10 @@ export const QuoteRequestsPage: React.FC = () => {
       {/* Quote Requests Table */}
       <div className="max-w-7xl mx-auto">
         {quoteRequests.length === 0 ? (
-          <Card className="bg-white/10 border-white/20">
+          <Card className="bg-card border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-16 w-16 text-white/40 mb-4" />
-              <p className="text-white/60 text-lg mb-4">No quote requests yet</p>
+              <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-lg mb-4">No quote requests yet</p>
               <Button
                 onClick={() => {
                   toast({
@@ -152,7 +152,7 @@ export const QuoteRequestsPage: React.FC = () => {
                     description: 'Add items to cart first to request a quote',
                   });
                 }}
-                className="bg-purple-600 hover:bg-purple-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Quote Request
@@ -160,10 +160,10 @@ export const QuoteRequestsPage: React.FC = () => {
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-white/10 border-white/20">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white">All Quote Requests</CardTitle>
-              <CardDescription className="text-white/60">
+              <CardTitle className="text-card-foreground">All Quote Requests</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 {quoteRequests.length} total request{quoteRequests.length !== 1 ? 's' : ''}
               </CardDescription>
             </CardHeader>
@@ -171,29 +171,29 @@ export const QuoteRequestsPage: React.FC = () => {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-white/10">
-                      <TableHead className="text-white/80">ID</TableHead>
-                      <TableHead className="text-white/80">Status</TableHead>
-                      <TableHead className="text-white/80">Items</TableHead>
-                      <TableHead className="text-white/80">Estimated</TableHead>
-                      <TableHead className="text-white/80">Created</TableHead>
-                      <TableHead className="text-white/80 text-right">Actions</TableHead>
+                    <TableRow className="border-border">
+                      <TableHead className="text-muted-foreground">ID</TableHead>
+                      <TableHead className="text-muted-foreground">Status</TableHead>
+                      <TableHead className="text-muted-foreground">Items</TableHead>
+                      <TableHead className="text-muted-foreground">Estimated</TableHead>
+                      <TableHead className="text-muted-foreground">Created</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {quoteRequests.map((quote) => (
-                      <TableRow key={quote.id} className="border-white/10">
-                        <TableCell className="text-white/80 font-mono text-sm">
+                      <TableRow key={quote.id} className="border-border">
+                        <TableCell className="text-card-foreground font-mono text-sm">
                           {quote.id.substring(0, 8)}...
                         </TableCell>
                         <TableCell>{getStatusBadge(quote.status)}</TableCell>
-                        <TableCell className="text-white/80">
+                        <TableCell className="text-card-foreground">
                           {quote.items_count || 0} items
                         </TableCell>
-                        <TableCell className="text-white/80">
+                        <TableCell className="text-card-foreground">
                           {formatPrice(quote.total_estimated)}
                         </TableCell>
-                        <TableCell className="text-white/80">
+                        <TableCell className="text-card-foreground">
                           {formatDate(quote.created_at)}
                         </TableCell>
                         <TableCell className="text-right">
@@ -201,7 +201,7 @@ export const QuoteRequestsPage: React.FC = () => {
                             onClick={() => handleViewQuote(quote.id)}
                             variant="outline"
                             size="sm"
-                            className="border-white/20 text-white hover:bg-white/10"
+                            className="border-border text-primary hover:bg-accent"
                           >
                             <Eye className="h-4 w-4 mr-1" />
                             View

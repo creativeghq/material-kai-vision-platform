@@ -54,80 +54,58 @@ export const quotesService = {
     workspace_id?: string;
     notes?: string;
   }): Promise<QuoteRequest> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/quote-requests`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      }
-    );
+    const { data: result, error } = await supabase
+      .from('quote_requests')
+      .insert({
+        user_id: user.id,
+        cart_id: data.cart_id,
+        workspace_id: data.workspace_id,
+        notes: data.notes,
+        status: 'pending',
+      })
+      .select()
+      .single();
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create quote request');
-    }
-
-    const result = await response.json();
-    return result.data;
+    if (error) throw error;
+    return result;
   },
 
   /**
    * Get all quote requests for the current user
    */
   async getQuoteRequests(): Promise<QuoteRequest[]> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/quote-requests`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const { data, error } = await supabase
+      .from('quote_requests')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch quote requests');
-    }
-
-    const result = await response.json();
-    return result.data || [];
+    if (error) throw error;
+    return data || [];
   },
 
   /**
    * Get a specific quote request
    */
   async getQuoteRequest(id: string): Promise<QuoteRequest> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/quote-requests/${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const { data, error } = await supabase
+      .from('quote_requests')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch quote request');
-    }
-
-    const result = await response.json();
-    return result.data;
+    if (error) throw error;
+    return data;
   },
 
   /**
@@ -137,80 +115,65 @@ export const quotesService = {
     id: string,
     status: 'pending' | 'updated' | 'approved' | 'rejected'
   ): Promise<QuoteRequest> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/quote-requests/${id}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      }
-    );
+    const { data, error } = await supabase
+      .from('quote_requests')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update quote request');
-    }
-
-    const result = await response.json();
-    return result.data;
+    if (error) throw error;
+    return data;
   },
 
   /**
    * Get all proposals for the current user's quote requests
    */
   async getProposals(): Promise<Proposal[]> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/proposals`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const { data, error } = await supabase
+      .from('proposals')
+      .select(`
+        *,
+        quote_requests (*)
+      `)
+      .eq('quote_requests.user_id', user.id)
+      .order('created_at', { ascending: false });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch proposals');
-    }
-
-    const result = await response.json();
-    return result.data || [];
+    if (error) throw error;
+    return data || [];
   },
 
   /**
    * Get a specific proposal
    */
   async getProposal(id: string): Promise<Proposal> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/proposals/${id}`,
-      {
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const { data, error } = await supabase
+      .from('proposals')
+      .select(`
+        *,
+        quote_requests (*)
+      `)
+      .eq('id', id)
+      .single();
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch proposal');
+    if (error) throw error;
+
+    // Verify user has access to this proposal
+    if (data.quote_requests && data.quote_requests.user_id !== user.id) {
+      throw new Error('Unauthorized');
     }
 
-    const result = await response.json();
-    return result.data;
+    return data;
   },
 
   /**
@@ -220,28 +183,31 @@ export const quotesService = {
     id: string,
     status: 'accepted' | 'rejected'
   ): Promise<Proposal> {
-    const session = await supabase.auth.getSession();
-    if (!session.data.session) throw new Error('Not authenticated');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
 
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/quotes-api/proposals/${id}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${session.data.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status }),
-      }
-    );
+    const { data, error } = await supabase
+      .from('proposals')
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+        ...(status === 'accepted' ? { accepted_at: new Date().toISOString() } : {})
+      })
+      .eq('id', id)
+      .select(`
+        *,
+        quote_requests (*)
+      `)
+      .single();
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to update proposal');
+    if (error) throw error;
+
+    // Verify user has access to this proposal
+    if (data.quote_requests && data.quote_requests.user_id !== user.id) {
+      throw new Error('Unauthorized');
     }
 
-    const result = await response.json();
-    return result.data;
+    return data;
   },
 };
 

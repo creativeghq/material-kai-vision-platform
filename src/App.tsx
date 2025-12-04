@@ -64,6 +64,7 @@ import { CreditPackagesPage } from './components/Billing/CreditPackagesPage';
 import { QuoteRequestsPage } from './components/Quotes/QuoteRequestsPage';
 import { ProposalsPage } from './components/Quotes/ProposalsPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
+import DesignPreview from './pages/DesignPreview';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -610,6 +611,7 @@ const App = () => (
               <Route path="/health" element={<HealthPage />} />
               <Route path="/ready" element={<HealthPage />} />
               <Route path="/coverage" element={<CoveragePage />} />
+              <Route path="/design-preview" element={<DesignPreview />} />
               <Route path="/coverage/*" element={<CoveragePage />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
