@@ -22,6 +22,7 @@ import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
 import AgentMLCoordination from './components/Admin/AgentMLCoordination';
 import { AgentConfigsPage } from './components/Admin/AgentConfigs';
 import { PromptTemplatesPage } from './components/Admin/PromptTemplates/PromptTemplatesPage';
+import { ExtractionPromptsPage } from './components/Admin/ExtractionPrompts/ExtractionPromptsPage';
 import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
@@ -58,6 +59,11 @@ import MaterialsPage from './pages/Materials';
 import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
 import DataImportHub from './components/Admin/DataImportHub';
+import { SubscriptionPlansPage } from './components/Billing/SubscriptionPlansPage';
+import { CreditPackagesPage } from './components/Billing/CreditPackagesPage';
+import { QuoteRequestsPage } from './components/Quotes/QuoteRequestsPage';
+import { ProposalsPage } from './components/Quotes/ProposalsPage';
+import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -229,6 +235,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <PromptTemplatesPage />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/extraction-prompts"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <ExtractionPromptsPage />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>
@@ -500,6 +518,18 @@ const App = () => (
                 }
               />
               <Route
+                path="/admin/system-settings"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <SystemSettingsPage />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
                 path="/scraper"
                 element={
                   <AuthGuard>
@@ -533,6 +563,46 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <CRMManagement />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/billing/subscriptions"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <SubscriptionPlansPage />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/billing/credits"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <CreditPackagesPage />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/quotes/requests"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <QuoteRequestsPage />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/quotes/proposals"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <ProposalsPage />
                     </Layout>
                   </AuthGuard>
                 }

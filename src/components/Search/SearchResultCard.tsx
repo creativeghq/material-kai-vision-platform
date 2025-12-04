@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 
 // Types for search results
 export interface SearchResult {
@@ -46,6 +47,7 @@ export interface SearchResult {
   isFavorite?: boolean;
   viewCount?: number;
   downloadCount?: number;
+  product_id?: string; // For adding to quotes
   // Quality metrics
   qualityMetrics?: {
     precision?: number;
@@ -363,6 +365,17 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                )}
+
+                {/* Add to Quote Button */}
+                {result.product_id && (
+                  <AddToQuoteButton
+                    productId={result.product_id}
+                    productName={result.title}
+                    source="search"
+                    variant="ghost"
+                    size="sm"
+                  />
                 )}
 
                 {result.url && (

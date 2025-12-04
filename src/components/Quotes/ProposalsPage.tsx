@@ -1,0 +1,212 @@
+import React, { useState, useEffect } from 'react';
+import { FileCheck, Loader2, Eye, CheckCircle, XCircle, Send, FileText } from 'lucide-react';
+
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
+import { quotesService, Proposal } from '@/services/quotes.service';
+import { ProposalDetailModal } from './ProposalDetailModal';
+
+export const ProposalsPage: React.FC = () => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+  const [showModal, setShowModal] = useState(false);
+
+  useEffect(() => {
+    loadProposals();
+  }, []);
+
+  const loadProposals = async () => {
+    try {
+      setLoading(true);
+      const data = await quotesService.getProposals();
+      setProposals(data);
+    } catch (error) {
+      console.error('Error loading proposals:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load proposals',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewProposal = async (proposalId: string) => {
+    try {
+      const proposal = await quotesService.getProposal(proposalId);
+      setSelectedProposal(proposal);
+      setShowModal(true);
+    } catch (error) {
+      console.error('Error loading proposal details:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load proposal details',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      draft: { color: 'bg-gray-600/20 text-gray-300', icon: FileText },
+      sent: { color: 'bg-blue-600/20 text-blue-300', icon: Send },
+      accepted: { color: 'bg-green-600/20 text-green-300', icon: CheckCircle },
+      rejected: { color: 'bg-red-600/20 text-red-300', icon: XCircle },
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;
+    const Icon = config.icon;
+
+    return (
+      <Badge variant="secondary" className={config.color}>
+        <Icon className="h-3 w-3 mr-1" />
+        {status}
+      </Badge>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatPrice = (price?: number) => {
+    if (!price) return '-';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(price);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-purple-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 p-6">
+      {/* Header */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-4xl font-bold text-white flex items-center gap-3">
+              <FileCheck className="h-10 w-10" />
+              Proposals
+            </h1>
+            <p className="text-white/60 text-lg mt-1">
+              Review and manage supplier proposals
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Proposals Table */}
+      <div className="max-w-7xl mx-auto">
+        {proposals.length === 0 ? (
+          <Card className="bg-white/10 border-white/20">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <FileCheck className="h-16 w-16 text-white/40 mb-4" />
+              <p className="text-white/60 text-lg">No proposals yet</p>
+              <p className="text-white/40 text-sm mt-2">
+                Proposals will appear here once suppliers respond to your quote requests
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-white/10 border-white/20">
+            <CardHeader>
+              <CardTitle className="text-white">All Proposals</CardTitle>
+              <CardDescription className="text-white/60">
+                {proposals.length} total proposal{proposals.length !== 1 ? 's' : ''}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/10">
+                      <TableHead className="text-white/80">ID</TableHead>
+                      <TableHead className="text-white/80">Status</TableHead>
+                      <TableHead className="text-white/80">Total</TableHead>
+                      <TableHead className="text-white/80">Created</TableHead>
+                      <TableHead className="text-white/80">Sent</TableHead>
+                      <TableHead className="text-white/80 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {proposals.map((proposal) => (
+                      <TableRow key={proposal.id} className="border-white/10">
+                        <TableCell className="text-white/80 font-mono text-sm">
+                          {proposal.id.substring(0, 8)}...
+                        </TableCell>
+                        <TableCell>{getStatusBadge(proposal.status)}</TableCell>
+                        <TableCell className="text-white/80 font-semibold">
+                          {formatPrice(proposal.total)}
+                        </TableCell>
+                        <TableCell className="text-white/80">
+                          {formatDate(proposal.created_at)}
+                        </TableCell>
+                        <TableCell className="text-white/80">
+                          {proposal.sent_at ? formatDate(proposal.sent_at) : '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            onClick={() => handleViewProposal(proposal.id)}
+                            variant="outline"
+                            size="sm"
+                            className="border-white/20 text-white hover:bg-white/10"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Proposal Detail Modal */}
+      {showModal && selectedProposal && (
+        <ProposalDetailModal
+          proposal={selectedProposal}
+          onClose={() => {
+            setShowModal(false);
+            setSelectedProposal(null);
+          }}
+          onUpdate={loadProposals}
+        />
+      )}
+    </div>
+  );
+};
+

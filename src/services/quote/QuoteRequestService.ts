@@ -3,7 +3,7 @@ import { SupabaseApiService } from '../base/ApiService';
 export interface QuoteRequest {
   id: string;
   user_id: string;
-  cart_id: string;
+  quote_id: string; // Changed from cart_id
   workspace_id?: string;
   status: 'pending' | 'updated' | 'approved' | 'rejected';
   items_count: number;
@@ -32,17 +32,17 @@ export class QuoteRequestService {
    * Submit a quote request
    */
   async submitRequest(
-    cartId: string,
+    quoteId: string, // Changed from cartId
     workspaceId?: string,
     notes?: string,
   ): Promise<QuoteRequest> {
     try {
       const response = await this.apiService.call<
-        { cart_id: string; workspace_id?: string; notes?: string },
+        { quote_id: string; workspace_id?: string; notes?: string }, // Changed from cart_id
         { data: QuoteRequest }
       >(
         'quote-request-api',
-        { cart_id: cartId, workspace_id: workspaceId, notes },
+        { quote_id: quoteId, workspace_id: workspaceId, notes }, // Changed from cart_id
         { method: 'POST' },
       );
 

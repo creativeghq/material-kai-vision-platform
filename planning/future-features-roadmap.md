@@ -6,22 +6,6 @@ This document tracks planned features that have database tables created but are 
 
 ## 🛒 E-Commerce Features
 
-### **Shopping Cart System**
-**Status:** Planned  
-**Database Tables:**
-- `cart_items` - Shopping cart items
-- `shopping_carts` - Shopping cart sessions
-
-**Description:**
-Allow users to add materials/products to a shopping cart for bulk ordering or quote requests.
-
-**Use Cases:**
-- Interior designers collecting materials for a project
-- Bulk material ordering
-- Quote request preparation
-
----
-
 ### **Credit & Subscription System**
 **Status:** Planned  
 **Database Tables:**

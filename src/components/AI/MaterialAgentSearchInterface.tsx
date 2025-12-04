@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 // import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
@@ -1050,19 +1051,36 @@ export const MaterialAgentSearchInterface: React.FC<
                             .map((material, idx) => (
                               <div
                                 key={idx}
-                                onClick={() => handleMaterialClick(material)}
-                                className="p-2 border rounded cursor-pointer hover:bg-muted/50 transition-colors"
+                                className="p-2 border rounded hover:bg-muted/50 transition-colors"
                               >
-                                <div className="font-medium text-sm">
-                                  {material.name}
+                                <div
+                                  onClick={() => handleMaterialClick(material)}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="font-medium text-sm">
+                                    {material.name}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {material.description}
+                                  </div>
+                                  {material.category && (
+                                    <Badge className="mt-1 text-xs border border-border bg-background text-foreground">
+                                      {material.category}
+                                    </Badge>
+                                  )}
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">
-                                  {material.description}
-                                </div>
-                                {material.category && (
-                                  <Badge className="mt-1 text-xs border border-border bg-background text-foreground">
-                                    {material.category}
-                                  </Badge>
+                                {/* Add to Quote Button */}
+                                {material.id && (
+                                  <div className="mt-2">
+                                    <AddToQuoteButton
+                                      productId={material.id}
+                                      productName={material.name}
+                                      source="agent"
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full"
+                                    />
+                                  </div>
                                 )}
                               </div>
                             ))}
@@ -1207,6 +1225,67 @@ export const MaterialAgentSearchInterface: React.FC<
                           </div>
                         </div>
                       )}
+
+                    {/* 3D Generation Matched Materials */}
+                    {message.metadata?.has3DContent &&
+                     message.metadata?.designGeneration?.matchedMaterials &&
+                     (message.metadata.designGeneration.matchedMaterials as any[]).length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <Sparkles className="h-3 w-3" />
+                          3D Generation - Matched Materials ({(message.metadata.designGeneration.matchedMaterials as any[]).length})
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(message.metadata.designGeneration.matchedMaterials as any[])
+                            .slice(0, 6)
+                            .map((material: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="p-2 border rounded hover:bg-muted/50 transition-colors"
+                              >
+                                <div
+                                  onClick={() => handleMaterialClick({
+                                    id: material.id,
+                                    name: material.name,
+                                    description: material.category || 'Material from 3D generation',
+                                    category: material.category,
+                                    relevanceScore: 0.9,
+                                    source: '3d_generation',
+                                  })}
+                                  className="cursor-pointer"
+                                >
+                                  <div className="font-medium text-sm">
+                                    {material.name}
+                                  </div>
+                                  {material.category && (
+                                    <Badge className="mt-1 text-xs border border-border bg-background text-foreground">
+                                      {material.category}
+                                    </Badge>
+                                  )}
+                                </div>
+                                {/* Add to Quote Button */}
+                                {material.id && (
+                                  <div className="mt-2">
+                                    <AddToQuoteButton
+                                      productId={material.id}
+                                      productName={material.name}
+                                      source="3d_generation"
+                                      variant="outline"
+                                      size="sm"
+                                      className="w-full"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                        {(message.metadata.designGeneration.matchedMaterials as any[]).length > 6 && (
+                          <div className="text-xs text-muted-foreground">
+                            +{(message.metadata.designGeneration.matchedMaterials as any[]).length - 6} more materials matched
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Suggestions */}
                     {message.suggestions && message.suggestions.length > 0 && (

@@ -7,16 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-// REMOVED: searchSuggestionsService deleted during cleanup - use MIVAA API instead
-// import { getSearchSuggestionsService } from '@/services/searchSuggestionsService';
-// import type { SearchSuggestion as APISuggestion } from '@/services/searchSuggestionsService';
-
-// Temporary types until migration to MIVAA API
-type APISuggestion = any;
-const getSearchSuggestionsService = () => ({
-  getSuggestions: async () => { throw new Error('Deprecated: Use MIVAA API /api/suggestions'); },
-  getTrendingSearches: async () => { throw new Error('Deprecated: Use MIVAA API /api/suggestions'); },
-});
+import { getSearchSuggestionsService } from '@/services/searchSuggestionsService';
+import type { SearchSuggestion as APISuggestion } from '@/services/searchSuggestionsService';
 
 // Types for semantic search functionality
 export interface SearchSuggestion {
