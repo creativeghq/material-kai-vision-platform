@@ -782,72 +782,98 @@ const AdminDashboard: React.FC = () => {
           {/* System Monitoring Tab */}
           <TabsContent value="monitoring" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    CPU Usage
-                  </CardTitle>
-                  <Cpu className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    <span className={getMetricColor(systemMetrics.cpu, 'cpu')}>
-                      {systemMetrics.cpu.toFixed(1)}%
-                    </span>
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: '2.5rem',
+                      height: '2.5rem',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'hsl(var(--primary) / 0.1)'
+                    }}
+                  >
+                    <Cpu className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                   </div>
-                  <Progress value={systemMetrics.cpu} className="mt-2" />
-                </CardContent>
-              </Card>
+                </div>
+                <div className="text-2xl font-semibold mb-1">
+                  <span className={getMetricColor(systemMetrics.cpu, 'cpu')}>
+                    {systemMetrics.cpu.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground mb-2">
+                  CPU Usage
+                </div>
+                <Progress value={systemMetrics.cpu} className="mt-2" />
+              </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Memory Usage
-                  </CardTitle>
-                  <HardDrive className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    <span
-                      className={getMetricColor(systemMetrics.memory, 'memory')}
-                    >
-                      {systemMetrics.memory.toFixed(1)}%
-                    </span>
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: '2.5rem',
+                      height: '2.5rem',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'hsl(var(--primary) / 0.1)'
+                    }}
+                  >
+                    <HardDrive className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                   </div>
-                  <Progress value={systemMetrics.memory} className="mt-2" />
-                </CardContent>
-              </Card>
+                </div>
+                <div className="text-2xl font-semibold mb-1">
+                  <span className={getMetricColor(systemMetrics.memory, 'memory')}>
+                    {systemMetrics.memory.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground mb-2">
+                  Memory Usage
+                </div>
+                <Progress value={systemMetrics.memory} className="mt-2" />
+              </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Disk Usage
-                  </CardTitle>
-                  <Server className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    <span
-                      className={getMetricColor(systemMetrics.disk, 'disk')}
-                    >
-                      {systemMetrics.disk}%
-                    </span>
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: '2.5rem',
+                      height: '2.5rem',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'hsl(var(--primary) / 0.1)'
+                    }}
+                  >
+                    <Server className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                   </div>
-                  <Progress value={systemMetrics.disk} className="mt-2" />
-                </CardContent>
-              </Card>
+                </div>
+                <div className="text-2xl font-semibold mb-1">
+                  <span className={getMetricColor(systemMetrics.disk, 'disk')}>
+                    {systemMetrics.disk}%
+                  </span>
+                </div>
+                <div className="text-sm text-muted-foreground mb-2">
+                  Disk Usage
+                </div>
+                <Progress value={systemMetrics.disk} className="mt-2" />
+              </div>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    Network I/O
-                  </CardTitle>
-                  <Wifi className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    <span
-                      className={getMetricColor(
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <div className="flex items-center justify-between mb-4">
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: '2.5rem',
+                      height: '2.5rem',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'hsl(var(--primary) / 0.1)'
+                    }}
+                  >
+                    <Wifi className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                </div>
+                <div className="text-2xl font-semibold mb-1">
+                  <span
+                    className={getMetricColor(
                         systemMetrics.network,
                         'network',
                       )}
@@ -855,9 +881,11 @@ const AdminDashboard: React.FC = () => {
                       {systemMetrics.network.toFixed(1)} MB/s
                     </span>
                   </div>
-                  <Progress value={systemMetrics.network} className="mt-2" />
-                </CardContent>
-              </Card>
+                <div className="text-sm text-muted-foreground mb-2">
+                  Network I/O
+                </div>
+                <Progress value={systemMetrics.network} className="mt-2" />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
