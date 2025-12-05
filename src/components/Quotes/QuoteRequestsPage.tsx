@@ -109,37 +109,39 @@ export const QuoteRequestsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
-              <FileText className="h-10 w-10 text-primary" />
-              Quote Requests
-            </h1>
-            <p className="text-muted-foreground text-lg mt-1">
-              Manage your material quote requests
-            </p>
+      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+        <div className="page-container">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-3">
+                <FileText className="h-8 w-8 text-primary" />
+                Quote Requests
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Manage your material quote requests
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                // Navigate to cart or create quote flow
+                toast({
+                  title: 'Info',
+                  description: 'Add items to cart first to request a quote',
+                });
+              }}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              New Quote Request
+            </Button>
           </div>
-          <Button
-            onClick={() => {
-              // Navigate to cart or create quote flow
-              toast({
-                title: 'Info',
-                description: 'Add items to cart first to request a quote',
-              });
-            }}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Quote Request
-          </Button>
         </div>
       </div>
 
       {/* Quote Requests Table */}
-      <div className="max-w-7xl mx-auto">
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
         {quoteRequests.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">

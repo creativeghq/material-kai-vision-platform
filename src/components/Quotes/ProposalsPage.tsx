@@ -109,24 +109,26 @@ export const ProposalsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="max-w-7xl mx-auto mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-4xl font-bold text-foreground flex items-center gap-3">
-              <FileCheck className="h-10 w-10 text-primary" />
-              Proposals
-            </h1>
-            <p className="text-muted-foreground text-lg mt-1">
-              Review and manage supplier proposals
-            </p>
+      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+        <div className="page-container">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-3">
+                <FileCheck className="h-8 w-8 text-primary" />
+                Proposals
+              </h1>
+              <p className="text-muted-foreground mt-2">
+                Review and manage supplier proposals
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Proposals Table */}
-      <div className="max-w-7xl mx-auto">
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
         {proposals.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="flex flex-col items-center justify-center py-12">

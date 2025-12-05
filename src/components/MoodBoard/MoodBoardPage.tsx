@@ -132,18 +132,20 @@ export const MoodBoardPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Palette className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">MoodBoards</h1>
-            <p className="text-muted-foreground">
-              Organize and curate your favorite materials
-            </p>
-          </div>
-        </div>
+      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+        <div className="page-container">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Palette className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">MoodBoards</h1>
+                <p className="text-muted-foreground">
+                  Organize and curate your favorite materials
+                </p>
+              </div>
+            </div>
 
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
@@ -180,11 +182,13 @@ export const MoodBoardPage = () => {
             <Plus className="h-4 w-4 mr-2" />
             New MoodBoard
           </Button>
+          </div>
         </div>
       </div>
 
       {/* MoodBoards Grid */}
-      {moodboards.length === 0 ? (
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
+        {moodboards.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
             <Palette className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -275,6 +279,7 @@ export const MoodBoardPage = () => {
           ))}
         </div>
       )}
+      </div>
 
       {/* Create MoodBoard Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -357,6 +362,7 @@ export const MoodBoardPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 };
