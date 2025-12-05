@@ -4,23 +4,23 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm',
+          'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm border-none',
         secondary:
-          'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-sm',
+          'bg-secondary text-secondary-foreground hover:bg-secondary/90 shadow-sm border-none',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm',
-        outline: 'text-foreground border-border hover:bg-accent',
+          'bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm border-none',
+        outline: 'text-foreground hover:bg-accent shadow-sm border-none',
         success:
-          'badge-success border-transparent',
+          'badge-success border-none',
         warning:
-          'badge-warning border-transparent',
+          'badge-warning border-none',
         error:
-          'badge-error border-transparent',
+          'badge-error border-none',
         info:
           'badge-info border-transparent',
         high:

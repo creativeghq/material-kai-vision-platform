@@ -97,16 +97,17 @@
 .outlineButton {
   font-size: 1.125rem;
   padding: 1rem 2rem;
-  border: 1px solid hsl(var(--border));
-  background: transparent;
+  border: none;
+  background: hsl(var(--card));
   color: hsl(var(--foreground));
   border-radius: 0.5rem;
   transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
 }
 
 .outlineButton:hover {
   background: hsl(var(--accent));
-  border-color: hsl(var(--accent-foreground));
+  box-shadow: var(--shadow-lg);
 }
 
 /* Main Content Sections */
@@ -314,8 +315,8 @@
   color: hsl(270 95% 75%);
 }
 
-.metricValue.green {
-  color: hsl(142 76% 36%);
+.metricValue.mocha {
+  color: hsl(25 20% 62%);
 }
 
 .metricLabel {

@@ -47,7 +47,7 @@ All colors MUST be HSL.
     /* Layout System - Consistent spacing and widths */
     --page-max-width: 1400px;  /* Maximum content width */
     --page-padding-x: 2rem;  /* Horizontal padding (32px) */
-    --page-padding-y: 2rem;  /* Vertical padding (32px) */
+    --page-padding-y: 0;  /* No top/bottom padding - full height */
     --grid-gap: 1.5rem;  /* Gap between grid items (24px) */
     --card-padding: 1.5rem;  /* Card internal padding (24px) */
     --section-spacing: 3rem;  /* Spacing between sections (48px) */
@@ -127,9 +127,9 @@ All colors MUST be HSL.
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     /* Status colors - Dark theme */
-    --success: 142 71% 45%;  /* #22C55E - Green */
+    --success: 270 30% 45%;  /* Muted lavender instead of green */
     --success-foreground: 0 0% 100%;
-    --success-bg: 142 71% 15%;  /* Dark green background */
+    --success-bg: 270 30% 15%;  /* Dark lavender background */
 
     --warning: 38 92% 50%;  /* #F59E0B - Orange */
     --warning-foreground: 0 0% 100%;
@@ -143,12 +143,12 @@ All colors MUST be HSL.
     --info-foreground: 0 0% 100%;
     --info-bg: 217 91% 15%;  /* Dark blue background */
 
-    /* Chart colors - Dark theme (neon yellow/purple) */
+    /* Chart colors - Muted palette (no green) */
     --chart-yellow: 75 100% 50%;  /* #D4FF00 - Neon yellow */
-    --chart-purple: 270 70% 60%;  /* #9F5FE8 - Purple */
-    --chart-orange: 30 100% 50%;  /* #FF8000 - Orange */
-    --chart-green: 140 50% 50%;  /* #40D98F - Green */
-    --chart-blue: 220 60% 55%;  /* #6B9FE0 - Blue */
+    --chart-purple: 270 30% 45%;  /* Muted lavender */
+    --chart-orange: 30 40% 45%;  /* Muted peach */
+    --chart-mocha: 25 20% 42%;  /* Muted mocha */
+    --chart-sage: 140 25% 45%;  /* Muted sage */
   }
 
 .dark {
@@ -275,7 +275,7 @@ All colors MUST be HSL.
     @apply bg-secondary text-secondary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
     box-shadow: var(--shadow-xs);
-    border: 1px solid hsl(var(--border));
+    border: none;
   }
 
   .btn-secondary:hover {
@@ -288,8 +288,8 @@ All colors MUST be HSL.
   .btn-outline {
     @apply bg-card text-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-xs);
+    border: none;
+    box-shadow: var(--shadow-md);
   }
 
   .btn-outline:hover {
