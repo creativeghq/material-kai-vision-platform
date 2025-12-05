@@ -292,14 +292,14 @@ export const RelevancyManagement: React.FC = () => {
   // Get relationship type badge
   const getRelTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      source: 'bg-blue-100 text-blue-800 border-blue-300',
-      depicts: 'bg-purple-100 text-purple-800 border-purple-300',
-      illustrates: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-      related: 'bg-gray-100 text-gray-800 border-gray-300',
-      component: 'bg-orange-100 text-orange-800 border-orange-300',
-      alternative: 'bg-pink-100 text-pink-800 border-pink-300',
-      variant: 'bg-teal-100 text-teal-800 border-teal-300',
-      example: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+      source: 'bg-blue-50 text-blue-700 border-blue-200',
+      depicts: 'bg-purple-50 text-purple-700 border-purple-200',
+      illustrates: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      related: 'bg-gray-50 text-gray-700 border-gray-200',
+      component: 'bg-orange-50 text-orange-700 border-orange-200',
+      alternative: 'bg-pink-50 text-pink-700 border-pink-200',
+      variant: 'bg-teal-50 text-teal-700 border-teal-200',
+      example: 'bg-cyan-50 text-cyan-700 border-cyan-200',
     };
 
     return (

@@ -67,10 +67,22 @@ export const QuoteRequestsPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { color: 'bg-yellow-600/20 text-yellow-300', icon: Clock },
-      updated: { color: 'bg-blue-600/20 text-blue-300', icon: FileText },
-      approved: { color: 'bg-green-600/20 text-green-300', icon: CheckCircle },
-      rejected: { color: 'bg-red-600/20 text-red-300', icon: XCircle },
+      pending: {
+        color: 'bg-[hsl(var(--badge-pending-bg))] text-[hsl(var(--badge-pending-text))] border-[hsl(var(--badge-pending-border))]',
+        icon: Clock
+      },
+      updated: {
+        color: 'bg-[hsl(var(--badge-updated-bg))] text-[hsl(var(--badge-updated-text))] border-[hsl(var(--badge-updated-border))]',
+        icon: FileText
+      },
+      approved: {
+        color: 'bg-[hsl(var(--badge-approved-bg))] text-[hsl(var(--badge-approved-text))] border-[hsl(var(--badge-approved-border))]',
+        icon: CheckCircle
+      },
+      rejected: {
+        color: 'bg-[hsl(var(--badge-rejected-bg))] text-[hsl(var(--badge-rejected-text))] border-[hsl(var(--badge-rejected-border))]',
+        icon: XCircle
+      },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;

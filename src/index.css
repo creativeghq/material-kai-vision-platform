@@ -181,22 +181,22 @@ All colors MUST be HSL.
     --transition-smooth: all 0.15s ease;
     --transition-bounce: all 0.2s ease;
 
-    /* Status colors - Muted (Notion-like) */
-    --success: 142 71% 45%;  /* Muted green */
-    --success-foreground: 0 0% 100%;
-    --success-bg: 142 71% 15%;  /* Dark green background */
+    /* Status colors - Light theme with good contrast */
+    --success: 142 71% 35%;  /* Darker green for readability */
+    --success-foreground: 0 0% 100%;  /* White text */
+    --success-bg: 142 71% 95%;  /* Very light green background */
 
-    --warning: 27 98% 54%;  /* Muted orange */
-    --warning-foreground: 0 0% 100%;
-    --warning-bg: 27 98% 15%;  /* Dark orange background */
+    --warning: 27 98% 40%;  /* Darker orange for readability */
+    --warning-foreground: 0 0% 100%;  /* White text */
+    --warning-bg: 27 98% 95%;  /* Very light orange background */
 
-    --error: 0 70% 50%;  /* Muted red */
-    --error-foreground: 0 0% 100%;
-    --error-bg: 0 70% 15%;  /* Dark red background */
+    --error: 0 70% 45%;  /* Darker red for readability */
+    --error-foreground: 0 0% 100%;  /* White text */
+    --error-bg: 0 70% 95%;  /* Very light red background */
 
-    --info: 95 20% 77%;  /* Soft sage green (primary) */
-    --info-foreground: 0 0% 10%;  /* Dark text */
-    --info-bg: 95 20% 15%;  /* Dark sage background */
+    --info: 210 100% 45%;  /* Darker blue for readability */
+    --info-foreground: 0 0% 100%;  /* White text */
+    --info-bg: 210 100% 95%;  /* Very light blue background */
 
     /* Chart colors - Muted palette (Notion-like) */
     --chart-1: 95 20% 77%;    /* Soft sage green (primary) */
@@ -204,6 +204,31 @@ All colors MUST be HSL.
     --chart-3: 271 76% 53%;   /* Muted purple */
     --chart-4: 27 98% 54%;    /* Muted orange */
     --chart-5: 349 86% 61%;   /* Muted red */
+
+    /* Badge color system - Light theme with excellent accessibility */
+    --badge-pending-bg: 45 93% 95%;      /* Very light yellow */
+    --badge-pending-text: 45 93% 35%;    /* Dark yellow */
+    --badge-pending-border: 45 93% 70%;  /* Medium yellow */
+
+    --badge-updated-bg: 210 100% 95%;    /* Very light blue */
+    --badge-updated-text: 210 100% 35%;  /* Dark blue */
+    --badge-updated-border: 210 100% 70%; /* Medium blue */
+
+    --badge-approved-bg: 142 71% 95%;    /* Very light green */
+    --badge-approved-text: 142 71% 30%;  /* Dark green */
+    --badge-approved-border: 142 71% 65%; /* Medium green */
+
+    --badge-rejected-bg: 0 70% 95%;      /* Very light red */
+    --badge-rejected-text: 0 70% 40%;    /* Dark red */
+    --badge-rejected-border: 0 70% 70%;  /* Medium red */
+
+    --badge-sent-bg: 271 76% 95%;        /* Very light purple */
+    --badge-sent-text: 271 76% 35%;      /* Dark purple */
+    --badge-sent-border: 271 76% 70%;    /* Medium purple */
+
+    --badge-draft-bg: 0 0% 95%;          /* Very light gray */
+    --badge-draft-text: 0 0% 35%;        /* Dark gray */
+    --badge-draft-border: 0 0% 70%;      /* Medium gray */
   }
 
 .dark {
@@ -408,38 +433,40 @@ All colors MUST be HSL.
     background-color: hsl(var(--input));
   }
 
-  /* Badge variants */
+  /* Badge variants - Light theme with excellent contrast */
   .badge {
-    @apply px-3 py-1 rounded-full text-xs font-semibold border;
+    @apply px-3 py-1 rounded-full text-xs border;
+    font-weight: var(--font-medium);
   }
 
   .badge-success {
     background-color: hsl(var(--success-bg));
     color: hsl(var(--success));
-    border-color: hsl(var(--success) / 0.3);
+    border-color: hsl(var(--success) / 0.2);
   }
 
   .badge-warning {
     background-color: hsl(var(--warning-bg));
     color: hsl(var(--warning));
-    border-color: hsl(var(--warning) / 0.3);
+    border-color: hsl(var(--warning) / 0.2);
   }
 
   .badge-error {
     background-color: hsl(var(--error-bg));
     color: hsl(var(--error));
-    border-color: hsl(var(--error) / 0.3);
+    border-color: hsl(var(--error) / 0.2);
   }
 
   .badge-info {
     background-color: hsl(var(--info-bg));
     color: hsl(var(--info));
-    border-color: hsl(var(--info) / 0.3);
+    border-color: hsl(var(--info) / 0.2);
   }
 
   .badge-neutral {
-    @apply bg-muted text-muted-foreground;
-    border: none;
+    background-color: hsl(0 0% 96%);
+    color: hsl(0 0% 40%);
+    border-color: hsl(0 0% 85%);
   }
 
   /* Status indicator dot */

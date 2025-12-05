@@ -42,10 +42,10 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
   const getStatusColor = (status: string) => {
     const colors = {
-      pending: 'bg-yellow-600/20 text-yellow-300',
-      updated: 'bg-blue-600/20 text-blue-300',
-      approved: 'bg-green-600/20 text-green-300',
-      rejected: 'bg-red-600/20 text-red-300',
+      pending: 'bg-[hsl(var(--badge-pending-bg))] text-[hsl(var(--badge-pending-text))] border-[hsl(var(--badge-pending-border))]',
+      updated: 'bg-[hsl(var(--badge-updated-bg))] text-[hsl(var(--badge-updated-text))] border-[hsl(var(--badge-updated-border))]',
+      approved: 'bg-[hsl(var(--badge-approved-bg))] text-[hsl(var(--badge-approved-text))] border-[hsl(var(--badge-approved-border))]',
+      rejected: 'bg-[hsl(var(--badge-rejected-bg))] text-[hsl(var(--badge-rejected-text))] border-[hsl(var(--badge-rejected-border))]',
     };
     return colors[status as keyof typeof colors] || colors.pending;
   };

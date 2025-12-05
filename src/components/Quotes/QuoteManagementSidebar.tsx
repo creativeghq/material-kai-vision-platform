@@ -254,7 +254,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
                               <h3 className="text-white font-medium">
                                 {quote.name || `Quote #${quote.id.substring(0, 8)}`}
                               </h3>
-                              <Badge variant="secondary" className="bg-blue-600/20 text-blue-300">
+                              <Badge variant="secondary" className="bg-[hsl(var(--badge-updated-bg))] text-[hsl(var(--badge-updated-text))] border-[hsl(var(--badge-updated-border))]">
                                 {quote.status}
                               </Badge>
                             </div>

@@ -67,10 +67,22 @@ export const ProposalsPage: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      draft: { color: 'bg-gray-600/20 text-gray-300', icon: FileText },
-      sent: { color: 'bg-blue-600/20 text-blue-300', icon: Send },
-      accepted: { color: 'bg-green-600/20 text-green-300', icon: CheckCircle },
-      rejected: { color: 'bg-red-600/20 text-red-300', icon: XCircle },
+      draft: {
+        color: 'bg-[hsl(var(--badge-draft-bg))] text-[hsl(var(--badge-draft-text))] border-[hsl(var(--badge-draft-border))]',
+        icon: FileText
+      },
+      sent: {
+        color: 'bg-[hsl(var(--badge-sent-bg))] text-[hsl(var(--badge-sent-text))] border-[hsl(var(--badge-sent-border))]',
+        icon: Send
+      },
+      accepted: {
+        color: 'bg-[hsl(var(--badge-approved-bg))] text-[hsl(var(--badge-approved-text))] border-[hsl(var(--badge-approved-border))]',
+        icon: CheckCircle
+      },
+      rejected: {
+        color: 'bg-[hsl(var(--badge-rejected-bg))] text-[hsl(var(--badge-rejected-text))] border-[hsl(var(--badge-rejected-border))]',
+        icon: XCircle
+      },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.draft;

@@ -68,19 +68,19 @@ export const QuoteStatusTracker: React.FC<QuoteStatusTrackerProps> = ({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-[hsl(var(--badge-pending-bg))] text-[hsl(var(--badge-pending-text))] border-[hsl(var(--badge-pending-border))]';
       case 'updated':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-[hsl(var(--badge-updated-bg))] text-[hsl(var(--badge-updated-text))] border-[hsl(var(--badge-updated-border))]';
       case 'approved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-[hsl(var(--badge-approved-bg))] text-[hsl(var(--badge-approved-text))] border-[hsl(var(--badge-approved-border))]';
       case 'rejected':
-        return 'bg-red-100 text-red-800';
+        return 'bg-[hsl(var(--badge-rejected-bg))] text-[hsl(var(--badge-rejected-text))] border-[hsl(var(--badge-rejected-border))]';
       case 'sent':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-[hsl(var(--badge-sent-bg))] text-[hsl(var(--badge-sent-text))] border-[hsl(var(--badge-sent-border))]';
       case 'accepted':
-        return 'bg-green-100 text-green-800';
+        return 'bg-[hsl(var(--badge-approved-bg))] text-[hsl(var(--badge-approved-text))] border-[hsl(var(--badge-approved-border))]';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-[hsl(var(--badge-draft-bg))] text-[hsl(var(--badge-draft-text))] border-[hsl(var(--badge-draft-border))]';
     }
   };
 
