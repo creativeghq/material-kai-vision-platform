@@ -105,34 +105,34 @@ export const metricsConfig = {
       icon: Database,
       iconColor: 'text-primary',
       value: '1,247',
-      valueColor: 'primary' as const,
+      valueColor: 'cyan' as const,
       label: 'Documents Processed',
       change: '+12% this week',
     },
     {
       id: 'queries',
       icon: Target,
-      iconColor: 'text-blue-500',
+      iconColor: 'text-primary',
       value: '8,432',
-      valueColor: 'blue' as const,
+      valueColor: 'green' as const,
       label: 'Search Queries',
       change: '+24% this week',
     },
     {
       id: 'accuracy',
       icon: TrendingUp,
-      iconColor: 'text-purple-500',
+      iconColor: 'text-primary',
       value: '94.2%',
-      valueColor: 'purple' as const,
+      valueColor: 'blue' as const,
       label: 'AI Accuracy',
       change: '+2.1% improved',
     },
     {
       id: 'uptime',
       icon: Shield,
-      iconColor: 'text-white',
+      iconColor: 'text-primary',
       value: '99.8%',
-      valueColor: 'mocha' as const,
+      valueColor: 'purple' as const,
       label: 'System Uptime',
       change: 'Excellent',
     },
@@ -147,7 +147,7 @@ export const searchHubConfig = {
 };
 
 // Type definitions for better TypeScript support
-export type ColorVariant = 'primary' | 'purple' | 'orange' | 'blue' | 'mocha' | 'sage' | 'peach' | 'lavender';
+export type ColorVariant = 'primary' | 'cyan' | 'green' | 'blue' | 'purple';
 export type ButtonType = 'primary' | 'outline';
 
 export interface HeroAction {

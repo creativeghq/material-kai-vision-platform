@@ -63,10 +63,10 @@ All colors MUST be HSL.
     --page-padding-y: 0;                   /* Top/Bottom: 0 (full height) */
     --grid-gap: var(--space-md);           /* Grid gap: 24px */
     --card-padding: var(--space-md);       /* Card padding: 24px */
-    --section-spacing: var(--space-xl);    /* Section spacing: 48px */
+    --section-spacing: var(--space-md);    /* Section spacing: 24px (REDUCED from 48px) */
     --hero-margin-x: var(--space-lg);      /* Hero left/right: 32px */
-    --hero-margin-bottom: var(--space-xl); /* Hero bottom: 48px */
-    --hero-padding-y: var(--space-2xl);    /* Hero top/bottom: 64px */
+    --hero-margin-bottom: var(--space-md); /* Hero bottom: 24px (REDUCED from 48px) */
+    --hero-padding-y: var(--space-lg);     /* Hero top/bottom: 32px (REDUCED from 64px) */
     --hero-padding-x: var(--space-md);     /* Hero left/right: 24px */
 
     /* ===== BORDER RADIUS ===== */
@@ -90,65 +90,69 @@ All colors MUST be HSL.
     --text-6xl: 3.75rem;   /* 60px */
     --text-7xl: 4.5rem;    /* 72px */
 
-    /* Main Background - Very dark (almost black) */
-    --background: 0 0% 8%;  /* #141414 - Very dark background */
+    /* Main Background - Very dark navy/black (reference dashboard) */
+    --background: 220 40% 6%;  /* #0A0E1A - Very dark navy */
     --foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    /* Page container - Dark gray (content area background) */
-    --page-background: 0 0% 11%;  /* #1C1C1C - Dark gray page area */
+    /* Page container - Dark navy (content area background) */
+    --page-background: 220 35% 8%;  /* #0D1219 - Dark navy page area */
 
-    /* Content sections/cards - Dark gray with subtle borders */
-    --card: 0 0% 16%;  /* #292929 - Dark gray cards */
+    /* Content sections/cards - Dark blue-gray with gradient */
+    --card: 220 30% 12%;  /* #1A2332 - Dark blue-gray cards */
     --card-foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    --popover: 0 0% 16%;  /* #292929 - Dark popover */
+    --popover: 220 30% 12%;  /* #1A2332 - Dark popover */
     --popover-foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    /* Primary - Soft sage green (#c6d0bc) */
-    --primary: 95 20% 77%;  /* #c6d0bc - Soft sage green */
-    --primary-foreground: 0 0% 10%;  /* #1A1A1A - Dark text on sage */
+    /* Primary - Bright cyan/turquoise (reference dashboard) */
+    --primary: 190 100% 50%;  /* #00D9FF - Bright cyan */
+    --primary-foreground: 220 40% 6%;  /* Dark navy text on cyan */
 
-    /* Secondary - Darker gray for hover states */
-    --secondary: 0 0% 20%;  /* #333333 - Medium dark gray */
-    --secondary-foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
+    /* Secondary - Bright green (reference dashboard) */
+    --secondary: 150 100% 50%;  /* #00FF88 - Bright green */
+    --secondary-foreground: 220 40% 6%;  /* Dark navy text on green */
 
-    /* Muted - Subtle dark backgrounds */
-    --muted: 0 0% 18%;  /* #2E2E2E - Dark gray */
+    /* Muted - Subtle dark blue backgrounds */
+    --muted: 220 25% 15%;  /* #1F2937 - Dark blue-gray */
     --muted-foreground: 0 0% 60%;  /* #999999 - Medium gray text */
 
-    /* Accent - Purple/violet (Plan CRM style) */
-    --accent: 270 70% 60%;  /* #9F5FE8 - Purple accent */
-    --accent-foreground: 0 0% 100%;  /* White text */
+    /* Accent - Bright cyan (same as primary) */
+    --accent: 190 100% 50%;  /* #00D9FF - Bright cyan */
+    --accent-foreground: 220 40% 6%;  /* Dark navy text */
 
     /* Destructive - Error/delete actions */
     --destructive: 0 84% 60%;  /* #E53E3E - Red */
     --destructive-foreground: 0 0% 100%;  /* White text */
 
-    /* Borders - Subtle dark borders */
-    --border: 0 0% 25%;  /* #404040 - Dark gray border */
-    --input: 0 0% 25%;  /* #404040 - Input border */
-    --ring: 95 20% 77%;  /* #c6d0bc - Focus ring (soft sage) */
+    /* Borders - Subtle dark blue borders */
+    --border: 220 25% 20%;  /* #2D3748 - Dark blue-gray border */
+    --input: 220 25% 20%;  /* #2D3748 - Input border */
+    --ring: 190 100% 50%;  /* #00D9FF - Focus ring (cyan) */
 
-    --radius: 0.75rem;  /* 12px - Rounded corners */
+    --radius: 1rem;  /* 16px - Large rounded corners (reference style) */
 
-    /* Sidebar - Very dark (almost black) */
-    --sidebar-background: 0 0% 10%;  /* #1A1A1A - Very dark sidebar */
+    /* Sidebar - Very dark navy (reference dashboard) */
+    --sidebar-background: 220 40% 8%;  /* #0D1117 - Very dark navy sidebar */
     --sidebar-foreground: 0 0% 70%;  /* #B3B3B3 - Medium light icons/text */
-    --sidebar-accent: 95 20% 77%;  /* #c6d0bc - Soft sage for active items */
-    --sidebar-accent-foreground: 0 0% 10%;  /* #1A1A1A - Dark text on sage */
-    --sidebar-border: 0 0% 20%;  /* #333333 - Subtle dark border */
+    --sidebar-accent: 190 100% 50%;  /* #00D9FF - Bright cyan for active items */
+    --sidebar-accent-foreground: 220 40% 6%;  /* Dark navy text on cyan */
+    --sidebar-border: 220 30% 15%;  /* #1A2332 - Subtle dark border */
 
     /* Hero section background - Same as page */
-    --hero-background: 0 0% 11%;  /* #1C1C1C */
+    --hero-background: 220 35% 8%;  /* #0D1219 */
 
-    /* ===== STAT BUBBLE COLORS ===== */
-    /* Muted, professional colors - NO bright/rainbow colors */
-    --bubble-sage: 140 20% 35%;      /* Muted sage green */
-    --bubble-peach: 30 35% 35%;      /* Muted peach/tan */
-    --bubble-lavender: 270 25% 35%;  /* Muted lavender */
-    --bubble-mocha: 25 18% 32%;      /* Muted mocha/brown */
+    /* ===== STAT BUBBLE COLORS (Reference Dashboard Style) ===== */
+    /* Bright, vibrant colors with gradients */
+    --bubble-cyan: 190 100% 50%;     /* Bright cyan (primary) */
+    --bubble-green: 150 100% 50%;    /* Bright green (secondary) */
+    --bubble-blue: 210 100% 55%;     /* Bright blue */
+    --bubble-purple: 270 70% 60%;    /* Bright purple */
     --bubble-text: 0 0% 100%;        /* White text on bubbles */
     --bubble-text-muted: 0 0% 80%;   /* Muted white for secondary text */
+
+    /* Card gradients (reference dashboard style) */
+    --card-gradient-start: 220 30% 14%;  /* Slightly lighter blue */
+    --card-gradient-end: 220 30% 10%;    /* Slightly darker blue */
 
     /* Gradients - Dark theme gradients */
     --gradient-yellow: linear-gradient(180deg, rgba(212, 255, 0, 0.2) 0%, rgba(212, 255, 0, 0.05) 100%);
@@ -227,9 +231,10 @@ All colors MUST be HSL.
     gap: var(--grid-gap);
   }
 
-  /* Dashboard Card - No borders, shadows only */
+  /* Dashboard Card - Reference dashboard style with gradient */
   .dashboard-card {
-    @apply bg-card rounded-xl;
+    background: linear-gradient(135deg, hsl(var(--card-gradient-start)), hsl(var(--card-gradient-end)));
+    border-radius: var(--radius);
     padding: var(--card-padding);
     box-shadow: var(--shadow-card);
     transition: var(--transition-smooth);
@@ -241,31 +246,49 @@ All colors MUST be HSL.
     transform: translateY(-1px);
   }
 
-  /* Stat bubbles - Soft muted colors (Zarss dashboard style) */
+  /* Card with cyan gradient (reference dashboard style) */
+  .card-gradient-cyan {
+    background: linear-gradient(135deg,
+      hsl(var(--card-gradient-start)),
+      hsl(220 30% 11%),
+      hsl(190 100% 10%)
+    );
+  }
+
+  /* Card with green gradient (reference dashboard style) */
+  .card-gradient-green {
+    background: linear-gradient(135deg,
+      hsl(var(--card-gradient-start)),
+      hsl(220 30% 11%),
+      hsl(150 100% 10%)
+    );
+  }
+
+  /* Stat bubbles - Bright vibrant colors (Reference dashboard style) */
   .stat-bubble {
-    @apply rounded-xl;
+    border-radius: var(--radius);
     padding: var(--card-padding);
     background: hsl(var(--bubble-background));
     box-shadow: var(--shadow-md);
     transition: var(--transition-smooth);
     border: none;
-    color: hsl(var(--foreground));
+    color: hsl(var(--bubble-text));
   }
 
-  .stat-bubble.sage {
-    background: hsl(var(--bubble-sage));
+  .stat-bubble.cyan {
+    background: linear-gradient(135deg, hsl(var(--bubble-cyan)), hsl(190 100% 40%));
   }
 
-  .stat-bubble.peach {
-    background: hsl(var(--bubble-peach));
+  .stat-bubble.green {
+    background: linear-gradient(135deg, hsl(var(--bubble-green)), hsl(150 100% 40%));
   }
 
-  .stat-bubble.lavender {
-    background: hsl(var(--bubble-lavender));
+  .stat-bubble.blue {
+    background: linear-gradient(135deg, hsl(var(--bubble-blue)), hsl(210 100% 45%));
   }
 
-  .stat-bubble.mocha {
-    background: hsl(var(--bubble-mocha));
+  .stat-bubble.purple {
+    background: linear-gradient(135deg, hsl(var(--bubble-purple)), hsl(270 70% 50%));
   }
 
   /* Stat card - For metrics/statistics */

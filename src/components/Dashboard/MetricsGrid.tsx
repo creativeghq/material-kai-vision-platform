@@ -3,8 +3,8 @@ import React from 'react';
 import { metricsConfig, type Metric } from './dashboardData';
 
 export const MetricsGrid: React.FC = () => {
-  // Cycle through bubble colors (sage, peach, lavender, mocha)
-  const bubbleColors = ['sage', 'peach', 'lavender', 'mocha'];
+  // Cycle through bubble colors (cyan, green, blue, purple) - Reference dashboard style
+  const bubbleColors = ['cyan', 'green', 'blue', 'purple'];
 
   return (
     <div style={{
