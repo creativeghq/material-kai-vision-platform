@@ -273,6 +273,66 @@ export class QuotesService {
       is_expired: quote.status === 'expired' || daysUntilExpiration < 0,
     };
   }
+
+  /**
+   * Get all quote requests (submitted quotes)
+   */
+  async getQuoteRequests(): Promise<QuoteWithItems[]> {
+    // Get all submitted quotes with their quote_requests
+    const { data: quoteRequests, error: requestsError } = await supabase
+      .from('quote_requests')
+      .select('quote_id')
+      .order('created_at', { ascending: false });
+
+    if (requestsError) throw requestsError;
+
+    if (!quoteRequests || quoteRequests.length === 0) {
+      return [];
+    }
+
+    const quoteIds = quoteRequests
+      .map(qr => qr.quote_id)
+      .filter((id): id is string => id !== null);
+
+    if (quoteIds.length === 0) {
+      return [];
+    }
+
+    // Get quotes with items
+    const quotes = await Promise.all(
+      quoteIds.map(id => this.getQuote(id))
+    );
+
+    return quotes;
+  }
+
+  /**
+   * Get a specific quote request
+   */
+  async getQuoteRequest(quoteId: string): Promise<QuoteWithItems> {
+    return this.getQuote(quoteId);
+  }
+
+  /**
+   * Delete a quote request (and its associated quote)
+   */
+  async deleteQuoteRequest(quoteId: string): Promise<void> {
+    // First delete the quote_request entry
+    const { error: requestError } = await supabase
+      .from('quote_requests')
+      .delete()
+      .eq('quote_id', quoteId);
+
+    if (requestError) throw requestError;
+
+    // Then delete the quote (this will cascade delete quote_items)
+    const { error: quoteError } = await supabase
+      .from('quotes')
+      .delete()
+      .eq('id', quoteId);
+
+    if (quoteError) throw quoteError;
+  }
 }
 
 export const quotesService = new QuotesService();

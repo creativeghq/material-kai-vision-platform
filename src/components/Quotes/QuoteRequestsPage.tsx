@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   Card,
@@ -19,15 +20,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteRequest } from '@/services/quotes.service';
+import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
 import { QuoteRequestModal } from './QuoteRequestModal';
+import { CreateQuoteModal } from './CreateQuoteModal';
 
 export const QuoteRequestsPage: React.FC = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [quoteRequests, setQuoteRequests] = useState<QuoteRequest[]>([]);
-  const [selectedQuote, setSelectedQuote] = useState<QuoteRequest | null>(null);
+  const [quoteRequests, setQuoteRequests] = useState<QuoteWithItems[]>([]);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteWithItems | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     loadQuoteRequests();
@@ -60,6 +64,28 @@ export const QuoteRequestsPage: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to load quote details',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteQuote = async (quoteId: string) => {
+    if (!confirm('Are you sure you want to delete this quote request?')) {
+      return;
+    }
+
+    try {
+      await quotesService.deleteQuoteRequest(quoteId);
+      toast({
+        title: 'Success',
+        description: 'Quote request deleted successfully',
+      });
+      loadQuoteRequests();
+    } catch (error) {
+      console.error('Error deleting quote request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quote request',
         variant: 'destructive',
       });
     }
@@ -136,13 +162,7 @@ export const QuoteRequestsPage: React.FC = () => {
               </p>
             </div>
             <Button
-              onClick={() => {
-                // Navigate to cart or create quote flow
-                toast({
-                  title: 'Info',
-                  description: 'Add items to cart first to request a quote',
-                });
-              }}
+              onClick={() => setShowCreateModal(true)}
               className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -189,7 +209,7 @@ export const QuoteRequestsPage: React.FC = () => {
                       <TableHead className="text-muted-foreground">ID</TableHead>
                       <TableHead className="text-muted-foreground">Status</TableHead>
                       <TableHead className="text-muted-foreground">Items</TableHead>
-                      <TableHead className="text-muted-foreground">Estimated</TableHead>
+                      <TableHead className="text-muted-foreground">Name</TableHead>
                       <TableHead className="text-muted-foreground">Created</TableHead>
                       <TableHead className="text-muted-foreground text-right">Actions</TableHead>
                     </TableRow>
@@ -202,24 +222,35 @@ export const QuoteRequestsPage: React.FC = () => {
                         </TableCell>
                         <TableCell>{getStatusBadge(quote.status)}</TableCell>
                         <TableCell className="text-card-foreground">
-                          {quote.items_count || 0} items
+                          {quote.items?.length || 0} items
                         </TableCell>
                         <TableCell className="text-card-foreground">
-                          {formatPrice(quote.total_estimated)}
+                          {quote.name || 'Untitled Quote'}
                         </TableCell>
                         <TableCell className="text-card-foreground">
                           {formatDate(quote.created_at)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            onClick={() => handleViewQuote(quote.id)}
-                            variant="outline"
-                            size="sm"
-                            className="border-border text-primary hover:bg-accent"
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              onClick={() => handleViewQuote(quote.id)}
+                              variant="outline"
+                              size="sm"
+                              className="border-border text-primary hover:bg-accent"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              onClick={() => handleDeleteQuote(quote.id)}
+                              variant="outline"
+                              size="sm"
+                              className="border-border text-destructive hover:bg-destructive/10"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -240,6 +271,18 @@ export const QuoteRequestsPage: React.FC = () => {
             setSelectedQuote(null);
           }}
           onUpdate={loadQuoteRequests}
+        />
+      )}
+
+      {/* Create Quote Modal */}
+      {showCreateModal && (
+        <CreateQuoteModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={(quoteId) => {
+            setShowCreateModal(false);
+            navigate(`/quotes?quote=${quoteId}`);
+          }}
         />
       )}
     </div>

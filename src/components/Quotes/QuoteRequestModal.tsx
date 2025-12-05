@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Calendar, FileText, Package } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import {
   Dialog,
@@ -10,10 +11,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { QuoteRequest } from '@/services/quotes.service';
+import { QuoteWithItems } from '@/services/quotes/QuotesService';
 
 interface QuoteRequestModalProps {
-  quote: QuoteRequest;
+  quote: QuoteWithItems;
   onClose: () => void;
   onUpdate: () => void;
 }
@@ -22,6 +23,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
   quote,
   onClose,
 }) => {
+  const navigate = useNavigate();
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -86,7 +88,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
               </div>
               <div>
                 <p className="text-muted-foreground text-sm">Items</p>
-                <p className="font-medium">{quote.items_count || 0} items</p>
+                <p className="font-medium">{quote.items?.length || 0} items</p>
               </div>
             </div>
 
@@ -103,9 +105,9 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                 <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Estimated Total</p>
+                <p className="text-muted-foreground text-sm">Quote Name</p>
                 <p className="text-lg font-semibold">
-                  {formatPrice(quote.total_estimated)}
+                  {quote.name || 'Untitled Quote'}
                 </p>
               </div>
             </div>
@@ -166,11 +168,11 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
             >
               Close
             </Button>
-            {quote.status === 'pending' && (
+            {quote.status === 'submitted' && (
               <Button
                 onClick={() => {
-                  // TODO: Navigate to proposals or contact admin
                   onClose();
+                  navigate('/quotes/proposals');
                 }}
                 className="flex-1"
               >

@@ -63,6 +63,7 @@ import { SubscriptionPlansPage } from './components/Billing/SubscriptionPlansPag
 import { CreditPackagesPage } from './components/Billing/CreditPackagesPage';
 import { QuoteRequestsPage } from './components/Quotes/QuoteRequestsPage';
 import { ProposalsPage } from './components/Quotes/ProposalsPage';
+import { QuotesPage } from './pages/QuotesPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
 
 // Coverage page component
@@ -583,6 +584,16 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <CreditPackagesPage />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/quotes"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <QuotesPage />
                     </Layout>
                   </AuthGuard>
                 }
