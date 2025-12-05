@@ -35,94 +35,91 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Dark Dashboard Design System - Based on provided screenshot */
+    /* Warm Light Design System - Based on automation dashboard screenshots */
 
-    /* Main Background - Dark navy/slate */
-    --background: 222 47% 11%;  /* #0F172A - Dark navy background */
-    --foreground: 210 40% 98%;  /* #F8FAFC - Almost white text */
+    /* Main Background - Warm cream/beige */
+    --background: 40 25% 95%;  /* #F5F3EE - Warm cream background */
+    --foreground: 0 0% 10%;  /* #1A1A1A - Almost black text */
 
-    /* Cards - Dark with subtle transparency */
-    --card: 217 33% 17%;  /* #1E293B - Dark slate for cards */
-    --card-foreground: 210 40% 98%;  /* White text on cards */
+    /* Cards - Pure white with shadows */
+    --card: 0 0% 100%;  /* #FFFFFF - White cards */
+    --card-foreground: 0 0% 10%;  /* Dark text on cards */
 
-    --popover: 217 33% 17%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
 
-    /* Primary - Emerald green accent (like in the logo and positive metrics) */
-    --primary: 160 84% 39%;  /* #10B981 - Emerald green */
-    --primary-foreground: 0 0% 100%;  /* White text */
+    /* Primary - Bright yellow accent */
+    --primary: 48 100% 62%;  /* #FFD93D - Bright yellow */
+    --primary-foreground: 0 0% 10%;  /* Dark text on yellow */
 
-    /* Secondary - Lighter slate for secondary elements */
-    --secondary: 215 25% 27%;  /* #334155 - Lighter slate */
-    --secondary-foreground: 210 40% 98%;  /* White text */
+    /* Secondary - Light gray */
+    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    --secondary-foreground: 0 0% 10%;
 
-    /* Muted - Even darker for subtle backgrounds */
-    --muted: 217 33% 17%;  /* Same as card */
-    --muted-foreground: 215 20% 65%;  /* #94A3B8 - Muted text */
+    /* Muted - For subtle elements */
+    --muted: 0 0% 96%;  /* #F5F5F5 */
+    --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray */
 
-    /* Accent - Blue accent (for charts and highlights) */
-    --accent: 217 91% 60%;  /* #3B82F6 - Blue accent */
-    --accent-foreground: 0 0% 100%;  /* White text */
+    /* Accent - Soft blue for highlights */
+    --accent: 210 100% 95%;  /* #E0F2FE - Very light blue */
+    --accent-foreground: 210 100% 30%;  /* Dark blue text */
 
+    /* Destructive - Soft red */
     --destructive: 0 84% 60%;  /* #EF4444 - Red */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders - Subtle dark borders */
-    --border: 217 33% 23%;  /* #293548 - Subtle border */
-    --input: 217 33% 20%;  /* Slightly lighter for inputs */
-    --ring: 160 84% 39%;  /* Emerald focus ring */
+    /* Borders - Very subtle borders */
+    --border: 0 0% 90%;  /* #E5E5E5 - Light gray border */
+    --input: 0 0% 90%;
+    --ring: 48 100% 62%;  /* Yellow ring for focus */
 
-    --radius: 0.75rem;  /* 12px rounded corners (more subtle than before) */
+    --radius: 0.75rem;  /* 12px - Moderate rounded corners */
 
-    /* Glass Morphism - Dark glass effect */
-    --glass-bg: rgba(30, 41, 59, 0.7);  /* Dark slate with transparency */
-    --glass-border: rgba(255, 255, 255, 0.1);  /* Subtle white border */
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);  /* Darker shadow */
-    --glass-blur: blur(12px);  /* Backdrop blur */
+    /* Sidebar - White with yellow accent */
+    --sidebar-background: 0 0% 100%;  /* White sidebar */
+    --sidebar-foreground: 0 0% 10%;  /* Dark text */
+    --sidebar-accent: 48 100% 62%;  /* Yellow for active items */
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 90%;  /* Light border */
 
-    /* Sidebar - Dark with emerald accent */
-    --sidebar-background: 222 47% 11%;  /* Same as main background */
-    --sidebar-foreground: 210 40% 98%;  /* White text */
-    --sidebar-accent: 160 84% 39%;  /* Emerald for active items */
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 217 33% 23%;  /* Subtle border */
+    /* Gradients - Yellow gradients for charts */
+    --gradient-yellow: linear-gradient(180deg, rgba(255, 217, 61, 0.4) 0%, rgba(255, 217, 61, 0.1) 100%);
+    --gradient-orange: linear-gradient(180deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.1) 100%);
+    --gradient-background: #F5F3EE;  /* Warm cream background */
 
-    /* Gradients - For charts (green/blue like in screenshot) */
-    --gradient-green: linear-gradient(180deg, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.05) 100%);
-    --gradient-blue: linear-gradient(180deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.05) 100%);
-    --gradient-background: #0F172A;  /* Solid dark background */
-
-    /* Shadows */
-    --shadow-glow: 0 0 30px rgba(16, 185, 129, 0.2);  /* Emerald glow */
-    --shadow-subtle: 0 2px 8px rgba(0, 0, 0, 0.3);
-    --shadow-medium: 0 8px 20px rgba(0, 0, 0, 0.4);
-    --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.3);
+    /* Shadows - Soft, subtle */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-card: 0 2px 8px rgb(0 0 0 / 0.08);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     /* Status colors */
-    --success: 160 84% 39%;  /* Emerald green */
+    --success: 142 71% 45%;  /* #22C55E - Green */
     --success-foreground: 0 0% 100%;
-    --success-bg: 160 84% 15%;  /* Dark emerald background */
+    --success-bg: 142 71% 95%;  /* Very light green background */
 
-    --warning: 38 92% 50%;  /* Orange */
+    --warning: 38 92% 50%;  /* #F59E0B - Orange */
     --warning-foreground: 0 0% 100%;
-    --warning-bg: 38 92% 15%;  /* Dark orange background */
+    --warning-bg: 38 92% 95%;  /* Very light orange background */
 
-    --error: 0 84% 60%;  /* Red */
+    --error: 0 84% 60%;  /* #EF4444 - Red */
     --error-foreground: 0 0% 100%;
-    --error-bg: 0 84% 15%;  /* Dark red background */
+    --error-bg: 0 84% 95%;  /* Very light red background */
 
-    --info: 217 91% 60%;  /* Blue */
+    --info: 217 91% 60%;  /* #3B82F6 - Blue */
     --info-foreground: 0 0% 100%;
-    --info-bg: 217 91% 15%;  /* Dark blue background */
+    --info-bg: 217 91% 95%;  /* Very light blue background */
 
-    /* Chart colors (matching screenshot) */
-    --chart-green: 160 84% 39%;  /* Emerald for positive/total */
-    --chart-blue: 217 91% 60%;  /* Blue for in-transit */
-    --chart-orange: 38 92% 50%;  /* Orange for warnings */
+    /* Chart colors - Yellow/orange gradients */
+    --chart-yellow: 48 100% 62%;  /* Yellow for primary metrics */
+    --chart-orange: 45 93% 47%;  /* Orange for secondary */
+    --chart-amber: 43 96% 56%;  /* Amber for tertiary */
+    --chart-green: 142 71% 45%;  /* Green for success */
     --chart-red: 0 84% 60%;  /* Red for errors */
   }
 
