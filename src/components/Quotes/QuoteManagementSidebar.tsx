@@ -26,6 +26,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, Quote, QuoteWithItems } from '@/services/quotes/QuotesService';
 import { QuoteBuilderView } from './QuoteBuilderView';
+import { CreateQuoteModal } from './CreateQuoteModal';
 
 interface QuoteManagementSidebarProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithItems | null>(null);
   const [view, setView] = useState<'list' | 'detail' | 'create'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -89,25 +91,9 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
     }
   };
 
-  const handleCreateQuote = async () => {
-    try {
-      const newQuote = await quotesService.createQuote({
-        name: `Quote ${new Date().toLocaleDateString()}`,
-      });
-      await loadQuotes();
-      handleSelectQuote(newQuote.id);
-      toast({
-        title: 'Success',
-        description: 'New quote created',
-      });
-    } catch (error) {
-      console.error('Error creating quote:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create quote',
-        variant: 'destructive',
-      });
-    }
+  const handleCreateQuote = (quoteId: string, quoteName: string) => {
+    loadQuotes();
+    handleSelectQuote(quoteId);
   };
 
   const handleDeleteQuote = async (quoteId: string) => {
@@ -159,6 +145,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
   });
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="right" className="w-full sm:max-w-2xl bg-gray-900 border-white/20 text-white p-0">
         <div className="flex flex-col h-full">
@@ -210,7 +197,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
                     />
                   </div>
                   <Button
-                    onClick={handleCreateQuote}
+                    onClick={() => setShowCreateModal(true)}
                     className="bg-purple-600 hover:bg-purple-700"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -231,7 +218,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
                     </p>
                     {!searchQuery && (
                       <Button
-                        onClick={handleCreateQuote}
+                        onClick={() => setShowCreateModal(true)}
                         className="bg-purple-600 hover:bg-purple-700"
                       >
                         <Plus className="h-4 w-4 mr-2" />
@@ -330,6 +317,13 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
         </div>
       </SheetContent>
     </Sheet>
+
+    <CreateQuoteModal
+      open={showCreateModal}
+      onClose={() => setShowCreateModal(false)}
+      onSuccess={handleCreateQuote}
+    />
+  </>
   );
 };
 

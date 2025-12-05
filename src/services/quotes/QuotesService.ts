@@ -12,6 +12,7 @@ export interface Quote {
   status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
   total_items: number;
   notes?: string;
+  custom_request_text?: string; // Custom text request instead of products
   expires_at: string;
   last_activity_at: string;
   created_at: string;
@@ -57,6 +58,7 @@ export class QuotesService {
     name?: string;
     workspace_id?: string;
     notes?: string;
+    custom_request_text?: string;
   }): Promise<Quote> {
     const { data: quote, error } = await supabase
       .from('quotes')
@@ -64,6 +66,7 @@ export class QuotesService {
         name: data?.name,
         workspace_id: data?.workspace_id,
         notes: data?.notes,
+        custom_request_text: data?.custom_request_text,
         status: 'draft',
       })
       .select()
@@ -134,6 +137,7 @@ export class QuotesService {
       name?: string;
       notes?: string;
       status?: Quote['status'];
+      custom_request_text?: string;
     }
   ): Promise<Quote> {
     const { data: quote, error } = await supabase

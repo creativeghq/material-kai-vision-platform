@@ -9,6 +9,7 @@ import {
   Edit,
   Clock,
   AlertCircle,
+  FileText,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 
@@ -41,8 +43,12 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   const { toast } = useToast();
   const [processing, setProcessing] = useState(false);
   const [notes, setNotes] = useState('');
+  const [customRequestText, setCustomRequestText] = useState(quote.custom_request_text || '');
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [quoteType, setQuoteType] = useState<'products' | 'custom'>(
+    quote.custom_request_text ? 'custom' : 'products'
+  );
 
   const items = (quote.items || []) as QuoteItemWithProduct[];
 
@@ -86,11 +92,53 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
     }
   };
 
+  const handleSaveCustomRequest = async () => {
+    if (!customRequestText.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter your custom request',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      await quotesService.updateQuote(quote.id, {
+        custom_request_text: customRequestText,
+      });
+      toast({
+        title: 'Success',
+        description: 'Custom request saved',
+      });
+      onUpdate();
+    } catch (error) {
+      console.error('Error saving custom request:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save custom request',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleSendRequest = async () => {
-    if (items.length === 0) {
+    // Validate based on quote type
+    if (quoteType === 'products' && items.length === 0) {
       toast({
         title: 'Error',
         description: 'Add at least one material to send quote request',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (quoteType === 'custom' && !customRequestText.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter your custom request',
         variant: 'destructive',
       });
       return;
@@ -102,6 +150,13 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
 
     try {
       setProcessing(true);
+
+      // Save custom request if in custom mode
+      if (quoteType === 'custom') {
+        await quotesService.updateQuote(quote.id, {
+          custom_request_text: customRequestText,
+        });
+      }
 
       // Submit quote (creates quote_request and updates status)
       await quotesService.submitQuote(quote.id, notes || undefined);
@@ -147,21 +202,34 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Quote Summary */}
-      <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+      <div className="bg-muted rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <Package className="h-5 w-5 text-purple-400" />
+          <h3 className="text-lg font-medium flex items-center gap-2">
+            <div style={{
+              width: '2rem',
+              height: '2rem',
+              borderRadius: 'var(--radius-lg)',
+              backgroundColor: 'hsl(var(--primary) / 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+            </div>
             {quote.name || `Quote #${quote.id.substring(0, 8)}`}
           </h3>
-          <Badge variant="secondary" className="bg-blue-600/20 text-blue-300">
+          <Badge variant="secondary">
             {quote.status}
           </Badge>
         </div>
         <div className="space-y-2">
-          <div className="text-white/60 text-sm">
-            {items.length} material{items.length !== 1 ? 's' : ''}
+          <div className="text-muted-foreground text-sm">
+            {quoteType === 'products'
+              ? `${items.length} material${items.length !== 1 ? 's' : ''}`
+              : 'Custom request'
+            }
           </div>
-          <div className="text-white/60 text-sm">
+          <div className="text-muted-foreground text-sm">
             Created: {new Date(quote.created_at).toLocaleDateString('en-US', {
               year: 'numeric',
               month: 'long',
@@ -196,123 +264,184 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
         </div>
       </div>
 
-      {/* Materials List */}
-      <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-white">Materials</h3>
-          <Button
-            onClick={() => setShowAddMaterial(!showAddMaterial)}
-            variant="outline"
-            size="sm"
-            className="border-white/20 text-white hover:bg-white/10"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Material
-          </Button>
-        </div>
+      {/* Quote Type Tabs */}
+      <Tabs value={quoteType} onValueChange={(value) => setQuoteType(value as 'products' | 'custom')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="products">
+            <Package className="h-4 w-4 mr-2" />
+            Products
+          </TabsTrigger>
+          <TabsTrigger value="custom">
+            <FileText className="h-4 w-4 mr-2" />
+            Custom Request
+          </TabsTrigger>
+        </TabsList>
 
-        {showAddMaterial && (
-          <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/40" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search materials to add..."
-                className="pl-10 bg-white/5 border-white/20 text-white"
-              />
+        {/* Products Tab */}
+        <TabsContent value="products" className="mt-4">
+          <div className="dashboard-card">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium">Materials</h3>
+              <Button
+                onClick={() => setShowAddMaterial(!showAddMaterial)}
+                variant="outline"
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Material
+              </Button>
             </div>
-            <p className="text-white/40 text-sm mt-2">
-              Search for materials from your catalog or use the "Add to Quote" button on product pages
-            </p>
-          </div>
-        )}
 
-        {items.length === 0 ? (
-          <div className="text-center py-8">
-            <Package className="h-12 w-12 text-white/40 mx-auto mb-3" />
-            <p className="text-white/60 mb-2">No materials added yet</p>
-            <p className="text-white/40 text-sm">
-              Use the "Add to Quote" button on product pages or search above
-            </p>
+            {showAddMaterial && (
+              <div className="mb-4 p-3 bg-muted rounded-lg">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search materials to add..."
+                    className="pl-10"
+                  />
+                </div>
+                <p className="text-muted-foreground text-sm mt-2">
+                  Search for materials from your catalog or use the "Add to Quote" button on product pages
+                </p>
+              </div>
+            )}
+
+            {items.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-foreground mb-2">No materials added yet</p>
+                <p className="text-muted-foreground text-sm">
+                  Use the "Add to Quote" button on product pages or search above
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Material</TableHead>
+                      <TableHead className="text-center">Quantity</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium">
+                              {item.product?.name || 'Unknown Material'}
+                            </div>
+                            {item.product?.sku && (
+                              <div className="text-xs text-muted-foreground">SKU: {item.product.sku}</div>
+                            )}
+                            {item.added_from && (
+                              <Badge variant="outline" className="text-xs">
+                                Added from: {item.added_from}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                            className="w-20 text-center"
+                          />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-xs">
+                          <div className="truncate">{item.notes || '-'}</div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            onClick={() => handleRemoveItem(item.id)}
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/10">
-                  <TableHead className="text-white/80">Material</TableHead>
-                  <TableHead className="text-white/80 text-center">Quantity</TableHead>
-                  <TableHead className="text-white/80">Notes</TableHead>
-                  <TableHead className="text-white/80 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id} className="border-white/10">
-                    <TableCell className="text-white/80">
-                      <div className="space-y-1">
-                        <div className="font-medium">
-                          {item.product?.name || 'Unknown Material'}
-                        </div>
-                        {item.product?.sku && (
-                          <div className="text-xs text-white/40">SKU: {item.product.sku}</div>
-                        )}
-                        {item.added_from && (
-                          <Badge variant="outline" className="text-xs border-white/20 text-white/60">
-                            Added from: {item.added_from}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-white/80 text-center">
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                        className="w-20 bg-white/5 border-white/20 text-white text-center"
-                      />
-                    </TableCell>
-                    <TableCell className="text-white/60 text-sm max-w-xs">
-                      <div className="truncate">{item.notes || '-'}</div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        onClick={() => handleRemoveItem(item.id)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        </TabsContent>
+
+        {/* Custom Request Tab */}
+        <TabsContent value="custom" className="mt-4">
+          <div className="dashboard-card">
+            <div className="mb-4">
+              <h3 className="text-lg font-medium mb-2">Custom Request</h3>
+              <p className="text-muted-foreground text-sm">
+                Describe the materials you need and we'll help you find the perfect match
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label>Request Details *</Label>
+                <Textarea
+                  value={customRequestText}
+                  onChange={(e) => setCustomRequestText(e.target.value)}
+                  placeholder="Describe the materials you're looking for, including specifications, quantities, and any special requirements..."
+                  className="mt-1"
+                  rows={10}
+                />
+                <p className="text-muted-foreground text-xs mt-1">
+                  Be as detailed as possible to help us provide accurate recommendations
+                </p>
+              </div>
+
+              <Button
+                onClick={handleSaveCustomRequest}
+                disabled={processing || !customRequestText.trim()}
+                variant="outline"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Custom Request'
+                )}
+              </Button>
+            </div>
           </div>
-        )}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Notes */}
-      <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-        <Label className="text-white/80 mb-2 block">Additional Notes</Label>
+      <div className="dashboard-card">
+        <Label className="mb-2 block">Additional Notes (Optional)</Label>
         <Textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Add any special requirements, delivery instructions, or questions..."
-          className="bg-white/5 border-white/20 text-white"
           rows={4}
         />
       </div>
 
       {/* Send Request Button */}
-      <div className="sticky bottom-0 bg-gray-900 pt-4 border-t border-white/10">
+      <div className="sticky bottom-0 bg-background pt-4" style={{ borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
         <Button
           onClick={handleSendRequest}
-          disabled={processing || items.length === 0}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-white py-6 text-lg"
+          disabled={processing || (quoteType === 'products' && items.length === 0) || (quoteType === 'custom' && !customRequestText.trim())}
+          className="w-full py-6 text-lg"
+          style={{
+            backgroundColor: 'hsl(var(--primary))',
+            color: 'white'
+          }}
         >
           {processing ? (
             <>
@@ -322,11 +451,12 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
           ) : (
             <>
               <Send className="h-5 w-5 mr-2" />
-              Send Quote Request ({items.length} material{items.length !== 1 ? 's' : ''})
+              Send Quote Request
+              {quoteType === 'products' && ` (${items.length} material${items.length !== 1 ? 's' : ''})`}
             </>
           )}
         </Button>
-        <p className="text-white/40 text-sm text-center mt-2">
+        <p className="text-muted-foreground text-sm text-center mt-2">
           We'll review your request and send you a detailed proposal with pricing
         </p>
       </div>
