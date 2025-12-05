@@ -1,6 +1,5 @@
 import React from 'react';
 import { X, Calendar, FileText, Package } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 import {
   Dialog,
@@ -23,7 +22,6 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
   quote,
   onClose,
 }) => {
-  const navigate = useNavigate();
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -168,17 +166,6 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
             >
               Close
             </Button>
-            {quote.status === 'submitted' && (
-              <Button
-                onClick={() => {
-                  onClose();
-                  navigate('/quotes/proposals');
-                }}
-                className="flex-1"
-              >
-                View Proposals
-              </Button>
-            )}
           </div>
         </div>
       </DialogContent>
