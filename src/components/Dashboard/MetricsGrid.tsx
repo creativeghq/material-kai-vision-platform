@@ -2,23 +2,6 @@ import React from 'react';
 
 import { metricsConfig, type Metric } from './dashboardData';
 
-const getBubbleColor = (valueColor: string) => {
-  switch (valueColor) {
-    case 'primary':
-      return 'hsl(var(--bubble-yellow))';
-    case 'blue':
-      return 'hsl(var(--bubble-blue))';
-    case 'purple':
-      return 'hsl(var(--bubble-purple))';
-    case 'green':
-      return 'hsl(var(--bubble-green))';
-    case 'orange':
-      return 'hsl(var(--bubble-orange))';
-    default:
-      return 'hsl(var(--bubble-yellow))';
-  }
-};
-
 export const MetricsGrid: React.FC = () => {
   return (
     <div className="py-12 px-8">
@@ -29,7 +12,7 @@ export const MetricsGrid: React.FC = () => {
               key={metric.id}
               className="p-6 rounded-[20px] transition-all duration-200 hover:scale-105"
               style={{
-                background: getBubbleColor(metric.valueColor),
+                background: 'hsl(var(--bubble-background))',
                 boxShadow: 'var(--shadow-sm)',
                 border: 'none',
               }}

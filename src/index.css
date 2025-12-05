@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Gradient background for main outer area - from screenshot */
+body {
+  background: linear-gradient(135deg,
+    hsl(180, 30%, 88%) 0%,    /* Light mint top-left */
+    hsl(160, 25%, 90%) 25%,   /* Soft green-tint */
+    hsl(180, 20%, 92%) 50%,   /* Light blue-gray center */
+    hsl(200, 20%, 90%) 75%,   /* Soft blue */
+    hsl(180, 25%, 88%) 100%   /* Light mint bottom-right */
+  );
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
 /* Custom Scrollbar Styles */
 .custom-scrollbar::-webkit-scrollbar {
   width: 8px;
@@ -35,18 +48,17 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Warm Light Design System - Based on automation dashboard screenshots */
-    /* Main background: Light mint/blue-gray, Sidebar: Light beige, Content sections: Warm beige */
+    /* Warm Light Design System - Exact colors from screenshot */
 
-    /* Main Background - Light mint/blue-gray tint (outer background) */
-    --background: 180 15% 92%;  /* #E5F0F0 - Light mint/blue-gray */
+    /* Main Background - Light mint/blue-gray gradient (outer background) */
+    --background: 180 20% 90%;  /* Light mint/blue-gray base */
     --foreground: 0 0% 20%;  /* #333333 - Dark text */
 
-    /* Content sections - Warm light beige (main content area background) */
-    --card: 30 20% 96%;  /* #F7F5F3 - Light warm beige */
+    /* Content sections/pages - Light warm beige #f1f1e8 */
+    --card: 60 25% 93%;  /* #f1f1e8 - Light warm beige for sections/pages */
     --card-foreground: 0 0% 20%;  /* #333333 - Dark text */
 
-    --popover: 30 20% 96%;
+    --popover: 60 25% 93%;
     --popover-foreground: 0 0% 20%;
 
     /* Primary - Bright yellow accent (for buttons, active states) */
@@ -54,15 +66,15 @@ All colors MUST be HSL.
     --primary-foreground: 0 0% 20%;  /* Dark text on yellow */
 
     /* Secondary - Very light beige for hover states */
-    --secondary: 30 15% 94%;  /* #F2F0ED - Very light beige */
+    --secondary: 60 20% 91%;  /* Slightly darker than card */
     --secondary-foreground: 0 0% 20%;
 
     /* Muted - For subtle elements and secondary text */
-    --muted: 30 15% 94%;  /* #F2F0ED - Very light beige */
+    --muted: 60 20% 91%;
     --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray text */
 
-    /* Accent - Very light yellow for hero sections */
-    --accent: 48 100% 95%;  /* #FFF9E6 - Very light yellow */
+    /* Accent - Hero section background #f5f4eb */
+    --accent: 50 33% 95%;  /* #f5f4eb - Hero background */
     --accent-foreground: 0 0% 20%;
 
     /* Destructive - Red for errors */
@@ -70,28 +82,24 @@ All colors MUST be HSL.
     --destructive-foreground: 0 0% 100%;
 
     /* Borders - Very subtle */
-    --border: 30 10% 88%;  /* #E5E3E0 - Very subtle beige border */
-    --input: 30 10% 90%;  /* Slightly lighter for inputs */
+    --border: 60 15% 88%;  /* Very subtle beige border */
+    --input: 60 15% 90%;  /* Slightly lighter for inputs */
     --ring: 48 100% 62%;  /* Yellow ring for focus */
 
     --radius: 0.75rem;  /* 12px - Moderate rounded corners */
 
-    /* Sidebar - Light beige/cream (warmer than main background) */
-    --sidebar-background: 30 25% 97%;  /* #F9F7F5 - Light warm beige/cream */
+    /* Sidebar - Light beige/cream from screenshot */
+    --sidebar-background: 40 30% 96%;  /* Light warm beige/cream */
     --sidebar-foreground: 0 0% 20%;  /* #333333 - Dark text */
     --sidebar-accent: 48 100% 62%;  /* #FFD93D - Yellow for active items */
     --sidebar-accent-foreground: 0 0% 20%;  /* Dark text on yellow */
     --sidebar-border: transparent;  /* No border */
 
-    /* Hero section background - Very light yellow */
-    --hero-background: 48 100% 95%;  /* #FFF9E6 - Very light yellow */
+    /* Hero section background - #f5f4eb */
+    --hero-background: 50 33% 95%;  /* #f5f4eb */
 
-    /* Stat bubbles - Light colored backgrounds for metrics */
-    --bubble-yellow: 48 100% 95%;  /* #FFF9E6 - Very light yellow */
-    --bubble-blue: 217 91% 96%;  /* Very light blue */
-    --bubble-green: 142 71% 96%;  /* Very light green */
-    --bubble-purple: 270 95% 96%;  /* Very light purple */
-    --bubble-orange: 38 92% 96%;  /* Very light orange */
+    /* Stat bubbles - ALL use #f1f1e8 */
+    --bubble-background: 60 25% 93%;  /* #f1f1e8 - Same as card/section background */
 
     /* Gradients - Yellow gradients for charts */
     --gradient-yellow: linear-gradient(180deg, rgba(255, 217, 61, 0.3) 0%, rgba(255, 217, 61, 0.05) 100%);
@@ -164,36 +172,13 @@ All colors MUST be HSL.
     transform: translateY(-1px);
   }
 
-  /* Stat bubbles - For metrics with colored backgrounds */
+  /* Stat bubbles - All use same background #f1f1e8 */
   .stat-bubble {
     @apply rounded-xl p-4;
+    background: hsl(var(--bubble-background));
     box-shadow: var(--shadow-sm);
     transition: var(--transition-smooth);
     border: none;
-  }
-
-  .stat-bubble.yellow {
-    background: hsl(var(--bubble-yellow));
-    color: hsl(var(--foreground));
-  }
-
-  .stat-bubble.blue {
-    background: hsl(var(--bubble-blue));
-    color: hsl(var(--foreground));
-  }
-
-  .stat-bubble.green {
-    background: hsl(var(--bubble-green));
-    color: hsl(var(--foreground));
-  }
-
-  .stat-bubble.purple {
-    background: hsl(var(--bubble-purple));
-    color: hsl(var(--foreground));
-  }
-
-  .stat-bubble.orange {
-    background: hsl(var(--bubble-orange));
     color: hsl(var(--foreground));
   }
 
