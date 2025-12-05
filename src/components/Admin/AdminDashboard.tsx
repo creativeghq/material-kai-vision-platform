@@ -678,14 +678,18 @@ const AdminDashboard: React.FC = () => {
                             </CardDescription>
                           </CardHeader>
                           <CardContent>
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
                               <span className="text-sm text-muted-foreground">
                                 {section.count}
                               </span>
                               <Button
                                 asChild
-                                variant="ghost"
-                                className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
+                                size="sm"
+                                style={{
+                                  backgroundColor: 'hsl(var(--primary))',
+                                  color: 'white'
+                                }}
+                                className="hover:opacity-90"
                               >
                                 <Link to={section.path}>Manage</Link>
                               </Button>

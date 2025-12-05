@@ -112,12 +112,12 @@ export const ProposalDetailModal: React.FC<ProposalDetailModalProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-white/20 text-white max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl">Proposal Details</DialogTitle>
-              <DialogDescription className="text-white/60 mt-1">
+              <DialogDescription className="mt-1">
                 Proposal ID: {proposal.id}
               </DialogDescription>
             </div>
@@ -129,72 +129,112 @@ export const ProposalDetailModal: React.FC<ProposalDetailModalProps> = ({
 
         <div className="space-y-6 mt-4">
           {/* Summary */}
-          <div className="bg-white/5 rounded-lg p-4 grid grid-cols-2 gap-4">
+          <div className="bg-muted rounded-lg p-4 grid grid-cols-2 gap-4">
             <div className="flex items-center gap-3">
-              <DollarSign className="h-5 w-5 text-purple-400" />
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
               <div>
-                <p className="text-white/60 text-sm">Subtotal</p>
-                <p className="text-white font-semibold">{formatPrice(proposal.subtotal || 0)}</p>
+                <p className="text-muted-foreground text-sm">Subtotal</p>
+                <p className="font-semibold">{formatPrice(proposal.subtotal || 0)}</p>
               </div>
             </div>
 
             {proposal.tax && proposal.tax > 0 && (
               <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-purple-400" />
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
                 <div>
-                  <p className="text-white/60 text-sm">Tax</p>
-                  <p className="text-white font-semibold">{formatPrice(proposal.tax)}</p>
+                  <p className="text-muted-foreground text-sm">Tax</p>
+                  <p className="font-semibold">{formatPrice(proposal.tax)}</p>
                 </div>
               </div>
             )}
 
             {proposal.discount && proposal.discount > 0 && (
               <div className="flex items-center gap-3">
-                <DollarSign className="h-5 w-5 text-green-400" />
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(142 71% 95%)'
+                  }}
+                >
+                  <DollarSign className="h-4 w-4" style={{ color: 'hsl(142 71% 35%)' }} />
+                </div>
                 <div>
-                  <p className="text-white/60 text-sm">Discount</p>
-                  <p className="text-green-400 font-semibold">-{formatPrice(proposal.discount)}</p>
+                  <p className="text-muted-foreground text-sm">Discount</p>
+                  <p className="font-semibold" style={{ color: 'hsl(142 71% 35%)' }}>-{formatPrice(proposal.discount)}</p>
                 </div>
               </div>
             )}
 
             <div className="flex items-center gap-3">
-              <DollarSign className="h-5 w-5 text-yellow-400" />
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.15)'
+                }}
+              >
+                <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
               <div>
-                <p className="text-white/60 text-sm">Total</p>
-                <p className="text-yellow-400 text-xl font-bold">{formatPrice(proposal.total || 0)}</p>
+                <p className="text-muted-foreground text-sm">Total</p>
+                <p className="text-xl font-bold" style={{ color: 'hsl(var(--primary))' }}>{formatPrice(proposal.total || 0)}</p>
               </div>
             </div>
           </div>
 
           {/* Items */}
           {proposal.items && proposal.items.length > 0 && (
-            <div className="bg-white/5 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+            <div className="bg-muted rounded-lg p-4">
+              <h3 className="text-lg font-medium mb-3 flex items-center gap-2">
                 <Package className="h-5 w-5" />
                 Items ({proposal.items.length})
               </h3>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-white/10">
-                      <TableHead className="text-white/80">Product</TableHead>
-                      <TableHead className="text-white/80 text-right">Quantity</TableHead>
-                      <TableHead className="text-white/80 text-right">Unit Price</TableHead>
-                      <TableHead className="text-white/80 text-right">Total</TableHead>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Unit Price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {proposal.items.map((item, index) => (
-                      <TableRow key={index} className="border-white/10">
-                        <TableCell className="text-white/80">
+                      <TableRow key={index}>
+                        <TableCell>
                           {item.product_name || item.product_id}
                         </TableCell>
-                        <TableCell className="text-white/80 text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-white/80 text-right">
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
                           {formatPrice(item.unit_price)}
                         </TableCell>
-                        <TableCell className="text-white/80 text-right font-semibold">
+                        <TableCell className="text-right font-semibold">
                           {formatPrice(item.total)}
                         </TableCell>
                       </TableRow>
@@ -207,33 +247,33 @@ export const ProposalDetailModal: React.FC<ProposalDetailModalProps> = ({
 
           {/* Notes */}
           {proposal.notes && (
-            <div className="bg-white/5 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-white mb-2">Notes</h3>
-              <p className="text-white/80 whitespace-pre-wrap">{proposal.notes}</p>
+            <div className="bg-muted rounded-lg p-4">
+              <h3 className="text-lg font-medium mb-2">Notes</h3>
+              <p className="text-muted-foreground whitespace-pre-wrap">{proposal.notes}</p>
             </div>
           )}
 
           {/* Metadata */}
-          <div className="bg-white/5 rounded-lg p-4">
-            <h3 className="text-lg font-semibold text-white mb-3">Timeline</h3>
+          <div className="bg-muted rounded-lg p-4">
+            <h3 className="text-lg font-medium mb-3">Timeline</h3>
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-purple-400" />
-                <span className="text-white/60 text-sm">Created:</span>
-                <span className="text-white text-sm">{formatDate(proposal.created_at)}</span>
+                <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <span className="text-muted-foreground text-sm">Created:</span>
+                <span className="text-sm">{formatDate(proposal.created_at)}</span>
               </div>
               {proposal.sent_at && (
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-4 w-4 text-purple-400" />
-                  <span className="text-white/60 text-sm">Sent:</span>
-                  <span className="text-white text-sm">{formatDate(proposal.sent_at)}</span>
+                  <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                  <span className="text-muted-foreground text-sm">Sent:</span>
+                  <span className="text-sm">{formatDate(proposal.sent_at)}</span>
                 </div>
               )}
               {proposal.accepted_at && (
                 <div className="flex items-center gap-3">
-                  <Calendar className="h-4 w-4 text-green-400" />
-                  <span className="text-white/60 text-sm">Accepted:</span>
-                  <span className="text-white text-sm">{formatDate(proposal.accepted_at)}</span>
+                  <Calendar className="h-4 w-4" style={{ color: 'hsl(142 71% 35%)' }} />
+                  <span className="text-muted-foreground text-sm">Accepted:</span>
+                  <span className="text-sm">{formatDate(proposal.accepted_at)}</span>
                 </div>
               )}
             </div>
@@ -244,7 +284,7 @@ export const ProposalDetailModal: React.FC<ProposalDetailModalProps> = ({
             <Button
               onClick={onClose}
               variant="outline"
-              className="flex-1 border-white/20 text-white hover:bg-white/10"
+              className="flex-1"
               disabled={processing}
             >
               Close

@@ -52,12 +52,12 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-white/20 text-white max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-2xl">Quote Request Details</DialogTitle>
-              <DialogDescription className="text-white/60 mt-1">
+              <DialogDescription className="mt-1">
                 Request ID: {quote.id}
               </DialogDescription>
             </div>
@@ -69,41 +69,81 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
         <div className="space-y-6 mt-4">
           {/* Summary */}
-          <div className="bg-white/5 rounded-lg p-4 space-y-3">
-            <h3 className="text-lg font-semibold text-white mb-3">Summary</h3>
+          <div className="bg-muted rounded-lg p-4 space-y-3">
+            <h3 className="text-lg font-medium mb-3">Summary</h3>
 
             <div className="flex items-center gap-3">
-              <Package className="h-5 w-5 text-purple-400" />
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
               <div>
-                <p className="text-white/60 text-sm">Items</p>
-                <p className="text-white">{quote.items_count || 0} items</p>
+                <p className="text-muted-foreground text-sm">Items</p>
+                <p className="font-medium">{quote.items_count || 0} items</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <FileText className="h-5 w-5 text-purple-400" />
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
               <div>
-                <p className="text-white/60 text-sm">Estimated Total</p>
-                <p className="text-white text-lg font-semibold">
+                <p className="text-muted-foreground text-sm">Estimated Total</p>
+                <p className="text-lg font-semibold">
                   {formatPrice(quote.total_estimated)}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-purple-400" />
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
               <div>
-                <p className="text-white/60 text-sm">Created</p>
-                <p className="text-white">{formatDate(quote.created_at)}</p>
+                <p className="text-muted-foreground text-sm">Created</p>
+                <p className="font-medium">{formatDate(quote.created_at)}</p>
               </div>
             </div>
 
             {quote.updated_at !== quote.created_at && (
               <div className="flex items-center gap-3">
-                <Calendar className="h-5 w-5 text-purple-400" />
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
                 <div>
-                  <p className="text-white/60 text-sm">Last Updated</p>
-                  <p className="text-white">{formatDate(quote.updated_at)}</p>
+                  <p className="text-muted-foreground text-sm">Last Updated</p>
+                  <p className="font-medium">{formatDate(quote.updated_at)}</p>
                 </div>
               </div>
             )}
@@ -111,9 +151,9 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
           {/* Notes */}
           {quote.notes && (
-            <div className="bg-white/5 rounded-lg p-4">
-              <h3 className="text-lg font-semibold text-white mb-2">Notes</h3>
-              <p className="text-white/80 whitespace-pre-wrap">{quote.notes}</p>
+            <div className="bg-muted rounded-lg p-4">
+              <h3 className="text-lg font-medium mb-2">Notes</h3>
+              <p className="text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
             </div>
           )}
 
@@ -122,7 +162,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
             <Button
               onClick={onClose}
               variant="outline"
-              className="flex-1 border-white/20 text-white hover:bg-white/10"
+              className="flex-1"
             >
               Close
             </Button>
@@ -132,7 +172,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                   // TODO: Navigate to proposals or contact admin
                   onClose();
                 }}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                className="flex-1"
               >
                 View Proposals
               </Button>
