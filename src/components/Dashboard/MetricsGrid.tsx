@@ -2,6 +2,23 @@ import React from 'react';
 
 import { metricsConfig, type Metric } from './dashboardData';
 
+const getBubbleColor = (valueColor: string) => {
+  switch (valueColor) {
+    case 'primary':
+      return 'hsl(var(--bubble-yellow))';
+    case 'blue':
+      return 'hsl(var(--bubble-blue))';
+    case 'purple':
+      return 'hsl(var(--bubble-purple))';
+    case 'green':
+      return 'hsl(var(--bubble-green))';
+    case 'orange':
+      return 'hsl(var(--bubble-orange))';
+    default:
+      return 'hsl(var(--bubble-yellow))';
+  }
+};
+
 export const MetricsGrid: React.FC = () => {
   return (
     <div className="py-12 px-8">
@@ -12,19 +29,15 @@ export const MetricsGrid: React.FC = () => {
               key={metric.id}
               className="p-6 rounded-[20px] transition-all duration-200 hover:scale-105"
               style={{
-                background: 'var(--glass-bg)',
-                backdropFilter: 'var(--glass-blur)',
-                border: '1px solid var(--glass-border)',
-                boxShadow: 'var(--glass-shadow)',
+                background: getBubbleColor(metric.valueColor),
+                boxShadow: 'var(--shadow-sm)',
+                border: 'none',
               }}
             >
               <div className="flex items-center justify-between mb-4">
-                {/* Mocha-colored icon background */}
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ background: 'var(--mocha-color)' }}
-                >
-                  <metric.icon className="h-5 w-5 text-foreground/70" />
+                {/* Icon with subtle background */}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/50">
+                  <metric.icon className="h-5 w-5 text-foreground" />
                 </div>
                 {/* Badge with proper colors */}
                 <div className={`text-xs px-2 py-1 rounded-full font-medium ${
@@ -35,7 +48,7 @@ export const MetricsGrid: React.FC = () => {
                   {metric.change}
                 </div>
               </div>
-              {/* Dark text on glass card */}
+              {/* Dark text on colored bubble */}
               <div className="text-4xl font-bold mb-2 text-foreground">
                 {metric.value}
               </div>

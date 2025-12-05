@@ -12,7 +12,8 @@
   background: hsl(var(--accent));
   margin: 1.5rem;
   border-radius: 1.5rem;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
+  border: none;
 }
 
 .heroContent {

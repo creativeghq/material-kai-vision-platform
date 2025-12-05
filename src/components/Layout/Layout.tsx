@@ -15,8 +15,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Sidebar */}
       <Sidebar />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Content Area - Warm beige background */}
+      <div className="flex-1 flex flex-col bg-card">
         <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
         <main className="flex-1 overflow-x-hidden">
           <div className="w-full h-full">{children}</div>
