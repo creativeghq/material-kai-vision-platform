@@ -124,11 +124,12 @@ export const MoodBoardPage = () => {
       // Add all moodboard items to the quote
       for (const item of moodboard.items) {
         if (item.material_id) {
-          await quotesService.addQuoteItem({
+          await quotesService.addItem({
             quote_id: quote.id,
             product_id: item.material_id,
             quantity: 1,
             notes: item.notes || '',
+            added_from: 'moodboard',
           });
         }
       }

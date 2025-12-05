@@ -140,7 +140,7 @@ class MoodBoardAPI {
       .select(
         `
         *,
-        material:materials_catalog(
+        material:products(
           id,
           name,
           category,
@@ -180,7 +180,7 @@ class MoodBoardAPI {
       .select(
         `
         *,
-        material:materials_catalog(
+        material:products(
           id,
           name,
           category,
@@ -207,7 +207,7 @@ class MoodBoardAPI {
       .select(
         `
         *,
-        material:materials_catalog(
+        material:products(
           id,
           name,
           category,
