@@ -54,6 +54,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface AIMetricsSummary {
   total_calls: number;
@@ -153,10 +154,17 @@ export const AIMonitoringDashboard: React.FC = () => {
 
   if (loading && !metrics) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading AI metrics...</p>
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="AI Monitoring Dashboard"
+          description="Real-time AI usage, costs, and performance metrics"
+          badge="Analytics"
+        />
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading AI metrics...</p>
+          </div>
         </div>
       </div>
     );
@@ -164,22 +172,29 @@ export const AIMonitoringDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Error Loading Metrics
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">{error}</p>
-            <Button onClick={fetchMetrics} className="w-full">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="AI Monitoring Dashboard"
+          description="Real-time AI usage, costs, and performance metrics"
+          badge="Analytics"
+        />
+        <div className="flex items-center justify-center h-96">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Error Loading Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">{error}</p>
+              <Button onClick={fetchMetrics} className="w-full">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -187,16 +202,16 @@ export const AIMonitoringDashboard: React.FC = () => {
   if (!metrics) return null;
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">AI Monitoring Dashboard</h1>
-          <p className="text-muted-foreground">
-            Real-time AI usage, costs, and performance metrics
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="AI Monitoring Dashboard"
+        description="Real-time AI usage, costs, and performance metrics"
+        badge="Analytics"
+      />
+
+      <div className="p-6 space-y-6">
+        {/* Header Controls */}
+        <div className="flex items-center justify-end gap-4">
           <Select value={timePeriod} onValueChange={setTimePeriod}>
             <SelectTrigger className="w-32">
               <SelectValue />
@@ -224,10 +239,9 @@ export const AIMonitoringDashboard: React.FC = () => {
             Refresh
           </Button>
         </div>
-      </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
@@ -484,6 +498,7 @@ export const AIMonitoringDashboard: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 };

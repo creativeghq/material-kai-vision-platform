@@ -22,6 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { usersAPI, contactsAPI } from '@/services/crm.service';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface UserProfile {
   id: string;
@@ -190,9 +191,16 @@ export const CRMManagement: React.FC = () => {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="CRM Management"
+        description="Manage users and customer contacts"
+        badge="Admin"
+      />
+
+      <div className="p-6 space-y-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -586,6 +594,7 @@ export const CRMManagement: React.FC = () => {
           </Card>
         </div>
       )}
+      </div>
     </div>
   );
 };
