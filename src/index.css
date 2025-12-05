@@ -36,91 +36,95 @@ All colors MUST be HSL.
 @layer base {
 :root {
     /* Warm Light Design System - Based on automation dashboard screenshots */
+    /* Refined for better accessibility and visual hierarchy */
 
-    /* Main Background - Warm cream/beige */
-    --background: 40 25% 95%;  /* #F5F3EE - Warm cream background */
-    --foreground: 0 0% 10%;  /* #1A1A1A - Almost black text */
+    /* Main Background - Light blue-gray tint (like in screenshots) */
+    --background: 200 20% 93%;  /* #E8EDEF - Light blue-gray background */
+    --foreground: 215 25% 17%;  /* #2D3748 - Dark gray text (better contrast) */
 
-    /* Cards - Pure white with shadows */
-    --card: 0 0% 100%;  /* #FFFFFF - White cards */
-    --card-foreground: 0 0% 10%;  /* Dark text on cards */
+    /* Cards - Pure white with NO borders, only shadows */
+    --card: 0 0% 100%;  /* #FFFFFF - Pure white cards */
+    --card-foreground: 215 25% 17%;  /* #2D3748 - Dark gray text */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover-foreground: 215 25% 17%;
 
-    /* Primary - Bright yellow accent */
+    /* Primary - Bright yellow accent (for buttons, active states) */
     --primary: 48 100% 62%;  /* #FFD93D - Bright yellow */
-    --primary-foreground: 0 0% 10%;  /* Dark text on yellow */
+    --primary-foreground: 215 25% 17%;  /* Dark text on yellow for accessibility */
 
-    /* Secondary - Light gray */
-    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
-    --secondary-foreground: 0 0% 10%;
+    /* Secondary - Very light gray (for subtle backgrounds) */
+    --secondary: 210 20% 98%;  /* #F8F9FA - Very light gray */
+    --secondary-foreground: 215 25% 17%;
 
-    /* Muted - For subtle elements */
-    --muted: 0 0% 96%;  /* #F5F5F5 */
-    --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray */
+    /* Muted - For subtle elements and secondary text */
+    --muted: 210 20% 98%;  /* #F8F9FA - Very light gray background */
+    --muted-foreground: 215 10% 42%;  /* #6B7280 - Medium gray text */
 
-    /* Accent - Soft blue for highlights */
-    --accent: 210 100% 95%;  /* #E0F2FE - Very light blue */
-    --accent-foreground: 210 100% 30%;  /* Dark blue text */
+    /* Accent - Very light yellow for hero sections */
+    --accent: 48 100% 95%;  /* #FFF9E6 - Very light yellow */
+    --accent-foreground: 215 25% 17%;  /* Dark text */
 
-    /* Destructive - Soft red */
+    /* Destructive - Red for errors */
     --destructive: 0 84% 60%;  /* #EF4444 - Red */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders - Very subtle borders */
-    --border: 0 0% 90%;  /* #E5E5E5 - Light gray border */
-    --input: 0 0% 90%;
+    /* Borders - Almost invisible (or none for cards) */
+    --border: 210 20% 92%;  /* #E5E7EB - Very subtle border (barely visible) */
+    --input: 210 20% 90%;  /* Slightly darker for inputs */
     --ring: 48 100% 62%;  /* Yellow ring for focus */
 
     --radius: 0.75rem;  /* 12px - Moderate rounded corners */
 
-    /* Sidebar - White with yellow accent */
-    --sidebar-background: 0 0% 100%;  /* White sidebar */
-    --sidebar-foreground: 0 0% 10%;  /* Dark text */
+    /* Sidebar - Very light gray background */
+    --sidebar-background: 210 20% 98%;  /* #F8F9FA - Very light gray */
+    --sidebar-foreground: 215 25% 17%;  /* Dark gray text */
     --sidebar-accent: 48 100% 62%;  /* Yellow for active items */
-    --sidebar-accent-foreground: 0 0% 10%;
-    --sidebar-border: 0 0% 90%;  /* Light border */
+    --sidebar-accent-foreground: 215 25% 17%;  /* Dark text */
+    --sidebar-border: transparent;  /* No border */
+
+    /* Hero section background - Very light yellow */
+    --hero-background: 48 100% 95%;  /* #FFF9E6 - Very light yellow */
 
     /* Gradients - Yellow gradients for charts */
-    --gradient-yellow: linear-gradient(180deg, rgba(255, 217, 61, 0.4) 0%, rgba(255, 217, 61, 0.1) 100%);
-    --gradient-orange: linear-gradient(180deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.1) 100%);
-    --gradient-background: #F5F3EE;  /* Warm cream background */
+    --gradient-yellow: linear-gradient(180deg, rgba(255, 217, 61, 0.3) 0%, rgba(255, 217, 61, 0.05) 100%);
+    --gradient-orange: linear-gradient(180deg, rgba(251, 146, 60, 0.3) 0%, rgba(251, 146, 60, 0.05) 100%);
 
-    /* Shadows - Soft, subtle */
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-card: 0 2px 8px rgb(0 0 0 / 0.08);
+    /* Shadows - Very soft and subtle (key to the design) */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06), 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-md: 0 4px 8px 0 rgb(0 0 0 / 0.08), 0 2px 4px 0 rgb(0 0 0 / 0.04);
+    --shadow-lg: 0 8px 16px 0 rgb(0 0 0 / 0.1), 0 4px 8px 0 rgb(0 0 0 / 0.05);
+    --shadow-card: 0 2px 8px 0 rgb(0 0 0 / 0.06), 0 1px 4px 0 rgb(0 0 0 / 0.04);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    /* Status colors */
+    /* Status colors - Adjusted for light backgrounds */
     --success: 142 71% 45%;  /* #22C55E - Green */
     --success-foreground: 0 0% 100%;
-    --success-bg: 142 71% 95%;  /* Very light green background */
+    --success-bg: 142 71% 96%;  /* Very light green background */
 
     --warning: 38 92% 50%;  /* #F59E0B - Orange */
     --warning-foreground: 0 0% 100%;
-    --warning-bg: 38 92% 95%;  /* Very light orange background */
+    --warning-bg: 38 92% 96%;  /* Very light orange background */
 
     --error: 0 84% 60%;  /* #EF4444 - Red */
     --error-foreground: 0 0% 100%;
-    --error-bg: 0 84% 95%;  /* Very light red background */
+    --error-bg: 0 84% 96%;  /* Very light red background */
 
     --info: 217 91% 60%;  /* #3B82F6 - Blue */
     --info-foreground: 0 0% 100%;
-    --info-bg: 217 91% 95%;  /* Very light blue background */
+    --info-bg: 217 91% 96%;  /* Very light blue background */
 
     /* Chart colors - Yellow/orange gradients */
-    --chart-yellow: 48 100% 62%;  /* Yellow for primary metrics */
-    --chart-orange: 45 93% 47%;  /* Orange for secondary */
-    --chart-amber: 43 96% 56%;  /* Amber for tertiary */
-    --chart-green: 142 71% 45%;  /* Green for success */
-    --chart-red: 0 84% 60%;  /* Red for errors */
+    --chart-yellow: 48 100% 62%;  /* #FFD93D - Yellow for primary metrics */
+    --chart-orange: 38 92% 50%;  /* #F59E0B - Orange for secondary */
+    --chart-amber: 43 96% 56%;  /* #FBBF24 - Amber for tertiary */
+    --chart-green: 142 71% 45%;  /* #22C55E - Green for success */
+    --chart-red: 0 84% 60%;  /* #EF4444 - Red for errors */
   }
 
 .dark {
@@ -134,32 +138,31 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply text-foreground;
-    background: var(--gradient-background);
+    @apply bg-background text-foreground;
     background-attachment: fixed;
   }
 }
 
 @layer components {
-  /* Dark Dashboard Card - Main content cards */
+  /* Light Dashboard Card - Main content cards (NO BORDERS, only shadows) */
   .dashboard-card {
-    @apply bg-card rounded-xl border border-border p-6;
+    @apply bg-card rounded-xl p-6;
     box-shadow: var(--shadow-card);
     transition: var(--transition-smooth);
+    border: none;  /* No borders - separation through shadows only */
   }
 
   .dashboard-card:hover {
-    box-shadow: var(--shadow-medium);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
   }
 
-  /* Glass morphism card - For overlays and special sections */
-  .glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--glass-shadow);
-    @apply rounded-xl;
+  /* Stat bubble - For metrics with colored backgrounds */
+  .stat-bubble {
+    @apply bg-accent rounded-xl p-4;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition-smooth);
+    border: none;
   }
 
   /* Stat card - For metrics/statistics */
@@ -167,54 +170,63 @@ All colors MUST be HSL.
     @apply dashboard-card;
   }
 
-  /* Section container - For grouping content */
+  /* Section container - For grouping content (NO BORDERS) */
   .section-container {
-    @apply bg-card rounded-xl border border-border p-6 space-y-4;
+    @apply bg-card rounded-xl p-6 space-y-4;
+    box-shadow: var(--shadow-card);
+    border: none;
   }
 
-  /* Sidebar item */
+  /* Sidebar item - Light theme with yellow active state */
   .sidebar-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200;
-    @apply text-muted-foreground hover:text-foreground hover:bg-secondary/50;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200;
+    @apply text-muted-foreground hover:text-foreground hover:bg-secondary;
   }
 
   .sidebar-item.active {
     @apply bg-primary text-primary-foreground;
-    box-shadow: var(--shadow-glow);
+    box-shadow: var(--shadow-sm);
   }
 
-  /* Primary button - Emerald green */
+  /* Primary button - Yellow */
   .btn-primary {
     @apply bg-primary text-primary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
-    box-shadow: var(--shadow-subtle);
+    box-shadow: var(--shadow-sm);
+    border: none;
   }
 
   .btn-primary:hover {
-    @apply brightness-110;
-    box-shadow: var(--shadow-glow);
+    @apply brightness-95;
+    box-shadow: var(--shadow-md);
     transform: translateY(-1px);
   }
 
-  /* Secondary button - Slate */
+  /* Secondary button - Light gray */
   .btn-secondary {
     @apply bg-secondary text-secondary-foreground rounded-lg px-6 py-2.5;
-    @apply font-medium transition-all duration-300 border border-border;
+    @apply font-medium transition-all duration-300;
+    box-shadow: var(--shadow-xs);
+    border: none;
   }
 
   .btn-secondary:hover {
-    @apply bg-secondary/80;
+    @apply bg-muted;
+    box-shadow: var(--shadow-sm);
     transform: translateY(-1px);
   }
 
-  /* Outline button */
+  /* Outline button - Subtle border */
   .btn-outline {
-    @apply bg-transparent text-foreground rounded-lg px-6 py-2.5;
-    @apply font-medium transition-all duration-300 border border-border;
+    @apply bg-card text-foreground rounded-lg px-6 py-2.5;
+    @apply font-medium transition-all duration-300;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-xs);
   }
 
   .btn-outline:hover {
-    @apply bg-secondary/30;
+    @apply bg-secondary;
+    box-shadow: var(--shadow-sm);
   }
 
   /* Input field - Dark theme */

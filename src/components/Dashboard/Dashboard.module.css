@@ -9,6 +9,10 @@
 .heroSection {
   position: relative;
   overflow: hidden;
+  background: hsl(var(--accent));
+  margin: 1.5rem;
+  border-radius: 1.5rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .heroContent {
@@ -45,14 +49,14 @@
 .heroTitle {
   font-size: 3rem;
   font-weight: bold;
-  color: #BFB3A3;
+  color: hsl(var(--foreground));
   line-height: 1.2;
 }
 
 .heroSubtitle {
   font-size: 2.5rem;
   font-weight: bold;
-  color: #BFB3A3;
+  color: hsl(var(--foreground));
 }
 
 .heroDescription {
@@ -137,21 +141,20 @@
 }
 
 .featureCard {
-  background: hsl(var(--card) / 0.5);
-  backdrop-filter: blur(10px);
-  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--card));
+  border: none;
   border-radius: 1rem;
   padding: 1.5rem;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .featureCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px hsl(var(--shadow) / 0.1);
-  border-color: hsl(var(--primary) / 0.3);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .featureCard::before {
@@ -271,17 +274,18 @@
 }
 
 .metricCard {
-  background: hsl(var(--card) / 0.5);
-  backdrop-filter: blur(10px);
-  border: 1px solid hsl(var(--border) / 0.5);
+  background: hsl(var(--card));
+  border: none;
   border-radius: 1rem;
   text-align: center;
   padding: 1.5rem;
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-card);
 }
 
 .metricCard:hover {
-  transform: scale(1.05);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .metricHeader {
