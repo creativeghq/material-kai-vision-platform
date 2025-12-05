@@ -1,51 +1,64 @@
 /**
  * 3D Generation - AI-Powered Interior Design
  *
- * LangChain.js-based 3D interior generation system.
+ * TEMPORARY STUB: This function is currently disabled due to missing Mastra dependencies.
+ * The function uses Mastra framework functions (createTool, createAgent, createStep, createWorkflow)
+ * that are not available in Deno edge runtime.
  *
- * Features:
- * - LangChain.js agent orchestration
- * - 4-step workflow (Parse → Match → Generate → Store)
- * - 10 AI models (3 Hugging Face + 7 Replicate)
- * - Database workflow tracking
- * - Claude Sonnet 4.5 for intelligent coordination
+ * TODO: Either:
+ * 1. Rewrite using pure LangChain.js (no Mastra)
+ * 2. Import Mastra package if available for Deno
+ * 3. Use the existing crewai-3d-generation function instead
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2';
-import Replicate from 'https://esm.sh/replicate@0.25.2';
-import { ChatAnthropic } from 'npm:@langchain/anthropic';
-import { DynamicStructuredTool } from 'npm:@langchain/core/tools';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Environment variables
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const hfToken = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN')!;
-const replicateToken = Deno.env.get('REPLICATE_API_TOKEN')!;
-const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY')!;
-const mivaaGatewayUrl = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+/**
+ * Main handler - Returns error message indicating function is disabled
+ */
+serve(async (req) => {
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  try {
+    const request = await req.json();
 
-// Request validation schema (same as CrewAI)
-const GenerationRequestSchema = z.object({
-  user_id: z.string().uuid(),
-  prompt: z.string().min(10).max(1000),
-  models: z.array(z.string()).optional(),
-  room_type: z.string().optional(),
-  roomType: z.string().optional(),
-  style: z.string().optional(),
-  specific_materials: z.array(z.string()).optional(),
-  reference_image_url: z.string().url().optional(),
-  testMode: z.boolean().optional(),
+    console.error('⚠️ mastra-3d-generation called but is currently disabled');
+    console.error('Request:', request);
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Function temporarily disabled',
+        details: 'This function uses Mastra framework which is not available in Deno edge runtime. Please use crewai-3d-generation instead.',
+        alternative: 'Use the crewai-3d-generation edge function for 3D interior generation.',
+      }),
+      {
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    );
+  } catch (error) {
+    console.error('❌ Error in mastra-3d-generation stub:', error);
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      },
+    );
+  }
 });
 
-/**
- * Mastra Tool: Parse User Request
- * Replaces CrewAI parseUserRequestHybrid function
- */
+// ORIGINAL CODE COMMENTED OUT BELOW - NEEDS MASTRA DEPENDENCIES
+/*
 const parseRequestTool = createTool({
   id: 'parse-request',
   description: 'Parse interior design request and extract structured information',
@@ -715,22 +728,4 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       },
     );
-  } catch (error) {
-    console.error('❌ Mastra 3D generation error:', error);
-
-    const processingTime = Date.now() - startTime;
-
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        processing_time_ms: processingTime,
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      },
-    );
-  }
-});
-
+*/
