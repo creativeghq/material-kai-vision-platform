@@ -402,15 +402,6 @@ const AdminDashboard: React.FC = () => {
         count: 'User Docs',
       },
       {
-        title: 'PDF Processing',
-        description:
-          'Upload and process new PDF documents for material knowledge extraction',
-        icon: FileText,
-        path: '/admin/pdf-processing',
-        status: 'active',
-        count: 'Upload PDFs',
-      },
-      {
         title: 'PDF Processing Data',
         description:
           'View all products, chunks, images, and embeddings generated from PDF processing',

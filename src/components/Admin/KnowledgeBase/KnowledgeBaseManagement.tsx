@@ -10,6 +10,7 @@ import {
   History,
   MessageSquare,
   BarChart3,
+  Brain,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -112,45 +113,77 @@ export const KnowledgeBaseManagement: React.FC = () => {
       <div className="container mx-auto p-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalDocs}</div>
-            </CardContent>
-          </Card>
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Brain className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.totalDocs}</div>
+            <div className="text-sm text-muted-foreground">Total Documents</div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Categories</CardTitle>
-              <FolderTree className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalCategories}</div>
-            </CardContent>
-          </Card>
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <FolderTree className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.totalCategories}</div>
+            <div className="text-sm text-muted-foreground">Categories</div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Product Links</CardTitle>
-              <Link2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalAttachments}</div>
-            </CardContent>
-          </Card>
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Link2 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.totalAttachments}</div>
+            <div className="text-sm text-muted-foreground">Product Links</div>
+          </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Searches</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalSearches}</div>
-            </CardContent>
-          </Card>
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.totalSearches}</div>
+            <div className="text-sm text-muted-foreground">Total Searches</div>
+          </div>
         </div>
 
         {/* Main Content */}

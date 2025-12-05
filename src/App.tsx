@@ -34,7 +34,6 @@ import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
-import PDFProcessing from './pages/PDFProcessing';
 import SearchHub from './pages/SearchHub';
 import AgentHub from './pages/AgentHub';
 import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
@@ -338,28 +337,6 @@ const App = () => (
                 }
               />
 
-              <Route
-                path="/admin/pdf-processing"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <PDFProcessing />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/pdf-processing"
-                element={
-                  <AuthGuard>
-                    <Layout>
-                      <PDFProcessing />
-                    </Layout>
-                  </AuthGuard>
-                }
-              />
               {/* Redirect /search-hub to /agent-hub */}
               <Route
                 path="/search-hub"
