@@ -3,8 +3,8 @@ import React from 'react';
 import { metricsConfig, type Metric } from './dashboardData';
 
 export const MetricsGrid: React.FC = () => {
-  // Cycle through bubble colors (blue, coral, green, default)
-  const bubbleColors = ['blue', 'coral', 'green', ''];
+  // Cycle through bubble colors (purple, orange, yellow, default)
+  const bubbleColors = ['purple', 'orange', 'yellow', ''];
 
   return (
     <div className="py-12 px-8">

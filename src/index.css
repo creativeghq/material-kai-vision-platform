@@ -2,10 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
-/* SugarCRM-style background - medium gray for clear separation */
+/* Dark theme background - almost black */
 body {
-  background: hsl(0, 0%, 67%);  /* #ACACAC - Medium gray background */
+  background: hsl(0, 0%, 8%);  /* #141414 - Very dark background */
   min-height: 100vh;
+  color: hsl(0, 0%, 95%);  /* Light text by default */
 }
 
 /* Custom Scrollbar Styles */
@@ -41,104 +42,104 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* SugarCRM-Inspired Design System - Professional & Clean */
+    /* Dark Theme Design System - Plan CRM / Paytech Inspired */
 
-    /* Main Background - Medium gray for clear separation (like SugarCRM) */
-    --background: 0 0% 67%;  /* #ACACAC - Medium gray background */
-    --foreground: 0 0% 13%;  /* #212121 - Very dark text for accessibility */
+    /* Main Background - Very dark (almost black) */
+    --background: 0 0% 8%;  /* #141414 - Very dark background */
+    --foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    /* Page container - Light gray (content area background) */
-    --page-background: 0 0% 94%;  /* #F0F0F0 - Light gray page area */
+    /* Page container - Dark gray (content area background) */
+    --page-background: 0 0% 11%;  /* #1C1C1C - Dark gray page area */
 
-    /* Content sections/cards - Pure white with shadows */
-    --card: 0 0% 100%;  /* #FFFFFF - Pure white cards */
-    --card-foreground: 0 0% 13%;  /* #212121 - Dark text */
+    /* Content sections/cards - Dark gray with subtle borders */
+    --card: 0 0% 16%;  /* #292929 - Dark gray cards */
+    --card-foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 13%;
+    --popover: 0 0% 16%;  /* #292929 - Dark popover */
+    --popover-foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    /* Primary - Black button (SugarCRM style) */
-    --primary: 0 0% 13%;  /* #212121 - Black/very dark gray */
-    --primary-foreground: 0 0% 100%;  /* White text */
+    /* Primary - Neon yellow/lime accent (Paytech style) */
+    --primary: 75 100% 50%;  /* #D4FF00 - Neon yellow/lime */
+    --primary-foreground: 0 0% 10%;  /* #1A1A1A - Dark text on yellow */
 
-    /* Secondary - Light gray for hover states */
-    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
-    --secondary-foreground: 0 0% 13%;
+    /* Secondary - Darker gray for hover states */
+    --secondary: 0 0% 20%;  /* #333333 - Medium dark gray */
+    --secondary-foreground: 0 0% 95%;  /* #F2F2F2 - Light text */
 
-    /* Muted - For subtle elements and secondary text */
-    --muted: 0 0% 96%;  /* #F5F5F5 */
-    --muted-foreground: 0 0% 40%;  /* #666666 - Medium gray text */
+    /* Muted - Subtle dark backgrounds */
+    --muted: 0 0% 18%;  /* #2E2E2E - Dark gray */
+    --muted-foreground: 0 0% 60%;  /* #999999 - Medium gray text */
 
-    /* Accent - Soft blue for highlights */
-    --accent: 220 60% 92%;  /* #D9E5F7 - Soft blue */
-    --accent-foreground: 0 0% 13%;
+    /* Accent - Purple/violet (Plan CRM style) */
+    --accent: 270 70% 60%;  /* #9F5FE8 - Purple accent */
+    --accent-foreground: 0 0% 100%;  /* White text */
 
-    /* Destructive - Coral/red for errors */
-    --destructive: 0 70% 60%;  /* #E85D5D - Coral red */
-    --destructive-foreground: 0 0% 100%;
+    /* Destructive - Error/delete actions */
+    --destructive: 0 84% 60%;  /* #E53E3E - Red */
+    --destructive-foreground: 0 0% 100%;  /* White text */
 
-    /* Borders - Subtle gray borders */
-    --border: 0 0% 88%;  /* #E0E0E0 - Light gray borders */
-    --input: 0 0% 90%;  /* Slightly lighter for inputs */
-    --ring: 0 0% 13%;  /* Black ring for focus */
+    /* Borders - Subtle dark borders */
+    --border: 0 0% 25%;  /* #404040 - Dark gray border */
+    --input: 0 0% 25%;  /* #404040 - Input border */
+    --ring: 75 100% 50%;  /* #D4FF00 - Focus ring (neon yellow) */
 
-    --radius: 0.75rem;  /* 12px - Moderate rounded corners */
+    --radius: 0.75rem;  /* 12px - Rounded corners */
 
-    /* Sidebar - White background with dark icons */
-    --sidebar-background: 0 0% 100%;  /* #FFFFFF - White sidebar */
-    --sidebar-foreground: 0 0% 13%;  /* #212121 - Dark icons/text */
-    --sidebar-accent: 0 0% 13%;  /* #212121 - Black for active items */
-    --sidebar-accent-foreground: 0 0% 100%;  /* White text on black */
-    --sidebar-border: 0 0% 88%;  /* #E0E0E0 - Subtle border */
+    /* Sidebar - Very dark (almost black) */
+    --sidebar-background: 0 0% 10%;  /* #1A1A1A - Very dark sidebar */
+    --sidebar-foreground: 0 0% 70%;  /* #B3B3B3 - Medium light icons/text */
+    --sidebar-accent: 75 100% 50%;  /* #D4FF00 - Neon yellow for active items */
+    --sidebar-accent-foreground: 0 0% 10%;  /* #1A1A1A - Dark text on yellow */
+    --sidebar-border: 0 0% 20%;  /* #333333 - Subtle dark border */
 
-    /* Hero section background - Light gray (same as page) */
-    --hero-background: 0 0% 94%;  /* #F0F0F0 */
+    /* Hero section background - Same as page */
+    --hero-background: 0 0% 11%;  /* #1C1C1C */
 
-    /* Stat bubbles - Soft colored backgrounds */
-    --bubble-blue: 220 60% 92%;  /* #D9E5F7 - Soft blue */
-    --bubble-coral: 0 70% 88%;  /* #F5D5D5 - Soft coral */
-    --bubble-green: 140 50% 88%;  /* #D5F0E0 - Soft green */
-    --bubble-background: 0 0% 96%;  /* #F5F5F5 - Default light gray */
+    /* Stat bubbles - Dark with colored accents */
+    --bubble-purple: 270 70% 25%;  /* #3D1F5C - Dark purple */
+    --bubble-orange: 30 100% 25%;  /* #804000 - Dark orange */
+    --bubble-yellow: 75 100% 25%;  /* #6A8000 - Dark yellow */
+    --bubble-background: 0 0% 18%;  /* #2E2E2E - Default dark gray */
 
-    /* Gradients - Soft blue/coral gradients for charts */
-    --gradient-blue: linear-gradient(180deg, rgba(144, 180, 240, 0.3) 0%, rgba(144, 180, 240, 0.1) 100%);
-    --gradient-coral: linear-gradient(180deg, rgba(232, 93, 93, 0.3) 0%, rgba(232, 93, 93, 0.1) 100%);
+    /* Gradients - Dark theme gradients */
+    --gradient-yellow: linear-gradient(180deg, rgba(212, 255, 0, 0.2) 0%, rgba(212, 255, 0, 0.05) 100%);
+    --gradient-purple: linear-gradient(180deg, rgba(159, 95, 232, 0.2) 0%, rgba(159, 95, 232, 0.05) 100%);
 
-    /* Shadows - Stronger shadows for clear separation (SugarCRM style) */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-sm: 0 2px 4px 0 rgb(0 0 0 / 0.08);
-    --shadow: 0 2px 6px 0 rgb(0 0 0 / 0.1), 0 1px 3px 0 rgb(0 0 0 / 0.06);
-    --shadow-md: 0 4px 10px 0 rgb(0 0 0 / 0.12), 0 2px 6px 0 rgb(0 0 0 / 0.08);
-    --shadow-lg: 0 8px 20px 0 rgb(0 0 0 / 0.15), 0 4px 10px 0 rgb(0 0 0 / 0.1);
-    --shadow-card: 0 2px 8px 0 rgb(0 0 0 / 0.1), 0 1px 4px 0 rgb(0 0 0 / 0.06);
+    /* Shadows - Subtle shadows for dark theme */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-sm: 0 2px 4px 0 rgb(0 0 0 / 0.4);
+    --shadow: 0 2px 6px 0 rgb(0 0 0 / 0.5), 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 10px 0 rgb(0 0 0 / 0.6), 0 2px 6px 0 rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 8px 20px 0 rgb(0 0 0 / 0.7), 0 4px 10px 0 rgb(0 0 0 / 0.5);
+    --shadow-card: 0 2px 8px 0 rgb(0 0 0 / 0.5), 0 1px 4px 0 rgb(0 0 0 / 0.3);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    /* Status colors - Adjusted for light backgrounds */
+    /* Status colors - Dark theme */
     --success: 142 71% 45%;  /* #22C55E - Green */
     --success-foreground: 0 0% 100%;
-    --success-bg: 142 71% 96%;  /* Very light green background */
+    --success-bg: 142 71% 15%;  /* Dark green background */
 
     --warning: 38 92% 50%;  /* #F59E0B - Orange */
     --warning-foreground: 0 0% 100%;
-    --warning-bg: 38 92% 96%;  /* Very light orange background */
+    --warning-bg: 38 92% 15%;  /* Dark orange background */
 
     --error: 0 84% 60%;  /* #EF4444 - Red */
     --error-foreground: 0 0% 100%;
-    --error-bg: 0 84% 96%;  /* Very light red background */
+    --error-bg: 0 84% 15%;  /* Dark red background */
 
     --info: 217 91% 60%;  /* #3B82F6 - Blue */
     --info-foreground: 0 0% 100%;
-    --info-bg: 217 91% 96%;  /* Very light blue background */
+    --info-bg: 217 91% 15%;  /* Dark blue background */
 
-    /* Chart colors - SugarCRM style (blue/coral) */
-    --chart-blue: 220 60% 65%;  /* #90B4F0 - Soft blue for primary metrics */
-    --chart-coral: 0 70% 60%;  /* #E85D5D - Coral for secondary */
-    --chart-green: 140 50% 55%;  /* #5FD99F - Soft green for success */
-    --chart-purple: 270 50% 65%;  /* #9F7FD9 - Soft purple for tertiary */
-    --chart-orange: 30 80% 60%;  /* #E89F5D - Soft orange for warnings */
+    /* Chart colors - Dark theme (neon yellow/purple) */
+    --chart-yellow: 75 100% 50%;  /* #D4FF00 - Neon yellow */
+    --chart-purple: 270 70% 60%;  /* #9F5FE8 - Purple */
+    --chart-orange: 30 100% 50%;  /* #FF8000 - Orange */
+    --chart-green: 140 50% 50%;  /* #40D98F - Green */
+    --chart-blue: 220 60% 55%;  /* #6B9FE0 - Blue */
   }
 
 .dark {
@@ -177,26 +178,29 @@ All colors MUST be HSL.
     transform: translateY(-1px);
   }
 
-  /* Stat bubbles - Soft colored backgrounds (blue/coral/green) */
+  /* Stat bubbles - Dark with colored accents (purple/orange/yellow) */
   .stat-bubble {
     @apply rounded-xl p-4;
     background: hsl(var(--bubble-background));
     box-shadow: var(--shadow-sm);
     transition: var(--transition-smooth);
-    border: none;
+    border: 1px solid hsl(var(--border));
     color: hsl(var(--foreground));
   }
 
-  .stat-bubble.blue {
-    background: hsl(var(--bubble-blue));
+  .stat-bubble.purple {
+    background: hsl(var(--bubble-purple));
+    border-color: hsl(270 70% 35%);
   }
 
-  .stat-bubble.coral {
-    background: hsl(var(--bubble-coral));
+  .stat-bubble.orange {
+    background: hsl(var(--bubble-orange));
+    border-color: hsl(30 100% 35%);
   }
 
-  .stat-bubble.green {
-    background: hsl(var(--bubble-green));
+  .stat-bubble.yellow {
+    background: hsl(var(--bubble-yellow));
+    border-color: hsl(75 100% 35%);
   }
 
   /* Stat card - For metrics/statistics */
@@ -211,7 +215,7 @@ All colors MUST be HSL.
     border: none;
   }
 
-  /* Sidebar item - White background with dark icons (SugarCRM style) */
+  /* Sidebar item - Dark theme */
   .sidebar-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200;
     @apply text-sidebar-foreground hover:bg-secondary;
@@ -219,24 +223,23 @@ All colors MUST be HSL.
 
   .sidebar-item.active {
     @apply bg-sidebar-accent text-sidebar-accent-foreground;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 0 10px hsl(var(--sidebar-accent) / 0.3);
   }
 
-  /* Primary button - Black (SugarCRM style) */
+  /* Primary button - Neon yellow (Paytech style) */
   .btn-primary {
     @apply bg-primary text-primary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 0 10px hsl(var(--primary) / 0.3);
     border: none;
   }
 
   .btn-primary:hover {
-    @apply brightness-110;
-    box-shadow: var(--shadow-md);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.5);
     transform: translateY(-1px);
   }
 
-  /* Secondary button - Light gray */
+  /* Secondary button - Dark gray */
   .btn-secondary {
     @apply bg-secondary text-secondary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
