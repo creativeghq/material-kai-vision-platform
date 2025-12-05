@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface SystemSetting {
   id: string;
@@ -94,47 +95,47 @@ export const SystemSettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="System Settings"
+          description="Configure platform-wide settings"
+          badge="Admin"
+        />
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900/20 to-gray-900 p-6">
-      {/* Header */}
-      <div className="max-w-4xl mx-auto mb-8">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-          <div className="flex items-center gap-3">
-            <Settings className="h-8 w-8 text-purple-400" />
-            <div>
-              <h1 className="text-3xl font-bold text-white">System Settings</h1>
-              <p className="text-white/60 mt-1">Configure platform-wide settings</p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="System Settings"
+        description="Configure platform-wide settings"
+        badge="Admin"
+      />
 
       {/* Settings Content */}
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20">
-          <div className="space-y-6">
+      <div className="p-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="dashboard-card space-y-6">
             {/* Quote Expiration Setting */}
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-purple-400" />
-                <h2 className="text-xl font-semibold text-white">Quote Expiration</h2>
+                <Clock className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                <h2 className="text-xl font-semibold">Quote Expiration</h2>
               </div>
-              
-              <div className="bg-white/5 rounded-lg p-6 border border-white/10">
-                <Label htmlFor="expiration-days" className="text-white text-base">
+
+              <div className="space-y-4">
+                <Label htmlFor="expiration-days" className="text-base">
                   Days Until Expiration
                 </Label>
-                <p className="text-white/60 text-sm mt-1 mb-4">
-                  Number of days of inactivity before a draft quote expires. 
+                <p className="text-sm text-muted-foreground">
+                  Number of days of inactivity before a draft quote expires.
                   Any activity (adding/removing items) extends the expiration.
                 </p>
-                
+
                 <div className="flex items-center gap-4">
                   <Input
                     id="expiration-days"
@@ -142,9 +143,9 @@ export const SystemSettingsPage: React.FC = () => {
                     min="1"
                     value={quoteExpirationDays}
                     onChange={(e) => setQuoteExpirationDays(parseInt(e.target.value) || 1)}
-                    className="max-w-xs bg-white/10 border-white/20 text-white"
+                    className="max-w-xs"
                   />
-                  <span className="text-white/60">days</span>
+                  <span className="text-muted-foreground">days</span>
                 </div>
               </div>
             </div>
@@ -154,7 +155,7 @@ export const SystemSettingsPage: React.FC = () => {
               <Button
                 onClick={handleSave}
                 disabled={saving}
-                className="bg-purple-600 hover:bg-purple-700"
+                style={{ backgroundColor: 'hsl(var(--primary))' }}
               >
                 {saving ? (
                   <>

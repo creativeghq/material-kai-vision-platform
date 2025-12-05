@@ -18,6 +18,7 @@ import {
   Clock,
   Zap,
 } from 'lucide-react';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface QueueJob {
   id: string;
@@ -223,11 +224,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-6 bg-white rounded-lg">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
-            <p>Loading queue data...</p>
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="Async Job Queue Monitor"
+          description="Monitor background job processing queues and progress"
+          badge="Admin"
+        />
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
+              <p>Loading queue data...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -236,27 +244,49 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   if (error) {
     return (
-      <Alert className="bg-red-50 border-red-200">
-        <AlertTriangle className="h-4 w-4 text-red-600" />
-        <AlertDescription className="text-red-800">
-          Error: {error}
-        </AlertDescription>
-      </Alert>
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="Async Job Queue Monitor"
+          description="Monitor background job processing queues and progress"
+          badge="Admin"
+        />
+        <div className="p-6">
+          <Alert className="bg-red-50 border-red-200">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              Error: {error}
+            </AlertDescription>
+          </Alert>
+        </div>
+      </div>
     );
   }
 
   if (!metrics) {
     return (
-      <div className="p-6 bg-white rounded-lg">
-        <p className="text-gray-600">No queue data available</p>
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="Async Job Queue Monitor"
+          description="Monitor background job processing queues and progress"
+          badge="Admin"
+        />
+        <div className="p-6">
+          <p className="text-muted-foreground">No queue data available</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-white rounded-lg space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">🔄 Async Job Queue Monitor</h1>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="Async Job Queue Monitor"
+        description="Monitor background job processing queues and progress"
+        badge="Admin"
+      />
+
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
         <div className="flex gap-2">
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
@@ -581,6 +611,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 };

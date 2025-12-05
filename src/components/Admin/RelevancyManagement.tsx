@@ -48,6 +48,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ChunkProductRelationship {
@@ -375,30 +376,12 @@ export const RelevancyManagement: React.FC = () => {
   const totalPages = Math.ceil(currentData.length / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/admin')}
-              className="border border-gray-300 bg-white text-gray-700"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Admin
-            </Button>
-            <div className="h-6 w-px bg-gray-300" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Relevancy Management</h1>
-              <p className="text-sm text-gray-600">
-                View and manage entity relationships with relevance scoring
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen bg-background">
+      <GlobalAdminHeader
+        title="Relevancy Management"
+        description="View and manage entity relationships with relevance scoring"
+        badge="Admin"
+      />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
