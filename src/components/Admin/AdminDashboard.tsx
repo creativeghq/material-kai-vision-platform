@@ -593,15 +593,16 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen page-container">
       {/* Header with Navigation */}
       <div
-        className="px-6 py-4 m-4 rounded-3xl"
+        className="rounded-3xl section-spacing"
         style={{
           background: 'var(--glass-bg)',
           backdropFilter: 'var(--glass-blur)',
-          border: '1px solid var(--glass-border)',
+          border: 'none',
           boxShadow: 'var(--glass-shadow)',
+          padding: 'var(--card-padding)',
         }}
       >
         <div className="flex items-center justify-between">

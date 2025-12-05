@@ -36,13 +36,21 @@ body {
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--background));
 }
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */
 
 @layer base {
 :root {
     /* Dark Theme Design System - Plan CRM / Paytech Inspired */
+
+    /* Layout System - Consistent spacing and widths */
+    --page-max-width: 1400px;  /* Maximum content width */
+    --page-padding-x: 2rem;  /* Horizontal padding (32px) */
+    --page-padding-y: 2rem;  /* Vertical padding (32px) */
+    --grid-gap: 1.5rem;  /* Gap between grid items (24px) */
+    --card-padding: 1.5rem;  /* Card internal padding (24px) */
+    --section-spacing: 3rem;  /* Spacing between sections (48px) */
 
     /* Main Background - Very dark (almost black) */
     --background: 0 0% 8%;  /* #141414 - Very dark background */
@@ -95,10 +103,11 @@ All colors MUST be HSL.
     /* Hero section background - Same as page */
     --hero-background: 0 0% 11%;  /* #1C1C1C */
 
-    /* Stat bubbles - Dark with colored accents */
-    --bubble-purple: 270 70% 25%;  /* #3D1F5C - Dark purple */
-    --bubble-orange: 30 100% 25%;  /* #804000 - Dark orange */
-    --bubble-yellow: 75 100% 25%;  /* #6A8000 - Dark yellow */
+    /* Stat bubbles - Soft muted colors (Zarss dashboard style) */
+    --bubble-sage: 140 25% 25%;  /* #3D4D42 - Muted sage green */
+    --bubble-peach: 30 40% 25%;  /* #524438 - Muted peach/tan */
+    --bubble-lavender: 270 30% 25%;  /* #3D3D52 - Muted lavender */
+    --bubble-mocha: 25 20% 22%;  /* #433D38 - Mocha/grey-brown */
     --bubble-background: 0 0% 18%;  /* #2E2E2E - Default dark gray */
 
     /* Gradients - Dark theme gradients */
@@ -159,15 +168,29 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* Page wrapper - Light gray content area (SugarCRM style) */
+  /* Page wrapper - Consistent layout system */
   .page-wrapper {
     background: hsl(var(--page-background));
     min-height: 100vh;
   }
 
-  /* Dashboard Card - Pure white cards with strong shadows */
+  /* Page container - Consistent max-width and padding */
+  .page-container {
+    max-width: var(--page-max-width);
+    margin: 0 auto;
+    padding: var(--page-padding-y) var(--page-padding-x);
+  }
+
+  /* Grid system - Consistent spacing */
+  .grid-layout {
+    display: grid;
+    gap: var(--grid-gap);
+  }
+
+  /* Dashboard Card - No borders, shadows only */
   .dashboard-card {
-    @apply bg-card rounded-xl p-6;
+    @apply bg-card rounded-xl;
+    padding: var(--card-padding);
     box-shadow: var(--shadow-card);
     transition: var(--transition-smooth);
     border: none;  /* No borders - separation through shadows only */
@@ -178,29 +201,31 @@ All colors MUST be HSL.
     transform: translateY(-1px);
   }
 
-  /* Stat bubbles - Dark with colored accents (purple/orange/yellow) */
+  /* Stat bubbles - Soft muted colors (Zarss dashboard style) */
   .stat-bubble {
-    @apply rounded-xl p-4;
+    @apply rounded-xl;
+    padding: var(--card-padding);
     background: hsl(var(--bubble-background));
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-md);
     transition: var(--transition-smooth);
-    border: 1px solid hsl(var(--border));
+    border: none;
     color: hsl(var(--foreground));
   }
 
-  .stat-bubble.purple {
-    background: hsl(var(--bubble-purple));
-    border-color: hsl(270 70% 35%);
+  .stat-bubble.sage {
+    background: hsl(var(--bubble-sage));
   }
 
-  .stat-bubble.orange {
-    background: hsl(var(--bubble-orange));
-    border-color: hsl(30 100% 35%);
+  .stat-bubble.peach {
+    background: hsl(var(--bubble-peach));
   }
 
-  .stat-bubble.yellow {
-    background: hsl(var(--bubble-yellow));
-    border-color: hsl(75 100% 35%);
+  .stat-bubble.lavender {
+    background: hsl(var(--bubble-lavender));
+  }
+
+  .stat-bubble.mocha {
+    background: hsl(var(--bubble-mocha));
   }
 
   /* Stat card - For metrics/statistics */
@@ -210,9 +235,15 @@ All colors MUST be HSL.
 
   /* Section container - For grouping content (NO BORDERS) */
   .section-container {
-    @apply bg-card rounded-xl p-6 space-y-4;
+    @apply bg-card rounded-xl space-y-4;
+    padding: var(--card-padding);
     box-shadow: var(--shadow-card);
     border: none;
+  }
+
+  /* Section spacing - Consistent vertical spacing */
+  .section-spacing {
+    margin-bottom: var(--section-spacing);
   }
 
   /* Sidebar item - Dark theme */

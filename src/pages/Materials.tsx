@@ -166,8 +166,8 @@ export const MaterialsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto py-6">
+      <div className="bg-card section-spacing">
+        <div className="page-container">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold flex items-center gap-3">
@@ -188,7 +188,7 @@ export const MaterialsPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto py-8">
+      <div className="page-container">
         {materials.length === 0 ? (
           <Card>
             <CardContent className="p-12">
