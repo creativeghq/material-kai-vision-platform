@@ -7,36 +7,71 @@ export const MetricsGrid: React.FC = () => {
   const bubbleColors = ['sage', 'peach', 'lavender', 'mocha'];
 
   return (
-    <div className="py-12 px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div style={{
+      paddingLeft: 'var(--page-padding-x)',
+      paddingRight: 'var(--page-padding-x)',
+      paddingBottom: 'var(--space-xl)'
+    }}>
+      <div className="w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: 'var(--grid-gap)' }}>
           {metricsConfig.metrics.map((metric: Metric, index: number) => {
             const colorClass = bubbleColors[index % bubbleColors.length];
 
             return (
               <div
                 key={metric.id}
-                className={`stat-bubble ${colorClass} p-6 transition-all duration-200 hover:scale-105`}
+                className={`stat-bubble ${colorClass} transition-all duration-200 hover:scale-105`}
+                style={{ padding: 'var(--card-padding)' }}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-sm)' }}>
                   {/* Icon with subtle background */}
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/50">
-                    <metric.icon className="h-5 w-5 text-foreground" />
+                  <div
+                    className="flex items-center justify-center bg-white/10"
+                    style={{
+                      width: '2.5rem',
+                      height: '2.5rem',
+                      borderRadius: 'var(--radius-lg)'
+                    }}
+                  >
+                    <metric.icon className="h-5 w-5 text-white" />
                   </div>
-                  {/* Badge with proper colors */}
-                  <div className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    metric.change.startsWith('+') ? 'bg-green-500/20 text-green-700' :
-                    metric.change.startsWith('-') ? 'bg-red-500/20 text-red-700' :
-                    'bg-gray-500/20 text-gray-700'
-                  }`}>
+                  {/* Badge with muted colors - NO GREEN */}
+                  <div
+                    className={`font-medium ${
+                      metric.change.startsWith('+') ? 'bg-white/20' :
+                      metric.change.startsWith('-') ? 'bg-white/10' :
+                      'bg-white/15'
+                    }`}
+                    style={{
+                      fontSize: 'var(--text-xs)',
+                      padding: 'var(--space-xs) calc(var(--space-xs) * 2)',
+                      borderRadius: 'var(--radius-full)',
+                      color: 'hsl(var(--bubble-text))'
+                    }}
+                  >
                     {metric.change}
                   </div>
                 </div>
-                {/* Dark text on colored bubble */}
-                <div className="text-4xl font-bold mb-2 text-foreground">
+                {/* White text on colored bubble */}
+                <div
+                  className="font-bold"
+                  style={{
+                    fontSize: 'var(--text-4xl)',
+                    marginBottom: 'var(--space-xs)',
+                    color: 'hsl(var(--bubble-text))'
+                  }}
+                >
                   {metric.value}
                 </div>
-                <div className="text-sm text-muted-foreground font-medium">{metric.label}</div>
+                <div
+                  className="font-medium"
+                  style={{
+                    fontSize: 'var(--text-sm)',
+                    color: 'hsl(var(--bubble-text-muted))'
+                  }}
+                >
+                  {metric.label}
+                </div>
               </div>
             );
           })}

@@ -130,9 +130,9 @@ export const metricsConfig = {
     {
       id: 'uptime',
       icon: Shield,
-      iconColor: 'text-green-500',
+      iconColor: 'text-white',
       value: '99.8%',
-      valueColor: 'green' as const,
+      valueColor: 'mocha' as const,
       label: 'System Uptime',
       change: 'Excellent',
     },
@@ -147,7 +147,7 @@ export const searchHubConfig = {
 };
 
 // Type definitions for better TypeScript support
-export type ColorVariant = 'primary' | 'purple' | 'orange' | 'blue' | 'green';
+export type ColorVariant = 'primary' | 'purple' | 'orange' | 'blue' | 'mocha' | 'sage' | 'peach' | 'lavender';
 export type ButtonType = 'primary' | 'outline';
 
 export interface HeroAction {

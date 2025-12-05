@@ -19,8 +19,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col page-wrapper">
         <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
         <main className="flex-1 overflow-x-hidden">
-          {/* Consistent page container with max-width and padding */}
-          <div className="page-container">{children}</div>
+          {/* NO padding wrapper - children handle their own spacing */}
+          {children}
         </main>
       </div>
     </div>

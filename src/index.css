@@ -42,15 +42,53 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Dark Theme Design System - Plan CRM / Paytech Inspired */
+    /* ========================================
+       CENTRALIZED DESIGN SYSTEM
+       All spacing, colors, sizes in ONE place
+       Change here = changes everywhere
+       ======================================== */
 
-    /* Layout System - Consistent spacing and widths */
-    --page-max-width: 1400px;  /* Maximum content width */
-    --page-padding-x: 2rem;  /* Horizontal padding (32px) */
-    --page-padding-y: 0;  /* No top/bottom padding - full height */
-    --grid-gap: 1.5rem;  /* Gap between grid items (24px) */
-    --card-padding: 1.5rem;  /* Card internal padding (24px) */
-    --section-spacing: 3rem;  /* Spacing between sections (48px) */
+    /* ===== SPACING SYSTEM ===== */
+    --space-xs: 0.5rem;    /* 8px */
+    --space-sm: 1rem;      /* 16px */
+    --space-md: 1.5rem;    /* 24px */
+    --space-lg: 2rem;      /* 32px */
+    --space-xl: 3rem;      /* 48px */
+    --space-2xl: 4rem;     /* 64px */
+    --space-3xl: 6rem;     /* 96px */
+
+    /* ===== LAYOUT SYSTEM ===== */
+    --page-max-width: 1400px;
+    --page-padding-x: var(--space-lg);     /* Left/Right: 32px */
+    --page-padding-y: 0;                   /* Top/Bottom: 0 (full height) */
+    --grid-gap: var(--space-md);           /* Grid gap: 24px */
+    --card-padding: var(--space-md);       /* Card padding: 24px */
+    --section-spacing: var(--space-xl);    /* Section spacing: 48px */
+    --hero-margin-x: var(--space-lg);      /* Hero left/right: 32px */
+    --hero-margin-bottom: var(--space-xl); /* Hero bottom: 48px */
+    --hero-padding-y: var(--space-2xl);    /* Hero top/bottom: 64px */
+    --hero-padding-x: var(--space-md);     /* Hero left/right: 24px */
+
+    /* ===== BORDER RADIUS ===== */
+    --radius-sm: 0.5rem;   /* 8px */
+    --radius-md: 0.75rem;  /* 12px */
+    --radius-lg: 1rem;     /* 16px */
+    --radius-xl: 1.5rem;   /* 24px */
+    --radius-2xl: 2rem;    /* 32px */
+    --radius-full: 9999px; /* Fully rounded */
+
+    /* ===== FONT SIZES ===== */
+    --text-xs: 0.75rem;    /* 12px */
+    --text-sm: 0.875rem;   /* 14px */
+    --text-base: 1rem;     /* 16px */
+    --text-lg: 1.125rem;   /* 18px */
+    --text-xl: 1.25rem;    /* 20px */
+    --text-2xl: 1.5rem;    /* 24px */
+    --text-3xl: 1.875rem;  /* 30px */
+    --text-4xl: 2.25rem;   /* 36px */
+    --text-5xl: 3rem;      /* 48px */
+    --text-6xl: 3.75rem;   /* 60px */
+    --text-7xl: 4.5rem;    /* 72px */
 
     /* Main Background - Very dark (almost black) */
     --background: 0 0% 8%;  /* #141414 - Very dark background */
@@ -103,12 +141,14 @@ All colors MUST be HSL.
     /* Hero section background - Same as page */
     --hero-background: 0 0% 11%;  /* #1C1C1C */
 
-    /* Stat bubbles - Soft muted colors (Zarss dashboard style) */
-    --bubble-sage: 140 25% 25%;  /* #3D4D42 - Muted sage green */
-    --bubble-peach: 30 40% 25%;  /* #524438 - Muted peach/tan */
-    --bubble-lavender: 270 30% 25%;  /* #3D3D52 - Muted lavender */
-    --bubble-mocha: 25 20% 22%;  /* #433D38 - Mocha/grey-brown */
-    --bubble-background: 0 0% 18%;  /* #2E2E2E - Default dark gray */
+    /* ===== STAT BUBBLE COLORS ===== */
+    /* Muted, professional colors - NO bright/rainbow colors */
+    --bubble-sage: 140 20% 35%;      /* Muted sage green */
+    --bubble-peach: 30 35% 35%;      /* Muted peach/tan */
+    --bubble-lavender: 270 25% 35%;  /* Muted lavender */
+    --bubble-mocha: 25 18% 32%;      /* Muted mocha/brown */
+    --bubble-text: 0 0% 100%;        /* White text on bubbles */
+    --bubble-text-muted: 0 0% 80%;   /* Muted white for secondary text */
 
     /* Gradients - Dark theme gradients */
     --gradient-yellow: linear-gradient(180deg, rgba(212, 255, 0, 0.2) 0%, rgba(212, 255, 0, 0.05) 100%);
@@ -174,11 +214,11 @@ All colors MUST be HSL.
     min-height: 100vh;
   }
 
-  /* Page container - Consistent max-width and padding */
+  /* Page container - ONLY left/right padding, NO top/bottom */
   .page-container {
-    max-width: var(--page-max-width);
-    margin: 0 auto;
-    padding: var(--page-padding-y) var(--page-padding-x);
+    max-width: 100%;
+    margin: 0;
+    padding: 0 var(--page-padding-x);
   }
 
   /* Grid system - Consistent spacing */
@@ -299,13 +339,16 @@ All colors MUST be HSL.
 
   /* Input field - Dark theme */
   .input-dark {
-    @apply bg-input border-border rounded-lg px-4 py-2.5;
+    @apply bg-input rounded-lg px-4 py-2.5;
     @apply text-foreground placeholder:text-muted-foreground;
     @apply transition-all duration-200;
+    border: none;
+    box-shadow: var(--shadow-xs);
   }
 
   .input-dark:focus {
-    @apply outline-none ring-2 ring-primary border-primary;
+    @apply outline-none ring-2 ring-primary;
+    border: none;
   }
 
   /* Search input - Like in the screenshot */
@@ -344,7 +387,8 @@ All colors MUST be HSL.
   }
 
   .badge-neutral {
-    @apply bg-muted text-muted-foreground border-border;
+    @apply bg-muted text-muted-foreground;
+    border: none;
   }
 
   /* Status indicator dot */
@@ -394,7 +438,7 @@ All colors MUST be HSL.
   }
 
   .table-dark thead {
-    @apply border-b border-border;
+    border-bottom: none;
   }
 
   .table-dark th {
@@ -402,7 +446,8 @@ All colors MUST be HSL.
   }
 
   .table-dark td {
-    @apply px-4 py-4 text-sm text-foreground border-b border-border;
+    @apply px-4 py-4 text-sm text-foreground;
+    border-bottom: none;
   }
 
   .table-dark tr:hover {
@@ -434,7 +479,10 @@ All colors MUST be HSL.
 
   /* Divider */
   .divider {
-    @apply border-t border-border my-6;
+    @apply my-6;
+    border-top: none;
+    height: 1px;
+    background: hsl(var(--muted));
   }
 
   /* Animations */
