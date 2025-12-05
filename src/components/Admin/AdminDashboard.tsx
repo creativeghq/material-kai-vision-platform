@@ -493,17 +493,9 @@ const AdminDashboard: React.FC = () => {
         title: 'Quote Requests',
         description: 'View and manage customer quote requests with pricing',
         icon: FileText,
-        path: '/quotes/requests',
+        path: '/admin/quote-requests',
         status: 'active',
         count: 'Quote System',
-      },
-      {
-        title: 'Proposals',
-        description: 'Create and send proposals to customers',
-        icon: FileText,
-        path: '/quotes/proposals',
-        status: 'active',
-        count: 'Proposals',
       },
     ],
     'System Monitoring': [
@@ -650,43 +642,51 @@ const AdminDashboard: React.FC = () => {
                     {sections.map((section) => {
                       const Icon = section.icon;
                       return (
-                        <Card
+                        <div
                           key={section.path}
-                          className="hover:shadow-md transition-shadow"
+                          className="dashboard-card transition-all duration-200 hover:shadow-md"
                         >
-                          <CardHeader className="pb-3">
-                            <div className="flex items-center justify-between">
-                              <Icon className="h-8 w-8 text-primary" />
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <div
+                                className="flex items-center justify-center"
+                                style={{
+                                  width: '2.5rem',
+                                  height: '2.5rem',
+                                  borderRadius: 'var(--radius-lg)',
+                                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                                }}
+                              >
+                                <Icon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                              </div>
                               <Badge className={getStatusColor(section.status)}>
                                 {section.status}
                               </Badge>
                             </div>
-                            <CardTitle className="text-lg">
+                            <h3 className="text-lg font-semibold mb-2">
                               {section.title}
-                            </CardTitle>
-                            <CardDescription className="text-sm">
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
                               {section.description}
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
-                              <span className="text-sm text-muted-foreground">
-                                {section.count}
-                              </span>
-                              <Button
-                                asChild
-                                size="sm"
-                                style={{
-                                  backgroundColor: 'hsl(var(--primary))',
-                                  color: 'white'
-                                }}
-                                className="hover:opacity-90"
-                              >
-                                <Link to={section.path}>Manage</Link>
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
+                            <span className="text-sm text-muted-foreground">
+                              {section.count}
+                            </span>
+                            <Button
+                              asChild
+                              size="sm"
+                              style={{
+                                backgroundColor: 'hsl(var(--primary))',
+                                color: 'white'
+                              }}
+                              className="hover:opacity-90"
+                            >
+                              <Link to={section.path}>Manage</Link>
+                            </Button>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -695,53 +695,43 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">System Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>PDF Documents</span>
-                      <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                        156 Processed
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Knowledge Entries</span>
-                      <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                        1,247 Active
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Search Queries</span>
-                      <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                        8,432 Total
-                      </Badge>
-                    </div>
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <h3 className="text-lg font-semibold mb-4">System Status</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>PDF Documents</span>
+                    <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
+                      156 Processed
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div>• New PDF processed: Material Specifications v2.1</div>
-                    <div>• 3D material suggestions updated</div>
-                    <div>• Enhanced search index rebuilt</div>
-                    <div>• Knowledge base entries validated</div>
+                  <div className="flex justify-between">
+                    <span>Knowledge Entries</span>
+                    <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
+                      1,247 Active
+                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex justify-between">
+                    <span>Search Queries</span>
+                    <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
+                      8,432 Total
+                    </Badge>
+                  </div>
+                </div>
+              </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
+                <div className="space-y-2 text-sm">
+                  <div>• New PDF processed: Material Specifications v2.1</div>
+                  <div>• 3D material suggestions updated</div>
+                  <div>• Enhanced search index rebuilt</div>
+                  <div>• Knowledge base entries validated</div>
+                </div>
+              </div>
+
+              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+                <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+                <div className="space-y-2">
                   <Button
                     asChild
                     variant="ghost"
@@ -765,8 +755,8 @@ const AdminDashboard: React.FC = () => {
                       Interior Designer Agent
                     </Link>
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
           </TabsContent>
 
