@@ -257,7 +257,12 @@ const createSpaceformerTool = (workspaceId: string) => {
 
 /**
  * LangChain Tool: 3D Interior Design Generation
+ *
+ * DISABLED: The mastra-3d-generation edge function has been removed.
+ * 3D generation is now handled client-side via MaterialAgent3DGenerationAPI
+ * which uses BrowserApiIntegrationService.generateInteriorDesign()
  */
+/* DISABLED - Use MaterialAgent3DGenerationAPI on frontend instead
 const create3DGenerationTool = (userId: string, workspaceId: string) => {
   return tool(
     async ({ prompt, roomType, style, referenceImageUrl }) => {
@@ -306,6 +311,7 @@ const create3DGenerationTool = (userId: string, workspaceId: string) => {
     }
   );
 };
+*/
 
 /**
  * LangChain Tool: Material Cost Estimation
@@ -1226,9 +1232,10 @@ async function executeAgent(
   if (config.tools.includes('spaceformer_analysis')) {
     tools.push(createSpaceformerTool(workspaceId));
   }
-  if (config.tools.includes('generate_3d')) {
-    tools.push(create3DGenerationTool(userId, workspaceId));
-  }
+  // DISABLED: 3D generation tool removed - use MaterialAgent3DGenerationAPI on frontend instead
+  // if (config.tools.includes('generate_3d')) {
+  //   tools.push(create3DGenerationTool(userId, workspaceId));
+  // }
   if (config.tools.includes('estimate_cost')) {
     tools.push(createCostEstimationTool(workspaceId));
   }

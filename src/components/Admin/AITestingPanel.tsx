@@ -547,47 +547,9 @@ export const AITestingPanel: React.FC = () => {
     }
   };
 
-  const test3DGeneration = async () => {
-    setTesting(true);
-
-    try {
-      const apiService = BrowserApiIntegrationService.getInstance();
-      const result = await apiService.callSupabaseFunction(
-        'mastra-3d-generation',
-        {
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          prompt: testPrompt,
-          room_type: 'living room',
-          style: 'modern',
-        },
-      );
-
-      if (!result.success) {
-        throw new Error(
-          `3D generation failed: ${result.error?.message || 'Unknown error'}`,
-        );
-      }
-
-      const data = result.data;
-
-      toast({
-        title: '3D Generation Test Completed',
-        description: `Generation completed in ${((data as any)?.processing_time_ms / 1000).toFixed(2)}s`,
-        variant: 'default',
-      });
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('3D test error:', error);
-      toast({
-        title: '3D Test Failed',
-        description:
-          error instanceof Error ? error.message : 'An unknown error occurred',
-        variant: 'destructive',
-      });
-    } finally {
-      setTesting(false);
-    }
-  };
+  // REMOVED: test3DGeneration function
+  // 3D generation is now handled via MaterialAgent3DGenerationAPI on frontend
+  // which uses BrowserApiIntegrationService.generateInteriorDesign()
 
   const getSampleImageUrls = () => [
     'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800',
@@ -718,49 +680,9 @@ export const AITestingPanel: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* 3D Generation Test */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="h-5 w-5" />
-                    3D Generation Test
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Test Prompt</label>
-                    <Textarea
-                      value={testPrompt}
-                      onChange={(e) => setTestPrompt(e.target.value)}
-                      placeholder="Describe the interior design you want to generate"
-                      rows={3}
-                    />
-                  </div>
-
-                  <Button
-                    onClick={test3DGeneration}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        test3DGeneration();
-                      }
-                    }}
-                    disabled={testing || !testPrompt}
-                    className="w-full"
-                  >
-                    {testing ? (
-                      <>
-                        <Activity className="h-4 w-4 mr-2 animate-spin" />
-                        Testing...
-                      </>
-                    ) : (
-                      <>
-                        <TestTube className="h-4 w-4 mr-2" />
-                        Test 3D Generation
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+              {/* 3D Generation Test - REMOVED */}
+              {/* 3D generation is now handled via MaterialAgent3DGenerationAPI */}
+              {/* Use /agent-hub to test 3D generation functionality */}
             </div>
 
             {/* Test Results */}
@@ -826,8 +748,8 @@ export const AITestingPanel: React.FC = () => {
                     hybrid OpenAI/Claude material recognition
                   </p>
                   <p>
-                    • Use the <strong>3D Generation Test</strong> to test
-                    interior design generation with prompt parsing
+                    • For 3D generation testing, use the <strong>/agent-hub</strong> page
+                    which uses MaterialAgent3DGenerationAPI
                   </p>
                   <p>
                     • Test results will appear in the Admin Panel analytics

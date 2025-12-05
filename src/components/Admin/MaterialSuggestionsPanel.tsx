@@ -167,77 +167,9 @@ export const MaterialSuggestionsPanel: React.FC = () => {
     }
   }, [config, toast]);
 
-  const test3DIntegration = useCallback(async () => {
-    setIsGenerating(true);
-    try {
-      // Test the 3D generation with current suggestions
-      const materialList = suggestions.map((s) => s.name).join(', ');
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-
-      const apiService = BrowserApiIntegrationService.getInstance();
-      const result = await apiService.callSupabaseFunction(
-        'mastra-3d-generation',
-        {
-          user_id: user.id,
-          prompt: config.prompt,
-          room_type: config.roomType,
-          style: config.style,
-          materials_used: materialList,
-          model: 'test_mode',
-        },
-      );
-
-      if (!result.success) {
-        throw new Error(
-          result.error?.message || 'Failed to test 3D integration',
-        );
-      }
-
-      const data = result.data;
-
-      setTestResults((prev) => [
-        ...prev,
-        {
-          timestamp: new Date().toISOString(),
-          success: true,
-          materials_suggested: suggestions.length,
-          processing_time: data?.processing_time_ms || 0,
-          result: data,
-        },
-      ]);
-
-      toast({
-        title: '3D Integration Test Complete',
-        description: `Successfully tested with ${suggestions.length} material suggestions`,
-      });
-    } catch (error) {
-      console.error('3D integration test failed:', error);
-      setTestResults((prev) => [
-        ...prev,
-        {
-          timestamp: new Date().toISOString(),
-          success: false,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          materials_suggested: suggestions.length,
-        },
-      ]);
-
-      toast({
-        title: '3D Integration Test Failed',
-        description:
-          error instanceof Error ? error.message : 'Unknown error occurred',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [config, suggestions, toast]);
+  // REMOVED: test3DIntegration function
+  // 3D generation is now handled via MaterialAgent3DGenerationAPI on frontend
+  // Use /agent-hub to test 3D generation with material suggestions
 
   const getSourceIcon = (source: string) => {
     switch (source) {
@@ -385,21 +317,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
                 Generate Suggestions
               </Button>
 
-              {suggestions.length > 0 && (
-                <Button
-                  className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                  onClick={test3DIntegration}
-                  onKeyDown={(e) => e.key === 'Enter' && test3DIntegration()}
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
-                  Test 3D Integration
-                </Button>
-              )}
+              {/* Test 3D Integration button removed - use /agent-hub instead */}
             </div>
           </CardContent>
         </Card>
