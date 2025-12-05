@@ -3,9 +3,6 @@ import React from 'react';
 import { metricsConfig, type Metric } from './dashboardData';
 
 export const MetricsGrid: React.FC = () => {
-  // Cycle through bubble colors (cyan, green, blue, purple) - Reference dashboard style
-  const bubbleColors = ['cyan', 'green', 'blue', 'purple'];
-
   return (
     <div style={{
       paddingLeft: 'var(--page-padding-x)',
@@ -14,60 +11,65 @@ export const MetricsGrid: React.FC = () => {
     }}>
       <div className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: 'var(--grid-gap)' }}>
-          {metricsConfig.metrics.map((metric: Metric, index: number) => {
-            const colorClass = bubbleColors[index % bubbleColors.length];
-
+          {metricsConfig.metrics.map((metric: Metric) => {
             return (
               <div
                 key={metric.id}
-                className={`stat-bubble ${colorClass} transition-all duration-200 hover:scale-105`}
+                className="dashboard-card transition-all duration-200 hover:shadow-md"
                 style={{ padding: 'var(--card-padding)' }}
               >
                 <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-sm)' }}>
-                  {/* Icon with subtle background */}
+                  {/* Icon with sage green background */}
                   <div
-                    className="flex items-center justify-center bg-white/10"
+                    className="flex items-center justify-center"
                     style={{
                       width: '2.5rem',
                       height: '2.5rem',
-                      borderRadius: 'var(--radius-lg)'
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'hsl(var(--primary) / 0.1)'
                     }}
                   >
-                    <metric.icon className="h-5 w-5 text-white" />
+                    <metric.icon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                   </div>
-                  {/* Badge with muted colors - NO GREEN */}
+                  {/* Change badge with proper contrast */}
                   <div
-                    className={`font-medium ${
-                      metric.change.startsWith('+') ? 'bg-white/20' :
-                      metric.change.startsWith('-') ? 'bg-white/10' :
-                      'bg-white/15'
-                    }`}
+                    className="font-medium"
                     style={{
                       fontSize: 'var(--text-xs)',
                       padding: 'var(--space-xs) calc(var(--space-xs) * 2)',
                       borderRadius: 'var(--radius-full)',
-                      color: 'hsl(var(--bubble-text))'
+                      backgroundColor: metric.change.startsWith('+')
+                        ? 'hsl(142 71% 95%)'
+                        : metric.change.startsWith('-')
+                        ? 'hsl(0 70% 95%)'
+                        : 'hsl(0 0% 95%)',
+                      color: metric.change.startsWith('+')
+                        ? 'hsl(142 71% 35%)'
+                        : metric.change.startsWith('-')
+                        ? 'hsl(0 70% 45%)'
+                        : 'hsl(0 0% 40%)'
                     }}
                   >
                     {metric.change}
                   </div>
                 </div>
-                {/* White text on colored bubble */}
+                {/* Value with dark text */}
                 <div
-                  className="font-bold"
                   style={{
                     fontSize: 'var(--text-4xl)',
+                    fontWeight: 'var(--font-semibold)',
                     marginBottom: 'var(--space-xs)',
-                    color: 'hsl(var(--bubble-text))'
+                    color: 'hsl(var(--foreground))'
                   }}
                 >
                   {metric.value}
                 </div>
+                {/* Label with muted text */}
                 <div
-                  className="font-medium"
                   style={{
                     fontSize: 'var(--text-sm)',
-                    color: 'hsl(var(--bubble-text-muted))'
+                    fontWeight: 'var(--font-normal)',
+                    color: 'hsl(var(--muted-foreground))'
                   }}
                 >
                   {metric.label}
