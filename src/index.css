@@ -1,12 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Dark theme background - almost black */
+/* Notion light theme - clean white background */
 body {
-  background: hsl(0, 0%, 8%);  /* #141414 - Very dark background */
+  background: hsl(0, 0%, 100%);  /* #FFFFFF - Pure white */
   min-height: 100vh;
-  color: hsl(0, 0%, 95%);  /* Light text by default */
+  color: hsl(0, 0%, 15%);  /* Dark text */
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;  /* Regular weight by default */
 }
 
 /* Custom Scrollbar Styles */
@@ -90,57 +94,63 @@ All colors MUST be HSL.
     --text-6xl: 3.75rem;   /* 60px */
     --text-7xl: 4.5rem;    /* 72px */
 
-    /* ===== NOTION-STYLE COLOR SYSTEM ===== */
-    /* Main Background - Very dark gray (Notion-like #191919) */
-    --background: 0 0% 10%;  /* #191919 - Very dark gray */
-    --foreground: 0 0% 98%;  /* #FAFAFA - Almost white text */
+    /* ===== FONT WEIGHTS (Open Sans - Light) ===== */
+    --font-light: 300;     /* Light */
+    --font-normal: 400;    /* Regular */
+    --font-medium: 500;    /* Medium */
+    --font-semibold: 600;  /* Semi-bold */
 
-    /* Page container - Same as background for consistency */
-    --page-background: 0 0% 10%;  /* #191919 - Same as background */
+    /* ===== NOTION LIGHT THEME COLOR SYSTEM ===== */
+    /* Main Background - Clean white/off-white (Notion light) */
+    --background: 0 0% 100%;  /* #FFFFFF - Pure white */
+    --foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
-    /* Content sections/cards - Subtle elevation (Notion-like #242424) */
-    --card: 0 0% 14%;  /* #242424 - Slightly lighter gray */
-    --card-foreground: 0 0% 98%;  /* #FAFAFA - Almost white text */
+    /* Page container - Subtle off-white for depth */
+    --page-background: 0 0% 98%;  /* #FAFAFA - Very light gray */
 
-    --popover: 0 0% 14%;  /* #242424 - Same as card */
-    --popover-foreground: 0 0% 98%;  /* #FAFAFA - Almost white text */
+    /* Content sections/cards - White with transparency (glass effect) */
+    --card: 0 0% 100%;  /* #FFFFFF - White cards */
+    --card-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
+
+    --popover: 0 0% 100%;  /* #FFFFFF - White popover */
+    --popover-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
     /* Primary - Soft sage green #c6d0bc */
     --primary: 95 20% 77%;  /* #c6d0bc - Soft sage green */
-    --primary-foreground: 0 0% 10%;  /* Dark text on sage */
+    --primary-foreground: 0 0% 20%;  /* Dark text on sage */
 
-    /* Secondary - Subtle gray (Notion-like) */
-    --secondary: 0 0% 20%;  /* #333333 - Dark gray */
-    --secondary-foreground: 0 0% 98%;  /* Almost white text */
+    /* Secondary - Light gray (Notion-like) */
+    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    --secondary-foreground: 0 0% 20%;  /* Dark text */
 
-    /* Muted - Subtle backgrounds (Notion-like) */
-    --muted: 0 0% 18%;  /* #2E2E2E - Muted gray */
-    --muted-foreground: 0 0% 60%;  /* #999999 - Muted text */
+    /* Muted - Subtle light backgrounds (Notion-like) */
+    --muted: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray text */
 
     /* Accent - Subtle hover state (Notion-like) */
-    --accent: 0 0% 18%;  /* #2E2E2E - Subtle gray */
-    --accent-foreground: 0 0% 98%;  /* Almost white text */
+    --accent: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    --accent-foreground: 0 0% 20%;  /* Dark text */
 
     /* Destructive - Muted red (Notion-like) */
     --destructive: 0 70% 50%;  /* #D9534F - Muted red */
     --destructive-foreground: 0 0% 100%;  /* White text */
 
-    /* Borders - Very subtle (Notion-like, almost invisible) */
-    --border: 0 0% 20%;  /* #333333 - Very subtle border */
-    --input: 0 0% 20%;  /* #333333 - Input border */
+    /* Borders - Very subtle light gray (Notion-like, soft) */
+    --border: 0 0% 90%;  /* #E5E5E5 - Very light border */
+    --input: 0 0% 90%;  /* #E5E5E5 - Input border */
     --ring: 95 20% 77%;  /* #c6d0bc - Focus ring (sage green) */
 
-    --radius: 0.375rem;  /* 6px - Minimal rounded corners (Notion-like) */
+    --radius: 0.5rem;  /* 8px - Slightly rounded corners (Notion-like) */
 
-    /* Sidebar - Same as background for unified look */
-    --sidebar-background: 0 0% 10%;  /* #191919 - Same as main background */
-    --sidebar-foreground: 0 0% 70%;  /* #B3B3B3 - Medium gray text */
+    /* Sidebar - Clean white (Notion light) */
+    --sidebar-background: 0 0% 98%;  /* #FAFAFA - Very light gray */
+    --sidebar-foreground: 0 0% 40%;  /* #666666 - Medium gray text */
     --sidebar-accent: 95 20% 77%;  /* #c6d0bc - Sage green for active items */
-    --sidebar-accent-foreground: 0 0% 10%;  /* Dark text on sage */
-    --sidebar-border: 0 0% 15%;  /* #262626 - Very subtle border */
+    --sidebar-accent-foreground: 0 0% 20%;  /* Dark text on sage */
+    --sidebar-border: 0 0% 93%;  /* #EDEDED - Very subtle border */
 
-    /* Hero section background - Same as background */
-    --hero-background: 0 0% 10%;  /* #191919 - Same as background */
+    /* Hero section background - Clean white */
+    --hero-background: 0 0% 100%;  /* #FFFFFF - Pure white */
 
     /* ===== STAT BUBBLE COLORS (Notion-Style) ===== */
     /* Muted, professional colors */
@@ -159,13 +169,13 @@ All colors MUST be HSL.
     --gradient-sage: linear-gradient(180deg, rgba(198, 208, 188, 0.1) 0%, rgba(198, 208, 188, 0.02) 100%);
     --gradient-gray: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
 
-    /* Shadows - Minimal (Notion-like, almost invisible) */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.1);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.15);
-    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.2);
-    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.25);
-    --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.3);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.15);
+    /* Shadows - Very subtle (Notion light theme) */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.08);
+    --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.1);
+    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04);
 
     /* Animation - Smooth (Notion-like) */
     --transition-smooth: all 0.15s ease;
@@ -209,6 +219,19 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     background-attachment: fixed;
+    font-weight: var(--font-normal);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--font-medium);  /* Medium weight for headings */
+  }
+
+  strong, b {
+    font-weight: var(--font-semibold);  /* Semi-bold for emphasis */
+  }
+
+  p, span, div {
+    font-weight: var(--font-normal);  /* Regular weight for body text */
   }
 }
 
@@ -232,19 +255,22 @@ All colors MUST be HSL.
     gap: var(--grid-gap);
   }
 
-  /* Dashboard Card - Notion-style minimal */
+  /* Dashboard Card - Glass morphism effect (Notion-style) */
   .dashboard-card {
-    background: hsl(var(--card));
+    background: rgba(255, 255, 255, 0.7);  /* Semi-transparent white */
+    backdrop-filter: blur(10px);  /* Glass blur effect */
+    -webkit-backdrop-filter: blur(10px);  /* Safari support */
     border-radius: var(--radius);
     padding: var(--card-padding);
-    box-shadow: none;  /* No shadows - Notion-like */
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);  /* Very subtle shadow */
     transition: var(--transition-smooth);
-    border: 1px solid hsl(var(--border));  /* Minimal border */
+    border: 1px solid rgba(0, 0, 0, 0.06);  /* Very soft border */
   }
 
   .dashboard-card:hover {
-    background: hsl(var(--muted));
-    border-color: hsl(var(--border));
+    background: rgba(255, 255, 255, 0.85);  /* Slightly more opaque on hover */
+    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
+    border-color: rgba(0, 0, 0, 0.08);
   }
 
   /* Card with subtle gradient (Notion-like) */
@@ -255,39 +281,42 @@ All colors MUST be HSL.
     );
   }
 
-  /* Stat bubbles - Muted colors (Notion-style) */
+  /* Stat bubbles - Glass effect with subtle colors (Notion-style) */
   .stat-bubble {
     border-radius: var(--radius);
     padding: var(--card-padding);
-    background: hsl(var(--card));
-    box-shadow: none;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);
     transition: var(--transition-smooth);
-    border: 1px solid hsl(var(--border));
+    border: 1px solid rgba(0, 0, 0, 0.06);
     color: hsl(var(--foreground));
+    font-weight: var(--font-normal);
   }
 
   .stat-bubble.sage {
-    background: hsl(95 20% 77% / 0.1);
-    border-color: hsl(95 20% 77% / 0.3);
-    color: hsl(95 20% 85%);
+    background: rgba(198, 208, 188, 0.15);
+    border-color: rgba(198, 208, 188, 0.3);
+    color: hsl(95 25% 35%);
   }
 
   .stat-bubble.green {
-    background: hsl(142 71% 45% / 0.1);
-    border-color: hsl(142 71% 45% / 0.3);
-    color: hsl(142 71% 60%);
+    background: rgba(52, 168, 83, 0.1);
+    border-color: rgba(52, 168, 83, 0.2);
+    color: hsl(142 71% 30%);
   }
 
   .stat-bubble.purple {
-    background: hsl(271 76% 53% / 0.1);
-    border-color: hsl(271 76% 53% / 0.3);
-    color: hsl(271 76% 68%);
+    background: rgba(157, 78, 221, 0.1);
+    border-color: rgba(157, 78, 221, 0.2);
+    color: hsl(271 76% 40%);
   }
 
   .stat-bubble.orange {
-    background: hsl(27 98% 54% / 0.1);
-    border-color: hsl(27 98% 54% / 0.3);
-    color: hsl(27 98% 69%);
+    background: rgba(249, 171, 0, 0.1);
+    border-color: rgba(249, 171, 0, 0.2);
+    color: hsl(27 98% 40%);
   }
 
   /* Stat card - For metrics/statistics */
