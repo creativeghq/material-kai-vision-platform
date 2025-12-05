@@ -95,8 +95,8 @@ All colors MUST be HSL.
     --background: 0 0% 10%;  /* #191919 - Very dark gray */
     --foreground: 0 0% 98%;  /* #FAFAFA - Almost white text */
 
-    /* Page container - Slightly lighter than background */
-    --page-background: 0 0% 12%;  /* #1F1F1F - Slightly lighter gray */
+    /* Page container - Same as background for consistency */
+    --page-background: 0 0% 10%;  /* #191919 - Same as background */
 
     /* Content sections/cards - Subtle elevation (Notion-like #242424) */
     --card: 0 0% 14%;  /* #242424 - Slightly lighter gray */
@@ -105,9 +105,9 @@ All colors MUST be HSL.
     --popover: 0 0% 14%;  /* #242424 - Same as card */
     --popover-foreground: 0 0% 98%;  /* #FAFAFA - Almost white text */
 
-    /* Primary - Subtle blue (Notion-like #2383E2) */
-    --primary: 210 100% 56%;  /* #2383E2 - Notion blue */
-    --primary-foreground: 0 0% 100%;  /* White text on blue */
+    /* Primary - Soft sage green #c6d0bc */
+    --primary: 95 20% 77%;  /* #c6d0bc - Soft sage green */
+    --primary-foreground: 0 0% 10%;  /* Dark text on sage */
 
     /* Secondary - Subtle gray (Notion-like) */
     --secondary: 0 0% 20%;  /* #333333 - Dark gray */
@@ -128,23 +128,23 @@ All colors MUST be HSL.
     /* Borders - Very subtle (Notion-like, almost invisible) */
     --border: 0 0% 20%;  /* #333333 - Very subtle border */
     --input: 0 0% 20%;  /* #333333 - Input border */
-    --ring: 210 100% 56%;  /* #2383E2 - Focus ring (blue) */
+    --ring: 95 20% 77%;  /* #c6d0bc - Focus ring (sage green) */
 
     --radius: 0.375rem;  /* 6px - Minimal rounded corners (Notion-like) */
 
-    /* Sidebar - Same as background (Notion-like) */
-    --sidebar-background: 0 0% 10%;  /* #191919 - Same as background */
+    /* Sidebar - Same as background for unified look */
+    --sidebar-background: 0 0% 10%;  /* #191919 - Same as main background */
     --sidebar-foreground: 0 0% 70%;  /* #B3B3B3 - Medium gray text */
-    --sidebar-accent: 210 100% 56%;  /* #2383E2 - Notion blue for active items */
-    --sidebar-accent-foreground: 0 0% 100%;  /* White text on blue */
+    --sidebar-accent: 95 20% 77%;  /* #c6d0bc - Sage green for active items */
+    --sidebar-accent-foreground: 0 0% 10%;  /* Dark text on sage */
     --sidebar-border: 0 0% 15%;  /* #262626 - Very subtle border */
 
-    /* Hero section background - Same as page */
-    --hero-background: 0 0% 12%;  /* #1F1F1F */
+    /* Hero section background - Same as background */
+    --hero-background: 0 0% 10%;  /* #191919 - Same as background */
 
     /* ===== STAT BUBBLE COLORS (Notion-Style) ===== */
     /* Muted, professional colors */
-    --bubble-blue: 210 100% 56%;     /* Notion blue */
+    --bubble-sage: 95 20% 77%;       /* Soft sage green (primary) */
     --bubble-green: 142 71% 45%;     /* Muted green */
     --bubble-purple: 271 76% 53%;    /* Muted purple */
     --bubble-orange: 27 98% 54%;     /* Muted orange */
@@ -156,7 +156,7 @@ All colors MUST be HSL.
     --card-gradient-end: 0 0% 13%;    /* Slightly darker gray */
 
     /* Gradients - Subtle (Notion-like) */
-    --gradient-blue: linear-gradient(180deg, rgba(35, 131, 226, 0.1) 0%, rgba(35, 131, 226, 0.02) 100%);
+    --gradient-sage: linear-gradient(180deg, rgba(198, 208, 188, 0.1) 0%, rgba(198, 208, 188, 0.02) 100%);
     --gradient-gray: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
 
     /* Shadows - Minimal (Notion-like, almost invisible) */
@@ -184,12 +184,12 @@ All colors MUST be HSL.
     --error-foreground: 0 0% 100%;
     --error-bg: 0 70% 15%;  /* Dark red background */
 
-    --info: 210 100% 56%;  /* Notion blue */
-    --info-foreground: 0 0% 100%;
-    --info-bg: 210 100% 15%;  /* Dark blue background */
+    --info: 95 20% 77%;  /* Soft sage green (primary) */
+    --info-foreground: 0 0% 10%;  /* Dark text */
+    --info-bg: 95 20% 15%;  /* Dark sage background */
 
     /* Chart colors - Muted palette (Notion-like) */
-    --chart-1: 210 100% 56%;  /* Notion blue */
+    --chart-1: 95 20% 77%;    /* Soft sage green (primary) */
     --chart-2: 142 71% 45%;   /* Muted green */
     --chart-3: 271 76% 53%;   /* Muted purple */
     --chart-4: 27 98% 54%;    /* Muted orange */
@@ -266,10 +266,10 @@ All colors MUST be HSL.
     color: hsl(var(--foreground));
   }
 
-  .stat-bubble.blue {
-    background: hsl(210 100% 56% / 0.1);
-    border-color: hsl(210 100% 56% / 0.3);
-    color: hsl(210 100% 70%);
+  .stat-bubble.sage {
+    background: hsl(95 20% 77% / 0.1);
+    border-color: hsl(95 20% 77% / 0.3);
+    color: hsl(95 20% 85%);
   }
 
   .stat-bubble.green {
