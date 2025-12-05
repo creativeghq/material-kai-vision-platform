@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronRight } from 'lucide-react';
+import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
+import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
 
 export interface Product {
   id: string;
@@ -157,16 +159,38 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </div>
         )}
 
-        {/* View Details Button */}
-        <Button
-          onClick={() => onViewDetails(product)}
-          variant="outline"
-          className="w-full justify-between hover:bg-gray-50 border-gray-300 text-gray-900"
-          size="sm"
-        >
-          <span>View Details</span>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+        {/* Action Buttons */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <AddToQuoteButton
+              productId={product.id}
+              productName={product.name}
+              productImage={primaryImage?.url}
+              variant="outline"
+              size="sm"
+              showText={false}
+            />
+            <AddToMoodboardButton
+              productId={product.id}
+              productName={product.name}
+              productImage={primaryImage?.url}
+              variant="outline"
+              size="sm"
+              showText={false}
+            />
+          </div>
+
+          {/* View Details Button */}
+          <Button
+            onClick={() => onViewDetails(product)}
+            variant="outline"
+            className="w-full justify-between hover:bg-gray-50 border-gray-300 text-gray-900"
+            size="sm"
+          >
+            <span>View Details</span>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

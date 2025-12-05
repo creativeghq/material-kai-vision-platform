@@ -16,6 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, ShoppingCart, Factory } from 'lucide-react';
 import { Product } from './ProductCard';
+import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
+import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -418,14 +420,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </CardContent>
             </Card>
 
-            {/* Add to Quote Button */}
-            <Button
-              className="w-full bg-gray-900 hover:bg-gray-800 text-white"
-              size="lg"
-            >
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              Add to Quote
-            </Button>
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3">
+              <AddToQuoteButton
+                productId={product.id}
+                productName={product.name}
+                productImage={currentImage?.url}
+                variant="default"
+                size="lg"
+                className="w-full"
+              />
+              <AddToMoodboardButton
+                productId={product.id}
+                productName={product.name}
+                productImage={currentImage?.url}
+                variant="outline"
+                size="lg"
+                className="w-full"
+              />
+            </div>
           </div>
         </div>
 

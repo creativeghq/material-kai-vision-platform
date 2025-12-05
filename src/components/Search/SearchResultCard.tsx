@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
+import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
 
 // Types for search results
 export interface SearchResult {
@@ -373,6 +374,17 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
                     productId={result.product_id}
                     productName={result.title}
                     source="search"
+                    variant="ghost"
+                    size="sm"
+                  />
+                )}
+
+                {/* Add to Moodboard Button */}
+                {result.product_id && (
+                  <AddToMoodboardButton
+                    productId={result.product_id}
+                    productName={result.title}
+                    productImage={result.thumbnail}
                     variant="ghost"
                     size="sm"
                   />
