@@ -2,16 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Gradient background for main outer area - from screenshot */
+/* Clean minimal background - very light gray */
 body {
-  background: linear-gradient(135deg,
-    hsl(180, 30%, 88%) 0%,    /* Light mint top-left */
-    hsl(160, 25%, 90%) 25%,   /* Soft green-tint */
-    hsl(180, 20%, 92%) 50%,   /* Light blue-gray center */
-    hsl(200, 20%, 90%) 75%,   /* Soft blue */
-    hsl(180, 25%, 88%) 100%   /* Light mint bottom-right */
-  );
-  background-attachment: fixed;
+  background: hsl(0, 0%, 96%);  /* #F5F5F5 - Very light gray */
   min-height: 100vh;
 }
 
@@ -48,62 +41,62 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Warm Light Design System - Exact colors from screenshot */
+    /* Clean Minimal Design System - From TalentsPro screenshot */
 
-    /* Main Background - Light mint/blue-gray gradient (outer background) */
-    --background: 180 20% 90%;  /* Light mint/blue-gray base */
-    --foreground: 0 0% 20%;  /* #333333 - Dark text */
+    /* Main Background - Very light gray #F5F5F5 */
+    --background: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    --foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
-    /* Content sections/pages - Light warm beige #f1f1e8 */
-    --card: 60 25% 93%;  /* #f1f1e8 - Light warm beige for sections/pages */
-    --card-foreground: 0 0% 20%;  /* #333333 - Dark text */
+    /* Content sections/cards - Pure white */
+    --card: 0 0% 100%;  /* #FFFFFF - Pure white cards */
+    --card-foreground: 0 0% 15%;  /* #262626 - Dark text */
 
-    --popover: 60 25% 93%;
-    --popover-foreground: 0 0% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 15%;
 
-    /* Primary - Bright yellow accent (for buttons, active states) */
-    --primary: 48 100% 62%;  /* #FFD93D - Bright yellow */
-    --primary-foreground: 0 0% 20%;  /* Dark text on yellow */
+    /* Primary - Coral/salmon CTA button */
+    --primary: 15 90% 60%;  /* #F87060 - Coral/salmon */
+    --primary-foreground: 0 0% 100%;  /* White text */
 
-    /* Secondary - Very light beige for hover states */
-    --secondary: 60 20% 91%;  /* Slightly darker than card */
-    --secondary-foreground: 0 0% 20%;
+    /* Secondary - Very light gray for hover states */
+    --secondary: 0 0% 98%;  /* #FAFAFA - Very light gray */
+    --secondary-foreground: 0 0% 15%;
 
     /* Muted - For subtle elements and secondary text */
-    --muted: 60 20% 91%;
+    --muted: 0 0% 98%;  /* #FAFAFA */
     --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray text */
 
-    /* Accent - Hero section background #f5f4eb */
-    --accent: 50 33% 95%;  /* #f5f4eb - Hero background */
-    --accent-foreground: 0 0% 20%;
+    /* Accent - Very light warm cream for hero */
+    --accent: 40 20% 98%;  /* #FEFDFB - Subtle warm tint */
+    --accent-foreground: 0 0% 15%;
 
     /* Destructive - Red for errors */
     --destructive: 0 84% 60%;  /* #EF4444 - Red */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders - Very subtle */
-    --border: 60 15% 88%;  /* Very subtle beige border */
-    --input: 60 15% 90%;  /* Slightly lighter for inputs */
-    --ring: 48 100% 62%;  /* Yellow ring for focus */
+    /* Borders - Very subtle light gray */
+    --border: 0 0% 90%;  /* #E5E5E5 - Light gray borders */
+    --input: 0 0% 92%;  /* Slightly lighter for inputs */
+    --ring: 15 90% 60%;  /* Coral ring for focus */
 
     --radius: 0.75rem;  /* 12px - Moderate rounded corners */
 
-    /* Sidebar - Light beige/cream from screenshot */
-    --sidebar-background: 40 30% 96%;  /* Light warm beige/cream */
-    --sidebar-foreground: 0 0% 20%;  /* #333333 - Dark text */
-    --sidebar-accent: 48 100% 62%;  /* #FFD93D - Yellow for active items */
-    --sidebar-accent-foreground: 0 0% 20%;  /* Dark text on yellow */
+    /* Sidebar - Light warm cream */
+    --sidebar-background: 40 25% 97%;  /* #FDFCFA - Light warm cream */
+    --sidebar-foreground: 0 0% 15%;  /* #262626 - Dark text */
+    --sidebar-accent: 15 90% 60%;  /* #F87060 - Coral for active items */
+    --sidebar-accent-foreground: 0 0% 100%;  /* White text on coral */
     --sidebar-border: transparent;  /* No border */
 
-    /* Hero section background - #f5f4eb */
-    --hero-background: 50 33% 95%;  /* #f5f4eb */
+    /* Hero section background - Very light warm cream */
+    --hero-background: 40 20% 98%;  /* #FEFDFB */
 
-    /* Stat bubbles - ALL use #f1f1e8 */
-    --bubble-background: 60 25% 93%;  /* #f1f1e8 - Same as card/section background */
+    /* Stat bubbles - Very light warm cream (barely tinted) */
+    --bubble-background: 40 30% 97%;  /* #FBF9F6 - Light warm cream */
 
-    /* Gradients - Yellow gradients for charts */
-    --gradient-yellow: linear-gradient(180deg, rgba(255, 217, 61, 0.3) 0%, rgba(255, 217, 61, 0.05) 100%);
-    --gradient-orange: linear-gradient(180deg, rgba(251, 146, 60, 0.3) 0%, rgba(251, 146, 60, 0.05) 100%);
+    /* Gradients - Subtle coral/salmon gradients for charts */
+    --gradient-coral: linear-gradient(180deg, rgba(248, 112, 96, 0.2) 0%, rgba(248, 112, 96, 0.05) 100%);
+    --gradient-orange: linear-gradient(180deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.05) 100%);
 
     /* Shadows - Very soft and subtle (key to the design) */
     --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
