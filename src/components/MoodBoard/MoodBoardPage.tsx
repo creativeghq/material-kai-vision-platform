@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Grid3X3, List, Palette } from 'lucide-react';
+import { Plus, Grid3X3, List, Palette, FileText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,6 +25,8 @@ import {
   type CreateMoodBoardData,
 } from '@/services/moodboardAPI';
 import type { MoodBoard } from '@/types/materials';
+import { quotesService } from '@/services/quotes/QuotesService';
+import { useNavigate } from 'react-router-dom';
 
 export const MoodBoardPage = () => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
@@ -32,7 +34,9 @@ export const MoodBoardPage = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [creatingProposal, setCreatingProposal] = useState<string | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [newMoodBoard, setNewMoodBoard] = useState<CreateMoodBoardData>({
     title: '',
@@ -95,6 +99,56 @@ export const MoodBoardPage = () => {
       });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleCreateProposal = async (moodboardId: string, moodboardTitle: string) => {
+    const moodboard = moodboards.find(b => b.id === moodboardId);
+    if (!moodboard || !moodboard.items || moodboard.items.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Cannot create proposal from empty moodboard',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setCreatingProposal(moodboardId);
+    try {
+      // Create a new quote
+      const quote = await quotesService.createQuote({
+        name: `Proposal from ${moodboardTitle}`,
+        notes: `Created from moodboard: ${moodboardTitle}`,
+      });
+
+      // Add all moodboard items to the quote
+      for (const item of moodboard.items) {
+        if (item.material_id) {
+          await quotesService.addQuoteItem({
+            quote_id: quote.id,
+            product_id: item.material_id,
+            quantity: 1,
+            notes: item.notes || '',
+          });
+        }
+      }
+
+      toast({
+        title: 'Proposal Created',
+        description: `Quote created with ${moodboard.items.length} items from "${moodboardTitle}"`,
+      });
+
+      // Navigate to the quote builder
+      navigate(`/quotes?quote=${quote.id}`);
+    } catch (error) {
+      console.error('Error creating proposal:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create proposal from moodboard',
+        variant: 'destructive',
+      });
+    } finally {
+      setCreatingProposal(null);
     }
   };
 
@@ -257,8 +311,29 @@ export const MoodBoardPage = () => {
                   </div>
 
                   <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button className="flex-1">Open</Button>
                     <Button
+                      className="flex-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCreateProposal(board.id, board.title);
+                      }}
+                      disabled={!board.items || board.items.length === 0 || creatingProposal === board.id}
+                      style={{
+                        backgroundColor: 'hsl(var(--primary))',
+                        color: 'white'
+                      }}
+                    >
+                      {creatingProposal === board.id ? (
+                        <>Creating...</>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Create Proposal
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDeleteMoodBoard(board.id, board.title);
