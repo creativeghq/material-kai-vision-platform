@@ -9,6 +9,7 @@
     "start": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:moodboard-quote": "node test-moodboard-quote-integration.js",
     "validate-env": "node scripts/validate-env.js",
     "test:integration:material-kai": "node tests/material-kai-integration-test.js",
     "test:qa": "node scripts/testing/qa-comprehensive-test.js",
