@@ -9,10 +9,18 @@ import {
   Home,
   ArrowLeft,
   Clock,
+  FileText,
+  Link2,
+  MessageSquare,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Database,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,8 +32,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
+import Phase3MetricsPanel from './Phase3MetricsPanel';
+import { ChunkQualityDashboard } from './ChunkQualityDashboard';
+import QualityStabilityMetricsPanel from './QualityStabilityMetricsPanel';
+import { PDFProcessingMonitor } from './PDFProcessingMonitor';
 
 interface UsageAnalytics {
   total_searches: number;
@@ -239,48 +253,11 @@ export const AnalyticsDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => navigate('/')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-                className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
-              >
-                <Home className="h-4 w-4" />
-                Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-                className="flex items-center gap-2 border border-gray-300 text-sm px-3 py-1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Admin
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                Analytics Dashboard
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                User behavior, search patterns, and API usage analytics
-              </p>
-            </div>
-          </div>
-          <Button
-            onClick={fetchAnalyticsData}
-            onKeyDown={(e) => e.key === 'Enter' && fetchAnalyticsData()}
-            disabled={loading}
-          >
-            <Activity className="h-4 w-4 mr-2" />
-            Refresh Data
-          </Button>
-        </div>
-      </div>
+      <GlobalAdminHeader
+        title="Analytics Dashboard"
+        description="Comprehensive analytics: search, API usage, PDF processing, chunk quality, and validation metrics"
+        badge="Analytics"
+      />
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
@@ -317,11 +294,35 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="searches" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="searches">Search Analytics</TabsTrigger>
-            <TabsTrigger value="api-usage">API Usage</TabsTrigger>
-            <TabsTrigger value="user-behavior">User Behavior</TabsTrigger>
-            <TabsTrigger value="trends">Trends</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-7">
+            <TabsTrigger value="searches">
+              <Search className="h-4 w-4 mr-2" />
+              Search
+            </TabsTrigger>
+            <TabsTrigger value="api-usage">
+              <Activity className="h-4 w-4 mr-2" />
+              API Usage
+            </TabsTrigger>
+            <TabsTrigger value="pdf-processing">
+              <FileText className="h-4 w-4 mr-2" />
+              PDF Processing
+            </TabsTrigger>
+            <TabsTrigger value="chunk-quality">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Chunk Quality
+            </TabsTrigger>
+            <TabsTrigger value="quality-stability">
+              <Database className="h-4 w-4 mr-2" />
+              Quality & Stability
+            </TabsTrigger>
+            <TabsTrigger value="phase3-metrics">
+              <Link2 className="h-4 w-4 mr-2" />
+              Phase 3 Metrics
+            </TabsTrigger>
+            <TabsTrigger value="user-behavior">
+              <Users className="h-4 w-4 mr-2" />
+              User Behavior
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="searches" className="space-y-4">
@@ -439,6 +440,22 @@ export const AnalyticsDashboard: React.FC = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="pdf-processing" className="space-y-4">
+            <PDFProcessingMonitor />
+          </TabsContent>
+
+          <TabsContent value="chunk-quality" className="space-y-4">
+            <ChunkQualityDashboard />
+          </TabsContent>
+
+          <TabsContent value="quality-stability" className="space-y-4">
+            <QualityStabilityMetricsPanel />
+          </TabsContent>
+
+          <TabsContent value="phase3-metrics" className="space-y-4">
+            <Phase3MetricsPanel />
+          </TabsContent>
+
           <TabsContent value="user-behavior" className="space-y-4">
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
@@ -499,89 +516,6 @@ export const AnalyticsDashboard: React.FC = () => {
                     <div className="flex justify-between">
                       <span className="text-sm">Return rate</span>
                       <span className="font-mono text-sm">67%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="trends" className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4" />
-                    Growth Trends
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Daily searches</span>
-                      <Badge className="bg-green-100 text-green-800">
-                        +15%
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">API usage</span>
-                      <Badge className="bg-blue-100 text-blue-800">+8%</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">User registrations</span>
-                      <Badge className="bg-purple-100 text-purple-800">
-                        +22%
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Peak Hours</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>9:00 - 11:00 AM</span>
-                      <span className="font-mono">Peak activity</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>2:00 - 4:00 PM</span>
-                      <span className="font-mono">High activity</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>8:00 - 10:00 PM</span>
-                      <span className="font-mono">Medium activity</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Popular Features</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Material Recognition</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">
-                        1,247 uses
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>3D Generation</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">
-                        892 uses
-                      </Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Mood Boards</span>
-                      <Badge className="border border-gray-300 text-xs px-2 py-1">
-                        634 uses
-                      </Badge>
                     </div>
                   </div>
                 </CardContent>
