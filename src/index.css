@@ -2,9 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Clean minimal background - very light gray */
+/* SugarCRM-style background - medium gray for clear separation */
 body {
-  background: hsl(0, 0%, 96%);  /* #F5F5F5 - Very light gray */
+  background: hsl(0, 0%, 67%);  /* #ACACAC - Medium gray background */
   min-height: 100vh;
 }
 
@@ -41,70 +41,76 @@ All colors MUST be HSL.
 
 @layer base {
 :root {
-    /* Clean Minimal Design System - From TalentsPro screenshot */
+    /* SugarCRM-Inspired Design System - Professional & Clean */
 
-    /* Main Background - Very light gray #F5F5F5 */
-    --background: 0 0% 96%;  /* #F5F5F5 - Very light gray */
-    --foreground: 0 0% 15%;  /* #262626 - Dark gray text */
+    /* Main Background - Medium gray for clear separation (like SugarCRM) */
+    --background: 0 0% 67%;  /* #ACACAC - Medium gray background */
+    --foreground: 0 0% 13%;  /* #212121 - Very dark text for accessibility */
 
-    /* Content sections/cards - Pure white */
+    /* Page container - Light gray (content area background) */
+    --page-background: 0 0% 94%;  /* #F0F0F0 - Light gray page area */
+
+    /* Content sections/cards - Pure white with shadows */
     --card: 0 0% 100%;  /* #FFFFFF - Pure white cards */
-    --card-foreground: 0 0% 15%;  /* #262626 - Dark text */
+    --card-foreground: 0 0% 13%;  /* #212121 - Dark text */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 15%;
+    --popover-foreground: 0 0% 13%;
 
-    /* Primary - Coral/salmon CTA button */
-    --primary: 15 90% 60%;  /* #F87060 - Coral/salmon */
+    /* Primary - Black button (SugarCRM style) */
+    --primary: 0 0% 13%;  /* #212121 - Black/very dark gray */
     --primary-foreground: 0 0% 100%;  /* White text */
 
-    /* Secondary - Very light gray for hover states */
-    --secondary: 0 0% 98%;  /* #FAFAFA - Very light gray */
-    --secondary-foreground: 0 0% 15%;
+    /* Secondary - Light gray for hover states */
+    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    --secondary-foreground: 0 0% 13%;
 
     /* Muted - For subtle elements and secondary text */
-    --muted: 0 0% 98%;  /* #FAFAFA */
-    --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray text */
+    --muted: 0 0% 96%;  /* #F5F5F5 */
+    --muted-foreground: 0 0% 40%;  /* #666666 - Medium gray text */
 
-    /* Accent - Very light warm cream for hero */
-    --accent: 40 20% 98%;  /* #FEFDFB - Subtle warm tint */
-    --accent-foreground: 0 0% 15%;
+    /* Accent - Soft blue for highlights */
+    --accent: 220 60% 92%;  /* #D9E5F7 - Soft blue */
+    --accent-foreground: 0 0% 13%;
 
-    /* Destructive - Red for errors */
-    --destructive: 0 84% 60%;  /* #EF4444 - Red */
+    /* Destructive - Coral/red for errors */
+    --destructive: 0 70% 60%;  /* #E85D5D - Coral red */
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders - Very subtle light gray */
-    --border: 0 0% 90%;  /* #E5E5E5 - Light gray borders */
-    --input: 0 0% 92%;  /* Slightly lighter for inputs */
-    --ring: 15 90% 60%;  /* Coral ring for focus */
+    /* Borders - Subtle gray borders */
+    --border: 0 0% 88%;  /* #E0E0E0 - Light gray borders */
+    --input: 0 0% 90%;  /* Slightly lighter for inputs */
+    --ring: 0 0% 13%;  /* Black ring for focus */
 
     --radius: 0.75rem;  /* 12px - Moderate rounded corners */
 
-    /* Sidebar - Light warm cream */
-    --sidebar-background: 40 25% 97%;  /* #FDFCFA - Light warm cream */
-    --sidebar-foreground: 0 0% 15%;  /* #262626 - Dark text */
-    --sidebar-accent: 15 90% 60%;  /* #F87060 - Coral for active items */
-    --sidebar-accent-foreground: 0 0% 100%;  /* White text on coral */
-    --sidebar-border: transparent;  /* No border */
+    /* Sidebar - White background with dark icons */
+    --sidebar-background: 0 0% 100%;  /* #FFFFFF - White sidebar */
+    --sidebar-foreground: 0 0% 13%;  /* #212121 - Dark icons/text */
+    --sidebar-accent: 0 0% 13%;  /* #212121 - Black for active items */
+    --sidebar-accent-foreground: 0 0% 100%;  /* White text on black */
+    --sidebar-border: 0 0% 88%;  /* #E0E0E0 - Subtle border */
 
-    /* Hero section background - Very light warm cream */
-    --hero-background: 40 20% 98%;  /* #FEFDFB */
+    /* Hero section background - Light gray (same as page) */
+    --hero-background: 0 0% 94%;  /* #F0F0F0 */
 
-    /* Stat bubbles - Very light warm cream (barely tinted) */
-    --bubble-background: 40 30% 97%;  /* #FBF9F6 - Light warm cream */
+    /* Stat bubbles - Soft colored backgrounds */
+    --bubble-blue: 220 60% 92%;  /* #D9E5F7 - Soft blue */
+    --bubble-coral: 0 70% 88%;  /* #F5D5D5 - Soft coral */
+    --bubble-green: 140 50% 88%;  /* #D5F0E0 - Soft green */
+    --bubble-background: 0 0% 96%;  /* #F5F5F5 - Default light gray */
 
-    /* Gradients - Subtle coral/salmon gradients for charts */
-    --gradient-coral: linear-gradient(180deg, rgba(248, 112, 96, 0.2) 0%, rgba(248, 112, 96, 0.05) 100%);
-    --gradient-orange: linear-gradient(180deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.05) 100%);
+    /* Gradients - Soft blue/coral gradients for charts */
+    --gradient-blue: linear-gradient(180deg, rgba(144, 180, 240, 0.3) 0%, rgba(144, 180, 240, 0.1) 100%);
+    --gradient-coral: linear-gradient(180deg, rgba(232, 93, 93, 0.3) 0%, rgba(232, 93, 93, 0.1) 100%);
 
-    /* Shadows - Very soft and subtle (key to the design) */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06);
-    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06), 0 1px 2px 0 rgb(0 0 0 / 0.03);
-    --shadow-md: 0 4px 8px 0 rgb(0 0 0 / 0.08), 0 2px 4px 0 rgb(0 0 0 / 0.04);
-    --shadow-lg: 0 8px 16px 0 rgb(0 0 0 / 0.1), 0 4px 8px 0 rgb(0 0 0 / 0.05);
-    --shadow-card: 0 2px 8px 0 rgb(0 0 0 / 0.06), 0 1px 4px 0 rgb(0 0 0 / 0.04);
+    /* Shadows - Stronger shadows for clear separation (SugarCRM style) */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+    --shadow: 0 2px 6px 0 rgb(0 0 0 / 0.1), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    --shadow-md: 0 4px 10px 0 rgb(0 0 0 / 0.12), 0 2px 6px 0 rgb(0 0 0 / 0.08);
+    --shadow-lg: 0 8px 20px 0 rgb(0 0 0 / 0.15), 0 4px 10px 0 rgb(0 0 0 / 0.1);
+    --shadow-card: 0 2px 8px 0 rgb(0 0 0 / 0.1), 0 1px 4px 0 rgb(0 0 0 / 0.06);
 
     /* Animation */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -127,12 +133,12 @@ All colors MUST be HSL.
     --info-foreground: 0 0% 100%;
     --info-bg: 217 91% 96%;  /* Very light blue background */
 
-    /* Chart colors - Yellow/orange gradients */
-    --chart-yellow: 48 100% 62%;  /* #FFD93D - Yellow for primary metrics */
-    --chart-orange: 38 92% 50%;  /* #F59E0B - Orange for secondary */
-    --chart-amber: 43 96% 56%;  /* #FBBF24 - Amber for tertiary */
-    --chart-green: 142 71% 45%;  /* #22C55E - Green for success */
-    --chart-red: 0 84% 60%;  /* #EF4444 - Red for errors */
+    /* Chart colors - SugarCRM style (blue/coral) */
+    --chart-blue: 220 60% 65%;  /* #90B4F0 - Soft blue for primary metrics */
+    --chart-coral: 0 70% 60%;  /* #E85D5D - Coral for secondary */
+    --chart-green: 140 50% 55%;  /* #5FD99F - Soft green for success */
+    --chart-purple: 270 50% 65%;  /* #9F7FD9 - Soft purple for tertiary */
+    --chart-orange: 30 80% 60%;  /* #E89F5D - Soft orange for warnings */
   }
 
 .dark {
@@ -152,7 +158,13 @@ All colors MUST be HSL.
 }
 
 @layer components {
-  /* Light Dashboard Card - Main content cards (NO BORDERS, only shadows) */
+  /* Page wrapper - Light gray content area (SugarCRM style) */
+  .page-wrapper {
+    background: hsl(var(--page-background));
+    min-height: 100vh;
+  }
+
+  /* Dashboard Card - Pure white cards with strong shadows */
   .dashboard-card {
     @apply bg-card rounded-xl p-6;
     box-shadow: var(--shadow-card);
@@ -165,7 +177,7 @@ All colors MUST be HSL.
     transform: translateY(-1px);
   }
 
-  /* Stat bubbles - All use same background #f1f1e8 */
+  /* Stat bubbles - Soft colored backgrounds (blue/coral/green) */
   .stat-bubble {
     @apply rounded-xl p-4;
     background: hsl(var(--bubble-background));
@@ -173,6 +185,18 @@ All colors MUST be HSL.
     transition: var(--transition-smooth);
     border: none;
     color: hsl(var(--foreground));
+  }
+
+  .stat-bubble.blue {
+    background: hsl(var(--bubble-blue));
+  }
+
+  .stat-bubble.coral {
+    background: hsl(var(--bubble-coral));
+  }
+
+  .stat-bubble.green {
+    background: hsl(var(--bubble-green));
   }
 
   /* Stat card - For metrics/statistics */
@@ -187,18 +211,18 @@ All colors MUST be HSL.
     border: none;
   }
 
-  /* Sidebar item - Light theme with yellow active state */
+  /* Sidebar item - White background with dark icons (SugarCRM style) */
   .sidebar-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200;
-    @apply text-muted-foreground hover:text-foreground hover:bg-secondary;
+    @apply text-sidebar-foreground hover:bg-secondary;
   }
 
   .sidebar-item.active {
-    @apply bg-primary text-primary-foreground;
+    @apply bg-sidebar-accent text-sidebar-accent-foreground;
     box-shadow: var(--shadow-sm);
   }
 
-  /* Primary button - Yellow */
+  /* Primary button - Black (SugarCRM style) */
   .btn-primary {
     @apply bg-primary text-primary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
@@ -207,7 +231,7 @@ All colors MUST be HSL.
   }
 
   .btn-primary:hover {
-    @apply brightness-95;
+    @apply brightness-110;
     box-shadow: var(--shadow-md);
     transform: translateY(-1px);
   }
@@ -217,7 +241,7 @@ All colors MUST be HSL.
     @apply bg-secondary text-secondary-foreground rounded-lg px-6 py-2.5;
     @apply font-medium transition-all duration-300;
     box-shadow: var(--shadow-xs);
-    border: none;
+    border: 1px solid hsl(var(--border));
   }
 
   .btn-secondary:hover {

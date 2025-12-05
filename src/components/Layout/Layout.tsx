@@ -12,11 +12,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden flex">
-      {/* Sidebar */}
+      {/* Sidebar - White background with dark icons (SugarCRM style) */}
       <Sidebar />
 
-      {/* Main Content Area - Warm beige background */}
-      <div className="flex-1 flex flex-col bg-card">
+      {/* Main Content Area - Light gray page background (#F0F0F0) */}
+      <div className="flex-1 flex flex-col page-wrapper">
         <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
         <main className="flex-1 overflow-x-hidden">
           <div className="w-full h-full">{children}</div>

@@ -623,15 +623,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Middle Panel - Conversation List */}
-      <div
-        className="w-80 flex flex-col m-4 rounded-3xl"
-        style={{
-          background: 'var(--glass-bg)',
-          backdropFilter: 'var(--glass-blur)',
-          border: '1px solid var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
-        }}
-      >
+      <div className="w-80 flex flex-col m-4 rounded-3xl dashboard-card bg-card">
         {/* Header */}
         <div className="p-4 border-b border-white/10">
           <div className="flex items-center justify-between mb-3">
@@ -723,15 +715,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <div
-          className="min-h-16 px-6 py-3 flex items-center justify-between m-4 rounded-3xl"
-          style={{
-            background: 'var(--glass-bg)',
-            backdropFilter: 'var(--glass-blur)',
-            border: '1px solid var(--glass-border)',
-            boxShadow: 'var(--glass-shadow)',
-          }}
-        >
+        <div className="min-h-16 px-6 py-3 flex items-center justify-between m-4 rounded-3xl dashboard-card bg-card">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
               <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
@@ -833,12 +817,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 border-2 text-white`}
-                    style={{
-                      background: 'var(--glass-bg)',
-                      backdropFilter: 'var(--glass-blur)',
-                      borderColor: message.role === 'user' ? '#1f2937' : 'hsl(var(--primary))'
-                    }}
+                    className={`${message.demoData || message.materialData || message.designData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 dashboard-card ${
+                      message.role === 'user' ? 'bg-secondary' : 'bg-card'
+                    }`}
                   >
                     {message.demoData ? (
                       <div className="space-y-4">
@@ -897,9 +878,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         )}
                       </div>
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
                     )}
-                    <p className="text-xs opacity-70 mt-2">
+                    <p className="text-xs text-muted-foreground mt-2">
                       {message.timestamp.toLocaleTimeString()}
                     </p>
                   </div>
@@ -958,15 +939,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Input Area */}
-        <div
-          className="m-4 rounded-3xl"
-          style={{
-            background: 'var(--glass-bg)',
-            backdropFilter: 'var(--glass-blur)',
-            border: '1px solid var(--glass-border)',
-            boxShadow: 'var(--glass-shadow)',
-          }}
-        >
+        <div className="m-4 rounded-3xl dashboard-card bg-card">
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
             <div className="px-6 pt-3">
