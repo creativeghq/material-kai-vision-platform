@@ -1,6 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const API_BASE = '/functions/v1';
+// Get Supabase URL from environment
+const SUPABASE_URL = process.env.SUPABASE_URL;
+if (!SUPABASE_URL) {
+  throw new Error('SUPABASE_URL is not defined');
+}
+
+const API_BASE = `${SUPABASE_URL}/functions/v1`;
 
 /**
  * CRM Service

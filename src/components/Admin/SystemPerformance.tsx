@@ -251,12 +251,9 @@ export const SystemPerformance: React.FC = () => {
 
       if (queueError) throw queueError;
 
-      // Fetch ML tasks
-      const { data: mlData, error: mlError } = await supabase
-        .from('agent_ml_tasks')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      // Fetch ML tasks (agent_ml_tasks table doesn't exist, use empty array)
+      const mlData: any[] = [];
+      const mlError = null;
 
       if (mlError) throw mlError;
 

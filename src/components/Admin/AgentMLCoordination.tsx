@@ -68,30 +68,21 @@ const AgentMLCoordination: React.FC = () => {
 
   const fetchData = useCallback(async () => {
     try {
-      const [agentTasksResult, mlTasksResult] = await Promise.all([
-        supabase
-          .from('agent_tasks')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50),
-        supabase
-          .from('agent_ml_tasks')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(50),
-      ]);
+      // Only fetch agent_tasks table (agent_ml_tasks table doesn't exist in database)
+      const agentTasksResult = await supabase
+        .from('agent_tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (agentTasksResult.error) throw agentTasksResult.error;
-      if (mlTasksResult.error) throw mlTasksResult.error;
 
       const agentData = (agentTasksResult.data || []).filter(
         (task: Record<string, unknown>) => task.status !== null,
       ) as AgentTask[];
-      const mlData = (mlTasksResult.data || []).filter(
-        (task: unknown) =>
-          (task as any).agent_task_id !== null &&
-          (task as any).created_at !== null,
-      ) as MLTask[];
+
+      // Empty ML tasks array since table doesn't exist
+      const mlData: MLTask[] = [];
 
       setAgentTasks(agentData);
       setMLTasks(mlData);

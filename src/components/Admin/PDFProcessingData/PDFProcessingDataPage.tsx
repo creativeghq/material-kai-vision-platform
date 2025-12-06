@@ -54,8 +54,9 @@ export const PDFProcessingDataPage: React.FC = () => {
   const loadStats = async (wsId: string) => {
     try {
       // ✅ NEW: Use MIVAA API endpoint that counts VECS embeddings
+      const MIVAA_API_URL = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
+        `${MIVAA_API_URL}/api/rag/workspace-stats?workspace_id=${wsId}`,
       );
 
       if (!response.ok) {
