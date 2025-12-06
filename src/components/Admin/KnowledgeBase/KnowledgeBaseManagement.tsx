@@ -100,7 +100,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <GlobalAdminHeader
         title="Knowledge Base & Documentation"
         description="Manage documentation with AI embeddings, semantic search, and product attachments"
@@ -110,7 +110,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
         ]}
       />
 
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="p-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="dashboard-card transition-all duration-200 hover:shadow-md">

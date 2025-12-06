@@ -112,7 +112,7 @@ export const PDFProcessingDataPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       <GlobalAdminHeader
         title="PDF Processing Data"
         description="View all products, chunks, images, and embeddings generated from PDF processing"
