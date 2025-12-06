@@ -347,12 +347,12 @@ The platform uses **6 embedding types** for comprehensive search:
 
 **Dashboard**: Metrics, feature grid, quick actions  
 **PDF Processing**: Drag-and-drop upload with real-time progress  
-**Materials Catalog**: Searchable, filterable product catalog  
-**Search Hub**: AI-powered semantic search  
-**Material Recognition**: Upload images for material identification  
-**3D Generation**: AI-powered material visualization  
-**Mood Boards**: Create and share material collections  
-**Shopping Cart**: Quote requests and commission tracking
+**Materials Catalog**: Searchable, filterable product catalog
+**Search Hub**: AI-powered semantic search
+**Material Recognition**: Upload images for material identification
+**3D Generation**: AI-powered material visualization
+**Mood Boards**: Create and share material collections
+**Quotes System**: Complete quote management with timeline tracking
 
 ### Admin Features
 
@@ -364,6 +364,10 @@ The platform uses **6 embedding types** for comprehensive search:
 **User Management**: Workspace members and permissions
 **Async Job Queue Monitor**: Background job status and recovery
 **Agent Configurations**: Manage AI agent system prompts and behavior
+**Quote Management**: View all quote requests with status filtering
+**Status Tags Management**: Create/edit custom status tags with colors
+**Upsells Management**: Manage upsell items with pricing
+**Timeline Steps Management**: Configure project timeline steps
 
 ---
 
@@ -424,9 +428,53 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ---
 
-**Last Updated**: 2025-10-31  
-**Version**: 2.0.0  
-**Status**: Production  
-**Users**: 5,000+  
+## Quote System
+
+### Complete Quote Management Platform
+
+**Customer Features**:
+- Create multiple independent quotes
+- Add products from search, agents, moodboards
+- Custom text-based requests (no products required)
+- Dimensions and area tracking (width, height, sqm)
+- Auto-expiration after 30 days (configurable)
+- Submit quote requests
+- View and accept/reject extras/upsells
+- Accept quotes with validation
+- Track project timeline progress
+
+**Admin Features**:
+- View all quote requests with filtering
+- Assign custom status tags with colors
+- Attach upsells/extras to quotes
+- Monitor customer acceptance
+- Update project timeline progress
+- Add notes to timeline steps
+
+**System Components**:
+- 8 database tables (quotes, quote_items, status_tags, upsells, quote_upsells, timeline_steps, quote_timeline, system_settings)
+- 30+ service methods via QuotesService
+- 6 default status tags (pending, in_progress, quoted, accepted, rejected, expired)
+- 9 predefined timeline steps (Quote Accepted → Project Completed)
+- Full-page admin interface with tabs
+- Visual timeline tree with connector lines
+- Real-time status updates
+
+**Workflow**:
+1. Customer creates quote and adds materials
+2. Customer submits quote request
+3. Admin assigns status tag and attaches upsells
+4. Customer accepts/rejects each upsell
+5. Customer accepts quote (validates all upsells decided)
+6. System auto-initializes project timeline
+7. Admin updates timeline progress with notes
+8. Customer tracks project completion
+
+---
+
+**Last Updated**: 2025-01-06
+**Version**: 2.2.0
+**Status**: Production
+**Users**: 5,000+
 **Uptime**: 99.5%+
 

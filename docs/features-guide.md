@@ -459,6 +459,89 @@ POST /api/images/upload-and-analyze
 
 ---
 
+### 16. Quotes System
+
+**Purpose**: Comprehensive quote management system for customers and admins
+
+**Status:** ✅ 100% Complete (Production Ready)
+
+**Customer Features**:
+- ✅ Create multiple independent quotes
+- ✅ Add products from search, agents, moodboards
+- ✅ Custom text-based requests (no products required)
+- ✅ Dimensions and area tracking (width, height, sqm)
+- ✅ Auto-expiration after 30 days (configurable)
+- ✅ Activity tracking extends expiration
+- ✅ Submit quote requests
+- ✅ View attached extras/upsells
+- ✅ Accept/reject individual extras
+- ✅ Accept quotes with validation
+- ✅ View project timeline (when accepted)
+
+**Admin Features**:
+- ✅ View all quote requests
+- ✅ Filter by custom status tags
+- ✅ Full-page quote detail view with tabs
+- ✅ Assign custom status tags with colors
+- ✅ Attach upsells/extras to quotes
+- ✅ Monitor customer acceptance of extras
+- ✅ Update project timeline progress
+- ✅ Add notes to timeline steps
+
+**Management Pages**:
+- ✅ Status Tags Management (`/admin/status-tags`)
+  - Create/edit/delete custom status tags
+  - Color picker for tag colors
+  - System vs custom tag distinction
+  - 6 default system tags (pending, in_progress, quoted, accepted, rejected, expired)
+
+- ✅ Upsells Management (`/admin/upsells`)
+  - Create/edit/delete upsell items
+  - Set pricing and descriptions
+  - Active/inactive status toggle
+  - Display order management
+
+- ✅ Timeline Steps Management (`/admin/timeline-steps`)
+  - Create/edit/delete timeline steps
+  - 9 default steps (Quote Accepted → Project Completed)
+  - Display order management
+  - Active/inactive status
+
+**Project Timeline**:
+- ✅ Auto-initialization when quote accepted
+- ✅ 9 predefined steps with descriptions
+- ✅ Visual timeline tree with connector lines
+- ✅ Status tracking (pending, in_progress, completed, skipped)
+- ✅ Admin can update status and add notes
+- ✅ Customer read-only view
+- ✅ Completed timestamps
+- ✅ Color-coded status badges
+
+**Quote Acceptance Workflow**:
+- ✅ Validation requiring all extras to be decided
+- ✅ Status change to 'accepted'
+- ✅ Automatic timeline initialization
+- ✅ Timeline button visibility control
+
+**Database Tables** (8 total):
+- `quotes` - Core quote data
+- `quote_items` - Quote items with dimensions
+- `status_tags` - Custom status tags
+- `upsells` - Admin-managed upsell items
+- `quote_upsells` - Junction table with acceptance tracking
+- `timeline_steps` - Predefined timeline steps
+- `quote_timeline` - Timeline progress tracking
+- `system_settings` - Platform configuration
+
+**API Endpoints**: 30+ methods via QuotesService
+- Core quote operations (CRUD)
+- Status tags management
+- Upsells management
+- Timeline management
+- Expiration tracking
+
+---
+
 ## 📱 User Interface Features
 
 **Frontend Components**:
@@ -469,6 +552,8 @@ POST /api/images/upload-and-analyze
 - Progress visualization
 - Error handling
 - Responsive design
+- Quote management system
+- Project timeline viewer
 
 **User Experience**:
 - ✅ Intuitive navigation
@@ -477,10 +562,13 @@ POST /api/images/upload-and-analyze
 - ✅ Error messages
 - ✅ Help documentation
 - ✅ Accessibility
+- ✅ Tab-based interfaces
+- ✅ Modal workflows
+- ✅ Visual feedback
 
 ---
 
-**Last Updated**: November 9, 2025
-**Version**: 1.1.0
+**Last Updated**: January 6, 2025
+**Version**: 1.2.0
 **Status**: Production
 
