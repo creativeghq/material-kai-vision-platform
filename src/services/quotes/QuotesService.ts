@@ -10,6 +10,7 @@ export interface Quote {
   workspace_id?: string;
   name?: string;
   status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
+  status_tag_id?: string;
   total_items: number;
   notes?: string;
   custom_request_text?: string; // Custom text request instead of products
@@ -44,6 +45,73 @@ export interface Product {
 
 export interface QuoteItemWithProduct extends QuoteItem {
   product?: Product;
+}
+
+// =====================================================
+// STATUS TAGS
+// =====================================================
+
+export interface StatusTag {
+  id: string;
+  name: string;
+  color: string;
+  description?: string;
+  is_system: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// =====================================================
+// UPSELLS/EXTRAS
+// =====================================================
+
+export interface Upsell {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteUpsell {
+  id: string;
+  quote_id: string;
+  upsell_id: string;
+  customer_accepted?: boolean | null;
+  admin_notes?: string;
+  added_at: string;
+  decided_at?: string;
+  upsell?: Upsell;
+}
+
+// =====================================================
+// PROJECT TIMELINE
+// =====================================================
+
+export interface TimelineStep {
+  id: string;
+  name: string;
+  description?: string;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteTimeline {
+  id: string;
+  quote_id: string;
+  timeline_step_id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+  notes?: string;
+  completed_at?: string;
+  created_at: string;
+  updated_at: string;
+  timeline_step?: TimelineStep;
 }
 
 // =====================================================
@@ -280,35 +348,41 @@ export class QuotesService {
   }
 
   /**
-   * Get all quote requests (submitted quotes)
+   * Get all quote requests (ALL quotes for admin view)
+   * ✅ FIX: Show all quotes, not just those with quote_requests entries
    */
   async getQuoteRequests(): Promise<QuoteWithItems[]> {
-    // Get all submitted quotes with their quote_requests
-    const { data: quoteRequests, error: requestsError } = await supabase
-      .from('quote_requests')
-      .select('quote_id')
+    // Get ALL quotes (admin view shows everything)
+    const { data: quotes, error: quotesError } = await supabase
+      .from('quotes')
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (requestsError) throw requestsError;
+    if (quotesError) throw quotesError;
 
-    if (!quoteRequests || quoteRequests.length === 0) {
+    if (!quotes || quotes.length === 0) {
       return [];
     }
 
-    const quoteIds = quoteRequests
-      .map(qr => qr.quote_id)
-      .filter((id): id is string => id !== null);
+    // Get items for each quote
+    const quotesWithItems = await Promise.all(
+      quotes.map(async (quote) => {
+        const { data: items, error: itemsError } = await supabase
+          .from('quote_items')
+          .select('*, product:products(*)')
+          .eq('quote_id', quote.id)
+          .order('added_at', { ascending: true });
 
-    if (quoteIds.length === 0) {
-      return [];
-    }
+        if (itemsError) throw itemsError;
 
-    // Get quotes with items
-    const quotes = await Promise.all(
-      quoteIds.map(id => this.getQuote(id))
+        return {
+          ...quote,
+          items: items || [],
+        };
+      })
     );
 
-    return quotes;
+    return quotesWithItems;
   }
 
   /**
@@ -337,6 +411,313 @@ export class QuotesService {
       .eq('id', quoteId);
 
     if (quoteError) throw quoteError;
+  }
+
+  // =====================================================
+  // STATUS TAGS METHODS
+  // =====================================================
+
+  /**
+   * Get all status tags
+   */
+  async getStatusTags(): Promise<StatusTag[]> {
+    const { data, error } = await supabase
+      .from('status_tags')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Create a new status tag
+   */
+  async createStatusTag(data: {
+    name: string;
+    color: string;
+    description?: string;
+    display_order?: number;
+  }): Promise<StatusTag> {
+    const { data: tag, error } = await supabase
+      .from('status_tags')
+      .insert({
+        name: data.name,
+        color: data.color,
+        description: data.description,
+        display_order: data.display_order || 0,
+        is_system: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return tag;
+  }
+
+  /**
+   * Update quote status tag
+   */
+  async updateQuoteStatusTag(quoteId: string, statusTagId: string): Promise<Quote> {
+    const { data: quote, error } = await supabase
+      .from('quotes')
+      .update({ status_tag_id: statusTagId })
+      .eq('id', quoteId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return quote;
+  }
+
+  // =====================================================
+  // UPSELLS/EXTRAS METHODS
+  // =====================================================
+
+  /**
+   * Get all upsells
+   */
+  async getUpsells(activeOnly: boolean = false): Promise<Upsell[]> {
+    let query = supabase
+      .from('upsells')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Create a new upsell
+   */
+  async createUpsell(data: {
+    name: string;
+    description?: string;
+    price: number;
+    display_order?: number;
+  }): Promise<Upsell> {
+    const { data: upsell, error } = await supabase
+      .from('upsells')
+      .insert({
+        name: data.name,
+        description: data.description,
+        price: data.price,
+        display_order: data.display_order || 0,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return upsell;
+  }
+
+  /**
+   * Update an upsell
+   */
+  async updateUpsell(
+    upsellId: string,
+    data: {
+      name?: string;
+      description?: string;
+      price?: number;
+      is_active?: boolean;
+      display_order?: number;
+    }
+  ): Promise<Upsell> {
+    const { data: upsell, error } = await supabase
+      .from('upsells')
+      .update(data)
+      .eq('id', upsellId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return upsell;
+  }
+
+  /**
+   * Delete an upsell
+   */
+  async deleteUpsell(upsellId: string): Promise<void> {
+    const { error } = await supabase
+      .from('upsells')
+      .delete()
+      .eq('id', upsellId);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Get quote upsells
+   */
+  async getQuoteUpsells(quoteId: string): Promise<QuoteUpsell[]> {
+    const { data, error } = await supabase
+      .from('quote_upsells')
+      .select('*, upsell:upsells(*)')
+      .eq('quote_id', quoteId)
+      .order('added_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Add upsell to quote
+   */
+  async addUpsellToQuote(quoteId: string, upsellId: string, adminNotes?: string): Promise<QuoteUpsell> {
+    const { data, error } = await supabase
+      .from('quote_upsells')
+      .insert({
+        quote_id: quoteId,
+        upsell_id: upsellId,
+        admin_notes: adminNotes,
+      })
+      .select('*, upsell:upsells(*)')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Update customer acceptance of upsell
+   */
+  async updateUpsellAcceptance(
+    quoteUpsellId: string,
+    accepted: boolean
+  ): Promise<QuoteUpsell> {
+    const { data, error } = await supabase
+      .from('quote_upsells')
+      .update({
+        customer_accepted: accepted,
+        decided_at: new Date().toISOString(),
+      })
+      .eq('id', quoteUpsellId)
+      .select('*, upsell:upsells(*)')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  /**
+   * Remove upsell from quote
+   */
+  async removeUpsellFromQuote(quoteUpsellId: string): Promise<void> {
+    const { error } = await supabase
+      .from('quote_upsells')
+      .delete()
+      .eq('id', quoteUpsellId);
+
+    if (error) throw error;
+  }
+
+  // =====================================================
+  // PROJECT TIMELINE METHODS
+  // =====================================================
+
+  /**
+   * Get all timeline steps
+   */
+  async getTimelineSteps(): Promise<TimelineStep[]> {
+    const { data, error } = await supabase
+      .from('timeline_steps')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Create a new timeline step
+   */
+  async createTimelineStep(data: {
+    name: string;
+    description?: string;
+    display_order?: number;
+  }): Promise<TimelineStep> {
+    const { data: step, error } = await supabase
+      .from('timeline_steps')
+      .insert({
+        name: data.name,
+        description: data.description,
+        display_order: data.display_order || 0,
+        is_active: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return step;
+  }
+
+  /**
+   * Get quote timeline
+   */
+  async getQuoteTimeline(quoteId: string): Promise<QuoteTimeline[]> {
+    const { data, error } = await supabase
+      .from('quote_timeline')
+      .select('*, timeline_step:timeline_steps(*)')
+      .eq('quote_id', quoteId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  /**
+   * Initialize quote timeline (create entries for all active steps)
+   */
+  async initializeQuoteTimeline(quoteId: string): Promise<void> {
+    const steps = await this.getTimelineSteps();
+
+    const timelineEntries = steps.map(step => ({
+      quote_id: quoteId,
+      timeline_step_id: step.id,
+      status: 'pending' as const,
+    }));
+
+    const { error } = await supabase
+      .from('quote_timeline')
+      .insert(timelineEntries);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Update timeline step status
+   */
+  async updateTimelineStep(
+    quoteTimelineId: string,
+    data: {
+      status?: 'pending' | 'in_progress' | 'completed' | 'skipped';
+      notes?: string;
+    }
+  ): Promise<QuoteTimeline> {
+    const updateData: any = { ...data };
+
+    if (data.status === 'completed') {
+      updateData.completed_at = new Date().toISOString();
+    }
+
+    const { data: timeline, error } = await supabase
+      .from('quote_timeline')
+      .update(updateData)
+      .eq('id', quoteTimelineId)
+      .select('*, timeline_step:timeline_steps(*)')
+      .single();
+
+    if (error) throw error;
+    return timeline;
   }
 }
 
