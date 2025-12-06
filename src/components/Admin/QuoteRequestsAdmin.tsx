@@ -31,6 +31,8 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
 import { usersAPI } from '@/services/crm.service';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UserProfile {
   id: string;
@@ -40,13 +42,14 @@ interface UserProfile {
 
 export const QuoteRequestsAdmin: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [quoteRequests, setQuoteRequests] = useState<QuoteWithItems[]>([]);
   const [selectedQuote, setSelectedQuote] = useState<QuoteWithItems | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  
+
   // Create quote form state
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [quoteName, setQuoteName] = useState('');
@@ -78,13 +81,39 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
   const loadUsers = async () => {
     try {
-      const { data } = await usersAPI.listUsers(100, 0);
-      setUsers(data || []);
-    } catch (error: any) {
-      // ✅ FIX (KAI-1C, KAI-1J): Silently handle admin access errors
-      if (error?.message !== 'Admin access required') {
-        console.error('Error loading users:', error);
+      const usersList: UserProfile[] = [];
+
+      // Always add current user first
+      if (user) {
+        const { data: currentUserProfile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (currentUserProfile) {
+          usersList.push(currentUserProfile);
+        }
       }
+
+      // Try to load all users from CRM (admin only)
+      try {
+        const { data } = await usersAPI.listUsers(100, 0);
+        if (data) {
+          // Add other users, avoiding duplicates
+          const otherUsers = data.filter((u: UserProfile) => u.user_id !== user?.id);
+          usersList.push(...otherUsers);
+        }
+      } catch (error: any) {
+        // ✅ FIX: Silently handle admin access errors - current user already added
+        if (error?.message !== 'Admin access required') {
+          console.error('Error loading CRM users:', error);
+        }
+      }
+
+      setUsers(usersList);
+    } catch (error: any) {
+      console.error('Error loading users:', error);
     }
   };
 

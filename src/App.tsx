@@ -31,6 +31,7 @@ import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
 import { SystemPerformance } from './components/Admin/SystemPerformance';
 import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
 import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
+import { MoodBoardDetailPage } from './components/MoodBoard/MoodBoardDetailPage';
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
@@ -121,6 +122,16 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <MoodBoardPage />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/moodboard/:id"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <MoodBoardDetailPage />
                     </Layout>
                   </AuthGuard>
                 }
