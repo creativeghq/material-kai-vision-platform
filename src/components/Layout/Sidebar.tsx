@@ -14,7 +14,7 @@ const navigationItems = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
-  { id: 'quotes', label: 'Quotes', path: '/quotes/requests', icon: FileText },
+  { id: 'quotes', label: 'Quotes Cart', path: '/quotes', icon: FileText },
   { id: 'admin', label: 'Admin Panel', path: '/admin', icon: Settings },
 ];
 

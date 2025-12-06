@@ -176,6 +176,44 @@ export class QuotesService {
   }
 
   /**
+   * Get all quotes for the current user with their items (for customer-facing quotes page)
+   */
+  async getUserQuotes(): Promise<QuoteWithItems[]> {
+    // Get all quotes for the current user
+    const { data: quotes, error: quotesError } = await supabase
+      .from('quotes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (quotesError) throw quotesError;
+    if (!quotes || quotes.length === 0) return [];
+
+    // Fetch items for all quotes
+    const quoteIds = quotes.map((q: Quote) => q.id);
+    const { data: allItems, error: itemsError } = await supabase
+      .from('quote_items')
+      .select('*')
+      .in('quote_id', quoteIds);
+
+    if (itemsError) throw itemsError;
+
+    // Map items to their quotes
+    const itemsByQuoteId = (allItems || []).reduce((acc: Record<string, QuoteItem[]>, item: QuoteItem) => {
+      if (!acc[item.quote_id]) {
+        acc[item.quote_id] = [];
+      }
+      acc[item.quote_id].push(item);
+      return acc;
+    }, {} as Record<string, QuoteItem[]>);
+
+    // Combine quotes with their items
+    return quotes.map((quote: Quote) => ({
+      ...quote,
+      items: itemsByQuoteId[quote.id] || [],
+    }));
+  }
+
+  /**
    * Get a specific quote with its items
    */
   async getQuote(quoteId: string): Promise<QuoteWithItems> {
