@@ -273,13 +273,24 @@ export const MoodBoardPage = () => {
           }
         >
           {moodboards.map((board) => (
-            <Card
+            <DashboardCard
               key={board.id}
-              className={`group hover:shadow-lg transition-all cursor-pointer ${
+              className={`group cursor-pointer ${
                 viewMode === 'list' ? 'flex flex-row' : ''
               }`}
+              hover={true}
             >
-              <div className={viewMode === 'list' ? 'flex-1' : ''}>
+              <div
+                className={viewMode === 'list' ? 'flex-1' : ''}
+                onClick={() => navigate(`/moodboard/${board.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate(`/moodboard/${board.id}`);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
@@ -351,7 +362,7 @@ export const MoodBoardPage = () => {
                   </div>
                 </CardContent>
               </div>
-            </Card>
+            </DashboardCard>
           ))}
         </div>
       )}
