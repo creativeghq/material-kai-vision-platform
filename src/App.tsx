@@ -48,15 +48,14 @@ import {
   PageErrorBoundary,
 } from './components/ErrorBoundary/ErrorBoundary';
 import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
-import QualityStabilityMetricsPanel from './components/Admin/QualityStabilityMetricsPanel';
-import Phase3MetricsPanel from './components/Admin/Phase3MetricsPanel';
+// Removed: QualityStabilityMetricsPanel and Phase3MetricsPanel - now consolidated in AnalyticsDashboard
 import { MetadataManagement } from './components/Admin/MetadataManagement';
 import { RelevancyManagement } from './components/Admin/RelevancyManagement';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
-import { ChunkQualityDashboard } from './components/Admin/ChunkQualityDashboard';
+// Removed: ChunkQualityDashboard - now consolidated in AnalyticsDashboard
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
 import DataImportHub from './components/Admin/DataImportHub';
 import { SubscriptionPlansPage } from './components/Billing/SubscriptionPlansPage';
@@ -422,42 +421,8 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-              <Route
-                path="/admin/quality-stability-metrics"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <QualityStabilityMetricsPanel />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/admin/phase3-metrics"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <Phase3MetricsPanel />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/admin/chunk-quality"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <ChunkQualityDashboard />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
+              {/* Removed: /admin/quality-stability-metrics and /admin/phase3-metrics - now consolidated in /admin/analytics */}
+              {/* Removed: /admin/chunk-quality - now consolidated in /admin/analytics */}
               <Route
                 path="/admin/metadata"
                 element={

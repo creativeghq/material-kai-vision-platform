@@ -75,6 +75,7 @@ interface ApiUsageLog {
 
 export const AnalyticsDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('overview');
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
     total_searches: 0,
     total_api_calls: 0,

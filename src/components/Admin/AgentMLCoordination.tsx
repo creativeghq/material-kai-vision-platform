@@ -11,6 +11,10 @@ import {
   Play,
   Pause,
   Square,
+  Settings,
+  Bot,
+  Database,
+  Sparkles,
 } from 'lucide-react';
 
 import {
@@ -31,8 +35,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { AdminStatCard } from './AdminStatCard';
 
 interface AgentTask {
   id: string;
@@ -156,121 +163,68 @@ const AgentMLCoordination: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => navigate('/')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Brain className="h-4 w-4" />
-                Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Activity className="h-4 w-4" />
-                Back to Admin
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                Agent ML Coordination
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Monitor agent assignments and ML task distribution
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={fetchData}
-              onKeyDown={(e) => e.key === 'Enter' && fetchData()}
-              className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-            <Button className="px-2 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white">
-              <Play className="h-4 w-4 mr-2" />
-              Start New Task
-            </Button>
-          </div>
-        </div>
-      </div>
+      <GlobalAdminHeader
+        title="AI Settings & Agent Coordination"
+        description="Comprehensive AI configuration: prompts, NLP settings, model configurations, and agent task monitoring"
+        badge="AI Control Panel"
+      />
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-              <Brain className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTasks}</div>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Active Tasks
-              </CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {stats.activeTasks}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Currently processing
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {stats.completedTasks}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Success rate:{' '}
-                {stats.totalTasks > 0
-                  ? ((stats.completedTasks / stats.totalTasks) * 100).toFixed(1)
-                  : 0}
-                %
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Avg Processing
-              </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats.avgProcessingTime}ms
-              </div>
-              <p className="text-xs text-muted-foreground">Per task</p>
-            </CardContent>
-          </Card>
+          <AdminStatCard
+            title="Total Tasks"
+            value={stats.totalTasks}
+            icon={Brain}
+            description="All time"
+            variant="glass"
+          />
+          <AdminStatCard
+            title="Active Tasks"
+            value={stats.activeTasks}
+            icon={Activity}
+            description="Currently processing"
+            variant="glass"
+          />
+          <AdminStatCard
+            title="Completed"
+            value={stats.completedTasks}
+            icon={TrendingUp}
+            description={`Success rate: ${stats.totalTasks > 0 ? ((stats.completedTasks / stats.totalTasks) * 100).toFixed(1) : 0}%`}
+            variant="glass"
+          />
+          <AdminStatCard
+            title="Avg Processing"
+            value={`${stats.avgProcessingTime}ms`}
+            icon={Clock}
+            description="Per task"
+            variant="glass"
+          />
         </div>
+
+        {/* Tabs for AI Settings */}
+        <Tabs defaultValue="tasks" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="tasks">
+              <Brain className="h-4 w-4 mr-2" />
+              Agent Tasks
+            </TabsTrigger>
+            <TabsTrigger value="prompts">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Prompts
+            </TabsTrigger>
+            <TabsTrigger value="models">
+              <Settings className="h-4 w-4 mr-2" />
+              Model Settings
+            </TabsTrigger>
+            <TabsTrigger value="agents">
+              <Bot className="h-4 w-4 mr-2" />
+              Agent Configs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tasks" className="space-y-4">
 
         {/* Agent Tasks Table */}
         <Card>
@@ -422,6 +376,112 @@ const AgentMLCoordination: React.FC = () => {
             </Table>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="prompts" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Prompts Management</CardTitle>
+                <CardDescription>
+                  Manage prompts for data extraction, NLP processing, and agent interactions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Button onClick={() => navigate('/admin/agent-configs')}>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Manage Agent Prompts
+                  </Button>
+                  <p className="text-sm text-muted-foreground">
+                    Configure prompts for PDF processing, search enhancement, product discovery, and interior design agents.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="models" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>AI Model Settings</CardTitle>
+                <CardDescription>
+                  Configure AI model parameters and API settings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Claude Models</h4>
+                      <p className="text-sm text-muted-foreground">Sonnet 4.5, Haiku 4.5</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">GPT Models</h4>
+                      <p className="text-sm text-muted-foreground">GPT-5</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Vision Models</h4>
+                      <p className="text-sm text-muted-foreground">Llama 4 Scout 17B Vision</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Embedding Models</h4>
+                      <p className="text-sm text-muted-foreground">google/vit-base-patch16-224</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="agents" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Configurations</CardTitle>
+                <CardDescription>
+                  View and manage all AI agents with role-based access control
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Button onClick={() => navigate('/admin/agent-configs')}>
+                    <Bot className="h-4 w-4 mr-2" />
+                    Configure Agents
+                  </Button>
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">📄</span>
+                        <h4 className="font-medium">PDF Processor</h4>
+                      </div>
+                      <Badge>Admin Only</Badge>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">🔍</span>
+                        <h4 className="font-medium">Search Agent</h4>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Public</Badge>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">📦</span>
+                        <h4 className="font-medium">Product Agent</h4>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Public</Badge>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">🎨</span>
+                        <h4 className="font-medium">Interior Designer</h4>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Public</Badge>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
