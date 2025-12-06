@@ -22,7 +22,7 @@ const DataImportHub: React.FC = () => {
   const [activeTab, setActiveTab] = useState('xml');
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Data Import Hub"
         description="Import products from XML files, web scraping, or manual entry"

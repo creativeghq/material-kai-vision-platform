@@ -236,7 +236,7 @@ export const MetadataManagement: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Metadata Management"
         description="View and manage extracted metadata from PDF processing"

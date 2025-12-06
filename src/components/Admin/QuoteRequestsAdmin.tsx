@@ -185,7 +185,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="Quote Requests"
           description="Manage customer quote requests and create quotes for users"
@@ -202,7 +202,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Quote Requests"
         description="Manage customer quote requests and create quotes for users"

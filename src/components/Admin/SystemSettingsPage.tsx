@@ -95,7 +95,7 @@ export const SystemSettingsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="System Settings"
           description="Configure platform-wide settings"
@@ -109,7 +109,7 @@ export const SystemSettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="System Settings"
         description="Configure platform-wide settings"

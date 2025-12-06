@@ -154,7 +154,7 @@ export const AIMonitoringDashboard: React.FC = () => {
 
   if (loading && !metrics) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="AI Monitoring Dashboard"
           description="Real-time AI usage, costs, and performance metrics"
@@ -172,7 +172,7 @@ export const AIMonitoringDashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="AI Monitoring Dashboard"
           description="Real-time AI usage, costs, and performance metrics"
@@ -202,7 +202,7 @@ export const AIMonitoringDashboard: React.FC = () => {
   if (!metrics) return null;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="AI Monitoring Dashboard"
         description="Real-time AI usage, costs, and performance metrics"

@@ -224,7 +224,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="Async Job Queue Monitor"
           description="Monitor background job processing queues and progress"
@@ -244,7 +244,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="Async Job Queue Monitor"
           description="Monitor background job processing queues and progress"
@@ -264,7 +264,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   if (!metrics) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <GlobalAdminHeader
           title="Async Job Queue Monitor"
           description="Monitor background job processing queues and progress"
@@ -278,7 +278,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Async Job Queue Monitor"
         description="Monitor background job processing queues and progress"

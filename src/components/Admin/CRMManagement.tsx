@@ -191,7 +191,7 @@ export const CRMManagement: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="CRM Management"
         description="Manage users and customer contacts"

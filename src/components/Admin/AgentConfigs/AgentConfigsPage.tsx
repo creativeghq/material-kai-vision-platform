@@ -232,7 +232,7 @@ export const AgentConfigsPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Agent Configurations"
         description="Manage AI agent system prompts and access control"

@@ -376,7 +376,7 @@ export const RelevancyManagement: React.FC = () => {
   const totalPages = Math.ceil(currentData.length / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Relevancy Management"
         description="View and manage entity relationships with relevance scoring"
