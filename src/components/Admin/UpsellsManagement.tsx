@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, DollarSign, Loader2, Package } from 'lucide-react';
+import { Plus, Edit2, Trash2, DollarSign, Loader2, Package, ArrowUp, ArrowDown, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,22 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -29,8 +45,11 @@ export const UpsellsManagement: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [upsells, setUpsells] = useState<Upsell[]>([]);
+  const [usageCounts, setUsageCounts] = useState<Record<string, number>>({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingUpsell, setEditingUpsell] = useState<Upsell | null>(null);
+  const [deletingUpsell, setDeletingUpsell] = useState<Upsell | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   // Form state
   const [upsellName, setUpsellName] = useState('');
@@ -49,6 +68,20 @@ export const UpsellsManagement: React.FC = () => {
       setLoading(true);
       const data = await quotesService.getUpsells();
       setUpsells(data);
+
+      // Load usage counts for each upsell
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        data.map(async (upsell) => {
+          try {
+            const count = await quotesService.getUpsellUsageCount(upsell.id);
+            counts[upsell.id] = count;
+          } catch {
+            counts[upsell.id] = 0;
+          }
+        })
+      );
+      setUsageCounts(counts);
     } catch (error) {
       console.error('Error loading upsells:', error);
       toast({
@@ -58,6 +91,38 @@ export const UpsellsManagement: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleMoveUpsell = async (upsellId: string, direction: 'up' | 'down') => {
+    const sortedUpsells = [...upsells].sort((a, b) => a.display_order - b.display_order);
+    const currentIndex = sortedUpsells.findIndex(u => u.id === upsellId);
+
+    if (
+      (direction === 'up' && currentIndex === 0) ||
+      (direction === 'down' && currentIndex === sortedUpsells.length - 1)
+    ) {
+      return;
+    }
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const newOrder = [...sortedUpsells];
+    const [movedUpsell] = newOrder.splice(currentIndex, 1);
+    newOrder.splice(newIndex, 0, movedUpsell);
+
+    try {
+      setReordering(true);
+      await quotesService.reorderUpsells(newOrder.map(u => u.id));
+      await loadUpsells();
+    } catch (error) {
+      console.error('Error reordering upsells:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reorder upsells',
+        variant: 'destructive',
+      });
+    } finally {
+      setReordering(false);
     }
   };
 
@@ -124,15 +189,17 @@ export const UpsellsManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteUpsell = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this upsell?')) return;
+  const handleDeleteUpsell = async () => {
+    if (!deletingUpsell) return;
 
     try {
-      await quotesService.deleteUpsell(id);
+      setSaving(true);
+      await quotesService.deleteUpsell(deletingUpsell.id);
       toast({
         title: 'Success',
         description: 'Upsell deleted successfully',
       });
+      setDeletingUpsell(null);
       await loadUpsells();
     } catch (error) {
       console.error('Error deleting upsell:', error);
@@ -141,6 +208,8 @@ export const UpsellsManagement: React.FC = () => {
         description: 'Failed to delete upsell',
         variant: 'destructive',
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -216,77 +285,110 @@ export const UpsellsManagement: React.FC = () => {
         </div>
 
         {/* Upsells Table */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Display Order</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {upsells.length === 0 ? (
+        <TooltipProvider>
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-600">
-                    No upsells found. Create your first upsell to get started.
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Usage</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ) : (
-                upsells
-                  .sort((a, b) => a.display_order - b.display_order)
-                  .map((upsell) => (
-                    <TableRow key={upsell.id}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-gray-400" />
-                          {upsell.name}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-gray-700 max-w-md truncate">
-                        {upsell.description || <span className="text-gray-400 italic">No description</span>}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1 font-semibold text-green-600">
-                          <DollarSign className="h-4 w-4" />
-                          {formatPrice(upsell.price)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={upsell.is_active ? 'default' : 'secondary'}>
-                          {upsell.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-gray-600">{upsell.display_order}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenEdit(upsell)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteUpsell(upsell.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {upsells.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-600">
+                      No upsells found. Create your first upsell to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  upsells
+                    .sort((a, b) => a.display_order - b.display_order)
+                    .map((upsell, index, sortedArray) => (
+                      <TableRow key={upsell.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <div className="flex flex-col gap-0.5">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0"
+                                disabled={index === 0 || reordering}
+                                onClick={() => handleMoveUpsell(upsell.id, 'up')}
+                              >
+                                <ArrowUp className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0"
+                                disabled={index === sortedArray.length - 1 || reordering}
+                                onClick={() => handleMoveUpsell(upsell.id, 'down')}
+                              >
+                                <ArrowDown className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            <Package className="h-4 w-4 text-gray-400" />
+                            {upsell.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-gray-700 max-w-md truncate">
+                          {upsell.description || <span className="text-gray-400 italic">No description</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1 font-semibold text-green-600">
+                            <DollarSign className="h-4 w-4" />
+                            {formatPrice(upsell.price)}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={upsell.is_active ? 'default' : 'secondary'}>
+                            {upsell.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1 text-gray-600">
+                                <Users className="h-4 w-4" />
+                                <span>{usageCounts[upsell.id] || 0}</span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Used in {usageCounts[upsell.id] || 0} quote(s)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleOpenEdit(upsell)}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingUpsell(upsell)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TooltipProvider>
       </div>
 
       {/* Create/Edit Modal */}
@@ -374,7 +476,39 @@ export const UpsellsManagement: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingUpsell} onOpenChange={() => setDeletingUpsell(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Upsell</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingUpsell?.name}"?
+              {(usageCounts[deletingUpsell?.id || ''] || 0) > 0 && (
+                <span className="block mt-2 text-amber-600">
+                  Warning: This upsell is currently used in {usageCounts[deletingUpsell?.id || '']} quote(s).
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUpsell}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
-

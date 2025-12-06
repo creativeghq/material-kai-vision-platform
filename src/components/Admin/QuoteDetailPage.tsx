@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ProjectTimelineModal } from '../Quotes/ProjectTimelineModal';
 import {
@@ -32,12 +33,19 @@ export const QuoteDetailPage: React.FC = () => {
   const [loadingUpsells, setLoadingUpsells] = useState(false);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
 
+  // Timeline state
+  const [timelineSteps, setTimelineSteps] = useState<TimelineStep[]>([]);
+  const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
+  const [updatingTimelineStep, setUpdatingTimelineStep] = useState<string | null>(null);
+
   useEffect(() => {
     if (id) {
       loadQuoteDetails();
       loadStatusTags();
       loadUpsells();
       loadQuoteUpsells();
+      loadTimelineData();
     }
   }, [id]);
 
@@ -88,6 +96,69 @@ export const QuoteDetailPage: React.FC = () => {
       console.error('Error loading quote upsells:', error);
     } finally {
       setLoadingUpsells(false);
+    }
+  };
+
+  const loadTimelineData = async () => {
+    if (!id) return;
+    try {
+      setLoadingTimeline(true);
+      const [steps, timeline] = await Promise.all([
+        quotesService.getTimelineSteps(),
+        quotesService.getQuoteTimeline(id),
+      ]);
+      setTimelineSteps(steps);
+      setQuoteTimeline(timeline);
+    } catch (error) {
+      console.error('Error loading timeline:', error);
+    } finally {
+      setLoadingTimeline(false);
+    }
+  };
+
+  const handleUpdateTimelineStatus = async (
+    quoteTimelineId: string,
+    status: 'pending' | 'in_progress' | 'completed' | 'skipped'
+  ) => {
+    try {
+      setUpdatingTimelineStep(quoteTimelineId);
+      await quotesService.updateTimelineStep(quoteTimelineId, { status });
+      toast({
+        title: 'Success',
+        description: 'Timeline step updated',
+      });
+      await loadTimelineData();
+    } catch (error) {
+      console.error('Error updating timeline step:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update timeline step',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingTimelineStep(null);
+    }
+  };
+
+  const handleInitializeTimeline = async () => {
+    if (!id) return;
+    try {
+      setLoadingTimeline(true);
+      await quotesService.initializeQuoteTimeline(id);
+      toast({
+        title: 'Success',
+        description: 'Timeline initialized',
+      });
+      await loadTimelineData();
+    } catch (error) {
+      console.error('Error initializing timeline:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to initialize timeline',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingTimeline(false);
     }
   };
 
@@ -223,7 +294,13 @@ export const QuoteDetailPage: React.FC = () => {
               <h1 className="text-3xl font-bold text-gray-900">
                 {quote.name || 'Untitled Quote'}
               </h1>
-              <p className="text-gray-600 mt-1">Quote ID: {quote.id}</p>
+              <p className="text-gray-600 mt-1">
+                Created {new Date(quote.created_at).toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })}
+              </p>
             </div>
             <div className="flex items-center gap-3">
               {quote.status === 'accepted' && (
@@ -612,14 +689,137 @@ export const QuoteDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Timeline Tab - Placeholder */}
+          {/* Timeline Tab */}
           <TabsContent value="timeline">
             <Card>
               <CardHeader>
-                <CardTitle>Project Timeline</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Project Timeline</CardTitle>
+                    <CardDescription>
+                      Track and manage the project timeline for this quote
+                    </CardDescription>
+                  </div>
+                  {quoteTimeline.length === 0 && quote.status === 'accepted' && (
+                    <Button
+                      onClick={handleInitializeTimeline}
+                      disabled={loadingTimeline}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {loadingTimeline ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Initialize Timeline
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">Timeline will be displayed here</p>
+                {loadingTimeline ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                  </div>
+                ) : quoteTimeline.length === 0 ? (
+                  <div className="text-center py-8">
+                    <GitBranch className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-600 mb-2">No timeline steps assigned</p>
+                    <p className="text-gray-500 text-sm">
+                      {quote.status === 'accepted'
+                        ? 'Click "Initialize Timeline" to create timeline steps for this quote'
+                        : 'Timeline will be available once the quote is accepted'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {quoteTimeline.map((item, index) => {
+                      const step = item.timeline_step;
+                      if (!step) return null;
+
+                      const getStatusIcon = (status: string) => {
+                        switch (status) {
+                          case 'completed':
+                            return <CheckCircle className="h-5 w-5 text-green-500" />;
+                          case 'in_progress':
+                            return <PlayCircle className="h-5 w-5 text-blue-500" />;
+                          case 'skipped':
+                            return <SkipForward className="h-5 w-5 text-gray-400" />;
+                          default:
+                            return <Circle className="h-5 w-5 text-gray-300" />;
+                        }
+                      };
+
+                      const getStatusBadgeColor = (status: string) => {
+                        switch (status) {
+                          case 'completed':
+                            return 'bg-green-100 text-green-700 border-green-200';
+                          case 'in_progress':
+                            return 'bg-blue-100 text-blue-700 border-blue-200';
+                          case 'skipped':
+                            return 'bg-gray-100 text-gray-500 border-gray-200';
+                          default:
+                            return 'bg-gray-50 text-gray-600 border-gray-200';
+                        }
+                      };
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
+                        >
+                          <div className="flex flex-col items-center">
+                            {getStatusIcon(item.status)}
+                            {index < quoteTimeline.length - 1 && (
+                              <div className="w-0.5 h-8 bg-gray-200 mt-2" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium text-gray-900">{step.name}</h4>
+                              <Badge className={`border ${getStatusBadgeColor(item.status)}`}>
+                                {item.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            {step.description && (
+                              <p className="text-sm text-gray-600 mb-3">{step.description}</p>
+                            )}
+                            {item.completed_at && (
+                              <p className="text-xs text-gray-500 mb-2">
+                                Completed: {new Date(item.completed_at).toLocaleDateString()}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={item.status}
+                                onValueChange={(value) =>
+                                  handleUpdateTimelineStatus(
+                                    item.id,
+                                    value as 'pending' | 'in_progress' | 'completed' | 'skipped'
+                                  )
+                                }
+                                disabled={updatingTimelineStep === item.id}
+                              >
+                                <SelectTrigger className="w-40 h-8 text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="in_progress">In Progress</SelectItem>
+                                  <SelectItem value="completed">Completed</SelectItem>
+                                  <SelectItem value="skipped">Skipped</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {updatingTimelineStep === item.id && (
+                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

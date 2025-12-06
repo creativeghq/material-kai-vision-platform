@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Send,
   Trash2,
@@ -10,6 +10,7 @@ import {
   Clock,
   AlertCircle,
   FileText,
+  X,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, QuoteItemWithProduct } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, QuoteItemWithProduct, Product } from '@/services/quotes/QuotesService';
 
 interface QuoteBuilderViewProps {
   quote: QuoteWithItems;
@@ -46,11 +47,68 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   const [customRequestText, setCustomRequestText] = useState(quote.custom_request_text || '');
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [quoteType, setQuoteType] = useState<'products' | 'custom'>(
     quote.custom_request_text ? 'custom' : 'products'
   );
 
   const items = (quote.items || []) as QuoteItemWithProduct[];
+
+  // Debounced product search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const debounceTimer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const results = await quotesService.searchProducts(searchQuery, 10);
+        // Filter out products already in the quote
+        const existingProductIds = items.map(item => item.product_id);
+        const filteredResults = results.filter(p => !existingProductIds.includes(p.id));
+        setSearchResults(filteredResults);
+      } catch (error) {
+        console.error('Error searching products:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to search products',
+          variant: 'destructive',
+        });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery, items, toast]);
+
+  // Handle adding product to quote
+  const handleAddProduct = async (product: Product) => {
+    try {
+      setAddingProductId(product.id);
+      await quotesService.addItem(quote.id, product.id, 1, undefined, 'search');
+      toast({
+        title: 'Success',
+        description: `${product.name || 'Product'} added to quote`,
+      });
+      setSearchQuery('');
+      setSearchResults([]);
+      onUpdate();
+    } catch (error) {
+      console.error('Error adding product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add product to quote',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingProductId(null);
+    }
+  };
 
   const handleRemoveItem = async (itemId: string) => {
     if (!confirm('Remove this material from the quote?')) return;
@@ -285,19 +343,84 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
             </div>
 
             {showAddMaterial && (
-              <div className="mb-4 p-3 bg-muted rounded-lg">
+              <div className="mb-4 p-4 bg-muted rounded-lg">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search materials to add..."
-                    className="pl-10"
+                    className="pl-10 pr-10"
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSearchResults([]);
+                      }}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-                <p className="text-muted-foreground text-sm mt-2">
-                  Search for materials from your catalog or use the "Add to Quote" button on product pages
-                </p>
+
+                {/* Search Results */}
+                {searchLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                    {searchResults.map((product) => (
+                      <div
+                        key={product.id}
+                        className="flex items-center justify-between p-3 bg-background rounded-lg border hover:border-primary transition-colors"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-10 h-10 bg-muted rounded flex items-center justify-center flex-shrink-0">
+                            <Package className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{product.name || 'Unnamed Product'}</p>
+                            {product.sku && (
+                              <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                            )}
+                            {product.description && (
+                              <p className="text-xs text-muted-foreground truncate max-w-xs">
+                                {product.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => handleAddProduct(product)}
+                          disabled={addingProductId === product.id}
+                          size="sm"
+                          className="ml-2 flex-shrink-0"
+                        >
+                          {addingProductId === product.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Plus className="h-4 w-4 mr-1" />
+                              Add
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : searchQuery.trim() ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">No products found matching "{searchQuery}"</p>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm mt-2">
+                    Type to search for materials from your catalog
+                  </p>
+                )}
               </div>
             )}
 

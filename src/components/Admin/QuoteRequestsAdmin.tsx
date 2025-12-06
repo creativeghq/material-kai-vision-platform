@@ -367,7 +367,6 @@ export const QuoteRequestsAdmin: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Quote Name</TableHead>
-                <TableHead>User ID</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Status Tag</TableHead>
                 <TableHead>Items</TableHead>
@@ -379,7 +378,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
             <TableBody>
               {quoteRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No quote requests found
                   </TableCell>
                 </TableRow>
@@ -391,12 +390,9 @@ export const QuoteRequestsAdmin: React.FC = () => {
                   .map((quote) => {
                     const statusTag = statusTags.find(tag => tag.id === quote.status_tag_id);
                     return (
-                  <TableRow key={quote.id}>
+                  <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewQuote(quote.id)}>
                     <TableCell className="font-medium">
-                      {quote.name || `Quote #${quote.id.substring(0, 8)}`}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {quote.user_id.substring(0, 8)}...
+                      {quote.name || 'Untitled Quote'}
                     </TableCell>
                     <TableCell>{getStatusBadge(quote.status)}</TableCell>
                     <TableCell>
@@ -427,14 +423,20 @@ export const QuoteRequestsAdmin: React.FC = () => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleViewQuote(quote.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewQuote(quote.id);
+                          }}
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteQuote(quote.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteQuote(quote.id);
+                          }}
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>

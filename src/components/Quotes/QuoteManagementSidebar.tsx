@@ -32,12 +32,14 @@ interface QuoteManagementSidebarProps {
   isOpen: boolean;
   onClose: () => void;
   initialQuoteId?: string;
+  onQuoteUpdate?: () => void;
 }
 
 export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
   isOpen,
   onClose,
   initialQuoteId,
+  onQuoteUpdate,
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -303,6 +305,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
                 quote={selectedQuote}
                 onUpdate={() => {
                   loadQuotes();
+                  onQuoteUpdate?.();
                   if (selectedQuote) {
                     handleSelectQuote(selectedQuote.id);
                   }
@@ -310,6 +313,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
                 onClose={() => {
                   setView('list');
                   setSelectedQuote(null);
+                  onQuoteUpdate?.();
                 }}
               />
             )}

@@ -624,17 +624,29 @@ export class QuotesService {
   // =====================================================
 
   /**
-   * Get all timeline steps
+   * Get all timeline steps (active only by default)
    */
-  async getTimelineSteps(): Promise<TimelineStep[]> {
-    const { data, error } = await supabase
+  async getTimelineSteps(activeOnly: boolean = true): Promise<TimelineStep[]> {
+    let query = supabase
       .from('timeline_steps')
       .select('*')
-      .eq('is_active', true)
       .order('display_order', { ascending: true });
+
+    if (activeOnly) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];
+  }
+
+  /**
+   * Get all timeline steps including inactive ones
+   */
+  async getAllTimelineSteps(): Promise<TimelineStep[]> {
+    return this.getTimelineSteps(false);
   }
 
   /**
@@ -644,6 +656,7 @@ export class QuotesService {
     name: string;
     description?: string;
     display_order?: number;
+    is_active?: boolean;
   }): Promise<TimelineStep> {
     const { data: step, error } = await supabase
       .from('timeline_steps')
@@ -651,13 +664,182 @@ export class QuotesService {
         name: data.name,
         description: data.description,
         display_order: data.display_order || 0,
-        is_active: true,
+        is_active: data.is_active !== false,
       })
       .select()
       .single();
 
     if (error) throw error;
     return step;
+  }
+
+  /**
+   * Update a timeline step
+   */
+  async updateTimelineStepDefinition(
+    stepId: string,
+    data: {
+      name?: string;
+      description?: string;
+      is_active?: boolean;
+      display_order?: number;
+    }
+  ): Promise<TimelineStep> {
+    const { data: step, error } = await supabase
+      .from('timeline_steps')
+      .update(data)
+      .eq('id', stepId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return step;
+  }
+
+  /**
+   * Delete a timeline step
+   */
+  async deleteTimelineStepDefinition(stepId: string): Promise<void> {
+    const { error } = await supabase
+      .from('timeline_steps')
+      .delete()
+      .eq('id', stepId);
+
+    if (error) throw error;
+  }
+
+  /**
+   * Reorder timeline steps
+   */
+  async reorderTimelineSteps(stepIds: string[]): Promise<void> {
+    // Update each step's display_order based on its position in the array
+    const updates = stepIds.map((id, index) => ({
+      id,
+      display_order: index,
+    }));
+
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('timeline_steps')
+        .update({ display_order: update.display_order })
+        .eq('id', update.id);
+
+      if (error) throw error;
+    }
+  }
+
+  /**
+   * Get timeline step usage count (how many quotes use this step)
+   */
+  async getTimelineStepUsageCount(stepId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('quote_timeline')
+      .select('*', { count: 'exact', head: true })
+      .eq('timeline_step_id', stepId);
+
+    if (error) throw error;
+    return count || 0;
+  }
+
+  /**
+   * Reorder upsells
+   */
+  async reorderUpsells(upsellIds: string[]): Promise<void> {
+    // Update each upsell's display_order based on its position in the array
+    const updates = upsellIds.map((id, index) => ({
+      id,
+      display_order: index,
+    }));
+
+    for (const update of updates) {
+      const { error } = await supabase
+        .from('upsells')
+        .update({ display_order: update.display_order })
+        .eq('id', update.id);
+
+      if (error) throw error;
+    }
+  }
+
+  /**
+   * Get upsell usage count (how many quotes have this upsell attached)
+   */
+  async getUpsellUsageCount(upsellId: string): Promise<number> {
+    const { count, error } = await supabase
+      .from('quote_upsells')
+      .select('*', { count: 'exact', head: true })
+      .eq('upsell_id', upsellId);
+
+    if (error) throw error;
+    return count || 0;
+  }
+
+  // =====================================================
+  // PRODUCT SEARCH FOR QUOTES
+  // =====================================================
+
+  /**
+   * Search products for adding to quotes
+   */
+  async searchProducts(query: string, limit: number = 10): Promise<Product[]> {
+    // Get the current user to find their workspace
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get user's workspace
+    const { data: workspaceData } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (!workspaceData) {
+      throw new Error('No workspace found for user');
+    }
+
+    // Search products by name or description
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, name, sku, description, metadata')
+      .eq('workspace_id', workspaceData.workspace_id)
+      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  // =====================================================
+  // QUOTE ACCEPTANCE
+  // =====================================================
+
+  /**
+   * Accept a quote with validation
+   * Validates that all upsells have been decided before accepting
+   */
+  async acceptQuote(quoteId: string): Promise<{ success: boolean; error?: string }> {
+    // Get quote upsells
+    const upsells = await this.getQuoteUpsells(quoteId);
+
+    // Check if all upsells have been decided
+    const pendingUpsells = upsells.filter(u => u.customer_accepted === null);
+    if (pendingUpsells.length > 0) {
+      return {
+        success: false,
+        error: `Please decide on all ${pendingUpsells.length} pending extra(s) before accepting the quote.`
+      };
+    }
+
+    // Update quote status to accepted
+    await this.updateQuote(quoteId, { status: 'accepted' });
+
+    // Initialize timeline for the quote
+    await this.initializeQuoteTimeline(quoteId);
+
+    return { success: true };
   }
 
   /**

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, FileText, Package, DollarSign, Check, Loader2, GitBranch } from 'lucide-react';
+import { X, Calendar, FileText, Package, DollarSign, Check, Loader2, GitBranch, AlertCircle } from 'lucide-react';
 
 import {
   Dialog,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, Upsell, QuoteUpsell } from '@/services/quotes/QuotesService';
 import { ProjectTimelineModal } from './ProjectTimelineModal';
@@ -83,28 +83,24 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
   };
 
   const handleAcceptQuote = async () => {
-    // Validate all upsells have been accepted or rejected
-    const pendingUpsells = quoteUpsells.filter(qu => qu.customer_accepted === null);
-    if (pendingUpsells.length > 0) {
-      toast({
-        title: 'Action Required',
-        description: `Please accept or reject all extras before accepting the quote (${pendingUpsells.length} pending)`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
       setAcceptingQuote(true);
-      // Update quote status to 'accepted'
-      await quotesService.updateQuote(quote.id, { status: 'accepted' });
 
-      // Initialize timeline
-      await quotesService.initializeQuoteTimeline(quote.id);
+      // Use the acceptQuote method which handles validation and timeline initialization
+      const result = await quotesService.acceptQuote(quote.id);
+
+      if (!result.success) {
+        toast({
+          title: 'Action Required',
+          description: result.error || 'Please accept or reject all extras before accepting the quote',
+          variant: 'destructive',
+        });
+        return;
+      }
 
       toast({
-        title: 'Success',
-        description: 'Quote accepted successfully! Timeline has been initialized.',
+        title: 'Quote Accepted!',
+        description: 'Your quote has been accepted and the project timeline has been initialized.',
       });
 
       onUpdate();
@@ -113,13 +109,16 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
       console.error('Error accepting quote:', error);
       toast({
         title: 'Error',
-        description: 'Failed to accept quote',
+        description: 'Failed to accept quote. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setAcceptingQuote(false);
     }
   };
+
+  // Calculate pending upsells for UI feedback
+  const pendingUpsellsCount = quoteUpsells.filter(qu => qu.customer_accepted === null).length;
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -128,14 +127,6 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
-
-  const formatPrice = (price?: number) => {
-    if (!price) return 'Not estimated';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
   };
 
   const getStatusColor = (status: string) => {
@@ -154,9 +145,9 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
-              <DialogTitle className="text-2xl">Quote Request Details</DialogTitle>
+              <DialogTitle className="text-2xl">{quote.name || 'Quote Request'}</DialogTitle>
               <DialogDescription className="mt-1">
-                Request ID: {quote.id}
+                Created {formatDate(quote.created_at)}
               </DialogDescription>
             </div>
             <Badge variant="secondary" className={getStatusColor(quote.status)}>
@@ -166,6 +157,16 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
+          {/* Pending Upsells Warning */}
+          {pendingUpsellsCount > 0 && quote.status !== 'accepted' && quoteUpsells.length > 0 && (
+            <Alert className="border-amber-300 bg-amber-50">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                You have {pendingUpsellsCount} extra{pendingUpsellsCount !== 1 ? 's' : ''} pending decision.
+                Please accept or reject all extras before accepting the quote.
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Summary */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
             <h3 className="text-lg font-medium mb-3 text-gray-900">Summary</h3>
@@ -232,94 +233,138 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
           {/* Extras/Upsells Section */}
           {quoteUpsells.length > 0 && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="text-lg font-medium mb-4 text-gray-900">
-                Additional Extras
-                <span className="text-sm font-normal text-gray-600 ml-2">
-                  ({quoteUpsells.length} item{quoteUpsells.length !== 1 ? 's' : ''})
-                </span>
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Additional Extras
+                  <span className="text-sm font-normal text-gray-600 ml-2">
+                    ({quoteUpsells.length} item{quoteUpsells.length !== 1 ? 's' : ''})
+                  </span>
+                </h3>
+                {quote.status === 'accepted' && (
+                  <Badge className="bg-blue-100 text-blue-700 border-blue-300">
+                    Locked
+                  </Badge>
+                )}
+              </div>
               {loadingUpsells ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {quoteUpsells.map((quoteUpsell) => {
-                    const upsell = upsells.find(u => u.id === quoteUpsell.upsell_id);
-                    if (!upsell) return null;
+                <>
+                  <div className="grid gap-3">
+                    {quoteUpsells.map((quoteUpsell) => {
+                      const upsell = upsells.find(u => u.id === quoteUpsell.upsell_id);
+                      if (!upsell) return null;
 
-                    const isUpdating = updatingUpsell === quoteUpsell.id;
-                    const isAccepted = quoteUpsell.customer_accepted === true;
-                    const isRejected = quoteUpsell.customer_accepted === false;
+                      const isUpdating = updatingUpsell === quoteUpsell.id;
+                      const isAccepted = quoteUpsell.customer_accepted === true;
+                      const isRejected = quoteUpsell.customer_accepted === false;
+                      const isPending = quoteUpsell.customer_accepted === null;
+                      const isLocked = quote.status === 'accepted';
 
-                    return (
-                      <div
-                        key={quoteUpsell.id}
-                        className={`flex items-start justify-between p-4 border rounded-lg transition-colors ${
-                          isAccepted
-                            ? 'border-green-300 bg-green-50'
-                            : isRejected
-                            ? 'border-red-300 bg-red-50'
-                            : 'border-gray-300 bg-white'
-                        }`}
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Package className="h-4 w-4 text-gray-400" />
-                            <h4 className="font-medium text-gray-900">{upsell.name}</h4>
-                            {isAccepted && (
-                              <Badge className="bg-green-100 text-green-700 border-green-300">
-                                Accepted
-                              </Badge>
-                            )}
-                            {isRejected && (
-                              <Badge className="bg-red-100 text-red-700 border-red-300">
-                                Rejected
-                              </Badge>
-                            )}
-                          </div>
-                          {upsell.description && (
-                            <p className="text-sm text-gray-600 mb-2">{upsell.description}</p>
-                          )}
-                          <div className="flex items-center gap-1 text-green-600 font-semibold">
-                            <DollarSign className="h-4 w-4" />
-                            {new Intl.NumberFormat('en-US', {
-                              style: 'currency',
-                              currency: 'USD',
-                            }).format(upsell.price)}
+                      return (
+                        <div
+                          key={quoteUpsell.id}
+                          className={`p-4 border rounded-lg transition-all ${
+                            isAccepted
+                              ? 'border-green-300 bg-green-50'
+                              : isRejected
+                              ? 'border-red-300 bg-red-50'
+                              : isPending
+                              ? 'border-amber-300 bg-amber-50'
+                              : 'border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Package className="h-4 w-4 text-gray-400" />
+                                <h4 className="font-medium text-gray-900">{upsell.name}</h4>
+                                {isAccepted && (
+                                  <Badge className="bg-green-100 text-green-700 border-green-300">
+                                    Accepted
+                                  </Badge>
+                                )}
+                                {isRejected && (
+                                  <Badge className="bg-red-100 text-red-700 border-red-300">
+                                    Rejected
+                                  </Badge>
+                                )}
+                                {isPending && !isLocked && (
+                                  <Badge className="bg-amber-100 text-amber-700 border-amber-300">
+                                    Pending Decision
+                                  </Badge>
+                                )}
+                              </div>
+                              {upsell.description && (
+                                <p className="text-sm text-gray-600 mb-2">{upsell.description}</p>
+                              )}
+                              <div className="flex items-center gap-1 text-green-600 font-semibold">
+                                <DollarSign className="h-4 w-4" />
+                                {new Intl.NumberFormat('en-US', {
+                                  style: 'currency',
+                                  currency: 'USD',
+                                }).format(upsell.price)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              {isUpdating ? (
+                                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                              ) : isLocked ? (
+                                <span className="text-sm text-gray-500 italic">Locked</span>
+                              ) : (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant={isAccepted ? 'default' : 'outline'}
+                                    onClick={() => handleAcceptUpsell(quoteUpsell.id, true)}
+                                    disabled={isAccepted}
+                                    className={isAccepted ? 'bg-green-600 hover:bg-green-700' : ''}
+                                  >
+                                    <Check className="h-4 w-4 mr-1" />
+                                    Accept
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={isRejected ? 'destructive' : 'outline'}
+                                    onClick={() => handleAcceptUpsell(quoteUpsell.id, false)}
+                                    disabled={isRejected}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Reject
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          {isUpdating ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                variant={isAccepted ? 'default' : 'outline'}
-                                onClick={() => handleAcceptUpsell(quoteUpsell.id, true)}
-                                disabled={isAccepted}
-                                className={isAccepted ? 'bg-green-600 hover:bg-green-700' : ''}
-                              >
-                                <Check className="h-4 w-4 mr-1" />
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={isRejected ? 'destructive' : 'outline'}
-                                onClick={() => handleAcceptUpsell(quoteUpsell.id, false)}
-                                disabled={isRejected}
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Reject
-                              </Button>
-                            </>
+                      );
+                    })}
+                  </div>
+
+                  {/* Extras Total */}
+                  {quoteUpsells.some(qu => qu.customer_accepted === true) && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Accepted Extras Total:</span>
+                        <span className="font-semibold text-green-600">
+                          {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: 'USD',
+                          }).format(
+                            quoteUpsells
+                              .filter(qu => qu.customer_accepted === true)
+                              .reduce((sum, qu) => {
+                                const upsell = upsells.find(u => u.id === qu.upsell_id);
+                                return sum + (upsell?.price || 0);
+                              }, 0)
                           )}
-                        </div>
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

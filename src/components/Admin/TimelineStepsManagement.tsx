@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, GripVertical, Save } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -30,7 +40,10 @@ export const TimelineStepsManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [timelineSteps, setTimelineSteps] = useState<TimelineStep[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingStep, setEditingStep] = useState<TimelineStep | null>(null);
+  const [deletingStep, setDeletingStep] = useState<TimelineStep | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   // Form state
   const [stepName, setStepName] = useState('');
@@ -112,7 +125,110 @@ export const TimelineStepsManagement: React.FC = () => {
 
   const handleCloseModal = () => {
     setShowCreateModal(false);
+    setShowEditModal(false);
     resetForm();
+  };
+
+  const handleOpenEdit = (step: TimelineStep) => {
+    setEditingStep(step);
+    setStepName(step.name);
+    setStepDescription(step.description || '');
+    setIsActive(step.is_active);
+    setDisplayOrder(step.display_order.toString());
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStep = async () => {
+    if (!editingStep || !stepName.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Step name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await quotesService.updateTimelineStepDefinition(editingStep.id, {
+        name: stepName.trim(),
+        description: stepDescription.trim() || undefined,
+        is_active: isActive,
+        display_order: parseInt(displayOrder) || 0,
+      });
+      toast({
+        title: 'Success',
+        description: 'Timeline step updated successfully',
+      });
+      setShowEditModal(false);
+      resetForm();
+      await loadTimelineSteps();
+    } catch (error) {
+      console.error('Error updating timeline step:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update timeline step',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteStep = async () => {
+    if (!deletingStep) return;
+
+    try {
+      setSaving(true);
+      await quotesService.deleteTimelineStepDefinition(deletingStep.id);
+      toast({
+        title: 'Success',
+        description: 'Timeline step deleted successfully',
+      });
+      setDeletingStep(null);
+      await loadTimelineSteps();
+    } catch (error) {
+      console.error('Error deleting timeline step:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete timeline step',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
+    const sortedSteps = [...timelineSteps].sort((a, b) => a.display_order - b.display_order);
+    const currentIndex = sortedSteps.findIndex(s => s.id === stepId);
+
+    if (
+      (direction === 'up' && currentIndex === 0) ||
+      (direction === 'down' && currentIndex === sortedSteps.length - 1)
+    ) {
+      return;
+    }
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    const newOrder = [...sortedSteps];
+    const [movedStep] = newOrder.splice(currentIndex, 1);
+    newOrder.splice(newIndex, 0, movedStep);
+
+    try {
+      setReordering(true);
+      await quotesService.reorderTimelineSteps(newOrder.map(s => s.id));
+      await loadTimelineSteps();
+    } catch (error) {
+      console.error('Error reordering steps:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reorder steps',
+        variant: 'destructive',
+      });
+    } finally {
+      setReordering(false);
+    }
   };
 
   if (loading) {
@@ -172,10 +288,30 @@ export const TimelineStepsManagement: React.FC = () => {
               ) : (
                 timelineSteps
                   .sort((a, b) => a.display_order - b.display_order)
-                  .map((step) => (
+                  .map((step, index, sortedArray) => (
                     <TableRow key={step.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              disabled={index === 0 || reordering}
+                              onClick={() => handleMoveStep(step.id, 'up')}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              disabled={index === sortedArray.length - 1 || reordering}
+                              onClick={() => handleMoveStep(step.id, 'down')}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                          </div>
                           <GitBranch className="h-4 w-4 text-gray-400" />
                           {step.name}
                         </div>
@@ -196,9 +332,17 @@ export const TimelineStepsManagement: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled
+                            onClick={() => handleOpenEdit(step)}
                           >
                             <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeletingStep(step)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -283,6 +427,97 @@ export const TimelineStepsManagement: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Modal */}
+      <Dialog open={showEditModal} onOpenChange={handleCloseModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Timeline Step</DialogTitle>
+            <DialogDescription>
+              Update the timeline step details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Name *</label>
+              <Input
+                value={stepName}
+                onChange={(e) => setStepName(e.target.value)}
+                placeholder="e.g., Materials Ordered"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Description</label>
+              <Textarea
+                value={stepDescription}
+                onChange={(e) => setStepDescription(e.target.value)}
+                placeholder="Describe this timeline step..."
+                className="mt-1"
+                rows={3}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">Active</label>
+              <Switch
+                checked={isActive}
+                onCheckedChange={setIsActive}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={handleCloseModal}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleUpdateStep}
+                disabled={saving || !stepName.trim()}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingStep} onOpenChange={() => setDeletingStep(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Timeline Step</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingStep?.name}"? This action cannot be undone.
+              Any quotes using this step will lose their timeline data for this step.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteStep}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
