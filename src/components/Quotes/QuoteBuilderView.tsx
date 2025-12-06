@@ -202,19 +202,11 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Quote Summary */}
-      <div className="bg-muted rounded-lg p-4">
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-medium flex items-center gap-2">
-            <div style={{
-              width: '2rem',
-              height: '2rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'hsl(var(--primary) / 0.1)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+          <h3 className="text-lg font-medium flex items-center gap-2 text-gray-900">
+            <div className="bg-blue-50 rounded-lg flex items-center justify-center" style={{ width: '2rem', height: '2rem' }}>
+              <Package className="h-4 w-4 text-blue-600" />
             </div>
             {quote.name || `Quote #${quote.id.substring(0, 8)}`}
           </h3>
@@ -223,7 +215,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
           </Badge>
         </div>
         <div className="space-y-2">
-          <div className="text-muted-foreground text-sm">
+          <div className="text-gray-600 text-sm">
             {quoteType === 'products'
               ? `${items.length} material${items.length !== 1 ? 's' : ''}`
               : 'Custom request'
@@ -311,9 +303,9 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
 
             {items.length === 0 ? (
               <div className="text-center py-8">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                <p className="text-foreground mb-2">No materials added yet</p>
-                <p className="text-muted-foreground text-sm">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-900 mb-2">No materials added yet</p>
+                <p className="text-gray-600 text-sm">
                   Use the "Add to Quote" button on product pages or search above
                 </p>
               </div>
@@ -333,11 +325,11 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
                       <TableRow key={item.id}>
                         <TableCell>
                           <div className="space-y-1">
-                            <div className="font-medium">
+                            <div className="font-medium text-gray-900">
                               {item.product?.name || 'Unknown Material'}
                             </div>
                             {item.product?.sku && (
-                              <div className="text-xs text-muted-foreground">SKU: {item.product.sku}</div>
+                              <div className="text-xs text-gray-600">SKU: {item.product.sku}</div>
                             )}
                             {item.added_from && (
                               <Badge variant="outline" className="text-xs">
@@ -355,7 +347,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
                             className="w-20 text-center"
                           />
                         </TableCell>
-                        <TableCell className="text-muted-foreground text-sm max-w-xs">
+                        <TableCell className="text-gray-600 text-sm max-w-xs">
                           <div className="truncate">{item.notes || '-'}</div>
                         </TableCell>
                         <TableCell className="text-right">

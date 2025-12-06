@@ -69,81 +69,55 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
         <div className="space-y-6 mt-4">
           {/* Summary */}
-          <div className="bg-muted rounded-lg p-4 space-y-3">
-            <h3 className="text-lg font-medium mb-3">Summary</h3>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+            <h3 className="text-lg font-medium mb-3 text-gray-900">Summary</h3>
 
             <div className="flex items-center gap-3">
               <div
-                className="flex items-center justify-center"
+                className="flex items-center justify-center bg-blue-50 rounded-lg"
                 style={{
                   width: '2rem',
                   height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
                 }}
               >
-                <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <Package className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Items</p>
-                <p className="font-medium">{quote.items?.length || 0} items</p>
+                <p className="text-gray-600 text-sm">Items</p>
+                <p className="font-medium text-gray-900">{quote.items?.length || 0} items</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <div className="flex items-center justify-center bg-blue-50 rounded-lg" style={{ width: '2rem', height: '2rem' }}>
+                <FileText className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Quote Name</p>
-                <p className="text-lg font-semibold">
+                <p className="text-gray-600 text-sm">Quote Name</p>
+                <p className="text-lg font-semibold text-gray-900">
                   {quote.name || 'Untitled Quote'}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <div className="flex items-center justify-center bg-blue-50 rounded-lg" style={{ width: '2rem', height: '2rem' }}>
+                <Calendar className="h-4 w-4 text-blue-600" />
               </div>
               <div>
-                <p className="text-muted-foreground text-sm">Created</p>
-                <p className="font-medium">{formatDate(quote.created_at)}</p>
+                <p className="text-gray-600 text-sm">Created</p>
+                <p className="font-medium text-gray-900">{formatDate(quote.created_at)}</p>
               </div>
             </div>
 
             {quote.updated_at !== quote.created_at && (
               <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2rem',
-                    height: '2rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)'
-                  }}
-                >
-                  <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <div className="flex items-center justify-center bg-blue-50 rounded-lg" style={{ width: '2rem', height: '2rem' }}>
+                  <Calendar className="h-4 w-4 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-sm">Last Updated</p>
-                  <p className="font-medium">{formatDate(quote.updated_at)}</p>
+                  <p className="text-gray-600 text-sm">Last Updated</p>
+                  <p className="font-medium text-gray-900">{formatDate(quote.updated_at)}</p>
                 </div>
               </div>
             )}
@@ -151,9 +125,9 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
 
           {/* Notes */}
           {quote.notes && (
-            <div className="bg-muted rounded-lg p-4">
-              <h3 className="text-lg font-medium mb-2">Notes</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="text-lg font-medium mb-2 text-gray-900">Notes</h3>
+              <p className="text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
             </div>
           )}
 
