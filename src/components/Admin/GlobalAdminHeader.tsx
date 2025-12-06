@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ArrowLeft } from 'lucide-react';
+import { Brain, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -21,42 +21,28 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div
-      className="px-6 py-4 m-4 rounded-3xl"
-      style={{
-        background: 'var(--glass-bg)',
-        backdropFilter: 'var(--glass-blur)',
-        border: '1px solid var(--glass-border)',
-        boxShadow: 'var(--glass-shadow)',
-      }}
-    >
+    <div className="border-b bg-card px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          {/* Navigation Buttons */}
           <div className="flex items-center space-x-2">
             <Button
               onClick={() => navigate('/')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
-              variant="ghost"
+              className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
             >
-              <Home className="h-4 w-4" />
+              <Brain className="h-4 w-4" />
               Back to Main
             </Button>
             <Button
               onClick={() => navigate('/admin')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
-              variant="ghost"
+              className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Admin Dashboard
+              <Activity className="h-4 w-4" />
+              Back to Admin
             </Button>
           </div>
-
-          <div className="h-6 w-px bg-white/20" />
-
-          {/* Title and Description */}
+          <div className="h-6 w-px bg-border" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             {description && (
@@ -64,10 +50,8 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
             )}
           </div>
         </div>
-
-        {/* Badge */}
         {badge && (
-          <Badge className="text-sm px-2 py-1" style={{ background: 'var(--mocha-color)' }}>
+          <Badge className="text-sm px-2 py-1" style={{ background: 'hsl(var(--primary))' }}>
             {badge}
           </Badge>
         )}
