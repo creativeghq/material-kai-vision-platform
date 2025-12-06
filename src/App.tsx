@@ -64,6 +64,7 @@ import { QuoteRequestsPage } from './components/Quotes/QuoteRequestsPage';
 import { QuotesPage } from './pages/QuotesPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
 import { QuoteRequestsAdmin } from './components/Admin/QuoteRequestsAdmin';
+import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -558,6 +559,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <QuoteRequestsAdmin />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/quotes/:id"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <QuoteDetailPage />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, StatusTag } from '@/services/quotes/QuotesService';
 import { usersAPI } from '@/services/crm.service';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,12 +44,13 @@ interface UserProfile {
 export const QuoteRequestsAdmin: React.FC = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [quoteRequests, setQuoteRequests] = useState<QuoteWithItems[]>([]);
-  const [selectedQuote, setSelectedQuote] = useState<QuoteWithItems | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
 
   // Create quote form state
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -60,6 +62,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   useEffect(() => {
     loadQuoteRequests();
     loadUsers();
+    loadStatusTags();
   }, []);
 
   const loadQuoteRequests = async () => {
@@ -76,6 +79,15 @@ export const QuoteRequestsAdmin: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadStatusTags = async () => {
+    try {
+      const tags = await quotesService.getStatusTags();
+      setStatusTags(tags);
+    } catch (error) {
+      console.error('Error loading status tags:', error);
     }
   };
 
@@ -117,19 +129,8 @@ export const QuoteRequestsAdmin: React.FC = () => {
     }
   };
 
-  const handleViewQuote = async (quoteId: string) => {
-    try {
-      const quote = await quotesService.getQuoteRequest(quoteId);
-      setSelectedQuote(quote);
-      setShowDetailModal(true);
-    } catch (error) {
-      console.error('Error loading quote details:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load quote details',
-        variant: 'destructive',
-      });
-    }
+  const handleViewQuote = (quoteId: string) => {
+    navigate(`/admin/quotes/${quoteId}`);
   };
 
   const handleDeleteQuote = async (quoteId: string) => {
@@ -325,7 +326,28 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
         {/* Actions */}
         <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold">All Quote Requests</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold">All Quote Requests</h2>
+            <Select value={selectedStatusFilter} onValueChange={setSelectedStatusFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Filter by status tag" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status Tags</SelectItem>
+                {statusTags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
             onClick={() => setShowCreateModal(true)}
             style={{
@@ -347,6 +369,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 <TableHead>Quote Name</TableHead>
                 <TableHead>User ID</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Status Tag</TableHead>
                 <TableHead>Items</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Expires</TableHead>
@@ -356,12 +379,18 @@ export const QuoteRequestsAdmin: React.FC = () => {
             <TableBody>
               {quoteRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No quote requests found
                   </TableCell>
                 </TableRow>
               ) : (
-                quoteRequests.map((quote) => (
+                quoteRequests
+                  .filter(quote =>
+                    selectedStatusFilter === 'all' || quote.status_tag_id === selectedStatusFilter
+                  )
+                  .map((quote) => {
+                    const statusTag = statusTags.find(tag => tag.id === quote.status_tag_id);
+                    return (
                   <TableRow key={quote.id}>
                     <TableCell className="font-medium">
                       {quote.name || `Quote #${quote.id.substring(0, 8)}`}
@@ -370,6 +399,22 @@ export const QuoteRequestsAdmin: React.FC = () => {
                       {quote.user_id.substring(0, 8)}...
                     </TableCell>
                     <TableCell>{getStatusBadge(quote.status)}</TableCell>
+                    <TableCell>
+                      {statusTag ? (
+                        <Badge
+                          style={{
+                            backgroundColor: statusTag.color + '20',
+                            color: statusTag.color,
+                            borderColor: statusTag.color,
+                          }}
+                          className="border"
+                        >
+                          {statusTag.name}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400 text-sm">No tag</span>
+                      )}
+                    </TableCell>
                     <TableCell>{quote.total_items}</TableCell>
                     <TableCell className="text-sm">
                       {new Date(quote.created_at).toLocaleDateString()}
@@ -396,85 +441,13 @@ export const QuoteRequestsAdmin: React.FC = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                    );
+                  })
               )}
             </TableBody>
           </Table>
         </div>
       </div>
-
-      {/* Detail Modal */}
-      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Quote Request Details</DialogTitle>
-            <DialogDescription>
-              {selectedQuote?.name || `Quote #${selectedQuote?.id.substring(0, 8)}`}
-            </DialogDescription>
-          </DialogHeader>
-          {selectedQuote && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium">Status</p>
-                  <div className="mt-1">{getStatusBadge(selectedQuote.status)}</div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Total Items</p>
-                  <p className="mt-1">{selectedQuote.total_items}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Created</p>
-                  <p className="mt-1 text-sm">{new Date(selectedQuote.created_at).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Expires</p>
-                  <p className="mt-1 text-sm">{new Date(selectedQuote.expires_at).toLocaleString()}</p>
-                </div>
-              </div>
-              {selectedQuote.notes && (
-                <div>
-                  <p className="text-sm font-medium">Notes</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedQuote.notes}</p>
-                </div>
-              )}
-              {selectedQuote.custom_request_text && (
-                <div>
-                  <p className="text-sm font-medium">Custom Request</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{selectedQuote.custom_request_text}</p>
-                </div>
-              )}
-              {selectedQuote.items && selectedQuote.items.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Items</p>
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product ID</TableHead>
-                          <TableHead>Quantity</TableHead>
-                          <TableHead>Added From</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedQuote.items.map((item) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-mono text-sm">
-                              {item.product_id.substring(0, 8)}...
-                            </TableCell>
-                            <TableCell>{item.quantity}</TableCell>
-                            <TableCell className="text-sm">{item.added_from}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Create Quote Modal */}
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
