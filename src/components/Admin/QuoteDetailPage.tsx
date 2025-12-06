@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { ProjectTimelineModal } from '../Quotes/ProjectTimelineModal';
 import {
   Select,
   SelectContent,
@@ -38,6 +38,19 @@ export const QuoteDetailPage: React.FC = () => {
   const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
   const [updatingTimelineStep, setUpdatingTimelineStep] = useState<string | null>(null);
+  const [selectedTimelineStepId, setSelectedTimelineStepId] = useState<string>('');
+  const [timelineNote, setTimelineNote] = useState('');
+  const [addingTimeline, setAddingTimeline] = useState(false);
+
+  // Upsell add state
+  const [selectedUpsellId, setSelectedUpsellId] = useState<string>('');
+  const [upsellPrice, setUpsellPrice] = useState('');
+  const [upsellQuantity, setUpsellQuantity] = useState('1');
+  const [upsellMeasurement, setUpsellMeasurement] = useState('');
+  const [addingUpsell, setAddingUpsell] = useState(false);
+
+  // Timeline notes state (for editing notes on existing timeline items)
+  const [editingTimelineNotes, setEditingTimelineNotes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (id) {
@@ -162,6 +175,84 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
+  const handleAddTimelineFromDropdown = async () => {
+    if (!id || !selectedTimelineStepId) return;
+    try {
+      setAddingTimeline(true);
+      await quotesService.addTimelineStepToQuote(id, selectedTimelineStepId, timelineNote || undefined);
+      toast({
+        title: 'Success',
+        description: 'Timeline step added',
+      });
+      setSelectedTimelineStepId('');
+      setTimelineNote('');
+      await loadTimelineData();
+    } catch (error) {
+      console.error('Error adding timeline step:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add timeline step',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingTimeline(false);
+    }
+  };
+
+  const handleUpdateTimelineNote = async (quoteTimelineId: string, notes: string) => {
+    try {
+      await quotesService.updateTimelineStep(quoteTimelineId, { notes });
+      toast({
+        title: 'Success',
+        description: 'Note saved',
+      });
+      setEditingTimelineNotes((prev) => {
+        const updated = { ...prev };
+        delete updated[quoteTimelineId];
+        return updated;
+      });
+      await loadTimelineData();
+    } catch (error) {
+      console.error('Error updating timeline note:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save note',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleAddUpsellFromDropdown = async () => {
+    if (!id || !selectedUpsellId) return;
+    try {
+      setAddingUpsell(true);
+      const metadata = {
+        custom_price: upsellPrice ? parseFloat(upsellPrice) : undefined,
+        quantity: upsellQuantity ? parseFloat(upsellQuantity) : 1,
+        measurement: upsellMeasurement || undefined,
+      };
+      await quotesService.addUpsellToQuote(id, selectedUpsellId, undefined, metadata);
+      toast({
+        title: 'Success',
+        description: 'Upsell added to quote',
+      });
+      setSelectedUpsellId('');
+      setUpsellPrice('');
+      setUpsellQuantity('1');
+      setUpsellMeasurement('');
+      await loadQuoteUpsells();
+    } catch (error) {
+      console.error('Error adding upsell:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add upsell',
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingUpsell(false);
+    }
+  };
+
   const handleAddUpsell = async (upsellId: string) => {
     if (!id) return;
     try {
@@ -246,10 +337,10 @@ export const QuoteDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <GlobalAdminHeader title="Quote Details" />
-        <div className="flex items-center justify-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="min-h-screen">
+        <GlobalAdminHeader title="Quote Details" description="Loading..." badge="Admin" />
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </div>
     );
@@ -257,119 +348,127 @@ export const QuoteDetailPage: React.FC = () => {
 
   if (!quote) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <GlobalAdminHeader title="Quote Details" />
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="text-center">
-            <p className="text-gray-600">Quote not found</p>
-            <Button onClick={() => navigate('/admin/quote-requests')} className="mt-4">
-              Back to Quotes
-            </Button>
-          </div>
+      <div className="min-h-screen">
+        <GlobalAdminHeader title="Quote Not Found" badge="Admin" />
+        <div className="p-6">
+          <Button onClick={() => navigate('/admin/quote-requests')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Quotes
+          </Button>
         </div>
       </div>
     );
   }
 
   const selectedTag = statusTags.find(tag => tag.id === quote.status_tag_id);
+  const itemCount = quote.items?.length || quote.total_items || 0;
+  const extrasTotal = quoteUpsells.reduce((sum, qu) => {
+    const upsell = upsells.find(u => u.id === qu.upsell_id);
+    return sum + (upsell?.price || 0);
+  }, 0);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <GlobalAdminHeader title="Quote Details" />
+    <div className="min-h-screen">
+      <GlobalAdminHeader
+        title={quote.name || 'Untitled Quote'}
+        description={`Created ${new Date(quote.created_at).toLocaleDateString()}`}
+        badge="Quote Details"
+      />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/admin/quote-requests')}
-            className="mb-4"
-          >
+      <div className="p-6 space-y-6">
+        {/* Back Button & Status Row */}
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={() => navigate('/admin/quote-requests')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Quotes
           </Button>
 
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {quote.name || 'Untitled Quote'}
-              </h1>
-              <p className="text-gray-600 mt-1">
-                Created {new Date(quote.created_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              {quote.status === 'accepted' && (
-                <Button
-                  onClick={() => setShowTimelineModal(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <GitBranch className="h-4 w-4 mr-2" />
-                  View Timeline
-                </Button>
-              )}
-              <Badge variant="secondary" className={getStatusColor(quote.status)}>
-                {quote.status}
-              </Badge>
-              {selectedTag && (
-                <Badge
-                  style={{
-                    backgroundColor: selectedTag.color + '20',
-                    color: selectedTag.color,
-                    borderColor: selectedTag.color,
-                  }}
-                  className="border"
-                >
-                  {selectedTag.name}
-                </Badge>
-              )}
-            </div>
+          <div className="flex items-center gap-3">
+            {/* Quote Status Badge */}
+            <Badge className={`border ${getStatusColor(quote.status)}`}>
+              {quote.status}
+            </Badge>
+
+            {/* Status Tag Selector */}
+            <Select
+              value={quote.status_tag_id || ''}
+              onValueChange={handleStatusTagChange}
+              disabled={updatingStatus}
+            >
+              <SelectTrigger className="w-48 h-9 bg-white border-2">
+                {updatingStatus ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <SelectValue placeholder="Assign Status Tag">
+                    {selectedTag && (
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: selectedTag.color }}
+                        />
+                        <span className="truncate">{selectedTag.name}</span>
+                      </div>
+                    )}
+                  </SelectValue>
+                )}
+              </SelectTrigger>
+              <SelectContent>
+                {statusTags.map((tag) => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-3 h-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      <span>{tag.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Status Tag Selector */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700">Status Tag:</label>
-              <Select
-                value={quote.status_tag_id || ''}
-                onValueChange={handleStatusTagChange}
-                disabled={updatingStatus}
-              >
-                <SelectTrigger className="w-64">
-                  <SelectValue placeholder="Select status tag" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusTags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: tag.color }}
-                        />
-                        {tag.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="dashboard-card">
+            <div className="flex items-center gap-3 mb-2">
+              <Package className="h-5 w-5 text-primary" />
+              <span className="text-sm text-muted-foreground">Items</span>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-2xl font-semibold">{itemCount}</div>
+          </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-3 mb-2">
+              <Gift className="h-5 w-5 text-primary" />
+              <span className="text-sm text-muted-foreground">Extras</span>
+            </div>
+            <div className="text-2xl font-semibold">{quoteUpsells.length}</div>
+          </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-3 mb-2">
+              <DollarSign className="h-5 w-5 text-primary" />
+              <span className="text-sm text-muted-foreground">Extras Total</span>
+            </div>
+            <div className="text-2xl font-semibold">€{extrasTotal.toFixed(2)}</div>
+          </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-3 mb-2">
+              <ListChecks className="h-5 w-5 text-primary" />
+              <span className="text-sm text-muted-foreground">Timeline Steps</span>
+            </div>
+            <div className="text-2xl font-semibold">{quoteTimeline.length}</div>
+          </div>
+        </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="bg-white border border-gray-200">
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="items">Items ({quote.items?.length || 0})</TabsTrigger>
-            <TabsTrigger value="extras">Extras/Upsells</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="activity">Activity Log</TabsTrigger>
+            <TabsTrigger value="items">Items ({itemCount})</TabsTrigger>
+            <TabsTrigger value="extras">Extras ({quoteUpsells.length})</TabsTrigger>
+            <TabsTrigger value="timeline">Timeline ({quoteTimeline.length})</TabsTrigger>
+            <TabsTrigger value="activity">Activity</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -576,6 +675,98 @@ export const QuoteDetailPage: React.FC = () => {
 
           {/* Extras Tab */}
           <TabsContent value="extras" className="space-y-6">
+            {/* Add Upsell Dropdown Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5" />
+                  Add Extra/Upsell
+                </CardTitle>
+                <CardDescription>
+                  Select an upsell from the dropdown and customize price, quantity, and measurement
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                  {/* Upsell Dropdown */}
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium mb-2 block">Select Upsell</label>
+                    <Select value={selectedUpsellId} onValueChange={setSelectedUpsellId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Choose an upsell..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {upsells
+                          .filter(u => !quoteUpsells.some(qu => qu.upsell_id === u.id))
+                          .map((upsell) => (
+                            <SelectItem key={upsell.id} value={upsell.id}>
+                              <div className="flex items-center justify-between gap-4">
+                                <span>{upsell.name}</span>
+                                <span className="text-muted-foreground">€{upsell.price.toFixed(2)}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Custom Price */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      <DollarSign className="h-3 w-3 inline mr-1" />
+                      Price (€)
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Custom price"
+                      value={upsellPrice}
+                      onChange={(e) => setUpsellPrice(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Quantity */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      <Ruler className="h-3 w-3 inline mr-1" />
+                      Quantity
+                    </label>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="1"
+                      placeholder="1"
+                      value={upsellQuantity}
+                      onChange={(e) => setUpsellQuantity(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Measurement */}
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Measurement</label>
+                    <Input
+                      placeholder="e.g., m², pcs"
+                      value={upsellMeasurement}
+                      onChange={(e) => setUpsellMeasurement(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleAddUpsellFromDropdown}
+                  disabled={!selectedUpsellId || addingUpsell}
+                  className="mt-4"
+                >
+                  {addingUpsell ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Add Upsell to Quote
+                </Button>
+              </CardContent>
+            </Card>
+
             {/* Attached Upsells */}
             <Card>
               <CardHeader>
@@ -587,25 +778,30 @@ export const QuoteDetailPage: React.FC = () => {
               <CardContent>
                 {loadingUpsells ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                    <Loader2 className="h-6 w-6 animate-spin" />
                   </div>
                 ) : quoteUpsells.length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No upsells attached to this quote yet</p>
+                  <p className="text-muted-foreground text-center py-8">No upsells attached to this quote yet</p>
                 ) : (
                   <div className="space-y-3">
                     {quoteUpsells.map((quoteUpsell) => {
                       const upsell = upsells.find(u => u.id === quoteUpsell.upsell_id);
                       if (!upsell) return null;
 
+                      const metadata = quoteUpsell.metadata as { custom_price?: number; quantity?: number; measurement?: string } | null;
+                      const displayPrice = metadata?.custom_price ?? upsell.price;
+                      const displayQty = metadata?.quantity ?? 1;
+                      const displayMeasurement = metadata?.measurement ?? '';
+
                       return (
                         <div
                           key={quoteUpsell.id}
-                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50"
+                          className="flex items-center justify-between p-4 border rounded-lg bg-muted/50"
                         >
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <Package className="h-4 w-4 text-gray-400" />
-                              <h4 className="font-medium text-gray-900">{upsell.name}</h4>
+                              <Gift className="h-4 w-4 text-muted-foreground" />
+                              <h4 className="font-medium">{upsell.name}</h4>
                               {quoteUpsell.customer_accepted !== null && (
                                 <Badge variant={quoteUpsell.customer_accepted ? 'default' : 'destructive'}>
                                   {quoteUpsell.customer_accepted ? 'Accepted' : 'Rejected'}
@@ -613,21 +809,21 @@ export const QuoteDetailPage: React.FC = () => {
                               )}
                             </div>
                             {upsell.description && (
-                              <p className="text-sm text-gray-600 mt-1">{upsell.description}</p>
+                              <p className="text-sm text-muted-foreground mt-1">{upsell.description}</p>
                             )}
-                            <div className="flex items-center gap-1 mt-2 text-green-600 font-semibold">
-                              <DollarSign className="h-4 w-4" />
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'USD',
-                              }).format(upsell.price)}
+                            <div className="flex items-center gap-4 mt-2 text-sm">
+                              <span className="text-green-600 font-semibold">€{displayPrice.toFixed(2)}</span>
+                              <span className="text-muted-foreground">Qty: {displayQty}</span>
+                              {displayMeasurement && (
+                                <span className="text-muted-foreground">({displayMeasurement})</span>
+                              )}
                             </div>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleRemoveUpsell(quoteUpsell.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -638,97 +834,110 @@ export const QuoteDetailPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Available Upsells */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Upsells to Quote</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {upsells.length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No active upsells available</p>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {upsells
-                      .filter(upsell => !quoteUpsells.some(qu => qu.upsell_id === upsell.id))
-                      .sort((a, b) => a.display_order - b.display_order)
-                      .map((upsell) => (
-                        <div
-                          key={upsell.id}
-                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Package className="h-4 w-4 text-gray-400" />
-                              <h4 className="font-medium text-gray-900">{upsell.name}</h4>
-                            </div>
-                            {upsell.description && (
-                              <p className="text-sm text-gray-600 mt-1">{upsell.description}</p>
-                            )}
-                            <div className="flex items-center gap-1 mt-2 text-green-600 font-semibold">
-                              <DollarSign className="h-4 w-4" />
-                              {new Intl.NumberFormat('en-US', {
-                                style: 'currency',
-                                currency: 'USD',
-                              }).format(upsell.price)}
-                            </div>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleAddUpsell(upsell.id)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add
-                          </Button>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Timeline Tab */}
-          <TabsContent value="timeline">
+          <TabsContent value="timeline" className="space-y-6">
+            {/* Add Timeline Step Dropdown Section */}
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <ListChecks className="h-5 w-5" />
+                  Add Timeline Step
+                </CardTitle>
+                <CardDescription>
+                  Select a timeline step from the dropdown and optionally add a note
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  {/* Timeline Step Dropdown */}
                   <div>
-                    <CardTitle>Project Timeline</CardTitle>
-                    <CardDescription>
-                      Track and manage the project timeline for this quote
-                    </CardDescription>
+                    <label className="text-sm font-medium mb-2 block">Select Step</label>
+                    <Select value={selectedTimelineStepId} onValueChange={setSelectedTimelineStepId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Choose a timeline step..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timelineSteps
+                          .filter(s => !quoteTimeline.some(qt => qt.timeline_step_id === s.id))
+                          .sort((a, b) => a.display_order - b.display_order)
+                          .map((step) => (
+                            <SelectItem key={step.id} value={step.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{step.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  {quoteTimeline.length === 0 && quote.status === 'accepted' && (
-                    <Button
-                      onClick={handleInitializeTimeline}
-                      disabled={loadingTimeline}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      {loadingTimeline ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Plus className="h-4 w-4 mr-2" />
-                      )}
-                      Initialize Timeline
-                    </Button>
-                  )}
+
+                  {/* Note */}
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium mb-2 block">
+                      <MessageSquare className="h-3 w-3 inline mr-1" />
+                      Note (optional)
+                    </label>
+                    <Textarea
+                      placeholder="Add a note for this timeline step..."
+                      value={timelineNote}
+                      onChange={(e) => setTimelineNote(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
                 </div>
+
+                <Button
+                  onClick={handleAddTimelineFromDropdown}
+                  disabled={!selectedTimelineStepId || addingTimeline}
+                  className="mt-4"
+                >
+                  {addingTimeline ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Add Step to Timeline
+                </Button>
+
+                {quoteTimeline.length === 0 && quote.status === 'accepted' && (
+                  <Button
+                    variant="outline"
+                    onClick={handleInitializeTimeline}
+                    disabled={loadingTimeline}
+                    className="mt-4 ml-2"
+                  >
+                    {loadingTimeline ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <GitBranch className="h-4 w-4 mr-2" />
+                    )}
+                    Initialize All Steps
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Timeline Steps List */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Project Timeline</span>
+                  <Badge variant="secondary">{quoteTimeline.length} steps</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {loadingTimeline ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
                 ) : quoteTimeline.length === 0 ? (
                   <div className="text-center py-8">
-                    <GitBranch className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-600 mb-2">No timeline steps assigned</p>
-                    <p className="text-gray-500 text-sm">
-                      {quote.status === 'accepted'
-                        ? 'Click "Initialize Timeline" to create timeline steps for this quote'
-                        : 'Timeline will be available once the quote is accepted'}
+                    <GitBranch className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                    <p className="text-muted-foreground mb-2">No timeline steps assigned</p>
+                    <p className="text-muted-foreground/70 text-sm">
+                      Use the dropdown above to add individual steps or initialize all steps at once
                     </p>
                   </div>
                 ) : (
@@ -744,9 +953,9 @@ export const QuoteDetailPage: React.FC = () => {
                           case 'in_progress':
                             return <PlayCircle className="h-5 w-5 text-blue-500" />;
                           case 'skipped':
-                            return <SkipForward className="h-5 w-5 text-gray-400" />;
+                            return <SkipForward className="h-5 w-5 text-muted-foreground" />;
                           default:
-                            return <Circle className="h-5 w-5 text-gray-300" />;
+                            return <Circle className="h-5 w-5 text-muted-foreground/50" />;
                         }
                       };
 
@@ -757,39 +966,70 @@ export const QuoteDetailPage: React.FC = () => {
                           case 'in_progress':
                             return 'bg-blue-100 text-blue-700 border-blue-200';
                           case 'skipped':
-                            return 'bg-gray-100 text-gray-500 border-gray-200';
+                            return 'bg-muted text-muted-foreground border-muted';
                           default:
-                            return 'bg-gray-50 text-gray-600 border-gray-200';
+                            return 'bg-muted/50 text-muted-foreground border-muted';
                         }
                       };
+
+                      const isEditingNote = editingTimelineNotes[item.id] !== undefined;
+                      const currentNote = isEditingNote ? editingTimelineNotes[item.id] : (item.notes || '');
 
                       return (
                         <div
                           key={item.id}
-                          className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
+                          className="flex items-start gap-4 p-4 border rounded-lg bg-muted/50"
                         >
                           <div className="flex flex-col items-center">
                             {getStatusIcon(item.status)}
                             {index < quoteTimeline.length - 1 && (
-                              <div className="w-0.5 h-8 bg-gray-200 mt-2" />
+                              <div className="w-0.5 h-8 bg-border mt-2" />
                             )}
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-medium text-gray-900">{step.name}</h4>
+                              <h4 className="font-medium">{step.name}</h4>
                               <Badge className={`border ${getStatusBadgeColor(item.status)}`}>
                                 {item.status.replace('_', ' ')}
                               </Badge>
                             </div>
                             {step.description && (
-                              <p className="text-sm text-gray-600 mb-3">{step.description}</p>
+                              <p className="text-sm text-muted-foreground mb-3">{step.description}</p>
                             )}
                             {item.completed_at && (
-                              <p className="text-xs text-gray-500 mb-2">
+                              <p className="text-xs text-muted-foreground mb-2">
                                 Completed: {new Date(item.completed_at).toLocaleDateString()}
                               </p>
                             )}
-                            <div className="flex items-center gap-2">
+
+                            {/* Note Section */}
+                            <div className="mt-3 p-3 bg-background rounded border">
+                              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                                <MessageSquare className="h-3 w-3 inline mr-1" />
+                                Note
+                              </label>
+                              <Textarea
+                                placeholder="Add a note..."
+                                value={currentNote}
+                                onChange={(e) => setEditingTimelineNotes(prev => ({
+                                  ...prev,
+                                  [item.id]: e.target.value
+                                }))}
+                                rows={2}
+                                className="text-sm"
+                              />
+                              {isEditingNote && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleUpdateTimelineNote(item.id, editingTimelineNotes[item.id])}
+                                  className="mt-2"
+                                >
+                                  Save Note
+                                </Button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-3">
                               <Select
                                 value={item.status}
                                 onValueChange={(value) =>
@@ -811,7 +1051,7 @@ export const QuoteDetailPage: React.FC = () => {
                                 </SelectContent>
                               </Select>
                               {updatingTimelineStep === item.id && (
-                                <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+                                <Loader2 className="h-4 w-4 animate-spin" />
                               )}
                             </div>
                           </div>
@@ -824,29 +1064,19 @@ export const QuoteDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Activity Tab - Placeholder */}
+          {/* Activity Tab */}
           <TabsContent value="activity">
             <Card>
               <CardHeader>
                 <CardTitle>Activity Log</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">Activity log will be displayed here</p>
+                <p className="text-muted-foreground">Activity log will be displayed here</p>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Timeline Modal */}
-      {showTimelineModal && (
-        <ProjectTimelineModal
-          quoteId={quote.id}
-          quoteName={quote.name || 'Untitled Quote'}
-          onClose={() => setShowTimelineModal(false)}
-          isAdmin={true}
-        />
-      )}
     </div>
   );
 };

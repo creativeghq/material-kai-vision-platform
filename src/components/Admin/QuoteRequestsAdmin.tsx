@@ -566,7 +566,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       {/* Global Timeline Elements Slide-out Panel */}
       <Sheet open={showTimelinePanel} onOpenChange={setShowTimelinePanel}>
-        <SheetContent side="right" className="w-[600px] sm:w-[800px] overflow-y-auto">
+        <SheetContent side="right" className="w-[50vw] max-w-[50vw] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <ListChecks className="h-5 w-5" />
@@ -584,7 +584,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       {/* Global Upsells Elements Slide-out Panel */}
       <Sheet open={showUpsellsPanel} onOpenChange={setShowUpsellsPanel}>
-        <SheetContent side="right" className="w-[600px] sm:w-[800px] overflow-y-auto">
+        <SheetContent side="right" className="w-[50vw] max-w-[50vw] overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
               <Gift className="h-5 w-5" />

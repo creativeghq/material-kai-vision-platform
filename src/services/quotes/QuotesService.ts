@@ -607,15 +607,21 @@ export class QuotesService {
   }
 
   /**
-   * Add upsell to quote
+   * Add upsell to quote with optional metadata (custom price, quantity, measurement)
    */
-  async addUpsellToQuote(quoteId: string, upsellId: string, adminNotes?: string): Promise<QuoteUpsell> {
+  async addUpsellToQuote(
+    quoteId: string,
+    upsellId: string,
+    adminNotes?: string,
+    metadata?: { custom_price?: number; quantity?: number; measurement?: string }
+  ): Promise<QuoteUpsell> {
     const { data, error } = await supabase
       .from('quote_upsells')
       .insert({
         quote_id: quoteId,
         upsell_id: upsellId,
         admin_notes: adminNotes,
+        metadata: metadata || null,
       })
       .select('*, upsell:upsells(*)')
       .single();
@@ -923,7 +929,7 @@ export class QuotesService {
       notes?: string;
     }
   ): Promise<QuoteTimeline> {
-    const updateData: any = { ...data };
+    const updateData: Record<string, unknown> = { ...data };
 
     if (data.status === 'completed') {
       updateData.completed_at = new Date().toISOString();
@@ -938,6 +944,40 @@ export class QuotesService {
 
     if (error) throw error;
     return timeline;
+  }
+
+  /**
+   * Add a single timeline step to a quote
+   */
+  async addTimelineStepToQuote(
+    quoteId: string,
+    timelineStepId: string,
+    notes?: string
+  ): Promise<QuoteTimeline> {
+    // Get the current max order for this quote
+    const { data: existingSteps } = await supabase
+      .from('quote_timeline')
+      .select('step_order')
+      .eq('quote_id', quoteId)
+      .order('step_order', { ascending: false })
+      .limit(1);
+
+    const nextOrder = existingSteps && existingSteps.length > 0 ? existingSteps[0].step_order + 1 : 1;
+
+    const { data, error } = await supabase
+      .from('quote_timeline')
+      .insert({
+        quote_id: quoteId,
+        timeline_step_id: timelineStepId,
+        step_order: nextOrder,
+        status: 'pending',
+        notes: notes || null,
+      })
+      .select('*, timeline_step:timeline_steps(*)')
+      .single();
+
+    if (error) throw error;
+    return data;
   }
 }
 
