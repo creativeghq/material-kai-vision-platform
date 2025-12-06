@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, ListChecks, Gift } from 'lucide-react';
+import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-import { ProjectTimelineModal } from '@/components/Quotes/ProjectTimelineModal';
 
 /**
  * Customer-facing Quote Detail Page
@@ -24,7 +23,6 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
-  const [showTimelineModal, setShowTimelineModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -127,13 +125,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Quotes
           </Button>
-          <div className="flex items-center gap-4">
-            {getStatusBadge(quote.status)}
-            <Button variant="outline" onClick={() => setShowTimelineModal(true)}>
-              <ListChecks className="h-4 w-4 mr-2" />
-              View Timeline
-            </Button>
-          </div>
+          {getStatusBadge(quote.status)}
         </div>
 
         {/* Stats Cards */}
@@ -326,13 +318,6 @@ export const QuoteDetailCustomerPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
-
-      {/* Timeline Modal */}
-      <ProjectTimelineModal
-        open={showTimelineModal}
-        onClose={() => setShowTimelineModal(false)}
-        quoteId={id || ''}
-      />
     </div>
   );
 };
