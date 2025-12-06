@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { ProjectTimelineModal } from '../Quotes/ProjectTimelineModal';
 import {
   Select,
   SelectContent,
@@ -29,6 +30,7 @@ export const QuoteDetailPage: React.FC = () => {
   const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [loadingUpsells, setLoadingUpsells] = useState(false);
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -224,6 +226,15 @@ export const QuoteDetailPage: React.FC = () => {
               <p className="text-gray-600 mt-1">Quote ID: {quote.id}</p>
             </div>
             <div className="flex items-center gap-3">
+              {quote.status === 'accepted' && (
+                <Button
+                  onClick={() => setShowTimelineModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <GitBranch className="h-4 w-4 mr-2" />
+                  View Timeline
+                </Button>
+              )}
               <Badge variant="secondary" className={getStatusColor(quote.status)}>
                 {quote.status}
               </Badge>
@@ -405,14 +416,83 @@ export const QuoteDetailPage: React.FC = () => {
             )}
           </TabsContent>
 
-          {/* Items Tab - Placeholder for now */}
+          {/* Items Tab */}
           <TabsContent value="items">
             <Card>
               <CardHeader>
-                <CardTitle>Quote Items</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Quote Items</span>
+                  <Badge variant="secondary">{quote.items?.length || 0} items</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">Items list will be displayed here</p>
+                {!quote.items || quote.items.length === 0 ? (
+                  <p className="text-gray-600 text-center py-8">No items in this quote</p>
+                ) : (
+                  <div className="space-y-4">
+                    {quote.items.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
+                      >
+                        {/* Item Image */}
+                        {item.product?.image_url && (
+                          <img
+                            src={item.product.image_url}
+                            alt={item.product.name}
+                            className="w-20 h-20 object-cover rounded-lg"
+                          />
+                        )}
+
+                        {/* Item Details */}
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="font-semibold text-gray-900">
+                                {item.product?.name || `Item ${index + 1}`}
+                              </h4>
+                              {item.product?.description && (
+                                <p className="text-sm text-gray-600 mt-1">{item.product.description}</p>
+                              )}
+                            </div>
+                            <Badge variant="secondary">Qty: {item.quantity}</Badge>
+                          </div>
+
+                          {/* Item Metadata */}
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                            {item.width && (
+                              <div className="text-gray-600">
+                                <span className="font-medium">Width:</span> {item.width}
+                              </div>
+                            )}
+                            {item.height && (
+                              <div className="text-gray-600">
+                                <span className="font-medium">Height:</span> {item.height}
+                              </div>
+                            )}
+                            {item.area && (
+                              <div className="text-gray-600">
+                                <span className="font-medium">Area:</span> {item.area}
+                              </div>
+                            )}
+                            {item.unit && (
+                              <div className="text-gray-600">
+                                <span className="font-medium">Unit:</span> {item.unit}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Item Notes */}
+                          {item.notes && (
+                            <div className="mt-3 p-3 bg-white rounded border border-gray-200">
+                              <p className="text-sm text-gray-700">{item.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -557,6 +637,16 @@ export const QuoteDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Timeline Modal */}
+      {showTimelineModal && (
+        <ProjectTimelineModal
+          quoteId={quote.id}
+          quoteName={quote.name || 'Untitled Quote'}
+          onClose={() => setShowTimelineModal(false)}
+          isAdmin={true}
+        />
+      )}
     </div>
   );
 };

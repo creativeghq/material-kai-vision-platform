@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar, FileText, Package, DollarSign, Check, Loader2 } from 'lucide-react';
+import { X, Calendar, FileText, Package, DollarSign, Check, Loader2, GitBranch } from 'lucide-react';
 
 import {
   Dialog,
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, Upsell, QuoteUpsell } from '@/services/quotes/QuotesService';
+import { ProjectTimelineModal } from './ProjectTimelineModal';
 
 interface QuoteRequestModalProps {
   quote: QuoteWithItems;
@@ -30,6 +31,8 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [loadingUpsells, setLoadingUpsells] = useState(false);
   const [updatingUpsell, setUpdatingUpsell] = useState<string | null>(null);
+  const [acceptingQuote, setAcceptingQuote] = useState(false);
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
 
   useEffect(() => {
     loadUpsells();
@@ -76,6 +79,45 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
       });
     } finally {
       setUpdatingUpsell(null);
+    }
+  };
+
+  const handleAcceptQuote = async () => {
+    // Validate all upsells have been accepted or rejected
+    const pendingUpsells = quoteUpsells.filter(qu => qu.customer_accepted === null);
+    if (pendingUpsells.length > 0) {
+      toast({
+        title: 'Action Required',
+        description: `Please accept or reject all extras before accepting the quote (${pendingUpsells.length} pending)`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setAcceptingQuote(true);
+      // Update quote status to 'accepted'
+      await quotesService.updateQuote(quote.id, { status: 'accepted' });
+
+      // Initialize timeline
+      await quotesService.initializeQuoteTimeline(quote.id);
+
+      toast({
+        title: 'Success',
+        description: 'Quote accepted successfully! Timeline has been initialized.',
+      });
+
+      onUpdate();
+      onClose();
+    } catch (error) {
+      console.error('Error accepting quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to accept quote',
+        variant: 'destructive',
+      });
+    } finally {
+      setAcceptingQuote(false);
     }
   };
   const formatDate = (dateString: string) => {
@@ -291,9 +333,47 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
             >
               Close
             </Button>
+            {quote.status === 'accepted' && (
+              <Button
+                onClick={() => setShowTimelineModal(true)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <GitBranch className="h-4 w-4 mr-2" />
+                View Timeline
+              </Button>
+            )}
+            {quote.status !== 'accepted' && quote.status !== 'rejected' && (
+              <Button
+                onClick={handleAcceptQuote}
+                disabled={acceptingQuote}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                {acceptingQuote ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Accepting...
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Accept Quote
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
+
+      {/* Timeline Modal */}
+      {showTimelineModal && (
+        <ProjectTimelineModal
+          quoteId={quote.id}
+          quoteName={quote.name || 'Untitled Quote'}
+          onClose={() => setShowTimelineModal(false)}
+          isAdmin={false}
+        />
+      )}
     </Dialog>
   );
 };
