@@ -180,12 +180,7 @@ export const QuoteRequestsPage: React.FC = () => {
               <FileText className="h-16 w-16 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-lg mb-4">No quote requests yet</p>
               <Button
-                onClick={() => {
-                  toast({
-                    title: 'Info',
-                    description: 'Add items to cart first to request a quote',
-                  });
-                }}
+                onClick={() => setShowCreateModal(true)}
                 className="bg-primary hover:bg-primary/90"
               >
                 <Plus className="h-4 w-4 mr-2" />
