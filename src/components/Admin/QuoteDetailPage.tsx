@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, StatusTag } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import {
   Select,
@@ -26,11 +26,16 @@ export const QuoteDetailPage: React.FC = () => {
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [upsells, setUpsells] = useState<Upsell[]>([]);
+  const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
+  const [loadingUpsells, setLoadingUpsells] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadQuoteDetails();
       loadStatusTags();
+      loadUpsells();
+      loadQuoteUpsells();
     }
   }, [id]);
 
@@ -59,6 +64,65 @@ export const QuoteDetailPage: React.FC = () => {
       setStatusTags(tags);
     } catch (error) {
       console.error('Error loading status tags:', error);
+    }
+  };
+
+  const loadUpsells = async () => {
+    try {
+      const data = await quotesService.getUpsells();
+      setUpsells(data.filter(u => u.is_active));
+    } catch (error) {
+      console.error('Error loading upsells:', error);
+    }
+  };
+
+  const loadQuoteUpsells = async () => {
+    if (!id) return;
+    try {
+      setLoadingUpsells(true);
+      const data = await quotesService.getQuoteUpsells(id);
+      setQuoteUpsells(data);
+    } catch (error) {
+      console.error('Error loading quote upsells:', error);
+    } finally {
+      setLoadingUpsells(false);
+    }
+  };
+
+  const handleAddUpsell = async (upsellId: string) => {
+    if (!id) return;
+    try {
+      await quotesService.addUpsellToQuote(id, upsellId);
+      toast({
+        title: 'Success',
+        description: 'Upsell added to quote',
+      });
+      await loadQuoteUpsells();
+    } catch (error) {
+      console.error('Error adding upsell:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add upsell',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveUpsell = async (quoteUpsellId: string) => {
+    try {
+      await quotesService.removeUpsellFromQuote(quoteUpsellId);
+      toast({
+        title: 'Success',
+        description: 'Upsell removed from quote',
+      });
+      await loadQuoteUpsells();
+    } catch (error) {
+      console.error('Error removing upsell:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove upsell',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -353,14 +417,117 @@ export const QuoteDetailPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Extras Tab - Placeholder */}
-          <TabsContent value="extras">
+          {/* Extras Tab */}
+          <TabsContent value="extras" className="space-y-6">
+            {/* Attached Upsells */}
             <Card>
               <CardHeader>
-                <CardTitle>Extras & Upsells</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Attached Extras/Upsells</span>
+                  <Badge variant="secondary">{quoteUpsells.length} items</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600">Upsells management will be displayed here</p>
+                {loadingUpsells ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+                  </div>
+                ) : quoteUpsells.length === 0 ? (
+                  <p className="text-gray-600 text-center py-8">No upsells attached to this quote yet</p>
+                ) : (
+                  <div className="space-y-3">
+                    {quoteUpsells.map((quoteUpsell) => {
+                      const upsell = upsells.find(u => u.id === quoteUpsell.upsell_id);
+                      if (!upsell) return null;
+
+                      return (
+                        <div
+                          key={quoteUpsell.id}
+                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg bg-gray-50"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-gray-400" />
+                              <h4 className="font-medium text-gray-900">{upsell.name}</h4>
+                              {quoteUpsell.customer_accepted !== null && (
+                                <Badge variant={quoteUpsell.customer_accepted ? 'default' : 'destructive'}>
+                                  {quoteUpsell.customer_accepted ? 'Accepted' : 'Rejected'}
+                                </Badge>
+                              )}
+                            </div>
+                            {upsell.description && (
+                              <p className="text-sm text-gray-600 mt-1">{upsell.description}</p>
+                            )}
+                            <div className="flex items-center gap-1 mt-2 text-green-600 font-semibold">
+                              <DollarSign className="h-4 w-4" />
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                              }).format(upsell.price)}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveUpsell(quoteUpsell.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Available Upsells */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Add Upsells to Quote</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upsells.length === 0 ? (
+                  <p className="text-gray-600 text-center py-8">No active upsells available</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {upsells
+                      .filter(upsell => !quoteUpsells.some(qu => qu.upsell_id === upsell.id))
+                      .sort((a, b) => a.display_order - b.display_order)
+                      .map((upsell) => (
+                        <div
+                          key={upsell.id}
+                          className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Package className="h-4 w-4 text-gray-400" />
+                              <h4 className="font-medium text-gray-900">{upsell.name}</h4>
+                            </div>
+                            {upsell.description && (
+                              <p className="text-sm text-gray-600 mt-1">{upsell.description}</p>
+                            )}
+                            <div className="flex items-center gap-1 mt-2 text-green-600 font-semibold">
+                              <DollarSign className="h-4 w-4" />
+                              {new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                              }).format(upsell.price)}
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddUpsell(upsell.id)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
