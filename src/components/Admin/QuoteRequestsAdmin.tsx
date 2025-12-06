@@ -80,8 +80,11 @@ export const QuoteRequestsAdmin: React.FC = () => {
     try {
       const { data } = await usersAPI.listUsers(100, 0);
       setUsers(data || []);
-    } catch (error) {
-      console.error('Error loading users:', error);
+    } catch (error: any) {
+      // ✅ FIX (KAI-1C, KAI-1J): Silently handle admin access errors
+      if (error?.message !== 'Admin access required') {
+        console.error('Error loading users:', error);
+      }
     }
   };
 

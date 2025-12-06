@@ -78,13 +78,16 @@ export const CRMManagement: React.FC = () => {
           data?.filter((u: UserProfile) => u.status === 'inactive').length || 0,
       };
       setUserStats(stats);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading users:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load users',
-        variant: 'destructive',
-      });
+      // ✅ FIX (KAI-1J): Don't show error toast for admin access issues
+      if (error?.message !== 'Admin access required') {
+        toast({
+          title: 'Error',
+          description: 'Failed to load users',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -96,13 +99,16 @@ export const CRMManagement: React.FC = () => {
       setLoading(true);
       const { data } = await contactsAPI.listContacts(100, 0);
       setContacts(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading contacts:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load contacts',
-        variant: 'destructive',
-      });
+      // ✅ FIX (KAI-1K): Don't show error toast for CRM access issues
+      if (error?.message !== 'CRM access required') {
+        toast({
+          title: 'Error',
+          description: 'Failed to load contacts',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }

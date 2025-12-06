@@ -60,9 +60,14 @@ export class QuotesService {
     notes?: string;
     custom_request_text?: string;
   }): Promise<Quote> {
+    // ✅ FIX (KAI-1M): Get current user_id for RLS policy
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data: quote, error } = await supabase
       .from('quotes')
       .insert({
+        user_id: user.id, // ✅ Required for RLS policy
         name: data?.name,
         workspace_id: data?.workspace_id,
         notes: data?.notes,

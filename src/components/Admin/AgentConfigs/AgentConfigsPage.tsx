@@ -59,7 +59,16 @@ export const AgentConfigsPage: React.FC = () => {
         .from('agent_chat_prompts')
         .select('*');
 
-      if (error) throw error;
+      // ✅ FIX (KAI-1H): Handle missing table gracefully
+      if (error) {
+        if (error.code === '42P01') {
+          // Table doesn't exist - use empty prompts
+          console.warn('agent_chat_prompts table does not exist yet');
+          setAgentPrompts({});
+          return;
+        }
+        throw error;
+      }
 
       // Convert array to record keyed by agent_type
       const promptsMap: Record<string, AgentPrompt> = {};
