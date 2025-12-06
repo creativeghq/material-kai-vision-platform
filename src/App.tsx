@@ -65,6 +65,9 @@ import { QuotesPage } from './pages/QuotesPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
 import { QuoteRequestsAdmin } from './components/Admin/QuoteRequestsAdmin';
 import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
+import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
+import { UpsellsManagement } from './components/Admin/UpsellsManagement';
+import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -571,6 +574,42 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <QuoteDetailPage />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/status-tags"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <StatusTagsManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/upsells"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <UpsellsManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/timeline-steps"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <TimelineStepsManagement />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>
