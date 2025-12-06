@@ -12,6 +12,7 @@ export interface Quote {
   status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
   status_tag_id?: string;
   total_items: number;
+  extras_total?: number; // Total of accepted upsells (price × quantity)
   notes?: string;
   custom_request_text?: string; // Custom text request instead of products
   expires_at: string;
@@ -83,6 +84,11 @@ export interface QuoteUpsell {
   upsell_id: string;
   customer_accepted?: boolean | null;
   admin_notes?: string;
+  metadata?: {
+    custom_price?: number;
+    quantity?: number;
+    measurement?: string;
+  } | null;
   added_at: string;
   decided_at?: string;
   upsell?: Upsell;
@@ -631,12 +637,13 @@ export class QuotesService {
   }
 
   /**
-   * Update customer acceptance of upsell
+   * Update customer acceptance of upsell and recalculate quote extras_total
    */
   async updateUpsellAcceptance(
     quoteUpsellId: string,
     accepted: boolean
   ): Promise<QuoteUpsell> {
+    // First update the upsell acceptance
     const { data, error } = await supabase
       .from('quote_upsells')
       .update({
@@ -648,7 +655,43 @@ export class QuotesService {
       .single();
 
     if (error) throw error;
+
+    // Recalculate extras_total for the quote
+    await this.recalculateQuoteExtrasTotal(data.quote_id);
+
     return data;
+  }
+
+  /**
+   * Recalculate and update the extras_total for a quote
+   * Only includes accepted upsells, using custom_price from metadata if available
+   */
+  async recalculateQuoteExtrasTotal(quoteId: string): Promise<number> {
+    // Get all quote upsells with their upsell details
+    const quoteUpsells = await this.getQuoteUpsells(quoteId);
+
+    // Calculate total from accepted upsells only
+    const extrasTotal = quoteUpsells.reduce((sum, qu) => {
+      // Only count accepted upsells
+      if (qu.customer_accepted !== true) return sum;
+
+      // Get price: use custom_price from metadata if available, otherwise use default upsell price
+      const metadata = qu.metadata as { custom_price?: number; quantity?: number } | null;
+      const price = metadata?.custom_price ?? qu.upsell?.price ?? 0;
+      const quantity = metadata?.quantity ?? 1;
+
+      return sum + (price * quantity);
+    }, 0);
+
+    // Update the quote with new extras_total
+    const { error } = await supabase
+      .from('quotes')
+      .update({ extras_total: extrasTotal })
+      .eq('id', quoteId);
+
+    if (error) throw error;
+
+    return extrasTotal;
   }
 
   /**

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift } from 'lucide-react';
+import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
@@ -23,6 +24,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [quote, setQuote] = useState<QuoteWithItems | null>(null);
   const [quoteUpsells, setQuoteUpsells] = useState<QuoteUpsell[]>([]);
   const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
+  const [updatingUpsell, setUpdatingUpsell] = useState<string | null>(null);
+  const [acceptingQuote, setAcceptingQuote] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -51,6 +54,62 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle upsell accept/reject
+  const handleUpsellDecision = async (quoteUpsellId: string, accepted: boolean) => {
+    try {
+      setUpdatingUpsell(quoteUpsellId);
+      await quotesService.updateUpsellAcceptance(quoteUpsellId, accepted);
+      toast({
+        title: 'Success',
+        description: `Extra ${accepted ? 'accepted' : 'rejected'}`,
+      });
+      // Reload to get updated extras_total
+      await loadQuoteDetails();
+    } catch (error) {
+      console.error('Error updating upsell:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update extra',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingUpsell(null);
+    }
+  };
+
+  // Handle quote acceptance
+  const handleAcceptQuote = async () => {
+    if (!id) return;
+    try {
+      setAcceptingQuote(true);
+      const result = await quotesService.acceptQuote(id);
+
+      if (!result.success) {
+        toast({
+          title: 'Action Required',
+          description: result.error || 'Please decide on all extras before accepting the quote',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Quote Accepted!',
+        description: 'Your quote has been accepted and the project timeline has been initialized.',
+      });
+      await loadQuoteDetails();
+    } catch (error) {
+      console.error('Error accepting quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to accept quote. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setAcceptingQuote(false);
     }
   };
 
@@ -108,7 +167,23 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   }
 
   const itemCount = quote.items?.length || quote.total_items || 0;
-  const extrasTotal = quoteUpsells.reduce((sum, u) => sum + (u.upsell?.price || 0), 0);
+
+  // Calculate extras total from accepted upsells (using custom price × quantity if available)
+  const acceptedExtrasTotal = quoteUpsells.reduce((sum, qu) => {
+    if (qu.customer_accepted !== true) return sum;
+    const price = qu.metadata?.custom_price ?? qu.upsell?.price ?? 0;
+    const quantity = qu.metadata?.quantity ?? 1;
+    return sum + (price * quantity);
+  }, 0);
+
+  // Use stored extras_total from quote if available, otherwise calculate
+  const extrasTotal = quote.extras_total ?? acceptedExtrasTotal;
+
+  // Check for pending upsells (not yet decided)
+  const pendingUpsells = quoteUpsells.filter(u => u.customer_accepted === null || u.customer_accepted === undefined);
+  const hasUpsells = quoteUpsells.length > 0;
+  const allUpsellsDecided = pendingUpsells.length === 0;
+  const canAcceptQuote = quote.status === 'quoted' && (!hasUpsells || allUpsellsDecided);
 
   return (
     <div className="min-h-screen">
@@ -119,14 +194,42 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       />
 
       <div className="p-6 space-y-6">
-        {/* Back Button & Status */}
+        {/* Back Button & Status & Accept Quote */}
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={() => navigate('/quotes')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Quotes
           </Button>
-          {getStatusBadge(quote.status)}
+          <div className="flex items-center gap-4">
+            {getStatusBadge(quote.status)}
+            {quote.status === 'quoted' && (
+              <Button
+                onClick={handleAcceptQuote}
+                disabled={!canAcceptQuote || acceptingQuote}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {acceptingQuote ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Accept Quote
+              </Button>
+            )}
+          </div>
         </div>
+
+        {/* Pending Upsells Warning */}
+        {quote.status === 'quoted' && hasUpsells && !allUpsellsDecided && (
+          <Alert variant="destructive" className="border-yellow-500 bg-yellow-50">
+            <AlertCircle className="h-4 w-4 text-yellow-600" />
+            <AlertTitle className="text-yellow-800">Action Required</AlertTitle>
+            <AlertDescription className="text-yellow-700">
+              Please accept or reject all {pendingUpsells.length} pending extra(s) before you can accept this quote.
+              Go to the <strong>Extras</strong> tab to review them.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -142,14 +245,19 @@ export const QuoteDetailCustomerPage: React.FC = () => {
               <Gift className="h-5 w-5 text-primary" />
               <span className="text-sm text-muted-foreground">Extras</span>
             </div>
-            <div className="text-2xl font-semibold">{quoteUpsells.length}</div>
+            <div className="text-2xl font-semibold">
+              {quoteUpsells.length}
+              {pendingUpsells.length > 0 && (
+                <span className="text-sm text-yellow-600 ml-2">({pendingUpsells.length} pending)</span>
+              )}
+            </div>
           </div>
           <div className="dashboard-card">
             <div className="flex items-center gap-3 mb-2">
               <DollarSign className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Extras Total</span>
+              <span className="text-sm text-muted-foreground">Accepted Extras Total</span>
             </div>
-            <div className="text-2xl font-semibold">€{extrasTotal.toFixed(2)}</div>
+            <div className="text-2xl font-semibold text-green-600">€{extrasTotal.toFixed(2)}</div>
           </div>
           <div className="dashboard-card">
             <div className="flex items-center gap-3 mb-2">
@@ -252,25 +360,112 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Extras & Add-ons</CardTitle>
-                <CardDescription>Additional services included in this quote</CardDescription>
+                <CardDescription>
+                  Review and accept or reject additional services. Accepted extras will be added to your total.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {quoteUpsells.length > 0 ? (
                   <div className="space-y-4">
-                    {quoteUpsells.map((qu) => (
-                      <div key={qu.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div>
-                          <p className="font-medium">{qu.upsell?.name || 'Unknown Extra'}</p>
-                          <p className="text-sm text-muted-foreground">{qu.upsell?.description}</p>
+                    {quoteUpsells.map((qu) => {
+                      const price = qu.metadata?.custom_price ?? qu.upsell?.price ?? 0;
+                      const quantity = qu.metadata?.quantity ?? 1;
+                      const measurement = qu.metadata?.measurement || '';
+                      const totalPrice = price * quantity;
+                      const isDecided = qu.customer_accepted !== null && qu.customer_accepted !== undefined;
+                      const isUpdating = updatingUpsell === qu.id;
+
+                      return (
+                        <div
+                          key={qu.id}
+                          className={`p-4 border rounded-lg ${
+                            qu.customer_accepted === true
+                              ? 'border-green-300 bg-green-50'
+                              : qu.customer_accepted === false
+                              ? 'border-red-300 bg-red-50'
+                              : 'border-yellow-300 bg-yellow-50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Gift className="h-4 w-4 text-muted-foreground" />
+                                <p className="font-medium">{qu.upsell?.name || 'Unknown Extra'}</p>
+                                {isDecided && (
+                                  <Badge
+                                    variant={qu.customer_accepted ? 'default' : 'destructive'}
+                                    className={qu.customer_accepted ? 'bg-green-600' : ''}
+                                  >
+                                    {qu.customer_accepted ? 'Accepted' : 'Rejected'}
+                                  </Badge>
+                                )}
+                                {!isDecided && (
+                                  <Badge variant="outline" className="border-yellow-500 text-yellow-700">
+                                    Pending Decision
+                                  </Badge>
+                                )}
+                              </div>
+                              {qu.upsell?.description && (
+                                <p className="text-sm text-muted-foreground mt-1 ml-6">{qu.upsell.description}</p>
+                              )}
+                              <div className="flex items-center gap-4 mt-2 ml-6 text-sm">
+                                <span className="font-semibold text-green-700">€{price.toFixed(2)}</span>
+                                {quantity > 1 && <span className="text-muted-foreground">× {quantity}</span>}
+                                {measurement && <span className="text-muted-foreground">{measurement}</span>}
+                                {quantity > 1 && (
+                                  <span className="font-semibold text-green-700">= €{totalPrice.toFixed(2)}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Accept/Reject Buttons - only show if not yet decided */}
+                            {!isDecided && quote.status === 'quoted' && (
+                              <div className="flex items-center gap-2 ml-4">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700"
+                                  onClick={() => handleUpsellDecision(qu.id, false)}
+                                  disabled={isUpdating}
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <X className="h-4 w-4 mr-1" />
+                                      Reject
+                                    </>
+                                  )}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700"
+                                  onClick={() => handleUpsellDecision(qu.id, true)}
+                                  disabled={isUpdating}
+                                >
+                                  {isUpdating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Check className="h-4 w-4 mr-1" />
+                                      Accept
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold">€{qu.upsell?.price?.toFixed(2) || '0.00'}</p>
-                          <Badge variant={qu.accepted ? 'default' : 'secondary'}>
-                            {qu.accepted ? 'Accepted' : 'Pending'}
-                          </Badge>
-                        </div>
+                      );
+                    })}
+
+                    {/* Summary */}
+                    <div className="mt-6 pt-4 border-t">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Accepted Extras Total:</span>
+                        <span className="text-2xl font-bold text-green-600">€{extrasTotal.toFixed(2)}</span>
                       </div>
-                    ))}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-muted-foreground text-center py-8">No extras added to this quote</p>
