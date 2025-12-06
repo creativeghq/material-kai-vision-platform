@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus } from 'lucide-react';
+import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus, ListChecks, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -34,6 +41,8 @@ import { usersAPI } from '@/services/crm.service';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { TimelineStepsManagement } from './TimelineStepsManagement';
+import { UpsellsManagement } from './UpsellsManagement';
 
 interface UserProfile {
   id: string;
@@ -51,6 +60,10 @@ export const QuoteRequestsAdmin: React.FC = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [statusTags, setStatusTags] = useState<StatusTag[]>([]);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+
+  // Slide-out panels state
+  const [showTimelinePanel, setShowTimelinePanel] = useState(false);
+  const [showUpsellsPanel, setShowUpsellsPanel] = useState(false);
 
   // Create quote form state
   const [selectedUserId, setSelectedUserId] = useState<string>('');
@@ -348,17 +361,33 @@ export const QuoteRequestsAdmin: React.FC = () => {
               </SelectContent>
             </Select>
           </div>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            style={{
-              backgroundColor: 'hsl(var(--primary))',
-              color: 'white'
-            }}
-            className="hover:opacity-90"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Create Quote for User
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowTimelinePanel(true)}
+            >
+              <ListChecks className="h-4 w-4 mr-2" />
+              Global Timeline Elements
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowUpsellsPanel(true)}
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              Global Upsells Elements
+            </Button>
+            <Button
+              onClick={() => setShowCreateModal(true)}
+              style={{
+                backgroundColor: 'hsl(var(--primary))',
+                color: 'white'
+              }}
+              className="hover:opacity-90"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Create Quote for User
+            </Button>
+          </div>
         </div>
 
         {/* Quote Requests Table */}
@@ -534,6 +563,42 @@ export const QuoteRequestsAdmin: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Global Timeline Elements Slide-out Panel */}
+      <Sheet open={showTimelinePanel} onOpenChange={setShowTimelinePanel}>
+        <SheetContent side="right" className="w-[600px] sm:w-[800px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <ListChecks className="h-5 w-5" />
+              Global Timeline Elements
+            </SheetTitle>
+            <SheetDescription>
+              Manage the global timeline steps that can be assigned to quotes
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <TimelineStepsManagement embedded />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Global Upsells Elements Slide-out Panel */}
+      <Sheet open={showUpsellsPanel} onOpenChange={setShowUpsellsPanel}>
+        <SheetContent side="right" className="w-[600px] sm:w-[800px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5" />
+              Global Upsells Elements
+            </SheetTitle>
+            <SheetDescription>
+              Manage the global upsells that can be added to quotes
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <UpsellsManagement embedded />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

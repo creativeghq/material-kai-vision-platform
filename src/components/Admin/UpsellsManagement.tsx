@@ -41,7 +41,11 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, Upsell } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
-export const UpsellsManagement: React.FC = () => {
+interface UpsellsManagementProps {
+  embedded?: boolean;
+}
+
+export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded = false }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [upsells, setUpsells] = useState<Upsell[]>([]);
@@ -250,12 +254,160 @@ export const UpsellsManagement: React.FC = () => {
   };
 
   if (loading) {
+    if (embedded) {
+      return (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gray-50">
         <GlobalAdminHeader title="Upsells Management" />
         <div className="flex items-center justify-center h-96">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
+      </div>
+    );
+  }
+
+  // Embedded mode for Sheet panels
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-muted-foreground">
+            {upsells.length} upsell{upsells.length !== 1 ? 's' : ''} defined
+          </p>
+          <Button onClick={handleOpenCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Upsell
+          </Button>
+        </div>
+
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {upsells.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    No upsells yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                upsells
+                  .sort((a, b) => a.display_order - b.display_order)
+                  .map((upsell, index, sortedArray) => (
+                    <TableRow key={upsell.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              disabled={index === 0 || reordering}
+                              onClick={() => handleMoveUpsell(upsell.id, 'up')}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              disabled={index === sortedArray.length - 1 || reordering}
+                              onClick={() => handleMoveUpsell(upsell.id, 'down')}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <span className="font-medium">{upsell.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{formatPrice(upsell.price)}</TableCell>
+                      <TableCell>
+                        <Badge variant={upsell.is_active ? 'default' : 'secondary'}>
+                          {upsell.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(upsell)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeletingUpsell(upsell)}>
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Create/Edit Modal */}
+        <Dialog open={showCreateModal} onOpenChange={handleCloseModal}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{editingUpsell ? 'Edit Upsell' : 'Create Upsell'}</DialogTitle>
+              <DialogDescription>
+                {editingUpsell ? 'Update the upsell details' : 'Create a new upsell item'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Name *</label>
+                <Input value={upsellName} onChange={(e) => setUpsellName(e.target.value)} placeholder="e.g., Express Shipping" className="mt-1" />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Description</label>
+                <Textarea value={upsellDescription} onChange={(e) => setUpsellDescription(e.target.value)} placeholder="Describe this upsell..." className="mt-1" rows={3} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Price *</label>
+                <Input type="number" step="0.01" min="0" value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} placeholder="0.00" className="mt-1" />
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Active</label>
+                <Switch checked={isActive} onCheckedChange={setIsActive} />
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>
+                <Button onClick={editingUpsell ? handleUpdateUpsell : handleCreateUpsell} disabled={saving || !upsellName.trim() || !upsellPrice}>
+                  {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : editingUpsell ? 'Save Changes' : 'Create Upsell'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={!!deletingUpsell} onOpenChange={() => setDeletingUpsell(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Upsell</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{deletingUpsell?.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteUpsell} className="bg-red-600 hover:bg-red-700 text-white">
+                {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</> : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }

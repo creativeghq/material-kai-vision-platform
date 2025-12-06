@@ -62,6 +62,7 @@ import { SubscriptionPlansPage } from './components/Billing/SubscriptionPlansPag
 import { CreditPackagesPage } from './components/Billing/CreditPackagesPage';
 import { QuoteRequestsPage } from './components/Quotes/QuoteRequestsPage';
 import { QuotesPage } from './pages/QuotesPage';
+import { QuoteDetailCustomerPage } from './pages/QuoteDetailCustomerPage';
 import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
 import { QuoteRequestsAdmin } from './components/Admin/QuoteRequestsAdmin';
 import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
@@ -551,6 +552,16 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <QuotesPage />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/quotes/:id"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <QuoteDetailCustomerPage />
                     </Layout>
                   </AuthGuard>
                 }

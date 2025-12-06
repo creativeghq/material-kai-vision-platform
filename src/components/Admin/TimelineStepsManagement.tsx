@@ -35,7 +35,11 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, TimelineStep } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
-export const TimelineStepsManagement: React.FC = () => {
+interface TimelineStepsManagementProps {
+  embedded?: boolean;
+}
+
+export const TimelineStepsManagement: React.FC<TimelineStepsManagementProps> = ({ embedded = false }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [timelineSteps, setTimelineSteps] = useState<TimelineStep[]>([]);
@@ -231,13 +235,196 @@ export const TimelineStepsManagement: React.FC = () => {
     }
   };
 
+  // Render helpers for modals (shared between embedded and full modes)
+  const renderCreateModal = () => (
+    <Dialog open={showCreateModal} onOpenChange={handleCloseModal}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Create Timeline Step</DialogTitle>
+          <DialogDescription>Create a new step for the project timeline</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Name *</label>
+            <Input value={stepName} onChange={(e) => setStepName(e.target.value)} placeholder="e.g., Materials Ordered" className="mt-1" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Description</label>
+            <Textarea value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Display Order</label>
+            <Input type="number" min="0" value={displayOrder} onChange={(e) => setDisplayOrder(e.target.value)} placeholder="0" className="mt-1" />
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium">Active</label>
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>
+            <Button onClick={handleCreateStep} disabled={saving || !stepName.trim()}>
+              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : <><Plus className="h-4 w-4 mr-2" />Create Step</>}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const renderEditModal = () => (
+    <Dialog open={showEditModal} onOpenChange={handleCloseModal}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Timeline Step</DialogTitle>
+          <DialogDescription>Update the timeline step details</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Name *</label>
+            <Input value={stepName} onChange={(e) => setStepName(e.target.value)} placeholder="e.g., Materials Ordered" className="mt-1" />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Description</label>
+            <Textarea value={stepDescription} onChange={(e) => setStepDescription(e.target.value)} placeholder="Describe this timeline step..." className="mt-1" rows={3} />
+          </div>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium">Active</label>
+            <Switch checked={isActive} onCheckedChange={setIsActive} />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={handleCloseModal}>Cancel</Button>
+            <Button onClick={handleUpdateStep} disabled={saving || !stepName.trim()}>
+              {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : <><Save className="h-4 w-4 mr-2" />Save Changes</>}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const renderDeleteDialog = () => (
+    <AlertDialog open={!!deletingStep} onOpenChange={() => setDeletingStep(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Timeline Step</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete "{deletingStep?.name}"? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeleteStep} className="bg-red-600 hover:bg-red-700 text-white">
+            {saving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</> : 'Delete'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (loading) {
+    if (embedded) {
+      return (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gray-50">
         <GlobalAdminHeader title="Timeline Steps Management" />
         <div className="flex items-center justify-center h-96">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
+      </div>
+    );
+  }
+
+  // Embedded mode for Sheet panels
+  if (embedded) {
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <p className="text-sm text-muted-foreground">
+            {timelineSteps.length} timeline step{timelineSteps.length !== 1 ? 's' : ''} defined
+          </p>
+          <Button onClick={handleOpenCreate} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Step
+          </Button>
+        </div>
+
+        <div className="border rounded-lg">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {timelineSteps.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                    No timeline steps yet
+                  </TableCell>
+                </TableRow>
+              ) : (
+                timelineSteps
+                  .sort((a, b) => a.display_order - b.display_order)
+                  .map((step, index, sortedArray) => (
+                    <TableRow key={step.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              disabled={index === 0 || reordering}
+                              onClick={() => handleMoveStep(step.id, 'up')}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 w-5 p-0"
+                              disabled={index === sortedArray.length - 1 || reordering}
+                              onClick={() => handleMoveStep(step.id, 'down')}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                          <span className="font-medium">{step.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={step.is_active ? 'default' : 'secondary'}>
+                          {step.is_active ? 'Active' : 'Inactive'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(step)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeletingStep(step)}>
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Modals */}
+        {renderCreateModal()}
+        {renderEditModal()}
+        {renderDeleteDialog()}
       </div>
     );
   }
@@ -354,170 +541,10 @@ export const TimelineStepsManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Create Modal */}
-      <Dialog open={showCreateModal} onOpenChange={handleCloseModal}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Create Timeline Step</DialogTitle>
-            <DialogDescription>
-              Create a new step for the project timeline
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Name *</label>
-              <Input
-                value={stepName}
-                onChange={(e) => setStepName(e.target.value)}
-                placeholder="e.g., Materials Ordered"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Description</label>
-              <Textarea
-                value={stepDescription}
-                onChange={(e) => setStepDescription(e.target.value)}
-                placeholder="Describe this timeline step..."
-                className="mt-1"
-                rows={3}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Display Order</label>
-              <Input
-                type="number"
-                min="0"
-                value={displayOrder}
-                onChange={(e) => setDisplayOrder(e.target.value)}
-                placeholder="0"
-                className="mt-1"
-              />
-              <p className="text-xs text-gray-500 mt-1">Lower numbers appear first</p>
-            </div>
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Active</label>
-              <Switch
-                checked={isActive}
-                onCheckedChange={setIsActive}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={handleCloseModal}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateStep}
-                disabled={saving || !stepName.trim()}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Step
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Modal */}
-      <Dialog open={showEditModal} onOpenChange={handleCloseModal}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Timeline Step</DialogTitle>
-            <DialogDescription>
-              Update the timeline step details
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Name *</label>
-              <Input
-                value={stepName}
-                onChange={(e) => setStepName(e.target.value)}
-                placeholder="e.g., Materials Ordered"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Description</label>
-              <Textarea
-                value={stepDescription}
-                onChange={(e) => setStepDescription(e.target.value)}
-                placeholder="Describe this timeline step..."
-                className="mt-1"
-                rows={3}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-700">Active</label>
-              <Switch
-                checked={isActive}
-                onCheckedChange={setIsActive}
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-4">
-              <Button variant="outline" onClick={handleCloseModal}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleUpdateStep}
-                disabled={saving || !stepName.trim()}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {saving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deletingStep} onOpenChange={() => setDeletingStep(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Timeline Step</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{deletingStep?.name}"? This action cannot be undone.
-              Any quotes using this step will lose their timeline data for this step.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteStep}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Modals */}
+      {renderCreateModal()}
+      {renderEditModal()}
+      {renderDeleteDialog()}
     </div>
   );
 };
