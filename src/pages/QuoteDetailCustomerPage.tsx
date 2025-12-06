@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X } from 'lucide-react';
+import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 /**
  * Customer-facing Quote Detail Page
@@ -143,8 +142,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen">
-        <GlobalAdminHeader title="Quote Details" description="Loading..." />
+      <div className="min-h-screen bg-background">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -154,14 +152,18 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   if (!quote) {
     return (
-      <div className="min-h-screen">
-        <GlobalAdminHeader title="Quote Not Found" description="The requested quote could not be found" />
-        <div className="p-6">
-          <Button onClick={() => navigate('/quotes')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Quotes
-          </Button>
-        </div>
+      <div className="min-h-screen bg-background p-6">
+        <Button variant="ghost" onClick={() => navigate('/quotes')} className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Quotes
+        </Button>
+        <Card className="text-center py-12">
+          <CardContent>
+            <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Quote Not Found</h3>
+            <p className="text-muted-foreground">The requested quote could not be found.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -186,42 +188,46 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const canAcceptQuote = quote.status === 'quoted' && (!hasUpsells || allUpsellsDecided);
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title={quote.name || 'Untitled Quote'}
-        description={`Created ${new Date(quote.created_at).toLocaleDateString()}`}
-        badge="Quote Details"
-      />
-
-      <div className="p-6 space-y-6">
-        {/* Back Button & Status & Accept Quote */}
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate('/quotes')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Quotes
-          </Button>
-          <div className="flex items-center gap-4">
-            {getStatusBadge(quote.status)}
-            {quote.status === 'quoted' && (
-              <Button
-                onClick={handleAcceptQuote}
-                disabled={!canAcceptQuote || acceptingQuote}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {acceptingQuote ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4 mr-2" />
-                )}
-                Accept Quote
-              </Button>
-            )}
+    <div className="min-h-screen bg-background">
+      {/* Page Header - Customer Style */}
+      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+        <div className="page-container">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ShoppingCart className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">{quote.name || 'Untitled Quote'}</h1>
+                <p className="text-muted-foreground">
+                  Created {new Date(quote.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              {getStatusBadge(quote.status)}
+              {quote.status === 'quoted' && (
+                <Button
+                  onClick={handleAcceptQuote}
+                  disabled={!canAcceptQuote || acceptingQuote}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {acceptingQuote ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Accept Quote
+                </Button>
+              )}
+            </div>
           </div>
         </div>
+      </div>
 
+      {/* Main Content */}
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
         {/* Pending Upsells Warning */}
         {quote.status === 'quoted' && hasUpsells && !allUpsellsDecided && (
-          <Alert variant="destructive" className="border-yellow-500 bg-yellow-50">
+          <Alert variant="destructive" className="border-yellow-500 bg-yellow-50 mb-6">
             <AlertCircle className="h-4 w-4 text-yellow-600" />
             <AlertTitle className="text-yellow-800">Action Required</AlertTitle>
             <AlertDescription className="text-yellow-700">
@@ -232,7 +238,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <div className="dashboard-card">
             <div className="flex items-center gap-3 mb-2">
               <Package className="h-5 w-5 text-primary" />

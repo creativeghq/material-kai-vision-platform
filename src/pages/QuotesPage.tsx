@@ -32,7 +32,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { CreateQuoteModal } from '@/components/Quotes/CreateQuoteModal';
 import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
 
@@ -136,12 +135,7 @@ export const QuotesPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen">
-        <GlobalAdminHeader
-          title="My Quotes"
-          description="Create and manage your material quotes"
-          badge="Quotes Cart"
-        />
+      <div className="min-h-screen bg-background">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -153,14 +147,29 @@ export const QuotesPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="My Quotes"
-        description="Create and manage your material quotes"
-        badge="Quotes Cart"
-      />
+    <div className="min-h-screen bg-background">
+      {/* Page Header - Customer Style */}
+      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+        <div className="page-container">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ShoppingCart className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">My Quotes</h1>
+                <p className="text-muted-foreground">
+                  Create and manage your material quotes
+                </p>
+              </div>
+            </div>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Quote
+            </Button>
+          </div>
+        </div>
+      </div>
 
-      <div className="p-6 space-y-6">
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="dashboard-card transition-all duration-200 hover:shadow-md">
@@ -242,36 +251,23 @@ export const QuotesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold">My Quotes</h2>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="quoted">Quoted</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="expired">Expired</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            onClick={() => setShowCreateModal(true)}
-            style={{
-              backgroundColor: 'hsl(var(--primary))',
-              color: 'white'
-            }}
-            className="hover:opacity-90"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Quote
-          </Button>
+        {/* Filter */}
+        <div className="flex items-center gap-4 mb-4">
+          <span className="text-muted-foreground">Filter:</span>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="submitted">Submitted</SelectItem>
+              <SelectItem value="quoted">Quoted</SelectItem>
+              <SelectItem value="accepted">Accepted</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="expired">Expired</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Quotes Table */}
