@@ -27,6 +27,7 @@ import {
 import type { MoodBoard } from '@/types/materials';
 import { quotesService } from '@/services/quotes/QuotesService';
 import { useNavigate } from 'react-router-dom';
+import { DashboardCard } from '@/components/DesignSystem/DashboardCard';
 
 export const MoodBoardPage = () => {
   const [moodboards, setMoodboards] = useState<MoodBoard[]>([]);
