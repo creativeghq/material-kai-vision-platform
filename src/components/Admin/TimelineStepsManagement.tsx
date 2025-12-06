@@ -148,7 +148,7 @@ export const TimelineStepsManagement: React.FC = () => {
             <Plus className="h-4 w-4 mr-2" />
             Create Step
           </Button>
-
+        </div>
 
         {/* Timeline Steps Table */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
