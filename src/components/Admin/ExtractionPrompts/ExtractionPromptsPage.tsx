@@ -58,11 +58,14 @@ interface ExtractionPrompt {
   category: string;
   prompt_template: string;
   system_prompt: string | null;
+  prompt_type: string;
+  name: string;
   is_custom: boolean;
   version: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  used_in: string[] | null;
 }
 
 interface PromptHistory {
@@ -328,10 +331,12 @@ export const ExtractionPromptsPage: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow className="border-white/10">
+                  <TableHead className="text-white/80">Name</TableHead>
+                  <TableHead className="text-white/80">Type</TableHead>
                   <TableHead className="text-white/80">Stage</TableHead>
                   <TableHead className="text-white/80">Category</TableHead>
                   <TableHead className="text-white/80">Version</TableHead>
-                  <TableHead className="text-white/80">Custom</TableHead>
+                  <TableHead className="text-white/80">Used In</TableHead>
                   <TableHead className="text-white/80">Updated</TableHead>
                   <TableHead className="text-white/80 text-right">Actions</TableHead>
                 </TableRow>
@@ -339,14 +344,45 @@ export const ExtractionPromptsPage: React.FC = () => {
               <TableBody>
                 {prompts.map((prompt) => (
                   <TableRow key={prompt.id} className="border-white/10">
+                    <TableCell className="text-white/90 font-medium">
+                      {prompt.name || `${prompt.stage} - ${prompt.category}`}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={
+                        prompt.prompt_type === 'agent' ? 'bg-blue-500/20 text-blue-300' :
+                        prompt.prompt_type === 'extraction' ? 'bg-green-500/20 text-green-300' :
+                        prompt.prompt_type === 'template' ? 'bg-purple-500/20 text-purple-300' :
+                        prompt.prompt_type === 'search' ? 'bg-orange-500/20 text-orange-300' :
+                        'bg-gray-500/20 text-gray-300'
+                      }>
+                        {prompt.prompt_type || 'extraction'}
+                      </Badge>
+                    </TableCell>
                     <TableCell>{getStageBadge(prompt.stage)}</TableCell>
                     <TableCell>{getCategoryBadge(prompt.category)}</TableCell>
                     <TableCell className="text-white/80">v{prompt.version}</TableCell>
-                    <TableCell>
-                      {prompt.is_custom ? (
-                        <Badge className="bg-purple-500/20 text-purple-300">Custom</Badge>
+                    <TableCell className="max-w-[200px]">
+                      {prompt.used_in && prompt.used_in.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {prompt.used_in.slice(0, 2).map((location, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="text-xs text-white/60 border-white/20 truncate max-w-[150px]"
+                              title={location}
+                            >
+                              <Code className="h-3 w-3 mr-1" />
+                              {location.split('::')[0]}
+                            </Badge>
+                          ))}
+                          {prompt.used_in.length > 2 && (
+                            <Badge variant="outline" className="text-xs text-white/40 border-white/10">
+                              +{prompt.used_in.length - 2} more
+                            </Badge>
+                          )}
+                        </div>
                       ) : (
-                        <Badge className="bg-gray-500/20 text-gray-300">Default</Badge>
+                        <span className="text-white/40 text-xs">Not specified</span>
                       )}
                     </TableCell>
                     <TableCell className="text-white/60 text-sm">
