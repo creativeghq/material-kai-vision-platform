@@ -179,12 +179,12 @@ export const QuotesPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="page-container py-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
+        {/* Stats Cards - Compact like /quotes/:id */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
               <div
-                className="flex items-center justify-center"
+                className="flex items-center justify-center flex-shrink-0"
                 style={{
                   width: '2.5rem',
                   height: '2.5rem',
@@ -194,15 +194,16 @@ export const QuotesPage: React.FC = () => {
               >
                 <ShoppingCart className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Total Quotes</p>
+                <p className="text-lg font-semibold">{quotes.length}</p>
+              </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">{quotes.length}</div>
-            <div className="text-sm text-muted-foreground">Total Quotes</div>
           </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
               <div
-                className="flex items-center justify-center"
+                className="flex items-center justify-center flex-shrink-0"
                 style={{
                   width: '2.5rem',
                   height: '2.5rem',
@@ -212,17 +213,16 @@ export const QuotesPage: React.FC = () => {
               >
                 <Clock className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Pending</p>
+                <p className="text-lg font-semibold">{quotes.filter(q => q.status === 'submitted').length}</p>
+              </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">
-              {quotes.filter(q => q.status === 'submitted').length}
-            </div>
-            <div className="text-sm text-muted-foreground">Pending</div>
           </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
               <div
-                className="flex items-center justify-center"
+                className="flex items-center justify-center flex-shrink-0"
                 style={{
                   width: '2.5rem',
                   height: '2.5rem',
@@ -232,17 +232,16 @@ export const QuotesPage: React.FC = () => {
               >
                 <CheckCircle className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Accepted</p>
+                <p className="text-lg font-semibold">{quotes.filter(q => q.status === 'accepted').length}</p>
+              </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">
-              {quotes.filter(q => q.status === 'accepted').length}
-            </div>
-            <div className="text-sm text-muted-foreground">Accepted</div>
           </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
               <div
-                className="flex items-center justify-center"
+                className="flex items-center justify-center flex-shrink-0"
                 style={{
                   width: '2.5rem',
                   height: '2.5rem',
@@ -252,11 +251,11 @@ export const QuotesPage: React.FC = () => {
               >
                 <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
               </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Drafts</p>
+                <p className="text-lg font-semibold">{quotes.filter(q => q.status === 'draft').length}</p>
+              </div>
             </div>
-            <div className="text-2xl font-semibold mb-1">
-              {quotes.filter(q => q.status === 'draft').length}
-            </div>
-            <div className="text-sm text-muted-foreground">Drafts</div>
           </div>
         </div>
 
@@ -332,7 +331,7 @@ export const QuotesPage: React.FC = () => {
         </div>
 
         {/* Quotes Table */}
-        <div className="dashboard-card">
+        <div className="dashboard-card" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
           <Table>
             <TableHeader>
               <TableRow>
