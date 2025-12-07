@@ -101,78 +101,98 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     );
   };
 
-  // Extract metadata from product
+  // Extract metadata from product - handling nested structure
   const allData = product.metadata || {};
-  const factory = allData?.factory || allData?.manufacturer || 'Unknown Factory';
-  const collection = allData?.collection || '';
-  const size = allData?.size || allData?.dimensions || 'N/A';
-  const thickness = allData?.thickness || 'N/A';
-  const finish = allData?.finish || 'N/A';
-  const material = allData?.material_type || allData?.material || 'N/A';
 
-  // Organize metadata into categories
+  // Helper to extract value from {value, confidence} objects or plain values
+  const extractValue = (val: unknown): string | undefined => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
+      return String((val as Record<string, unknown>).value);
+    }
+    if (Array.isArray(val)) return val.join(', ');
+    return String(val);
+  };
+
+  // Extract from correct nested paths
+  const factory = allData?.factory_name || allData?.factory_group_name || 'Unknown Factory';
+  const collection = allData?.design?.collection || '';
+  const designData = allData?.design || {};
+  const appearanceData = allData?.appearance || {};
+  const materialPropsData = allData?.material_properties || {};
+  const applicationData = allData?.application || {};
+  const commercialData = allData?.commercial || {};
+  const dimensionsData = allData?.dimensions || [];
+
+  // Get material category and finish from correct paths
+  const material = allData?.material_category || 'N/A';
+  const finish = extractValue(materialPropsData?.finish) || 'N/A';
+  const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
+
+  // Organize metadata into categories - reading from correct nested paths
   const materialProperties = {
-    'Material Type': material,
-    'Composition': allData?.composition,
-    'Type': allData?.type,
-    'Texture': allData?.texture,
+    'Material Category': material,
+    'Composition': extractValue(materialPropsData?.composition),
+    'Body Type': extractValue(materialPropsData?.body_type),
     'Finish': finish,
-    'Pattern': allData?.pattern,
-    'Weight': allData?.weight,
-    'Durability Rating': allData?.durability_rating || allData?.durability
+    'Patterns': extractValue(materialPropsData?.patterns),
+    'Surface': extractValue(materialPropsData?.surface),
+    'Thickness': thickness
   };
 
   const dimensions = {
-    'Size': size,
-    'Length': allData?.length,
-    'Width': allData?.width,
-    'Height': allData?.height,
-    'Thickness': thickness,
-    'Diameter': allData?.diameter
+    'Size': Array.isArray(dimensionsData) && dimensionsData.length > 0
+      ? dimensionsData.map((d: unknown) => typeof d === 'object' ? JSON.stringify(d) : String(d)).join(', ')
+      : 'N/A',
+    'Page Range': allData?.page_range?.join(' - ') || 'N/A'
   };
 
   const appearance = {
-    'Color': allData?.color,
-    'Color Code': allData?.color_code,
-    'Gloss Level': allData?.gloss_level,
-    'Sheen': allData?.sheen,
-    'Grain': allData?.grain
+    'Colors': extractValue(appearanceData?.colors),
+    'Shade Variation': extractValue(appearanceData?.shade_variation),
+    'Visual Effect': extractValue(appearanceData?.visual_effect),
+    'Color Variants': Object.keys(appearanceData)
+      .filter(k => k.startsWith('color_'))
+      .map(k => extractValue(appearanceData[k]))
+      .filter(Boolean)
+      .join(', ') || undefined
   };
 
   const performance = {
-    'Water Resistance': allData?.water_resistance || allData?.water_absorption,
-    'Fire Rating': allData?.fire_rating,
-    'Slip Resistance': allData?.slip_resistance || allData?.class,
-    'Wear Rating': allData?.wear_rating,
-    'Hardness': allData?.hardness
+    'Traffic Level': extractValue(applicationData?.traffic_level),
+    'Slip Resistance': extractValue(materialPropsData?.slip_resistance),
+    'Water Resistance': extractValue(materialPropsData?.water_resistance)
   };
 
   const application = {
-    'Recommended Use': allData?.recommended_use || allData?.application,
-    'Installation Method': allData?.installation_method,
-    'Room Type': allData?.room_type,
-    'Care Instructions': allData?.care_instructions
+    'Recommended Use': extractValue(applicationData?.recommended_use),
+    'Installation': extractValue(applicationData?.installation),
+    'Recommended Joint (Mapei)': extractValue(applicationData?.recommended_joint_color_mapei),
+    'Recommended Joint (Kerakoll)': extractValue(applicationData?.recommended_joint_color_kerakoll)
   };
 
   const compliance = {
-    'Certifications': allData?.certifications,
-    'Standards': allData?.standards,
-    'Eco Friendly': allData?.eco_friendly,
-    'VOC Rating': allData?.voc_rating
+    'Certifications': extractValue(allData?.certifications),
+    'Standards': extractValue(allData?.standards)
   };
 
   const design = {
-    'Designer': allData?.designer || allData?.studio,
+    'Designer': Array.isArray(designData?.designers)
+      ? designData.designers.join(', ')
+      : extractValue(designData?.designers) || extractValue(designData?.studio),
     'Collection': collection,
-    'Series': allData?.series,
-    'Aesthetic Style': allData?.aesthetic_style
+    'Brand': extractValue(designData?.brand),
+    'Aesthetic Style': extractValue(designData?.aesthetic_style),
+    'Philosophy': extractValue(designData?.philosophy)
   };
 
   const manufacturing = {
     'Factory': factory,
-    'Origin': allData?.origin || allData?.country_of_origin,
-    'Production Method': allData?.production_method,
-    'Lead Time': allData?.lead_time
+    'Factory Group': allData?.factory_group_name || undefined,
+    'SKU Codes': commercialData?.sku_codes
+      ? Object.entries(commercialData.sku_codes).map(([k, v]) => `${k}: ${v}`).join(', ')
+      : undefined,
+    'Grout Codes': extractValue(commercialData?.grout_color_codes?.codes)
   };
 
   const renderMetadataSection = (title: string, data: Record<string, any>, icon?: React.ReactNode) => {
@@ -317,9 +337,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               )}
 
               {/* Category Badge */}
-              {allData?.category && (
+              {allData?.material_category && (
                 <Badge className="text-sm px-3 py-1" style={{ backgroundColor: 'hsl(var(--primary))' }}>
-                  {allData.category}
+                  {allData.material_category}
                 </Badge>
               )}
 

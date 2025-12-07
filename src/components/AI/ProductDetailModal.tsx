@@ -57,112 +57,112 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     ...product.specifications
   };
 
-  const factory = allData?.factory || allData?.manufacturer || 'Unknown Factory';
-  const origin = allData?.origin || allData?.country_of_origin || '';
-  const collection = allData?.collection || '';
-  const size = allData?.size || allData?.dimensions || 'N/A';
-  const thickness = allData?.thickness || 'N/A';
-  const finish = allData?.finish || 'N/A';
-  const material = allData?.material_type || allData?.material || product.type;
+  // Helper to extract value from {value, confidence} objects or plain values
+  const extractValue = (val: unknown): string | undefined => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
+      return String((val as Record<string, unknown>).value);
+    }
+    if (Array.isArray(val)) return val.join(', ');
+    return String(val);
+  };
 
-  // Organize metadata into comprehensive categories matching DynamicMetadataExtractor
-  // Category 1: Material Properties
+  // Extract from correct nested paths (matching actual DB structure)
+  const designData = allData?.design || {};
+  const appearanceData = allData?.appearance || {};
+  const materialPropsData = allData?.material_properties || {};
+  const applicationData = allData?.application || {};
+  const commercialData = allData?.commercial || {};
+  const dimensionsData = allData?.dimensions || [];
+
+  const factory = allData?.factory_name || allData?.factory_group_name || 'Unknown Factory';
+  const origin = allData?.origin || allData?.country_of_origin || '';
+  const collection = designData?.collection || allData?.collection || '';
+  const size = Array.isArray(dimensionsData) && dimensionsData.length > 0
+    ? dimensionsData.map((d: unknown) => typeof d === 'object' ? JSON.stringify(d) : String(d)).join(', ')
+    : 'N/A';
+  const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
+  const finish = extractValue(materialPropsData?.finish) || 'N/A';
+  const material = allData?.material_category || product.type || 'N/A';
+
+  // Category 1: Material Properties (from material_properties nested object)
   const materialProperties = {
-    'Material Type': material,
-    'Composition': allData?.composition,
-    'Type': allData?.type,
-    'Blend': allData?.blend,
-    'Fiber Content': allData?.fiber_content,
-    'Texture': allData?.texture,
+    'Material Category': material,
+    'Composition': extractValue(materialPropsData?.composition),
+    'Body Type': extractValue(materialPropsData?.body_type),
     'Finish': finish,
-    'Pattern': allData?.pattern,
-    'Weight': allData?.weight,
-    'Density': allData?.density,
-    'Durability Rating': allData?.durability_rating || allData?.durability
+    'Patterns': extractValue(materialPropsData?.patterns),
+    'Surface': extractValue(materialPropsData?.surface),
+    'Thickness': thickness
   };
 
   // Category 2: Dimensions
   const dimensions = {
     'Size': size,
-    'Length': allData?.length,
-    'Width': allData?.width,
-    'Height': allData?.height,
-    'Thickness': thickness,
-    'Diameter': allData?.diameter,
-    'Area': allData?.area,
-    'Volume': allData?.volume
+    'Page Range': allData?.page_range?.join(' - ') || undefined
   };
 
-  // Category 3: Appearance
+  // Category 3: Appearance (from appearance nested object)
   const appearance = {
-    'Color': allData?.color,
-    'Color Code': allData?.color_code,
-    'Gloss Level': allData?.gloss_level,
-    'Sheen': allData?.sheen,
-    'Transparency': allData?.transparency,
-    'Grain': allData?.grain,
-    'Visual Effect': allData?.visual_effect
+    'Colors': extractValue(appearanceData?.colors),
+    'Shade Variation': extractValue(appearanceData?.shade_variation),
+    'Visual Effect': extractValue(appearanceData?.visual_effect),
+    'Color Variants': Object.keys(appearanceData)
+      .filter(k => k.startsWith('color_'))
+      .map(k => extractValue(appearanceData[k]))
+      .filter(Boolean)
+      .join(', ') || undefined
   };
 
   // Category 4: Performance
   const performance = {
-    'Water Resistance': allData?.water_resistance || allData?.water_absorption,
-    'Fire Rating': allData?.fire_rating,
-    'Slip Resistance': allData?.slip_resistance || allData?.class,
-    'Wear Rating': allData?.wear_rating,
-    'Abrasion Resistance': allData?.abrasion_resistance,
-    'Tensile Strength': allData?.tensile_strength,
-    'Breaking Strength': allData?.breaking_strength,
-    'Hardness': allData?.hardness
+    'Traffic Level': extractValue(applicationData?.traffic_level),
+    'Slip Resistance': extractValue(materialPropsData?.slip_resistance),
+    'Water Resistance': extractValue(materialPropsData?.water_resistance),
+    'Fire Rating': extractValue(materialPropsData?.fire_rating)
   };
 
-  // Category 5: Application
+  // Category 5: Application (from application nested object)
   const application = {
-    'Recommended Use': allData?.recommended_use || allData?.application,
-    'Installation Method': allData?.installation_method,
-    'Room Type': allData?.room_type,
-    'Traffic Level': allData?.traffic_level,
-    'Care Instructions': allData?.care_instructions,
-    'Maintenance': allData?.maintenance
+    'Recommended Use': extractValue(applicationData?.recommended_use),
+    'Installation': extractValue(applicationData?.installation),
+    'Recommended Joint (Mapei)': extractValue(applicationData?.recommended_joint_color_mapei),
+    'Recommended Joint (Kerakoll)': extractValue(applicationData?.recommended_joint_color_kerakoll)
   };
 
   // Category 6: Compliance
   const compliance = {
-    'Certifications': allData?.certifications,
-    'Standards': allData?.standards,
-    'Eco Friendly': allData?.eco_friendly,
-    'Sustainability Rating': allData?.sustainability_rating,
-    'VOC Rating': allData?.voc_rating,
-    'Safety Rating': allData?.safety_rating
+    'Certifications': extractValue(allData?.certifications),
+    'Standards': extractValue(allData?.standards)
   };
 
-  // Category 7: Design
+  // Category 7: Design (from design nested object)
   const design = {
-    'Designer': allData?.designer || allData?.studio,
-    'Studio': allData?.studio,
+    'Designer': Array.isArray(designData?.designers)
+      ? designData.designers.join(', ')
+      : extractValue(designData?.designers) || extractValue(designData?.studio),
+    'Studio': extractValue(designData?.studio),
     'Collection': collection,
-    'Series': allData?.series,
-    'Aesthetic Style': allData?.aesthetic_style,
-    'Design Era': allData?.design_era
+    'Brand': extractValue(designData?.brand),
+    'Aesthetic Style': extractValue(designData?.aesthetic_style),
+    'Philosophy': extractValue(designData?.philosophy)
   };
 
   // Category 8: Manufacturing
   const manufacturing = {
     'Factory': factory,
-    'Manufacturer': allData?.manufacturer || allData?.factory_group,
-    'Factory Group': allData?.factory_group,
-    'Country of Origin': allData?.country_of_origin || origin,
-    'Manufacturing Process': allData?.manufacturing_process,
-    'Construction': allData?.construction
+    'Factory Group': allData?.factory_group_name || undefined,
+    'Country of Origin': origin || undefined
   };
 
-  // Category 9: Commercial
+  // Category 9: Commercial (from commercial nested object)
   const commercial = {
-    'Pricing': allData?.pricing,
-    'Availability': allData?.availability,
-    'Supplier': allData?.supplier,
-    'SKU': allData?.sku || product.sku,
-    'Warranty': allData?.warranty
+    'SKU Codes': commercialData?.sku_codes
+      ? Object.entries(commercialData.sku_codes).map(([k, v]) => `${k}: ${v}`).join(', ')
+      : undefined,
+    'Grout (Mapei)': extractValue(commercialData?.grout_mapei),
+    'Grout (Kerakoll)': extractValue(commercialData?.grout_kerakoll),
+    'Grout Codes': extractValue(commercialData?.grout_color_codes?.codes)
   };
 
   // Get all other metadata not in the above categories

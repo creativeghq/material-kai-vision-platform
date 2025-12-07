@@ -153,15 +153,22 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, onStatsUp
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {filteredProducts.map((product) => {
+                  // Extract from correct metadata paths
+                  const category = product.metadata?.material_category || 'N/A';
+                  const manufacturer = product.metadata?.factory_name ||
+                                       product.metadata?.factory_group_name ||
+                                       'N/A';
+
+                  return (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
-                        {product.metadata?.category || 'N/A'}
+                        {category}
                       </Badge>
                     </TableCell>
-                    <TableCell>{product.metadata?.manufacturer || 'N/A'}</TableCell>
+                    <TableCell>{manufacturer}</TableCell>
                     <TableCell>
                       {new Date(product.created_at).toLocaleDateString()}
                     </TableCell>
@@ -184,7 +191,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, onStatsUp
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
