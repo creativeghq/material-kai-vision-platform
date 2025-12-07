@@ -47,7 +47,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   const [customRequestText, setCustomRequestText] = useState(quote.custom_request_text || '');
   const [showAddMaterial, setShowAddMaterial] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [searchResults, setSearchResults] = useState<(Product & { image_url?: string })[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [quoteType, setQuoteType] = useState<'products' | 'custom'>(
@@ -56,7 +56,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
 
   const items = (quote.items || []) as QuoteItemWithProduct[];
 
-  // Debounced product search
+  // Debounced product search - uses MIVAA API for semantic search
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -66,7 +66,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
     const debounceTimer = setTimeout(async () => {
       try {
         setSearchLoading(true);
-        const results = await quotesService.searchProducts(searchQuery, 10);
+        const results = await quotesService.searchProductsWithImages(searchQuery, 10);
         // Filter out products already in the quote
         const existingProductIds = items.map(item => item.product_id);
         const filteredResults = results.filter(p => !existingProductIds.includes(p.id));

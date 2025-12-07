@@ -867,40 +867,6 @@ export class QuotesService {
   // =====================================================
 
   /**
-   * Search products for adding to quotes
-   */
-  async searchProducts(query: string, limit: number = 10): Promise<Product[]> {
-    // Get the current user to find their workspace
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
-
-    // Get user's workspace
-    const { data: workspaceData } = await supabase
-      .from('workspace_members')
-      .select('workspace_id')
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .order('joined_at', { ascending: true })
-      .limit(1)
-      .single();
-
-    if (!workspaceData) {
-      throw new Error('No workspace found for user');
-    }
-
-    // Search products by name or description
-    const { data, error } = await supabase
-      .from('products')
-      .select('id, name, sku, description, metadata')
-      .eq('workspace_id', workspaceData.workspace_id)
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
-      .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  /**
    * Search products with their primary images for the add products sheet
    * Uses MIVAA API's powerful /api/rag/search endpoint for semantic + text search
    */
