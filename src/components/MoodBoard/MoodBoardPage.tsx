@@ -240,10 +240,11 @@ export const MoodBoardPage = () => {
           </Button>
           </div>
         </div>
+        </div>
       </div>
 
       {/* MoodBoards Grid */}
-      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
         {moodboards.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
@@ -450,7 +451,6 @@ export const MoodBoardPage = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
     </div>
   );
 };

@@ -305,7 +305,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
