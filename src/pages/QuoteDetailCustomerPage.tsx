@@ -223,12 +223,12 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Hero Section - Quote Information */}
-      <div className="bg-muted/30 border-b">
-        <div className="page-container" style={{ paddingTop: 'var(--space-lg)', paddingBottom: 'var(--space-lg)' }}>
+      {/* Stats Row */}
+      <div className="border-b">
+        <div className="page-container py-4">
           {/* Pending Upsells Warning */}
           {quote.status === 'quoted' && hasUpsells && !allUpsellsDecided && (
-            <Alert variant="destructive" className="border-yellow-500 bg-yellow-50 mb-6">
+            <Alert variant="destructive" className="border-yellow-500 bg-yellow-50 mb-4">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
               <AlertTitle className="text-yellow-800">Action Required</AlertTitle>
               <AlertDescription className="text-yellow-700">
@@ -238,27 +238,27 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             </Alert>
           )}
 
-          {/* Quote Information Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-              <Tag className="h-5 w-5 text-primary flex-shrink-0" />
+          {/* Quote Information Grid - compact stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Status</p>
                 <div className="mt-0.5">{getStatusBadge(quote.status)}</div>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-              <Boxes className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <Boxes className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Items</p>
-                <p className="font-semibold truncate">{itemCount}</p>
+                <p className="font-medium text-sm">{itemCount}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-              <Plus className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <Plus className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Extras</p>
-                <p className="font-semibold truncate">
+                <p className="font-medium text-sm">
                   {quoteUpsells.length}
                   {pendingUpsells.length > 0 && (
                     <span className="text-xs text-yellow-600 ml-1">({pendingUpsells.length} pending)</span>
@@ -266,34 +266,34 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-              <DollarSign className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Extras Total</p>
-                <p className="font-semibold truncate">€{(quote.extras_total || 0).toFixed(2)}</p>
+                <p className="font-medium text-sm">€{(quote.extras_total || 0).toFixed(2)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-              <Calendar className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Created</p>
-                <p className="font-semibold text-sm truncate">{new Date(quote.created_at).toLocaleDateString()}</p>
+                <p className="font-medium text-sm">{new Date(quote.created_at).toLocaleDateString()}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
-              <Timer className="h-5 w-5 text-primary flex-shrink-0" />
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <Timer className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Expires</p>
-                <p className="font-semibold text-sm truncate">{new Date(quote.expires_at).toLocaleDateString()}</p>
+                <p className="font-medium text-sm">{new Date(quote.expires_at).toLocaleDateString()}</p>
               </div>
             </div>
           </div>
 
           {/* Custom Request (if exists) */}
           {quote.custom_request_text && (
-            <div className="mt-4 p-4 bg-background rounded-lg border">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="h-4 w-4 text-primary" />
+            <div className="mt-3 p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-1">
+                <FileText className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Custom Request</span>
               </div>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">
@@ -305,7 +305,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container py-4" style={{ paddingBottom: 'var(--space-xl)' }}>
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
@@ -323,7 +323,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="items" className="mt-6">
+          <TabsContent value="items" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Quote Items</CardTitle>
@@ -359,7 +359,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="extras" className="mt-6">
+          <TabsContent value="extras" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Extras & Add-ons</CardTitle>
@@ -477,7 +477,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="timeline" className="mt-6">
+          <TabsContent value="timeline" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle>Project Timeline</CardTitle>
