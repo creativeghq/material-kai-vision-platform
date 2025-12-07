@@ -946,7 +946,7 @@ export class QuotesService {
       // Fetch full product details
       const { data: products, error } = await supabase
         .from('products')
-        .select('id, name, sku, description, metadata')
+        .select('id, name, description, metadata')
         .in('id', Array.from(productIds));
 
       if (error) throw error;
@@ -1000,19 +1000,29 @@ export class QuotesService {
     workspaceId: string,
     limit: number
   ): Promise<(Product & { image_url?: string })[]> {
-    // Search products by name, description, SKU, or metadata
+    // Search products by name or description
+    // Note: products table doesn't have 'sku' column - it may be in metadata
     const searchTerms = query.split(/\s+/).filter(t => t.length > 1);
 
-    // Build OR conditions for each search term
-    const orConditions = searchTerms.map(term =>
-      `name.ilike.%${term}%,description.ilike.%${term}%,sku.ilike.%${term}%`
-    ).join(',');
+    // Build OR conditions for each search term across name and description
+    let orConditions = '';
+    if (searchTerms.length > 0) {
+      const conditions: string[] = [];
+      for (const term of searchTerms) {
+        conditions.push(`name.ilike.%${term}%`);
+        conditions.push(`description.ilike.%${term}%`);
+      }
+      orConditions = conditions.join(',');
+    } else {
+      // Fallback to full query if no valid terms
+      orConditions = `name.ilike.%${query}%,description.ilike.%${query}%`;
+    }
 
     const { data: products, error } = await supabase
       .from('products')
-      .select('id, name, sku, description, metadata')
+      .select('id, name, description, metadata')
       .eq('workspace_id', workspaceId)
-      .or(orConditions || `name.ilike.%${query}%,description.ilike.%${query}%,sku.ilike.%${query}%`)
+      .or(orConditions)
       .limit(limit);
 
     if (error) throw error;
