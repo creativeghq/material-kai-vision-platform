@@ -283,7 +283,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
           {/* Quote Information Grid - compact stats with proper card styling */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -302,7 +302,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -321,7 +321,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -345,7 +345,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -364,7 +364,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -383,7 +383,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -406,7 +406,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
           {/* Custom Request (if exists) */}
           {quote.custom_request_text && (
-            <div className="mt-4 dashboard-card p-4">
+            <div className="mt-4 dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
                 <span className="text-sm font-medium">Custom Request</span>
@@ -443,6 +443,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
               items={quote.items || []}
               showAddButton={quote.status === 'draft' || quote.status === 'submitted'}
               onAddProducts={() => setShowAddProducts(true)}
+              onUpdateQuantity={async (itemId, quantity) => {
+                await quotesService.updateItem(itemId, { quantity });
+                await loadQuoteDetails();
+              }}
+              onRemoveItem={async (itemId) => {
+                await quotesService.removeItem(itemId);
+                await loadQuoteDetails();
+              }}
+              editable={quote.status === 'draft' || quote.status === 'submitted'}
               variant="compact"
             />
           </TabsContent>

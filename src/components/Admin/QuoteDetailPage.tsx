@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { QuoteItemsList } from '@/components/Quotes/QuoteItemsList';
+import { AddProductsSheet } from '@/components/Quotes/AddProductsSheet';
 import {
   Select,
   SelectContent,
@@ -52,6 +53,9 @@ export const QuoteDetailPage: React.FC = () => {
 
   // Timeline notes state (for editing notes on existing timeline items)
   const [editingTimelineNotes, setEditingTimelineNotes] = useState<Record<string, string>>({});
+
+  // Add Products Sheet state
+  const [isAddProductsOpen, setIsAddProductsOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -432,7 +436,7 @@ export const QuoteDetailPage: React.FC = () => {
 
         {/* Compact Quote Information Row - dashboard card styling */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -451,7 +455,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -470,7 +474,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -489,7 +493,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -508,7 +512,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -527,7 +531,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -546,7 +550,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="dashboard-card p-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
             <div className="flex items-center gap-3">
               <div
                 className="flex items-center justify-center flex-shrink-0"
@@ -566,7 +570,7 @@ export const QuoteDetailPage: React.FC = () => {
             </div>
           </div>
           {quote.workspace_id && (
-            <div className="dashboard-card p-4">
+            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center flex-shrink-0"
@@ -592,7 +596,7 @@ export const QuoteDetailPage: React.FC = () => {
         {(quote.notes || quote.custom_request_text) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {quote.notes && (
-              <div className="dashboard-card p-4">
+              <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <MessageSquare className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
                   <span className="text-sm font-medium">Notes</span>
@@ -601,7 +605,7 @@ export const QuoteDetailPage: React.FC = () => {
               </div>
             )}
             {quote.custom_request_text && (
-              <div className="dashboard-card p-4">
+              <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
                 <div className="flex items-center gap-2 mb-2">
                   <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
                   <span className="text-sm font-medium">Custom Request</span>
@@ -638,6 +642,17 @@ export const QuoteDetailPage: React.FC = () => {
             <QuoteItemsList
               items={quote.items || []}
               variant="detailed"
+              showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
+              onAddProducts={() => setIsAddProductsOpen(true)}
+              onUpdateQuantity={async (itemId, quantity) => {
+                await quotesService.updateItem(itemId, { quantity });
+                await loadQuoteDetails();
+              }}
+              onRemoveItem={async (itemId) => {
+                await quotesService.removeItem(itemId);
+                await loadQuoteDetails();
+              }}
+              editable={quote.status !== 'accepted' && quote.status !== 'rejected'}
             />
           </TabsContent>
 
@@ -1045,6 +1060,16 @@ export const QuoteDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Products Sheet */}
+      {id && (
+        <AddProductsSheet
+          quoteId={id}
+          isOpen={isAddProductsOpen}
+          onClose={() => setIsAddProductsOpen(false)}
+          onProductsAdded={loadQuoteDetails}
+        />
+      )}
     </div>
   );
 };

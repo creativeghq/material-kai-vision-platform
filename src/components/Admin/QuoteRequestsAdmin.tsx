@@ -110,13 +110,13 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       // Always add current user first
       if (user) {
-        const { data: currentUserProfile } = await supabase
+        const { data: currentUserProfile, error: profileError } = await supabase
           .from('user_profiles')
-          .select('*')
+          .select('id, user_id, role_id, subscription_tier, status, created_at')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle(); // Use maybeSingle to avoid 406 error when no profile exists
 
-        if (currentUserProfile) {
+        if (currentUserProfile && !profileError) {
           usersList.push(currentUserProfile);
         }
       }
@@ -129,16 +129,14 @@ export const QuoteRequestsAdmin: React.FC = () => {
           const otherUsers = data.filter((u: UserProfile) => u.user_id !== user?.id);
           usersList.push(...otherUsers);
         }
-      } catch (error: any) {
-        // ✅ FIX: Silently handle admin access errors - current user already added
-        if (error?.message !== 'Admin access required') {
-          console.error('Error loading CRM users:', error);
-        }
+      } catch {
+        // Silently handle CRM access errors - current user already added
+        // This is expected for non-admin users
       }
 
       setUsers(usersList);
-    } catch (error: any) {
-      console.error('Error loading users:', error);
+    } catch {
+      // Silently handle any errors - users list will just be empty
     }
   };
 
@@ -257,47 +255,119 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Compact Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Total</p>
-              <p className="font-medium text-sm">{quoteRequests.length}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Total</p>
+                <p className="text-lg font-semibold">{quoteRequests.length}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Pending</p>
-              <p className="font-medium text-sm">{quoteRequests.filter(q => q.status === 'submitted').length}</p>
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Pending</p>
+                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'submitted').length}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Quoted</p>
-              <p className="font-medium text-sm">{quoteRequests.filter(q => q.status === 'quoted').length}</p>
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Quoted</p>
+                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'quoted').length}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <CheckCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Accepted</p>
-              <p className="font-medium text-sm">{quoteRequests.filter(q => q.status === 'accepted').length}</p>
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Accepted</p>
+                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'accepted').length}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <XCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Rejected</p>
-              <p className="font-medium text-sm">{quoteRequests.filter(q => q.status === 'rejected').length}</p>
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <XCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Rejected</p>
+                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'rejected').length}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Draft</p>
-              <p className="font-medium text-sm">{quoteRequests.filter(q => q.status === 'draft').length}</p>
+          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Draft</p>
+                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'draft').length}</p>
+              </div>
             </div>
           </div>
         </div>
