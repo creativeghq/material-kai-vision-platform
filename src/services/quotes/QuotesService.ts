@@ -33,7 +33,7 @@ export interface QuoteItem {
 }
 
 export interface QuoteWithItems extends Quote {
-  items?: QuoteItem[];
+  items?: QuoteItemWithProduct[];
 }
 
 export interface Product {
@@ -42,6 +42,7 @@ export interface Product {
   sku?: string;
   description?: string;
   metadata?: Record<string, any>;
+  image_url?: string;
 }
 
 export interface QuoteItemWithProduct extends QuoteItem {
@@ -897,6 +898,64 @@ export class QuotesService {
 
     if (error) throw error;
     return data || [];
+  }
+
+  /**
+   * Search products with their primary images for the add products sheet
+   */
+  async searchProductsWithImages(query: string, limit: number = 10): Promise<(Product & { image_url?: string })[]> {
+    // Get the current user to find their workspace
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get user's workspace
+    const { data: workspaceData } = await supabase
+      .from('workspace_members')
+      .select('workspace_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .order('joined_at', { ascending: true })
+      .limit(1)
+      .single();
+
+    if (!workspaceData) {
+      throw new Error('No workspace found for user');
+    }
+
+    // Search products by name or description
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, name, sku, description, metadata')
+      .eq('workspace_id', workspaceData.workspace_id)
+      .or(`name.ilike.%${query}%,description.ilike.%${query}%,sku.ilike.%${query}%`)
+      .limit(limit);
+
+    if (error) throw error;
+    if (!products || products.length === 0) return [];
+
+    // Get images for these products from product_image_relationships
+    const productIds = products.map(p => p.id);
+    const { data: relationships } = await supabase
+      .from('product_image_relationships')
+      .select('product_id, image:document_images(image_url)')
+      .in('product_id', productIds)
+      .order('relevance_score', { ascending: false });
+
+    // Create a map of product_id to first image URL
+    const productImageMap: Record<string, string> = {};
+    if (relationships) {
+      for (const rel of relationships) {
+        if (!productImageMap[rel.product_id] && rel.image?.image_url) {
+          productImageMap[rel.product_id] = rel.image.image_url;
+        }
+      }
+    }
+
+    // Combine products with their images
+    return products.map(product => ({
+      ...product,
+      image_url: productImageMap[product.id] || undefined,
+    }));
   }
 
   // =====================================================

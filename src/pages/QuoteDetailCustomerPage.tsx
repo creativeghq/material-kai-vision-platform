@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
+import { AddProductsSheet } from '@/components/Quotes/AddProductsSheet';
 
 /**
  * Customer-facing Quote Detail Page
@@ -25,6 +26,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
   const [updatingUpsell, setUpdatingUpsell] = useState<string | null>(null);
   const [acceptingQuote, setAcceptingQuote] = useState(false);
+  const [showAddProducts, setShowAddProducts] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -325,35 +327,61 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
           <TabsContent value="items" className="mt-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Quote Items</CardTitle>
-                <CardDescription>Materials included in this quote</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle>Quote Items</CardTitle>
+                  <CardDescription>Materials included in this quote</CardDescription>
+                </div>
+                {(quote.status === 'draft' || quote.status === 'submitted') && (
+                  <Button onClick={() => setShowAddProducts(true)} size="sm">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Products
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 {quote.items && quote.items.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {quote.items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
                         <div className="flex items-center gap-4">
-                          {item.product?.image_url && (
-                            <img
-                              src={item.product.image_url}
-                              alt={item.product.name}
-                              className="w-16 h-16 object-cover rounded"
-                            />
-                          )}
+                          <div className="w-14 h-14 rounded bg-muted overflow-hidden flex-shrink-0">
+                            {item.product?.image_url ? (
+                              <img
+                                src={item.product.image_url}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
                           <div>
                             <p className="font-medium">{item.product?.name || 'Unknown Product'}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Quantity: {item.quantity}
-                            </p>
+                            {item.product?.sku && (
+                              <p className="text-xs text-muted-foreground">SKU: {item.product.sku}</p>
+                            )}
                           </div>
                         </div>
+                        <Badge variant="secondary" className="text-sm">
+                          Qty: {item.quantity}
+                        </Badge>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground text-center py-8">No items in this quote</p>
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">No items in this quote yet</p>
+                    {(quote.status === 'draft' || quote.status === 'submitted') && (
+                      <Button onClick={() => setShowAddProducts(true)} variant="outline">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Product
+                      </Button>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -516,6 +544,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Products Sheet */}
+      <AddProductsSheet
+        open={showAddProducts}
+        onOpenChange={setShowAddProducts}
+        quoteId={quote.id}
+        existingProductIds={quote.items?.map(item => item.product_id) || []}
+        onProductsAdded={loadQuoteDetails}
+      />
     </div>
   );
 };
