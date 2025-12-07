@@ -189,8 +189,8 @@ export const MoodBoardPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      {/* Page Header */}
+      <div className="bg-card py-6">
         <div className="page-container">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -220,8 +220,8 @@ export const MoodBoardPage = () => {
         </div>
       </div>
 
-      {/* MoodBoards Grid */}
-      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
+      {/* Main Content */}
+      <div className="page-container py-6">
         {moodboards.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>

@@ -6,8 +6,8 @@ import { MaterialAgentSearchInterface } from '@/components/AI/MaterialAgentSearc
 const SearchHubPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - Customer Style */}
-      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      {/* Page Header */}
+      <div className="bg-card py-6">
         <div className="page-container">
           <div className="flex items-center gap-3">
             <Search className="h-8 w-8 text-primary" />
@@ -22,7 +22,7 @@ const SearchHubPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container py-6">
         <MaterialAgentSearchInterface
           onMaterialSelect={(materialId) => {
             console.log('Material selected:', materialId);

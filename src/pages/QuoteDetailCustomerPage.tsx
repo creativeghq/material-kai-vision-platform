@@ -189,8 +189,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Page Header - Customer Style */}
-      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      {/* Page Header */}
+      <div className="bg-card py-6">
         <div className="page-container">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -305,7 +305,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="page-container py-4" style={{ paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container py-6">
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full">
           <TabsList className="grid w-full grid-cols-3">

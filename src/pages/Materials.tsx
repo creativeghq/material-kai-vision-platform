@@ -165,8 +165,8 @@ export const MaterialsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - Customer Style */}
-      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      {/* Page Header */}
+      <div className="bg-card py-6">
         <div className="page-container">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -186,7 +186,7 @@ export const MaterialsPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container py-6">
         {materials.length === 0 ? (
           <Card>
             <CardContent className="p-12">
