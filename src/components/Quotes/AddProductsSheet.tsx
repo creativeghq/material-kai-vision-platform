@@ -196,7 +196,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search products by name..."
+              placeholder="Search products by name, brand, material, color..."
               className="pl-10 pr-10"
             />
             {searchQuery && (
@@ -221,34 +221,62 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                 </div>
               ) : searchResults.length > 0 ? (
                 <div className="divide-y">
-                  {searchResults.map((product) => (
-                    <button
-                      key={product.id}
-                      onClick={() => handleSelectProduct(product)}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
-                    >
-                      <div className="w-12 h-12 rounded bg-muted flex-shrink-0 overflow-hidden">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name || 'Product'}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Package className="h-5 w-5 text-muted-foreground" />
+                  {searchResults.map((product) => {
+                    // Extract useful metadata for display
+                    const metadata = product.metadata || {};
+                    const manufacturer = metadata.manufacturer || metadata.brand || metadata.factory;
+                    const collection = metadata.collection || metadata.series;
+                    const material = metadata.material_type || metadata.material;
+                    const color = metadata.color || metadata.primary_color;
+
+                    return (
+                      <button
+                        key={product.id}
+                        onClick={() => handleSelectProduct(product)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-muted transition-colors text-left"
+                      >
+                        <div className="w-14 h-14 rounded bg-muted flex-shrink-0 overflow-hidden">
+                          {product.image_url ? (
+                            <img
+                              src={product.image_url}
+                              alt={product.name || 'Product'}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{product.name || 'Unnamed Product'}</p>
+                          {manufacturer && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              by {manufacturer}{collection ? ` • ${collection}` : ''}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                            {product.sku && (
+                              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                {product.sku}
+                              </span>
+                            )}
+                            {material && (
+                              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                {material}
+                              </span>
+                            )}
+                            {color && (
+                              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                {color}
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{product.name || 'Unnamed Product'}</p>
-                        {product.sku && (
-                          <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
-                        )}
-                      </div>
-                      <Plus className="h-4 w-4 text-primary flex-shrink-0" />
-                    </button>
-                  ))}
+                        </div>
+                        <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="py-4 text-center text-muted-foreground text-sm">

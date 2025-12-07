@@ -902,8 +902,9 @@ export class QuotesService {
 
   /**
    * Search products with their primary images for the add products sheet
+   * Uses MIVAA API's powerful /api/rag/search endpoint for semantic + text search
    */
-  async searchProductsWithImages(query: string, limit: number = 10): Promise<(Product & { image_url?: string })[]> {
+  async searchProductsWithImages(query: string, limit: number = 20): Promise<(Product & { image_url?: string })[]> {
     // Get the current user to find their workspace
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -922,12 +923,130 @@ export class QuotesService {
       throw new Error('No workspace found for user');
     }
 
-    // Search products by name or description
+    try {
+      // Use MIVAA API for semantic search with multi_vector strategy
+      const MIVAA_API_URL = 'https://v1api.materialshub.gr';
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || '';
+
+      const response = await fetch(`${MIVAA_API_URL}/api/rag/search?strategy=multi_vector`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          query,
+          workspace_id: workspaceData.workspace_id,
+          top_k: limit,
+          similarity_threshold: 0.3, // Lower threshold for broader results
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn('MIVAA search failed, falling back to direct DB search');
+        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
+      }
+
+      const result = await response.json();
+
+      if (!result.success || !result.results || result.results.length === 0) {
+        // Fallback to direct DB search if MIVAA returns no results
+        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
+      }
+
+      // Extract unique product IDs from search results
+      const productIds = new Set<string>();
+      const productDataMap: Record<string, { image_url?: string; score?: number }> = {};
+
+      for (const item of result.results) {
+        // MIVAA search returns products in various formats
+        const productId = item.product_id || item.metadata?.product_id;
+        const imageUrl = item.image_url || item.metadata?.image_url;
+
+        if (productId && !productIds.has(productId)) {
+          productIds.add(productId);
+          productDataMap[productId] = {
+            image_url: imageUrl,
+            score: item.score || item.similarity_score,
+          };
+        }
+      }
+
+      if (productIds.size === 0) {
+        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
+      }
+
+      // Fetch full product details
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('id, name, sku, description, metadata')
+        .in('id', Array.from(productIds));
+
+      if (error) throw error;
+      if (!products || products.length === 0) {
+        return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
+      }
+
+      // Get images for products that don't have them from search results
+      const productsNeedingImages = products.filter(p => !productDataMap[p.id]?.image_url).map(p => p.id);
+
+      if (productsNeedingImages.length > 0) {
+        const { data: relationships } = await supabase
+          .from('product_image_relationships')
+          .select('product_id, image:document_images(image_url)')
+          .in('product_id', productsNeedingImages)
+          .order('relevance_score', { ascending: false });
+
+        if (relationships) {
+          for (const rel of relationships) {
+            if (!productDataMap[rel.product_id]?.image_url && rel.image?.image_url) {
+              productDataMap[rel.product_id] = {
+                ...productDataMap[rel.product_id],
+                image_url: rel.image.image_url,
+              };
+            }
+          }
+        }
+      }
+
+      // Combine and return sorted by relevance
+      return products.map(product => ({
+        ...product,
+        image_url: productDataMap[product.id]?.image_url || undefined,
+      })).sort((a, b) => {
+        const scoreA = productDataMap[a.id]?.score || 0;
+        const scoreB = productDataMap[b.id]?.score || 0;
+        return scoreB - scoreA;
+      });
+    } catch (error) {
+      console.error('MIVAA search error:', error);
+      // Fallback to direct DB search
+      return this.searchProductsDirectDB(query, workspaceData.workspace_id, limit);
+    }
+  }
+
+  /**
+   * Direct database search fallback when MIVAA API is unavailable
+   */
+  private async searchProductsDirectDB(
+    query: string,
+    workspaceId: string,
+    limit: number
+  ): Promise<(Product & { image_url?: string })[]> {
+    // Search products by name, description, SKU, or metadata
+    const searchTerms = query.split(/\s+/).filter(t => t.length > 1);
+
+    // Build OR conditions for each search term
+    const orConditions = searchTerms.map(term =>
+      `name.ilike.%${term}%,description.ilike.%${term}%,sku.ilike.%${term}%`
+    ).join(',');
+
     const { data: products, error } = await supabase
       .from('products')
       .select('id, name, sku, description, metadata')
-      .eq('workspace_id', workspaceData.workspace_id)
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%,sku.ilike.%${query}%`)
+      .eq('workspace_id', workspaceId)
+      .or(orConditions || `name.ilike.%${query}%,description.ilike.%${query}%,sku.ilike.%${query}%`)
       .limit(limit);
 
     if (error) throw error;
