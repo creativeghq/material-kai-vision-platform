@@ -52,6 +52,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { supabase } from '@/integrations/supabase/client';
+
+// MIVAA API URL
+const MIVAA_API_URL = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
 
 interface MetadataItem {
   id: string;
@@ -111,15 +115,26 @@ export const MetadataManagement: React.FC = () => {
   const loadMetadata = async () => {
     try {
       setLoading(true);
-      
+
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
       const params = new URLSearchParams();
       if (scopeFilter !== 'all') params.append('scope', scopeFilter);
       if (confidenceFilter !== '0.0') params.append('min_confidence', confidenceFilter);
       if (documentFilter !== 'all') params.append('document_id', documentFilter);
       params.append('limit', '1000');
 
-      const response = await fetch(`/api/rag/metadata/list?${params.toString()}`);
-      
+      const response = await fetch(`${MIVAA_API_URL}/api/rag/metadata/list?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
         throw new Error('Failed to load metadata');
       }
@@ -140,8 +155,17 @@ export const MetadataManagement: React.FC = () => {
 
   const loadStatistics = async () => {
     try {
-      const response = await fetch('/api/rag/metadata/statistics');
-      
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(`${MIVAA_API_URL}/api/rag/metadata/statistics`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
         throw new Error('Failed to load statistics');
       }

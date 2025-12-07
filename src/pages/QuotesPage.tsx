@@ -177,7 +177,7 @@ export const QuotesPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="page-container" style={{ marginTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="dashboard-card transition-all duration-200 hover:shadow-md">

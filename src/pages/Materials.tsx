@@ -186,7 +186,7 @@ export const MaterialsPage: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="page-container" style={{ marginTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
         {materials.length === 0 ? (
           <Card>
             <CardContent className="p-12">

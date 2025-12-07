@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Grid3X3, List, Palette, FileText } from 'lucide-react';
+import { Plus, Palette, FileText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -204,29 +204,6 @@ export const MoodBoardPage = () => {
             </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-            <Button
-              onClick={() => setViewMode('grid')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setViewMode('grid');
-                }
-              }}
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={() => setViewMode('list')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setViewMode('list');
-                }
-              }}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-
           <Button
             onClick={() => setShowCreateDialog(true)}
             onKeyDown={(e) => {
@@ -244,7 +221,7 @@ export const MoodBoardPage = () => {
       </div>
 
       {/* MoodBoards Grid */}
-      <div className="page-container" style={{ marginTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
+      <div className="page-container" style={{ paddingBottom: 'var(--space-xl)' }}>
         {moodboards.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
