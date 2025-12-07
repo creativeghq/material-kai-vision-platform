@@ -2,6 +2,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/((?!api|assets|models|static|favicon.ico|robots.txt|sitemap.xml).*)",
+      "destination": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)\\.css",
