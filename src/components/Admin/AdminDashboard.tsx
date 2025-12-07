@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  Activity,
   BarChart3,
   Brain,
   Database as DatabaseIcon,
+  Link2,
   Microscope,
   Settings,
   Search,
@@ -152,7 +154,7 @@ const AdminDashboard: React.FC = () => {
       {
         title: 'Relevancy Management',
         description: 'Manage entity relationships and relevance scoring algorithms',
-        icon: Link,
+        icon: Link2,
         path: '/admin/relevancy',
         status: 'active',
         count: '3 algorithms',
