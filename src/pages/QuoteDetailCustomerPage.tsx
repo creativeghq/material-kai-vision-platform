@@ -518,13 +518,15 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Accept/Reject Buttons - only show if not yet decided */}
-                            {!isDecided && quote.status === 'quoted' && (
+                            {/* Accept/Reject Buttons - show when quote is 'quoted' and not yet accepted/rejected */}
+                            {quote.status === 'quoted' && (
                               <div className="flex items-center gap-2 ml-4">
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700"
+                                  variant={qu.customer_accepted === false ? 'default' : 'outline'}
+                                  className={qu.customer_accepted === false
+                                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                                    : 'border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700'}
                                   onClick={() => handleUpsellDecision(qu.id, false)}
                                   disabled={isUpdating}
                                 >
@@ -539,7 +541,10 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                                 </Button>
                                 <Button
                                   size="sm"
-                                  className="bg-green-600 hover:bg-green-700"
+                                  variant={qu.customer_accepted === true ? 'default' : 'outline'}
+                                  className={qu.customer_accepted === true
+                                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                                    : 'border-green-300 text-green-600 hover:bg-green-100 hover:text-green-700'}
                                   onClick={() => handleUpsellDecision(qu.id, true)}
                                   disabled={isUpdating}
                                 >
