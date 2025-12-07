@@ -258,6 +258,17 @@ All colors MUST be HSL.
   p, span, div {
     font-weight: var(--font-normal);  /* Regular weight for body text */
   }
+
+  /* Hide number input spinners - we use custom +/- buttons instead */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 @layer components {
