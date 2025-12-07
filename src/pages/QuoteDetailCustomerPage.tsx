@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { AddProductsSheet } from '@/components/Quotes/AddProductsSheet';
+import { QuoteItemsList } from '@/components/Quotes/QuoteItemsList';
 
 /**
  * Customer-facing Quote Detail Page
@@ -26,6 +27,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const [quoteTimeline, setQuoteTimeline] = useState<QuoteTimeline[]>([]);
   const [updatingUpsell, setUpdatingUpsell] = useState<string | null>(null);
   const [acceptingQuote, setAcceptingQuote] = useState(false);
+  const [submittingQuote, setSubmittingQuote] = useState(false);
   const [showAddProducts, setShowAddProducts] = useState(false);
 
   useEffect(() => {
@@ -78,6 +80,29 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       });
     } finally {
       setUpdatingUpsell(null);
+    }
+  };
+
+  // Handle quote submission (finalize draft → submitted)
+  const handleSubmitQuote = async () => {
+    if (!id) return;
+    try {
+      setSubmittingQuote(true);
+      await quotesService.submitQuote(id, quote?.notes || undefined);
+      toast({
+        title: 'Quote Submitted!',
+        description: 'Your quote has been submitted for review. We will prepare a proposal for you.',
+      });
+      await loadQuoteDetails();
+    } catch (error) {
+      console.error('Error submitting quote:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to submit quote. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmittingQuote(false);
     }
   };
 
@@ -206,6 +231,22 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-4">
               {getStatusBadge(quote.status)}
+              {/* Submit/Finalize Quote button for draft status */}
+              {quote.status === 'draft' && (
+                <Button
+                  onClick={handleSubmitQuote}
+                  disabled={submittingQuote || (quote.items?.length || 0) === 0}
+                  style={{ backgroundColor: 'hsl(var(--primary))', color: 'white' }}
+                  className="hover:opacity-90"
+                >
+                  {submittingQuote ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  Submit Quote Request
+                </Button>
+              )}
               {quote.status === 'quoted' && (
                 <Button
                   onClick={handleAcceptQuote}
@@ -326,65 +367,12 @@ export const QuoteDetailCustomerPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value="items" className="mt-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                <div>
-                  <CardTitle>Quote Items</CardTitle>
-                  <CardDescription>Materials included in this quote</CardDescription>
-                </div>
-                {(quote.status === 'draft' || quote.status === 'submitted') && (
-                  <Button onClick={() => setShowAddProducts(true)} size="sm">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Products
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent>
-                {quote.items && quote.items.length > 0 ? (
-                  <div className="space-y-3">
-                    {quote.items.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 rounded bg-muted overflow-hidden flex-shrink-0">
-                            {item.product?.image_url ? (
-                              <img
-                                src={item.product.image_url}
-                                alt={item.product.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="h-5 w-5 text-muted-foreground" />
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium">{item.product?.name || 'Unknown Product'}</p>
-                            {item.product?.sku && (
-                              <p className="text-xs text-muted-foreground">SKU: {item.product.sku}</p>
-                            )}
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="text-sm">
-                          Qty: {item.quantity}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">No items in this quote yet</p>
-                    {(quote.status === 'draft' || quote.status === 'submitted') && (
-                      <Button onClick={() => setShowAddProducts(true)} variant="outline">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Your First Product
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <QuoteItemsList
+              items={quote.items || []}
+              showAddButton={quote.status === 'draft' || quote.status === 'submitted'}
+              onAddProducts={() => setShowAddProducts(true)}
+              variant="compact"
+            />
           </TabsContent>
 
           <TabsContent value="extras" className="mt-4">

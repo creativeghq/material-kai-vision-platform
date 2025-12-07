@@ -71,7 +71,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
         .range(from, to);
 
       if (typeFilter !== 'all') {
-        query = query.eq('embedding_type', typeFilter);
+        query = query.eq('model_name', typeFilter);
       }
 
       const { data, error, count } = await query;
@@ -98,16 +98,14 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
           <div className="flex items-center justify-between">
             <CardTitle>All Embeddings</CardTitle>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by type" />
+              <SelectTrigger className="w-[250px]">
+                <SelectValue placeholder="Filter by model" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="text">Text</SelectItem>
-                <SelectItem value="visual">Visual</SelectItem>
-                <SelectItem value="color">Color</SelectItem>
-                <SelectItem value="texture">Texture</SelectItem>
-                <SelectItem value="application">Application</SelectItem>
+                <SelectItem value="all">All Models</SelectItem>
+                <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
+                <SelectItem value="text-embedding-ada-002">text-embedding-ada-002</SelectItem>
+                <SelectItem value="voyage-3">voyage-3</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -125,7 +123,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Type</TableHead>
+                  <TableHead>Model</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Dimension</TableHead>
                   <TableHead>Created</TableHead>
@@ -136,13 +134,13 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
                 {embeddings.map((emb) => (
                   <TableRow key={emb.id}>
                     <TableCell>
-                      <Badge>{emb.embedding_type || 'text'}</Badge>
+                      <Badge>{emb.model_name || 'text'}</Badge>
                     </TableCell>
                     <TableCell>
-                      {emb.chunk_id ? 'Chunk' : emb.image_id ? 'Image' : 'Unknown'}
+                      {emb.chunk_id ? 'Chunk' : 'Unknown'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{emb.embedding?.length || 0}</Badge>
+                      <Badge variant="outline">{emb.dimensions || emb.embedding?.length || 0}</Badge>
                     </TableCell>
                     <TableCell>
                       {new Date(emb.created_at).toLocaleDateString()}
@@ -206,22 +204,20 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <h4 className="font-semibold mb-2">Type</h4>
-                <Badge>{selectedEmbedding.embedding_type || 'text'}</Badge>
+                <h4 className="font-semibold mb-2">Model</h4>
+                <Badge>{selectedEmbedding.model_name || 'text'}</Badge>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">Source</h4>
                 <p className="text-sm">
                   {selectedEmbedding.chunk_id
                     ? `Chunk ID: ${selectedEmbedding.chunk_id}`
-                    : selectedEmbedding.image_id
-                    ? `Image ID: ${selectedEmbedding.image_id}`
                     : 'Unknown'}
                 </p>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">Vector Dimension</h4>
-                <p className="text-sm">{selectedEmbedding.embedding?.length || 0}</p>
+                <p className="text-sm">{selectedEmbedding.dimensions || selectedEmbedding.embedding?.length || 0}</p>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">Embedding Vector (first 20 values)</h4>

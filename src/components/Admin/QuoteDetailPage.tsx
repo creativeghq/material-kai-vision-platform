@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Info, Tag, Timer } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { QuoteItemsList } from '@/components/Quotes/QuoteItemsList';
 import {
   Select,
   SelectContent,
@@ -429,45 +430,95 @@ export const QuoteDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Items</span>
+        {/* Compact Quote Information Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <Boxes className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Items</p>
+              <p className="font-medium text-sm">{itemCount}</p>
             </div>
-            <div className="text-2xl font-semibold">{itemCount}</div>
           </div>
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <Gift className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Extras</span>
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <Gift className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Extras</p>
+              <p className="font-medium text-sm">{quoteUpsells.length}</p>
             </div>
-            <div className="text-2xl font-semibold">{quoteUpsells.length}</div>
           </div>
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Extras Total</span>
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Extras Total</p>
+              <p className="font-medium text-sm">€{extrasTotal.toFixed(2)}</p>
             </div>
-            <div className="text-2xl font-semibold">€{extrasTotal.toFixed(2)}</div>
           </div>
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <ListChecks className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Timeline Steps</span>
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <ListChecks className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Timeline</p>
+              <p className="font-medium text-sm">{quoteTimeline.length} steps</p>
             </div>
-            <div className="text-2xl font-semibold">{quoteTimeline.length}</div>
           </div>
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Created</p>
+              <p className="font-medium text-sm">{new Date(quote.created_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <Timer className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Expires</p>
+              <p className="font-medium text-sm">{new Date(quote.expires_at).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">User ID</p>
+              <p className="font-medium text-sm truncate" title={quote.user_id}>{quote.user_id.substring(0, 8)}...</p>
+            </div>
+          </div>
+          {quote.workspace_id && (
+            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
+              <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Workspace</p>
+                <p className="font-medium text-sm truncate" title={quote.workspace_id}>{quote.workspace_id.substring(0, 8)}...</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Info className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
+        {/* Notes & Custom Request (if present) */}
+        {(quote.notes || quote.custom_request_text) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {quote.notes && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Notes</span>
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
+              </div>
+            )}
+            {quote.custom_request_text && (
+              <div className="p-3 bg-muted/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Custom Request</span>
+                </div>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.custom_request_text}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tabs - Reduced to 4 tabs (removed Overview) */}
+        <Tabs defaultValue="items" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="items" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Items ({itemCount})
@@ -486,218 +537,12 @@ export const QuoteDetailPage: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Quote Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Info className="h-5 w-5 text-primary" />
-                    Quote Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                      <FileText className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Quote Name</p>
-                      <p className="font-medium">{quote.name || 'Untitled'}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                      <Boxes className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Items</p>
-                      <p className="font-medium">{quote.total_items || 0}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                      <Calendar className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Created</p>
-                      <p className="font-medium">{formatDate(quote.created_at)}</p>
-                    </div>
-                  </div>
-
-                  {quote.submitted_at && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                        <Clock className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Submitted</p>
-                        <p className="font-medium">{formatDate(quote.submitted_at)}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {quote.expires_at && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                        <Timer className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Expires</p>
-                        <p className="font-medium">{formatDate(quote.expires_at)}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Customer Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <User className="h-5 w-5 text-primary" />
-                    Customer Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">User ID</p>
-                      <p className="font-medium">{quote.user_id}</p>
-                    </div>
-                  </div>
-
-                  {quote.workspace_id && (
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
-                        <Package className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Workspace ID</p>
-                        <p className="font-medium">{quote.workspace_id}</p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Notes */}
-            {quote.notes && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                    Notes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Custom Request */}
-            {quote.custom_request_text && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    Custom Request
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{quote.custom_request_text}</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-
           {/* Items Tab */}
           <TabsContent value="items">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Quote Items</span>
-                  <Badge variant="secondary">{quote.items?.length || 0} items</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!quote.items || quote.items.length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No items in this quote</p>
-                ) : (
-                  <div className="space-y-4">
-                    {quote.items.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="flex items-start gap-4 p-4 border border-gray-200 rounded-lg bg-gray-50"
-                      >
-                        {/* Item Image */}
-                        {item.product?.image_url && (
-                          <img
-                            src={item.product.image_url}
-                            alt={item.product.name}
-                            className="w-20 h-20 object-cover rounded-lg"
-                          />
-                        )}
-
-                        {/* Item Details */}
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-semibold text-gray-900">
-                                {item.product?.name || `Item ${index + 1}`}
-                              </h4>
-                              {item.product?.description && (
-                                <p className="text-sm text-gray-600 mt-1">{item.product.description}</p>
-                              )}
-                            </div>
-                            <Badge variant="secondary">Qty: {item.quantity}</Badge>
-                          </div>
-
-                          {/* Item Metadata */}
-                          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                            {item.width && (
-                              <div className="text-gray-600">
-                                <span className="font-medium">Width:</span> {item.width}
-                              </div>
-                            )}
-                            {item.height && (
-                              <div className="text-gray-600">
-                                <span className="font-medium">Height:</span> {item.height}
-                              </div>
-                            )}
-                            {item.area && (
-                              <div className="text-gray-600">
-                                <span className="font-medium">Area:</span> {item.area}
-                              </div>
-                            )}
-                            {item.unit && (
-                              <div className="text-gray-600">
-                                <span className="font-medium">Unit:</span> {item.unit}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Item Notes */}
-                          {item.notes && (
-                            <div className="mt-3 p-3 bg-white rounded border border-gray-200">
-                              <p className="text-sm text-gray-700">{item.notes}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <QuoteItemsList
+              items={quote.items || []}
+              variant="detailed"
+            />
           </TabsContent>
 
           {/* Extras Tab */}

@@ -3,6 +3,7 @@ import {
   Send,
   Trash2,
   Plus,
+  Minus,
   Loader2,
   Package,
   Search,
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   FileText,
   X,
+  Eye,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -26,9 +28,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteItemWithProduct, Product } from '@/services/quotes/QuotesService';
+import { ProductDetailModal } from '@/components/Admin/PDFProcessingData/ProductDetailModal';
 
 interface QuoteBuilderViewProps {
   quote: QuoteWithItems;
@@ -53,8 +63,48 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   const [quoteType, setQuoteType] = useState<'products' | 'custom'>(
     quote.custom_request_text ? 'custom' : 'products'
   );
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   const items = (quote.items || []) as QuoteItemWithProduct[];
+
+  // Helper to extract sizes/colors from product metadata
+  const getProductVariants = (product: Product | undefined) => {
+    if (!product?.metadata) return { sizes: [], colors: [] };
+
+    const metadata = product.metadata;
+    let sizes: string[] = [];
+    let colors: string[] = [];
+
+    // Extract sizes from dimensions or explicit size field
+    if (metadata.dimensions) {
+      const dims = metadata.dimensions;
+      if (typeof dims === 'object' && dims.available_sizes) {
+        sizes = Array.isArray(dims.available_sizes) ? dims.available_sizes : [dims.available_sizes];
+      } else if (typeof dims === 'string') {
+        sizes = [dims];
+      }
+    }
+    if (metadata.size) {
+      sizes = Array.isArray(metadata.size) ? metadata.size : [metadata.size];
+    }
+    if (metadata.sizes) {
+      sizes = Array.isArray(metadata.sizes) ? metadata.sizes : [metadata.sizes];
+    }
+
+    // Extract colors from appearance or explicit color field
+    if (metadata.appearance?.colors) {
+      const appColors = metadata.appearance.colors;
+      colors = Array.isArray(appColors) ? appColors : [appColors];
+    }
+    if (metadata.color) {
+      colors = Array.isArray(metadata.color) ? metadata.color : [metadata.color];
+    }
+    if (metadata.colors) {
+      colors = Array.isArray(metadata.colors) ? metadata.colors : [metadata.colors];
+    }
+
+    return { sizes, colors };
+  };
 
   // Debounced product search - uses MIVAA API for semantic search
   useEffect(() => {
@@ -437,54 +487,158 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-16">Image</TableHead>
                       <TableHead>Material</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Color</TableHead>
                       <TableHead className="text-center">Quantity</TableHead>
-                      <TableHead>Notes</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-900">
-                              {item.product?.name || 'Unknown Material'}
+                    {items.map((item) => {
+                      const { sizes, colors } = getProductVariants(item.product);
+                      return (
+                        <TableRow key={item.id}>
+                          {/* Image Column */}
+                          <TableCell>
+                            <div
+                              className="w-14 h-14 rounded bg-gray-100 overflow-hidden flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-green-500 transition-all"
+                              onClick={() => item.product && setSelectedProduct(item.product)}
+                            >
+                              {item.product?.image_url ? (
+                                <img
+                                  src={item.product.image_url}
+                                  alt={item.product.name || 'Product'}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Package className="h-5 w-5 text-gray-400" />
+                                </div>
+                              )}
                             </div>
-                            {item.product?.sku && (
-                              <div className="text-xs text-gray-600">SKU: {item.product.sku}</div>
+                          </TableCell>
+
+                          {/* Material Name Column */}
+                          <TableCell>
+                            <div className="space-y-1">
+                              <button
+                                onClick={() => item.product && setSelectedProduct(item.product)}
+                                className="font-medium text-gray-900 hover:text-green-600 hover:underline text-left"
+                              >
+                                {item.product?.name || 'Unknown Material'}
+                              </button>
+                              {item.product?.sku && (
+                                <div className="text-xs text-gray-600">SKU: {item.product.sku}</div>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          {/* Size Selector */}
+                          <TableCell>
+                            {sizes.length > 0 ? (
+                              <Select
+                                value={item.selected_size || ''}
+                                onValueChange={(value) =>
+                                  quotesService.updateItem(item.id, { selected_size: value }).then(onUpdate)
+                                }
+                              >
+                                <SelectTrigger className="w-28">
+                                  <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {sizes.map((size) => (
+                                    <SelectItem key={size} value={size}>
+                                      {size}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
                             )}
-                            {item.added_from && (
-                              <Badge variant="outline" className="text-xs">
-                                Added from: {item.added_from}
-                              </Badge>
+                          </TableCell>
+
+                          {/* Color Selector */}
+                          <TableCell>
+                            {colors.length > 0 ? (
+                              <Select
+                                value={item.selected_color || ''}
+                                onValueChange={(value) =>
+                                  quotesService.updateItem(item.id, { selected_color: value }).then(onUpdate)
+                                }
+                              >
+                                <SelectTrigger className="w-28">
+                                  <SelectValue placeholder="Select" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {colors.map((color) => (
+                                    <SelectItem key={color} value={color}>
+                                      {color}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
-                            className="w-20 text-center"
-                          />
-                        </TableCell>
-                        <TableCell className="text-gray-600 text-sm max-w-xs">
-                          <div className="truncate">{item.notes || '-'}</div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            onClick={() => handleRemoveItem(item.id)}
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+
+                          {/* Quantity with +/- Buttons */}
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                                disabled={item.quantity <= 1}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => handleUpdateQuantity(item.id, parseInt(e.target.value) || 1)}
+                                className="w-14 text-center h-8"
+                              />
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+
+                          {/* Actions */}
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                onClick={() => item.product && setSelectedProduct(item.product)}
+                                variant="ghost"
+                                size="sm"
+                                className="text-gray-600 hover:text-gray-900"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                onClick={() => handleRemoveItem(item.id)}
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -575,6 +729,14 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
           We'll review your request and send you a detailed proposal with pricing
         </p>
       </div>
+
+      {/* Product Detail Modal */}
+      {selectedProduct && (
+        <ProductDetailModal
+          product={selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
     </div>
   );
 };

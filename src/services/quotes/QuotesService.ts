@@ -30,6 +30,8 @@ export interface QuoteItem {
   notes?: string;
   added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page';
   added_at: string;
+  selected_size?: string;
+  selected_color?: string;
 }
 
 export interface QuoteWithItems extends Quote {
@@ -240,9 +242,42 @@ export class QuotesService {
 
     if (itemsError) throw itemsError;
 
+    // Fetch images for all products in this quote
+    const productIds = (items || [])
+      .filter(item => item.product?.id)
+      .map(item => item.product!.id);
+
+    const productImageMap: Record<string, string> = {};
+
+    if (productIds.length > 0) {
+      const { data: imageRelations } = await supabase
+        .from('product_image_relationships')
+        .select('product_id, image:document_images(image_url)')
+        .in('product_id', productIds)
+        .order('relevance_score', { ascending: false });
+
+      if (imageRelations) {
+        for (const rel of imageRelations) {
+          const imgData = rel.image as any;
+          if (!productImageMap[rel.product_id] && imgData?.image_url) {
+            productImageMap[rel.product_id] = imgData.image_url;
+          }
+        }
+      }
+    }
+
+    // Attach images to products
+    const itemsWithImages = (items || []).map(item => ({
+      ...item,
+      product: item.product ? {
+        ...item.product,
+        image_url: productImageMap[item.product.id] || item.product.image_url,
+      } : item.product,
+    }));
+
     return {
       ...quote,
-      items: items || [],
+      items: itemsWithImages,
     };
   }
 
@@ -291,6 +326,8 @@ export class QuotesService {
     quantity?: number;
     notes?: string;
     added_from?: QuoteItem['added_from'];
+    selected_size?: string;
+    selected_color?: string;
   }): Promise<QuoteItem> {
     const { data: item, error } = await supabase
       .from('quote_items')
@@ -300,6 +337,8 @@ export class QuotesService {
         quantity: data.quantity || 1,
         notes: data.notes,
         added_from: data.added_from || 'manual',
+        selected_size: data.selected_size,
+        selected_color: data.selected_color,
       })
       .select()
       .single();
@@ -316,6 +355,8 @@ export class QuotesService {
     data: {
       quantity?: number;
       notes?: string;
+      selected_size?: string;
+      selected_color?: string;
     }
   ): Promise<QuoteItem> {
     const { data: item, error } = await supabase
