@@ -1,120 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Brain,
   Database as DatabaseIcon,
   Microscope,
   Settings,
-  Activity,
   Search,
   Home,
   FileText,
   Globe,
   Users,
-  Server,
-  Cpu,
-  HardDrive,
-  Wifi,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  TrendingUp,
-  UserPlus,
-  Edit,
-  Trash2,
-  Eye,
-  RefreshCw,
-  Download,
   Sparkles,
-  Filter,
   Bug,
-  MoreHorizontal,
   Package,
   Bot,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
-import { SearchAnalyticsDashboard } from './SearchAnalyticsDashboard';
 
 // Types for our data structures
 type SystemMetrics = {
-  cpu: number;
-  memory: number;
-  disk: number;
-  network: number;
-  uptime: string;
-  activeUsers: number;
-  totalRequests: number;
-  errorRate: number;
   processedDocuments: number;
   knowledgeEntries: number;
   activeSessions: number;
 };
 
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  status: string;
-  lastLogin: string;
-};
-
-type Config = {
-  key: string;
-  value: string;
-  category: string;
-  description: string;
-};
-
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
-    cpu: 45,
-    memory: 68,
-    disk: 32,
-    network: 12,
-    uptime: '15 days, 4 hours',
-    activeUsers: 23,
-    totalRequests: 8432,
-    errorRate: 0.2,
+  const [, setSystemMetrics] = useState<SystemMetrics>({
     processedDocuments: 0,
     knowledgeEntries: 0,
     activeSessions: 0,
   });
-  const [users, setUsers] = useState<User[]>([]);
-  const [configs, setConfigs] = useState<Config[]>([]);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [userFilter, setUserFilter] = useState('');
-  const [configFilter, setConfigFilter] = useState('');
   const [, setLoading] = useState(true);
   const [, setError] = useState<string | null>(null);
-
-  const loadPackageStatus = useCallback(async () => {
-    try {
-      // DISABLED: Health check call was causing 500 errors on page load
-      // The mivaa-gateway health check is not critical for dashboard initialization
-      // Re-enable only after MIVAA service is properly configured
-      console.log('⏭️ Skipping MIVAA health check during dashboard load');
-    } catch (error) {
-      console.error('Error loading package status:', error);
-    }
-  }, []);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -122,272 +44,36 @@ const AdminDashboard: React.FC = () => {
       setError(null);
 
       // Load system metrics from database
-      await loadSystemMetrics();
+      const { count: processedDocs } = await supabase
+        .from('processing_results')
+        .select('*', { count: 'exact', head: true });
 
-      // Load users from workspaces (simplified user management)
-      await loadUsers();
+      const { count: knowledgeEntries } = await supabase
+        .from('materials_catalog')
+        .select('*', { count: 'exact', head: true });
 
-      // Load configurations from workspace settings
-      await loadConfigurations();
+      const { count: activeSessions } = await supabase
+        .from('scraping_sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
 
-      // Load package status
-      await loadPackageStatus();
+      setSystemMetrics({
+        processedDocuments: processedDocs || 0,
+        knowledgeEntries: knowledgeEntries || 0,
+        activeSessions: activeSessions || 0,
+      });
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       setError('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
-  }, [loadPackageStatus]);
+  }, []);
 
   // Load real data from Supabase
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
-
-  const loadSystemMetrics = async () => {
-    try {
-      // Get processing results count
-      const { count: processedDocs } = await supabase
-        .from('processing_results')
-        .select('*', { count: 'exact', head: true });
-
-      // Get materials catalog count
-      const { count: knowledgeEntries } = await supabase
-        .from('materials_catalog')
-        .select('*', { count: 'exact', head: true });
-
-      // Get active scraping sessions count
-      const { count: activeSessions } = await supabase
-        .from('scraping_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
-
-      // Calculate total requests from processing results
-      const { data: processingData } = await supabase
-        .from('processing_results')
-        .select('created_at')
-        .order('created_at', { ascending: false })
-        .limit(1000);
-
-      const totalRequests = processingData?.length || 0;
-
-      // Calculate error rate from processing results
-      const { count: errorCount } = await supabase
-        .from('processing_results')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'error');
-
-      const errorRate =
-        totalRequests > 0 ? ((errorCount || 0) / totalRequests) * 100 : 0;
-
-      setSystemMetrics((prev) => ({
-        ...prev,
-        processedDocuments: processedDocs || 0,
-        knowledgeEntries: knowledgeEntries || 0,
-        activeSessions: activeSessions || 0,
-        totalRequests,
-        errorRate: Number(errorRate.toFixed(2)),
-      }));
-    } catch (err) {
-      console.error('Error loading system metrics:', err);
-    }
-  };
-
-  const loadUsers = async () => {
-    try {
-      // Load workspaces as a simplified user management system
-      const { data: workspaces, error } = await supabase
-        .from('workspaces')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Transform workspaces into user-like objects for display
-      const userList: User[] =
-        workspaces?.map((workspace: any, index: number) => ({
-          id: workspace.id,
-          name: workspace.name,
-          email: `admin@${workspace.name.toLowerCase().replace(/\s+/g, '')}.com`,
-          role: index === 0 ? 'Admin' : 'User',
-          status: 'Active',
-          lastLogin: workspace.updated_at
-            ? new Date(workspace.updated_at).toLocaleDateString()
-            : 'Never',
-        })) || [];
-
-      setUsers(userList);
-    } catch (err) {
-      console.error('Error loading users:', err);
-    }
-  };
-
-  const loadConfigurations = async () => {
-    try {
-      // Load workspace settings as configurations
-      const { data: workspaces, error } = await supabase
-        .from('workspaces')
-        .select('settings')
-        .limit(1);
-
-      if (error) throw error;
-
-      // Default configurations with some from workspace settings
-      const defaultConfigs: Config[] = [
-        {
-          key: 'max_upload_size',
-          value: '100MB',
-          category: 'File Processing',
-          description: 'Maximum file size for uploads',
-        },
-        {
-          key: 'session_timeout',
-          value: '30 minutes',
-          category: 'Security',
-          description: 'User session timeout duration',
-        },
-        {
-          key: 'api_rate_limit',
-          value: '1000/hour',
-          category: 'API',
-          description: 'API requests per hour limit',
-        },
-        {
-          key: 'backup_frequency',
-          value: 'Daily',
-          category: 'System',
-          description: 'Automated backup frequency',
-        },
-      ];
-
-      // Add workspace-specific settings if available
-      if (workspaces?.[0]?.settings) {
-        const settings = workspaces[0].settings as unknown;
-        Object.entries(settings as Record<string, unknown>).forEach(
-          ([key, value]) => {
-            defaultConfigs.push({
-              key,
-              value: String(value),
-              category: 'Workspace',
-              description: `Workspace setting: ${key}`,
-            });
-          },
-        );
-      }
-
-      setConfigs(defaultConfigs);
-    } catch (err) {
-      console.error('Error loading configurations:', err);
-      // Set default configs on error
-      setConfigs([
-        {
-          key: 'max_upload_size',
-          value: '100MB',
-          category: 'File Processing',
-          description: 'Maximum file size for uploads',
-        },
-        {
-          key: 'session_timeout',
-          value: '30 minutes',
-          category: 'Security',
-          description: 'User session timeout duration',
-        },
-        {
-          key: 'api_rate_limit',
-          value: '1000/hour',
-          category: 'API',
-          description: 'API requests per hour limit',
-        },
-        {
-          key: 'backup_frequency',
-          value: 'Daily',
-          category: 'System',
-          description: 'Automated backup frequency',
-        },
-      ]);
-    }
-  };
-
-  // Real-time updates for system metrics
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSystemMetrics((prev) => ({
-        ...prev,
-        cpu: Math.max(10, Math.min(90, prev.cpu + (Math.random() - 0.5) * 10)),
-        memory: Math.max(
-          20,
-          Math.min(95, prev.memory + (Math.random() - 0.5) * 8),
-        ),
-        network: Math.max(
-          0,
-          Math.min(100, prev.network + (Math.random() - 0.5) * 20),
-        ),
-      }));
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const handleUserAction = (action: string, userId?: string) => {
-    console.log(`${action} action for user:`, userId);
-    // In real app, this would make API calls to manage workspace users
-  };
-
-  const handleBulkUserAction = (action: string) => {
-    console.log(`Bulk ${action} for users:`, selectedUsers);
-    // In real app, this would make API calls to manage multiple workspace users
-  };
-
-  const handleConfigUpdate = async (key: string, newValue: string) => {
-    try {
-      setConfigs((prev) =>
-        prev.map((config) =>
-          config.key === key ? { ...config, value: newValue } : config,
-        ),
-      );
-
-      // Update workspace settings in database if it's a workspace setting
-      const config = configs.find((c) => c.key === key);
-      if (config?.category === 'Workspace') {
-        const { data: workspaces } = await supabase
-          .from('workspaces')
-          .select('id, settings')
-          .limit(1);
-
-        if (workspaces?.[0]) {
-          const currentSettings = (workspaces[0].settings as unknown) || {};
-          const updatedSettings = {
-            ...(currentSettings as Record<string, unknown>),
-            [key]: newValue,
-          };
-
-          await supabase
-            .from('workspaces')
-            .update({ settings: updatedSettings })
-            .eq('id', workspaces[0].id);
-        }
-      }
-
-      console.log(`Updated config ${key} to:`, newValue);
-    } catch (err) {
-      console.error('Error updating configuration:', err);
-    }
-  };
-
-  const filteredUsers = users.filter(
-    (user: User) =>
-      user.name.toLowerCase().includes(userFilter.toLowerCase()) ||
-      user.email.toLowerCase().includes(userFilter.toLowerCase()) ||
-      user.role.toLowerCase().includes(userFilter.toLowerCase()),
-  );
-
-  const filteredConfigs = configs.filter(
-    (config: Config) =>
-      config.key.toLowerCase().includes(configFilter.toLowerCase()) ||
-      config.category.toLowerCase().includes(configFilter.toLowerCase()) ||
-      config.description.toLowerCase().includes(configFilter.toLowerCase()),
-  );
 
   // Organize admin sections by category
   const adminSections = {
@@ -619,20 +305,8 @@ const AdminDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        {/* Enhanced Admin Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="monitoring">System Monitoring</TabsTrigger>
-            <TabsTrigger value="users">User Management</TabsTrigger>
-            <TabsTrigger value="analytics">Search Analytics</TabsTrigger>
-            <TabsTrigger value="config">Configuration</TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Admin Sections by Category */}
-            <div className="space-y-8">
+        {/* Admin Sections by Category */}
+        <div className="space-y-8">
               {Object.entries(adminSections).map(([category, sections]) => (
                 <div key={category}>
                   <h2 className="text-2xl font-bold mb-4 text-gray-800">
@@ -758,470 +432,6 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
-          </TabsContent>
-
-          {/* System Monitoring Tab */}
-          <TabsContent value="monitoring" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="flex items-center justify-center"
-                    style={{
-                      width: '2.5rem',
-                      height: '2.5rem',
-                      borderRadius: 'var(--radius-lg)',
-                      backgroundColor: 'hsl(var(--primary) / 0.1)'
-                    }}
-                  >
-                    <Cpu className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                </div>
-                <div className="text-2xl font-semibold mb-1">
-                  <span className={getMetricColor(systemMetrics.cpu, 'cpu')}>
-                    {systemMetrics.cpu.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  CPU Usage
-                </div>
-                <Progress value={systemMetrics.cpu} className="mt-2" />
-              </div>
-
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="flex items-center justify-center"
-                    style={{
-                      width: '2.5rem',
-                      height: '2.5rem',
-                      borderRadius: 'var(--radius-lg)',
-                      backgroundColor: 'hsl(var(--primary) / 0.1)'
-                    }}
-                  >
-                    <HardDrive className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                </div>
-                <div className="text-2xl font-semibold mb-1">
-                  <span className={getMetricColor(systemMetrics.memory, 'memory')}>
-                    {systemMetrics.memory.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  Memory Usage
-                </div>
-                <Progress value={systemMetrics.memory} className="mt-2" />
-              </div>
-
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="flex items-center justify-center"
-                    style={{
-                      width: '2.5rem',
-                      height: '2.5rem',
-                      borderRadius: 'var(--radius-lg)',
-                      backgroundColor: 'hsl(var(--primary) / 0.1)'
-                    }}
-                  >
-                    <Server className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                </div>
-                <div className="text-2xl font-semibold mb-1">
-                  <span className={getMetricColor(systemMetrics.disk, 'disk')}>
-                    {systemMetrics.disk}%
-                  </span>
-                </div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  Disk Usage
-                </div>
-                <Progress value={systemMetrics.disk} className="mt-2" />
-              </div>
-
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="flex items-center justify-center"
-                    style={{
-                      width: '2.5rem',
-                      height: '2.5rem',
-                      borderRadius: 'var(--radius-lg)',
-                      backgroundColor: 'hsl(var(--primary) / 0.1)'
-                    }}
-                  >
-                    <Wifi className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                  </div>
-                </div>
-                <div className="text-2xl font-semibold mb-1">
-                  <span
-                    className={getMetricColor(
-                        systemMetrics.network,
-                        'network',
-                      )}
-                    >
-                      {systemMetrics.network.toFixed(1)} MB/s
-                    </span>
-                  </div>
-                <div className="text-sm text-muted-foreground mb-2">
-                  Network I/O
-                </div>
-                <Progress value={systemMetrics.network} className="mt-2" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    System Health
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span>System Uptime</span>
-                    <Badge className="text-green-600 px-2 py-1 border border-gray-300 bg-white">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      {systemMetrics.uptime}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Active Users</span>
-                    <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
-                      <Users className="h-3 w-3 mr-1" />
-                      {systemMetrics.activeUsers}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Total Requests</span>
-                    <Badge className="px-2 py-1 border border-gray-300 bg-white text-gray-700">
-                      <TrendingUp className="h-3 w-3 mr-1" />
-                      {systemMetrics.totalRequests.toLocaleString()}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Error Rate</span>
-                    <Badge
-                      className={`px-2 py-1 border border-gray-300 bg-white ${systemMetrics.errorRate > 1 ? 'text-red-600' : 'text-green-600'}`}
-                    >
-                      {systemMetrics.errorRate > 1 ? (
-                        <AlertTriangle className="h-3 w-3 mr-1" />
-                      ) : (
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                      )}
-                      {systemMetrics.errorRate}%
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5" />
-                    System Alerts
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      High memory usage detected on server-02 (85%)
-                    </AlertDescription>
-                  </Alert>
-                  <Alert>
-                    <Clock className="h-4 w-4" />
-                    <AlertDescription>
-                      Scheduled maintenance in 2 hours
-                    </AlertDescription>
-                  </Alert>
-                  <Alert>
-                    <CheckCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      All services are running normally
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* User Management Tab */}
-          <TabsContent value="users" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium">User Management</h3>
-                <p className="text-sm text-muted-foreground">
-                  Manage user accounts, roles, and permissions
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-                <Button className="px-3 py-1 text-sm text-white hover:opacity-90" style={{ background: 'hsl(195, 25%, 45%)' }}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search users..."
-                  value={userFilter}
-                  onChange={(e) => setUserFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md"
-                />
-              </div>
-              <Button variant="ghost" className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter
-              </Button>
-              {selectedUsers.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
-                    onClick={() => handleBulkUserAction('activate')}
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' && handleBulkUserAction('activate')
-                    }
-                  >
-                    Activate ({selectedUsers.length})
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
-                    onClick={() => handleBulkUserAction('deactivate')}
-                    onKeyDown={(e) =>
-                      e.key === 'Enter' && handleBulkUserAction('deactivate')
-                    }
-                  >
-                    Deactivate ({selectedUsers.length})
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="border-b">
-                      <tr>
-                        <th className="text-left p-4">
-                          <input
-                            type="checkbox"
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedUsers(
-                                  filteredUsers.map((u: User) => u.id),
-                                );
-                              } else {
-                                setSelectedUsers([]);
-                              }
-                            }}
-                          />
-                        </th>
-                        <th className="text-left p-4">User</th>
-                        <th className="text-left p-4">Role</th>
-                        <th className="text-left p-4">Status</th>
-                        <th className="text-left p-4">Last Login</th>
-                        <th className="text-left p-4">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map((user: User) => (
-                        <tr
-                          key={user.id}
-                          className="border-b hover:bg-muted/50"
-                        >
-                          <td className="p-4">
-                            <input
-                              type="checkbox"
-                              checked={selectedUsers.includes(user.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedUsers([...selectedUsers, user.id]);
-                                } else {
-                                  setSelectedUsers(
-                                    selectedUsers.filter(
-                                      (id) => id !== user.id,
-                                    ),
-                                  );
-                                }
-                              }}
-                            />
-                          </td>
-                          <td className="p-4">
-                            <div>
-                              <div className="font-medium">{user.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {user.email}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                              {user.role}
-                            </Badge>
-                          </td>
-                          <td className="p-4">
-                            <Badge
-                              className={
-                                user.status === 'Active'
-                                  ? 'bg-green-500/20 text-green-600'
-                                  : 'bg-gray-500/20 text-gray-600'
-                              }
-                            >
-                              {user.status}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-sm text-muted-foreground">
-                            {user.lastLogin}
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                className="px-2 py-1 text-sm hover:bg-white/10"
-                                onClick={() =>
-                                  handleUserAction('edit', user.id)
-                                }
-                                onKeyDown={(e) =>
-                                  e.key === 'Enter' &&
-                                  handleUserAction('edit', user.id)
-                                }
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                className="px-2 py-1 text-sm hover:bg-white/10"
-                                onClick={() =>
-                                  handleUserAction('view', user.id)
-                                }
-                                onKeyDown={(e) =>
-                                  e.key === 'Enter' &&
-                                  handleUserAction('view', user.id)
-                                }
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                className="px-2 py-1 text-sm hover:bg-white/10"
-                                onClick={() =>
-                                  handleUserAction('delete', user.id)
-                                }
-                                onKeyDown={(e) =>
-                                  e.key === 'Enter' &&
-                                  handleUserAction('delete', user.id)
-                                }
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Configuration Tab */}
-          <TabsContent value="config" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium">System Configuration</h3>
-                <p className="text-sm text-muted-foreground">
-                  Manage system settings and configuration parameters
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
-                <Button className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Add Config
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search configurations..."
-                  value={configFilter}
-                  onChange={(e) => setConfigFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md"
-                />
-              </div>
-              <Button className="px-3 py-1 text-sm border border-gray-300 hover:bg-gray-50">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter by Category
-              </Button>
-            </div>
-
-            <div className="grid gap-4">
-              {filteredConfigs.map((config: Config) => (
-                <Card key={config.key}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-medium">{config.key}</h4>
-                          <Badge className="text-xs px-2 py-1 border border-gray-300 bg-white text-gray-700">
-                            {config.category}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          {config.description}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">
-                            Current Value:
-                          </span>
-                          <input
-                            type="text"
-                            value={config.value}
-                            onChange={(e) =>
-                              handleConfigUpdate(config.key, e.target.value)
-                            }
-                            className="px-2 py-1 border border-input rounded text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button className="px-2 py-1 text-sm hover:bg-gray-100">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button className="px-2 py-1 text-sm hover:bg-gray-100">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Search Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <SearchAnalyticsDashboard />
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );

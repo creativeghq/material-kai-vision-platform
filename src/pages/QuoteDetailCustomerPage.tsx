@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, User, Tag, Timer, Boxes, Plus, Milestone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -223,108 +223,105 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Hero Section - Quote Information */}
+      <div className="bg-muted/30 border-b">
+        <div className="page-container" style={{ paddingTop: 'var(--space-lg)', paddingBottom: 'var(--space-lg)' }}>
+          {/* Pending Upsells Warning */}
+          {quote.status === 'quoted' && hasUpsells && !allUpsellsDecided && (
+            <Alert variant="destructive" className="border-yellow-500 bg-yellow-50 mb-6">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              <AlertTitle className="text-yellow-800">Action Required</AlertTitle>
+              <AlertDescription className="text-yellow-700">
+                Please accept or reject all {pendingUpsells.length} pending extra(s) before you can accept this quote.
+                Go to the <strong>Extras</strong> tab to review them.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Quote Information Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+              <Tag className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Status</p>
+                <div className="mt-0.5">{getStatusBadge(quote.status)}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+              <Boxes className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Items</p>
+                <p className="font-semibold truncate">{itemCount}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+              <Plus className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Extras</p>
+                <p className="font-semibold truncate">
+                  {quoteUpsells.length}
+                  {pendingUpsells.length > 0 && (
+                    <span className="text-xs text-yellow-600 ml-1">({pendingUpsells.length} pending)</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+              <DollarSign className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Extras Total</p>
+                <p className="font-semibold truncate">€{(quote.extras_total || 0).toFixed(2)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+              <Calendar className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Created</p>
+                <p className="font-semibold text-sm truncate">{new Date(quote.created_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-background rounded-lg border">
+              <Timer className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Expires</p>
+                <p className="font-semibold text-sm truncate">{new Date(quote.expires_at).toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Request (if exists) */}
+          {quote.custom_request_text && (
+            <div className="mt-4 p-4 bg-background rounded-lg border">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Custom Request</span>
+              </div>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {quote.custom_request_text}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
-        {/* Pending Upsells Warning */}
-        {quote.status === 'quoted' && hasUpsells && !allUpsellsDecided && (
-          <Alert variant="destructive" className="border-yellow-500 bg-yellow-50 mb-6">
-            <AlertCircle className="h-4 w-4 text-yellow-600" />
-            <AlertTitle className="text-yellow-800">Action Required</AlertTitle>
-            <AlertDescription className="text-yellow-700">
-              Please accept or reject all {pendingUpsells.length} pending extra(s) before you can accept this quote.
-              Go to the <strong>Extras</strong> tab to review them.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <Package className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Items</span>
-            </div>
-            <div className="text-2xl font-semibold">{itemCount}</div>
-          </div>
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <Gift className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Extras</span>
-            </div>
-            <div className="text-2xl font-semibold">
-              {quoteUpsells.length}
-              {pendingUpsells.length > 0 && (
-                <span className="text-sm text-yellow-600 ml-2">({pendingUpsells.length} pending)</span>
-              )}
-            </div>
-          </div>
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <DollarSign className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Accepted Extras Total</span>
-            </div>
-            <div className="text-2xl font-semibold text-green-600">€{extrasTotal.toFixed(2)}</div>
-          </div>
-          <div className="dashboard-card">
-            <div className="flex items-center gap-3 mb-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              <span className="text-sm text-muted-foreground">Expires</span>
-            </div>
-            <div className="text-2xl font-semibold">
-              {new Date(quote.expires_at).toLocaleDateString()}
-            </div>
-          </div>
-        </div>
-
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="items">Items ({itemCount})</TabsTrigger>
-            <TabsTrigger value="extras">Extras ({quoteUpsells.length})</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+        <Tabs defaultValue="items" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="items" className="flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Items ({itemCount})
+            </TabsTrigger>
+            <TabsTrigger value="extras" className="flex items-center gap-2">
+              <Gift className="h-4 w-4" />
+              Extras ({quoteUpsells.length})
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
+              <Milestone className="h-4 w-4" />
+              Timeline
+            </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="overview" className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quote Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <span className="text-sm text-muted-foreground">Name</span>
-                    <p className="font-medium">{quote.name || 'Untitled Quote'}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">Status</span>
-                    <div className="mt-1">{getStatusBadge(quote.status)}</div>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">Created</span>
-                    <p className="font-medium">{new Date(quote.created_at).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <span className="text-sm text-muted-foreground">Expires</span>
-                    <p className="font-medium">{new Date(quote.expires_at).toLocaleString()}</p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {quote.custom_request_text && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Custom Request</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground whitespace-pre-wrap">
-                      {quote.custom_request_text}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
 
           <TabsContent value="items" className="mt-6">
             <Card>

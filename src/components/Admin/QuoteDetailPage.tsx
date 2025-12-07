@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Info, Tag, Timer } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -464,11 +464,26 @@ export const QuoteDetailPage: React.FC = () => {
         {/* Tabs */}
         <Tabs defaultValue="overview" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="items">Items ({itemCount})</TabsTrigger>
-            <TabsTrigger value="extras">Extras ({quoteUpsells.length})</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline ({quoteTimeline.length})</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="items" className="flex items-center gap-2">
+              <Boxes className="h-4 w-4" />
+              Items ({itemCount})
+            </TabsTrigger>
+            <TabsTrigger value="extras" className="flex items-center gap-2">
+              <Gift className="h-4 w-4" />
+              Extras ({quoteUpsells.length})
+            </TabsTrigger>
+            <TabsTrigger value="timeline" className="flex items-center gap-2">
+              <Milestone className="h-4 w-4" />
+              Timeline ({quoteTimeline.length})
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Activity
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -477,59 +492,62 @@ export const QuoteDetailPage: React.FC = () => {
               {/* Quote Information */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Quote Information</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Info className="h-5 w-5 text-primary" />
+                    Quote Information
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                      <FileText className="h-5 w-5 text-blue-600" />
+                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                      <FileText className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Quote Name</p>
-                      <p className="font-medium text-gray-900">{quote.name || 'Untitled'}</p>
+                      <p className="text-sm text-muted-foreground">Quote Name</p>
+                      <p className="font-medium">{quote.name || 'Untitled'}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                      <Package className="h-5 w-5 text-blue-600" />
+                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                      <Boxes className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Total Items</p>
-                      <p className="font-medium text-gray-900">{quote.total_items || 0}</p>
+                      <p className="text-sm text-muted-foreground">Total Items</p>
+                      <p className="font-medium">{quote.total_items || 0}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                      <Calendar className="h-5 w-5 text-blue-600" />
+                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                      <Calendar className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Created</p>
-                      <p className="font-medium text-gray-900">{formatDate(quote.created_at)}</p>
+                      <p className="text-sm text-muted-foreground">Created</p>
+                      <p className="font-medium">{formatDate(quote.created_at)}</p>
                     </div>
                   </div>
 
                   {quote.submitted_at && (
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                        <Clock className="h-5 w-5 text-blue-600" />
+                      <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                        <Clock className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Submitted</p>
-                        <p className="font-medium text-gray-900">{formatDate(quote.submitted_at)}</p>
+                        <p className="text-sm text-muted-foreground">Submitted</p>
+                        <p className="font-medium">{formatDate(quote.submitted_at)}</p>
                       </div>
                     </div>
                   )}
 
                   {quote.expires_at && (
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                        <Calendar className="h-5 w-5 text-blue-600" />
+                      <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                        <Timer className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Expires</p>
-                        <p className="font-medium text-gray-900">{formatDate(quote.expires_at)}</p>
+                        <p className="text-sm text-muted-foreground">Expires</p>
+                        <p className="font-medium">{formatDate(quote.expires_at)}</p>
                       </div>
                     </div>
                   )}
@@ -539,27 +557,30 @@ export const QuoteDetailPage: React.FC = () => {
               {/* Customer Information */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Customer Information</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-primary" />
+                    Customer Information
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                      <User className="h-5 w-5 text-blue-600" />
+                    <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                      <User className="h-5 w-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">User ID</p>
-                      <p className="font-medium text-gray-900">{quote.user_id}</p>
+                      <p className="text-sm text-muted-foreground">User ID</p>
+                      <p className="font-medium">{quote.user_id}</p>
                     </div>
                   </div>
 
                   {quote.workspace_id && (
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center bg-blue-50 rounded-lg w-10 h-10">
-                        <Package className="h-5 w-5 text-blue-600" />
+                      <div className="flex items-center justify-center bg-primary/10 rounded-lg w-10 h-10">
+                        <Package className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600">Workspace ID</p>
-                        <p className="font-medium text-gray-900">{quote.workspace_id}</p>
+                        <p className="text-sm text-muted-foreground">Workspace ID</p>
+                        <p className="font-medium">{quote.workspace_id}</p>
                       </div>
                     </div>
                   )}
@@ -571,10 +592,13 @@ export const QuoteDetailPage: React.FC = () => {
             {quote.notes && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Notes</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    Notes
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
                 </CardContent>
               </Card>
             )}
@@ -583,10 +607,13 @@ export const QuoteDetailPage: React.FC = () => {
             {quote.custom_request_text && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Custom Request</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    Custom Request
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-700 whitespace-pre-wrap">{quote.custom_request_text}</p>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{quote.custom_request_text}</p>
                 </CardContent>
               </Card>
             )}

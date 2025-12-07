@@ -10,9 +10,7 @@ import {
   FileText,
   Eye,
   Trash2,
-  LayoutGrid,
   Filter,
-  SlidersHorizontal,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -26,18 +24,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { useToast } from '@/hooks/use-toast';
 import { CreateQuoteModal } from '@/components/Quotes/CreateQuoteModal';
 import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
@@ -57,6 +55,7 @@ export const QuotesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Load quotes
   const loadQuotes = useCallback(async () => {
@@ -260,60 +259,75 @@ export const QuotesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Toolbar - Notion Style */}
-        <div className="flex items-center justify-between py-3 mt-6 mb-4 border-b border-border">
-          <div className="flex items-center gap-1">
-            {/* View Toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <LayoutGrid className="h-4 w-4 mr-1.5" />
-              <span className="text-sm">Table</span>
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {/* Filter Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`h-8 px-2 hover:bg-muted ${statusFilter !== 'all' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-                >
-                  <Filter className="h-4 w-4 mr-1.5" />
-                  <span className="text-sm">
-                    {statusFilter === 'all' ? 'Filter' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => setStatusFilter('all')} className={statusFilter === 'all' ? 'bg-primary/10' : ''}>
-                  All Statuses
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('draft')} className={statusFilter === 'draft' ? 'bg-primary/10' : ''}>
-                  Draft
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('submitted')} className={statusFilter === 'submitted' ? 'bg-primary/10' : ''}>
-                  Submitted
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('quoted')} className={statusFilter === 'quoted' ? 'bg-primary/10' : ''}>
-                  Quoted
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('accepted')} className={statusFilter === 'accepted' ? 'bg-primary/10' : ''}>
-                  Accepted
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('rejected')} className={statusFilter === 'rejected' ? 'bg-primary/10' : ''}>
-                  Rejected
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setStatusFilter('expired')} className={statusFilter === 'expired' ? 'bg-primary/10' : ''}>
-                  Expired
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+        {/* Toolbar - Minimal */}
+        <div className="flex items-center justify-end py-3 mt-6 mb-4 border-b border-border">
+          {/* Searchable Filter */}
+          <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-8 px-2 hover:bg-muted ${statusFilter !== 'all' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+              >
+                <Filter className="h-4 w-4 mr-1.5" />
+                <span className="text-sm">
+                  {statusFilter === 'all' ? 'Filter' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-0" align="end">
+              <Command>
+                <CommandInput placeholder="Search status..." />
+                <CommandList>
+                  <CommandEmpty>No status found.</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('all'); setFilterOpen(false); }}
+                      className={statusFilter === 'all' ? 'bg-primary/10' : ''}
+                    >
+                      All Statuses
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('draft'); setFilterOpen(false); }}
+                      className={statusFilter === 'draft' ? 'bg-primary/10' : ''}
+                    >
+                      Draft
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('submitted'); setFilterOpen(false); }}
+                      className={statusFilter === 'submitted' ? 'bg-primary/10' : ''}
+                    >
+                      Submitted
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('quoted'); setFilterOpen(false); }}
+                      className={statusFilter === 'quoted' ? 'bg-primary/10' : ''}
+                    >
+                      Quoted
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('accepted'); setFilterOpen(false); }}
+                      className={statusFilter === 'accepted' ? 'bg-primary/10' : ''}
+                    >
+                      Accepted
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('rejected'); setFilterOpen(false); }}
+                      className={statusFilter === 'rejected' ? 'bg-primary/10' : ''}
+                    >
+                      Rejected
+                    </CommandItem>
+                    <CommandItem
+                      onSelect={() => { setStatusFilter('expired'); setFilterOpen(false); }}
+                      className={statusFilter === 'expired' ? 'bg-primary/10' : ''}
+                    >
+                      Expired
+                    </CommandItem>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Quotes Table */}
