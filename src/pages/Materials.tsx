@@ -165,30 +165,28 @@ export const MaterialsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card section-spacing">
+      {/* Header - Customer Style */}
+      <div className="bg-card" style={{ paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-xl)' }}>
         <div className="page-container">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold flex items-center gap-3">
-                <Package className="h-8 w-8" />
-                Materials Catalog
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                Browse and search through our comprehensive materials database
-              </p>
+            <div className="flex items-center gap-3">
+              <Package className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-3xl font-bold">Materials Catalog</h1>
+                <p className="text-muted-foreground">
+                  Browse and search through our comprehensive materials database
+                </p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-lg px-4 py-2">
-                {materials.length} Materials
-              </Badge>
-            </div>
+            <Badge variant="outline" className="text-lg px-4 py-2">
+              {materials.length} Materials
+            </Badge>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="page-container">
+      <div className="page-container" style={{ marginTop: 'var(--space-xl)' }}>
         {materials.length === 0 ? (
           <Card>
             <CardContent className="p-12">
