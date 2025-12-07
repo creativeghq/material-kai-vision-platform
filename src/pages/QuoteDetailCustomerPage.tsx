@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Package, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, User, Tag, Timer, Boxes, Plus, Milestone } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -281,62 +281,134 @@ export const QuoteDetailCustomerPage: React.FC = () => {
             </Alert>
           )}
 
-          {/* Quote Information Grid - compact stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <Tag className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Status</p>
-                <div className="mt-0.5">{getStatusBadge(quote.status)}</div>
+          {/* Quote Information Grid - compact stats with proper card styling */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Tag className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  {getStatusBadge(quote.status)}
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <Boxes className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Items</p>
-                <p className="font-medium text-sm">{itemCount}</p>
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Boxes className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Items</p>
+                  <p className="text-lg font-semibold">{itemCount}</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <Plus className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Extras</p>
-                <p className="font-medium text-sm">
-                  {quoteUpsells.length}
-                  {pendingUpsells.length > 0 && (
-                    <span className="text-xs text-yellow-600 ml-1">({pendingUpsells.length} pending)</span>
-                  )}
-                </p>
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Gift className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Extras</p>
+                  <p className="text-lg font-semibold">
+                    {quoteUpsells.length}
+                    {pendingUpsells.length > 0 && (
+                      <span className="text-xs text-yellow-600 ml-1">({pendingUpsells.length} pending)</span>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Extras Total</p>
-                <p className="font-medium text-sm">€{(quote.extras_total || 0).toFixed(2)}</p>
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Extras Total</p>
+                  <p className="text-lg font-semibold">€{(quote.extras_total || 0).toFixed(2)}</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Created</p>
-                <p className="font-medium text-sm">{new Date(quote.created_at).toLocaleDateString()}</p>
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Calendar className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Created</p>
+                  <p className="text-lg font-semibold">{new Date(quote.created_at).toLocaleDateString()}</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <Timer className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Expires</p>
-                <p className="font-medium text-sm">{new Date(quote.expires_at).toLocaleDateString()}</p>
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Timer className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Expires</p>
+                  <p className="text-lg font-semibold">{new Date(quote.expires_at).toLocaleDateString()}</p>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Custom Request (if exists) */}
           {quote.custom_request_text && (
-            <div className="mt-3 p-3 bg-muted/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-1">
-                <FileText className="h-4 w-4 text-muted-foreground" />
+            <div className="mt-4 dashboard-card p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
                 <span className="text-sm font-medium">Custom Request</span>
               </div>
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">

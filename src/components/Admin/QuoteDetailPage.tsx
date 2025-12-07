@@ -430,63 +430,159 @@ export const QuoteDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Compact Quote Information Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <Boxes className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Items</p>
-              <p className="font-medium text-sm">{itemCount}</p>
+        {/* Compact Quote Information Row - dashboard card styling */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Boxes className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Items</p>
+                <p className="text-lg font-semibold">{itemCount}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <Gift className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Extras</p>
-              <p className="font-medium text-sm">{quoteUpsells.length}</p>
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Gift className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Extras</p>
+                <p className="text-lg font-semibold">{quoteUpsells.length}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Extras Total</p>
-              <p className="font-medium text-sm">€{extrasTotal.toFixed(2)}</p>
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Extras Total</p>
+                <p className="text-lg font-semibold">€{extrasTotal.toFixed(2)}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <ListChecks className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Timeline</p>
-              <p className="font-medium text-sm">{quoteTimeline.length} steps</p>
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <ListChecks className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Timeline</p>
+                <p className="text-lg font-semibold">{quoteTimeline.length} steps</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Created</p>
-              <p className="font-medium text-sm">{new Date(quote.created_at).toLocaleDateString()}</p>
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Created</p>
+                <p className="text-lg font-semibold">{new Date(quote.created_at).toLocaleDateString()}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <Timer className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Expires</p>
-              <p className="font-medium text-sm">{new Date(quote.expires_at).toLocaleDateString()}</p>
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Timer className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Expires</p>
+                <p className="text-lg font-semibold">{new Date(quote.expires_at).toLocaleDateString()}</p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">User ID</p>
-              <p className="font-medium text-sm truncate" title={quote.user_id}>{quote.user_id.substring(0, 8)}...</p>
+          <div className="dashboard-card p-4">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <User className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">User ID</p>
+                <p className="text-sm font-semibold truncate" title={quote.user_id}>{quote.user_id.substring(0, 8)}...</p>
+              </div>
             </div>
           </div>
           {quote.workspace_id && (
-            <div className="flex items-center gap-2 p-2.5 bg-muted/30 rounded-lg">
-              <Package className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Workspace</p>
-                <p className="font-medium text-sm truncate" title={quote.workspace_id}>{quote.workspace_id.substring(0, 8)}...</p>
+            <div className="dashboard-card p-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: '2rem',
+                    height: '2rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Workspace</p>
+                  <p className="text-sm font-semibold truncate" title={quote.workspace_id}>{quote.workspace_id.substring(0, 8)}...</p>
+                </div>
               </div>
             </div>
           )}
@@ -496,18 +592,18 @@ export const QuoteDetailPage: React.FC = () => {
         {(quote.notes || quote.custom_request_text) && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {quote.notes && (
-              <div className="p-3 bg-muted/30 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              <div className="dashboard-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquare className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
                   <span className="text-sm font-medium">Notes</span>
                 </div>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
               </div>
             )}
             {quote.custom_request_text && (
-              <div className="p-3 bg-muted/30 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
+              <div className="dashboard-card p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
                   <span className="text-sm font-medium">Custom Request</span>
                 </div>
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.custom_request_text}</p>
