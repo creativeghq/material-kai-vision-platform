@@ -518,8 +518,8 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Accept/Reject Buttons - show when quote is 'quoted' and not yet accepted/rejected */}
-                            {quote.status === 'quoted' && (
+                            {/* Accept/Reject Buttons - show for all statuses except accepted/rejected */}
+                            {quote.status !== 'accepted' && quote.status !== 'rejected' && (
                               <div className="flex items-center gap-2 ml-4">
                                 <Button
                                   size="sm"
