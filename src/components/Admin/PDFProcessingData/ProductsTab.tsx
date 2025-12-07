@@ -154,11 +154,27 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, onStatsUp
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => {
-                  // Extract from correct metadata paths
-                  const category = product.metadata?.material_category || 'N/A';
-                  const manufacturer = product.metadata?.factory_name ||
-                                       product.metadata?.factory_group_name ||
-                                       'N/A';
+                  // Helper to check if value is a "not found" placeholder
+                  const isNotFound = (val: string | null | undefined): boolean => {
+                    if (!val) return true;
+                    const normalized = val.toLowerCase().trim();
+                    return normalized === 'not found' ||
+                           normalized === 'not explicitly mentioned' ||
+                           normalized === 'not mentioned' ||
+                           normalized === 'n/a' ||
+                           normalized === 'unknown';
+                  };
+
+                  // Normalize category - use consistent casing
+                  const rawCategory = product.metadata?.material_category;
+                  const category = isNotFound(rawCategory) ? 'N/A' : rawCategory;
+
+                  // Get manufacturer - try factory_name first, then factory_group_name
+                  const factoryName = product.metadata?.factory_name;
+                  const factoryGroup = product.metadata?.factory_group_name;
+                  const manufacturer = !isNotFound(factoryName) ? factoryName
+                                     : !isNotFound(factoryGroup) ? factoryGroup
+                                     : 'N/A';
 
                   return (
                   <TableRow key={product.id}>
