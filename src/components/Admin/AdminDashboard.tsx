@@ -3,20 +3,19 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Activity,
   BarChart3,
-  Brain,
   Database as DatabaseIcon,
   Link2,
   Microscope,
   Settings,
-  Search,
   Home,
   FileText,
   Globe,
   Users,
-  Sparkles,
-  Bug,
   Package,
   Bot,
+  ExternalLink,
+  Book,
+  AlertTriangle,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -100,15 +99,6 @@ const AdminDashboard: React.FC = () => {
       },
     ],
     'AI & Intelligence': [
-      {
-        title: 'Search Hub',
-        description:
-          'Multi-modal search interface with text, image, and hybrid capabilities',
-        icon: Search,
-        path: '/admin/search-hub',
-        status: 'active',
-        count: 'Enhanced search',
-      },
       {
         title: 'AI Settings Control',
         description: 'Configure AI prompts, NLP patterns, extraction settings, and agent tools',
@@ -220,24 +210,6 @@ const AdminDashboard: React.FC = () => {
         status: 'active',
         count: 'Dependencies',
       },
-      {
-        title: 'MIVAA API Docs',
-        description:
-          'Access MIVAA service documentation and API specifications',
-        icon: FileText,
-        path: '/admin/mivaa-docs',
-        status: 'active',
-        count: 'Documentation',
-      },
-      {
-        title: 'Sentry Error Tracking',
-        description:
-          'Test Sentry integration and error tracking functionality',
-        icon: Bug,
-        path: '/admin/sentry-test',
-        status: 'active',
-        count: 'Testing',
-      },
     ],
   };
 
@@ -299,9 +271,119 @@ const AdminDashboard: React.FC = () => {
               </p>
             </div>
           </div>
-          <Badge className="text-sm px-2 py-1" style={{ background: 'var(--mocha-color)' }}>
-            Administrator Access
-          </Badge>
+          <div className="flex items-center space-x-3">
+            <Button
+              onClick={() => window.open('https://ethosco.sentry.io/issues/', '_blank')}
+              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
+              variant="ghost"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Sentry
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+            <Button
+              onClick={() => window.open('https://v1api.materialshub.gr/docs', '_blank')}
+              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
+              variant="ghost"
+            >
+              <Book className="h-4 w-4" />
+              API Docs
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+            <Button
+              onClick={() => window.open('https://v1api.materialshub.gr/redoc', '_blank')}
+              className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"
+              variant="ghost"
+            >
+              <FileText className="h-4 w-4" />
+              ReDoc
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+            <div className="h-6 w-px bg-white/20" />
+            <Badge className="text-sm px-2 py-1" style={{ background: 'var(--mocha-color)' }}>
+              Administrator Access
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      {/* System Status Section */}
+      <div className="px-6 pt-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">PDF Documents</p>
+                  <p className="text-2xl font-bold">156</p>
+                </div>
+              </div>
+              <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
+                Processed
+              </Badge>
+            </div>
+          </div>
+
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <DatabaseIcon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Knowledge Entries</p>
+                  <p className="text-2xl font-bold">1,247</p>
+                </div>
+              </div>
+              <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
+                Active
+              </Badge>
+            </div>
+          </div>
+
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: '2.5rem',
+                    height: '2.5rem',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  }}
+                >
+                  <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Search Queries</p>
+                  <p className="text-2xl font-bold">8,432</p>
+                </div>
+              </div>
+              <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
+                Total
+              </Badge>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -370,70 +452,7 @@ const AdminDashboard: React.FC = () => {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <h3 className="text-lg font-semibold mb-4">System Status</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>PDF Documents</span>
-                    <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                      156 Processed
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Knowledge Entries</span>
-                    <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                      1,247 Active
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Search Queries</span>
-                    <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
-                      8,432 Total
-                    </Badge>
-                  </div>
-                </div>
-              </div>
 
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <h3 className="text-lg font-semibold mb-4">Recent Activity</h3>
-                <div className="space-y-2 text-sm">
-                  <div>• New PDF processed: Material Specifications v2.1</div>
-                  <div>• 3D material suggestions updated</div>
-                  <div>• Enhanced search index rebuilt</div>
-                  <div>• Knowledge base entries validated</div>
-                </div>
-              </div>
-
-              <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-                <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
-                <div className="space-y-2">
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
-                  >
-                    <Link to="/admin/pdf-processing">Process New PDF</Link>
-                  </Button>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
-                  >
-                    <Link to="/admin/search-hub">Test Search System</Link>
-                  </Button>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    className="w-full px-3 py-1 text-sm hover:bg-white/10 border border-white/20"
-                  >
-                    <Link to="/agent-hub?agent=interior-designer">
-                      Interior Designer Agent
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
       </div>
     </div>
   );

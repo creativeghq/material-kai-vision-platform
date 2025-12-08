@@ -35,7 +35,7 @@ import { MoodBoardDetailPage } from './components/MoodBoard/MoodBoardDetailPage'
 import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
-import SearchHub from './pages/SearchHub';
+// Removed: SearchHub - functionality available on frontend
 import AgentHub from './pages/AgentHub';
 import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
 import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
@@ -47,7 +47,7 @@ import {
   CriticalErrorBoundary,
   PageErrorBoundary,
 } from './components/ErrorBoundary/ErrorBoundary';
-import { MivaaDocsViewer } from './components/Admin/MivaaDocsViewer';
+// Removed: MivaaDocsViewer - now external links in admin header
 // Removed: QualityStabilityMetricsPanel and Phase3MetricsPanel - now consolidated in AnalyticsDashboard
 import { MetadataManagement } from './components/Admin/MetadataManagement';
 import { RelevancyManagement } from './components/Admin/RelevancyManagement';
@@ -378,18 +378,7 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-              <Route
-                path="/admin/search-hub"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <SearchHub />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
+              {/* Removed: /admin/search-hub - functionality available on frontend */}
               <Route
                 path="/admin/3d-suggestions"
                 element={
@@ -414,18 +403,7 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-              <Route
-                path="/admin/mivaa-docs"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <MivaaDocsViewer />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
+              {/* Removed: /admin/mivaa-docs - now external links in admin header */}
               {/* Removed: /admin/quality-stability-metrics and /admin/phase3-metrics - now consolidated in /admin/analytics */}
               {/* Removed: /admin/chunk-quality - now consolidated in /admin/analytics */}
               <Route

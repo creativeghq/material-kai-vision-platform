@@ -143,9 +143,14 @@ class MoodBoardAPI {
         material:products(
           id,
           name,
-          category,
-          thumbnail_url,
-          properties
+          category_id,
+          properties,
+          metadata,
+          product_images(
+            image_url,
+            image_type,
+            display_order
+          )
         )
       `,
       )
@@ -153,28 +158,37 @@ class MoodBoardAPI {
       .order('position', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+
+    // Transform data to include thumbnail_url from product_images
+    return (data || []).map(item => ({
+      ...item,
+      material: item.material ? {
+        ...item.material,
+        category: item.material.metadata?.category || item.material.category_id || 'Uncategorized',
+        thumbnail_url: item.material.product_images?.[0]?.image_url || null,
+      } : null,
+    }));
   }
 
   // Add material to moodboard
-  async addMoodBoardItem(data: AddMoodBoardItemData): Promise<MoodBoardItem> {
+  async addMoodBoardItem(itemData: AddMoodBoardItemData): Promise<MoodBoardItem> {
     // Get the next position
     const { data: existingItems } = await supabase
       .from('moodboard_items')
       .select('position')
-      .eq('moodboard_id', data.moodboard_id)
+      .eq('moodboard_id', itemData.moodboard_id)
       .order('position', { ascending: false })
       .limit(1);
 
     const nextPosition =
-      data.position ?? (existingItems?.[0]?.position ?? -1) + 1;
+      itemData.position ?? (existingItems?.[0]?.position ?? -1) + 1;
 
     const { data: result, error } = await supabase
       .from('moodboard_items')
       .insert({
-        moodboard_id: data.moodboard_id,
-        material_id: data.material_id,
-        notes: data.notes,
+        moodboard_id: itemData.moodboard_id,
+        material_id: itemData.material_id,
+        notes: itemData.notes,
         position: nextPosition,
       })
       .select(
@@ -183,26 +197,40 @@ class MoodBoardAPI {
         material:products(
           id,
           name,
-          category,
-          thumbnail_url,
-          properties
+          category_id,
+          properties,
+          metadata,
+          product_images(
+            image_url,
+            image_type,
+            display_order
+          )
         )
       `,
       )
       .single();
 
     if (error) throw error;
-    return result;
+
+    // Transform to include thumbnail_url
+    return {
+      ...result,
+      material: result.material ? {
+        ...result.material,
+        category: result.material.metadata?.category || result.material.category_id || 'Uncategorized',
+        thumbnail_url: result.material.product_images?.[0]?.image_url || null,
+      } : null,
+    };
   }
 
   // Update moodboard item
   async updateMoodBoardItem(
     id: string,
-    data: { notes?: string; position?: number },
+    updateData: { notes?: string; position?: number },
   ): Promise<MoodBoardItem> {
     const { data: result, error } = await supabase
       .from('moodboard_items')
-      .update(data)
+      .update(updateData)
       .eq('id', id)
       .select(
         `
@@ -210,16 +238,30 @@ class MoodBoardAPI {
         material:products(
           id,
           name,
-          category,
-          thumbnail_url,
-          properties
+          category_id,
+          properties,
+          metadata,
+          product_images(
+            image_url,
+            image_type,
+            display_order
+          )
         )
       `,
       )
       .single();
 
     if (error) throw error;
-    return result;
+
+    // Transform to include thumbnail_url
+    return {
+      ...result,
+      material: result.material ? {
+        ...result.material,
+        category: result.material.metadata?.category || result.material.category_id || 'Uncategorized',
+        thumbnail_url: result.material.product_images?.[0]?.image_url || null,
+      } : null,
+    };
   }
 
   // Remove material from moodboard
