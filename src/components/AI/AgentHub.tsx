@@ -40,6 +40,9 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { DesignCanvas } from './DesignCanvas';
 import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { PromptLibrary } from './PromptLibrary';
+import { MarkdownRenderer } from './MarkdownRenderer';
+import { ProductStrip } from './ProductStrip';
+import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -305,31 +308,64 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         });
       }
 
-      // Prepare request body
-      const requestBody: any = {
-        messages: messages.concat({
-          id: `msg-${Date.now()}`,
-          role: 'user',
-          content: userInput,
-          timestamp: new Date(),
-        }),
-        agentId: selectedAgent,
-        model: selectedModel,
-        images: attachedImages,
-      };
+      // Check cache for similar queries (only for search-type queries without images)
+      const workspaceId = session.user?.user_metadata?.workspace_id;
+      const canUseCache = attachedImages.length === 0 && !attachedPDF && selectedAgent === 'search';
+      let data: any = null;
 
-      // Add PDF data if attached (for pdf-processor agent)
-      if (attachedPDF && selectedAgent === 'pdf-processor') {
-        requestBody.pdfFile = attachedPDF;
+      if (canUseCache) {
+        const cachedResponse = getCachedResponse(userInput, selectedAgent, workspaceId);
+        if (cachedResponse) {
+          console.log('🎯 Cache hit for query:', userInput);
+          data = {
+            text: cachedResponse.text,
+            agentId: cachedResponse.agentId,
+            model: cachedResponse.model,
+            materialResults: cachedResponse.products ? { products: cachedResponse.products } : undefined,
+          };
+        }
       }
 
-      // Call Supabase Edge Function for agent execution
-      const { data, error } = await supabase.functions.invoke('agent-chat', {
-        body: requestBody,
-      });
+      // If no cache hit, make API call
+      if (!data) {
+        // Prepare request body
+        const requestBody: any = {
+          messages: messages.concat({
+            id: `msg-${Date.now()}`,
+            role: 'user',
+            content: userInput,
+            timestamp: new Date(),
+          }),
+          agentId: selectedAgent,
+          model: selectedModel,
+          images: attachedImages,
+        };
 
-      if (error) {
-        throw new Error(error.message || 'Agent execution failed');
+        // Add PDF data if attached (for pdf-processor agent)
+        if (attachedPDF && selectedAgent === 'pdf-processor') {
+          requestBody.pdfFile = attachedPDF;
+        }
+
+        // Call Supabase Edge Function for agent execution
+        const { data: responseData, error } = await supabase.functions.invoke('agent-chat', {
+          body: requestBody,
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Agent execution failed');
+        }
+
+        data = responseData;
+
+        // Cache the response for future use
+        if (canUseCache && data) {
+          cacheResponse(userInput, selectedAgent, {
+            text: data.text,
+            model: data.model,
+            products: data.materialResults?.products,
+          }, workspaceId);
+          console.log('💾 Cached response for query:', userInput);
+        }
       }
 
       // Parse demo data if this is from DemoAgent
@@ -878,7 +914,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         )}
                       </div>
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
+                      <div className="space-y-2">
+                        {/* Render markdown content for assistant messages */}
+                        {message.role === 'assistant' ? (
+                          <MarkdownRenderer content={message.content} className="text-sm" />
+                        ) : (
+                          <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
+                        )}
+
+                        {/* Show ProductStrip for messages with material data */}
+                        {message.role === 'assistant' && message.materialData?.products && message.materialData.products.length > 0 && (
+                          <ProductStrip
+                            products={message.materialData.products}
+                            title={`Found ${message.materialData.products.length} products`}
+                          />
+                        )}
+                      </div>
                     )}
                     <p className="text-xs text-muted-foreground mt-2">
                       {message.timestamp.toLocaleTimeString()}
