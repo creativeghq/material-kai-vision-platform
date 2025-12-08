@@ -463,17 +463,39 @@ export const QuoteDetailCustomerPage: React.FC = () => {
           <TabsContent value="items" className="mt-4">
             <QuoteItemsList
               items={quote.items || []}
-              showAddButton={quote.status === 'draft' || quote.status === 'submitted'}
+              showAddButton={quote.status === 'draft'}
               onAddProducts={() => setShowAddProducts(true)}
               onUpdateQuantity={async (itemId, quantity) => {
-                await quotesService.updateItem(itemId, { quantity });
-                await loadQuoteDetails();
+                try {
+                  await quotesService.updateItem(itemId, { quantity });
+                  await loadQuoteDetails();
+                } catch (error) {
+                  console.error('Error updating item:', error);
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to update item quantity',
+                    variant: 'destructive',
+                  });
+                }
               }}
               onRemoveItem={async (itemId) => {
-                await quotesService.removeItem(itemId);
-                await loadQuoteDetails();
+                try {
+                  await quotesService.removeItem(itemId);
+                  await loadQuoteDetails();
+                  toast({
+                    title: 'Item Removed',
+                    description: 'Product removed from quote',
+                  });
+                } catch (error) {
+                  console.error('Error removing item:', error);
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to remove item from quote',
+                    variant: 'destructive',
+                  });
+                }
               }}
-              editable={quote.status === 'draft' || quote.status === 'submitted'}
+              editable={quote.status === 'draft'}
               variant="compact"
             />
           </TabsContent>
