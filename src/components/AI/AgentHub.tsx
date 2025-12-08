@@ -23,6 +23,7 @@ import {
   Sparkles,
   ThumbsUp,
   ThumbsDown,
+  Trash2,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -489,30 +490,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
 
       // Parse material data from agent responses (for Search Agent, etc.)
-      let materialData = undefined;
-      if (data.materialResults) {
-        // Agent returned structured material data
-        materialData = {
-          products: data.materialResults.products || [],
-          images: data.materialResults.images || {},
-          title: data.materialResults.title || 'Material Results',
-        };
-      } else if (data.text && data.text.includes('MATERIAL_DATA:')) {
-        // Parse embedded material data from response text
-        try {
-          const materialDataMatch = data.text.match(/MATERIAL_DATA:\s*(\{[\s\S]*?\})\s*$/m);
-          if (materialDataMatch) {
-            const parsedData = JSON.parse(materialDataMatch[1]);
-            materialData = {
-              products: parsedData.products || [],
-              images: parsedData.images || {},
-              title: parsedData.title || 'Material Results',
-            };
-          }
-        } catch (e) {
-          console.error('Error parsing material data:', e);
-        }
-      }
+      const materialData = data.materialResults ? {
+        products: data.materialResults.products || [],
+        images: data.materialResults.images || {},
+        title: data.materialResults.title || 'Material Results',
+      } : undefined;
 
       // Add assistant response to messages
       const assistantMessage: Message = {
@@ -528,8 +510,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      // Save assistant message to database
+      // Save assistant message to database with response metrics
       if (conversationId) {
+        const responseTimeMs = elapsedTime; // Capture elapsed time before state resets
         await agentChatHistoryService.saveMessage({
           conversationId,
           role: 'assistant',
@@ -537,6 +520,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           metadata: {
             agentId: data.agentId || selectedAgent,
             model: data.model || selectedModel,
+            responseTimeMs, // Time taken to respond
+            productsCount: materialData?.products?.length || 0,
+            cachedResponse: !!getCachedResponse(userInput, selectedAgent, workspaceId),
             demoData, // Save demo data for DemoAgent
             materialData, // Save material data for Search Agent
           },
@@ -642,6 +628,41 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     setCurrentConversationId(null);
     setMessages([]);
   }, []);
+
+  const handleDeleteConversation = useCallback(async (e: React.MouseEvent, conversationId: string) => {
+    e.stopPropagation(); // Prevent loading the conversation when clicking delete
+
+    const confirmed = window.confirm('Are you sure you want to delete this conversation? This cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      const success = await agentChatHistoryService.deleteConversation(conversationId);
+      if (success) {
+        // Remove from local state
+        setConversations((prev) => prev.filter((c) => c.id !== conversationId));
+
+        // If we deleted the current conversation, clear the chat
+        if (currentConversationId === conversationId) {
+          setCurrentConversationId(null);
+          setMessages([]);
+        }
+
+        toast({
+          title: 'Conversation Deleted',
+          description: 'The conversation has been permanently deleted.',
+        });
+      } else {
+        throw new Error('Failed to delete');
+      }
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast({
+        title: 'Delete Failed',
+        description: 'Could not delete the conversation. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  }, [currentConversationId, toast]);
 
   const handleExportConversation = useCallback(async () => {
     if (!currentConversationId) {
@@ -775,14 +796,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           ) : (
             <div className="p-2 space-y-1">
               {conversations.map((convo) => (
-                <button
+                <div
                   key={convo.id}
-                  onClick={() => handleLoadConversation(convo.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+                  className={`group w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors cursor-pointer ${
                     currentConversationId === convo.id
                       ? 'bg-primary/10 border-l-2 border-primary'
                       : 'hover:bg-accent'
                   }`}
+                  onClick={() => handleLoadConversation(convo.id)}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                     <MessageSquare className="h-5 w-5 text-primary" />
@@ -793,7 +814,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       {convo.messageCount} messages • {new Date(convo.lastMessageAt).toLocaleDateString()}
                     </div>
                   </div>
-                </button>
+                  <button
+                    onClick={(e) => handleDeleteConversation(e, convo.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0"
+                    title="Delete conversation"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
           )}

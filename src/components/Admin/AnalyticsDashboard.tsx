@@ -6,8 +6,6 @@ import {
   TrendingUp,
   MousePointer,
   Activity,
-  Home,
-  ArrowLeft,
   Clock,
   FileText,
   Link2,
@@ -17,6 +15,10 @@ import {
   XCircle,
   AlertTriangle,
   Database,
+  Bot,
+  DollarSign,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -41,11 +43,53 @@ import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import QualityStabilityMetricsPanel from './QualityStabilityMetricsPanel';
 import { PDFProcessingMonitor } from './PDFProcessingMonitor';
 
+// Model pricing per 1M tokens (in USD)
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
+  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
+  'gpt-4o': { input: 2.50, output: 10.00 },
+  'gpt-4o-mini': { input: 0.15, output: 0.60 },
+};
+
+// Estimate tokens from content length (rough approximation: 4 chars = 1 token)
+const estimateTokens = (content: string): number => Math.ceil(content.length / 4);
+
+// Calculate cost based on model and tokens
+const calculateCost = (model: string, inputTokens: number, outputTokens: number): { input: number; output: number; total: number } => {
+  const pricing = MODEL_PRICING[model] || { input: 3.00, output: 15.00 }; // Default to Sonnet pricing
+  const inputCost = (inputTokens / 1_000_000) * pricing.input;
+  const outputCost = (outputTokens / 1_000_000) * pricing.output;
+  return {
+    input: inputCost,
+    output: outputCost,
+    total: inputCost + outputCost,
+  };
+};
+
 interface UsageAnalytics {
   total_searches: number;
   total_api_calls: number;
   active_users: number;
   avg_response_time: number;
+}
+
+interface AgentChatMessage {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  metadata: {
+    agentId?: string;
+    model?: string;
+    responseTimeMs?: number;
+    productsCount?: number;
+    cachedResponse?: boolean;
+    rating?: 'up' | 'down' | null;
+  } | null;
+  created_at: string;
+  user_email?: string;
+  user_id?: string;
 }
 
 interface SearchAnalytic {
@@ -84,6 +128,7 @@ export const AnalyticsDashboard: React.FC = () => {
   });
   const [searchAnalytics, setSearchAnalytics] = useState<SearchAnalytic[]>([]);
   const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
+  const [agentChats, setAgentChats] = useState<AgentChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -108,6 +153,41 @@ export const AnalyticsDashboard: React.FC = () => {
         .limit(50);
 
       if (apiError) throw apiError;
+
+      // Fetch agent chat messages (assistant responses with metadata)
+      const { data: agentChatData, error: agentChatError } = await supabase
+        .from('agent_chat_messages')
+        .select(`
+          id,
+          conversation_id,
+          role,
+          content,
+          metadata,
+          created_at,
+          agent_chat_conversations!inner (
+            user_id
+          )
+        `)
+        .eq('role', 'assistant')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (agentChatError) {
+        console.error('Error fetching agent chats:', agentChatError);
+      }
+
+      // Map agent chat data with user info
+      const agentChatMessages: AgentChatMessage[] = (agentChatData || []).map((msg: any) => ({
+        id: msg.id,
+        conversation_id: msg.conversation_id,
+        role: msg.role,
+        content: msg.content,
+        metadata: msg.metadata,
+        created_at: msg.created_at,
+        user_id: msg.agent_chat_conversations?.user_id,
+      }));
+
+      setAgentChats(agentChatMessages);
 
       // Filter and cast data to match expected types
       const filteredSearchData = (searchData || [])
@@ -158,8 +238,8 @@ export const AnalyticsDashboard: React.FC = () => {
       setSearchAnalytics(filteredSearchData);
       setApiUsage(filteredApiData);
 
-      // Calculate aggregate statistics
-      const totalSearches = searchData?.length || 0;
+      // Calculate aggregate statistics (include agent chats in search count)
+      const totalSearches = (searchData?.length || 0) + agentChatMessages.length;
       const totalApiCalls = apiData?.length || 0;
       const uniqueUsers = new Set([
         ...(searchData
@@ -168,18 +248,22 @@ export const AnalyticsDashboard: React.FC = () => {
         ...(apiData
           ?.map((a: unknown) => (a as any).api_key_id)
           .filter(Boolean) || []),
+        ...agentChatMessages.map((m) => m.user_id).filter(Boolean),
       ]).size;
-      const avgResponseTime =
-        apiData?.reduce(
-          (sum: any, log: any) => sum + (log.response_time_ms || 0),
-          0,
-        ) / Math.max(apiData?.length || 1, 1);
+
+      // Calculate avg response time from agent chats (more accurate)
+      const agentResponseTimes = agentChatMessages
+        .map((m) => m.metadata?.responseTimeMs)
+        .filter((t): t is number => typeof t === 'number' && t > 0);
+      const avgAgentResponseTime = agentResponseTimes.length > 0
+        ? agentResponseTimes.reduce((a, b) => a + b, 0) / agentResponseTimes.length
+        : 0;
 
       setAnalytics({
         total_searches: totalSearches,
         total_api_calls: totalApiCalls,
         active_users: uniqueUsers,
-        avg_response_time: Math.round(avgResponseTime),
+        avg_response_time: Math.round(avgAgentResponseTime),
       });
     } catch (error) {
       console.error('Error fetching analytics:', error);
@@ -294,11 +378,11 @@ export const AnalyticsDashboard: React.FC = () => {
           />
         </div>
 
-        <Tabs defaultValue="searches" className="space-y-4">
+        <Tabs defaultValue="agent-chat" className="space-y-4">
           <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="searches">
-              <Search className="h-4 w-4 mr-2" />
-              Search
+            <TabsTrigger value="agent-chat">
+              <Bot className="h-4 w-4 mr-2" />
+              Agent Chat
             </TabsTrigger>
             <TabsTrigger value="api-usage">
               <Activity className="h-4 w-4 mr-2" />
@@ -326,63 +410,135 @@ export const AnalyticsDashboard: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="searches" className="space-y-4">
+          {/* Agent Chat Analytics Tab */}
+          <TabsContent value="agent-chat" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Recent Search Queries</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5" />
+                  Agent Chat Analytics
+                </CardTitle>
+                <CardDescription>
+                  Track agent responses, response times, quality ratings, and costs
+                </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Summary Stats */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-500">Total Chats</div>
+                    <div className="text-2xl font-bold">{agentChats.length}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-500">Avg Response Time</div>
+                    <div className="text-2xl font-bold">
+                      {agentChats.length > 0
+                        ? `${Math.round(
+                            agentChats
+                              .filter((c) => c.metadata?.responseTimeMs)
+                              .reduce((sum, c) => sum + (c.metadata?.responseTimeMs || 0), 0) /
+                              Math.max(agentChats.filter((c) => c.metadata?.responseTimeMs).length, 1)
+                          )}ms`
+                        : '0ms'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-500">Positive Ratings</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {agentChats.filter((c) => c.metadata?.rating === 'up').length}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-500">Est. Total Cost</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      ${agentChats
+                        .reduce((sum, chat) => {
+                          const model = chat.metadata?.model || 'claude-sonnet-4-5-20250929';
+                          const inputTokens = estimateTokens(chat.content);
+                          const outputTokens = estimateTokens(chat.content);
+                          return sum + calculateCost(model, inputTokens, outputTokens).total;
+                        }, 0)
+                        .toFixed(4)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Agent Chat Table */}
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Query</TableHead>
-                      <TableHead>Results</TableHead>
-                      <TableHead>Clicks</TableHead>
+                      <TableHead className="w-[300px]">Query / Response</TableHead>
+                      <TableHead>Agent</TableHead>
+                      <TableHead>Model</TableHead>
                       <TableHead>Response Time</TableHead>
-                      <TableHead>Satisfaction</TableHead>
+                      <TableHead>Rating</TableHead>
+                      <TableHead>Products</TableHead>
+                      <TableHead>Cost (Est.)</TableHead>
                       <TableHead>Time</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {searchAnalytics.slice(0, 10).map((search) => (
-                      <TableRow key={search.id}>
-                        <TableCell className="font-medium max-w-xs truncate">
-                          {search.query_text}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className="border border-gray-300 bg-white text-gray-700">
-                            {search.results_shown}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <MousePointer className="h-3 w-3" />
-                            {search.clicks_count}
-                          </div>
-                        </TableCell>
-                        <TableCell>{search.response_time_ms}ms</TableCell>
-                        <TableCell>
-                          {search.satisfaction_rating ? (
-                            <Badge
-                              className={
-                                search.satisfaction_rating >= 4
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-gray-100 text-gray-800'
-                              }
-                            >
-                              {search.satisfaction_rating}/5
+                    {agentChats.slice(0, 20).map((chat) => {
+                      const model = chat.metadata?.model || 'claude-sonnet-4-5-20250929';
+                      const inputTokens = estimateTokens(chat.content);
+                      const outputTokens = estimateTokens(chat.content);
+                      const cost = calculateCost(model, inputTokens, outputTokens);
+
+                      return (
+                        <TableRow key={chat.id}>
+                          <TableCell className="font-medium max-w-[300px]">
+                            <div className="truncate text-sm" title={chat.content}>
+                              {chat.content.slice(0, 80)}...
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {chat.metadata?.agentId || 'search'}
                             </Badge>
-                          ) : (
-                            '-'
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {new Date(search.created_at).toLocaleString()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                              {model.includes('haiku') ? 'Haiku' : model.includes('sonnet') ? 'Sonnet' : model.slice(0, 12)}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <span className={chat.metadata?.responseTimeMs && chat.metadata.responseTimeMs > 10000 ? 'text-red-600' : ''}>
+                              {chat.metadata?.responseTimeMs ? `${(chat.metadata.responseTimeMs / 1000).toFixed(1)}s` : '-'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {chat.metadata?.rating === 'up' ? (
+                              <ThumbsUp className="h-4 w-4 text-green-600" />
+                            ) : chat.metadata?.rating === 'down' ? (
+                              <ThumbsDown className="h-4 w-4 text-red-600" />
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {chat.metadata?.productsCount || 0}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-xs">
+                              <div className="text-green-600">In: ${cost.input.toFixed(5)}</div>
+                              <div className="text-blue-600">Out: ${cost.output.toFixed(5)}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-500">
+                            {new Date(chat.created_at).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
+                {agentChats.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No agent chat data available yet. Start chatting with the agent to see analytics.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

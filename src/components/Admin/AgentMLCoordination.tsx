@@ -13,8 +13,10 @@ import {
   Square,
   Settings,
   Bot,
-  Database,
   Sparkles,
+  Zap,
+  Eye,
+  MessageSquare,
 } from 'lucide-react';
 
 import {
@@ -60,10 +62,104 @@ interface MLTask {
   created_at: string;
 }
 
+interface ModelConfig {
+  id: string;
+  name: string;
+  provider: 'anthropic' | 'openai' | 'meta' | 'google';
+  model: string;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+  speed: 'fast' | 'medium' | 'slow';
+  usedFor: string[];
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+// Model configurations with pricing
+const MODEL_CONFIGS: ModelConfig[] = [
+  {
+    id: 'claude-haiku',
+    name: 'Claude Haiku 3.5',
+    provider: 'anthropic',
+    model: 'claude-3-5-haiku-20241022',
+    inputCostPer1M: 0.80,
+    outputCostPer1M: 4.00,
+    speed: 'fast',
+    usedFor: ['Search Agent', 'Quick Queries'],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  },
+  {
+    id: 'claude-sonnet',
+    name: 'Claude Sonnet 4.5',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4-5-20250929',
+    inputCostPer1M: 3.00,
+    outputCostPer1M: 15.00,
+    speed: 'medium',
+    usedFor: ['PDF Processing', 'Complex Tasks', 'Admin Agent'],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  },
+  {
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    provider: 'openai',
+    model: 'gpt-4o',
+    inputCostPer1M: 2.50,
+    outputCostPer1M: 10.00,
+    speed: 'medium',
+    usedFor: ['Fallback', 'Vision Tasks'],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  },
+  {
+    id: 'llama-vision',
+    name: 'Llama 4 Scout 17B Vision',
+    provider: 'meta',
+    model: 'meta-llama/Llama-4-Scout-17B-16E-Instruct',
+    inputCostPer1M: 0.20,
+    outputCostPer1M: 0.20,
+    speed: 'fast',
+    usedFor: ['Image Embeddings', 'Vision Analysis'],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  },
+  {
+    id: 'vit-embeddings',
+    name: 'ViT Base Patch16',
+    provider: 'google',
+    model: 'google/vit-base-patch16-224',
+    inputCostPer1M: 0.00,
+    outputCostPer1M: 0.00,
+    speed: 'fast',
+    usedFor: ['CLIP Embeddings', 'Image Classification'],
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+  },
+];
+
+// Provider icons/colors
+const getProviderStyle = (provider: string) => {
+  switch (provider) {
+    case 'anthropic':
+      return { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: '🧠' };
+    case 'openai':
+      return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: '🤖' };
+    case 'meta':
+      return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', icon: '🦙' };
+    case 'google':
+      return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: '🔍' };
+    default:
+      return { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: '⚙️' };
+  }
+};
+
 const AgentMLCoordination: React.FC = () => {
   const navigate = useNavigate();
   const [agentTasks, setAgentTasks] = useState<AgentTask[]>([]);
   const [mlTasks, setMLTasks] = useState<MLTask[]>([]);
+  const [modelUsage, setModelUsage] = useState<ModelConfig[]>(MODEL_CONFIGS);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalTasks: 0,
@@ -162,7 +258,7 @@ const AgentMLCoordination: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="AI Settings & Agent Coordination"
         description="Comprehensive AI configuration: prompts, NLP settings, model configurations, and agent task monitoring"
@@ -401,36 +497,124 @@ const AgentMLCoordination: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="models" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Model Settings</CardTitle>
-                <CardDescription>
-                  Configure AI model parameters and API settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+            {/* Model Cost Summary */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🧠</span>
                     <div>
-                      <h4 className="font-medium mb-2">Claude Models</h4>
-                      <p className="text-sm text-muted-foreground">Sonnet 4.5, Haiku 4.5</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2">GPT Models</h4>
-                      <p className="text-sm text-muted-foreground">GPT-5</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Vision Models</h4>
-                      <p className="text-sm text-muted-foreground">Llama 4 Scout 17B Vision</p>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2">Embedding Models</h4>
-                      <p className="text-sm text-muted-foreground">google/vit-base-patch16-224</p>
+                      <div className="text-sm text-orange-600 font-medium">Anthropic</div>
+                      <div className="text-2xl font-bold text-orange-800">
+                        ${modelUsage.filter(m => m.provider === 'anthropic').reduce((sum, m) =>
+                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
+                        ).toFixed(4)}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🤖</span>
+                    <div>
+                      <div className="text-sm text-green-600 font-medium">OpenAI</div>
+                      <div className="text-2xl font-bold text-green-800">
+                        ${modelUsage.filter(m => m.provider === 'openai').reduce((sum, m) =>
+                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
+                        ).toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🦙</span>
+                    <div>
+                      <div className="text-sm text-blue-600 font-medium">Meta / Other</div>
+                      <div className="text-2xl font-bold text-blue-800">
+                        ${modelUsage.filter(m => m.provider === 'meta' || m.provider === 'google').reduce((sum, m) =>
+                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
+                        ).toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Model Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {modelUsage.map((model) => {
+                const style = getProviderStyle(model.provider);
+                const inputCost = (model.totalInputTokens / 1_000_000) * model.inputCostPer1M;
+                const outputCost = (model.totalOutputTokens / 1_000_000) * model.outputCostPer1M;
+                const totalCost = inputCost + outputCost;
+
+                return (
+                  <Card key={model.id} className={`${style.bg} ${style.border} border-2 hover:shadow-lg transition-shadow`}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{style.icon}</span>
+                          <div>
+                            <CardTitle className={`text-lg ${style.text}`}>{model.name}</CardTitle>
+                            <CardDescription className="text-xs font-mono">{model.model}</CardDescription>
+                          </div>
+                        </div>
+                        <Badge className={`${model.speed === 'fast' ? 'bg-green-500' : model.speed === 'medium' ? 'bg-yellow-500' : 'bg-red-500'} text-white`}>
+                          <Zap className="h-3 w-3 mr-1" />
+                          {model.speed}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Pricing */}
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-white/50 rounded p-2">
+                          <div className="text-xs text-gray-500">Input Cost</div>
+                          <div className="font-semibold">${model.inputCostPer1M}/1M</div>
+                        </div>
+                        <div className="bg-white/50 rounded p-2">
+                          <div className="text-xs text-gray-500">Output Cost</div>
+                          <div className="font-semibold">${model.outputCostPer1M}/1M</div>
+                        </div>
+                      </div>
+
+                      {/* Usage Stats */}
+                      <div className="bg-white/50 rounded p-2">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>Token Usage</span>
+                          <span className="font-semibold text-gray-700">${totalCost.toFixed(4)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" />
+                            <span>In: {model.totalInputTokens.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            <span>Out: {model.totalOutputTokens.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Used For */}
+                      <div className="flex flex-wrap gap-1">
+                        {model.usedFor.map((use) => (
+                          <Badge key={use} variant="outline" className="text-xs bg-white/50">
+                            {use}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </TabsContent>
 
           <TabsContent value="agents" className="space-y-4">
