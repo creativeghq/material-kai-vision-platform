@@ -177,7 +177,9 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <AdminGuard>
-                      <AnalyticsDashboard />
+                      <Layout>
+                        <AnalyticsDashboard />
+                      </Layout>
                     </AdminGuard>
                   </AuthGuard>
                 }
