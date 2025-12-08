@@ -21,6 +21,8 @@ import {
   Upload,
   FileUp,
   Sparkles,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -196,6 +198,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
+  const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [messageRatings, setMessageRatings] = useState<Record<string, 'up' | 'down' | null>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -251,6 +256,66 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Timer for thinking duration
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isLoading) {
+      setThinkingStartTime(Date.now());
+      setElapsedTime(0);
+      interval = setInterval(() => {
+        setElapsedTime((prev) => prev + 100);
+      }, 100);
+    } else {
+      setThinkingStartTime(null);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading]);
+
+  // Format elapsed time as seconds with 1 decimal
+  const formatElapsedTime = (ms: number) => {
+    return (ms / 1000).toFixed(1) + 's';
+  };
+
+  // Handle message rating
+  const handleMessageRating = async (messageId: string, rating: 'up' | 'down') => {
+    const currentRating = messageRatings[messageId];
+    const newRating = currentRating === rating ? null : rating;
+
+    setMessageRatings((prev) => ({
+      ...prev,
+      [messageId]: newRating,
+    }));
+
+    // Find the message to get conversation context
+    const message = messages.find((m) => m.id === messageId);
+    if (!message || !currentConversationId) return;
+
+    try {
+      // Save rating to database via message metadata update
+      await supabase
+        .from('agent_chat_messages')
+        .update({
+          metadata: {
+            ...(message as any).metadata,
+            rating: newRating,
+            ratedAt: new Date().toISOString(),
+          },
+        })
+        .eq('conversation_id', currentConversationId)
+        .eq('content', message.content)
+        .eq('role', 'assistant');
+
+      toast({
+        title: newRating ? (newRating === 'up' ? '👍 Thanks!' : '👎 Thanks for the feedback') : 'Rating removed',
+        description: newRating ? 'Your feedback helps improve our AI responses.' : '',
+      });
+    } catch (error) {
+      console.error('Error saving rating:', error);
+    }
+  };
 
   // Filter agents based on user role
   const availableAgents = AGENTS.filter((agent) => {
@@ -931,9 +996,38 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         )}
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-muted-foreground">
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                      {/* Rating buttons for assistant messages */}
+                      {message.role === 'assistant' && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleMessageRating(message.id, 'up')}
+                            className={`p-1 rounded-md transition-all ${
+                              messageRatings[message.id] === 'up'
+                                ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                                : 'text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                            }`}
+                            title="Helpful response"
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleMessageRating(message.id, 'down')}
+                            className={`p-1 rounded-md transition-all ${
+                              messageRatings[message.id] === 'down'
+                                ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                : 'text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20'
+                            }`}
+                            title="Not helpful"
+                          >
+                            <ThumbsDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {message.role === 'user' && (
                     <div className="flex-shrink-0">
@@ -966,20 +1060,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   </div>
                   <div
-                    className="max-w-[70%] rounded-lg p-4 border-2 text-white"
+                    className="max-w-[70%] rounded-lg p-4 border-2"
                     style={{
                       background: 'var(--glass-bg)',
                       backdropFilter: 'var(--glass-blur)',
                       borderColor: 'hsl(var(--primary))'
                     }}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'hsl(var(--primary))', animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'hsl(var(--primary))', animationDelay: '150ms' }}></div>
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'hsl(var(--primary))', animationDelay: '300ms' }}></div>
                       </div>
-                      <span className="text-sm text-white/80">Thinking...</span>
+                      <span className="text-sm text-foreground">Thinking...</span>
+                      <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                        {formatElapsedTime(elapsedTime)}
+                      </span>
                     </div>
                   </div>
                 </div>
