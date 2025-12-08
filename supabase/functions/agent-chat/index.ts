@@ -104,22 +104,30 @@ const createSearchTool = (workspaceId: string) => {
     async ({ query, strategy = 'multi_vector', limit = 10 }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-        const response = await fetch(`${MIVAA_GATEWAY_URL}/search`, {
+        // Correct endpoint: /api/rag/search with strategy as query param
+        const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
+        url.searchParams.set('strategy', strategy);
+
+        console.log(`🔍 Material search: query="${query}", strategy="${strategy}", workspace="${workspaceId}"`);
+
+        const response = await fetch(url.toString(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             query,
             workspace_id: workspaceId,
-            search_type: strategy,
-            limit,
+            top_k: limit,
           }),
         });
 
         if (!response.ok) {
-          throw new Error(`MIVAA API error: ${response.statusText}`);
+          const errorText = await response.text();
+          console.error(`❌ MIVAA API error: ${response.status} - ${errorText}`);
+          throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
+        console.log(`✅ Search returned ${data.results?.length || 0} results`);
         return JSON.stringify(data);
       } catch (error) {
         console.error('Material search error:', error);
@@ -1389,11 +1397,24 @@ async function getUserWorkspaceId(userId: string): Promise<string | null> {
  */
 async function saveConversation(userId: string, agentId: string, messages: any[], response: string) {
   try {
+    // Get the last user message for the title
+    const lastUserMessage = messages.filter((m: any) => m.role === 'user').pop();
+    const title = lastUserMessage?.content?.substring(0, 100) || 'New conversation';
+
+    // Add the assistant response to the messages array
+    const fullMessages = [
+      ...messages,
+      { role: 'assistant', content: response, timestamp: new Date().toISOString() }
+    ];
+
     const { error } = await supabase.from('agent_chat_conversations').insert({
       user_id: userId,
       agent_id: agentId,
-      messages: messages,
-      response: response,
+      title: title,
+      messages: fullMessages,
+      message_count: fullMessages.length,
+      last_message_at: new Date().toISOString(),
+      is_archived: false,
       created_at: new Date().toISOString(),
     });
 
@@ -1409,9 +1430,12 @@ async function saveConversation(userId: string, agentId: string, messages: any[]
  * Main handler
  */
 serve(async (req) => {
-  // Handle CORS
+  // Handle CORS preflight - must return 200/204 with proper headers
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
   }
 
   try {
