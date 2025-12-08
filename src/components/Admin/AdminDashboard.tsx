@@ -98,16 +98,6 @@ const AdminDashboard: React.FC = () => {
         count: 'Extraction Data',
       },
     ],
-    'AI & Intelligence': [
-      {
-        title: 'Agent Configurations',
-        description: 'Manage AI agent system prompts and behavior settings',
-        icon: Bot,
-        path: '/admin/agent-configs',
-        status: 'active',
-        count: 'Agent Prompts',
-      },
-    ],
     'Data Management': [
       {
         title: 'Data Import Hub',
@@ -185,6 +175,14 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/analytics',
         status: 'active',
         count: 'Real-time',
+      },
+      {
+        title: 'Agent Configurations',
+        description: 'Manage AI agent system prompts and behavior settings',
+        icon: Bot,
+        path: '/admin/agent-configs',
+        status: 'active',
+        count: 'Agent Prompts',
       },
       {
         title: '3D Model Debugging',
