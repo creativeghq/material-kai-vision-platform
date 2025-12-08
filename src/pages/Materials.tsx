@@ -146,7 +146,7 @@ export const MaterialsPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <div className="container mx-auto py-8">
           <Card>
             <CardContent className="p-12">
@@ -164,7 +164,7 @@ export const MaterialsPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* Page Header */}
       <div className="bg-card py-6">
         <div className="page-container">

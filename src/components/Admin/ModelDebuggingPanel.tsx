@@ -273,7 +273,7 @@ const ModelDebuggingPanel: React.FC = () => {
   const untestedModels = models.filter((m) => m.status === 'untested').length;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="3D Model Debugging"
         description="Monitor and debug AI model performance for 3D generation"

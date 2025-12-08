@@ -189,7 +189,7 @@ export const MaterialSuggestionsPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="3D Material Suggestions"
         description="AI-powered material suggestions for 3D design and visualization"

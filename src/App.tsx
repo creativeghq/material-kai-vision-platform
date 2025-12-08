@@ -19,7 +19,7 @@ import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
 import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
-import AgentMLCoordination from './components/Admin/AgentMLCoordination';
+
 import { AgentConfigsPage } from './components/Admin/AgentConfigs';
 import { PromptTemplatesPage } from './components/Admin/PromptTemplates/PromptTemplatesPage';
 import { ExtractionPromptsPage } from './components/Admin/ExtractionPrompts/ExtractionPromptsPage';
@@ -214,18 +214,6 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <PDFDocumentDetails />
-                      </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/admin/agent-ml"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <Layout>
-                        <AgentMLCoordination />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

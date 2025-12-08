@@ -191,7 +191,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -201,7 +201,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
 
   if (!quote) {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen p-6">
         <Button variant="ghost" onClick={() => navigate('/quotes')} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Quotes
@@ -237,7 +237,7 @@ export const QuoteDetailCustomerPage: React.FC = () => {
   const canAcceptQuote = quote.status === 'quoted' && (!hasUpsells || allUpsellsDecided);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       {/* Page Header */}
       <div className="bg-card py-6">
         <div className="page-container">

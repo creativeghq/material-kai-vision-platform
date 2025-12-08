@@ -100,14 +100,6 @@ const AdminDashboard: React.FC = () => {
     ],
     'AI & Intelligence': [
       {
-        title: 'AI Settings Control',
-        description: 'Configure AI prompts, NLP patterns, extraction settings, and agent tools',
-        icon: Settings,
-        path: '/admin/agent-ml',
-        status: 'active',
-        count: 'AI Configuration',
-      },
-      {
         title: 'Agent Configurations',
         description: 'Manage AI agent system prompts and behavior settings',
         icon: Bot,

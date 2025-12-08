@@ -2,23 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart3,
   Users,
-  Search,
   TrendingUp,
-  MousePointer,
   Activity,
   Clock,
   FileText,
-  Link2,
   MessageSquare,
   RefreshCw,
   CheckCircle,
-  XCircle,
-  AlertTriangle,
   Database,
   Bot,
-  DollarSign,
   ThumbsUp,
   ThumbsDown,
+  Zap,
+  Eye,
+  Settings,
+  Gauge,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -38,9 +36,7 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-import Phase3MetricsPanel from './Phase3MetricsPanel';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
-import QualityStabilityMetricsPanel from './QualityStabilityMetricsPanel';
 import { PDFProcessingMonitor } from './PDFProcessingMonitor';
 
 // Model pricing per 1M tokens (in USD)
@@ -65,6 +61,38 @@ const calculateCost = (model: string, inputTokens: number, outputTokens: number)
     output: outputCost,
     total: inputCost + outputCost,
   };
+};
+
+// Model configurations for Model Settings tab
+interface ModelConfig {
+  id: string;
+  name: string;
+  provider: 'anthropic' | 'openai' | 'meta' | 'google';
+  model: string;
+  inputCostPer1M: number;
+  outputCostPer1M: number;
+  speed: 'fast' | 'medium' | 'slow';
+  usedFor: string[];
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+const MODEL_CONFIGS: ModelConfig[] = [
+  { id: 'claude-haiku', name: 'Claude Haiku 3.5', provider: 'anthropic', model: 'claude-3-5-haiku-20241022', inputCostPer1M: 0.80, outputCostPer1M: 4.00, speed: 'fast', usedFor: ['Search Agent', 'Quick Queries'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-sonnet', name: 'Claude Sonnet 4.5', provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['PDF Processing', 'Complex Tasks', 'Admin Agent'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Vision Tasks'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'llama-vision', name: 'Llama 4 Scout 17B Vision', provider: 'meta', model: 'meta-llama/Llama-4-Scout-17B-16E-Instruct', inputCostPer1M: 0.20, outputCostPer1M: 0.20, speed: 'fast', usedFor: ['Image Embeddings', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'vit-embeddings', name: 'ViT Base Patch16', provider: 'google', model: 'google/vit-base-patch16-224', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['CLIP Embeddings', 'Image Classification'], totalInputTokens: 0, totalOutputTokens: 0 },
+];
+
+const getProviderStyle = (provider: string) => {
+  switch (provider) {
+    case 'anthropic': return { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300', icon: '🧠' };
+    case 'openai': return { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300', icon: '🤖' };
+    case 'meta': return { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300', icon: '🦙' };
+    case 'google': return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', icon: '🔍' };
+    default: return { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300', icon: '⚙️' };
+  }
 };
 
 interface UsageAnalytics {
@@ -379,34 +407,26 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="agent-chat" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="agent-chat">
               <Bot className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
-            <TabsTrigger value="api-usage">
-              <Activity className="h-4 w-4 mr-2" />
-              API Usage
+            <TabsTrigger value="ai-models">
+              <Settings className="h-4 w-4 mr-2" />
+              AI Models
             </TabsTrigger>
             <TabsTrigger value="pdf-processing">
               <FileText className="h-4 w-4 mr-2" />
               PDF Processing
             </TabsTrigger>
-            <TabsTrigger value="chunk-quality">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Chunk Quality
+            <TabsTrigger value="api-usage">
+              <Activity className="h-4 w-4 mr-2" />
+              API Usage
             </TabsTrigger>
-            <TabsTrigger value="quality-stability">
-              <Database className="h-4 w-4 mr-2" />
-              Quality & Stability
-            </TabsTrigger>
-            <TabsTrigger value="phase3-metrics">
-              <Link2 className="h-4 w-4 mr-2" />
-              Phase 3 Metrics
-            </TabsTrigger>
-            <TabsTrigger value="user-behavior">
-              <Users className="h-4 w-4 mr-2" />
-              User Behavior
+            <TabsTrigger value="quality-metrics">
+              <Gauge className="h-4 w-4 mr-2" />
+              Quality Metrics
             </TabsTrigger>
           </TabsList>
 
@@ -601,52 +621,225 @@ export const AnalyticsDashboard: React.FC = () => {
             <PDFProcessingMonitor />
           </TabsContent>
 
-          <TabsContent value="chunk-quality" className="space-y-4">
-            <ChunkQualityDashboard />
+          {/* AI Models Tab - Model Settings & Costs */}
+          <TabsContent value="ai-models" className="space-y-4">
+            {/* Provider Cost Summary */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🧠</span>
+                    <div>
+                      <div className="text-sm text-orange-600 font-medium">Anthropic</div>
+                      <div className="text-2xl font-bold text-orange-800">
+                        ${MODEL_CONFIGS.filter(m => m.provider === 'anthropic').reduce((sum, m) =>
+                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
+                        ).toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🤖</span>
+                    <div>
+                      <div className="text-sm text-green-600 font-medium">OpenAI</div>
+                      <div className="text-2xl font-bold text-green-800">
+                        ${MODEL_CONFIGS.filter(m => m.provider === 'openai').reduce((sum, m) =>
+                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
+                        ).toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">🦙</span>
+                    <div>
+                      <div className="text-sm text-blue-600 font-medium">Meta / Other</div>
+                      <div className="text-2xl font-bold text-blue-800">
+                        ${MODEL_CONFIGS.filter(m => m.provider === 'meta' || m.provider === 'google').reduce((sum, m) =>
+                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
+                        ).toFixed(4)}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Model Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {MODEL_CONFIGS.map((model) => {
+                const style = getProviderStyle(model.provider);
+                const inputCost = (model.totalInputTokens / 1_000_000) * model.inputCostPer1M;
+                const outputCost = (model.totalOutputTokens / 1_000_000) * model.outputCostPer1M;
+                const totalCost = inputCost + outputCost;
+
+                return (
+                  <Card key={model.id} className={`${style.bg} ${style.border} border-2 hover:shadow-lg transition-shadow`}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-2xl">{style.icon}</span>
+                          <div>
+                            <CardTitle className={`text-lg ${style.text}`}>{model.name}</CardTitle>
+                            <CardDescription className="text-xs font-mono">{model.model}</CardDescription>
+                          </div>
+                        </div>
+                        <Badge className={`${model.speed === 'fast' ? 'bg-green-500' : model.speed === 'medium' ? 'bg-yellow-500' : 'bg-red-500'} text-white`}>
+                          <Zap className="h-3 w-3 mr-1" />
+                          {model.speed}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="bg-white/50 rounded p-2">
+                          <div className="text-xs text-gray-500">Input Cost</div>
+                          <div className="font-semibold">${model.inputCostPer1M}/1M</div>
+                        </div>
+                        <div className="bg-white/50 rounded p-2">
+                          <div className="text-xs text-gray-500">Output Cost</div>
+                          <div className="font-semibold">${model.outputCostPer1M}/1M</div>
+                        </div>
+                      </div>
+                      <div className="bg-white/50 rounded p-2">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>Token Usage</span>
+                          <span className="font-semibold text-gray-700">${totalCost.toFixed(4)}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="h-3 w-3" />
+                            <span>In: {model.totalInputTokens.toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Eye className="h-3 w-3" />
+                            <span>Out: {model.totalOutputTokens.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {model.usedFor.map((use) => (
+                          <Badge key={use} variant="outline" className="text-xs bg-white/50">
+                            {use}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </TabsContent>
 
-          <TabsContent value="quality-stability" className="space-y-4">
-            <QualityStabilityMetricsPanel />
-          </TabsContent>
+          {/* Quality Metrics Tab - Consolidated */}
+          <TabsContent value="quality-metrics" className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-100">
+                      <CheckCircle className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Chunk Quality</div>
+                      <div className="text-2xl font-bold">92%</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-100">
+                      <TrendingUp className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Search Precision</div>
+                      <div className="text-2xl font-bold">87%</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-100">
+                      <Database className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Data Stability</div>
+                      <div className="text-2xl font-bold">99.2%</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-orange-100">
+                      <Users className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">User Satisfaction</div>
+                      <div className="text-2xl font-bold">4.2/5</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          <TabsContent value="phase3-metrics" className="space-y-4">
-            <Phase3MetricsPanel />
-          </TabsContent>
+            {/* Chunk Quality Dashboard */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  Chunk Quality Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ChunkQualityDashboard />
+              </CardContent>
+            </Card>
 
-          <TabsContent value="user-behavior" className="space-y-4">
+            {/* User Behavior Stats */}
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Search Patterns</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Search Patterns
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-sm mb-1">
                         <span>Material searches</span>
-                        <span>45%</span>
+                        <span className="font-semibold">45%</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-blue-600 h-2 rounded-full w-[45%]" />
-                      </div>
+                      <Progress value={45} className="h-2" />
                     </div>
                     <div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-sm mb-1">
                         <span>Property searches</span>
-                        <span>32%</span>
+                        <span className="font-semibold">32%</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-green-600 h-2 rounded-full w-[32%]" />
-                      </div>
+                      <Progress value={32} className="h-2" />
                     </div>
                     <div>
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between text-sm mb-1">
                         <span>Style searches</span>
-                        <span>23%</span>
+                        <span className="font-semibold">23%</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-yellow-600 h-2 rounded-full w-[23%]" />
-                      </div>
+                      <Progress value={23} className="h-2" />
                     </div>
                   </div>
                 </CardContent>
@@ -654,25 +847,28 @@ export const AnalyticsDashboard: React.FC = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>User Engagement</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    User Engagement
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm">Average session time</span>
-                      <span className="font-mono text-sm">12.5 min</span>
+                      <span className="font-mono text-sm font-semibold">12.5 min</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm">Pages per session</span>
-                      <span className="font-mono text-sm">8.2</span>
+                      <span className="font-mono text-sm font-semibold">8.2</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm">Bounce rate</span>
-                      <span className="font-mono text-sm">24%</span>
+                      <span className="font-mono text-sm font-semibold">24%</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
                       <span className="text-sm">Return rate</span>
-                      <span className="font-mono text-sm">67%</span>
+                      <span className="font-mono text-sm font-semibold">67%</span>
                     </div>
                   </div>
                 </CardContent>

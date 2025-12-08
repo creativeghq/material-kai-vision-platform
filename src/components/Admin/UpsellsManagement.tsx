@@ -262,10 +262,10 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
       );
     }
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen">
         <GlobalAdminHeader title="Upsells Management" />
         <div className="flex items-center justify-center h-96">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
     );
@@ -413,7 +413,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Upsells Management"
         description="Manage upsell items that can be added to quotes"

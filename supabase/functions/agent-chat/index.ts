@@ -86,19 +86,48 @@ function getDefaultPrompt(agentType: string): string {
   return defaults[agentType] || 'You are a helpful assistant.';
 }
 
-// Initialize Claude model AT MODULE LOAD TIME
-// It will auto-read ANTHROPIC_API_KEY from process.env
-let model: ChatAnthropic;
+// Initialize Claude models AT MODULE LOAD TIME
+// Haiku for fast search queries, Sonnet for complex tasks
+let modelHaiku: ChatAnthropic;
+let modelSonnet: ChatAnthropic;
+
 try {
-  model = new ChatAnthropic({
-    model: 'claude-sonnet-4-5-20250929',  // Claude Sonnet 4.5
+  // Claude Haiku 3.5 - Fast model for search queries (~3-5 seconds)
+  modelHaiku = new ChatAnthropic({
+    model: 'claude-3-5-haiku-20241022',
+    temperature: 0.7,
+    maxTokens: 4096,
+  });
+  console.log('✅ Claude Haiku 3.5 model initialized (fast search)');
+
+  // Claude Sonnet 4.5 - Full model for complex tasks
+  modelSonnet = new ChatAnthropic({
+    model: 'claude-sonnet-4-5-20250929',
     temperature: 1,
     maxTokens: 4096,
   });
-  console.log('✅ LangChain ChatAnthropic model initialized');
+  console.log('✅ Claude Sonnet 4.5 model initialized (complex tasks)');
 } catch (error) {
-  console.error('❌ Failed to initialize ChatAnthropic:', error);
+  console.error('❌ Failed to initialize ChatAnthropic models:', error);
   throw error;
+}
+
+// Model selection based on agent type
+function getModelForAgent(agentId: string): ChatAnthropic {
+  // Search agent uses fast Haiku model
+  if (agentId === 'search') {
+    return modelHaiku;
+  }
+  // All other agents use Sonnet for complex reasoning
+  return modelSonnet;
+}
+
+// Get model name for logging/tracking
+function getModelNameForAgent(agentId: string): string {
+  if (agentId === 'search') {
+    return 'claude-3-5-haiku-20241022';
+  }
+  return 'claude-sonnet-4-5-20250929';
 }
 
 /**
@@ -1157,6 +1186,7 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
 
 /**
  * Execute agent with tools using LangChain
+ * Returns { text, materialResults } where materialResults contains search products
  */
 async function executeAgent(
   agentId: string,
@@ -1165,11 +1195,14 @@ async function executeAgent(
   userInput: string,
   messages: any[],
   pdfFile?: { name: string; base64: string; category: string }
-) {
+): Promise<{ text: string; materialResults?: { products: any[]; images?: Record<string, string>; title?: string } }> {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
   }
+
+  // Collect material results from search tool calls
+  let collectedProducts: any[] = [];
 
   // Load system prompt from database (or use hardcoded fallback)
   const systemPrompt = config.systemPrompt || await getAgentSystemPrompt(agentId);
@@ -1180,15 +1213,15 @@ async function executeAgent(
 
     // Detect what demo data to return based on keywords
     if (lowerInput.includes('cement') || lowerInput.includes('tile') || lowerInput.includes('grey')) {
-      return "I found 5 cement-based tiles in grey color. These are perfect for modern interiors.\n\nDEMO_DATA: {\"data\":{\"command\":\"cement_tiles\"}}";
+      return { text: "I found 5 cement-based tiles in grey color. These are perfect for modern interiors.\n\nDEMO_DATA: {\"data\":{\"command\":\"cement_tiles\"}}" };
     } else if (lowerInput.includes('wood') || lowerInput.includes('green') || lowerInput.includes('egger')) {
-      return "Here are 5 Egger wood materials in green tones, ideal for sustainable projects.\n\nDEMO_DATA: {\"data\":{\"command\":\"green_wood\"}}";
+      return { text: "Here are 5 Egger wood materials in green tones, ideal for sustainable projects.\n\nDEMO_DATA: {\"data\":{\"command\":\"green_wood\"}}" };
     } else if (lowerInput.includes('heat') || lowerInput.includes('pump') || lowerInput.includes('hvac')) {
-      return "Here's a comparison of our heat pump models.\n\nDEMO_DATA: {\"data\":{\"command\":\"heat_pumps\"}}";
+      return { text: "Here's a comparison of our heat pump models.\n\nDEMO_DATA: {\"data\":{\"command\":\"heat_pumps\"}}" };
     } else if (lowerInput.includes('3d') || lowerInput.includes('design') || lowerInput.includes('room')) {
-      return "Here's a modern living room 3D design.\n\nDEMO_DATA: {\"data\":{\"command\":\"3d_design\"}}";
+      return { text: "Here's a modern living room 3D design.\n\nDEMO_DATA: {\"data\":{\"command\":\"3d_design\"}}" };
     } else {
-      return "I can show you demo materials. Try asking for:\n- Cement tiles\n- Green wood materials\n- Heat pumps\n- 3D room designs";
+      return { text: "I can show you demo materials. Try asking for:\n- Cement tiles\n- Green wood materials\n- Heat pumps\n- 3D room designs" };
     }
   }
 
@@ -1253,8 +1286,13 @@ async function executeAgent(
     tools.push(createCostEstimationTool(workspaceId));
   }
 
+  // Select model based on agent type (Haiku for search, Sonnet for complex tasks)
+  const selectedModel = getModelForAgent(agentId);
+  const modelName = getModelNameForAgent(agentId);
+  console.log(`🤖 Using model: ${modelName} for agent: ${agentId}`);
+
   // Bind tools to model if any tools are configured
-  const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
+  const modelWithTools = tools.length > 0 ? selectedModel.bindTools(tools) : selectedModel;
 
   // Agent loop: handle tool calls iteratively
   const maxIterations = 10;
@@ -1281,6 +1319,7 @@ async function executeAgent(
     if (!response.tool_calls || response.tool_calls.length === 0) {
       // No tool calls - extract final text response
       console.log('✅ Agent finished - no more tool calls');
+      console.log(`📦 Collected ${collectedProducts.length} products total`);
 
       let textContent: string;
       if (typeof response.content === 'string') {
@@ -1298,7 +1337,10 @@ async function executeAgent(
         textContent = String(response.content);
       }
 
-      return textContent;
+      return {
+        text: textContent,
+        materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined
+      };
     }
 
     // Execute tool calls
@@ -1317,6 +1359,50 @@ async function executeAgent(
         // Execute the tool
         const toolResult = await tool.invoke(toolCall.args);
         console.log(`  ✅ Tool ${toolCall.name} completed`);
+
+        // Capture search results for materialResults
+        if (toolCall.name === 'material_search') {
+          try {
+            const resultStr = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+            const searchData = JSON.parse(resultStr);
+            if (searchData.results && Array.isArray(searchData.results)) {
+              // Transform search results to Product interface format for ProductStrip
+              const products = searchData.results.map((r: any) => {
+                const imageUrl = r.image_url || r.thumbnail || r.metadata?.image_url || r.metadata?.thumbnail;
+                return {
+                  id: r.id || r.product_id || `product-${Date.now()}-${Math.random()}`,
+                  sku: r.sku || r.metadata?.sku || '',
+                  name: r.name || r.title || r.product_name || 'Unnamed Product',
+                  description: r.description || r.content || '',
+                  category: r.category || r.metadata?.category || 'materials',
+                  type: r.type || r.metadata?.material_type || 'general',
+                  status: 'active',
+                  images: imageUrl ? [{ url: imageUrl, alt: r.name || 'Product image', isPrimary: true }] : [],
+                  metadata: {
+                    ...r.metadata,
+                    factory_name: r.factory || r.metadata?.factory || r.metadata?.factory_name || r.manufacturer,
+                    score: r.score || r.similarity_score,
+                  },
+                  pricing: {
+                    retail: r.price || r.metadata?.price || 0,
+                    wholesale: r.wholesale_price || r.metadata?.wholesale_price || 0,
+                    currency: r.currency || r.metadata?.currency || 'EUR',
+                  },
+                  stock: {
+                    quantity: r.stock || r.metadata?.stock || 0,
+                    status: 'available',
+                    unit: r.unit || r.metadata?.unit || 'piece',
+                  },
+                  tags: r.tags || r.metadata?.tags || [],
+                };
+              });
+              collectedProducts = [...collectedProducts, ...products];
+              console.log(`  📦 Collected ${products.length} products from search`);
+            }
+          } catch (parseError) {
+            console.warn('  ⚠️ Could not parse search results:', parseError);
+          }
+        }
 
         // Add tool result to messages
         currentMessages.push({
@@ -1341,7 +1427,10 @@ async function executeAgent(
 
   // Max iterations reached
   console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
-  return 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.';
+  return {
+    text: 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.',
+    materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined
+  };
 }
 
 /**
@@ -1445,7 +1534,7 @@ serve(async (req) => {
 
   try {
     // Get request body
-    const { messages, agentId = 'search', model: requestedModel, images, pdfFile } = await req.json();
+    const { messages, agentId = 'search', pdfFile } = await req.json();
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -1514,15 +1603,17 @@ After uploading, monitor the processing job and verify completion.`;
     // Execute agent
     const result = await executeAgent(agentId, workspaceId, user.id, userInput, anthropicMessages, pdfFile);
 
-    // Save conversation
-    await saveConversation(user.id, agentId, messages, result);
+    // Save conversation (pass just the text)
+    await saveConversation(user.id, agentId, messages, result.text);
 
-    // Return response
+    // Return response with materialResults for ProductStrip display
+    const modelUsed = getModelNameForAgent(agentId);
     return new Response(
       JSON.stringify({
-        text: result,
+        text: result.text,
         agentId,
-        model: 'claude-sonnet-4-20250514',
+        model: modelUsed,
+        materialResults: result.materialResults,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

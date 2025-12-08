@@ -497,7 +497,7 @@ const PackagesPanel: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Package Management"
         description="Monitor and manage system dependencies across NodeJS and MIVAA services"
