@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "@anthropic-ai/sdk": "npm:@anthropic-ai/sdk",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "http/": "https://deno.land/std@0.168.0/http/"
+  }
+}
+
