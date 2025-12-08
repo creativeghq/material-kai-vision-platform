@@ -37,14 +37,14 @@ console.log('🔑 Environment variables loaded:', {
 console.log('✅ process.env polyfill set up for npm packages');
 
 // NOW import dependencies (after polyfill is set up)
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { serve } from 'http/server.ts';
+import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// LangChain imports - using esm.sh with external flag to avoid bundling issues
-import { ChatAnthropic } from 'https://esm.sh/@langchain/anthropic@0.3.5';
-import { tool } from 'https://esm.sh/@langchain/core@0.3.17/tools';
-import { z } from 'https://esm.sh/zod@3.23.8';
+// LangChain imports - using bare imports resolved by deno.json
+import { ChatAnthropic } from '@langchain/anthropic';
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
