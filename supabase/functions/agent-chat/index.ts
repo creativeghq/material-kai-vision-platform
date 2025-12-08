@@ -41,10 +41,10 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// LangChain imports - using esm.sh for better reliability in Deno
-import { ChatAnthropic } from 'https://esm.sh/@langchain/anthropic@0.3.11';
-import { tool } from 'https://esm.sh/@langchain/core@0.3.29/tools';
-import { z } from 'https://esm.sh/zod@3.24.1';
+// LangChain imports - using npm: specifier for Deno native npm support
+import { ChatAnthropic } from 'npm:@langchain/anthropic@0.3.11';
+import { tool } from 'npm:@langchain/core@0.3.29/tools';
+import { z } from 'npm:zod@3.24.1';
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
