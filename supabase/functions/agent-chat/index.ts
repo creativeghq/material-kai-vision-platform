@@ -88,13 +88,18 @@ function getDefaultPrompt(agentType: string): string {
 
 // Initialize Claude model AT MODULE LOAD TIME
 // It will auto-read ANTHROPIC_API_KEY from process.env
-const model = new ChatAnthropic({
-  model: 'claude-sonnet-4-20250514',
-  temperature: 1,
-  maxTokens: 4096,
-});
-
-console.log('✅ LangChain ChatAnthropic model initialized');
+let model: ChatAnthropic;
+try {
+  model = new ChatAnthropic({
+    model: 'claude-sonnet-4-5-20250929',  // Claude Sonnet 4.5
+    temperature: 1,
+    maxTokens: 4096,
+  });
+  console.log('✅ LangChain ChatAnthropic model initialized');
+} catch (error) {
+  console.error('❌ Failed to initialize ChatAnthropic:', error);
+  throw error;
+}
 
 /**
  * LangChain Tool: Material Search using MIVAA API
