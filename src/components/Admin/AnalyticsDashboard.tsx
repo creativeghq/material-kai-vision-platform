@@ -17,6 +17,7 @@ import {
   Eye,
   Settings,
   Gauge,
+  Search,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
