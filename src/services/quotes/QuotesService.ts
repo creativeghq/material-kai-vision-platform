@@ -386,17 +386,33 @@ export class QuotesService {
    * Submit quote (convert to quote request)
    */
   async submitQuote(quoteId: string, notes?: string): Promise<void> {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Get the quote to retrieve workspace_id
+    const { data: quote, error: quoteError } = await supabase
+      .from('quotes')
+      .select('workspace_id, items:quote_items(count)')
+      .eq('id', quoteId)
+      .single();
+
+    if (quoteError) throw quoteError;
+
     // Update quote status
     await this.updateQuote(quoteId, {
       status: 'submitted',
       notes: notes,
     });
 
-    // Create quote request
+    // Create quote request with user_id
     const { error } = await supabase
       .from('quote_requests')
       .insert({
         quote_id: quoteId,
+        user_id: user.id,
+        workspace_id: quote?.workspace_id,
+        items_count: quote?.items?.[0]?.count || 0,
         status: 'pending',
         notes: notes,
       });
@@ -734,6 +750,28 @@ export class QuotesService {
     if (error) throw error;
 
     return extrasTotal;
+  }
+
+  /**
+   * Reset upsell decision (set customer_accepted back to null)
+   */
+  async resetUpsellDecision(quoteUpsellId: string): Promise<QuoteUpsell> {
+    const { data, error } = await supabase
+      .from('quote_upsells')
+      .update({
+        customer_accepted: null,
+        decided_at: null,
+      })
+      .eq('id', quoteUpsellId)
+      .select('*, upsell:upsells(*)')
+      .single();
+
+    if (error) throw error;
+
+    // Recalculate extras_total for the quote
+    await this.recalculateQuoteExtrasTotal(data.quote_id);
+
+    return data;
   }
 
   /**

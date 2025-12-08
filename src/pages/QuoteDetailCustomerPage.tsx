@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone, RotateCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +76,28 @@ export const QuoteDetailCustomerPage: React.FC = () => {
       toast({
         title: 'Error',
         description: 'Failed to update extra',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingUpsell(null);
+    }
+  };
+
+  // Handle reset upsell decision
+  const handleResetUpsellDecision = async (quoteUpsellId: string) => {
+    try {
+      setUpdatingUpsell(quoteUpsellId);
+      await quotesService.resetUpsellDecision(quoteUpsellId);
+      toast({
+        title: 'Decision Reset',
+        description: 'You can now reconsider this extra',
+      });
+      await loadQuoteDetails();
+    } catch (error) {
+      console.error('Error resetting upsell decision:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to reset decision',
         variant: 'destructive',
       });
     } finally {
@@ -518,45 +540,64 @@ export const QuoteDetailCustomerPage: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* Accept/Reject Buttons - show for all statuses except accepted/rejected */}
+                            {/* Accept/Reject Buttons - only show when quote is not finalized */}
                             {quote.status !== 'accepted' && quote.status !== 'rejected' && (
                               <div className="flex items-center gap-2 ml-4">
-                                <Button
-                                  size="sm"
-                                  variant={qu.customer_accepted === false ? 'default' : 'outline'}
-                                  className={qu.customer_accepted === false
-                                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                                    : 'border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700'}
-                                  onClick={() => handleUpsellDecision(qu.id, false)}
-                                  disabled={isUpdating}
-                                >
-                                  {isUpdating ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <X className="h-4 w-4 mr-1" />
-                                      Reject
-                                    </>
-                                  )}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant={qu.customer_accepted === true ? 'default' : 'outline'}
-                                  className={qu.customer_accepted === true
-                                    ? 'bg-green-600 hover:bg-green-700 text-white'
-                                    : 'border-green-300 text-green-600 hover:bg-green-100 hover:text-green-700'}
-                                  onClick={() => handleUpsellDecision(qu.id, true)}
-                                  disabled={isUpdating}
-                                >
-                                  {isUpdating ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <>
-                                      <Check className="h-4 w-4 mr-1" />
-                                      Accept
-                                    </>
-                                  )}
-                                </Button>
+                                {/* If already decided, show reset button only */}
+                                {isDecided ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-muted-foreground/30 text-muted-foreground hover:bg-muted"
+                                    onClick={() => handleResetUpsellDecision(qu.id)}
+                                    disabled={isUpdating}
+                                  >
+                                    {isUpdating ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <RotateCcw className="h-4 w-4 mr-1" />
+                                        Change
+                                      </>
+                                    )}
+                                  </Button>
+                                ) : (
+                                  /* Show accept/reject buttons when not yet decided */
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-300 text-red-600 hover:bg-red-100 hover:text-red-700"
+                                      onClick={() => handleUpsellDecision(qu.id, false)}
+                                      disabled={isUpdating}
+                                    >
+                                      {isUpdating ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <X className="h-4 w-4 mr-1" />
+                                          Reject
+                                        </>
+                                      )}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-green-300 text-green-600 hover:bg-green-100 hover:text-green-700"
+                                      onClick={() => handleUpsellDecision(qu.id, true)}
+                                      disabled={isUpdating}
+                                    >
+                                      {isUpdating ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <Check className="h-4 w-4 mr-1" />
+                                          Accept
+                                        </>
+                                      )}
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             )}
                           </div>
