@@ -14,6 +14,7 @@ import {
   X,
   ShoppingCart,
   Check,
+  Ruler,
 } from 'lucide-react';
 
 import {
@@ -34,6 +35,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService } from '@/services/quotes/QuotesService';
@@ -47,8 +55,36 @@ interface ProductWithImage {
   image_url?: string;
 }
 
+// Helper to extract available sizes from product metadata
+const getAvailableSizes = (metadata?: Record<string, any>): string[] => {
+  if (!metadata) return [];
+
+  const sizes: string[] = [];
+  const availableSizes = metadata.available_sizes || metadata.dimensions || [];
+
+  if (Array.isArray(availableSizes)) {
+    availableSizes.forEach((d: unknown) => {
+      if (typeof d === 'object' && d !== null) {
+        const dim = d as Record<string, unknown>;
+        if (dim.width && dim.height) {
+          const unit = dim.unit || 'cm';
+          sizes.push(`${dim.width}×${dim.height}${dim.depth ? `×${dim.depth}` : ''} ${unit}`);
+        }
+      } else if (typeof d === 'string') {
+        sizes.push(d);
+      }
+    });
+  } else if (typeof availableSizes === 'string') {
+    // Split comma-separated sizes
+    sizes.push(...availableSizes.split(',').map(s => s.trim()).filter(Boolean));
+  }
+
+  return sizes;
+};
+
 interface SelectedProduct extends ProductWithImage {
   quantity: number;
+  selectedSize?: string; // Selected tile size
 }
 
 interface AddProductsSheetProps {
@@ -106,7 +142,12 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
   // Add product to selection
   const handleSelectProduct = useCallback((product: ProductWithImage) => {
-    setSelectedProducts(prev => [...prev, { ...product, quantity: 1 }]);
+    const sizes = getAvailableSizes(product.metadata);
+    setSelectedProducts(prev => [...prev, {
+      ...product,
+      quantity: 1,
+      selectedSize: sizes.length > 0 ? sizes[0] : undefined
+    }]);
     setSearchQuery('');
     setSearchResults([]);
   }, []);
@@ -117,6 +158,17 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
       prev.map(p =>
         p.id === productId
           ? { ...p, quantity: Math.max(1, p.quantity + delta) }
+          : p
+      )
+    );
+  }, []);
+
+  // Update selected size
+  const handleSizeChange = useCallback((productId: string, size: string) => {
+    setSelectedProducts(prev =>
+      prev.map(p =>
+        p.id === productId
+          ? { ...p, selectedSize: size }
           : p
       )
     );
@@ -134,13 +186,15 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     try {
       setAdding(true);
 
-      // Add each product to the quote
+      // Add each product to the quote with size info in notes
       for (const product of selectedProducts) {
+        const notes = product.selectedSize ? `Size: ${product.selectedSize}` : undefined;
         await quotesService.addItem({
           quote_id: quoteId,
           product_id: product.id,
           quantity: product.quantity,
           added_from: 'manual',
+          notes,
         });
       }
 
@@ -226,8 +280,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                     const metadata = product.metadata || {};
                     const manufacturer = metadata.manufacturer || metadata.brand || metadata.factory;
                     const collection = metadata.collection || metadata.series;
-                    const material = metadata.material_type || metadata.material;
-                    const color = metadata.color || metadata.primary_color;
+                    const availableSizes = getAvailableSizes(metadata);
 
                     return (
                       <button
@@ -261,14 +314,10 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                                 {product.sku}
                               </span>
                             )}
-                            {material && (
-                              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                {material}
-                              </span>
-                            )}
-                            {color && (
-                              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                {color}
+                            {availableSizes.length > 0 && (
+                              <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <Ruler className="h-3 w-3" />
+                                {availableSizes.length} size{availableSizes.length !== 1 ? 's' : ''}
                               </span>
                             )}
                           </div>
@@ -303,12 +352,15 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                     <TableRow>
                       <TableHead className="w-16">Image</TableHead>
                       <TableHead>Product</TableHead>
-                      <TableHead className="w-32 text-center">Quantity</TableHead>
-                      <TableHead className="w-12"></TableHead>
+                      <TableHead className="w-36">Size</TableHead>
+                      <TableHead className="w-28 text-center">Qty</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedProducts.map((product) => (
+                    {selectedProducts.map((product) => {
+                      const availableSizes = getAvailableSizes(product.metadata);
+                      return (
                       <TableRow key={product.id}>
                         <TableCell>
                           <div className="w-12 h-12 rounded bg-muted overflow-hidden">
@@ -326,7 +378,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                           </div>
                         </TableCell>
                         <TableCell>
-                          <p className="font-medium text-sm truncate max-w-[150px]">
+                          <p className="font-medium text-sm truncate max-w-[120px]">
                             {product.name || 'Unnamed Product'}
                           </p>
                           {product.sku && (
@@ -334,7 +386,28 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center justify-center gap-2">
+                          {availableSizes.length > 0 ? (
+                            <Select
+                              value={product.selectedSize || availableSizes[0]}
+                              onValueChange={(value) => handleSizeChange(product.id, value)}
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select size" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableSizes.map((size) => (
+                                  <SelectItem key={size} value={size} className="text-xs">
+                                    {size}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">N/A</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="outline"
                               size="icon"
@@ -343,7 +416,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                             >
                               <Minus className="h-3 w-3" />
                             </Button>
-                            <span className="w-8 text-center font-medium">{product.quantity}</span>
+                            <span className="w-6 text-center font-medium text-sm">{product.quantity}</span>
                             <Button
                               variant="outline"
                               size="icon"
@@ -365,7 +438,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </ScrollArea>

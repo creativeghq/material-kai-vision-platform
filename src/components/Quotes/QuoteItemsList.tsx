@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Package, Plus, Eye, ChevronRight, Trash2, Minus } from 'lucide-react';
+import { Package, Plus, Eye, ChevronRight, Trash2, Minus, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -7,6 +7,13 @@ import { Input } from '@/components/ui/input';
 import { QuoteItemWithProduct } from '@/services/quotes/QuotesService';
 import { ProductDetailModal } from '@/components/Products/ProductDetailModal';
 import { Product, SimpleProduct } from '@/components/Products/types';
+
+// Helper to extract size from notes (format: "Size: 15×38 cm")
+const extractSizeFromNotes = (notes?: string | null): string | null => {
+  if (!notes) return null;
+  const match = notes.match(/Size:\s*(.+)/i);
+  return match ? match[1].trim() : null;
+};
 
 interface QuoteItemsListProps {
   items: QuoteItemWithProduct[];
@@ -92,7 +99,9 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
     }
   };
 
-  const renderCompactItem = (item: QuoteItemWithProduct) => (
+  const renderCompactItem = (item: QuoteItemWithProduct) => {
+    const selectedSize = extractSizeFromNotes(item.notes);
+    return (
     <div
       key={item.id}
       className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"
@@ -115,9 +124,17 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
         </div>
         <div>
           <p className="font-medium">{item.product?.name || 'Unknown Product'}</p>
-          {item.product?.sku && (
-            <p className="text-xs text-muted-foreground">SKU: {item.product.sku}</p>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {item.product?.sku && (
+              <span className="text-xs text-muted-foreground">SKU: {item.product.sku}</span>
+            )}
+            {selectedSize && (
+              <span className="text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Ruler className="h-3 w-3" />
+                {selectedSize}
+              </span>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-3">
@@ -175,9 +192,12 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
         <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </div>
-  );
+    );
+  };
 
-  const renderDetailedItem = (item: QuoteItemWithProduct, index: number) => (
+  const renderDetailedItem = (item: QuoteItemWithProduct, index: number) => {
+    const selectedSize = extractSizeFromNotes(item.notes);
+    return (
     <div
       key={item.id}
       className="flex items-start gap-4 p-4 border rounded-lg bg-card hover:shadow-md transition-all cursor-pointer group"
@@ -277,15 +297,19 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
           </div>
         </div>
 
-        {/* Item Notes */}
-        {item.notes && (
-          <div className="mt-3 p-3 bg-muted/30 rounded border">
-            <p className="text-sm text-muted-foreground">{item.notes}</p>
+        {/* Item Notes - show size badge instead of raw notes */}
+        {selectedSize && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded flex items-center gap-1">
+              <Ruler className="h-3 w-3" />
+              Size: {selectedSize}
+            </span>
           </div>
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <>

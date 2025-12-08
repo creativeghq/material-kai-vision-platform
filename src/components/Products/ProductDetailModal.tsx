@@ -98,9 +98,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const factory = allData?.factory_name || allData?.factory_group_name || 'Unknown Factory';
   const origin = allData?.origin || allData?.country_of_origin || '';
   const collection = designData?.collection || allData?.collection || '';
-  const size = Array.isArray(dimensionsData) && dimensionsData.length > 0
-    ? dimensionsData.map((d: unknown) => typeof d === 'object' ? JSON.stringify(d) : String(d)).join(', ')
-    : 'N/A';
+
+  // Extract tile dimensions from available_sizes or dimensions (not page_range!)
+  const availableSizes = allData?.available_sizes || dimensionsData || [];
+  const size = Array.isArray(availableSizes) && availableSizes.length > 0
+    ? availableSizes.map((d: unknown) => {
+        if (typeof d === 'object' && d !== null) {
+          const dim = d as Record<string, unknown>;
+          // Format: width x height (e.g., "15×38 cm")
+          if (dim.width && dim.height) {
+            const unit = dim.unit || 'cm';
+            return `${dim.width}×${dim.height}${dim.depth ? `×${dim.depth}` : ''} ${unit}`;
+          }
+          return JSON.stringify(d);
+        }
+        return String(d);
+      }).join(', ')
+    : extractValue(allData?.dimensions) || 'N/A';
   const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
   const finish = extractValue(materialPropsData?.finish) || 'N/A';
   const material = allData?.material_category || product.type || 'N/A';
@@ -117,8 +131,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const dimensions = {
-    'Size': size,
-    'Page Range': allData?.page_range?.join(' - ') || undefined
+    'Available Sizes': size,
+    'Thickness': thickness !== 'N/A' ? thickness : undefined,
   };
 
   const appearance = {
