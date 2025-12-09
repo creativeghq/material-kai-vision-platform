@@ -330,18 +330,20 @@ export const AnalyticsDashboard: React.FC = () => {
     description: string;
     trend?: number;
   }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+    <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
+          <Icon className="h-4 w-4 text-primary" />
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">{description}</p>
+        <div className="text-3xl font-bold text-slate-900">{value}</div>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-xs text-slate-500">{description}</p>
           {trend !== undefined && (
             <Badge
-              className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
+              className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800 border-green-300' : trend < 0 ? 'bg-red-100 text-red-800 border-red-300' : 'bg-slate-100 text-slate-800 border-slate-300'}`}
             >
               {trend > 0 ? '+' : ''}
               {trend}%
@@ -366,7 +368,7 @@ export const AnalyticsDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       <GlobalAdminHeader
         title="Analytics Dashboard"
         description="Comprehensive analytics: search, API usage, PDF processing, chunk quality, and validation metrics"
@@ -445,14 +447,14 @@ export const AnalyticsDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 {/* Summary Stats */}
-                <div className="grid grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Total Chats</div>
-                    <div className="text-2xl font-bold">{agentChats.length}</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
+                    <div className="text-sm text-slate-600">Total Chats</div>
+                    <div className="text-2xl font-bold text-slate-900">{agentChats.length}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Avg Response Time</div>
-                    <div className="text-2xl font-bold">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
+                    <div className="text-sm text-slate-600">Avg Response Time</div>
+                    <div className="text-2xl font-bold text-slate-900">
                       {agentChats.length > 0
                         ? `${Math.round(
                             agentChats
@@ -463,14 +465,14 @@ export const AnalyticsDashboard: React.FC = () => {
                         : '0ms'}
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Positive Ratings</div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
+                    <div className="text-sm text-green-700">Positive Ratings</div>
                     <div className="text-2xl font-bold text-green-600">
                       {agentChats.filter((c) => c.metadata?.rating === 'up').length}
                     </div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500">Est. Total Cost</div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
+                    <div className="text-sm text-blue-700">Est. Total Cost</div>
                     <div className="text-2xl font-bold text-blue-600">
                       ${agentChats
                         .reduce((sum, chat) => {
@@ -742,55 +744,55 @@ export const AnalyticsDashboard: React.FC = () => {
           {/* Quality Metrics Tab - Consolidated */}
           <TabsContent value="quality-metrics" className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-4 gap-4">
-              <Card>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100">
+                    <div className="p-2 rounded-lg bg-blue-100 border border-blue-200">
                       <CheckCircle className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Chunk Quality</div>
-                      <div className="text-2xl font-bold">92%</div>
+                      <div className="text-sm text-slate-600">Chunk Quality</div>
+                      <div className="text-2xl font-bold text-slate-900">92%</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-100">
+                    <div className="p-2 rounded-lg bg-green-100 border border-green-200">
                       <TrendingUp className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Search Precision</div>
-                      <div className="text-2xl font-bold">87%</div>
+                      <div className="text-sm text-slate-600">Search Precision</div>
+                      <div className="text-2xl font-bold text-slate-900">87%</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-100">
+                    <div className="p-2 rounded-lg bg-purple-100 border border-purple-200">
                       <Database className="h-5 w-5 text-purple-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">Data Stability</div>
-                      <div className="text-2xl font-bold">99.2%</div>
+                      <div className="text-sm text-slate-600">Data Stability</div>
+                      <div className="text-2xl font-bold text-slate-900">99.2%</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-orange-100">
+                    <div className="p-2 rounded-lg bg-orange-100 border border-orange-200">
                       <Users className="h-5 w-5 text-orange-600" />
                     </div>
                     <div>
-                      <div className="text-sm text-gray-500">User Satisfaction</div>
-                      <div className="text-2xl font-bold">4.2/5</div>
+                      <div className="text-sm text-slate-600">User Satisfaction</div>
+                      <div className="text-2xl font-bold text-slate-900">4.2/5</div>
                     </div>
                   </div>
                 </CardContent>
