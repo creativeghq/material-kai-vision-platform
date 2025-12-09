@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Users, Building2, Plus, Edit, Trash2, Search, Mail, Shield, CreditCard, Key } from 'lucide-react';
 
 import {
   Card,
@@ -20,18 +20,37 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { AdminStatCard } from './AdminStatCard';
+import { usersAPI, contactsAPI } from '@/services/crm.service';
 
-interface UserProfile {
+interface UserWithAuth {
   id: string;
   user_id: string;
-  role_id: string;
-  subscription_tier: string;
-  status: string;
+  email: string;
+  role_id?: string;
+  subscription_tier?: string;
+  status?: string;
+  credits?: number;
   created_at: string;
-  roles?: { name: string; level: number };
+  roles?: { id: string; name: string; level: number };
 }
 
 interface Contact {
@@ -44,6 +63,12 @@ interface Contact {
   created_at: string;
 }
 
+interface Role {
+  id: string;
+  name: string;
+  level: number;
+}
+
 /**
  * CRM Management Component
  * Handles user management and CRM contacts
@@ -51,24 +76,58 @@ interface Contact {
 export const CRMManagement: React.FC = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [userStats, setUserStats] = useState({
     total: 0,
     active: 0,
     inactive: 0,
   });
+
+  // User modal state
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserWithAuth | null>(null);
+  const [userEmail, setUserEmail] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userDisplayName, setUserDisplayName] = useState('');
+  const [userRoleId, setUserRoleId] = useState('');
+  const [userSubscription, setUserSubscription] = useState('free');
+  const [userStatus, setUserStatus] = useState('active');
+  const [userCredits, setUserCredits] = useState(0);
+
+  // Contact modal state
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Load users directly from Supabase
+  // Load roles
+  const loadRoles = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('roles')
+        .select('id, name, level')
+        .order('level', { ascending: true});
+
+      if (error) throw error;
+      setRoles(data || []);
+    } catch (error: any) {
+      console.error('Error loading roles:', error);
+    }
+  };
+
+  // Load users from auth.users and join with user_profiles
   const loadUsers = async () => {
     try {
       setLoading(true);
 
-      // Fetch user profiles with role information
-      const { data, error } = await supabase
+      // Fetch all auth users
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+
+      if (authError) throw authError;
+
+      // Fetch all user profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from('user_profiles')
         .select(`
           id,
@@ -78,24 +137,46 @@ export const CRMManagement: React.FC = () => {
           status,
           created_at,
           roles (
+            id,
             name,
             level
           )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(100);
+        `);
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      setUsers(data || []);
+      // Fetch user credits
+      const { data: creditsData, error: creditsError } = await supabase
+        .from('user_credits')
+        .select('user_id, balance');
+
+      if (creditsError) console.error('Error loading credits:', creditsError);
+
+      // Merge auth users with profiles and credits
+      const mergedUsers: UserWithAuth[] = authData.users.map((authUser) => {
+        const profile = profilesData?.find((p) => p.user_id === authUser.id);
+        const credits = creditsData?.find((c) => c.user_id === authUser.id);
+
+        return {
+          id: profile?.id || authUser.id,
+          user_id: authUser.id,
+          email: authUser.email || '',
+          role_id: profile?.role_id,
+          subscription_tier: profile?.subscription_tier || 'free',
+          status: profile?.status || 'active',
+          credits: credits?.balance || 0,
+          created_at: authUser.created_at,
+          roles: profile?.roles,
+        };
+      });
+
+      setUsers(mergedUsers);
 
       // Calculate stats
       const stats = {
-        total: data?.length || 0,
-        active:
-          data?.filter((u: UserProfile) => u.status === 'active').length || 0,
-        inactive:
-          data?.filter((u: UserProfile) => u.status === 'inactive').length || 0,
+        total: mergedUsers.length,
+        active: mergedUsers.filter((u) => u.status === 'active').length,
+        inactive: mergedUsers.filter((u) => u.status === 'inactive').length,
       };
       setUserStats(stats);
     } catch (error: any) {
@@ -165,6 +246,7 @@ export const CRMManagement: React.FC = () => {
   };
 
   useEffect(() => {
+    loadRoles();
     loadUsers();
     loadContacts();
   }, []);
@@ -209,7 +291,110 @@ export const CRMManagement: React.FC = () => {
     }
   };
 
+  // Handle edit user
+  const handleEditUser = (user: UserWithAuth) => {
+    setEditingUser(user);
+    setUserEmail(user.email);
+    setUserDisplayName(user.email); // We don't have display_name in the current schema
+    setUserRoleId(user.role_id || '');
+    setUserSubscription(user.subscription_tier || 'free');
+    setUserStatus(user.status || 'active');
+    setUserCredits(user.credits || 0);
+    setUserPassword(''); // Don't pre-fill password
+    setShowUserModal(true);
+  };
+
+  // Handle add user
+  const handleAddUser = () => {
+    setEditingUser(null);
+    setUserEmail('');
+    setUserPassword('');
+    setUserDisplayName('');
+    setUserRoleId(roles.find(r => r.name === 'user')?.id || '');
+    setUserSubscription('free');
+    setUserStatus('active');
+    setUserCredits(0);
+    setShowUserModal(true);
+  };
+
+  // Handle save user
+  const handleSaveUser = async () => {
+    try {
+      if (editingUser) {
+        // Update existing user
+        await usersAPI.updateUser(editingUser.user_id, {
+          role_id: userRoleId,
+          subscription_tier: userSubscription,
+          status: userStatus,
+        });
+
+        // Update credits if changed
+        if (userCredits !== editingUser.credits) {
+          await supabase
+            .from('user_credits')
+            .update({ balance: userCredits })
+            .eq('user_id', editingUser.user_id);
+        }
+
+        toast({
+          title: 'Success',
+          description: 'User updated successfully',
+        });
+      } else {
+        // Create new user
+        const { data, error } = await supabase.auth.signUp({
+          email: userEmail,
+          password: userPassword,
+          options: {
+            data: {
+              display_name: userDisplayName,
+            },
+          },
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Success',
+          description: 'User created successfully. They will receive a confirmation email.',
+        });
+      }
+
+      setShowUserModal(false);
+      await loadUsers();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to save user',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle reset password
+  const handleResetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Success',
+        description: 'Password reset email sent',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to send reset email',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
+    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.user_id.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
@@ -230,48 +415,28 @@ export const CRMManagement: React.FC = () => {
       <div className="p-6 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{userStats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Registered users
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {userStats.active}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Currently active
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Contacts
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{contacts.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">CRM contacts</p>
-          </CardContent>
-        </Card>
-      </div>
+          <AdminStatCard
+            title="Total Users"
+            value={userStats.total}
+            icon={Users}
+            description="Registered users"
+            variant="glass"
+          />
+          <AdminStatCard
+            title="Active Users"
+            value={userStats.active}
+            icon={Users}
+            description="Currently active"
+            variant="glass"
+          />
+          <AdminStatCard
+            title="Total Contacts"
+            value={contacts.length}
+            icon={Building2}
+            description="CRM contacts"
+            variant="glass"
+          />
+        </div>
 
       {/* Tabs */}
       <Tabs defaultValue="users" className="space-y-4">
@@ -301,13 +466,13 @@ export const CRMManagement: React.FC = () => {
                 <div className="relative flex-1">
                   <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search users..."
+                    placeholder="Search users by email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-8"
                   />
                 </div>
-                <Button>
+                <Button onClick={handleAddUser}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
@@ -318,9 +483,10 @@ export const CRMManagement: React.FC = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>User ID</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Subscription</TableHead>
+                      <TableHead>Credits</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -329,31 +495,40 @@ export const CRMManagement: React.FC = () => {
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4">
+                        <TableCell colSpan={7} className="text-center py-4">
                           Loading...
                         </TableCell>
                       </TableRow>
                     ) : filteredUsers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4">
+                        <TableCell colSpan={7} className="text-center py-4">
                           No users found
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredUsers.map((user) => (
                         <TableRow key={user.id}>
-                          <TableCell className="font-mono text-sm">
-                            {user.user_id.substring(0, 8)}...
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4 text-muted-foreground" />
+                              {user.email}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {user.roles?.name || 'unknown'}
+                              {user.roles?.name || 'No role'}
                             </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary">
                               {user.subscription_tier}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="h-4 w-4 text-muted-foreground" />
+                              {user.credits || 0}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -374,24 +549,24 @@ export const CRMManagement: React.FC = () => {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleEditContact(contact)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleEditContact(contact);
-                                  }
-                                }}
+                                onClick={() => handleEditUser(user)}
+                                title="Edit user"
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                onClick={() => handleResetPassword(user.email)}
+                                title="Reset password"
+                              >
+                                <Key className="h-4 w-4 text-blue-500" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={() => handleDeleteUser(user.user_id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleDeleteUser(user.user_id);
-                                  }
-                                }}
+                                title="Delete user"
                               >
                                 <Trash2 className="h-4 w-4 text-red-500" />
                               </Button>
@@ -623,6 +798,135 @@ export const CRMManagement: React.FC = () => {
           </Card>
         </div>
       )}
+
+      {/* User Edit/Add Modal */}
+      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingUser ? 'Edit User' : 'Add New User'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingUser
+                ? 'Update user information, role, subscription, and credits'
+                : 'Create a new user account. They will receive a confirmation email.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!editingUser && (
+              <>
+                <div>
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="user@example.com"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="password">Password *</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={userPassword}
+                    onChange={(e) => setUserPassword(e.target.value)}
+                    placeholder="Minimum 6 characters"
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input
+                    id="displayName"
+                    value={userDisplayName}
+                    onChange={(e) => setUserDisplayName(e.target.value)}
+                    placeholder="John Doe"
+                    className="mt-1"
+                  />
+                </div>
+              </>
+            )}
+            {editingUser && (
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4" />
+                  <span className="font-medium">{editingUser.email}</span>
+                </div>
+              </div>
+            )}
+            <div>
+              <Label htmlFor="role">Role *</Label>
+              <Select value={userRoleId} onValueChange={setUserRoleId}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select role..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        {role.name} (Level {role.level})
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="subscription">Subscription Tier *</Label>
+              <Select value={userSubscription} onValueChange={setUserSubscription}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                  <SelectItem value="enterprise">Enterprise</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status *</Label>
+              <Select value={userStatus} onValueChange={setUserStatus}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editingUser && (
+              <div>
+                <Label htmlFor="credits">Credits</Label>
+                <Input
+                  id="credits"
+                  type="number"
+                  value={userCredits}
+                  onChange={(e) => setUserCredits(parseInt(e.target.value) || 0)}
+                  className="mt-1"
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowUserModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveUser}>
+                {editingUser ? 'Save Changes' : 'Create User'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
