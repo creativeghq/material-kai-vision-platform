@@ -116,67 +116,21 @@ export const CRMManagement: React.FC = () => {
     }
   };
 
-  // Load users from auth.users and join with user_profiles
+  // Load users from CRM Users API (Edge Function)
   const loadUsers = async () => {
     try {
       setLoading(true);
 
-      // Fetch all auth users
-      const { data: authData, error: authError } = await supabase.auth.admin.listUsers();
+      // Use the CRM Users API Edge Function instead of direct admin API
+      const response = await usersAPI.listUsers();
 
-      if (authError) throw authError;
-
-      // Fetch all user profiles
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('user_profiles')
-        .select(`
-          id,
-          user_id,
-          role_id,
-          subscription_tier,
-          status,
-          created_at,
-          roles (
-            id,
-            name,
-            level
-          )
-        `);
-
-      if (profilesError) throw profilesError;
-
-      // Fetch user credits
-      const { data: creditsData, error: creditsError } = await supabase
-        .from('user_credits')
-        .select('user_id, balance');
-
-      if (creditsError) console.error('Error loading credits:', creditsError);
-
-      // Merge auth users with profiles and credits
-      const mergedUsers: UserWithAuth[] = authData.users.map((authUser) => {
-        const profile = profilesData?.find((p) => p.user_id === authUser.id);
-        const credits = creditsData?.find((c) => c.user_id === authUser.id);
-
-        return {
-          id: profile?.id || authUser.id,
-          user_id: authUser.id,
-          email: authUser.email || '',
-          role_id: profile?.role_id,
-          subscription_tier: profile?.subscription_tier || 'free',
-          status: profile?.status || 'active',
-          credits: credits?.balance || 0,
-          created_at: authUser.created_at,
-          roles: profile?.roles,
-        };
-      });
-
-      setUsers(mergedUsers);
+      setUsers(response.data || []);
 
       // Calculate stats
       const stats = {
-        total: mergedUsers.length,
-        active: mergedUsers.filter((u) => u.status === 'active').length,
-        inactive: mergedUsers.filter((u) => u.status === 'inactive').length,
+        total: response.data?.length || 0,
+        active: response.data?.filter((u) => u.status === 'active').length || 0,
+        inactive: response.data?.filter((u) => u.status === 'inactive').length || 0,
       };
       setUserStats(stats);
     } catch (error: any) {

@@ -64,11 +64,24 @@ Deno.serve(async (req) => {
 
     // GET /api/users - List all users
     if (method === 'GET' && path.length === 0) {
-      const limit = parseInt(url.searchParams.get('limit') || '50');
+      const limit = parseInt(url.searchParams.get('limit') || '1000');
       const offset = parseInt(url.searchParams.get('offset') || '0');
-      const search = url.searchParams.get('search');
 
-      let query = supabase
+      // Fetch all auth users using admin API
+      const { data: authData, error: authError } = await supabase.auth.admin.listUsers({
+        page: Math.floor(offset / limit) + 1,
+        perPage: limit,
+      });
+
+      if (authError) {
+        return new Response(
+          JSON.stringify({ error: authError.message }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      // Fetch user profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from('user_profiles')
         .select(`
           id,
@@ -77,26 +90,41 @@ Deno.serve(async (req) => {
           subscription_tier,
           status,
           created_at,
-          roles(name, level)
-        `)
-        .range(offset, offset + limit - 1);
+          roles(id, name, level)
+        `);
 
-      if (search) {
-        // Search by email in auth.users (limited capability)
-        query = query.ilike('id', `%${search}%`);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
+      if (profilesError) {
         return new Response(
-          JSON.stringify({ error: error.message }),
+          JSON.stringify({ error: profilesError.message }),
           { status: 400, headers: corsHeaders },
         );
       }
 
+      // Fetch user credits
+      const { data: creditsData } = await supabase
+        .from('user_credits')
+        .select('user_id, balance');
+
+      // Merge auth users with profiles and credits
+      const mergedUsers = authData.users.map((authUser) => {
+        const profile = profilesData?.find((p) => p.user_id === authUser.id);
+        const credits = creditsData?.find((c) => c.user_id === authUser.id);
+
+        return {
+          id: profile?.id || authUser.id,
+          user_id: authUser.id,
+          email: authUser.email || '',
+          role_id: profile?.role_id,
+          subscription_tier: profile?.subscription_tier || 'free',
+          status: profile?.status || 'active',
+          credits: credits?.balance || 0,
+          created_at: authUser.created_at,
+          roles: profile?.roles,
+        };
+      });
+
       return new Response(
-        JSON.stringify({ data, count: data?.length || 0 }),
+        JSON.stringify({ data: mergedUsers, count: mergedUsers.length }),
         { status: 200, headers: corsHeaders },
       );
     }
