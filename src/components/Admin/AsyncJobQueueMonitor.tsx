@@ -95,11 +95,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [jobCheckpoints, setJobCheckpoints] = useState<any[]>([]);
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
 
+  // Debug log
+  console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
+
   // Fetch job details with checkpoints
   const fetchJobDetails = async (job: BackgroundJob) => {
+    console.log('fetchJobDetails called with job:', job);
     try {
       setLoadingCheckpoints(true);
       setSelectedJob(job);
+      console.log('Selected job set:', job);
 
       // Fetch all checkpoints for this job
       const { data: checkpoints, error } = await supabase
@@ -108,8 +113,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         .eq('job_id', job.id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching checkpoints:', error);
+        throw error;
+      }
 
+      console.log('Checkpoints fetched:', checkpoints);
       setJobCheckpoints(checkpoints || []);
     } catch (error) {
       console.error('Error fetching job details:', error);
@@ -325,37 +334,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Overview Metrics - Compact Design */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="dashboard-card">
             <div className="flex items-center gap-2 mb-2">
               <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               <p className="text-xs text-muted-foreground">Documents</p>
             </div>
             <div className="text-2xl font-bold">{metrics.total_documents}</div>
-          </div>
-
-          <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              <p className="text-xs text-muted-foreground">Products</p>
-            </div>
-            <div className="text-2xl font-bold">{metrics.total_products_created}</div>
-          </div>
-
-          <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-2">
-              <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              <p className="text-xs text-muted-foreground">Chunks</p>
-            </div>
-            <div className="text-2xl font-bold">{metrics.total_chunks_created}</div>
-          </div>
-
-          <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              <p className="text-xs text-muted-foreground">Images</p>
-            </div>
-            <div className="text-2xl font-bold">{metrics.total_images_extracted}</div>
           </div>
 
           <div className="dashboard-card">
@@ -554,7 +539,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       )}
 
       {/* Job Details Modal */}
-      <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
+      <Dialog open={!!selectedJob} onOpenChange={(open) => {
+        console.log('Dialog onOpenChange:', open);
+        if (!open) setSelectedJob(null);
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
