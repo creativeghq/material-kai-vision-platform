@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { usersAPI, contactsAPI } from '@/services/crm.service';
+import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface UserProfile {
@@ -62,11 +62,31 @@ export const CRMManagement: React.FC = () => {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // Load users
+  // Load users directly from Supabase
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const { data } = await usersAPI.listUsers(100, 0);
+
+      // Fetch user profiles with role information
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select(`
+          id,
+          user_id,
+          role_id,
+          subscription_tier,
+          status,
+          created_at,
+          roles (
+            name,
+            level
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
       setUsers(data || []);
 
       // Calculate stats
@@ -80,35 +100,38 @@ export const CRMManagement: React.FC = () => {
       setUserStats(stats);
     } catch (error: any) {
       console.error('Error loading users:', error);
-      // ✅ FIX (KAI-1J): Don't show error toast for admin access issues
-      if (error?.message !== 'Admin access required') {
-        toast({
-          title: 'Error',
-          description: 'Failed to load users',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error',
+        description: `Failed to load users: ${error.message}`,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  // Load contacts
+  // Load contacts directly from Supabase
   const loadContacts = async () => {
     try {
       setLoading(true);
-      const { data } = await contactsAPI.listContacts(100, 0);
+
+      // Fetch CRM contacts
+      const { data, error } = await supabase
+        .from('crm_contacts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) throw error;
+
       setContacts(data || []);
     } catch (error: any) {
       console.error('Error loading contacts:', error);
-      // ✅ FIX (KAI-1K): Don't show error toast for CRM access issues
-      if (error?.message !== 'CRM access required') {
-        toast({
-          title: 'Error',
-          description: 'Failed to load contacts',
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error',
+        description: `Failed to load contacts: ${error.message}`,
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

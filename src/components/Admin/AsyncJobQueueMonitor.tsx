@@ -8,7 +8,6 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -76,7 +75,6 @@ interface QueueMetrics {
 export const AsyncJobQueueMonitor: React.FC = () => {
   const [metrics, setMetrics] = useState<QueueMetrics | null>(null);
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
-  const [checkpoints, setCheckpoints] = useState<JobCheckpoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -94,17 +92,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       if (jobsError) throw jobsError;
 
-      // Fetch job checkpoints for detailed stage information
-      const { data: checkpointsData, error: checkpointsError } = await supabase
-        .from('job_checkpoints')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(200);
-
-      if (checkpointsError) throw checkpointsError;
-
       setJobs(jobsData || []);
-      setCheckpoints(checkpointsData || []);
 
       // Calculate metrics from background_jobs
       const calculateMetrics = (): QueueMetrics => {
@@ -297,86 +285,66 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       />
 
       <div className="p-6 space-y-6">
-        {/* Overview Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Overview Metrics - Compact Design */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <p className="text-sm text-muted-foreground">Total Documents</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Documents</p>
             </div>
-            <div className="text-3xl font-bold">{metrics.total_documents}</div>
-            <p className="text-xs text-muted-foreground mt-1">Unique PDFs processed</p>
+            <div className="text-2xl font-bold">{metrics.total_documents}</div>
           </div>
 
           <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <p className="text-sm text-muted-foreground">Products Created</p>
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Products</p>
             </div>
-            <div className="text-3xl font-bold">{metrics.total_products_created}</div>
-            <p className="text-xs text-muted-foreground mt-1">From all documents</p>
+            <div className="text-2xl font-bold">{metrics.total_products_created}</div>
           </div>
 
           <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Zap className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <p className="text-sm text-muted-foreground">Success Rate</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Chunks</p>
             </div>
-            <div className="text-3xl font-bold">
+            <div className="text-2xl font-bold">{metrics.total_chunks_created}</div>
+          </div>
+
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Images</p>
+            </div>
+            <div className="text-2xl font-bold">{metrics.total_images_extracted}</div>
+          </div>
+
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Success Rate</p>
+            </div>
+            <div className="text-2xl font-bold">
               {metrics.pdf_processing.success_rate.toFixed(1)}%
             </div>
-            <Progress value={metrics.pdf_processing.success_rate} className="mt-2 h-2" />
           </div>
 
           <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <p className="text-sm text-muted-foreground">Avg Processing Time</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Avg Time</p>
             </div>
-            <div className="text-3xl font-bold">
+            <div className="text-2xl font-bold">
               {formatTime(metrics.pdf_processing.avg_processing_time)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Per document</p>
+          </div>
+
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Total Jobs</p>
+            </div>
+            <div className="text-2xl font-bold">{metrics.pdf_processing.total}</div>
           </div>
         </div>
 
@@ -402,13 +370,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         </div>
 
       {/* Queue Status */}
-      <Tabs defaultValue="jobs" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-white/80 backdrop-blur-sm">
-          <TabsTrigger value="jobs">Processing Jobs</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="jobs" className="space-y-4">
+      <div className="space-y-4">
           <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -501,103 +463,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Total Products
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900">
-                  {metrics.total_products_created}
-                </div>
-                <p className="text-sm text-slate-500 mt-2">
-                  Extracted from {metrics.total_documents} documents
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-blue-600" />
-                  Total Chunks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900">
-                  {metrics.total_chunks_created}
-                </div>
-                <p className="text-sm text-slate-500 mt-2">
-                  Text chunks for embeddings
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Zap className="h-5 w-5 text-purple-600" />
-                  Total Images
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-4xl font-bold text-slate-900">
-                  {metrics.total_images_extracted}
-                </div>
-                <p className="text-sm text-slate-500 mt-2">
-                  Images extracted and processed
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Processing Stages Breakdown */}
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                Processing Stages Overview
-              </CardTitle>
-              <CardDescription>
-                Breakdown of jobs by processing stage
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {checkpoints.length === 0 ? (
-                  <p className="text-slate-500 text-sm">No checkpoint data available</p>
-                ) : (
-                  (() => {
-                    const stageCount: Record<string, number> = {};
-                    checkpoints.forEach((cp) => {
-                      stageCount[cp.stage] = (stageCount[cp.stage] || 0) + 1;
-                    });
-                    return Object.entries(stageCount)
-                      .sort((a, b) => b[1] - a[1])
-                      .slice(0, 10)
-                      .map(([stage, count]) => (
-                        <div key={stage} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200">
-                          <div className="text-sm font-medium text-slate-700">
-                            {stage.replace(/_/g, ' ').toUpperCase()}
-                          </div>
-                          <Badge className="bg-primary/10 text-primary border-primary/30">
-                            {count} jobs
-                          </Badge>
-                        </div>
-                      ));
-                  })()
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
 
       {/* Error Logs */}
       {jobs.some((j) => j.status === 'failed') && (

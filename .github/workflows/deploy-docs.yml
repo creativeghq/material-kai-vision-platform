@@ -150,7 +150,7 @@ jobs:
                   </div>
 
                   <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ecf0f1; color: #7f8c8d; text-align: center;">
-                      <p><strong>Material Kai Vision Platform v2.2.0</strong></p>
+                      <p><strong>Material Kai Vision Platform v2.3.0</strong></p>
                       <p>Last updated: $(date +"%Y-%m-%d %H:%M:%S UTC")</p>
                       <p>This documentation is automatically generated and deployed from the main repository.</p>
                   </div>
