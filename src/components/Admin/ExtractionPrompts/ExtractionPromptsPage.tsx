@@ -5,13 +5,12 @@ import {
   Edit,
   History,
   RefreshCw,
-  ArrowLeft,
   Sparkles,
   Save,
   X,
-  Eye,
   Code,
 } from 'lucide-react';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 import {
   Card,
@@ -210,14 +209,14 @@ export const ExtractionPromptsPage: React.FC = () => {
 
   const getStageBadge = (stage: string) => {
     const colors: Record<string, string> = {
-      discovery: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-      entity_creation: 'bg-green-500/20 text-green-300 border-green-500/30',
-      image_analysis: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-      chunking: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+      discovery: 'bg-blue-100 text-blue-700 border-blue-200',
+      entity_creation: 'bg-green-100 text-green-700 border-green-200',
+      image_analysis: 'bg-purple-100 text-purple-700 border-purple-200',
+      chunking: 'bg-pink-100 text-pink-700 border-pink-200',
     };
 
     return (
-      <Badge className={colors[stage] || 'bg-gray-500/20 text-gray-300'}>
+      <Badge className={colors[stage] || 'bg-gray-100 text-gray-700'}>
         {stage.replace('_', ' ')}
       </Badge>
     );
@@ -225,65 +224,51 @@ export const ExtractionPromptsPage: React.FC = () => {
 
   const getCategoryBadge = (category: string) => {
     const colors: Record<string, string> = {
-      products: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-      material_properties: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-      certificates: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-      logos: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+      products: 'bg-orange-100 text-orange-700 border-orange-200',
+      material_properties: 'bg-teal-100 text-teal-700 border-teal-200',
+      certificates: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      logos: 'bg-indigo-100 text-indigo-700 border-indigo-200',
     };
 
     return (
-      <Badge className={colors[category] || 'bg-gray-500/20 text-gray-300'}>
+      <Badge className={colors[category] || 'bg-gray-100 text-gray-700'}>
         {category.replace('_', ' ')}
       </Badge>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a1a1a] via-[#2d2d2d] to-[#1a1a1a] p-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={() => navigate('/admin')}
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-              <Sparkles className="h-8 w-8 text-purple-400" />
-              Extraction Prompts Management
-            </h1>
-            <p className="text-white/60 mt-1">
-              Manage AI prompts for PDF extraction pipeline
-            </p>
-          </div>
-        </div>
-        <Button
-          onClick={loadPrompts}
-          variant="outline"
-          size="sm"
-          className="border-white/20 text-white hover:bg-white/10"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+    <div className="min-h-screen">
+      <GlobalAdminHeader
+        title="Extraction Prompts Management"
+        description="Manage AI prompts for PDF extraction pipeline"
+        badge="AI Prompts"
+      />
 
-      {/* Filters */}
-      <Card className="mb-6 bg-white/5 border-white/10">
-        <CardHeader>
-          <CardTitle className="text-white">Filters</CardTitle>
-        </CardHeader>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header Actions */}
+        <div className="flex justify-end mb-6">
+          <Button
+            onClick={loadPrompts}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+          </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label className="text-white/80">Stage</Label>
+              <Label>Stage</Label>
               <Select value={selectedStage} onValueChange={setSelectedStage}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -296,9 +281,9 @@ export const ExtractionPromptsPage: React.FC = () => {
               </Select>
             </div>
             <div>
-              <Label className="text-white/80">Category</Label>
+              <Label>Category</Label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -315,52 +300,52 @@ export const ExtractionPromptsPage: React.FC = () => {
       </Card>
 
       {/* Prompts Table */}
-      <Card className="bg-white/5 border-white/10">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white">Extraction Prompts ({prompts.length})</CardTitle>
-          <CardDescription className="text-white/60">
+          <CardTitle>Extraction Prompts ({prompts.length})</CardTitle>
+          <CardDescription>
             Configure AI prompts for each stage of the PDF extraction pipeline
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-white/60">Loading prompts...</div>
+            <div className="text-center py-8 text-muted-foreground">Loading prompts...</div>
           ) : prompts.length === 0 ? (
-            <div className="text-center py-8 text-white/60">No prompts found</div>
+            <div className="text-center py-8 text-muted-foreground">No prompts found</div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-white/10">
-                  <TableHead className="text-white/80">Name</TableHead>
-                  <TableHead className="text-white/80">Type</TableHead>
-                  <TableHead className="text-white/80">Stage</TableHead>
-                  <TableHead className="text-white/80">Category</TableHead>
-                  <TableHead className="text-white/80">Version</TableHead>
-                  <TableHead className="text-white/80">Used In</TableHead>
-                  <TableHead className="text-white/80">Updated</TableHead>
-                  <TableHead className="text-white/80 text-right">Actions</TableHead>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Used In</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {prompts.map((prompt) => (
-                  <TableRow key={prompt.id} className="border-white/10">
-                    <TableCell className="text-white/90 font-medium">
+                  <TableRow key={prompt.id}>
+                    <TableCell className="font-medium">
                       {prompt.name || `${prompt.stage} - ${prompt.category}`}
                     </TableCell>
                     <TableCell>
                       <Badge className={
-                        prompt.prompt_type === 'agent' ? 'bg-blue-500/20 text-blue-300' :
-                        prompt.prompt_type === 'extraction' ? 'bg-green-500/20 text-green-300' :
-                        prompt.prompt_type === 'template' ? 'bg-purple-500/20 text-purple-300' :
-                        prompt.prompt_type === 'search' ? 'bg-orange-500/20 text-orange-300' :
-                        'bg-gray-500/20 text-gray-300'
+                        prompt.prompt_type === 'agent' ? 'bg-blue-100 text-blue-700' :
+                        prompt.prompt_type === 'extraction' ? 'bg-green-100 text-green-700' :
+                        prompt.prompt_type === 'template' ? 'bg-purple-100 text-purple-700' :
+                        prompt.prompt_type === 'search' ? 'bg-orange-100 text-orange-700' :
+                        'bg-gray-100 text-gray-700'
                       }>
                         {prompt.prompt_type || 'extraction'}
                       </Badge>
                     </TableCell>
                     <TableCell>{getStageBadge(prompt.stage)}</TableCell>
                     <TableCell>{getCategoryBadge(prompt.category)}</TableCell>
-                    <TableCell className="text-white/80">v{prompt.version}</TableCell>
+                    <TableCell className="text-muted-foreground">v{prompt.version}</TableCell>
                     <TableCell className="max-w-[200px]">
                       {prompt.used_in && prompt.used_in.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -368,7 +353,7 @@ export const ExtractionPromptsPage: React.FC = () => {
                             <Badge
                               key={idx}
                               variant="outline"
-                              className="text-xs text-white/60 border-white/20 truncate max-w-[150px]"
+                              className="text-xs truncate max-w-[150px]"
                               title={location}
                             >
                               <Code className="h-3 w-3 mr-1" />
@@ -376,16 +361,16 @@ export const ExtractionPromptsPage: React.FC = () => {
                             </Badge>
                           ))}
                           {prompt.used_in.length > 2 && (
-                            <Badge variant="outline" className="text-xs text-white/40 border-white/10">
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
                               +{prompt.used_in.length - 2} more
                             </Badge>
                           )}
                         </div>
                       ) : (
-                        <span className="text-white/40 text-xs">Not specified</span>
+                        <span className="text-muted-foreground text-xs">Not specified</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-white/60 text-sm">
+                    <TableCell className="text-muted-foreground text-sm">
                       {new Date(prompt.updated_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
@@ -394,7 +379,6 @@ export const ExtractionPromptsPage: React.FC = () => {
                           onClick={() => handleEditPrompt(prompt)}
                           variant="ghost"
                           size="sm"
-                          className="text-white/70 hover:text-white hover:bg-white/10"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -402,7 +386,6 @@ export const ExtractionPromptsPage: React.FC = () => {
                           onClick={() => handleViewHistory(prompt)}
                           variant="ghost"
                           size="sm"
-                          className="text-white/70 hover:text-white hover:bg-white/10"
                         >
                           <History className="h-4 w-4" />
                         </Button>
@@ -418,32 +401,32 @@ export const ExtractionPromptsPage: React.FC = () => {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-4xl bg-[#1a1a1a] border-white/10 text-white">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-white">
+            <DialogTitle>
               Edit Prompt: {editingPrompt?.stage} - {editingPrompt?.category}
             </DialogTitle>
-            <DialogDescription className="text-white/60">
+            <DialogDescription>
               Customize the AI prompt template for this extraction stage
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="template" className="w-full">
-            <TabsList className="bg-white/5">
+            <TabsList>
               <TabsTrigger value="template">Prompt Template</TabsTrigger>
               <TabsTrigger value="system">System Prompt</TabsTrigger>
             </TabsList>
 
             <TabsContent value="template" className="space-y-4">
               <div>
-                <Label className="text-white/80">Prompt Template</Label>
+                <Label>Prompt Template</Label>
                 <Textarea
                   value={editedTemplate}
                   onChange={(e) => setEditedTemplate(e.target.value)}
-                  className="min-h-[300px] bg-white/5 border-white/10 text-white font-mono text-sm"
+                  className="min-h-[300px] font-mono text-sm"
                   placeholder="Enter prompt template..."
                 />
-                <p className="text-xs text-white/50 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Use placeholders like {'{product_name}'}, {'{page_content}'}, etc.
                 </p>
               </div>
@@ -451,14 +434,14 @@ export const ExtractionPromptsPage: React.FC = () => {
 
             <TabsContent value="system" className="space-y-4">
               <div>
-                <Label className="text-white/80">System Prompt (Optional)</Label>
+                <Label>System Prompt (Optional)</Label>
                 <Textarea
                   value={editedSystemPrompt}
                   onChange={(e) => setEditedSystemPrompt(e.target.value)}
-                  className="min-h-[300px] bg-white/5 border-white/10 text-white font-mono text-sm"
+                  className="min-h-[300px] font-mono text-sm"
                   placeholder="Enter system prompt..."
                 />
-                <p className="text-xs text-white/50 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   System-level instructions for the AI model
                 </p>
               </div>
@@ -469,7 +452,6 @@ export const ExtractionPromptsPage: React.FC = () => {
             <Button
               onClick={() => setShowEditDialog(false)}
               variant="ghost"
-              className="text-white/70 hover:text-white hover:bg-white/10"
             >
               <X className="h-4 w-4 mr-2" />
               Cancel
@@ -477,7 +459,6 @@ export const ExtractionPromptsPage: React.FC = () => {
             <Button
               onClick={handleSavePrompt}
               disabled={saving}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
             >
               <Save className="h-4 w-4 mr-2" />
               {saving ? 'Saving...' : 'Save Changes'}
@@ -488,40 +469,40 @@ export const ExtractionPromptsPage: React.FC = () => {
 
       {/* History Dialog */}
       <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
-        <DialogContent className="max-w-4xl bg-[#1a1a1a] border-white/10 text-white">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-white">
+            <DialogTitle>
               Version History: {editingPrompt?.stage} - {editingPrompt?.category}
             </DialogTitle>
-            <DialogDescription className="text-white/60">
+            <DialogDescription>
               View all previous versions of this prompt
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[500px] overflow-y-auto">
             {promptHistory.length === 0 ? (
-              <div className="text-center py-8 text-white/60">No history available</div>
+              <div className="text-center py-8 text-muted-foreground">No history available</div>
             ) : (
               <div className="space-y-4">
                 {promptHistory.map((history) => (
-                  <Card key={history.id} className="bg-white/5 border-white/10">
+                  <Card key={history.id}>
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-sm text-white">
+                        <CardTitle className="text-sm">
                           Version {history.version}
                         </CardTitle>
-                        <span className="text-xs text-white/60">
+                        <span className="text-xs text-muted-foreground">
                           {new Date(history.created_at).toLocaleString()}
                         </span>
                       </div>
                       {history.change_reason && (
-                        <CardDescription className="text-white/60 text-xs">
+                        <CardDescription className="text-xs">
                           {history.change_reason}
                         </CardDescription>
                       )}
                     </CardHeader>
                     <CardContent>
-                      <div className="bg-black/30 p-3 rounded text-xs font-mono text-white/80 max-h-[200px] overflow-y-auto">
+                      <div className="bg-muted p-3 rounded text-xs font-mono max-h-[200px] overflow-y-auto">
                         {history.prompt_template}
                       </div>
                     </CardContent>
@@ -535,13 +516,13 @@ export const ExtractionPromptsPage: React.FC = () => {
             <Button
               onClick={() => setShowHistoryDialog(false)}
               variant="ghost"
-              className="text-white/70 hover:text-white hover:bg-white/10"
             >
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 };

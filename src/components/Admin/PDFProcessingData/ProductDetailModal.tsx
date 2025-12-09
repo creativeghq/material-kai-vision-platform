@@ -19,7 +19,8 @@ import {
   Wrench,
   Shield,
   Sparkles,
-  Building2
+  Building2,
+  Package
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -46,26 +47,58 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setIsLoading(true);
       console.log('[ProductDetailModal] Loading details for product:', product.id, product.name);
 
-      // Load images related to this product
+      // Load images related to this product WITH FULL RELATIONSHIP DATA
       const { data: imageRelations, error: relError } = await supabase
         .from('product_image_relationships')
-        .select('image_id')
-        .eq('product_id', product.id);
+        .select(`
+          image_id,
+          relevance_score,
+          relationship_type,
+          created_at,
+          document_images (
+            id,
+            image_url,
+            page_number,
+            caption,
+            metadata,
+            document_id,
+            processed_documents (
+              id,
+              filename
+            )
+          )
+        `)
+        .eq('product_id', product.id)
+        .order('relevance_score', { ascending: false });
 
       console.log('[ProductDetailModal] Image relationships found:', imageRelations?.length || 0);
       if (relError) console.error('[ProductDetailModal] Error loading relationships:', relError);
 
       if (imageRelations && imageRelations.length > 0) {
-        const imageIds = imageRelations.map((r) => r.image_id);
-        const { data: imagesData, error: imgError } = await supabase
-          .from('document_images')
-          .select('*')
-          .in('id', imageIds);
+        // Extract images with relationship metadata
+        const imagesWithRelationships = imageRelations
+          .filter(rel => rel.document_images)
+          .map(rel => ({
+            ...rel.document_images,
+            relationship_score: rel.relevance_score,
+            relationship_type: rel.relationship_type,
+            relationship_created: rel.created_at
+          }));
 
-        console.log('[ProductDetailModal] Images loaded:', imagesData?.length || 0);
-        if (imgError) console.error('[ProductDetailModal] Error loading images:', imgError);
+        console.log('[ProductDetailModal] Images loaded:', imagesWithRelationships.length);
 
-        setImages(imagesData || []);
+        // DEBUG: Log detailed information about each image
+        imagesWithRelationships.forEach((img, idx) => {
+          console.log(`[ProductDetailModal] Image ${idx + 1}:`, {
+            page: img.page_number,
+            score: img.relationship_score,
+            type: img.relationship_type,
+            document: img.processed_documents?.filename,
+            caption: img.caption?.substring(0, 50)
+          });
+        });
+
+        setImages(imagesWithRelationships || []);
       }
 
       // Load chunks related to this product
@@ -140,12 +173,36 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Thickness': thickness
   };
 
+  // Extract material dimensions from available_sizes or dimensions (not page_range!)
+  const availableSizes = allData?.available_sizes || dimensionsData || [];
+  const size = Array.isArray(availableSizes) && availableSizes.length > 0
+    ? availableSizes.map((d: unknown) => {
+        if (typeof d === 'object' && d !== null) {
+          const dim = d as Record<string, unknown>;
+          // Format: width x height (e.g., "15×38 cm")
+          if (dim.width && dim.height) {
+            const unit = dim.unit || 'cm';
+            return `${dim.width}×${dim.height}${dim.depth ? `×${dim.depth}` : ''} ${unit}`;
+          }
+          return JSON.stringify(d);
+        }
+        return String(d);
+      }).join(', ')
+    : extractValue(allData?.dimensions) || 'N/A';
+
   const dimensions = {
-    'Size': Array.isArray(dimensionsData) && dimensionsData.length > 0
-      ? dimensionsData.map((d: unknown) => typeof d === 'object' ? JSON.stringify(d) : String(d)).join(', ')
-      : 'N/A',
-    'Page Range': allData?.page_range?.join(' - ') || 'N/A'
+    'Available Sizes': size,
+    'Thickness': thickness !== 'N/A' ? thickness : undefined,
   };
+
+  // Extract product variants (SKU codes with colors, shapes, patterns)
+  const variants = allData?.variants || [];
+  const hasVariants = Array.isArray(variants) && variants.length > 0;
+  const availableColors = allData?.available_colors || [];
+
+  // Extract packaging details
+  const packagingData = allData?.packaging || {};
+  const hasPackaging = Object.keys(packagingData).length > 0;
 
   const appearance = {
     'Colors': extractValue(appearanceData?.colors),
@@ -341,6 +398,133 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <Badge className="text-sm px-3 py-1" style={{ backgroundColor: 'hsl(var(--primary))' }}>
                   {allData.material_category}
                 </Badge>
+              )}
+
+              {/* Product Variants Section */}
+              {hasVariants && (
+                <Card className="bg-white border-gray-200">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200">
+                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Palette className="h-5 w-5 text-gray-700" />
+                      Product Variants ({variants.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="space-y-3">
+                      {variants.map((variant: any, index: number) => (
+                        <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:border-primary transition-colors">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">SKU</p>
+                              <p className="text-sm font-bold text-gray-900">{variant.sku || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Color</p>
+                              <p className="text-sm font-bold text-gray-900">{variant.color || 'N/A'}</p>
+                            </div>
+                            {variant.shape && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Shape</p>
+                                <p className="text-sm font-bold text-gray-900">{variant.shape}</p>
+                              </div>
+                            )}
+                            {variant.pattern && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Pattern</p>
+                                <p className="text-sm font-bold text-gray-900">{variant.pattern}</p>
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Size</p>
+                              <p className="text-sm font-bold text-gray-900">{variant.size || 'N/A'}</p>
+                            </div>
+                            {variant.pattern_count && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Patterns</p>
+                                <p className="text-sm font-bold text-gray-900">{variant.pattern_count} patterns</p>
+                              </div>
+                            )}
+                            {(variant.mapei_code || variant.kerakoll_code) && (
+                              <div>
+                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Joint Color</p>
+                                <p className="text-sm font-bold text-gray-900">
+                                  {variant.mapei_code && `Mapei ${variant.mapei_code}`}
+                                  {variant.mapei_code && variant.kerakoll_code && ' / '}
+                                  {variant.kerakoll_code && `Kerakoll ${variant.kerakoll_code}`}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          {variant.name && (
+                            <div className="mt-3 pt-3 border-t border-gray-200">
+                              <p className="text-xs text-gray-600">{variant.name}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Available Colors (when listed without SKUs) */}
+                    {availableColors.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Available Colors</p>
+                        <div className="flex flex-wrap gap-2">
+                          {availableColors.map((color: string, idx: number) => (
+                            <span key={idx} className="px-3 py-1 bg-white border border-gray-300 rounded-full text-sm font-medium text-gray-700">
+                              {color}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Packaging Details Section */}
+              {hasPackaging && (
+                <Card className="bg-white border-gray-200">
+                  <CardHeader className="bg-gray-50 border-b border-gray-200">
+                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Package className="h-5 w-5 text-gray-700" />
+                      Packaging Details
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {packagingData.pieces_per_box && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Pieces per Box</p>
+                          <p className="text-sm font-bold text-gray-900">{packagingData.pieces_per_box}</p>
+                        </div>
+                      )}
+                      {packagingData.boxes_per_pallet && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Boxes per Pallet</p>
+                          <p className="text-sm font-bold text-gray-900">{packagingData.boxes_per_pallet}</p>
+                        </div>
+                      )}
+                      {packagingData.weight_per_box_kg && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Weight per Box</p>
+                          <p className="text-sm font-bold text-gray-900">{packagingData.weight_per_box_kg} kg</p>
+                          {packagingData.weight_per_box_lb && (
+                            <p className="text-xs text-gray-600 mt-1">({packagingData.weight_per_box_lb} lb)</p>
+                          )}
+                        </div>
+                      )}
+                      {packagingData.coverage_per_box_m2 && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Coverage per Box</p>
+                          <p className="text-sm font-bold text-gray-900">{packagingData.coverage_per_box_m2} m²</p>
+                          {packagingData.coverage_per_box_sqft && (
+                            <p className="text-xs text-gray-600 mt-1">({packagingData.coverage_per_box_sqft} sqft)</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Metadata Sections */}

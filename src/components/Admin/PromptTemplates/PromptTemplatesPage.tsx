@@ -4,9 +4,9 @@ import {
   Plus,
   Edit,
   RefreshCw,
-  ArrowLeft,
   Sparkles,
 } from 'lucide-react';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 import {
   Card,
@@ -104,15 +104,15 @@ export const PromptTemplatesPage: React.FC = () => {
 
   const getIndustryBadge = (industry: string | null) => {
     if (!industry) return <Badge variant="outline">General</Badge>;
-    
+
     const colors: Record<string, string> = {
-      construction: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-      interior_design: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-      general: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+      construction: 'bg-orange-100 text-orange-700 border-orange-200',
+      interior_design: 'bg-purple-100 text-purple-700 border-purple-200',
+      general: 'bg-blue-100 text-blue-700 border-blue-200',
     };
 
     return (
-      <Badge className={colors[industry] || 'bg-gray-500/20 text-gray-300'}>
+      <Badge className={colors[industry] || 'bg-gray-100 text-gray-700'}>
         {industry.replace('_', ' ')}
       </Badge>
     );
@@ -120,49 +120,34 @@ export const PromptTemplatesPage: React.FC = () => {
 
   const getStageBadge = (stage: string) => {
     const colors: Record<string, string> = {
-      metadata_extraction: 'bg-green-500/20 text-green-300 border-green-500/30',
-      discovery: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-      classification: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-      chunking: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
+      metadata_extraction: 'bg-green-100 text-green-700 border-green-200',
+      discovery: 'bg-blue-100 text-blue-700 border-blue-200',
+      classification: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      chunking: 'bg-pink-100 text-pink-700 border-pink-200',
     };
 
     return (
-      <Badge className={colors[stage] || 'bg-gray-500/20 text-gray-300'}>
+      <Badge className={colors[stage] || 'bg-gray-100 text-gray-700'}>
         {stage.replace('_', ' ')}
       </Badge>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1a1a1a] via-[#2d2d2d] to-[#1a1a1a] p-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={() => navigate('/admin')}
-            variant="ghost"
-            size="sm"
-            className="text-white/70 hover:text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-2">
-              <Sparkles className="h-8 w-8 text-purple-400" />
-              AI Prompt Templates
-            </h1>
-            <p className="text-white/60 mt-1">
-              Customize AI prompts for different industries and extraction stages
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-2">
+    <div className="min-h-screen">
+      <GlobalAdminHeader
+        title="AI Prompt Templates"
+        description="Customize AI prompts for different industries and extraction stages"
+        badge="AI Templates"
+      />
+
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Header Actions */}
+        <div className="flex justify-end gap-2 mb-6">
           <Button
             onClick={() => loadTemplates()}
             variant="outline"
             size="sm"
-            className="border-white/20 text-white hover:bg-white/10"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -170,131 +155,126 @@ export const PromptTemplatesPage: React.FC = () => {
           <Button
             onClick={() => toast({ title: 'Coming Soon', description: 'Template creation UI will be available soon' })}
             size="sm"
-            className="bg-purple-600 hover:bg-purple-700 text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Template
           </Button>
         </div>
-      </div>
 
-      {/* Filters */}
-      <Card className="mb-6 bg-white/5 border-white/10 backdrop-blur-sm">
-        <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label className="text-white/70 mb-2 block">Stage</Label>
-              <Select value={selectedStage} onValueChange={setSelectedStage}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stages</SelectItem>
-                  <SelectItem value="metadata_extraction">Metadata Extraction</SelectItem>
-                  <SelectItem value="discovery">Product Discovery</SelectItem>
-                  <SelectItem value="classification">Image Classification</SelectItem>
-                  <SelectItem value="chunking">Text Chunking</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Label className="mb-2 block">Stage</Label>
+                <Select value={selectedStage} onValueChange={setSelectedStage}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Stages</SelectItem>
+                    <SelectItem value="metadata_extraction">Metadata Extraction</SelectItem>
+                    <SelectItem value="discovery">Product Discovery</SelectItem>
+                    <SelectItem value="classification">Image Classification</SelectItem>
+                    <SelectItem value="chunking">Text Chunking</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1">
+                <Label className="mb-2 block">Industry</Label>
+                <Select value={selectedIndustry} onValueChange={setSelectedIndustry}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Industries</SelectItem>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="construction">Construction</SelectItem>
+                    <SelectItem value="interior_design">Interior Design</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex-1">
-              <Label className="text-white/70 mb-2 block">Industry</Label>
-              <Select value={selectedIndustry} onValueChange={setSelectedIndustry}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Industries</SelectItem>
-                  <SelectItem value="general">General</SelectItem>
-                  <SelectItem value="construction">Construction</SelectItem>
-                  <SelectItem value="interior_design">Interior Design</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Templates Table */}
-      <Card className="bg-white/5 border-white/10 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-white">Prompt Templates</CardTitle>
-          <CardDescription className="text-white/60">
-            {templates.length} template{templates.length !== 1 ? 's' : ''} found
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8 text-white/60">Loading templates...</div>
-          ) : templates.length === 0 ? (
-            <div className="text-center py-8 text-white/60">
-              No templates found. Create your first template to get started.
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/10 hover:bg-white/5">
-                  <TableHead className="text-white/70">Name</TableHead>
-                  <TableHead className="text-white/70">Industry</TableHead>
-                  <TableHead className="text-white/70">Stage</TableHead>
-                  <TableHead className="text-white/70">Model</TableHead>
-                  <TableHead className="text-white/70">Version</TableHead>
-                  <TableHead className="text-white/70">Status</TableHead>
-                  <TableHead className="text-white/70 text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {templates.map((template) => (
-                  <TableRow
-                    key={template.id}
-                    className="border-white/10 hover:bg-white/5"
-                  >
-                    <TableCell className="text-white">
-                      <div>
-                        <div className="font-medium">{template.name}</div>
-                        {template.description && (
-                          <div className="text-sm text-white/60 mt-1">
-                            {template.description}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getIndustryBadge(template.industry)}</TableCell>
-                    <TableCell>{getStageBadge(template.stage)}</TableCell>
-                    <TableCell className="text-white/70">
-                      {template.model_preference || 'auto'}
-                    </TableCell>
-                    <TableCell className="text-white/70">v{template.version}</TableCell>
-                    <TableCell>
-                      {template.is_active ? (
-                        <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
-                          Active
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-white/40">
-                          Inactive
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          onClick={() => toast({ title: 'Coming Soon', description: 'Template editing UI will be available soon' })}
-                          variant="ghost"
-                          size="sm"
-                          className="text-white/70 hover:text-white hover:bg-white/10"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+        {/* Templates Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Prompt Templates</CardTitle>
+            <CardDescription>
+              {templates.length} template{templates.length !== 1 ? 's' : ''} found
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading templates...</div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No templates found. Create your first template to get started.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Industry</TableHead>
+                    <TableHead>Stage</TableHead>
+                    <TableHead>Model</TableHead>
+                    <TableHead>Version</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {templates.map((template) => (
+                    <TableRow key={template.id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{template.name}</div>
+                          {template.description && (
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {template.description}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getIndustryBadge(template.industry)}</TableCell>
+                      <TableCell>{getStageBadge(template.stage)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {template.model_preference || 'auto'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">v{template.version}</TableCell>
+                      <TableCell>
+                        {template.is_active ? (
+                          <Badge className="bg-green-100 text-green-700 border-green-200">
+                            Active
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            Inactive
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            onClick={() => toast({ title: 'Coming Soon', description: 'Template editing UI will be available soon' })}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

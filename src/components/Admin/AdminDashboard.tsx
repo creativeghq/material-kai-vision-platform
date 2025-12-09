@@ -177,12 +177,12 @@ const AdminDashboard: React.FC = () => {
         count: 'Real-time',
       },
       {
-        title: 'Agent Configurations',
-        description: 'Manage AI agent system prompts and behavior settings',
+        title: 'AI Configurations',
+        description: 'Manage all AI prompts: agents, extraction, templates, and search',
         icon: Bot,
-        path: '/admin/agent-configs',
+        path: '/admin/ai-configs',
         status: 'active',
-        count: 'Agent Prompts',
+        count: 'All AI Prompts',
       },
       {
         title: '3D Model Debugging',

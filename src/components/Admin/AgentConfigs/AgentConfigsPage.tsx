@@ -48,6 +48,7 @@ export const AgentConfigsPage: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [historyData, setHistoryData] = useState<PromptHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [selectedType, setSelectedType] = useState<string>('all');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -60,15 +61,15 @@ export const AgentConfigsPage: React.FC = () => {
       const { data, error } = await supabase
         .from('prompts')
         .select('*')
-        .eq('prompt_type', 'agent')
         .eq('is_active', true)
+        .order('prompt_type', { ascending: true })
         .order('category', { ascending: true });
 
       if (error) throw error;
       setPrompts(data || []);
     } catch (error) {
       console.error('Error loading prompts:', error);
-      toast({ title: 'Error', description: 'Failed to load agent prompts', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to load prompts', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -148,37 +149,86 @@ export const AgentConfigsPage: React.FC = () => {
     });
   };
 
-  const getAgentIcon = (category: string) => {
-    const icons: Record<string, string> = {
-      'pdf-processor': '📄', 'search': '🔍', 'product': '📦', 'interior-designer': '🎨'
-    };
-    return icons[category] || '🤖';
+  const getPromptIcon = (promptType: string, category: string) => {
+    // Prompt type icons
+    if (promptType === 'agent') {
+      const agentIcons: Record<string, string> = {
+        'pdf-processor': '📄', 'search': '🔍', 'product': '📦', 'interior-designer': '🎨'
+      };
+      return agentIcons[category] || '🤖';
+    }
+    if (promptType === 'extraction') return '🔬';
+    if (promptType === 'template') return '📋';
+    if (promptType === 'search') return '🔎';
+    return '✨';
   };
+
+  const getPromptTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'agent': 'Agent',
+      'extraction': 'Extraction',
+      'template': 'Template',
+      'search': 'Search'
+    };
+    return labels[type] || type;
+  };
+
+  const filteredPrompts = selectedType === 'all'
+    ? prompts
+    : prompts.filter(p => p.prompt_type === selectedType);
+
+  const promptTypes = ['all', ...Array.from(new Set(prompts.map(p => p.prompt_type)))];
 
   return (
     <div className="min-h-screen p-6">
-      <GlobalAdminHeader title="Agent Configurations" subtitle="Manage AI agent prompts and configurations" />
+      <GlobalAdminHeader title="AI Configurations" subtitle="Manage all AI prompts and configurations across the platform" />
+
+      {/* Filter Tabs */}
+      <div className="mt-6 flex gap-2 border-b border-gray-200">
+        {promptTypes.map((type) => (
+          <button
+            key={type}
+            onClick={() => setSelectedType(type)}
+            className={`px-4 py-2 font-medium transition-colors ${
+              selectedType === type
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {type === 'all' ? 'All Prompts' : `${getPromptTypeLabel(type)} (${prompts.filter(p => p.prompt_type === type).length})`}
+          </button>
+        ))}
+      </div>
+
       <div className="mt-6 space-y-6">
         {loading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading agents...</p>
+            <p className="mt-4 text-muted-foreground">Loading prompts...</p>
+          </div>
+        ) : filteredPrompts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No prompts found</p>
           </div>
         ) : (
           <div className="grid gap-6">
-            {prompts.map((prompt) => (
+            {filteredPrompts.map((prompt) => (
               <Card key={prompt.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="text-4xl">{getAgentIcon(prompt.category)}</div>
+                      <div className="text-4xl">{getPromptIcon(prompt.prompt_type, prompt.category)}</div>
                       <div>
                         <CardTitle className="flex items-center gap-2">
                           {prompt.name}
+                          <Badge variant="outline" className="ml-2">{getPromptTypeLabel(prompt.prompt_type)}</Badge>
                           <Badge variant="outline" className="ml-2">v{prompt.version}</Badge>
                           {prompt.status === 'active' && <Badge className="bg-green-100 text-green-800">Active</Badge>}
                         </CardTitle>
-                        <CardDescription>{prompt.description}</CardDescription>
+                        <CardDescription>
+                          {prompt.description || `${prompt.category} - ${prompt.subcategory || 'General'}`}
+                          {prompt.stage && <span className="ml-2 text-xs">• Stage: {prompt.stage}</span>}
+                        </CardDescription>
                       </div>
                     </div>
                     <div className="flex gap-2">
