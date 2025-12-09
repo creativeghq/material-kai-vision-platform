@@ -17,7 +17,20 @@ import {
   Clock,
   Zap,
   Activity,
+  ChevronRight,
+  FileText,
+  Image as ImageIcon,
+  Package,
+  Link as LinkIcon,
+  XCircle,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface BackgroundJob {
@@ -78,6 +91,32 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [selectedJob, setSelectedJob] = useState<BackgroundJob | null>(null);
+  const [jobCheckpoints, setJobCheckpoints] = useState<any[]>([]);
+  const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
+
+  // Fetch job details with checkpoints
+  const fetchJobDetails = async (job: BackgroundJob) => {
+    try {
+      setLoadingCheckpoints(true);
+      setSelectedJob(job);
+
+      // Fetch all checkpoints for this job
+      const { data: checkpoints, error } = await supabase
+        .from('job_checkpoints')
+        .select('*')
+        .eq('job_id', job.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      setJobCheckpoints(checkpoints || []);
+    } catch (error) {
+      console.error('Error fetching job details:', error);
+    } finally {
+      setLoadingCheckpoints(false);
+    }
+  };
 
   const fetchQueueData = useCallback(async () => {
     try {
@@ -433,10 +472,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     jobs.slice(0, 30).map((job) => (
                       <div
                         key={job.id}
-                        className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition"
+                        onClick={() => fetchJobDetails(job)}
+                        className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition cursor-pointer group"
                       >
                         <div className="flex-1">
-                          <div className="text-sm font-medium text-slate-900">
+                          <div className="text-sm font-medium text-slate-900 group-hover:text-primary transition">
                             {job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                           </div>
                           <div className="text-xs text-slate-500 mt-1">
@@ -455,6 +495,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             </Badge>
                           )}
                           {getStatusBadge(job.status)}
+                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-primary transition" />
                         </div>
                       </div>
                     ))
@@ -511,6 +552,223 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Job Details Modal */}
+      <Dialog open={!!selectedJob} onOpenChange={() => setSelectedJob(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Job Details: {selectedJob?.metadata?.filename || selectedJob?.document_id?.slice(0, 8) || 'Unknown'}
+            </DialogTitle>
+            <DialogDescription>
+              Complete pipeline workflow with all stages, metrics, and AI models used
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingCheckpoints ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Job Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Job Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Status</div>
+                    <div className="mt-1">{selectedJob && getStatusBadge(selectedJob.status)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Progress</div>
+                    <div className="mt-1 font-semibold">{selectedJob?.progress}%</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Created</div>
+                    <div className="mt-1 text-sm">{selectedJob && formatDate(selectedJob.created_at)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Duration</div>
+                    <div className="mt-1 text-sm">
+                      {selectedJob?.started_at && selectedJob?.completed_at
+                        ? formatTime(
+                            (new Date(selectedJob.completed_at).getTime() -
+                              new Date(selectedJob.started_at).getTime()) /
+                              1000
+                          )
+                        : 'N/A'}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Pipeline Stages - Workflow Style */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    Pipeline Workflow
+                  </CardTitle>
+                  <CardDescription>
+                    {jobCheckpoints.length} stages completed
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {jobCheckpoints.map((checkpoint) => {
+                      const metadata = checkpoint.metadata || {};
+                      const isCompleted = checkpoint.stage !== 'FAILED';
+                      const isFailed = checkpoint.stage === 'FAILED';
+
+                      return (
+                        <div
+                          key={checkpoint.id}
+                          className={`flex items-start gap-3 p-3 rounded-lg border ${
+                            isFailed
+                              ? 'bg-red-50 border-red-200'
+                              : isCompleted
+                              ? 'bg-green-50 border-green-200'
+                              : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          {/* Status Icon */}
+                          <div className="flex-shrink-0 mt-0.5">
+                            {isFailed ? (
+                              <XCircle className="h-5 w-5 text-red-600" />
+                            ) : isCompleted ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <Clock className="h-5 w-5 text-slate-400" />
+                            )}
+                          </div>
+
+                          {/* Stage Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <div className="font-medium text-sm">
+                                {checkpoint.stage.replace(/_/g, ' ')}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatDate(checkpoint.created_at)}
+                              </div>
+                            </div>
+
+                            {/* Stage Details */}
+                            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                              {metadata.ai_model && (
+                                <div>
+                                  <span className="text-muted-foreground">AI Model:</span>
+                                  <span className="ml-1 font-medium">{metadata.ai_model}</span>
+                                </div>
+                              )}
+                              {metadata.processing_time && (
+                                <div>
+                                  <span className="text-muted-foreground">Time:</span>
+                                  <span className="ml-1 font-medium">{metadata.processing_time}s</span>
+                                </div>
+                              )}
+                              {metadata.products_discovered !== undefined && (
+                                <div>
+                                  <span className="text-muted-foreground">Products:</span>
+                                  <span className="ml-1 font-medium">{metadata.products_discovered}</span>
+                                </div>
+                              )}
+                              {metadata.chunks_created !== undefined && (
+                                <div>
+                                  <span className="text-muted-foreground">Chunks:</span>
+                                  <span className="ml-1 font-medium">{metadata.chunks_created}</span>
+                                </div>
+                              )}
+                              {metadata.images_extracted !== undefined && (
+                                <div>
+                                  <span className="text-muted-foreground">Images:</span>
+                                  <span className="ml-1 font-medium">{metadata.images_extracted}</span>
+                                </div>
+                              )}
+                              {metadata.embeddings_generated !== undefined && (
+                                <div>
+                                  <span className="text-muted-foreground">Embeddings:</span>
+                                  <span className="ml-1 font-medium">{metadata.embeddings_generated}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Error Message */}
+                            {metadata.error && (
+                              <div className="mt-2 text-xs text-red-600 bg-red-100 p-2 rounded">
+                                {metadata.error}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Metrics Summary */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Processing Metrics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Products</div>
+                        <div className="font-semibold">
+                          {selectedJob?.metadata?.total_products || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Chunks</div>
+                        <div className="font-semibold">
+                          {selectedJob?.metadata?.total_chunks || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Images</div>
+                        <div className="font-semibold">
+                          {selectedJob?.metadata?.total_images || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Embeddings</div>
+                        <div className="font-semibold">
+                          {selectedJob?.metadata?.total_embeddings || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Relations</div>
+                        <div className="font-semibold">
+                          {selectedJob?.metadata?.total_relations || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
