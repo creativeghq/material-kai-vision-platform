@@ -289,7 +289,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="PDF Processing Monitor"
         description="Real-time monitoring of PDF processing jobs, stages, and analytics"
@@ -297,68 +297,87 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       />
 
       <div className="p-6 space-y-6">
-        {/* Overview Metrics - Glass Morphism Cards */}
+        {/* Overview Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-primary" />
-                Total Documents
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{metrics.total_documents}</div>
-              <p className="text-xs text-slate-500 mt-1">Unique PDFs processed</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                Products Created
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">
-                {metrics.total_products_created}
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                }}
+              >
+                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               </div>
-              <p className="text-xs text-slate-500 mt-1">From all documents</p>
-            </CardContent>
-          </Card>
+              <p className="text-sm text-muted-foreground">Total Documents</p>
+            </div>
+            <div className="text-3xl font-bold">{metrics.total_documents}</div>
+            <p className="text-xs text-muted-foreground mt-1">Unique PDFs processed</p>
+          </div>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-                <Zap className="h-4 w-4 text-blue-600" />
-                Success Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">
-                {metrics.pdf_processing.success_rate.toFixed(1)}%
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                }}
+              >
+                <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               </div>
-              <Progress
-                value={metrics.pdf_processing.success_rate}
-                className="mt-2 h-2"
-              />
-            </CardContent>
-          </Card>
+              <p className="text-sm text-muted-foreground">Products Created</p>
+            </div>
+            <div className="text-3xl font-bold">{metrics.total_products_created}</div>
+            <p className="text-xs text-muted-foreground mt-1">From all documents</p>
+          </div>
 
-          <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-purple-600" />
-                Avg Processing Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">
-                {formatTime(metrics.pdf_processing.avg_processing_time)}
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                }}
+              >
+                <Zap className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               </div>
-              <p className="text-xs text-slate-500 mt-1">Per document</p>
-            </CardContent>
-          </Card>
+              <p className="text-sm text-muted-foreground">Success Rate</p>
+            </div>
+            <div className="text-3xl font-bold">
+              {metrics.pdf_processing.success_rate.toFixed(1)}%
+            </div>
+            <Progress value={metrics.pdf_processing.success_rate} className="mt-2 h-2" />
+          </div>
+
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-3">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                }}
+              >
+                <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <p className="text-sm text-muted-foreground">Avg Processing Time</p>
+            </div>
+            <div className="text-3xl font-bold">
+              {formatTime(metrics.pdf_processing.avg_processing_time)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Per document</p>
+          </div>
         </div>
 
         {/* Control Buttons */}

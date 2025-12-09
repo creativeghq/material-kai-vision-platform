@@ -135,6 +135,20 @@ Complete documentation for Material Kai Vision Platform.
 - Configuration & tuning
 - Production metrics & reliability
 
+**[monitoring-analytics-system.md](monitoring-analytics-system.md)** - Monitoring & analytics system ✨ NEW
+- Real-time PDF processing monitor (`/admin/async-queue-monitor`)
+- Comprehensive analytics dashboard (`/admin/analytics`)
+- AI model usage and cost tracking (`/admin/ai-monitoring`)
+- Search analytics and query patterns
+- Agent chat analytics with quality ratings
+- System performance metrics (uptime, latency, error rates)
+- Sentry integration for exception tracking
+- 9 checkpoint stages with comprehensive metrics
+- Real-time updates via Supabase subscriptions
+- Stage-by-stage monitoring (Stage 0, 1, 3.5, 4)
+- Cost tracking per AI model
+- Alert system (critical, warning, notifications)
+
 ---
 
 ### 🤖 AI & Processing
@@ -350,18 +364,22 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: December 2, 2025
-**Version**: 2.0.0
+**Last Updated**: January 9, 2025
+**Version**: 2.1.0
 **Status**: Production
 **Maintainer**: Development Team
 
 **Recent Changes:**
-- Added metadata normalization system documentation
-- Added dynamic prompt system documentation (Phase 1 complete)
-- Removed temporary analysis documents (metadata-inconsistency-analysis.md, overview-general.md)
-- Moved RESTART_PROTECTION_SUMMARY.md to /planning
-- Complete platform audit (PLATFORM-AUDIT-2025-12-02.md)
-- Updated documentation format and consistency
+- ✨ Added monitoring-analytics-system.md - Complete monitoring and analytics documentation
+- ✨ Documented Stage 0 and Stage 1 monitoring integration
+- ✨ Documented Stage 3.5 (Embedding-to-Text) and Stage 4 (Metadata Consolidation)
+- ✨ Added real-time job tracking with Supabase subscriptions
+- ✨ Documented PDF Processing Monitor dashboard
+- ✨ Documented Analytics Dashboard with all tabs
+- ✨ Added AI model cost tracking documentation
+- ✨ Added Sentry integration documentation
+- Updated metadata normalization system documentation
+- Updated dynamic prompt system documentation (Phase 1 complete)
 
 ---
 
@@ -375,8 +393,17 @@ For questions or issues:
 
 ---
 
-**Total Documentation**: 33 comprehensive guides (3 removed, 2 added)
-**Total Lines**: 10,000+
+**Total Documentation**: 39 comprehensive guides
+**Total Lines**: 12,000+
 **Coverage**: 100% of platform features
 **Planning Documents**: 10 files in /planning directory
+
+**Documentation Categories**:
+- 🎯 Getting Started: 7 guides
+- 🏗️ Architecture & Design: 8 guides
+- 🤖 AI & Processing: 9 guides
+- 🔌 API Reference: 3 guides
+- 🚀 Deployment & Operations: 3 guides
+- 📊 Monitoring & Analytics: 3 guides ✨ NEW
+- 💼 Business Features: 6 guides
 

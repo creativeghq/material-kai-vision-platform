@@ -357,17 +357,28 @@ The platform uses **6 embedding types** for comprehensive search:
 ### Admin Features
 
 **Knowledge Base Management**: View/edit chunks, images, products
-**PDF Processing Monitor**: Real-time job tracking
-**AI Metrics Dashboard**: Model usage and cost tracking
+**PDF Processing Monitor**: Real-time job tracking with 9 checkpoint stages ✨ ENHANCED
+**Analytics Dashboard**: Comprehensive analytics (search, API, agent chat, quality) ✨ ENHANCED
+**AI Monitoring Dashboard**: Model usage, cost tracking, performance metrics
 **Quality Dashboard**: Chunk quality and embedding stability
 **System Performance**: Response times, error rates, uptime
 **User Management**: Workspace members and permissions
-**Async Job Queue Monitor**: Background job status and recovery
+**Async Job Queue Monitor**: Real-time background job status with auto-refresh ✨ ENHANCED
 **Agent Configurations**: Manage AI agent system prompts and behavior
+**AI Configs**: Unified AI prompt management (agents, extraction, templates, search) ✨ NEW
 **Quote Management**: View all quote requests with status filtering
 **Status Tags Management**: Create/edit custom status tags with colors
 **Upsells Management**: Manage upsell items with pricing
 **Timeline Steps Management**: Configure project timeline steps
+
+**Monitoring Features** ✨ NEW:
+- Real-time job tracking with Supabase subscriptions
+- Comprehensive metrics per pipeline stage
+- AI model cost tracking and usage analytics
+- Search analytics and query patterns
+- Agent chat quality ratings and performance
+- Sentry integration for exception tracking
+- Alert system (critical, warning, notifications)
 
 ---
 
@@ -472,9 +483,18 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ---
 
-**Last Updated**: 2025-01-06
-**Version**: 2.2.0
+**Last Updated**: 2025-01-09
+**Version**: 2.3.0
 **Status**: Production
 **Users**: 5,000+
 **Uptime**: 99.5%+
+
+**Recent Enhancements**:
+- ✨ Real-time PDF Processing Monitor with auto-refresh
+- ✨ Enhanced Analytics Dashboard with 4 comprehensive tabs
+- ✨ AI model cost tracking and usage analytics
+- ✨ Stage 0 and Stage 1 monitoring integration
+- ✨ Stage 3.5 (Embedding-to-Text) and Stage 4 (Metadata Consolidation)
+- ✨ Sentry integration for all pipeline stages
+- ✨ Comprehensive checkpoint system with 9 stages
 

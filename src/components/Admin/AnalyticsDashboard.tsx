@@ -330,28 +330,34 @@ export const AnalyticsDashboard: React.FC = () => {
     description: string;
     trend?: number;
   }) => (
-    <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-slate-600 flex items-center gap-2">
-          <Icon className="h-4 w-4 text-primary" />
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold text-slate-900">{value}</div>
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-slate-500">{description}</p>
-          {trend !== undefined && (
-            <Badge
-              className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800 border-green-300' : trend < 0 ? 'bg-red-100 text-red-800 border-red-300' : 'bg-slate-100 text-slate-800 border-slate-300'}`}
-            >
-              {trend > 0 ? '+' : ''}
-              {trend}%
-            </Badge>
-          )}
+    <div className="dashboard-card">
+      <div className="flex items-center gap-2 mb-3">
+        <div
+          className="flex items-center justify-center"
+          style={{
+            width: '2rem',
+            height: '2rem',
+            borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'hsl(var(--primary) / 0.1)',
+          }}
+        >
+          <Icon className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
         </div>
-      </CardContent>
-    </Card>
+        <p className="text-sm text-muted-foreground">{title}</p>
+      </div>
+      <div className="text-3xl font-bold">{value}</div>
+      <div className="flex items-center justify-between mt-2">
+        <p className="text-xs text-muted-foreground">{description}</p>
+        {trend !== undefined && (
+          <Badge
+            className={`text-xs ${trend > 0 ? 'bg-green-100 text-green-800 border-green-300' : trend < 0 ? 'bg-red-100 text-red-800 border-red-300' : 'bg-slate-100 text-slate-800 border-slate-300'}`}
+          >
+            {trend > 0 ? '+' : ''}
+            {trend}%
+          </Badge>
+        )}
+      </div>
+    </div>
   );
 
   if (loading) {
@@ -368,7 +374,7 @@ export const AnalyticsDashboard: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen">
       <GlobalAdminHeader
         title="Analytics Dashboard"
         description="Comprehensive analytics: search, API usage, PDF processing, chunk quality, and validation metrics"

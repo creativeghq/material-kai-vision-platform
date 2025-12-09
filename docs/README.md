@@ -145,6 +145,17 @@
 - Priority queuing
 - Health monitoring
 
+**[monitoring-analytics-system.md](monitoring-analytics-system.md)** - Monitoring & analytics ✨ NEW
+- Real-time PDF processing monitor
+- Comprehensive analytics dashboard
+- AI model usage and cost tracking
+- Search analytics and query patterns
+- Agent chat analytics
+- System performance metrics
+- Sentry integration
+- 9 checkpoint stages with full metrics
+- Real-time updates via Supabase subscriptions
+
 **[features-guide.md](features-guide.md)** - Platform features
 - Intelligent PDF processing
 - Multi-modal search
@@ -324,10 +335,18 @@ For questions or issues:
 
 ---
 
-**Last Updated**: December 2, 2025
-**Version**: 2.0.0
+**Last Updated**: January 9, 2025
+**Version**: 2.1.0
 **Status**: Production
-**Total Documentation**: 33 comprehensive guides (3 removed, 2 added)
-**Total Lines**: 10,000+
+**Total Documentation**: 39 comprehensive guides
+**Total Lines**: 12,000+
 **Coverage**: 100% of platform features
 **Planning Documents**: 10 files in /planning directory
+
+**Recent Additions**:
+- ✨ monitoring-analytics-system.md - Complete monitoring and analytics documentation
+- ✨ Stage 0 and Stage 1 monitoring integration
+- ✨ Stage 3.5 (Embedding-to-Text) and Stage 4 (Metadata Consolidation) documentation
+- ✨ Real-time job tracking with Supabase subscriptions
+- ✨ PDF Processing Monitor dashboard documentation
+- ✨ Analytics Dashboard comprehensive guide

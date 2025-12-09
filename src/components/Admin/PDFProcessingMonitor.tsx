@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PDFMetrics {
   totalDocuments: number;
@@ -26,26 +27,46 @@ export const PDFProcessingMonitor: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Use Edge Function to fetch PDF processing metrics
-        const response = await fetch('/api/pdf-processing-metrics', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+        // Fetch real data from Supabase
+        const [
+          { count: totalDocuments },
+          { count: totalChunks },
+          { count: totalEmbeddings },
+          { count: totalImages },
+          { count: totalProducts },
+        ] = await Promise.all([
+          supabase.from('documents').select('*', { count: 'exact', head: true }),
+          supabase.from('chunks').select('*', { count: 'exact', head: true }),
+          supabase.from('embeddings').select('*', { count: 'exact', head: true }),
+          supabase.from('images').select('*', { count: 'exact', head: true }),
+          supabase.from('products').select('*', { count: 'exact', head: true }),
+        ]);
+
+        // Calculate rates and averages
+        const embeddingSuccessRate = totalChunks > 0 ? (totalEmbeddings / totalChunks) * 100 : 0;
+        const imageExtractionRate = totalDocuments > 0 ? (totalImages / totalDocuments) * 100 : 0;
+        const productGenerationRate = totalDocuments > 0 ? (totalProducts / totalDocuments) * 100 : 0;
+        const averageChunksPerDocument = totalDocuments > 0 ? totalChunks / totalDocuments : 0;
+        const averageEmbeddingsPerDocument = totalDocuments > 0 ? totalEmbeddings / totalDocuments : 0;
+        const averageImagesPerDocument = totalDocuments > 0 ? totalImages / totalDocuments : 0;
+        const averageProductsPerDocument = totalDocuments > 0 ? totalProducts / totalDocuments : 0;
+
+        setMetrics({
+          totalDocuments: totalDocuments || 0,
+          totalChunks: totalChunks || 0,
+          totalEmbeddings: totalEmbeddings || 0,
+          totalImages: totalImages || 0,
+          totalProducts: totalProducts || 0,
+          embeddingSuccessRate,
+          imageExtractionRate,
+          productGenerationRate,
+          averageChunksPerDocument,
+          averageEmbeddingsPerDocument,
+          averageImagesPerDocument,
+          averageProductsPerDocument,
         });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch metrics: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.error || 'Failed to fetch metrics');
-        }
-
-        setMetrics(data.metrics);
       } catch (err) {
+        console.error('Error fetching PDF metrics:', err);
         setError(
           err instanceof Error ? err.message : 'Failed to fetch metrics',
         );
@@ -112,17 +133,22 @@ export const PDFProcessingMonitor: React.FC = () => {
       </div>
 
       {/* Overview Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <MetricCard
           label="Documents"
           value={metrics.totalDocuments}
           color="blue"
         />
-        <MetricCard label="Chunks" value={metrics.totalChunks} color="green" />
+        <MetricCard
+          label="Total Products"
+          value={metrics.totalProducts}
+          color="green"
+        />
+        <MetricCard label="Chunks" value={metrics.totalChunks} color="purple" />
         <MetricCard
           label="Embeddings"
           value={metrics.totalEmbeddings}
-          color="purple"
+          color="indigo"
         />
         <MetricCard label="Images" value={metrics.totalImages} color="orange" />
       </div>
