@@ -20,6 +20,7 @@ interface Prompt {
   description: string | null;
   prompt_text: string;
   system_prompt: string | null;
+  stage: string | null;
   configuration: any;
   version: number;
   status: string;
@@ -66,6 +67,11 @@ export const AgentConfigsPage: React.FC = () => {
         .order('category', { ascending: true });
 
       if (error) throw error;
+
+      console.log('[AI Configs] Loaded prompts:', data?.length || 0);
+      console.log('[AI Configs] Prompt types:', [...new Set(data?.map(p => p.prompt_type))]);
+      console.log('[AI Configs] Extraction prompts:', data?.filter(p => p.prompt_type === 'extraction').map(p => p.name));
+
       setPrompts(data || []);
     } catch (error) {
       console.error('Error loading prompts:', error);
@@ -77,7 +83,12 @@ export const AgentConfigsPage: React.FC = () => {
 
   const handleEdit = (prompt: Prompt) => {
     setEditingPrompt(prompt);
-    setEditedText(prompt.system_prompt || prompt.prompt_text);
+    // For extraction/template/search prompts, use prompt_text (the detailed instructions)
+    // For agent prompts, use system_prompt (the conversational system message)
+    const textToEdit = prompt.prompt_type === 'agent'
+      ? (prompt.system_prompt || prompt.prompt_text)
+      : (prompt.prompt_text || prompt.system_prompt);
+    setEditedText(textToEdit);
     setChangeReason('');
   };
 
@@ -113,22 +124,28 @@ export const AgentConfigsPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Determine which field to update based on prompt type
+      const isAgentPrompt = editingPrompt.prompt_type === 'agent';
+
+      // Save to history
       await supabase.from('prompt_history').insert({
         prompt_id: editingPrompt.id,
         old_prompt_text: editingPrompt.prompt_text,
-        new_prompt_text: editedText,
+        new_prompt_text: isAgentPrompt ? editingPrompt.prompt_text : editedText,
         old_system_prompt: editingPrompt.system_prompt,
-        new_system_prompt: editedText,
+        new_system_prompt: isAgentPrompt ? editedText : editingPrompt.system_prompt,
         old_configuration: editingPrompt.configuration,
         new_configuration: editingPrompt.configuration,
         change_reason: changeReason,
         changed_by: user.id,
       });
 
-      await supabase.from('prompts').update({
-        prompt_text: editedText,
-        system_prompt: editedText,
-      }).eq('id', editingPrompt.id);
+      // Update the appropriate field based on prompt type
+      const updateData = isAgentPrompt
+        ? { system_prompt: editedText }  // Agent prompts use system_prompt
+        : { prompt_text: editedText };   // Extraction/template/search prompts use prompt_text
+
+      await supabase.from('prompts').update(updateData).eq('id', editingPrompt.id);
 
       toast({ title: 'Success', description: `${editingPrompt.name} updated successfully` });
       setEditingPrompt(null);
@@ -181,7 +198,7 @@ export const AgentConfigsPage: React.FC = () => {
 
   return (
     <div className="min-h-screen p-6">
-      <GlobalAdminHeader title="AI Configurations" subtitle="Manage all AI prompts and configurations across the platform" />
+      <GlobalAdminHeader title="AI Configurations" description="Manage all AI prompts and configurations across the platform" />
 
       {/* Filter Tabs */}
       <div className="mt-6 flex gap-2 border-b border-gray-200">
@@ -246,7 +263,11 @@ export const AgentConfigsPage: React.FC = () => {
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Prompt Preview</Label>
                       <div className="mt-2 p-4 bg-muted rounded-lg">
-                        <p className="text-sm font-mono line-clamp-3">{prompt.system_prompt || prompt.prompt_text}</p>
+                        <p className="text-sm font-mono line-clamp-3">
+                          {prompt.prompt_type === 'agent'
+                            ? (prompt.system_prompt || prompt.prompt_text)
+                            : (prompt.prompt_text || prompt.system_prompt)}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-6 text-sm text-muted-foreground">
