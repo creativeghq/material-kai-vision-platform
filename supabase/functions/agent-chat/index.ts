@@ -50,15 +50,17 @@ import { z } from 'zod';
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 /**
- * Load agent system prompt from database
+ * Load agent system prompt from database (prompts table)
  * Falls back to default if not found
  */
 async function getAgentSystemPrompt(agentType: string): Promise<string> {
   try {
     const { data, error } = await supabase
-      .from('material_agents')
+      .from('prompts')
       .select('system_prompt')
-      .eq('agent_type', agentType)
+      .eq('prompt_type', 'agent')
+      .eq('category', agentType)
+      .eq('is_active', true)
       .eq('status', 'active')
       .single();
 

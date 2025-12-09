@@ -232,10 +232,12 @@ export class MaterialAgentOrchestratorAPI {
   static async getAvailableAgents() {
     try {
       const { data, error } = await supabase
-        .from('material_agents')
+        .from('prompts')
         .select('*')
+        .eq('prompt_type', 'agent')
+        .eq('is_active', true)
         .eq('status', 'active')
-        .order('agent_name');
+        .order('name');
 
       if (error) {
         throw error;

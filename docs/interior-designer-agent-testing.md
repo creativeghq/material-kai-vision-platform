@@ -25,9 +25,10 @@ The Interior Designer Agent is a comprehensive AI-powered interior design system
    - `createCostEstimationTool()` - Material cost calculation from products table
    - Existing tools reused: `createSearchTool()`, `createImageAnalysisTool()`
 
-3. **Database** (`material_agents` table)
+3. **Database** (`prompts` table)
    - System prompt inserted with comprehensive workflow guidelines
-   - Agent type: 'interior-designer'
+   - Prompt type: 'agent'
+   - Category: 'interior-designer'
    - Status: active
    - Includes tool descriptions, design principles, and example interactions
 

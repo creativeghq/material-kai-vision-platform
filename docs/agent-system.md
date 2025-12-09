@@ -41,29 +41,21 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Database (PostgreSQL/Supabase)                 │
-│  - material_agents table                                    │
-│  - Stores: prompts, configs, capabilities                   │
+│  - prompts table (unified for all AI prompts)              │
+│  - Stores: agent prompts, extraction prompts, templates    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Database Schema
 
-**Table: `material_agents`**
+**Table: `prompts`** (Unified table for all AI prompts)
 
-```sql
-CREATE TABLE material_agents (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  agent_type TEXT NOT NULL UNIQUE,
-  description TEXT,
-  status TEXT DEFAULT 'active',
-  version TEXT,
-  system_prompt TEXT,              -- AI system prompt
-  configuration JSONB,              -- Agent-specific config
-  capabilities JSONB,               -- Agent capabilities
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+Agent prompts are stored with:
+- `prompt_type` = 'agent'
+- `category` = agent type (pdf-processor, search, product, interior-designer)
+- `system_prompt` = conversational system message
+- `status` = 'active'
+- `is_active` = true
 ```
 
 **Current Agents**:
@@ -189,9 +181,11 @@ CREATE TABLE material_agents (
 ```typescript
 async function getAgentSystemPrompt(agentType: string): Promise<string> {
   const { data, error } = await supabase
-    .from('material_agents')
+    .from('prompts')
     .select('system_prompt')
-    .eq('agent_type', agentType)
+    .eq('prompt_type', 'agent')
+    .eq('category', agentType)
+    .eq('is_active', true)
     .eq('status', 'active')
     .single();
 
@@ -227,9 +221,11 @@ async function executeAgent(agentId: string, userInput: string) {
 ```typescript
 const loadAgents = async () => {
   const { data, error } = await supabase
-    .from('material_agents')
+    .from('prompts')
     .select('*')
-    .order('agent_type');
+    .eq('prompt_type', 'agent')
+    .eq('is_active', true)
+    .order('category');
 
   setAgents(data || []);
 };
