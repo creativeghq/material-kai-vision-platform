@@ -109,20 +109,28 @@ jobs:
                   <div class="stats">
                       <div class="stats-grid">
                           <div class="stat-item">
-                              <div class="stat-value">35</div>
+                              <div class="stat-value">39</div>
                               <div class="stat-label">Documentation Files</div>
                           </div>
                           <div class="stat-item">
-                              <div class="stat-value">113</div>
+                              <div class="stat-value">120+</div>
                               <div class="stat-label">API Endpoints</div>
                           </div>
                           <div class="stat-item">
-                              <div class="stat-value">12</div>
+                              <div class="stat-value">14</div>
                               <div class="stat-label">AI Models</div>
                           </div>
                           <div class="stat-item">
                               <div class="stat-value">5,000+</div>
                               <div class="stat-label">Active Users</div>
+                          </div>
+                          <div class="stat-item">
+                              <div class="stat-value">14</div>
+                              <div class="stat-label">Pipeline Stages</div>
+                          </div>
+                          <div class="stat-item">
+                              <div class="stat-value">6</div>
+                              <div class="stat-label">Embedding Types</div>
                           </div>
                       </div>
                   </div>
@@ -151,6 +159,7 @@ jobs:
 
                   <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #ecf0f1; color: #7f8c8d; text-align: center;">
                       <p><strong>Material Kai Vision Platform v2.3.0</strong></p>
+                      <p><em>AI-Powered Material Intelligence System with Real-time Monitoring & Analytics</em></p>
                       <p>Last updated: $(date +"%Y-%m-%d %H:%M:%S UTC")</p>
                       <p>This documentation is automatically generated and deployed from the main repository.</p>
                   </div>
@@ -226,12 +235,13 @@ jobs:
 
           ## 📊 Platform Stats
 
-          - **35** Comprehensive Documentation Files
-          - **113** API Endpoints across **14** categories
-          - **12** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Llama 4 Scout 17B Vision, CLIP, etc.)
+          - **39** Comprehensive Documentation Files
+          - **120+** API Endpoints across **15** categories
+          - **14** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Llama 4 Scout 17B Vision, CLIP, etc.)
           - **6** Embedding Types (text, visual, color, texture, application, multimodal)
-          - **14-Stage** PDF Processing Pipeline with checkpoint recovery
-          - **Complete Quote System** with status tags, upsells, and project timeline tracking
+          - **14-Stage** PDF Processing Pipeline with checkpoint recovery and real-time monitoring
+          - **Complete Quote System** with status tags, upsells/extras, and project timeline tracking
+          - **Real-time Monitoring** with Supabase subscriptions and comprehensive analytics
           - **5,000+** Active Users
           - **99.5%+** Uptime
 
@@ -266,22 +276,45 @@ jobs:
 
           ## 🚀 Key Features
 
-          - **PDF Processing**: 14-stage AI pipeline with checkpoint recovery and async job queuing
+          ### 📄 PDF Processing & AI Pipeline
+          - **14-Stage AI Pipeline**: Complete PDF processing with checkpoint recovery and async job queuing
+          - **Real-time Monitoring**: Live progress tracking with Supabase subscriptions and comprehensive metrics
           - **Product Discovery**: AI-powered dynamic product identification with metadata extraction
           - **Document Entities**: Certificates, logos, specifications as separate knowledge base
+          - **Stage-by-Stage Tracking**: Detailed monitoring for all 14 stages (INITIALIZED → COMPLETED)
+          - **Error Recovery**: Automatic retry logic with Sentry integration for all failures
+
+          ### 🔍 Search & Discovery
           - **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)
           - **Duplicate Detection**: Smart material deduplication with factory/manufacturer matching
           - **Search Suggestions**: AI-powered auto-complete, trending searches, and typo correction
           - **Material Recognition**: Llama 4 Scout 17B Vision (69.4% MMMU, #1 OCR performance)
-          - **Prompt Enhancement**: Admin-configurable extraction prompts with version control
           - **Relevancy System**: Multi-source linking between chunks, images, and products
-          - **Quote System**: Complete quote management with status tags, upsells/extras, and project timeline tracking
+
+          ### 💼 Quote & CRM System
+          - **Quote Management**: Complete quote system with status tags, upsells/extras, and project timeline tracking
           - **Project Timeline**: 9-step visual timeline with admin updates and customer progress tracking
           - **Custom Requests**: Support for text-based quote requests without products
+          - **CRM Integration**: User management with role-based access and subscription tracking
+          - **Status Tags**: Customizable quote status workflow with filtering and sorting
+
+          ### 📊 Monitoring & Analytics
+          - **Analytics Dashboard**: Comprehensive metrics for search, API usage, PDF processing, and quality
+          - **Async Job Queue Monitor**: Real-time job tracking with 7 compact metrics and live updates
+          - **AI Model Tracking**: Monitor which models are used at each pipeline stage
+          - **Cost Tracking**: Track API costs across all AI providers (Anthropic, OpenAI, Together AI)
+          - **Performance Metrics**: Processing time, success rates, and resource utilization
+
+          ### ⚙️ Admin & Configuration
+          - **Prompt Enhancement**: Admin-configurable extraction prompts with version control
+          - **AI Model Selection**: API-configurable model selection for each processing stage
+          - **Knowledge Base**: User-created documentation with PDF upload and markdown editor
+          - **Metadata Management**: Configure extraction categories and discovery prompts
+          - **System Settings**: Centralized configuration for all platform features
 
           ---
 
-          **Material Kai Vision Platform v2.2.0** - AI-powered material intelligence system
+          **Material Kai Vision Platform v2.3.0** - AI-powered material intelligence system with real-time monitoring & analytics
 
           *This documentation is automatically generated and deployed from the main repository.*
           *Last updated: $(date +"%Y-%m-%d %H:%M:%S UTC")*
