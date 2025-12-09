@@ -372,39 +372,53 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           </div>
         </div>
 
-        {/* Control Buttons */}
-        <div className="flex justify-end items-center gap-2">
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`px-4 py-2 rounded-lg font-medium transition shadow-sm ${
-              autoRefresh
-                ? 'bg-green-100 text-green-800 border border-green-300'
-                : 'bg-slate-100 text-slate-800 border border-slate-300'
-            }`}
-          >
-            {autoRefresh ? '🔄 Auto-refresh ON' : '⏸️ Auto-refresh OFF'}
-          </button>
-          <button
-            onClick={fetchQueueData}
-            className="px-4 py-2 bg-primary/10 text-primary rounded-lg font-medium hover:bg-primary/20 transition border border-primary/30 shadow-sm"
-          >
-            <RefreshCw className="w-4 h-4 inline mr-2" />
-            Refresh Now
-          </button>
-        </div>
-
       {/* Queue Status */}
       <div className="space-y-4">
           <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
-                PDF Processing Jobs
-              </CardTitle>
-              <CardDescription>
-                {metrics.pdf_processing.total} total jobs | Avg processing time:{' '}
-                {formatTime(metrics.pdf_processing.avg_processing_time)}
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    PDF Processing Jobs
+                  </CardTitle>
+                  <CardDescription>
+                    {metrics.pdf_processing.total} total jobs | Avg processing time:{' '}
+                    {formatTime(metrics.pdf_processing.avg_processing_time)}
+                  </CardDescription>
+                </div>
+
+                {/* Control Buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setAutoRefresh(!autoRefresh)}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                      autoRefresh
+                        ? 'bg-primary text-white hover:bg-primary/90 shadow-sm'
+                        : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 shadow-sm'
+                    }`}
+                  >
+                    {autoRefresh ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
+                        Auto-refresh ON
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
+                        Auto-refresh OFF
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={fetchQueueData}
+                    className="px-3 py-1.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-300 rounded-md text-sm font-medium transition-all duration-200 shadow-sm"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
+                    Refresh Now
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Status Breakdown */}
@@ -601,10 +615,17 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     Pipeline Workflow
                   </CardTitle>
                   <CardDescription>
-                    {jobCheckpoints.length} stages completed
+                    {jobCheckpoints.length} stage{jobCheckpoints.length !== 1 ? 's' : ''} completed
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {jobCheckpoints.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Activity className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                      <p className="text-sm">No pipeline checkpoints found for this job.</p>
+                      <p className="text-xs mt-1">This may be an older job processed before checkpoint tracking was implemented.</p>
+                    </div>
+                  ) : (
                   <div className="space-y-2">
                     {jobCheckpoints.map((checkpoint) => {
                       const metadata = checkpoint.metadata || {};
@@ -695,6 +716,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       );
                     })}
                   </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -704,49 +726,105 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   <CardTitle className="text-base">Processing Metrics</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-primary" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Products</div>
-                        <div className="font-semibold">
-                          {selectedJob?.metadata?.total_products || 0}
+                  <div className="space-y-6">
+                    {/* Core Metrics */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">Core Metrics</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Products</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.total_products || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Chunks</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.total_chunks || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Images</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.total_images || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Embeddings</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.total_embeddings || 0}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-primary" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Chunks</div>
-                        <div className="font-semibold">
-                          {selectedJob?.metadata?.total_chunks || 0}
+
+                    {/* Relations Breakdown */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">Relations</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                          <LinkIcon className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Product-Image</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.product_image_relations || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <LinkIcon className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Product-Chunk</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.product_chunk_relations || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <LinkIcon className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Chunk-Image</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.chunk_image_relations || 0}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <LinkIcon className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Total Relations</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.total_relations || 0}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4 text-primary" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Images</div>
-                        <div className="font-semibold">
-                          {selectedJob?.metadata?.total_images || 0}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-primary" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Embeddings</div>
-                        <div className="font-semibold">
-                          {selectedJob?.metadata?.total_embeddings || 0}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <LinkIcon className="h-4 w-4 text-primary" />
-                      <div>
-                        <div className="text-xs text-muted-foreground">Relations</div>
-                        <div className="font-semibold">
-                          {selectedJob?.metadata?.total_relations || 0}
+
+                    {/* Meta Fields */}
+                    <div>
+                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">Meta Fields</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-primary" />
+                          <div>
+                            <div className="text-xs text-muted-foreground">Total Metas</div>
+                            <div className="font-semibold">
+                              {selectedJob?.metadata?.total_metas || 0}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
