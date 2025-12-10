@@ -39,6 +39,9 @@
 | `VITE_ANTHROPIC_API_KEY` | **Secret** | Production | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `VITE_TOGETHER_AI_API_KEY` | **Secret** | Production | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `VITE_REPLICATE_API_TOKEN` | **Secret** | Production | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Public | Production, Preview | Stripe publishable key | `pk_test_...` or `pk_live_...` |
+| `VITE_STRIPE_PRO_PRICE_ID` | Public | Production, Preview | Stripe price ID for Pro subscription | `price_...` |
+| `VITE_STRIPE_ENTERPRISE_PRICE_ID` | Public | Production, Preview | Stripe price ID for Enterprise subscription | `price_...` |
 | `NODE_ENV` | Public | Production | Node environment | `production` |
 | `VITE_DEBUG` | Public | Production, Preview | Debug mode | `false` (production), `true` (preview) |
 
@@ -82,6 +85,10 @@
 | `SSH_USER` | Public | Supabase Dashboard | SSH username for server monitoring | `root` or `deploy` |
 | `SSH_PRIVATE_KEY` | **Secret** | Supabase Dashboard | SSH private key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
 | `SENTRY_AUTH_TOKEN` | **Secret** | Supabase Dashboard | Sentry API token for error queries | `sntrys_xxxxxxxxxxxxxxxx` |
+| `STRIPE_SECRET_KEY` | **Secret** | Supabase Dashboard | Stripe secret key for payments | `sk_test_...` or `sk_live_...` |
+| `STRIPE_WEBHOOK_SECRET` | **Secret** | Supabase Dashboard | Stripe webhook signing secret | `whsec_...` |
+| `STRIPE_PRO_PRICE_ID` | Public | Supabase Dashboard | Stripe price ID for Pro subscription | `price_...` |
+| `STRIPE_ENTERPRISE_PRICE_ID` | Public | Supabase Dashboard | Stripe price ID for Enterprise subscription | `price_...` |
 
 **How to Set Supabase Edge Function Secrets:**
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
@@ -111,6 +118,111 @@
 | `SENTRY_AUTH_TOKEN` | **Secret** | GitHub Actions, Supabase Edge Functions | Sentry release tracking & error queries | `sntrys_xxxxxxxxxxxxxxxx` |
 | `GOOGLE_ANALYTICS_ID` | Public | Frontend | Google Analytics tracking | `G-XXXXXXXXXX` |
 | `POSTHOG_API_KEY` | **Secret** | Frontend | PostHog analytics | `phc_xxxxxxxxxxxxxxxx` |
+
+---
+
+## 💳 Stripe Setup (Subscription & Credits System)
+
+### **Step 1: Create Stripe Account & Products**
+
+1. **Create Stripe Account**: https://dashboard.stripe.com/register
+2. **Create Products** in Stripe Dashboard:
+
+**Pro Subscription ($29/month):**
+- Go to **Products** → **Add Product**
+- Name: `Pro Subscription`
+- Description: `1000 credits per month + unlimited access`
+- Pricing: `$29.00 USD` / `Recurring` / `Monthly`
+- Copy the **Price ID** (starts with `price_...`)
+
+**Enterprise Subscription ($99/month):**
+- Go to **Products** → **Add Product**
+- Name: `Enterprise Subscription`
+- Description: `5000 credits per month + priority support`
+- Pricing: `$99.00 USD` / `Recurring` / `Monthly`
+- Copy the **Price ID** (starts with `price_...`)
+
+**Credit Packages (One-time purchases):**
+- 100 Credits: `$10.00 USD` / `One-time`
+- 600 Credits: `$50.00 USD` / `One-time`
+- 1300 Credits: `$100.00 USD` / `One-time`
+
+### **Step 2: Get Stripe API Keys**
+
+1. Go to **Developers** → **API Keys**
+2. Copy **Publishable key** (starts with `pk_test_...` or `pk_live_...`)
+3. Copy **Secret key** (starts with `sk_test_...` or `sk_live_...`)
+
+### **Step 3: Set Up Webhook**
+
+1. Go to **Developers** → **Webhooks**
+2. Click **Add endpoint**
+3. **Endpoint URL**: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/stripe-webhooks`
+4. **Events to send**: Select these events:
+   - `customer.created`
+   - `customer.subscription.created`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `payment_intent.succeeded`
+   - `invoice.paid`
+   - `invoice.payment_failed`
+5. Click **Add endpoint**
+6. Copy the **Signing secret** (starts with `whsec_...`)
+
+### **Step 4: Configure Supabase Secrets**
+
+**Go to:** https://supabase.com/dashboard/project/bgbavxtjlbvgplozizxu/settings/vault
+
+Add these 4 secrets:
+```
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRO_PRICE_ID=price_...
+STRIPE_ENTERPRISE_PRICE_ID=price_...
+```
+
+### **Step 5: Configure Vercel Environment Variables**
+
+**Go to:** https://vercel.com/creativeghq/material-kai-vision-platform/settings/environment-variables
+
+Add these 3 variables (select **ALL** environments: Production, Preview, Development):
+```
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+VITE_STRIPE_PRO_PRICE_ID=price_...
+VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
+```
+
+### **Step 6: Test the Integration**
+
+1. **Test Subscription Flow**:
+   - Go to `/profile` page
+   - Click "Subscribe to Pro"
+   - Use Stripe test card: `4242 4242 4242 4242`
+   - Verify subscription created in Stripe Dashboard
+   - Verify credits granted in database
+
+2. **Test Credit Purchase**:
+   - Go to `/profile` page
+   - Click "Buy Credits"
+   - Complete test purchase
+   - Verify credits added to account
+
+3. **Test Webhook Events**:
+   - Go to Stripe Dashboard → **Developers** → **Webhooks**
+   - Click on your webhook endpoint
+   - View **Recent events** to verify events are being received
+
+### **Stripe Test Cards**
+
+| Card Number | Description |
+|------------|-------------|
+| `4242 4242 4242 4242` | Successful payment |
+| `4000 0000 0000 0002` | Card declined |
+| `4000 0000 0000 9995` | Insufficient funds |
+
+**Expiry**: Any future date (e.g., `12/34`)
+**CVC**: Any 3 digits (e.g., `123`)
+**ZIP**: Any 5 digits (e.g., `12345`)
 
 ---
 
