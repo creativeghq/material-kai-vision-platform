@@ -152,10 +152,19 @@ export class AgentChatHistoryService {
       }
 
       // Update conversation's message count and last_message_at
+      // First get current message count
+      const { data: convo } = await supabase
+        .from('agent_chat_conversations')
+        .select('message_count')
+        .eq('id', options.conversationId)
+        .single();
+
+      const currentCount = convo?.message_count || 0;
+
       await supabase
         .from('agent_chat_conversations')
         .update({
-          message_count: supabase.rpc('increment', { row_id: options.conversationId }),
+          message_count: currentCount + 1,
           last_message_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
