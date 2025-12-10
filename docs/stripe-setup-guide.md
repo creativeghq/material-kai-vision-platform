@@ -70,32 +70,49 @@ Go to Stripe Dashboard → Developers → Webhooks → Add Endpoint
 
 ## Step 4: Configure Supabase Edge Function Secrets
 
-Go to Supabase Dashboard → Edge Functions → Manage Secrets
+**WHERE:** Supabase Dashboard → Project Settings → Edge Functions → Manage Secrets
 
-Add these secrets:
+**OR:** Supabase Dashboard → Settings → Vault (Secrets)
 
-```bash
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRO_PRICE_ID=price_...
-STRIPE_ENTERPRISE_PRICE_ID=price_...
-```
+**Add these 4 secrets:**
+
+| Secret Name | Value | Example |
+|-------------|-------|---------|
+| `STRIPE_SECRET_KEY` | Your Stripe Secret Key from Step 2 | `sk_test_51Abc...` |
+| `STRIPE_WEBHOOK_SECRET` | Your Webhook Signing Secret from Step 3 | `whsec_123...` |
+| `STRIPE_PRO_PRICE_ID` | Pro Subscription Price ID from Step 1 | `price_1Abc...` |
+| `STRIPE_ENTERPRISE_PRICE_ID` | Enterprise Subscription Price ID from Step 1 | `price_1Def...` |
+
+**How to add:**
+1. Click "Add new secret"
+2. Enter the secret name (exactly as shown above)
+3. Paste the value
+4. Click "Save"
+5. Repeat for all 4 secrets
 
 ## Step 5: Configure Vercel Environment Variables
 
-Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+**WHERE:** Vercel Dashboard → Your Project → Settings → Environment Variables
 
-Add these variables:
+**Add these 3 required variables:**
 
-```bash
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
-VITE_STRIPE_PRO_PRICE_ID=price_...
-VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_100_PRICE_ID=price_...  # Optional: if you create products
-VITE_STRIPE_CREDITS_500_PRICE_ID=price_...  # Optional
-VITE_STRIPE_CREDITS_1000_PRICE_ID=price_...  # Optional
-VITE_STRIPE_CREDITS_5000_PRICE_ID=price_...  # Optional
-```
+| Variable Name | Value | Example | Environment |
+|---------------|-------|---------|-------------|
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Your Stripe Publishable Key from Step 2 | `pk_test_51Abc...` | Production, Preview, Development |
+| `VITE_STRIPE_PRO_PRICE_ID` | Pro Subscription Price ID from Step 1 | `price_1Abc...` | Production, Preview, Development |
+| `VITE_STRIPE_ENTERPRISE_PRICE_ID` | Enterprise Subscription Price ID from Step 1 | `price_1Def...` | Production, Preview, Development |
+
+**How to add:**
+1. Click "Add New"
+2. Enter the variable name (exactly as shown above)
+3. Paste the value
+4. Select all environments: Production, Preview, Development
+5. Click "Save"
+6. Repeat for all 3 variables
+
+**After adding all variables:**
+- Click "Redeploy" to apply the new environment variables
+- Or wait for next automatic deployment
 
 ## Step 6: Test the Integration
 
