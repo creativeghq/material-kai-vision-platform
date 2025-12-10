@@ -53,6 +53,7 @@ import { MetadataManagement } from './components/Admin/MetadataManagement';
 import { RelevancyManagement } from './components/Admin/RelevancyManagement';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
+import { ContactDetailPage } from './pages/ContactDetailPage';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
 // Removed: ChunkQualityDashboard - now consolidated in AnalyticsDashboard
@@ -493,6 +494,18 @@ const App = () => (
                     <Layout>
                       <CRMManagement />
                     </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/crm/contacts/:id"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <ContactDetailPage />
+                      </Layout>
+                    </AdminGuard>
                   </AuthGuard>
                 }
               />

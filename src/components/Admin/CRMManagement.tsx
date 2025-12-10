@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building2, Plus, Edit, Trash2, Search, Mail, Shield, CreditCard, Key } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, Building2, Plus, Edit, Trash2, Search, Mail, Shield, CreditCard, Key, ExternalLink } from 'lucide-react';
 
 import {
   Card,
@@ -74,6 +75,7 @@ interface Role {
  * Handles user management and CRM contacts
  */
 export const CRMManagement: React.FC = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserWithAuth[]>([]);
@@ -172,6 +174,20 @@ export const CRMManagement: React.FC = () => {
     }
   };
 
+  // Handle add contact
+  const handleAddContact = () => {
+    setEditingContact({
+      id: '',
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      notes: '',
+      created_at: new Date().toISOString(),
+    });
+    setShowEditModal(true);
+  };
+
   // Handle edit contact
   const handleEditContact = (contact: Contact) => {
     setEditingContact(contact);
@@ -181,19 +197,29 @@ export const CRMManagement: React.FC = () => {
   // Handle save edited contact
   const handleSaveContact = async (updatedContact: Contact) => {
     try {
-      await contactsAPI.updateContact(updatedContact.id, updatedContact);
-      toast({
-        title: 'Success',
-        description: 'Contact updated successfully',
-      });
+      if (updatedContact.id) {
+        // Update existing contact
+        await contactsAPI.updateContact(updatedContact.id, updatedContact);
+        toast({
+          title: 'Success',
+          description: 'Contact updated successfully',
+        });
+      } else {
+        // Create new contact
+        await contactsAPI.createContact(updatedContact);
+        toast({
+          title: 'Success',
+          description: 'Contact created successfully',
+        });
+      }
       setShowEditModal(false);
       setEditingContact(null);
       await loadContacts();
     } catch (error) {
-      console.error('Error updating contact:', error);
+      console.error('Error saving contact:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update contact',
+        description: `Failed to ${updatedContact.id ? 'update' : 'create'} contact`,
         variant: 'destructive',
       });
     }
@@ -557,7 +583,7 @@ export const CRMManagement: React.FC = () => {
                     className="pl-8"
                   />
                 </div>
-                <Button>
+                <Button onClick={handleAddContact}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Contact
                 </Button>
@@ -593,7 +619,13 @@ export const CRMManagement: React.FC = () => {
                       filteredContacts.map((contact) => (
                         <TableRow key={contact.id}>
                           <TableCell className="font-medium">
-                            {contact.name}
+                            <button
+                              onClick={() => navigate(`/admin/crm/contacts/${contact.id}`)}
+                              className="text-primary hover:underline flex items-center gap-1"
+                            >
+                              {contact.name}
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
                           </TableCell>
                           <TableCell>
                             {contact.email ? (
@@ -662,13 +694,15 @@ export const CRMManagement: React.FC = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Edit Contact Modal */}
+      {/* Edit/Add Contact Modal */}
       {showEditModal && editingContact && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Edit Contact</CardTitle>
-              <CardDescription>Update contact information</CardDescription>
+              <CardTitle>{editingContact.id ? 'Edit Contact' : 'Add Contact'}</CardTitle>
+              <CardDescription>
+                {editingContact.id ? 'Update contact information' : 'Create a new contact'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -744,7 +778,7 @@ export const CRMManagement: React.FC = () => {
                     Cancel
                   </Button>
                   <Button onClick={() => handleSaveContact(editingContact)}>
-                    Save Changes
+                    {editingContact.id ? 'Save Changes' : 'Create Contact'}
                   </Button>
                 </div>
               </div>
