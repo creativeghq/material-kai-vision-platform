@@ -1443,14 +1443,7 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
 4. The marker MUST be on its own line
 5. ALWAYS include the marker for material queries`,
   },
-  'pdf-processor': {
-    id: 'pdf-processor',
-    name: 'PDF Processing Agent',
-    description: 'Intelligent PDF processing with monitoring',
-    allowedRoles: ['admin', 'owner'],
-    tools: ['uploadPDF', 'checkJobStatus', 'queryDatabase', 'checkServerHealth', 'querySentry', 'getStageDetails', 'getRelationshipCounts', 'getDocumentEntities', 'getMetadataExtraction'],
-    // systemPrompt loaded dynamically from database
-  },
+  // REMOVED: 'pdf-processor' agent - replaced with standalone /admin/data-import page
   'interior-designer': {
     id: 'interior-designer',
     name: 'Interior Designer Agent',
@@ -1520,38 +1513,13 @@ async function executeAgent(
   if (config.tools.includes('image_analysis')) {
     tools.push(createImageAnalysisTool(workspaceId));
   }
-  if (config.tools.includes('uploadPDF')) {
-    // If PDF file is provided, create a wrapper tool that auto-injects the PDF data
-    if (pdfFile) {
-      const uploadPDFWithData = tool(
-        async ({ category }: { category?: 'products' | 'certificates' | 'logos' | 'specifications' }) => {
-          // Call the original tool with the PDF data injected
-          const originalTool = createUploadPDFTool(userId, workspaceId);
-          return await originalTool.invoke({
-            fileName: pdfFile.name,
-            fileBase64: pdfFile.base64,
-            category: category || pdfFile.category,
-          });
-        },
-        {
-          name: 'uploadPDF',
-          description: `Upload the attached PDF file "${pdfFile.name}" to start processing`,
-          schema: z.object({
-            category: z
-              .enum(['products', 'certificates', 'logos', 'specifications'])
-              .optional()
-              .describe(`Document category (default: ${pdfFile.category})`),
-          }),
-        }
-      );
-      tools.push(uploadPDFWithData);
-    } else {
-      tools.push(createUploadPDFTool(userId, workspaceId));
-    }
-  }
-  if (config.tools.includes('checkJobStatus')) {
-    tools.push(createCheckJobStatusTool());
-  }
+  // REMOVED: PDF processing tools - moved to /admin/data-import page
+  // - uploadPDF
+  // - checkJobStatus
+  // - getStageDetails
+  // - getRelationshipCounts
+  // - getDocumentEntities
+  // - getMetadataExtraction
   if (config.tools.includes('queryDatabase')) {
     tools.push(createQueryDatabaseTool());
   }
@@ -1560,18 +1528,6 @@ async function executeAgent(
   }
   if (config.tools.includes('querySentry')) {
     tools.push(createQuerySentryTool());
-  }
-  if (config.tools.includes('getStageDetails')) {
-    tools.push(createGetStageDetailsTool());
-  }
-  if (config.tools.includes('getRelationshipCounts')) {
-    tools.push(createGetRelationshipCountsTool());
-  }
-  if (config.tools.includes('getDocumentEntities')) {
-    tools.push(createGetDocumentEntitiesTool());
-  }
-  if (config.tools.includes('getMetadataExtraction')) {
-    tools.push(createGetMetadataExtractionTool());
   }
   if (config.tools.includes('spaceformer_analysis')) {
     tools.push(createSpaceformerTool(workspaceId));
