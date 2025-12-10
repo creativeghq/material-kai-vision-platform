@@ -1871,7 +1871,9 @@ serve(async (req) => {
 
   try {
     // Get request body
-    const { messages, agentId = 'search', pdfFile } = await req.json();
+    const { messages = [], agentId = 'search', pdfFile } = await req.json();
+
+    console.log(`📨 Received request for agent: ${agentId}, messages: ${messages.length}, hasPDF: ${!!pdfFile}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -1928,11 +1930,19 @@ serve(async (req) => {
 
 After uploading, monitor the processing job and verify completion.`;
 
-      // Replace the last message with the upload instruction
-      anthropicMessages[anthropicMessages.length - 1] = {
-        role: 'user',
-        content: uploadInstruction,
-      };
+      // If messages array is empty or last message is empty, create a new message
+      if (anthropicMessages.length === 0 || !anthropicMessages[anthropicMessages.length - 1]?.content) {
+        anthropicMessages.push({
+          role: 'user',
+          content: uploadInstruction,
+        });
+      } else {
+        // Replace the last message with the upload instruction
+        anthropicMessages[anthropicMessages.length - 1] = {
+          role: 'user',
+          content: uploadInstruction,
+        };
+      }
 
       userInput = uploadInstruction;
     }
