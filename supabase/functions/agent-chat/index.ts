@@ -1935,6 +1935,8 @@ After uploading, monitor the processing job and verify completion.`;
     const stream = new ReadableStream({
       async start(controller) {
         console.log('🎬 Stream start() called');
+        let streamClosed = false;
+
         try {
           // Send initial status
           console.log('📤 Sending initial status chunk...');
@@ -1957,8 +1959,17 @@ After uploading, monitor the processing job and verify completion.`;
             pdfFile,
             // Streaming callback
             (chunk) => {
-              console.log('📨 Streaming callback received chunk:', chunk.type);
-              controller.enqueue(JSON.stringify(chunk) + '\n');
+              if (streamClosed) {
+                console.warn('⚠️ Stream already closed, skipping chunk:', chunk.type);
+                return;
+              }
+              try {
+                console.log('📨 Streaming callback received chunk:', chunk.type);
+                controller.enqueue(JSON.stringify(chunk) + '\n');
+              } catch (enqueueError) {
+                console.warn('⚠️ Failed to enqueue chunk (stream may be closed):', enqueueError);
+                streamClosed = true;
+              }
             }
           );
           console.log('✅ executeAgent completed');
@@ -1986,11 +1997,13 @@ After uploading, monitor the processing job and verify completion.`;
           console.log('✅ Done chunk sent');
 
           console.log('🏁 Closing stream');
+          streamClosed = true;
           controller.close();
           console.log('✅ Stream closed successfully');
         } catch (error) {
           console.error('❌ Streaming error:', error);
           console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
+          streamClosed = true;
           try {
             controller.enqueue(JSON.stringify({
               type: 'error',
