@@ -412,16 +412,78 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           requestBody.pdfFile = attachedPDF;
         }
 
-        // Call Supabase Edge Function for agent execution
-        const { data: responseData, error } = await supabase.functions.invoke('agent-chat', {
-          body: requestBody,
-        });
-
-        if (error) {
-          throw new Error(error.message || 'Agent execution failed');
+        // Call Supabase Edge Function for agent execution with STREAMING
+        const authToken = (await supabase.auth.getSession()).data.session?.access_token;
+        if (!authToken) {
+          throw new Error('Not authenticated');
         }
 
-        data = responseData;
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Agent execution failed: ${response.status}`);
+        }
+
+        if (!response.body) {
+          throw new Error('No response body');
+        }
+
+        // Read streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let finalResult: any = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const chunk = JSON.parse(line);
+
+              // Handle different chunk types
+              if (chunk.type === 'status') {
+                console.log('📊 Status:', chunk.message);
+              } else if (chunk.type === 'iteration') {
+                console.log(`🔄 Iteration ${chunk.iteration}/${chunk.maxIterations}`);
+              } else if (chunk.type === 'tool_call') {
+                console.log(`🔧 Calling tool: ${chunk.tool}`);
+              } else if (chunk.type === 'tool_result') {
+                console.log(`✅ Tool ${chunk.tool} completed`);
+              } else if (chunk.type === 'final_result') {
+                finalResult = chunk;
+              } else if (chunk.type === 'error') {
+                throw new Error(chunk.message);
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse chunk:', line, parseError);
+            }
+          }
+        }
+
+        if (!finalResult) {
+          throw new Error('No final result received from agent');
+        }
+
+        data = finalResult;
 
         // Cache the response for future use
         if (canUseCache && data) {

@@ -1218,8 +1218,9 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
 };
 
 /**
- * Execute agent with tools using LangChain
+ * Execute agent with tools using LangChain - STREAMING VERSION
  * Returns { text, materialResults } where materialResults contains search products
+ * onChunk callback receives real-time progress updates
  */
 async function executeAgent(
   agentId: string,
@@ -1227,7 +1228,8 @@ async function executeAgent(
   userId: string,
   userInput: string,
   messages: any[],
-  pdfFile?: { name: string; base64: string; category: string }
+  pdfFile?: { name: string; base64: string; category: string },
+  onChunk?: (chunk: any) => void
 ): Promise<{ text: string; materialResults?: { products: any[]; images?: Record<string, string>; title?: string } }> {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
@@ -1336,9 +1338,24 @@ async function executeAgent(
     iteration++;
     console.log(`🔄 Agent iteration ${iteration}/${maxIterations}`);
 
+    // Send iteration status via streaming
+    onChunk?.({
+      type: 'iteration',
+      iteration,
+      maxIterations,
+      message: `Processing step ${iteration}/${maxIterations}...`
+    });
+
     // Invoke model with current messages
     const response = await modelWithTools.invoke(currentMessages, {
       system: systemPrompt,
+    });
+
+    // Send Claude's response via streaming
+    onChunk?.({
+      type: 'assistant_thinking',
+      content: response.content,
+      hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
     });
 
     // Add assistant response to messages
@@ -1382,6 +1399,14 @@ async function executeAgent(
     for (const toolCall of response.tool_calls) {
       console.log(`  📞 Calling tool: ${toolCall.name}`);
 
+      // Send tool call status via streaming
+      onChunk?.({
+        type: 'tool_call',
+        tool: toolCall.name,
+        args: toolCall.args,
+        message: `Calling ${toolCall.name}...`
+      });
+
       try {
         // Find the tool
         const tool = tools.find((t: any) => t.name === toolCall.name);
@@ -1392,6 +1417,14 @@ async function executeAgent(
         // Execute the tool
         const toolResult = await tool.invoke(toolCall.args);
         console.log(`  ✅ Tool ${toolCall.name} completed`);
+
+        // Send tool result via streaming
+        onChunk?.({
+          type: 'tool_result',
+          tool: toolCall.name,
+          result: toolResult,
+          message: `${toolCall.name} completed`
+        });
 
         // Capture search results for materialResults
         if (toolCall.name === 'material_search') {
@@ -1446,6 +1479,14 @@ async function executeAgent(
         });
       } catch (error) {
         console.error(`  ❌ Tool ${toolCall.name} failed:`, error);
+
+        // Send tool error via streaming
+        onChunk?.({
+          type: 'tool_error',
+          tool: toolCall.name,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          message: `${toolCall.name} failed`
+        });
 
         // Add error result to messages
         currentMessages.push({
@@ -1633,25 +1674,67 @@ After uploading, monitor the processing job and verify completion.`;
       userInput = uploadInstruction;
     }
 
-    // Execute agent
-    const result = await executeAgent(agentId, workspaceId, user.id, userInput, anthropicMessages, pdfFile);
+    // Execute agent with STREAMING
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Send initial status
+          controller.enqueue(JSON.stringify({
+            type: 'status',
+            message: 'Starting agent...'
+          }) + '\n');
 
-    // Save conversation (pass just the text)
-    await saveConversation(user.id, agentId, messages, result.text);
+          let finalResult: any = null;
 
-    // Return response with materialResults for ProductStrip display
-    const modelUsed = getModelNameForAgent(agentId);
-    return new Response(
-      JSON.stringify({
-        text: result.text,
-        agentId,
-        model: modelUsed,
-        materialResults: result.materialResults,
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          // Execute agent with streaming callback
+          finalResult = await executeAgent(
+            agentId,
+            workspaceId,
+            user.id,
+            userInput,
+            anthropicMessages,
+            pdfFile,
+            // Streaming callback
+            (chunk) => {
+              controller.enqueue(JSON.stringify(chunk) + '\n');
+            }
+          );
+
+          // Save conversation
+          await saveConversation(user.id, agentId, messages, finalResult.text);
+
+          // Send final result
+          const modelUsed = getModelNameForAgent(agentId);
+          controller.enqueue(JSON.stringify({
+            type: 'final_result',
+            text: finalResult.text,
+            agentId,
+            model: modelUsed,
+            materialResults: finalResult.materialResults,
+          }) + '\n');
+
+          // Send completion
+          controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
+          controller.close();
+        } catch (error) {
+          console.error('❌ Streaming error:', error);
+          controller.enqueue(JSON.stringify({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error'
+          }) + '\n');
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
       },
-    );
+    });
   } catch (error) {
     console.error('❌ Agent chat error:', error);
     console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
