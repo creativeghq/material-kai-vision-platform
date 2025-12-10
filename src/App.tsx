@@ -42,6 +42,7 @@ import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
 import PackagesPanel from './components/Admin/PackagesPanel';
 import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
+import { UserProfilePage } from './pages/UserProfilePage';
 import HealthPage from './pages/Health';
 import {
   CriticalErrorBoundary,
@@ -107,6 +108,16 @@ const App = () => (
                   <PageErrorBoundary name="Home Page">
                     <AuthGuard>
                       <Index />
+                    </AuthGuard>
+                  </PageErrorBoundary>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <PageErrorBoundary name="User Profile">
+                    <AuthGuard>
+                      <UserProfilePage />
                     </AuthGuard>
                   </PageErrorBoundary>
                 }

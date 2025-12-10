@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, Bell, Settings, User, Sparkles, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -22,6 +24,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
 }) => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const handleSignOut = async () => {
     await signOut();
@@ -92,6 +95,20 @@ export const Header: React.FC<HeaderProps> = ({
                   <User className="mr-3 h-4 w-4" />
                   <span className="text-sm">{user.email}</span>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => navigate('/profile')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      navigate('/profile');
+                    }
+                  }}
+                  className="py-3"
+                >
+                  <User className="mr-3 h-4 w-4" />
+                  <span className="text-sm">My Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleSignOut}
                   onKeyDown={(e) => {
