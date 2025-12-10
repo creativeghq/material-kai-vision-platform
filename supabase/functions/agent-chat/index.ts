@@ -1955,41 +1955,68 @@ After uploading, monitor the processing job and verify completion.`;
         let streamClosed = false;
 
         try {
-          // Send initial status
+          // Send initial status IMMEDIATELY to keep stream alive
           console.log('📤 Sending initial status chunk...');
-          controller.enqueue(JSON.stringify({
-            type: 'status',
-            message: 'Starting agent...'
-          }) + '\n');
-          console.log('✅ Initial status chunk sent');
+          try {
+            controller.enqueue(JSON.stringify({
+              type: 'status',
+              message: 'Initializing agent...'
+            }) + '\n');
+            console.log('✅ Initial status chunk sent');
+          } catch (enqueueError) {
+            console.error('❌ Failed to send initial chunk:', enqueueError);
+            throw enqueueError;
+          }
 
           let finalResult: any = null;
 
-          // Execute agent with streaming callback
-          console.log('🤖 Calling executeAgent...');
-          finalResult = await executeAgent(
-            agentId,
-            workspaceId,
-            user.id,
-            userInput,
-            anthropicMessages,
-            pdfFile,
-            // Streaming callback
-            (chunk) => {
-              if (streamClosed) {
-                console.warn('⚠️ Stream already closed, skipping chunk:', chunk.type);
-                return;
-              }
+          // Start heartbeat to keep stream alive during long operations
+          const heartbeatInterval = setInterval(() => {
+            if (!streamClosed) {
               try {
-                console.log('📨 Streaming callback received chunk:', chunk.type);
-                controller.enqueue(JSON.stringify(chunk) + '\n');
-              } catch (enqueueError) {
-                console.warn('⚠️ Failed to enqueue chunk (stream may be closed):', enqueueError);
-                streamClosed = true;
+                controller.enqueue(JSON.stringify({
+                  type: 'heartbeat',
+                  timestamp: Date.now()
+                }) + '\n');
+                console.log('💓 Heartbeat sent');
+              } catch (error) {
+                console.warn('⚠️ Heartbeat failed, stream may be closed');
+                clearInterval(heartbeatInterval);
               }
             }
-          );
-          console.log('✅ executeAgent completed');
+          }, 5000); // Send heartbeat every 5 seconds
+
+          try {
+            // Execute agent with streaming callback
+            console.log('🤖 Calling executeAgent...');
+            finalResult = await executeAgent(
+              agentId,
+              workspaceId,
+              user.id,
+              userInput,
+              anthropicMessages,
+              pdfFile,
+              // Streaming callback
+              (chunk) => {
+                if (streamClosed) {
+                  console.warn('⚠️ Stream already closed, skipping chunk:', chunk.type);
+                  return;
+                }
+                try {
+                  console.log('📨 Streaming callback received chunk:', chunk.type);
+                  controller.enqueue(JSON.stringify(chunk) + '\n');
+                } catch (enqueueError) {
+                  console.warn('⚠️ Failed to enqueue chunk (stream may be closed):', enqueueError);
+                  streamClosed = true;
+                }
+              }
+            );
+            console.log('✅ executeAgent completed');
+          } finally {
+            // Stop heartbeat
+            clearInterval(heartbeatInterval);
+            console.log('💓 Heartbeat stopped');
+          }
 
           // Save conversation
           console.log('💾 Saving conversation...');
