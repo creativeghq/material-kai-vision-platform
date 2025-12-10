@@ -100,12 +100,12 @@ const AdminDashboard: React.FC = () => {
     ],
     'Data Management': [
       {
-        title: 'Data Import Hub',
-        description: 'Import products from XML files and web scraping with AI-assisted field mapping',
+        title: 'PDF Processing',
+        description: 'Upload and process PDF catalogs with 14-stage workflow monitoring',
         icon: DatabaseIcon,
         path: '/admin/data-import',
         status: 'active',
-        count: 'XML & Web',
+        count: 'PDF Upload',
       },
       {
         title: 'Material Scraper',

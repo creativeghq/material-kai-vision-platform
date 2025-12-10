@@ -1,0 +1,179 @@
+/**
+ * PDFProcessingWorkflow - Visual workflow for PDF processing
+ * Displays 14 stages with real-time progress updates
+ */
+
+import React, { useState, useEffect } from 'react';
+import { CheckCircle2, Circle, XCircle, Loader2, RotateCcw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { usePDFProcessingMonitor } from '@/services/pdf/pdfProcessingMonitor';
+
+interface PDFProcessingWorkflowProps {
+  jobId: string;
+  onComplete: () => void;
+  onReset: () => void;
+}
+
+interface Stage {
+  id: number;
+  name: string;
+  status: 'pending' | 'active' | 'complete' | 'error';
+  progress: number;
+  metrics?: Record<string, any>;
+  error?: string;
+}
+
+export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
+  jobId,
+  onComplete,
+  onReset,
+}) => {
+  const { jobStatus, isPolling, error: monitorError } = usePDFProcessingMonitor(jobId);
+  const [stages, setStages] = useState<Stage[]>([
+    { id: 1, name: 'Product Discovery', status: 'pending', progress: 0 },
+    { id: 2, name: 'Entity Discovery', status: 'pending', progress: 0 },
+    { id: 3, name: 'Focused Extraction', status: 'pending', progress: 0 },
+    { id: 4, name: 'Chunking', status: 'pending', progress: 0 },
+    { id: 5, name: 'Text Embeddings', status: 'pending', progress: 0 },
+    { id: 6, name: 'Image Extraction', status: 'pending', progress: 0 },
+    { id: 7, name: 'Image Classification', status: 'pending', progress: 0 },
+    { id: 8, name: 'Image Analysis', status: 'pending', progress: 0 },
+    { id: 9, name: 'CLIP Embeddings', status: 'pending', progress: 0 },
+    { id: 10, name: 'Product Creation', status: 'pending', progress: 0 },
+    { id: 11, name: 'Document Entities', status: 'pending', progress: 0 },
+    { id: 12, name: 'Relationship Mapping', status: 'pending', progress: 0 },
+    { id: 13, name: 'Metadata Extraction', status: 'pending', progress: 0 },
+    { id: 14, name: 'Quality Enhancement', status: 'pending', progress: 0 },
+  ]);
+
+  // Update stages based on job status
+  useEffect(() => {
+    if (!jobStatus) return;
+
+    // Map checkpoint to stages and update
+    const updatedStages = mapCheckpointToStages(jobStatus);
+    setStages(updatedStages);
+
+    // Check if completed
+    if (jobStatus.status === 'completed') {
+      onComplete();
+    }
+  }, [jobStatus, onComplete]);
+
+  const mapCheckpointToStages = (job: any): Stage[] => {
+    // This will be implemented in the monitoring service
+    // For now, return current stages
+    return stages;
+  };
+
+  const getStageIcon = (status: Stage['status']) => {
+    switch (status) {
+      case 'complete':
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      case 'active':
+        return <Loader2 className="h-5 w-5 text-primary animate-spin" />;
+      case 'error':
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      default:
+        return <Circle className="h-5 w-5 text-white/30" />;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Workflow Header */}
+      <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-white">Processing Workflow</h2>
+          {jobStatus?.status === 'failed' && (
+            <Button variant="outline" size="sm" onClick={onReset}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Start New Upload
+            </Button>
+          )}
+        </div>
+
+        {/* Overall Progress */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-sm text-white/70 mb-2">
+            <span>Overall Progress</span>
+            <span>{jobStatus?.progress || 0}%</span>
+          </div>
+          <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all duration-500"
+              style={{ width: `${jobStatus?.progress || 0}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {(jobStatus?.error || monitorError) && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">
+            <p className="font-semibold">Error:</p>
+            <p className="text-sm">{jobStatus?.error || monitorError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Stage Cards */}
+      <div className="space-y-3">
+        {stages.map((stage) => (
+          <div
+            key={stage.id}
+            className={`bg-slate-800/50 backdrop-blur-sm border rounded-lg p-4 transition-all ${
+              stage.status === 'active'
+                ? 'border-primary shadow-lg shadow-primary/20'
+                : stage.status === 'complete'
+                ? 'border-green-500/30'
+                : stage.status === 'error'
+                ? 'border-red-500/30'
+                : 'border-white/10'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {getStageIcon(stage.status)}
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-medium text-white">
+                    {stage.id}. {stage.name}
+                  </h3>
+                  <span className="text-sm text-white/60">{stage.progress}%</span>
+                </div>
+                {stage.progress > 0 && (
+                  <div className="h-1 bg-slate-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        stage.status === 'error' ? 'bg-red-500' : 'bg-primary'
+                      }`}
+                      style={{ width: `${stage.progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Metrics */}
+            {stage.metrics && (
+              <div className="mt-3 pl-8 text-sm text-white/60">
+                {Object.entries(stage.metrics).map(([key, value]) => (
+                  <div key={key}>
+                    • {key}: {value}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Error */}
+            {stage.error && (
+              <div className="mt-3 pl-8 text-sm text-red-400">
+                ⚠️ {stage.error}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+

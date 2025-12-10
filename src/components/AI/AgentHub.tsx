@@ -194,7 +194,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
-  const [attachedPDF, setAttachedPDF] = useState<{ name: string; base64: string; category: string } | null>(null);
+  // REMOVED: attachedPDF state - PDF processing moved to /admin/data-import page
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -204,7 +204,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [messageRatings, setMessageRatings] = useState<Record<string, 'up' | 'down' | null>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
+  // REMOVED: pdfInputRef - PDF processing moved to /admin/data-import page
 
   // Voice input hook
   const {
@@ -376,7 +376,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Check cache for similar queries (only for search-type queries without images)
       const workspaceId = session.user?.user_metadata?.workspace_id;
-      const canUseCache = attachedImages.length === 0 && !attachedPDF && selectedAgent === 'search';
+      const canUseCache = attachedImages.length === 0 && selectedAgent === 'search';
       let data: any = null;
 
       if (canUseCache) {
@@ -407,10 +407,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           images: attachedImages,
         };
 
-        // Add PDF data if attached (for pdf-processor agent)
-        if (attachedPDF && selectedAgent === 'pdf-processor') {
-          requestBody.pdfFile = attachedPDF;
-        }
+        // REMOVED: PDF data attachment - PDF processing moved to /admin/data-import page
 
         // Call Supabase Edge Function for agent execution with STREAMING
         const { data: { session } } = await supabase.auth.getSession();
@@ -628,9 +625,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     } finally {
       setIsLoading(false);
       setAttachedImages([]);
-      setAttachedPDF(null);
+      // REMOVED: setAttachedPDF(null) - PDF processing moved to /admin/data-import page
     }
-  }, [input, selectedAgent, selectedModel, attachedImages, attachedPDF, userId, currentConversationId, messages]);
+  }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -649,35 +646,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     });
   }, []);
 
-  const handlePDFUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'application/pdf') {
-      toast({
-        title: 'Invalid File Type',
-        description: 'Please upload a PDF file',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        const base64 = (event.target.result as string).split(',')[1]; // Remove data:application/pdf;base64, prefix
-        setAttachedPDF({
-          name: file.name,
-          base64,
-          category: 'products', // Default category
-        });
-
-        // Auto-populate input with upload instruction
-        setInput(`Upload and process this PDF: ${file.name}`);
-      }
-    };
-    reader.readAsDataURL(file);
-  }, [toast]);
+  // REMOVED: handlePDFUpload - PDF processing moved to /admin/data-import page
 
   const handleVoiceInput = useCallback(() => {
     if (!isVoiceSupported) {
@@ -1240,28 +1209,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           )}
 
-          {/* Attached PDF */}
-          {attachedPDF && (
-            <div className="px-6 pt-3">
-              <div className="p-3 border rounded-lg bg-indigo-500/10 border-indigo-500/30">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileUp className="h-5 w-5 text-indigo-500" />
-                    <div>
-                      <p className="text-sm font-medium text-white">{attachedPDF.name}</p>
-                      <p className="text-xs text-white/70">Category: {attachedPDF.category}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setAttachedPDF(null)}
-                    className="bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-destructive/90"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* REMOVED: Attached PDF display - PDF processing moved to /admin/data-import page */}
 
           {/* Input Controls */}
           <div className="p-4">
@@ -1274,26 +1222,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 className="hidden"
                 onChange={handleImageUpload}
               />
-              <input
-                ref={pdfInputRef}
-                type="file"
-                accept="application/pdf"
-                className="hidden"
-                onChange={handlePDFUpload}
-              />
-
-              {/* PDF Upload Button (only for pdf-processor agent) */}
-              {selectedAgent === 'pdf-processor' && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => pdfInputRef.current?.click()}
-                  className="h-9 w-9 text-indigo-500 hover:text-indigo-600"
-                  title="Upload PDF"
-                >
-                  <FileUp className="h-4 w-4" />
-                </Button>
-              )}
+              {/* REMOVED: PDF upload input and button - PDF processing moved to /admin/data-import page */}
 
               {/* Image Upload Buttons (hidden for pdf-processor agent) */}
               {selectedAgent !== 'pdf-processor' && (
