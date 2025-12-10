@@ -421,6 +421,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         // Get Supabase URL from the client
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
 
+        console.log('🚀 Calling agent-chat edge function...');
         const response = await fetch(
           `${supabaseUrl}/functions/v1/agent-chat`,
           {
@@ -433,26 +434,39 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }
         );
 
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
-          throw new Error(`Agent execution failed: ${response.status}`);
+          const errorText = await response.text();
+          console.error('❌ Error response:', errorText);
+          throw new Error(`Agent execution failed: ${response.status} - ${errorText}`);
         }
 
         if (!response.body) {
           throw new Error('No response body');
         }
 
+        console.log('✅ Starting to read stream...');
+
         // Read streaming response
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let finalResult: any = null;
+        let chunkCount = 0;
 
         while (true) {
           const { done, value } = await reader.read();
 
-          if (done) break;
+          if (done) {
+            console.log('📭 Stream ended. Total chunks received:', chunkCount);
+            break;
+          }
 
-          buffer += decoder.decode(value, { stream: true });
+          const decoded = decoder.decode(value, { stream: true });
+          console.log('📦 Received chunk:', decoded.substring(0, 100) + (decoded.length > 100 ? '...' : ''));
+          buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
 
@@ -461,6 +475,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
             try {
               const chunk = JSON.parse(line);
+              chunkCount++;
+              console.log(`📨 Chunk #${chunkCount}:`, chunk.type, chunk);
 
               // Handle different chunk types
               if (chunk.type === 'status') {
@@ -472,15 +488,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'tool_result') {
                 console.log(`✅ Tool ${chunk.tool} completed`);
               } else if (chunk.type === 'final_result') {
+                console.log('🎯 Final result received!');
                 finalResult = chunk;
               } else if (chunk.type === 'error') {
+                console.error('❌ Error chunk received:', chunk.message);
                 throw new Error(chunk.message);
+              } else if (chunk.type === 'done') {
+                console.log('✅ Done chunk received');
               }
             } catch (parseError) {
-              console.warn('Failed to parse chunk:', line, parseError);
+              console.warn('⚠️ Failed to parse chunk:', line, parseError);
             }
           }
         }
+
+        console.log('🔍 Final result check:', finalResult ? 'Found' : 'NOT FOUND');
 
         if (!finalResult) {
           throw new Error('No final result received from agent');
