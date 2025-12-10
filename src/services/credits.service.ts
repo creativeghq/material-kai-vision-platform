@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 const API_BASE = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
 
@@ -188,3 +188,23 @@ export const creditsAPI = {
   },
 };
 
+/**
+ * CreditsService class wrapper for compatibility
+ */
+export class CreditsService {
+  async getBalance() {
+    return creditsAPI.getBalance();
+  }
+
+  async getTransactions(limit?: number) {
+    return creditsAPI.getTransactions(limit);
+  }
+
+  async getUsageLogs(limit?: number) {
+    return creditsAPI.getUsageLogs(limit);
+  }
+
+  calculateCost(model: string, inputTokens: number, outputTokens: number) {
+    return creditsAPI.calculateCost(model, inputTokens, outputTokens);
+  }
+}

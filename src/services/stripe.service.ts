@@ -216,3 +216,27 @@ export const stripeAPI = {
   },
 };
 
+/**
+ * StripeService class wrapper for compatibility
+ */
+export class StripeService {
+  async createCreditCheckoutSession(creditPackageId: string, credits: number, price: number) {
+    return stripeAPI.createCreditCheckoutSession(creditPackageId, credits, price);
+  }
+
+  async createSubscriptionCheckoutSession(priceId: string) {
+    return stripeAPI.createSubscriptionCheckoutSession(priceId);
+  }
+
+  async createCustomerPortalSession() {
+    return stripeAPI.createCustomerPortalSession();
+  }
+
+  getCreditPackages() {
+    return stripeAPI.getCreditPackages();
+  }
+
+  getSubscriptionTiers() {
+    return stripeAPI.getSubscriptionTiers();
+  }
+}
