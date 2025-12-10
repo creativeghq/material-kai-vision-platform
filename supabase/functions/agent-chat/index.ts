@@ -788,9 +788,9 @@ const createQueryDatabaseTool = () => {
             });
 
           case 'chunks':
-            tableName = 'chunks';
+            tableName = 'document_chunks';
             query = supabase
-              .from('chunks')
+              .from('document_chunks')
               .select('id, content, metadata, created_at')
               .eq('document_id', documentId)
               .limit(5);

@@ -62,7 +62,7 @@ export const MetricsGrid: React.FC = () => {
 
         // Fetch chunks count
         const { count: chunksCount } = await supabase
-          .from('chunks')
+          .from('document_chunks')
           .select('*', { count: 'exact', head: true });
 
         // Fetch embeddings count

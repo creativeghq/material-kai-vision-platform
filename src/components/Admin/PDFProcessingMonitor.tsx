@@ -36,7 +36,7 @@ export const PDFProcessingMonitor: React.FC = () => {
           { count: totalProducts },
         ] = await Promise.all([
           supabase.from('documents').select('*', { count: 'exact', head: true }),
-          supabase.from('chunks').select('*', { count: 'exact', head: true }),
+          supabase.from('document_chunks').select('*', { count: 'exact', head: true }),
           supabase.from('embeddings').select('*', { count: 'exact', head: true }),
           supabase.from('images').select('*', { count: 'exact', head: true }),
           supabase.from('products').select('*', { count: 'exact', head: true }),
