@@ -518,7 +518,7 @@ const createUploadPDFTool = (userId: string, workspaceId: string) => {
 
           try {
             const { data: existingJobs } = await supabase
-              .from('async_jobs')
+              .from('background_jobs')
               .select('*')
               .ilike('metadata->>file_name', `%${fileName}%`)
               .order('created_at', { ascending: false })
@@ -612,6 +612,15 @@ const createCheckJobStatusTool = () => {
         // Detect failed stages
         const hasFailed = status.status === 'failed' || status.error;
 
+        // Build user-friendly progress message
+        const progressMessage = status.status === 'completed'
+          ? `✅ Processing complete! ${status.metadata?.products_created || 0} products created, ${status.metadata?.chunks_created || 0} chunks generated.`
+          : status.status === 'processing'
+          ? `⏳ Processing in progress: ${status.progress}% complete. Current stage: ${status.last_checkpoint?.stage || 'unknown'}`
+          : status.status === 'failed'
+          ? `❌ Processing failed: ${status.error || 'Unknown error'}`
+          : `📋 Job status: ${status.status}`;
+
         return JSON.stringify({
           success: true,
           job_id: status.job_id,
@@ -625,6 +634,8 @@ const createCheckJobStatusTool = () => {
           error: status.error,
           is_stuck: isStuck,
           has_failed: hasFailed,
+          user_message: progressMessage,
+          agent_instruction: 'IMPORTANT: Report this progress update to the user in a friendly, conversational way. Include the progress percentage and current stage.',
           suggestion: isStuck ? 'Job appears stuck. Check server health and Sentry logs.' :
                      hasFailed ? 'Job failed. Check error details and consider retry.' : null,
         });
@@ -640,7 +651,7 @@ const createCheckJobStatusTool = () => {
 
         try {
           const { data: job, error: dbError } = await supabase
-            .from('async_jobs')
+            .from('background_jobs')
             .select('*')
             .eq('id', jobId)
             .single();
@@ -657,6 +668,15 @@ const createCheckJobStatusTool = () => {
                          job.updated_at &&
                          (Date.now() - new Date(job.updated_at).getTime()) > 300000; // 5 minutes
 
+          // Build user-friendly progress message
+          const progressMessage = job.status === 'completed'
+            ? `✅ Processing complete! ${job.metadata?.products_created || 0} products created, ${job.metadata?.chunks_created || 0} chunks generated.`
+            : job.status === 'processing'
+            ? `⏳ Processing in progress: ${job.progress}% complete. Current stage: ${job.last_checkpoint?.stage || 'unknown'}`
+            : job.status === 'failed'
+            ? `❌ Processing failed: ${job.error || 'Unknown error'}`
+            : `📋 Job status: ${job.status}`;
+
           return JSON.stringify({
             success: true,
             job_id: job.id,
@@ -671,6 +691,8 @@ const createCheckJobStatusTool = () => {
             is_stuck: isStuck,
             has_failed: job.status === 'failed',
             recovered_from_db: true,
+            user_message: progressMessage,
+            agent_instruction: 'IMPORTANT: Report this progress update to the user in a friendly, conversational way. Include the progress percentage and current stage.',
             message: 'API unavailable, retrieved status from database',
             suggestion: isStuck ? 'Job appears stuck. Check server health.' :
                        job.status === 'failed' ? 'Job failed. Check error details and consider retry.' :
@@ -688,7 +710,16 @@ const createCheckJobStatusTool = () => {
     },
     {
       name: 'checkJobStatus',
-      description: 'Check the current status and progress of a PDF processing job',
+      description: `Check the current status and progress of a PDF processing job.
+
+CRITICAL INSTRUCTIONS FOR AGENT:
+1. Call this tool every 10-15 seconds while job is processing
+2. ALWAYS report the progress update to the user after each check
+3. Include progress percentage and current stage in your message to user
+4. If progress hasn't changed, still acknowledge you're monitoring
+5. Continue monitoring until job reaches 'completed' or 'failed' status
+
+The tool returns a 'user_message' field - use this to communicate progress to the user.`,
       schema: z.object({
         jobId: z.string().describe('Job ID to check status for'),
       }),
@@ -711,10 +742,10 @@ const createQueryDatabaseTool = () => {
 
         switch (queryType) {
           case 'jobs':
-            // Query async_jobs table for existing jobs
-            tableName = 'async_jobs';
+            // Query background_jobs table for existing jobs
+            tableName = 'background_jobs';
             let jobQuery = supabase
-              .from('async_jobs')
+              .from('background_jobs')
               .select('*')
               .order('created_at', { ascending: false })
               .limit(20);
