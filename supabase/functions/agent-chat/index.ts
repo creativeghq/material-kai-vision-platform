@@ -1484,7 +1484,14 @@ async function executeAgent(
   let collectedProducts: any[] = [];
 
   // Load system prompt from database (or use hardcoded fallback)
-  const systemPrompt = config.systemPrompt || await getAgentSystemPrompt(agentId);
+  let systemPrompt: string;
+  try {
+    systemPrompt = config.systemPrompt || await getAgentSystemPrompt(agentId);
+    console.log(`✅ System prompt loaded for ${agentId}, length: ${systemPrompt.length}`);
+  } catch (error) {
+    console.error(`❌ Failed to load system prompt for ${agentId}:`, error);
+    throw new Error(`Failed to load agent configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 
   // Special handling for Demo Agent - return structured command
   if (agentId === 'demo') {
