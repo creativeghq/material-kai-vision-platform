@@ -317,4 +317,113 @@ export const contactsAPI = {
 
     return response.json();
   },
+
+  // ============ User-Contact Linking ============
+
+  async linkUserToContact(contactId: string, userId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}/link-user`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to link user to contact');
+    }
+
+    return response.json();
+  },
+
+  async unlinkUserFromContact(contactId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}/unlink-user`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to unlink user from contact');
+    }
+
+    return response.json();
+  },
+
+  async getPotentialMatches() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-contacts-api/potential-matches`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch potential matches');
+    }
+
+    return response.json();
+  },
+
+  async bulkLinkContacts(links: Array<{ contactId: string; userId: string }>) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-contacts-api/bulk-link`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ links }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to bulk link contacts');
+    }
+
+    return response.json();
+  },
+
+  async getContactByUserId(userId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-contacts-api/by-user/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch contact by user ID');
+    }
+
+    return response.json();
+  },
 };

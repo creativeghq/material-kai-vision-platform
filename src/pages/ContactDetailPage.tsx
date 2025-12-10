@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2 } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-import { contactsAPI } from '@/services/crm.service';
+import { contactsAPI, usersAPI } from '@/services/crm.service';
+import { UserSearchDropdown } from '@/components/CRM/UserSearchDropdown';
 
 interface Contact {
   id: string;
@@ -40,6 +41,9 @@ interface Contact {
   created_at: string;
   updated_at?: string;
   created_by?: string;
+  user_id?: string;
+  linked_at?: string;
+  linked_by?: string;
 }
 
 /**
@@ -54,12 +58,23 @@ export const ContactDetailPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
   const [contact, setContact] = useState<Contact | null>(null);
+  const [linkedUser, setLinkedUser] = useState<any>(null);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     if (id) {
       loadContact();
     }
   }, [id]);
+
+  // Load linked user when contact loads
+  useEffect(() => {
+    if (contact?.user_id) {
+      loadLinkedUser(contact.user_id);
+    } else {
+      setLinkedUser(null);
+    }
+  }, [contact?.user_id]);
 
   const loadContact = async () => {
     if (!id) return;
@@ -105,6 +120,60 @@ export const ContactDetailPage: React.FC = () => {
   const updateField = (field: keyof Contact, value: any) => {
     if (!contact) return;
     setContact({ ...contact, [field]: value });
+  };
+
+  const loadLinkedUser = async (userId: string) => {
+    try {
+      const response = await usersAPI.getUser(userId);
+      setLinkedUser(response.data);
+    } catch (error) {
+      console.error('Error loading linked user:', error);
+      setLinkedUser(null);
+    }
+  };
+
+  const handleLinkUser = async (userId: string) => {
+    if (!id) return;
+    try {
+      setLinking(true);
+      await contactsAPI.linkUserToContact(id, userId);
+      toast({
+        title: 'Success',
+        description: 'User linked to contact successfully',
+      });
+      await loadContact();
+    } catch (error: any) {
+      console.error('Error linking user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to link user to contact',
+        variant: 'destructive',
+      });
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const handleUnlinkUser = async () => {
+    if (!id) return;
+    try {
+      setLinking(true);
+      await contactsAPI.unlinkUserFromContact(id);
+      toast({
+        title: 'Success',
+        description: 'User unlinked from contact successfully',
+      });
+      await loadContact();
+    } catch (error: any) {
+      console.error('Error unlinking user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to unlink user from contact',
+        variant: 'destructive',
+      });
+    } finally {
+      setLinking(false);
+    }
   };
 
   if (loading) {
@@ -324,6 +393,76 @@ export const ContactDetailPage: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Link to User Account Card */}
+            <Card className="dashboard-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <LinkIcon className="h-5 w-5" />
+                  Link to User Account
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {linkedUser ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{linkedUser.email}</span>
+                        </div>
+                        {linkedUser.user_profiles?.subscription_tier && (
+                          <Badge variant="outline" className="capitalize">
+                            {linkedUser.user_profiles.subscription_tier}
+                          </Badge>
+                        )}
+                      </div>
+                      {linkedUser.user_profiles?.full_name && (
+                        <div className="text-sm text-muted-foreground">
+                          {linkedUser.user_profiles.full_name}
+                        </div>
+                      )}
+                      {contact.linked_at && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          Linked on {new Date(contact.linked_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleUnlinkUser}
+                      disabled={linking}
+                      className="w-full"
+                    >
+                      <Unlink className="h-4 w-4 mr-2" />
+                      {linking ? 'Unlinking...' : 'Unlink User Account'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Link this contact to an authenticated user account to track their subscription, credits, and activity.
+                    </p>
+                    <div>
+                      <Label>Search for User</Label>
+                      <div className="mt-2">
+                        <UserSearchDropdown
+                          onSelect={handleLinkUser}
+                          placeholder="Search users by email or name..."
+                          selectedUserId={null}
+                        />
+                      </div>
+                    </div>
+                    {linking && (
+                      <div className="text-sm text-muted-foreground text-center">
+                        Linking user...
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Company Info Tab */}
