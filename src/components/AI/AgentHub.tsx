@@ -413,17 +413,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
 
         // Call Supabase Edge Function for agent execution with STREAMING
-        const authToken = (await supabase.auth.getSession()).data.session?.access_token;
-        if (!authToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) {
           throw new Error('Not authenticated');
         }
 
+        // Get Supabase URL from the client
+        const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/agent-chat`,
+          `${supabaseUrl}/functions/v1/agent-chat`,
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${authToken}`,
+              'Authorization': `Bearer ${session.access_token}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestBody),
