@@ -18,6 +18,9 @@ import {
   Settings,
   Gauge,
   Search,
+  CreditCard,
+  DollarSign,
+  Crown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -146,6 +149,37 @@ interface ApiUsageLog {
   created_at: string | null;
 }
 
+interface SubscriptionStats {
+  totalUsers: number;
+  freeUsers: number;
+  proUsers: number;
+  enterpriseUsers: number;
+  totalRevenue: number;
+  totalCreditsUsed: number;
+  totalAICost: number;
+}
+
+interface UserProfile {
+  id: string;
+  email: string;
+  subscription_tier: string;
+  subscription_status: string;
+  credits_balance: number;
+  created_at: string;
+}
+
+interface AIUsageLog {
+  id: string;
+  user_id: string;
+  operation_type: string;
+  model_name: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_cost_usd: number;
+  credits_debited: number;
+  created_at: string;
+}
+
 export const AnalyticsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -158,6 +192,17 @@ export const AnalyticsDashboard: React.FC = () => {
   const [searchAnalytics, setSearchAnalytics] = useState<SearchAnalytic[]>([]);
   const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
   const [agentChats, setAgentChats] = useState<AgentChatMessage[]>([]);
+  const [subscriptionStats, setSubscriptionStats] = useState<SubscriptionStats>({
+    totalUsers: 0,
+    freeUsers: 0,
+    proUsers: 0,
+    enterpriseUsers: 0,
+    totalRevenue: 0,
+    totalCreditsUsed: 0,
+    totalAICost: 0,
+  });
+  const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
+  const [aiUsageLogs, setAIUsageLogs] = useState<AIUsageLog[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -294,6 +339,58 @@ export const AnalyticsDashboard: React.FC = () => {
         active_users: uniqueUsers,
         avg_response_time: Math.round(avgAgentResponseTime),
       });
+
+      // Fetch subscription and credits data
+      const { data: profiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('id, email, subscription_tier, subscription_status, credits_balance, created_at')
+        .order('created_at', { ascending: false });
+
+      if (profilesError) {
+        console.error('Error fetching user profiles:', profilesError);
+      } else if (profiles) {
+        setUserProfiles(profiles);
+
+        // Calculate subscription stats
+        const totalUsers = profiles.length;
+        const freeUsers = profiles.filter(p => p.subscription_tier === 'free').length;
+        const proUsers = profiles.filter(p => p.subscription_tier === 'pro').length;
+        const enterpriseUsers = profiles.filter(p => p.subscription_tier === 'enterprise').length;
+        const totalRevenue = (proUsers * 29) + (enterpriseUsers * 99); // Monthly revenue
+
+        setSubscriptionStats({
+          totalUsers,
+          freeUsers,
+          proUsers,
+          enterpriseUsers,
+          totalRevenue,
+          totalCreditsUsed: 0, // Will be calculated from AI usage logs
+          totalAICost: 0, // Will be calculated from AI usage logs
+        });
+      }
+
+      // Fetch AI usage logs
+      const { data: aiLogs, error: aiLogsError } = await supabase
+        .from('ai_usage_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (aiLogsError) {
+        console.error('Error fetching AI usage logs:', aiLogsError);
+      } else if (aiLogs) {
+        setAIUsageLogs(aiLogs);
+
+        // Calculate total credits used and AI cost
+        const totalCreditsUsed = aiLogs.reduce((sum, log) => sum + (log.credits_debited || 0), 0);
+        const totalAICost = aiLogs.reduce((sum, log) => sum + (log.total_cost_usd || 0), 0);
+
+        setSubscriptionStats(prev => ({
+          ...prev,
+          totalCreditsUsed,
+          totalAICost,
+        }));
+      }
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -416,10 +513,14 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="agent-chat" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="agent-chat">
               <Bot className="h-4 w-4 mr-2" />
               Agent Chat
+            </TabsTrigger>
+            <TabsTrigger value="subscriptions">
+              <CreditCard className="h-4 w-4 mr-2" />
+              Subscriptions
             </TabsTrigger>
             <TabsTrigger value="ai-models">
               <Settings className="h-4 w-4 mr-2" />
@@ -566,6 +667,159 @@ export const AnalyticsDashboard: React.FC = () => {
                 {agentChats.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No agent chat data available yet. Start chatting with the agent to see analytics.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Subscriptions & Credits Tab */}
+          <TabsContent value="subscriptions" className="space-y-4">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-200">
+                      <Users className="h-5 w-5 text-blue-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-blue-600">Total Users</div>
+                      <div className="text-2xl font-bold text-blue-900">{subscriptionStats.totalUsers}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-200">
+                      <DollarSign className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-green-600">Monthly Revenue</div>
+                      <div className="text-2xl font-bold text-green-900">${subscriptionStats.totalRevenue}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-200">
+                      <Zap className="h-5 w-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-purple-600">Credits Used</div>
+                      <div className="text-2xl font-bold text-purple-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-orange-200">
+                      <TrendingUp className="h-5 w-5 text-orange-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-orange-600">AI Cost</div>
+                      <div className="text-2xl font-bold text-orange-900">${subscriptionStats.totalAICost.toFixed(4)}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Subscription Distribution */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5" />
+                  Subscription Distribution
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="text-sm text-gray-600 mb-1">Free Tier</div>
+                    <div className="text-3xl font-bold text-gray-900">{subscriptionStats.freeUsers}</div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.freeUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                    <div className="text-sm text-blue-600 mb-1">Pro Tier</div>
+                    <div className="text-3xl font-bold text-blue-900">{subscriptionStats.proUsers}</div>
+                    <div className="text-xs text-blue-500 mt-1">
+                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
+                    </div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+                    <div className="text-sm text-purple-600 mb-1">Enterprise Tier</div>
+                    <div className="text-3xl font-bold text-purple-900">{subscriptionStats.enterpriseUsers}</div>
+                    <div className="text-xs text-purple-500 mt-1">
+                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.enterpriseUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* User Profiles Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>User Subscriptions</CardTitle>
+                <CardDescription>All users with subscription and credit information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Subscription</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Credits Balance</TableHead>
+                      <TableHead>Joined</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {userProfiles.slice(0, 20).map((profile) => (
+                      <TableRow key={profile.id}>
+                        <TableCell className="font-medium">{profile.email}</TableCell>
+                        <TableCell>
+                          <Badge
+                            className={
+                              profile.subscription_tier === 'enterprise'
+                                ? 'bg-purple-500'
+                                : profile.subscription_tier === 'pro'
+                                ? 'bg-blue-500'
+                                : 'bg-gray-500'
+                            }
+                          >
+                            {profile.subscription_tier || 'free'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={profile.subscription_status === 'active' ? 'default' : 'secondary'}
+                          >
+                            {profile.subscription_status || 'inactive'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {(profile.credits_balance || 0).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {new Date(profile.created_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {userProfiles.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No user profiles found.
                   </div>
                 )}
               </CardContent>
