@@ -44,14 +44,6 @@ export const SubscriptionTab: React.FC = () => {
       features: ['1000 credits per month', 'Advanced AI features', 'Priority support', 'Early access to new features'],
       priceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || '',
     },
-    {
-      id: 'enterprise',
-      name: 'Enterprise',
-      price: 99,
-      credits: 5000,
-      features: ['5000 credits per month', 'All AI features', 'Dedicated support', 'Custom integrations', 'SLA guarantee'],
-      priceId: import.meta.env.VITE_STRIPE_ENTERPRISE_PRICE_ID || '',
-    },
   ];
 
   useEffect(() => {

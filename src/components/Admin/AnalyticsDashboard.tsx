@@ -153,10 +153,8 @@ interface SubscriptionStats {
   totalUsers: number;
   freeUsers: number;
   proUsers: number;
-  enterpriseUsers: number;
   totalRevenue: number;
   totalCreditsUsed: number;
-  totalAICost: number;
 }
 
 interface UserProfile {
@@ -196,10 +194,8 @@ export const AnalyticsDashboard: React.FC = () => {
     totalUsers: 0,
     freeUsers: 0,
     proUsers: 0,
-    enterpriseUsers: 0,
     totalRevenue: 0,
     totalCreditsUsed: 0,
-    totalAICost: 0,
   });
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [aiUsageLogs, setAIUsageLogs] = useState<AIUsageLog[]>([]);
@@ -353,19 +349,16 @@ export const AnalyticsDashboard: React.FC = () => {
 
         // Calculate subscription stats
         const totalUsers = profiles.length;
-        const freeUsers = profiles.filter(p => p.subscription_tier === 'free').length;
-        const proUsers = profiles.filter(p => p.subscription_tier === 'pro').length;
-        const enterpriseUsers = profiles.filter(p => p.subscription_tier === 'enterprise').length;
-        const totalRevenue = (proUsers * 29) + (enterpriseUsers * 99); // Monthly revenue
+        const freeUsers = profiles.filter((p: UserProfile) => p.subscription_tier === 'free').length;
+        const proUsers = profiles.filter((p: UserProfile) => p.subscription_tier === 'pro').length;
+        const totalRevenue = proUsers * 29; // Monthly revenue (Pro only)
 
         setSubscriptionStats({
           totalUsers,
           freeUsers,
           proUsers,
-          enterpriseUsers,
           totalRevenue,
           totalCreditsUsed: 0, // Will be calculated from AI usage logs
-          totalAICost: 0, // Will be calculated from AI usage logs
         });
       }
 
@@ -381,14 +374,12 @@ export const AnalyticsDashboard: React.FC = () => {
       } else if (aiLogs) {
         setAIUsageLogs(aiLogs);
 
-        // Calculate total credits used and AI cost
-        const totalCreditsUsed = aiLogs.reduce((sum, log) => sum + (log.credits_debited || 0), 0);
-        const totalAICost = aiLogs.reduce((sum, log) => sum + (log.total_cost_usd || 0), 0);
+        // Calculate total credits used
+        const totalCreditsUsed = aiLogs.reduce((sum: number, log: AIUsageLog) => sum + (log.credits_debited || 0), 0);
 
         setSubscriptionStats(prev => ({
           ...prev,
           totalCreditsUsed,
-          totalAICost,
         }));
       }
     } catch (error) {
@@ -676,16 +667,19 @@ export const AnalyticsDashboard: React.FC = () => {
           {/* Subscriptions & Credits Tab */}
           <TabsContent value="subscriptions" className="space-y-4">
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-blue-200">
-                      <Users className="h-5 w-5 text-blue-700" />
+                      <Crown className="h-5 w-5 text-blue-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-blue-600">Total Users</div>
-                      <div className="text-2xl font-bold text-blue-900">{subscriptionStats.totalUsers}</div>
+                      <div className="text-sm text-blue-600">Pro Subscribers</div>
+                      <div className="text-2xl font-bold text-blue-900">{subscriptionStats.proUsers}</div>
+                      <div className="text-xs text-blue-500 mt-1">
+                        {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -699,6 +693,9 @@ export const AnalyticsDashboard: React.FC = () => {
                     <div>
                       <div className="text-sm text-green-600">Monthly Revenue</div>
                       <div className="text-2xl font-bold text-green-900">${subscriptionStats.totalRevenue}</div>
+                      <div className="text-xs text-green-500 mt-1">
+                        From Pro subscriptions
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -712,59 +709,14 @@ export const AnalyticsDashboard: React.FC = () => {
                     <div>
                       <div className="text-sm text-purple-600">Credits Used</div>
                       <div className="text-2xl font-bold text-purple-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-orange-200">
-                      <TrendingUp className="h-5 w-5 text-orange-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-orange-600">AI Cost</div>
-                      <div className="text-2xl font-bold text-orange-900">${subscriptionStats.totalAICost.toFixed(4)}</div>
+                      <div className="text-xs text-purple-500 mt-1">
+                        Across all users
+                      </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Subscription Distribution */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Crown className="h-5 w-5" />
-                  Subscription Distribution
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="text-sm text-gray-600 mb-1">Free Tier</div>
-                    <div className="text-3xl font-bold text-gray-900">{subscriptionStats.freeUsers}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.freeUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
-                    </div>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                    <div className="text-sm text-blue-600 mb-1">Pro Tier</div>
-                    <div className="text-3xl font-bold text-blue-900">{subscriptionStats.proUsers}</div>
-                    <div className="text-xs text-blue-500 mt-1">
-                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                    <div className="text-sm text-purple-600 mb-1">Enterprise Tier</div>
-                    <div className="text-3xl font-bold text-purple-900">{subscriptionStats.enterpriseUsers}</div>
-                    <div className="text-xs text-purple-500 mt-1">
-                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.enterpriseUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
 
             {/* User Profiles Table */}
             <Card>
@@ -790,9 +742,7 @@ export const AnalyticsDashboard: React.FC = () => {
                         <TableCell>
                           <Badge
                             className={
-                              profile.subscription_tier === 'enterprise'
-                                ? 'bg-purple-500'
-                                : profile.subscription_tier === 'pro'
+                              profile.subscription_tier === 'pro'
                                 ? 'bg-blue-500'
                                 : 'bg-gray-500'
                             }
