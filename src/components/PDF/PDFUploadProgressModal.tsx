@@ -424,10 +424,14 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 const metadata = job.metadata as any || {};
 
                 // Get metrics from backend metadata (source of truth)
+                const totalPages = metadata.total_pages || 0;
+                const pagesCompleted = metadata.pages_completed || 0;
                 const chunksCreated = metadata.chunks_created || 0;
                 const imagesExtracted = metadata.images_extracted || 0;
+                const totalImagesExtracted = metadata.total_images_extracted || 0;
                 const productsCreated = metadata.products_created || 0;
-                const embeddingsGenerated = metadata.embeddings_generated?.total || 0;
+                const embeddingsGenerated = metadata.embeddings_generated || 0;
+                const ocrPagesProcessed = metadata.ocr_pages_processed || 0;
 
                 // Get AI usage stats
                 const aiUsage = metadata.ai_usage || {};
@@ -435,6 +439,27 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
 
                 return (
                   <>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">
+                        {productsCreated}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Products Found
+                      </div>
+                    </div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">
+                        {imagesExtracted}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Images Extracted
+                      </div>
+                      {totalImagesExtracted > imagesExtracted && (
+                        <div className="text-xs text-muted-foreground mt-1">
+                          ({totalImagesExtracted} total found)
+                        </div>
+                      )}
+                    </div>
                     <div className="text-center p-3 bg-card rounded-lg border">
                       <div className="text-2xl font-bold text-primary">
                         {chunksCreated}
@@ -445,28 +470,30 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                     </div>
                     <div className="text-center p-3 bg-card rounded-lg border">
                       <div className="text-2xl font-bold text-primary">
-                        {imagesExtracted}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Images Extracted
-                      </div>
-                    </div>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
-                        {productsCreated}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Products Created
-                      </div>
-                    </div>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
                         {embeddingsGenerated}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         Embeddings Generated
                       </div>
                     </div>
+                    <div className="text-center p-3 bg-card rounded-lg border">
+                      <div className="text-2xl font-bold text-primary">
+                        {pagesCompleted}/{totalPages}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Pages Processed
+                      </div>
+                    </div>
+                    {ocrPagesProcessed > 0 && (
+                      <div className="text-center p-3 bg-card rounded-lg border">
+                        <div className="text-2xl font-bold text-primary">
+                          {ocrPagesProcessed}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          OCR Pages
+                        </div>
+                      </div>
+                    )}
                   </>
                 );
               })()}

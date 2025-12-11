@@ -169,16 +169,22 @@ export function extractMetricsFromJob(metadata?: Record<string, any>): Record<st
   }
 
   // Progress metrics
+  if (metadata.total_pages !== undefined) {
+    metrics['Total Pages'] = metadata.total_pages;
+  }
   if (metadata.pages_completed !== undefined) {
     metrics['Pages Completed'] = metadata.pages_completed;
   }
   if (metadata.pages_failed !== undefined && metadata.pages_failed > 0) {
     metrics['Pages Failed'] = metadata.pages_failed;
   }
+  if (metadata.pages_skipped !== undefined && metadata.pages_skipped > 0) {
+    metrics['Pages Skipped'] = metadata.pages_skipped;
+  }
 
   // Content metrics
   if (metadata.products_created !== undefined) {
-    metrics['Products Created'] = metadata.products_created;
+    metrics['Products Found'] = metadata.products_created;
   }
   if (metadata.chunks_created !== undefined) {
     metrics['Chunks Created'] = metadata.chunks_created;
@@ -186,8 +192,18 @@ export function extractMetricsFromJob(metadata?: Record<string, any>): Record<st
   if (metadata.images_extracted !== undefined) {
     metrics['Images Extracted'] = metadata.images_extracted;
   }
+  if (metadata.total_images_extracted !== undefined && metadata.total_images_extracted > metadata.images_extracted) {
+    metrics['Total Images Found'] = metadata.total_images_extracted;
+  }
   if (metadata.embeddings_generated !== undefined) {
     metrics['Embeddings Generated'] = metadata.embeddings_generated;
+  }
+  if (metadata.ocr_pages_processed !== undefined && metadata.ocr_pages_processed > 0) {
+    metrics['OCR Pages'] = metadata.ocr_pages_processed;
+  }
+  if (metadata.total_text_extracted !== undefined) {
+    const textKB = Math.round(metadata.total_text_extracted / 1000);
+    metrics['Text Extracted'] = `${textKB}K chars`;
   }
 
   // Database records
