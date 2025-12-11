@@ -177,8 +177,6 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         throw new Error(`Processing failed: ${response.statusText} - ${errorText}`);
       }
 
-      setUploadProgress(80);
-      setUploadStatus('Processing response...');
       const result = await response.json();
       console.log('📦 Upload Response:', result);
 
