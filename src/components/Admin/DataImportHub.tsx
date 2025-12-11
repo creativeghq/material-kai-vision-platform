@@ -17,16 +17,18 @@ import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { PDFUploadSection } from '@/components/PDF/PDFUploadSection';
-import { PDFProcessingWorkflow } from '@/components/PDF/PDFProcessingWorkflow';
+import { PDFProcessingStepsMonitor } from '@/components/PDF/PDFProcessingStepsMonitor';
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('pdf'); // PDF is first tab
   const [jobId, setJobId] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleUploadComplete = (newJobId: string) => {
+  const handleUploadComplete = (newJobId: string, uploadedFileName?: string) => {
     setJobId(newJobId);
+    setFileName(uploadedFileName || 'PDF Document');
     setIsProcessing(true);
   };
 
@@ -36,6 +38,7 @@ const DataImportHub: React.FC = () => {
 
   const handleReset = () => {
     setJobId(null);
+    setFileName('');
     setIsProcessing(false);
   };
 
@@ -85,12 +88,16 @@ const DataImportHub: React.FC = () => {
                     <PDFUploadSection onUploadComplete={handleUploadComplete} />
                   )}
 
-                  {/* Workflow Section */}
+                  {/* Processing Monitor */}
                   {jobId && (
-                    <PDFProcessingWorkflow
+                    <PDFProcessingStepsMonitor
                       jobId={jobId}
+                      fileName={fileName}
                       onComplete={handleProcessingComplete}
-                      onReset={handleReset}
+                      onError={(error) => {
+                        console.error('Processing error:', error);
+                        setIsProcessing(false);
+                      }}
                     />
                   )}
                 </div>

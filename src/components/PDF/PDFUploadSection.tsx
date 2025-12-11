@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 
 interface PDFUploadSectionProps {
-  onUploadComplete: (jobId: string) => void;
+  onUploadComplete: (jobId: string, fileName?: string) => void;
 }
 
 interface MaterialCategory {
@@ -177,6 +177,21 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       formData.append('title', file.name);
       formData.append('processing_mode', 'standard');
 
+      // Debug: Log what we're sending
+      console.log('📤 Sending to MIVAA API:', {
+        url: `${MIVAA_API_URL}/api/rag/documents/upload`,
+        file_url: publicUrl,
+        categories: category,
+        workspace_id: user.id,
+        title: file.name,
+        processing_mode: 'standard'
+      });
+
+      // Log FormData contents
+      for (const [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value);
+      }
+
       const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/upload`, {
         method: 'POST',
         body: formData, // Send as FormData, not JSON
@@ -208,13 +223,15 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         description: `PDF processing started. Job ID: ${jobId}`,
       });
 
+      const uploadedFileName = file.name;
+
       // Reset form
       setFile(null);
       setUploadProgress(0);
       setUploadStatus('');
 
-      console.log('🚀 Calling onUploadComplete with job ID:', jobId);
-      onUploadComplete(jobId);
+      console.log('🚀 Calling onUploadComplete with job ID:', jobId, 'and filename:', uploadedFileName);
+      onUploadComplete(jobId, uploadedFileName);
     } catch (error) {
       console.error('Upload error:', error);
       setUploadProgress(0);
