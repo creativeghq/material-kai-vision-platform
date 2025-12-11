@@ -172,7 +172,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       // Create FormData - backend expects application/x-www-form-urlencoded
       const formData = new URLSearchParams();
       formData.append('file_url', publicUrl);
-      formData.append('categories', category);
+      formData.append('categories', 'products'); // Backend only accepts: products, certificates, logos, specifications, all, extract_only
       formData.append('workspace_id', user.id);
       formData.append('title', file.name);
       formData.append('processing_mode', 'standard');
