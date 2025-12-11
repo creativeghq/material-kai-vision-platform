@@ -14,19 +14,28 @@ export const DataImport: React.FC = () => {
   const navigate = useNavigate();
   const [jobId, setJobId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const [completedJobStatus, setCompletedJobStatus] = useState<any>(null);
 
   const handleUploadComplete = (newJobId: string) => {
     setJobId(newJobId);
     setIsProcessing(true);
+    setShowSummary(false);
   };
 
   const handleProcessingComplete = () => {
     setIsProcessing(false);
+    // Show summary modal after a brief delay
+    setTimeout(() => {
+      setShowSummary(true);
+    }, 500);
   };
 
   const handleReset = () => {
     setJobId(null);
     setIsProcessing(false);
+    setShowSummary(false);
+    setCompletedJobStatus(null);
   };
 
   return (

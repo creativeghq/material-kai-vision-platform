@@ -6,7 +6,13 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, XCircle, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { usePDFProcessingMonitor } from '@/services/pdf/pdfProcessingMonitor';
+import {
+  usePDFProcessingMonitor,
+  mapCheckpointToStages,
+  getCurrentActiveStage,
+  extractMetricsFromJob,
+  extractStageMetrics
+} from '@/services/pdf/pdfProcessingMonitor';
 
 interface PDFProcessingWorkflowProps {
   jobId: string;
@@ -50,21 +56,63 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
   useEffect(() => {
     if (!jobStatus) return;
 
-    // Map checkpoint to stages and update
-    const updatedStages = mapCheckpointToStages(jobStatus);
+    const currentCheckpoint = jobStatus.last_checkpoint?.stage;
+    if (!currentCheckpoint) return;
+
+    // Get completed stage IDs from checkpoint
+    const completedStageIds = mapCheckpointToStages(currentCheckpoint);
+    const activeStageId = getCurrentActiveStage(currentCheckpoint);
+
+    // Update stages
+    const updatedStages = stages.map((stage) => {
+      // Stage is complete
+      if (completedStageIds.includes(stage.id)) {
+        return {
+          ...stage,
+          status: 'complete' as const,
+          progress: 100,
+          metrics: extractStageMetrics(stage.id, jobStatus.last_checkpoint?.metadata),
+        };
+      }
+
+      // Stage is active
+      if (stage.id === activeStageId) {
+        // Calculate progress for active stage based on overall job progress
+        const stageProgress = Math.min(99, Math.max(0, (jobStatus.progress || 0) % 100));
+        return {
+          ...stage,
+          status: 'active' as const,
+          progress: stageProgress,
+          metrics: extractStageMetrics(stage.id, jobStatus.last_checkpoint?.metadata),
+        };
+      }
+
+      // Stage is pending
+      return {
+        ...stage,
+        status: 'pending' as const,
+        progress: 0,
+      };
+    });
+
     setStages(updatedStages);
 
     // Check if completed
     if (jobStatus.status === 'completed') {
       onComplete();
     }
-  }, [jobStatus, onComplete]);
 
-  const mapCheckpointToStages = (job: any): Stage[] => {
-    // This will be implemented in the monitoring service
-    // For now, return current stages
-    return stages;
-  };
+    // Handle errors
+    if (jobStatus.status === 'failed' && activeStageId) {
+      setStages((prev) =>
+        prev.map((stage) =>
+          stage.id === activeStageId
+            ? { ...stage, status: 'error' as const, error: jobStatus.error }
+            : stage
+        )
+      );
+    }
+  }, [jobStatus, onComplete]);
 
   const getStageIcon = (status: Stage['status']) => {
     switch (status) {
@@ -78,6 +126,9 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
         return <Circle className="h-5 w-5 text-white/30" />;
     }
   };
+
+  // Extract overall metrics
+  const overallMetrics = extractMetricsFromJob(jobStatus?.last_checkpoint?.metadata);
 
   return (
     <div className="space-y-6">
@@ -106,6 +157,21 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
             />
           </div>
         </div>
+
+        {/* Overall Metrics Grid */}
+        {Object.keys(overallMetrics).length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {Object.entries(overallMetrics).map(([key, value]) => (
+              <div
+                key={key}
+                className="bg-slate-700/30 rounded-lg p-3 border border-white/5"
+              >
+                <p className="text-xs text-white/50 mb-1">{key}</p>
+                <p className="text-lg font-semibold text-white">{value}</p>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Error Message */}
         {(jobStatus?.error || monitorError) && (

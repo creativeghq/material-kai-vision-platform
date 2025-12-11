@@ -86,87 +86,189 @@ export function usePDFProcessingMonitor(jobId: string) {
 
 /**
  * Map backend checkpoint stages to UI stages
+ * Returns array of stage IDs that should be marked as complete for this checkpoint
  */
-export function mapCheckpointToStages(checkpoint: string, metadata?: Record<string, any>): Partial<Stage>[] {
-  const stageMapping: Record<string, Partial<Stage>[]> = {
-    'INITIALIZED': [
-      { id: 1, name: 'Product Discovery', status: 'complete', progress: 100 },
-      { id: 2, name: 'Entity Discovery', status: 'complete', progress: 100 },
-    ],
-    'PDF_EXTRACTED': [
-      { id: 3, name: 'Focused Extraction', status: 'complete', progress: 100 },
-    ],
-    'CHUNKS_CREATED': [
-      { id: 4, name: 'Chunking', status: 'complete', progress: 100 },
-    ],
-    'TEXT_EMBEDDINGS_GENERATED': [
-      { id: 5, name: 'Text Embeddings', status: 'complete', progress: 100 },
-    ],
-    'IMAGES_EXTRACTED': [
-      { id: 6, name: 'Image Extraction', status: 'complete', progress: 100 },
-      { id: 7, name: 'Image Classification', status: 'complete', progress: 100 },
-      { id: 8, name: 'Image Analysis', status: 'complete', progress: 100 },
-    ],
-    'IMAGE_EMBEDDINGS_GENERATED': [
-      { id: 9, name: 'CLIP Embeddings', status: 'complete', progress: 100 },
-    ],
-    'PRODUCTS_CREATED': [
-      { id: 10, name: 'Product Creation', status: 'complete', progress: 100 },
-    ],
-    'DOCUMENT_ENTITIES_CREATED': [
-      { id: 11, name: 'Document Entities', status: 'complete', progress: 100 },
-    ],
-    'RELATIONSHIPS_CREATED': [
-      { id: 12, name: 'Relationship Mapping', status: 'complete', progress: 100 },
-    ],
-    'METADATA_EXTRACTED': [
-      { id: 13, name: 'Metadata Extraction', status: 'complete', progress: 100 },
-    ],
-    'COMPLETED': [
-      { id: 14, name: 'Quality Enhancement', status: 'complete', progress: 100 },
-    ],
+export function mapCheckpointToStages(checkpoint: string): number[] {
+  const stageMapping: Record<string, number[]> = {
+    'INITIALIZED': [1, 2], // Product Discovery + Entity Discovery
+    'PDF_EXTRACTED': [3], // Focused Extraction
+    'CHUNKS_CREATED': [4], // Chunking
+    'TEXT_EMBEDDINGS_GENERATED': [5], // Text Embeddings
+    'IMAGES_EXTRACTED': [6, 7, 8], // Image Extraction + Classification + Analysis
+    'IMAGE_EMBEDDINGS_GENERATED': [9], // CLIP Embeddings
+    'PRODUCTS_CREATED': [10], // Product Creation
+    'DOCUMENT_ENTITIES_CREATED': [11], // Document Entities
+    'RELATIONSHIPS_CREATED': [12], // Relationship Mapping
+    'METADATA_EXTRACTED': [13], // Metadata Extraction
+    'COMPLETED': [14], // Quality Enhancement
   };
 
   return stageMapping[checkpoint] || [];
 }
 
 /**
- * Extract metrics from checkpoint metadata
+ * Get the current active stage based on checkpoint
  */
-export function extractMetrics(checkpoint: string, metadata?: Record<string, any>): Record<string, any> {
+export function getCurrentActiveStage(checkpoint: string): number | null {
+  const completedStages = mapCheckpointToStages(checkpoint);
+  if (completedStages.length === 0) return 1; // Start at stage 1
+
+  const lastCompletedStage = Math.max(...completedStages);
+
+  // If all stages complete, no active stage
+  if (lastCompletedStage >= 14) return null;
+
+  // Next stage is active
+  return lastCompletedStage + 1;
+}
+
+/**
+ * Extract metrics from job metadata for display
+ * Metadata comes from background_jobs.metadata field
+ */
+export function extractMetricsFromJob(metadata?: Record<string, any>): Record<string, any> {
   if (!metadata) return {};
 
   const metrics: Record<string, any> = {};
 
-  switch (checkpoint) {
-    case 'INITIALIZED':
-      if (metadata.products_identified) metrics['Products Identified'] = metadata.products_identified;
-      if (metadata.pages_analyzed) metrics['Pages Analyzed'] = metadata.pages_analyzed;
+  // Current stage info
+  if (metadata.current_stage) {
+    metrics['Current Stage'] = metadata.current_stage;
+  }
+
+  // Progress metrics
+  if (metadata.pages_completed !== undefined) {
+    metrics['Pages Completed'] = metadata.pages_completed;
+  }
+  if (metadata.pages_failed !== undefined && metadata.pages_failed > 0) {
+    metrics['Pages Failed'] = metadata.pages_failed;
+  }
+
+  // Content metrics
+  if (metadata.products_created !== undefined) {
+    metrics['Products Created'] = metadata.products_created;
+  }
+  if (metadata.chunks_created !== undefined) {
+    metrics['Chunks Created'] = metadata.chunks_created;
+  }
+  if (metadata.images_extracted !== undefined) {
+    metrics['Images Extracted'] = metadata.images_extracted;
+  }
+  if (metadata.embeddings_generated !== undefined) {
+    metrics['Embeddings Generated'] = metadata.embeddings_generated;
+  }
+
+  // Database records
+  if (metadata.database_records_created !== undefined) {
+    metrics['DB Records'] = metadata.database_records_created;
+  }
+  if (metadata.knowledge_base_entries !== undefined) {
+    metrics['KB Entries'] = metadata.knowledge_base_entries;
+  }
+
+  // Error tracking
+  if (metadata.errors_count !== undefined && metadata.errors_count > 0) {
+    metrics['Errors'] = metadata.errors_count;
+  }
+  if (metadata.warnings_count !== undefined && metadata.warnings_count > 0) {
+    metrics['Warnings'] = metadata.warnings_count;
+  }
+
+  // AI model info
+  if (metadata.ai_model) {
+    metrics['AI Model'] = metadata.ai_model;
+  }
+
+  // Processing time
+  if (metadata.processing_time_ms) {
+    const seconds = Math.round(metadata.processing_time_ms / 1000);
+    metrics['Processing Time'] = `${seconds}s`;
+  }
+
+  return metrics;
+}
+
+/**
+ * Extract stage-specific metrics from checkpoint metadata
+ */
+export function extractStageMetrics(stageId: number, jobMetadata?: Record<string, any>): Record<string, any> {
+  if (!jobMetadata) return {};
+
+  const metrics: Record<string, any> = {};
+
+  switch (stageId) {
+    case 1: // Product Discovery
+    case 2: // Entity Discovery
+      if (jobMetadata.products_discovered !== undefined) {
+        metrics['Products Discovered'] = jobMetadata.products_discovered;
+      }
+      if (jobMetadata.pages_analyzed !== undefined) {
+        metrics['Pages Analyzed'] = jobMetadata.pages_analyzed;
+      }
       break;
 
-    case 'CHUNKS_CREATED':
-      if (metadata.total_chunks) metrics['Total Chunks'] = metadata.total_chunks;
-      if (metadata.avg_chunk_size) metrics['Avg Chunk Size'] = metadata.avg_chunk_size;
+    case 3: // Focused Extraction
+      if (jobMetadata.extracted_pages !== undefined) {
+        metrics['Pages Extracted'] = jobMetadata.extracted_pages;
+      }
+      if (jobMetadata.text_length !== undefined) {
+        metrics['Text Length'] = `${Math.round(jobMetadata.text_length / 1000)}K chars`;
+      }
       break;
 
-    case 'TEXT_EMBEDDINGS_GENERATED':
-      if (metadata.embeddings_count) metrics['Embeddings Generated'] = metadata.embeddings_count;
-      if (metadata.model_used) metrics['Model Used'] = metadata.model_used;
+    case 4: // Chunking
+      if (jobMetadata.chunks_created !== undefined) {
+        metrics['Chunks Created'] = jobMetadata.chunks_created;
+      }
       break;
 
-    case 'IMAGES_EXTRACTED':
-      if (metadata.total_images) metrics['Total Images'] = metadata.total_images;
-      if (metadata.material_images) metrics['Material Images'] = metadata.material_images;
+    case 5: // Text Embeddings
+      if (jobMetadata.embeddings_generated !== undefined) {
+        metrics['Embeddings'] = jobMetadata.embeddings_generated;
+      }
       break;
 
-    case 'PRODUCTS_CREATED':
-      if (metadata.total_products) metrics['Products Created'] = metadata.total_products;
-      if (metadata.products_with_metadata) metrics['With Metadata'] = metadata.products_with_metadata;
+    case 6: // Image Extraction
+    case 7: // Image Classification
+    case 8: // Image Analysis
+      if (jobMetadata.images_extracted !== undefined) {
+        metrics['Images'] = jobMetadata.images_extracted;
+      }
       break;
 
-    case 'RELATIONSHIPS_CREATED':
-      if (metadata.relationships?.total_relationships) {
-        metrics['Total Relationships'] = metadata.relationships.total_relationships;
+    case 9: // CLIP Embeddings
+      if (jobMetadata.clip_embeddings !== undefined) {
+        metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings;
+      }
+      break;
+
+    case 10: // Product Creation
+      if (jobMetadata.products_created !== undefined) {
+        metrics['Products'] = jobMetadata.products_created;
+      }
+      break;
+
+    case 11: // Document Entities
+      if (jobMetadata.entities_created !== undefined) {
+        metrics['Entities'] = jobMetadata.entities_created;
+      }
+      break;
+
+    case 12: // Relationship Mapping
+      if (jobMetadata.relationships_created !== undefined) {
+        metrics['Relationships'] = jobMetadata.relationships_created;
+      }
+      break;
+
+    case 13: // Metadata Extraction
+      if (jobMetadata.metadata_fields !== undefined) {
+        metrics['Metadata Fields'] = jobMetadata.metadata_fields;
+      }
+      break;
+
+    case 14: // Quality Enhancement
+      if (jobMetadata.confidence_score !== undefined) {
+        metrics['Confidence'] = `${Math.round(jobMetadata.confidence_score * 100)}%`;
       }
       break;
   }
