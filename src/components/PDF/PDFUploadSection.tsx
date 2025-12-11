@@ -35,30 +35,40 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         const { data, error } = await supabase
           .from('material_categories')
           .select('id, category_key, category_name, display_name')
-          .eq('is_active', true)
           .order('display_name');
 
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
 
-        setCategories(data || []);
-        // Set first category as default
         if (data && data.length > 0) {
+          setCategories(data);
+          // Set first category as default
           setCategory(data[0].category_key);
+        } else {
+          // No data returned, use fallback
+          throw new Error('No categories found in database');
         }
       } catch (error) {
         console.error('Failed to load categories:', error);
         toast({
           title: 'Warning',
-          description: 'Could not load categories. Using defaults.',
+          description: 'Could not load categories from database. Using defaults.',
           variant: 'destructive',
         });
         // Fallback to hardcoded categories
-        setCategories([
+        const fallbackCategories = [
           { id: '1', category_key: 'ceramic_tile', category_name: 'Ceramic Tile', display_name: 'Ceramic Tile' },
           { id: '2', category_key: 'porcelain_tile', category_name: 'Porcelain Tile', display_name: 'Porcelain Tile' },
           { id: '3', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
           { id: '4', category_key: 'stone', category_name: 'Stone', display_name: 'Stone' },
-        ]);
+          { id: '5', category_key: 'marble', category_name: 'Marble', display_name: 'Marble' },
+          { id: '6', category_key: 'granite', category_name: 'Granite', display_name: 'Granite' },
+          { id: '7', category_key: 'terrazzo', category_name: 'Terrazzo', display_name: 'Terrazzo' },
+          { id: '8', category_key: 'concrete', category_name: 'Concrete', display_name: 'Concrete' },
+        ];
+        setCategories(fallbackCategories);
         setCategory('ceramic_tile');
       }
     };
