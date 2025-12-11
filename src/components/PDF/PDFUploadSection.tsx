@@ -32,10 +32,11 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const { data, error } = await supabase
+        const { data, error} = await supabase
           .from('material_categories')
-          .select('id, category_key, category_name, display_name')
-          .order('display_name');
+          .select('id, category_key, name, display_name')
+          .eq('is_active', true)
+          .order('sort_order');
 
         if (error) {
           console.error('Supabase error:', error);
@@ -43,9 +44,17 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         }
 
         if (data && data.length > 0) {
-          setCategories(data);
+          // Map to expected format (category_name is actually 'name' in DB)
+          const formattedCategories = data.map(cat => ({
+            id: cat.id,
+            category_key: cat.category_key,
+            category_name: cat.name,
+            display_name: cat.display_name,
+          }));
+
+          setCategories(formattedCategories);
           // Set first category as default
-          setCategory(data[0].category_key);
+          setCategory(formattedCategories[0].category_key);
         } else {
           // No data returned, use fallback
           throw new Error('No categories found in database');
