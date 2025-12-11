@@ -167,7 +167,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       // Call MIVAA API to start processing
       setUploadProgress(60);
       setUploadStatus('Starting AI processing...');
-      const MIVAA_API_URL = import.meta.env.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
+      const MIVAA_API_URL = import.meta.env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
       const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/upload`, {
         method: 'POST',
         headers: {
@@ -189,12 +189,16 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       setUploadProgress(80);
       setUploadStatus('Processing response...');
       const result = await response.json();
+      console.log('📦 Upload Response:', result);
+
       const jobId = result.job_id;
 
       if (!jobId) {
+        console.error('❌ No job ID in response:', result);
         throw new Error('No job ID returned from API');
       }
 
+      console.log('✅ Job created successfully:', jobId);
       setUploadProgress(100);
       setUploadStatus('Complete!');
 
@@ -208,6 +212,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       setUploadProgress(0);
       setUploadStatus('');
 
+      console.log('🚀 Calling onUploadComplete with job ID:', jobId);
       onUploadComplete(jobId);
     } catch (error) {
       console.error('Upload error:', error);

@@ -37,12 +37,17 @@ export function usePDFProcessingMonitor(jobId: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!jobId) return;
+    if (!jobId) {
+      console.warn('⚠️ PDF Monitor: No job ID provided');
+      return;
+    }
 
+    console.log('🔍 PDF Monitor: Starting to monitor job:', jobId);
     let intervalId: NodeJS.Timeout;
 
     const pollJobStatus = async () => {
       try {
+        console.log('📊 PDF Monitor: Polling job status for:', jobId);
         const { data, error: queryError } = await supabase
           .from('background_jobs')
           .select('*')
@@ -50,20 +55,29 @@ export function usePDFProcessingMonitor(jobId: string) {
           .single();
 
         if (queryError) {
+          console.error('❌ PDF Monitor: Query error:', queryError);
           throw queryError;
         }
 
         if (data) {
+          console.log('✅ PDF Monitor: Job status received:', {
+            status: data.status,
+            progress: data.progress,
+            checkpoint: data.last_checkpoint?.stage
+          });
           setJobStatus(data as JobStatus);
 
           // Stop polling if job is completed or failed
           if (data.status === 'completed' || data.status === 'failed') {
+            console.log(`🏁 PDF Monitor: Job ${data.status}, stopping polling`);
             setIsPolling(false);
             clearInterval(intervalId);
           }
+        } else {
+          console.warn('⚠️ PDF Monitor: No data returned for job:', jobId);
         }
       } catch (err) {
-        console.error('Error polling job status:', err);
+        console.error('❌ PDF Monitor: Error polling job status:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
         setIsPolling(false);
         clearInterval(intervalId);
@@ -77,6 +91,7 @@ export function usePDFProcessingMonitor(jobId: string) {
     intervalId = setInterval(pollJobStatus, 2000);
 
     return () => {
+      console.log('🛑 PDF Monitor: Cleanup - stopping polling for job:', jobId);
       clearInterval(intervalId);
     };
   }, [jobId]);

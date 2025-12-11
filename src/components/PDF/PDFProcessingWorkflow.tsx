@@ -130,12 +130,67 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
   // Extract overall metrics
   const overallMetrics = extractMetricsFromJob(jobStatus?.last_checkpoint?.metadata);
 
+  // Show loading state while waiting for job data
+  if (!jobStatus && !monitorError) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+          <div className="flex items-center gap-3">
+            <Loader2 className="h-5 w-5 text-primary animate-spin" />
+            <div>
+              <h2 className="text-xl font-semibold text-white">Initializing Processing...</h2>
+              <p className="text-sm text-white/60 mt-1">Job ID: {jobId}</p>
+              <p className="text-xs text-white/40 mt-1">Connecting to processing pipeline...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state if monitoring failed
+  if (monitorError && !jobStatus) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-slate-800/50 backdrop-blur-sm border border-red-500/30 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <XCircle className="h-5 w-5 text-red-500" />
+              <div>
+                <h2 className="text-xl font-semibold text-white">Monitoring Error</h2>
+                <p className="text-sm text-red-400 mt-1">{monitorError}</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={onReset}>
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </div>
+          <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-sm text-white/70">
+              <strong>Troubleshooting:</strong>
+            </p>
+            <ul className="text-sm text-white/60 mt-2 space-y-1 list-disc list-inside">
+              <li>Check if the job was created successfully (Job ID: {jobId})</li>
+              <li>Verify database permissions for background_jobs table</li>
+              <li>Check browser console for detailed error messages</li>
+              <li>Try uploading the file again</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Workflow Header */}
       <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-white">Processing Workflow</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-white">Processing Workflow</h2>
+            <p className="text-xs text-white/40 mt-1">Job ID: {jobId}</p>
+          </div>
           {jobStatus?.status === 'failed' && (
             <Button variant="outline" size="sm" onClick={onReset}>
               <RotateCcw className="h-4 w-4 mr-2" />
