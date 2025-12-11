@@ -179,102 +179,111 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
   const totalSteps = steps.length;
   const overallProgress = (completedSteps / totalSteps) * 100;
 
+  const formatDuration = (start?: Date, end?: Date) => {
+    if (!start) return '';
+    const endTime = end || new Date();
+    const seconds = Math.round((endTime.getTime() - start.getTime()) / 1000);
+    if (seconds < 1) return '0s';
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s`;
+  };
+
   return (
     <Card className={cn('w-full', className)}>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg">{fileName}</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Started {formatDistanceToNow(startTime)} ago • {completedSteps} of {totalSteps} steps
+            <CardTitle className="text-base font-semibold">{fileName}</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              {formatDistanceToNow(startTime)} ago
             </p>
           </div>
           {getJobStatusBadge()}
         </div>
-        <Progress value={overallProgress} className="mt-4" />
       </CardHeader>
 
-      <CardContent>
-        <div className="space-y-2">
+      <CardContent className="pt-0">
+        <div className="space-y-0">
           {steps.map((step, index) => {
             const isExpanded = expandedSteps.has(step.id);
             const hasDetails = step.metrics && Object.keys(step.metrics).length > 0;
 
             return (
-              <div key={step.id} className="relative">
-                {/* Connector line */}
-                {index < steps.length - 1 && (
-                  <div className="absolute left-6 top-10 bottom-0 w-px bg-border" />
-                )}
-
-                <div
+              <div key={step.id}>
+                {/* Step Row - Vercel Style */}
+                <button
+                  onClick={() => hasDetails && toggleStepExpansion(step.id)}
                   className={cn(
-                    'flex items-start gap-3 p-3 rounded-lg border transition-colors',
-                    step.status === 'running' && 'bg-blue-50 border-blue-200',
-                    step.status === 'completed' && 'bg-green-50 border-green-200',
-                    step.status === 'failed' && 'bg-red-50 border-red-200'
+                    'w-full flex items-center gap-2 py-2 px-1 hover:bg-muted/50 transition-colors text-left',
+                    !hasDetails && 'cursor-default'
                   )}
                 >
-                  <div className="flex-shrink-0 mt-0.5">{getStepIcon(step.status)}</div>
+                  {/* Expand/Collapse Chevron */}
+                  <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                    {hasDetails ? (
+                      isExpanded ? (
+                        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                      )
+                    ) : null}
+                  </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{step.name}</span>
-                        {step.status === 'running' && (
-                          <span className="text-xs text-blue-600">{Math.round(step.progress)}%</span>
-                        )}
-                      </div>
-
-                      {hasDetails && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleStepExpansion(step.id)}
-                          className="h-6 w-6 p-0"
-                        >
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
-                    </div>
-
-                    <p className="text-xs text-muted-foreground mt-1">{step.description}</p>
-
+                  {/* Status Icon */}
+                  <div className="flex-shrink-0">
+                    {step.status === 'completed' && (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    )}
                     {step.status === 'running' && (
-                      <Progress value={step.progress} className="h-1 mt-2" />
+                      <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
                     )}
-
-                    {step.error && (
-                      <p className="text-xs text-red-600 mt-2">{step.error}</p>
+                    {step.status === 'failed' && (
+                      <AlertCircle className="h-4 w-4 text-red-600" />
                     )}
-
-                    {/* Expanded details */}
-                    {isExpanded && hasDetails && (
-                      <div className="mt-3 p-3 bg-white rounded border">
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          {Object.entries(step.metrics!).map(([key, value]) => (
-                            <div key={key}>
-                              <span className="text-muted-foreground">{key}:</span>{' '}
-                              <span className="font-medium">{value}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    {step.status === 'pending' && (
+                      <Clock className="h-4 w-4 text-gray-400" />
                     )}
                   </div>
-                </div>
+
+                  {/* Step Name */}
+                  <span className="text-sm flex-1">{step.name}</span>
+
+                  {/* Duration */}
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {step.status === 'completed' && formatDuration(step.startTime, step.endTime)}
+                    {step.status === 'running' && formatDuration(step.startTime)}
+                  </span>
+                </button>
+
+                {/* Expanded Details */}
+                {isExpanded && hasDetails && (
+                  <div className="ml-6 pl-6 py-2 border-l-2 border-muted">
+                    <div className="space-y-1 text-xs font-mono">
+                      {Object.entries(step.metrics!).map(([key, value]) => (
+                        <div key={key} className="text-muted-foreground">
+                          {key}: <span className="text-foreground">{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {step.error && (
+                  <div className="ml-6 pl-6 py-2 border-l-2 border-red-200">
+                    <p className="text-xs text-red-600 font-mono">{step.error}</p>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
         {monitorError && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{monitorError}</p>
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+            {monitorError}
           </div>
         )}
       </CardContent>
