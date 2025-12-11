@@ -21,7 +21,7 @@ import { PDFProcessingWorkflow } from '@/components/PDF/PDFProcessingWorkflow';
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('xml');
+  const [activeTab, setActiveTab] = useState('pdf'); // PDF is first tab
   const [jobId, setJobId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -116,53 +116,6 @@ const DataImportHub: React.FC = () => {
             </Tabs>
           </CardContent>
         </Card>
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">PDF Processing</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Upload PDF catalogs for AI-powered product extraction with 14-stage processing pipeline
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">XML Import</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Upload XML files from suppliers with automatic field detection and AI-assisted mapping
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Web Scraping</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Extract product data from websites using Firecrawl with intelligent content detection
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Import History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                View and manage all previous imports with detailed logs and error tracking
-              </p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
     </div>
   );

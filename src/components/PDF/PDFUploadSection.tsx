@@ -131,12 +131,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   };
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-      <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-        <FileUp className="h-5 w-5 text-primary" />
-        Upload PDF Catalog
-      </h2>
-
+    <div className="space-y-4">
       {/* Drag & Drop Area */}
       <div
         onDragOver={handleDragOver}
@@ -144,14 +139,19 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${
           isDragging
-            ? 'border-primary bg-primary/10'
-            : 'border-white/20 hover:border-white/40'
+            ? 'border-primary bg-primary/5'
+            : 'border-gray-300 hover:border-gray-400 bg-gray-50'
         }`}
       >
-        <Upload className="h-12 w-12 text-white/40 mx-auto mb-4" />
-        <p className="text-white/70 mb-2">
+        <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? 'text-primary' : 'text-gray-400'}`} />
+        <p className="text-gray-600 mb-2 font-medium">
           {file ? file.name : 'Drag & drop your PDF here, or click to browse'}
         </p>
+        {file && (
+          <p className="text-sm text-gray-500 mb-2">
+            {(file.size / 1024 / 1024).toFixed(2)} MB
+          </p>
+        )}
         <input
           type="file"
           accept="application/pdf"
@@ -160,7 +160,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
           id="pdf-upload"
         />
         <label htmlFor="pdf-upload">
-          <Button variant="outline" className="mt-2" asChild>
+          <Button variant="outline" className="mt-2 bg-white hover:bg-gray-50" asChild>
             <span>Browse Files</span>
           </Button>
         </label>
@@ -168,11 +168,11 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
 
       {/* Category Selection */}
       {file && (
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           <div>
-            <label className="text-sm text-white/70 mb-2 block">Category</label>
+            <label className="text-sm text-gray-700 mb-2 block font-medium">Category</label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-slate-700/50 border-white/10 text-white">
+              <SelectTrigger className="bg-white border-gray-300">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

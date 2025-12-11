@@ -5,9 +5,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 
@@ -22,6 +24,8 @@ interface DetectedField {
 const XMLImportTab: React.FC = () => {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [remoteUrl, setRemoteUrl] = useState<string>('');
+  const [sourceType, setSourceType] = useState<'file' | 'url'>('file');
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectedFields, setDetectedFields] = useState<DetectedField[]>([]);
   const [suggestedMappings, setSuggestedMappings] = useState<Record<string, string>>({});
@@ -66,14 +70,36 @@ const XMLImportTab: React.FC = () => {
   };
 
   const handleDetectFields = async () => {
-    if (!selectedFile || !workspaceId) return;
+    if (!workspaceId) return;
+
+    // Validate input based on source type
+    if (sourceType === 'file' && !selectedFile) {
+      setError('Please select an XML file');
+      return;
+    }
+    if (sourceType === 'url' && !remoteUrl) {
+      setError('Please enter a URL');
+      return;
+    }
 
     setIsDetecting(true);
     setError(null);
 
     try {
-      // Read file as text
-      const xmlText = await selectedFile.text();
+      let xmlText: string;
+
+      // Fetch XML content based on source type
+      if (sourceType === 'file' && selectedFile) {
+        xmlText = await selectedFile.text();
+      } else if (sourceType === 'url' && remoteUrl) {
+        const response = await fetch(remoteUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch URL: ${response.statusText}`);
+        }
+        xmlText = await response.text();
+      } else {
+        throw new Error('Invalid source configuration');
+      }
 
       // Encode to base64
       const xmlBase64 = btoa(xmlText);
@@ -85,6 +111,7 @@ const XMLImportTab: React.FC = () => {
           body: {
             workspace_id: workspaceId,
             xml_content: xmlBase64,
+            source_url: sourceType === 'url' ? remoteUrl : undefined,
             preview_only: true, // Trigger field detection mode
           },
         }
@@ -116,40 +143,75 @@ const XMLImportTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* File Upload Section */}
-      <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
-        <input
-          type="file"
-          accept=".xml"
-          onChange={handleFileSelect}
-          className="hidden"
-          id="xml-file-input"
-        />
-        <label
-          htmlFor="xml-file-input"
-          className="cursor-pointer flex flex-col items-center gap-4"
-        >
-          <div className="p-4 bg-blue-600/20 rounded-full">
-            <FileText className="h-12 w-12 text-blue-400" />
+      {/* Source Type Tabs */}
+      <Tabs value={sourceType} onValueChange={(v) => setSourceType(v as 'file' | 'url')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-gray-100">
+          <TabsTrigger value="file">
+            <Upload className="h-4 w-4 mr-2" />
+            Upload File
+          </TabsTrigger>
+          <TabsTrigger value="url">
+            <Link className="h-4 w-4 mr-2" />
+            Remote URL
+          </TabsTrigger>
+        </TabsList>
+
+        {/* File Upload Tab */}
+        <TabsContent value="file" className="mt-4">
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors bg-gray-50">
+            <input
+              type="file"
+              accept=".xml"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="xml-file-input"
+            />
+            <label
+              htmlFor="xml-file-input"
+              className="cursor-pointer flex flex-col items-center gap-4"
+            >
+              <div className="p-4 bg-primary/10 rounded-full">
+                <FileText className="h-12 w-12 text-primary" />
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-gray-900 mb-1">
+                  {selectedFile ? selectedFile.name : 'Choose XML File'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {selectedFile
+                    ? `${(selectedFile.size / 1024).toFixed(2)} KB`
+                    : 'Click to browse or drag and drop'}
+                </p>
+              </div>
+              {!selectedFile && (
+                <Button variant="outline" className="mt-2 bg-white hover:bg-gray-50">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Select File
+                </Button>
+              )}
+            </label>
           </div>
-          <div>
-            <p className="text-lg font-semibold text-white mb-1">
-              {selectedFile ? selectedFile.name : 'Choose XML File'}
-            </p>
-            <p className="text-sm text-gray-400">
-              {selectedFile
-                ? `${(selectedFile.size / 1024).toFixed(2)} KB`
-                : 'Click to browse or drag and drop'}
-            </p>
+        </TabsContent>
+
+        {/* URL Input Tab */}
+        <TabsContent value="url" className="mt-4">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm text-gray-700 mb-2 block font-medium">XML File URL</label>
+              <Input
+                type="url"
+                placeholder="https://example.com/products.xml"
+                value={remoteUrl}
+                onChange={(e) => setRemoteUrl(e.target.value)}
+                className="bg-white border-gray-300"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the direct URL to an XML file (must be publicly accessible)
+              </p>
+            </div>
           </div>
-          {!selectedFile && (
-            <Button variant="outline" className="mt-2">
-              <Upload className="h-4 w-4 mr-2" />
-              Select File
-            </Button>
-          )}
-        </label>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Error Alert */}
       {error && (
@@ -159,13 +221,17 @@ const XMLImportTab: React.FC = () => {
         </Alert>
       )}
 
-      {/* File Selected - Show Detect Button */}
-      {selectedFile && !detectedFields.length && (
+      {/* Source Selected - Show Detect Button */}
+      {((sourceType === 'file' && selectedFile) || (sourceType === 'url' && remoteUrl)) && !detectedFields.length && (
         <div className="flex flex-col items-center gap-4">
-          <Alert className="bg-blue-900/20 border-blue-700">
-            <CheckCircle className="h-4 w-4 text-blue-400" />
-            <AlertDescription className="text-blue-200">
-              File selected: <strong>{selectedFile.name}</strong>
+          <Alert className="bg-primary/10 border-primary/30">
+            <CheckCircle className="h-4 w-4 text-primary" />
+            <AlertDescription className="text-gray-700">
+              {sourceType === 'file' ? (
+                <>File selected: <strong>{selectedFile?.name}</strong></>
+              ) : (
+                <>URL provided: <strong>{remoteUrl}</strong></>
+              )}
               <br />
               Click "Detect Fields" to analyze the XML structure and get AI-assisted field mappings
             </AlertDescription>
@@ -174,7 +240,6 @@ const XMLImportTab: React.FC = () => {
           <Button
             onClick={handleDetectFields}
             disabled={isDetecting}
-            className="bg-blue-600 hover:bg-blue-700"
             size="lg"
           >
             {isDetecting ? (
@@ -195,14 +260,14 @@ const XMLImportTab: React.FC = () => {
       {/* Fields Detected - Show Summary */}
       {detectedFields.length > 0 && !showMappingModal && (
         <div className="space-y-4">
-          <Alert className="bg-green-900/20 border-green-700">
-            <CheckCircle className="h-4 w-4 text-green-400" />
-            <AlertDescription className="text-green-200">
+          <Alert className="bg-green-50 border-green-200">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">
               Detected <strong>{detectedFields.length} fields</strong> with AI-suggested mappings
               <br />
               <Button
                 variant="link"
-                className="text-green-300 hover:text-green-200 p-0 h-auto"
+                className="text-green-700 hover:text-green-600 p-0 h-auto"
                 onClick={() => setShowMappingModal(true)}
               >
                 Click here to review and confirm mappings
@@ -211,13 +276,13 @@ const XMLImportTab: React.FC = () => {
           </Alert>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-gray-700/30 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-1">Total Fields</p>
-              <p className="text-2xl font-bold text-white">{detectedFields.length}</p>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm text-gray-600 mb-1">Total Fields</p>
+              <p className="text-2xl font-bold text-gray-900">{detectedFields.length}</p>
             </div>
-            <div className="bg-gray-700/30 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-1">High Confidence</p>
-              <p className="text-2xl font-bold text-green-400">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <p className="text-sm text-gray-600 mb-1">High Confidence</p>
+              <p className="text-2xl font-bold text-green-600">
                 {detectedFields.filter((f) => f.confidence >= 0.9).length}
               </p>
             </div>
@@ -236,37 +301,6 @@ const XMLImportTab: React.FC = () => {
           onMappingConfirmed={handleMappingConfirmed}
         />
       )}
-
-      {/* Instructions */}
-      <div className="bg-gray-700/20 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold text-white mb-3">How It Works</h3>
-        <ol className="space-y-2 text-gray-300 text-sm">
-          <li className="flex gap-2">
-            <span className="text-blue-400 font-bold">1.</span>
-            <span>Upload your XML file from a supplier or manufacturer</span>
-          </li>
-          <li className="flex gap-2">
-            <span className="text-blue-400 font-bold">2.</span>
-            <span>
-              AI analyzes the XML structure and suggests field mappings to our product schema
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="text-blue-400 font-bold">3.</span>
-            <span>Review and adjust the suggested mappings in the mapping interface</span>
-          </li>
-          <li className="flex gap-2">
-            <span className="text-blue-400 font-bold">4.</span>
-            <span>Save the mapping as a template for future imports from the same source</span>
-          </li>
-          <li className="flex gap-2">
-            <span className="text-blue-400 font-bold">5.</span>
-            <span>
-              Products are processed in batches with real-time progress tracking
-            </span>
-          </li>
-        </ol>
-      </div>
     </div>
   );
 };

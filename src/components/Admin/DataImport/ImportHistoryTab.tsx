@@ -77,15 +77,51 @@ const ImportHistoryTab: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('data_import_jobs')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+      // Load both XML import jobs and PDF processing jobs
+      const [xmlJobsResult, pdfJobsResult] = await Promise.all([
+        supabase
+          .from('data_import_jobs')
+          .select('*')
+          .eq('workspace_id', workspaceId)
+          .order('created_at', { ascending: false })
+          .limit(25),
+        supabase
+          .from('background_jobs')
+          .select('*')
+          .eq('job_type', 'pdf_processing')
+          .order('created_at', { ascending: false })
+          .limit(25)
+      ]);
 
-      if (error) throw error;
-      setJobs(data || []);
+      const xmlJobs = xmlJobsResult.data || [];
+      const pdfJobs = (pdfJobsResult.data || []).map((job: any) => ({
+        id: job.id,
+        import_type: 'pdf',
+        source_name: job.metadata?.title || job.metadata?.file_name || 'PDF Processing',
+        status: job.status,
+        total_products: job.metadata?.products_discovered || 0,
+        processed_products: job.metadata?.products_created || 0,
+        failed_products: 0,
+        created_at: job.created_at,
+        completed_at: job.completed_at,
+        error_message: job.error_message,
+        original_xml_content: null,
+        field_mappings: null,
+        mapping_template_id: null,
+        category: job.metadata?.category || 'products',
+        is_scheduled: false,
+        cron_schedule: null,
+        last_run_at: null,
+        next_run_at: null,
+        source_url: null,
+      }));
+
+      // Combine and sort by created_at
+      const allJobs = [...xmlJobs, ...pdfJobs].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+
+      setJobs(allJobs);
     } catch (error) {
       console.error('Error loading import history:', error);
     } finally {
