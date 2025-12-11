@@ -94,6 +94,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [selectedJob, setSelectedJob] = useState<BackgroundJob | null>(null);
   const [jobCheckpoints, setJobCheckpoints] = useState<any[]>([]);
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
+  const [cancellingJob, setCancellingJob] = useState<string | null>(null);
 
   // Debug log
   console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
@@ -267,6 +268,41 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString();
+  };
+
+  const handleCancelJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to cancel this job? This action cannot be undone.')) {
+      return;
+    }
+
+    setCancellingJob(jobId);
+    try {
+      const response = await fetch(`https://v1api.materialshub.gr/api/rag/documents/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to cancel job: ${response.statusText}`);
+      }
+
+      // Refresh the job list
+      await fetchQueueData();
+
+      // Close the dialog if this was the selected job
+      if (selectedJob?.id === jobId) {
+        setSelectedJob(null);
+      }
+
+      alert('Job cancelled successfully');
+    } catch (error) {
+      console.error('Error cancelling job:', error);
+      alert(`Failed to cancel job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setCancellingJob(null);
+    }
   };
 
   if (loading) {
@@ -471,10 +507,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     jobs.slice(0, 30).map((job) => (
                       <div
                         key={job.id}
-                        onClick={() => fetchJobDetails(job)}
-                        className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition cursor-pointer group"
+                        className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition group"
                       >
-                        <div className="flex-1">
+                        <div
+                          className="flex-1 cursor-pointer"
+                          onClick={() => fetchJobDetails(job)}
+                        >
                           <div className="text-sm font-medium text-slate-900 group-hover:text-primary transition">
                             {job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                           </div>
@@ -494,7 +532,27 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             </Badge>
                           )}
                           {getStatusBadge(job.status)}
-                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-primary transition" />
+                          {(job.status === 'processing' || job.status === 'pending') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelJob(job.id);
+                              }}
+                              disabled={cancellingJob === job.id}
+                              className="p-1.5 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors disabled:opacity-50"
+                              title="Cancel job"
+                            >
+                              {cancellingJob === job.id ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
+                          <ChevronRight
+                            className="h-4 w-4 text-slate-400 group-hover:text-primary transition cursor-pointer"
+                            onClick={() => fetchJobDetails(job)}
+                          />
                         </div>
                       </div>
                     ))
@@ -577,7 +635,28 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               {/* Job Overview */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Job Overview</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">Job Overview</CardTitle>
+                    {selectedJob && (selectedJob.status === 'processing' || selectedJob.status === 'pending') && (
+                      <button
+                        onClick={() => handleCancelJob(selectedJob.id)}
+                        disabled={cancellingJob === selectedJob.id}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {cancellingJob === selectedJob.id ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            Cancelling...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-3.5 h-3.5" />
+                            Cancel Job
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
