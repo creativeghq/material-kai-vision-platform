@@ -3,12 +3,11 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Upload, FileUp, Loader2 } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Progress } from '@/components/ui/progress';
 
 interface PDFUploadSectionProps {
   onUploadComplete: (jobId: string, fileName?: string) => void;
@@ -28,8 +27,6 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStatus, setUploadStatus] = useState<string>('');
 
   // Load material categories from database
   useEffect(() => {
@@ -133,21 +130,15 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
     if (!file) return;
 
     setIsUploading(true);
-    setUploadProgress(0);
-    setUploadStatus('Preparing upload...');
 
     try {
       // Get current user
-      setUploadProgress(10);
-      setUploadStatus('Authenticating...');
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError || !user) {
         throw new Error('User not authenticated');
       }
 
       // Upload to Supabase Storage
-      setUploadProgress(20);
-      setUploadStatus('Uploading PDF to storage...');
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('pdf-documents')
@@ -158,15 +149,11 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       }
 
       // Get public URL
-      setUploadProgress(50);
-      setUploadStatus('Getting file URL...');
       const { data: { publicUrl } } = supabase.storage
         .from('pdf-documents')
         .getPublicUrl(fileName);
 
       // Call MIVAA API to start processing
-      setUploadProgress(60);
-      setUploadStatus('Starting AI processing...');
       const MIVAA_API_URL = import.meta.env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
 
       // Create FormData - backend expects application/x-www-form-urlencoded
@@ -203,8 +190,6 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       }
 
       console.log('✅ Job created successfully:', jobId);
-      setUploadProgress(100);
-      setUploadStatus('Complete!');
 
       toast({
         title: 'Upload Successful',
@@ -215,15 +200,11 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
 
       // Reset form
       setFile(null);
-      setUploadProgress(0);
-      setUploadStatus('');
 
       console.log('🚀 Calling onUploadComplete with job ID:', jobId, 'and filename:', uploadedFileName);
       onUploadComplete(jobId, uploadedFileName);
     } catch (error) {
       console.error('Upload error:', error);
-      setUploadProgress(0);
-      setUploadStatus('');
       toast({
         title: 'Upload Failed',
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -292,19 +273,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
             </p>
           </div>
 
-          {/* Upload Progress */}
-          {isUploading && (
-            <div className="space-y-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">{uploadStatus}</span>
-              </div>
-              <Progress value={uploadProgress} className="h-2" />
-              <p className="text-xs text-blue-700">
-                {uploadProgress}% complete - Please wait, this may take a few moments...
-              </p>
-            </div>
-          )}
+
 
           <Button
             onClick={handleUpload}
