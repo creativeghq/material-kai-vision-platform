@@ -137,7 +137,7 @@ export class QualityControlService {
           id, name, description, long_description, specifications, metadata,
           quality_score, confidence_score, completeness_score, quality_metrics,
           quality_assessment,
-          text_embedding_1536, visual_clip_embedding_512, multimodal_fusion_embedding_2048,
+          text_embedding_1536, visual_clip_embedding_512, multimodal_fusion_embedding_2688,
           color_embedding_256, texture_embedding_256, application_embedding_512,
           embedding_metadata
         `,
@@ -518,7 +518,7 @@ export class QualityControlService {
     const embeddingTypes = [
       'text_embedding_1536',
       'visual_clip_embedding_512',
-      'multimodal_fusion_embedding_2048',
+      'multimodal_fusion_embedding_2688',
       'color_embedding_256',
       'texture_embedding_256',
       'application_embedding_512',

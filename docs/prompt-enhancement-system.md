@@ -91,18 +91,21 @@ Claude/GPT receives the full, detailed prompt and returns comprehensive results.
 
 ### Database Schema
 
-**Table: `extraction_prompts`**
+**Table: `prompts`** (Unified table for all AI prompts)
 ```sql
-CREATE TABLE extraction_prompts (
+CREATE TABLE prompts (
     id UUID PRIMARY KEY,
     workspace_id UUID NOT NULL,
-    stage TEXT NOT NULL,  -- 'discovery', 'chunking', 'image_analysis', 'entity_creation'
+    prompt_type TEXT NOT NULL,  -- 'extraction', 'agent', etc.
+    stage TEXT,  -- 'discovery', 'chunking', 'image_analysis', 'entity_creation'
     category TEXT NOT NULL,  -- 'products', 'certificates', 'logos', 'specifications'
-    name TEXT NOT NULL,
-    template TEXT NOT NULL,  -- The actual prompt template
+    name TEXT,
+    prompt_text TEXT NOT NULL,  -- The actual prompt template
+    system_prompt TEXT,  -- Optional system prompt
     description TEXT,
     quality_threshold FLOAT DEFAULT 0.7,
     is_active BOOLEAN DEFAULT true,
+    is_custom BOOLEAN DEFAULT false,
     version INTEGER DEFAULT 1,
     created_at TIMESTAMP,
     updated_at TIMESTAMP,

@@ -310,7 +310,7 @@ export class MivaaApiClient {
   /**
    * Multi-vector search (combines 3 embedding types)
    * Uses consolidated /api/rag/search endpoint with strategy="multi_vector"
-   * Combines text_embedding_1536 (40%), visual_clip_embedding_512 (30%), multimodal_fusion_embedding_2048 (30%)
+   * Combines text_embedding_1536 (40%), visual_clip_embedding_512 (30%), multimodal_fusion_embedding_2688 (30%)
    */
   async searchMultiVector(payload: {
     query: string;

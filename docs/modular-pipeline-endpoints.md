@@ -312,29 +312,26 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - The orchestrator passes only the `uploaded_images` output from upload-images endpoint
 - These are already filtered twice: (1) AI classification, (2) successful upload
 
-**AI Processing - Visual Embeddings (SigLIP with CLIP Fallback)**:
-- **Primary Model**: Google SigLIP ViT-SO400M (`google/siglip-so400m-patch14-384`)
+**AI Processing - Visual Embeddings (SigLIP Exclusive)**:
+- **Model**: Google SigLIP ViT-SO400M (`google/siglip-so400m-patch14-384`)
   - +19-29% accuracy improvement over CLIP
   - Better visual understanding for material search
-- **Fallback Model**: OpenAI CLIP ViT-B/32 (`openai/clip-vit-base-patch32`)
-  - Used if SigLIP fails or encounters errors
-  - Reliable fallback with proven performance
-- **Embedding Dimension**: 512D per embedding
+  - Exclusive model - no CLIP fallback for dimensional consistency
+- **Embedding Dimension**: 1152D per embedding
 - **5 Embedding Types Per Image**:
-  1. **Visual** (512D): General visual features from SigLIP/CLIP image encoder
-  2. **Color** (512D): Same base embedding, optimized for color matching
-  3. **Texture** (512D): Same base embedding, optimized for texture matching
+  1. **Visual** (1152D): General visual features from SigLIP image encoder
+  2. **Color** (1152D): Text-guided SigLIP embedding optimized for color matching
+  3. **Texture** (1152D): Text-guided SigLIP embedding optimized for texture matching
   4. **Style** (512D): Same base embedding, optimized for style matching
   5. **Material** (512D): Same base embedding, optimized for material type matching
 
 **Technical Details**:
-- Tries SigLIP first for better accuracy
-- Falls back to CLIP if SigLIP fails
-- Generates base visual embedding using image encoder
-- Creates 5 specialized embeddings from the same base embedding
+- Uses SigLIP exclusively for all visual embeddings
+- Generates base visual embedding (1152D) using SigLIP image encoder
+- Creates 4 text-guided specialized embeddings using SigLIP with text prompts
 - Each embedding is normalized to unit vector (L2 normalization)
-- Total: 5 × 512D = 2,560 dimensions per image
-- Metadata tracks which model was actually used (siglip-so400m-patch14-384 or clip-vit-base-patch32)
+- Total: 5 × 1152D = 5,760 dimensions per image
+- All embeddings use siglip-so400m-patch14-384 model
 
 **Storage**:
 - Saves to `document_images` table (PostgreSQL)

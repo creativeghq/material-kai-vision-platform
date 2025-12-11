@@ -102,23 +102,40 @@ export function usePDFProcessingMonitor(jobId: string) {
 /**
  * Map backend checkpoint stages to UI stages
  * Returns array of stage IDs that should be marked as complete for this checkpoint
+ *
+ * Backend Checkpoints (from checkpoint_recovery_service.py):
+ * - INITIALIZED
+ * - PRODUCTS_DETECTED (Stage 0 discovery)
+ * - PDF_EXTRACTED (Stage 1 focused extraction)
+ * - CHUNKS_CREATED (Stage 2 chunking)
+ * - TEXT_EMBEDDINGS_GENERATED (Stage 2 embeddings)
+ * - IMAGES_EXTRACTED (Stage 3 image processing)
+ * - IMAGE_EMBEDDINGS_GENERATED (Stage 3 CLIP embeddings)
+ * - PRODUCTS_CREATED (Stage 4 product creation)
+ * - RELATIONSHIPS_CREATED (Stage 5 relationships)
+ * - DOCUMENT_ENTITIES_CREATED (Stage 5 entities)
+ * - METADATA_EXTRACTED (Stage 5 metadata)
+ * - COMPLETED (Final stage)
  */
 export function mapCheckpointToStages(checkpoint: string): number[] {
   const stageMapping: Record<string, number[]> = {
-    'INITIALIZED': [1, 2], // Product Discovery + Entity Discovery
-    'PDF_EXTRACTED': [3], // Focused Extraction
-    'CHUNKS_CREATED': [4], // Chunking
-    'TEXT_EMBEDDINGS_GENERATED': [5], // Text Embeddings
-    'IMAGES_EXTRACTED': [6, 7, 8], // Image Extraction + Classification + Analysis
-    'IMAGE_EMBEDDINGS_GENERATED': [9], // CLIP Embeddings
-    'PRODUCTS_CREATED': [10], // Product Creation
-    'DOCUMENT_ENTITIES_CREATED': [11], // Document Entities
-    'RELATIONSHIPS_CREATED': [12], // Relationship Mapping
-    'METADATA_EXTRACTED': [13], // Metadata Extraction
-    'COMPLETED': [14], // Quality Enhancement
+    'initialized': [1], // Job Initialization
+    'products_detected': [2], // Product Discovery (Stage 0)
+    'pdf_extracted': [3], // Focused Extraction (Stage 1)
+    'chunks_created': [4, 5], // Chunking + Text Embeddings (Stage 2)
+    'text_embeddings_generated': [5], // Text Embeddings Complete
+    'images_extracted': [6, 7, 8], // Image Extraction + Classification + Analysis (Stage 3)
+    'image_embeddings_generated': [9], // CLIP Embeddings (Stage 3)
+    'products_created': [10], // Product Creation (Stage 4)
+    'relationships_created': [11], // Relationship Mapping (Stage 5)
+    'document_entities_created': [12], // Document Entities (Stage 5)
+    'metadata_extracted': [13], // Metadata Extraction (Stage 5)
+    'completed': [14], // Quality Enhancement & Completion
   };
 
-  return stageMapping[checkpoint] || [];
+  // Handle both uppercase and lowercase checkpoint names
+  const normalizedCheckpoint = checkpoint.toLowerCase();
+  return stageMapping[normalizedCheckpoint] || [];
 }
 
 /**
@@ -205,6 +222,7 @@ export function extractMetricsFromJob(metadata?: Record<string, any>): Record<st
 
 /**
  * Extract stage-specific metrics from checkpoint metadata
+ * Maps backend metadata fields to user-friendly display metrics
  */
 export function extractStageMetrics(stageId: number, jobMetadata?: Record<string, any>): Record<string, any> {
   if (!jobMetadata) return {};
@@ -212,78 +230,166 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
   const metrics: Record<string, any> = {};
 
   switch (stageId) {
-    case 1: // Product Discovery
-    case 2: // Entity Discovery
-      if (jobMetadata.products_discovered !== undefined) {
-        metrics['Products Discovered'] = jobMetadata.products_discovered;
+    case 1: // Job Initialization
+      if (jobMetadata.filename) {
+        metrics['File'] = jobMetadata.filename;
       }
-      if (jobMetadata.pages_analyzed !== undefined) {
-        metrics['Pages Analyzed'] = jobMetadata.pages_analyzed;
+      if (jobMetadata.file_size) {
+        const sizeMB = (jobMetadata.file_size / (1024 * 1024)).toFixed(2);
+        metrics['Size'] = `${sizeMB} MB`;
       }
       break;
 
-    case 3: // Focused Extraction
+    case 2: // Product Discovery (Stage 0)
+      if (jobMetadata.products_discovered !== undefined) {
+        metrics['Products Found'] = jobMetadata.products_discovered;
+      }
+      if (jobMetadata.certificates_discovered !== undefined && jobMetadata.certificates_discovered > 0) {
+        metrics['Certificates'] = jobMetadata.certificates_discovered;
+      }
+      if (jobMetadata.logos_discovered !== undefined && jobMetadata.logos_discovered > 0) {
+        metrics['Logos'] = jobMetadata.logos_discovered;
+      }
+      if (jobMetadata.specifications_discovered !== undefined && jobMetadata.specifications_discovered > 0) {
+        metrics['Specifications'] = jobMetadata.specifications_discovered;
+      }
+      if (jobMetadata.total_entities !== undefined) {
+        metrics['Total Entities'] = jobMetadata.total_entities;
+      }
+      if (jobMetadata.discovery_model) {
+        metrics['AI Model'] = jobMetadata.discovery_model;
+      }
+      if (jobMetadata.confidence_score !== undefined) {
+        metrics['Confidence'] = `${Math.round(jobMetadata.confidence_score * 100)}%`;
+      }
+      break;
+
+    case 3: // Focused Extraction (Stage 1)
       if (jobMetadata.extracted_pages !== undefined) {
         metrics['Pages Extracted'] = jobMetadata.extracted_pages;
+      }
+      if (jobMetadata.total_pages !== undefined) {
+        metrics['Total Pages'] = jobMetadata.total_pages;
       }
       if (jobMetadata.text_length !== undefined) {
         metrics['Text Length'] = `${Math.round(jobMetadata.text_length / 1000)}K chars`;
       }
+      if (jobMetadata.extraction_rate !== undefined) {
+        metrics['Extraction Rate'] = `${Math.round(jobMetadata.extraction_rate * 100)}%`;
+      }
       break;
 
-    case 4: // Chunking
+    case 4: // Chunking (Stage 2)
       if (jobMetadata.chunks_created !== undefined) {
         metrics['Chunks Created'] = jobMetadata.chunks_created;
       }
+      if (jobMetadata.chunk_size) {
+        metrics['Chunk Size'] = jobMetadata.chunk_size;
+      }
+      if (jobMetadata.chunk_overlap) {
+        metrics['Overlap'] = jobMetadata.chunk_overlap;
+      }
       break;
 
-    case 5: // Text Embeddings
+    case 5: // Text Embeddings (Stage 2)
+      if (jobMetadata.chunks_created !== undefined) {
+        metrics['Embeddings Generated'] = jobMetadata.chunks_created;
+      }
       if (jobMetadata.embeddings_generated !== undefined) {
-        metrics['Embeddings'] = jobMetadata.embeddings_generated;
+        metrics['Total Embeddings'] = jobMetadata.embeddings_generated;
       }
+      metrics['Model'] = 'OpenAI text-embedding-3-small';
+      metrics['Dimensions'] = '1536D';
       break;
 
-    case 6: // Image Extraction
-    case 7: // Image Classification
-    case 8: // Image Analysis
+    case 6: // Image Extraction (Stage 3)
+    case 7: // Image Classification (Stage 3)
+    case 8: // Image Analysis (Stage 3)
       if (jobMetadata.images_extracted !== undefined) {
-        metrics['Images'] = jobMetadata.images_extracted;
+        metrics['Images Extracted'] = jobMetadata.images_extracted;
+      }
+      if (jobMetadata.images_saved !== undefined) {
+        metrics['Images Saved'] = jobMetadata.images_saved;
+      }
+      if (jobMetadata.images_analyzed !== undefined) {
+        metrics['Images Analyzed'] = jobMetadata.images_analyzed;
+      }
+      if (jobMetadata.images_processed !== undefined) {
+        metrics['Images Processed'] = jobMetadata.images_processed;
       }
       break;
 
-    case 9: // CLIP Embeddings
+    case 9: // CLIP Embeddings (Stage 3)
       if (jobMetadata.clip_embeddings !== undefined) {
         metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings;
       }
+      if (jobMetadata.specialized_embeddings !== undefined) {
+        metrics['Specialized Embeddings'] = jobMetadata.specialized_embeddings;
+      }
+      if (jobMetadata.images_saved !== undefined) {
+        const embeddingsPerImage = 5;
+        metrics['Embeddings/Image'] = embeddingsPerImage;
+        metrics['Total Vectors'] = jobMetadata.images_saved * embeddingsPerImage;
+      }
       break;
 
-    case 10: // Product Creation
+    case 10: // Product Creation (Stage 4)
       if (jobMetadata.products_created !== undefined) {
-        metrics['Products'] = jobMetadata.products_created;
+        metrics['Products Created'] = jobMetadata.products_created;
+      }
+      if (jobMetadata.products_discovered !== undefined) {
+        metrics['Products Discovered'] = jobMetadata.products_discovered;
+      }
+      if (jobMetadata.database_records_created !== undefined) {
+        metrics['DB Records'] = jobMetadata.database_records_created;
       }
       break;
 
-    case 11: // Document Entities
-      if (jobMetadata.entities_created !== undefined) {
-        metrics['Entities'] = jobMetadata.entities_created;
-      }
-      break;
-
-    case 12: // Relationship Mapping
+    case 11: // Relationship Mapping (Stage 5)
       if (jobMetadata.relationships_created !== undefined) {
         metrics['Relationships'] = jobMetadata.relationships_created;
       }
-      break;
-
-    case 13: // Metadata Extraction
-      if (jobMetadata.metadata_fields !== undefined) {
-        metrics['Metadata Fields'] = jobMetadata.metadata_fields;
+      if (jobMetadata.chunk_product_relationships !== undefined) {
+        metrics['Chunk-Product Links'] = jobMetadata.chunk_product_relationships;
       }
       break;
 
-    case 14: // Quality Enhancement
+    case 12: // Document Entities (Stage 5)
+      if (jobMetadata.entities_created !== undefined) {
+        metrics['Entities Created'] = jobMetadata.entities_created;
+      }
+      if (jobMetadata.certificates_discovered !== undefined) {
+        metrics['Certificates'] = jobMetadata.certificates_discovered;
+      }
+      if (jobMetadata.logos_discovered !== undefined) {
+        metrics['Logos'] = jobMetadata.logos_discovered;
+      }
+      break;
+
+    case 13: // Metadata Extraction (Stage 5)
+      if (jobMetadata.metadata_fields !== undefined) {
+        metrics['Metadata Fields'] = jobMetadata.metadata_fields;
+      }
+      if (jobMetadata.knowledge_base_entries !== undefined) {
+        metrics['KB Entries'] = jobMetadata.knowledge_base_entries;
+      }
+      break;
+
+    case 14: // Quality Enhancement & Completion
+      if (jobMetadata.pages_completed !== undefined) {
+        metrics['Pages Completed'] = jobMetadata.pages_completed;
+      }
+      if (jobMetadata.pages_failed !== undefined && jobMetadata.pages_failed > 0) {
+        metrics['Pages Failed'] = jobMetadata.pages_failed;
+      }
+      if (jobMetadata.errors_count !== undefined && jobMetadata.errors_count > 0) {
+        metrics['Errors'] = jobMetadata.errors_count;
+      }
+      if (jobMetadata.warnings_count !== undefined && jobMetadata.warnings_count > 0) {
+        metrics['Warnings'] = jobMetadata.warnings_count;
+      }
       if (jobMetadata.confidence_score !== undefined) {
-        metrics['Confidence'] = `${Math.round(jobMetadata.confidence_score * 100)}%`;
+        metrics['Quality Score'] = `${Math.round(jobMetadata.confidence_score * 100)}%`;
       }
       break;
   }

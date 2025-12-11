@@ -48,21 +48,81 @@ interface PDFProcessingStepsMonitorProps {
   className?: string;
 }
 
+/**
+ * 14-Step PDF Processing Pipeline
+ * Matches backend checkpoint stages from checkpoint_recovery_service.py
+ */
 const PROCESSING_STEPS: Array<{ id: number; name: string; description: string }> = [
-  { id: 1, name: 'Product Discovery', description: 'AI-powered product identification' },
-  { id: 2, name: 'Entity Discovery', description: 'Certificates, logos, specifications' },
-  { id: 3, name: 'Focused Extraction', description: 'Extract product pages only' },
-  { id: 4, name: 'Chunking', description: 'Semantic text chunking' },
-  { id: 5, name: 'Text Embeddings', description: 'Generate text embeddings (OpenAI 1536D)' },
-  { id: 6, name: 'Image Extraction', description: 'Extract images from PDF' },
-  { id: 7, name: 'Image Classification', description: 'Classify image types' },
-  { id: 8, name: 'Image Analysis', description: 'AI image analysis (Llama Vision)' },
-  { id: 9, name: 'CLIP Embeddings', description: 'Multi-vector image embeddings' },
-  { id: 10, name: 'Product Creation', description: 'Create product entities' },
-  { id: 11, name: 'Document Entities', description: 'Link entities and metadata' },
-  { id: 12, name: 'Relationship Mapping', description: 'Map entity relationships' },
-  { id: 13, name: 'Metadata Extraction', description: 'Extract document metadata' },
-  { id: 14, name: 'Quality Enhancement', description: 'Final quality checks' },
+  {
+    id: 1,
+    name: 'Job Initialization',
+    description: 'Creating job record and preparing workspace'
+  },
+  {
+    id: 2,
+    name: 'Product Discovery',
+    description: 'AI-powered product, certificate, logo, and specification detection'
+  },
+  {
+    id: 3,
+    name: 'Focused Extraction',
+    description: 'Extracting text from product pages only (smart filtering)'
+  },
+  {
+    id: 4,
+    name: 'Text Chunking',
+    description: 'Semantic chunking for RAG retrieval'
+  },
+  {
+    id: 5,
+    name: 'Text Embeddings',
+    description: 'Generating OpenAI embeddings (1536D vectors)'
+  },
+  {
+    id: 6,
+    name: 'Image Extraction',
+    description: 'Extracting images from PDF pages'
+  },
+  {
+    id: 7,
+    name: 'Image Classification',
+    description: 'AI classification (material vs non-material)'
+  },
+  {
+    id: 8,
+    name: 'Image Analysis',
+    description: 'Llama Vision analysis for image understanding'
+  },
+  {
+    id: 9,
+    name: 'CLIP Embeddings',
+    description: 'Multi-vector image embeddings (5 per image)'
+  },
+  {
+    id: 10,
+    name: 'Product Creation',
+    description: 'Creating product entities in database'
+  },
+  {
+    id: 11,
+    name: 'Relationship Mapping',
+    description: 'Linking chunks, images, and products'
+  },
+  {
+    id: 12,
+    name: 'Document Entities',
+    description: 'Creating certificates, logos, and specifications'
+  },
+  {
+    id: 13,
+    name: 'Metadata Extraction',
+    description: 'Extracting and storing document metadata'
+  },
+  {
+    id: 14,
+    name: 'Quality Enhancement',
+    description: 'Final validation and quality checks'
+  },
 ];
 
 export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps> = ({
@@ -87,39 +147,91 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
   useEffect(() => {
     if (!jobStatus) return;
 
+    console.log('📊 PDFProcessingStepsMonitor: Job status update:', {
+      status: jobStatus.status,
+      progress: jobStatus.progress,
+      checkpoint: jobStatus.last_checkpoint?.stage,
+      metadata: jobStatus.last_checkpoint?.metadata,
+    });
+
     const checkpoint = jobStatus.last_checkpoint?.stage;
-    if (!checkpoint) return;
+    if (!checkpoint) {
+      console.warn('⚠️ No checkpoint stage found in job status');
+      return;
+    }
 
     const completedStageIds = mapCheckpointToStages(checkpoint);
     const activeStageId = getCurrentActiveStage(checkpoint);
 
+    console.log('🎯 Stage mapping:', {
+      checkpoint,
+      completedStageIds,
+      activeStageId,
+    });
+
     setSteps(prevSteps =>
       prevSteps.map(step => {
+        // Mark completed stages
         if (completedStageIds.includes(step.id)) {
           return {
             ...step,
             status: 'completed' as const,
             progress: 100,
-            endTime: new Date(),
+            endTime: step.endTime || new Date(),
             metrics: extractStageMetrics(step.id, jobStatus.last_checkpoint?.metadata),
           };
-        } else if (step.id === activeStageId) {
+        }
+        // Mark active stage
+        else if (step.id === activeStageId) {
           return {
             ...step,
             status: 'running' as const,
             progress: jobStatus.progress || 0,
-            startTime: new Date(),
+            startTime: step.startTime || new Date(),
             metrics: extractStageMetrics(step.id, jobStatus.last_checkpoint?.metadata),
           };
         }
+        // Keep pending stages as-is
         return step;
       })
     );
 
-    // Handle completion
+    // Handle job completion
     if (jobStatus.status === 'completed') {
+      console.log('✅ Job completed successfully');
+      // Mark all steps as completed
+      setSteps(prevSteps =>
+        prevSteps.map(step => ({
+          ...step,
+          status: 'completed' as const,
+          progress: 100,
+          endTime: step.endTime || new Date(),
+          metrics: extractStageMetrics(step.id, jobStatus.last_checkpoint?.metadata),
+        }))
+      );
       onComplete?.();
-    } else if (jobStatus.status === 'failed') {
+    }
+    // Handle job failure
+    else if (jobStatus.status === 'failed') {
+      console.error('❌ Job failed:', jobStatus.error);
+
+      // Mark the active stage as failed
+      if (activeStageId) {
+        setSteps(prevSteps =>
+          prevSteps.map(step => {
+            if (step.id === activeStageId) {
+              return {
+                ...step,
+                status: 'failed' as const,
+                error: jobStatus.error || 'Processing failed',
+                endTime: new Date(),
+              };
+            }
+            return step;
+          })
+        );
+      }
+
       onError?.(jobStatus.error || 'Processing failed');
     }
   }, [jobStatus, onComplete, onError]);
@@ -194,13 +306,22 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
     <Card className={cn('w-full', className)}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1">
             <CardTitle className="text-base font-semibold">{fileName}</CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              {formatDistanceToNow(startTime)} ago
+              Started {formatDistanceToNow(startTime)} ago
             </p>
           </div>
           {getJobStatusBadge()}
+        </div>
+
+        {/* Overall Progress Bar */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+            <span>Overall Progress</span>
+            <span>{completedSteps} of {totalSteps} steps</span>
+          </div>
+          <Progress value={overallProgress} className="h-2" />
         </div>
       </CardHeader>
 
@@ -217,7 +338,8 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
                   onClick={() => hasDetails && toggleStepExpansion(step.id)}
                   className={cn(
                     'w-full flex items-center gap-2 py-2 px-1 hover:bg-muted/50 transition-colors text-left',
-                    !hasDetails && 'cursor-default'
+                    !hasDetails && 'cursor-default',
+                    step.status === 'failed' && 'bg-red-50'
                   )}
                 >
                   {/* Expand/Collapse Chevron */}
@@ -247,11 +369,16 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
                     )}
                   </div>
 
-                  {/* Step Name */}
-                  <span className="text-sm flex-1">{step.name}</span>
+                  {/* Step Name and Description */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium">{step.name}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {step.description}
+                    </div>
+                  </div>
 
                   {/* Duration */}
-                  <span className="text-xs text-muted-foreground tabular-nums">
+                  <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
                     {step.status === 'completed' && formatDuration(step.startTime, step.endTime)}
                     {step.status === 'running' && formatDuration(step.startTime)}
                   </span>
@@ -260,10 +387,11 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
                 {/* Expanded Details */}
                 {isExpanded && hasDetails && (
                   <div className="ml-6 pl-6 py-2 border-l-2 border-muted">
-                    <div className="space-y-1 text-xs font-mono">
+                    <div className="space-y-1 text-xs">
                       {Object.entries(step.metrics!).map(([key, value]) => (
-                        <div key={key} className="text-muted-foreground">
-                          {key}: <span className="text-foreground">{value}</span>
+                        <div key={key} className="flex justify-between">
+                          <span className="text-muted-foreground">{key}:</span>
+                          <span className="font-mono text-foreground">{value}</span>
                         </div>
                       ))}
                     </div>
@@ -272,8 +400,14 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
 
                 {/* Error Message */}
                 {step.error && (
-                  <div className="ml-6 pl-6 py-2 border-l-2 border-red-200">
-                    <p className="text-xs text-red-600 font-mono">{step.error}</p>
+                  <div className="ml-6 pl-6 py-2 border-l-2 border-red-200 bg-red-50">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-xs font-semibold text-red-900 mb-1">Error Details:</p>
+                        <p className="text-xs text-red-700">{step.error}</p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -281,9 +415,16 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
           })}
         </div>
 
+        {/* Global Error Display */}
         {monitorError && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-600">
-            {monitorError}
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-red-900 mb-1">Processing Error:</p>
+                <p className="text-xs text-red-700">{monitorError}</p>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>

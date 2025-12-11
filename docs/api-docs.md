@@ -22,13 +22,13 @@ The multi-vector search has been **significantly enhanced** to be the single com
 
 ### What's New
 
-✅ **6 Specialized Embeddings** (previously 3)
-- text_embedding_1536 (20%) - Semantic understanding
-- visual_512 (20%) - Visual similarity (VECS: image_clip_embeddings)
-- color_512 (15%) - Color palette matching (VECS: image_color_embeddings)
-- texture_512 (15%) - Texture pattern matching (VECS: image_texture_embeddings)
-- style_512 (15%) - Design style matching (VECS: image_style_embeddings)
-- material_512 (15%) - Material type matching (VECS: image_material_embeddings)
+✅ **6 Specialized Embeddings** (SigLIP-based)
+- text_embedding_1536 (20%) - Semantic understanding (OpenAI)
+- visual_1152 (20%) - Visual similarity (SigLIP, VECS: image_siglip_embeddings)
+- color_siglip_1152 (15%) - Color palette matching (SigLIP text-guided, VECS: image_color_embeddings)
+- texture_siglip_1152 (15%) - Texture pattern matching (SigLIP text-guided, VECS: image_texture_embeddings)
+- style_siglip_1152 (15%) - Design style matching (SigLIP text-guided, VECS: image_style_embeddings)
+- material_siglip_1152 (15%) - Material type matching (SigLIP text-guided, VECS: image_material_embeddings)
 
 **Note**: Embeddings stored in `embeddings` table + VECS collections (not document_images columns)
 
