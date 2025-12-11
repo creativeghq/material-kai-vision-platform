@@ -44,7 +44,6 @@ import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import { UserProfilePage } from './pages/UserProfilePage';
 import HealthPage from './pages/Health';
-import { DataImport } from './pages/Admin/DataImport';
 import {
   CriticalErrorBoundary,
   PageErrorBoundary,
@@ -218,16 +217,6 @@ const App = () => (
                       <Layout>
                         <PDFProcessingDataPage />
                       </Layout>
-                    </AdminGuard>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/admin/data-import"
-                element={
-                  <AuthGuard>
-                    <AdminGuard>
-                      <DataImport />
                     </AdminGuard>
                   </AuthGuard>
                 }

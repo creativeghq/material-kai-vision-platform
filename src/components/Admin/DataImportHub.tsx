@@ -8,7 +8,7 @@
  */
 
 import React, { useState } from 'react';
-import { ArrowLeft, Upload, Globe, FileText, Database } from 'lucide-react';
+import { ArrowLeft, Upload, Globe, FileText, Database, FileType } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,10 +16,28 @@ import { Button } from '@/components/ui/button';
 import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { PDFUploadSection } from '@/components/PDF/PDFUploadSection';
+import { PDFProcessingWorkflow } from '@/components/PDF/PDFProcessingWorkflow';
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('xml');
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handleUploadComplete = (newJobId: string) => {
+    setJobId(newJobId);
+    setIsProcessing(true);
+  };
+
+  const handleProcessingComplete = () => {
+    setIsProcessing(false);
+  };
+
+  const handleReset = () => {
+    setJobId(null);
+    setIsProcessing(false);
+  };
 
   return (
     <div className="min-h-screen">
@@ -40,7 +58,11 @@ const DataImportHub: React.FC = () => {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="pdf">
+                  <FileType className="h-4 w-4 mr-2" />
+                  PDF Processing
+                </TabsTrigger>
                 <TabsTrigger value="xml">
                   <FileText className="h-4 w-4 mr-2" />
                   XML Import
@@ -55,6 +77,24 @@ const DataImportHub: React.FC = () => {
                   Import History
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="pdf" className="mt-6">
+                <div className="space-y-6">
+                  {/* Upload Section */}
+                  {!isProcessing && (
+                    <PDFUploadSection onUploadComplete={handleUploadComplete} />
+                  )}
+
+                  {/* Workflow Section */}
+                  {jobId && (
+                    <PDFProcessingWorkflow
+                      jobId={jobId}
+                      onComplete={handleProcessingComplete}
+                      onReset={handleReset}
+                    />
+                  )}
+                </div>
+              </TabsContent>
 
               <TabsContent value="xml" className="mt-6">
                 <XMLImportTab />
@@ -78,7 +118,18 @@ const DataImportHub: React.FC = () => {
         </Card>
 
         {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">PDF Processing</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Upload PDF catalogs for AI-powered product extraction with 14-stage processing pipeline
+              </p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">XML Import</CardTitle>
@@ -103,11 +154,11 @@ const DataImportHub: React.FC = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Batch Processing</CardTitle>
+              <CardTitle className="text-sm">Import History</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Process products in batches with checkpoint recovery and real-time progress tracking
+                View and manage all previous imports with detailed logs and error tracking
               </p>
             </CardContent>
           </Card>
