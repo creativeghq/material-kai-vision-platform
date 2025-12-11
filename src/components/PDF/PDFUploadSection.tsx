@@ -160,7 +160,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       const formData = new URLSearchParams();
       formData.append('file_url', publicUrl);
       formData.append('categories', 'products'); // Backend only accepts: products, certificates, logos, specifications, all, extract_only
-      formData.append('workspace_id', user.id);
+      formData.append('workspace_id', 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e'); // Default workspace ID
       formData.append('title', file.name);
       formData.append('processing_mode', 'standard');
 

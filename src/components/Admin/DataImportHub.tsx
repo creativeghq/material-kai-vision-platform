@@ -27,9 +27,11 @@ const DataImportHub: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleUploadComplete = (newJobId: string, uploadedFileName?: string) => {
+    console.log('🎯 DataImportHub: handleUploadComplete called', { newJobId, uploadedFileName });
     setJobId(newJobId);
     setFileName(uploadedFileName || 'PDF Document');
     setIsProcessing(true);
+    console.log('✅ DataImportHub: State updated - jobId:', newJobId, 'isProcessing:', true);
   };
 
   const handleProcessingComplete = () => {
@@ -83,6 +85,11 @@ const DataImportHub: React.FC = () => {
 
               <TabsContent value="pdf" className="mt-6">
                 <div className="space-y-6">
+                  {/* Debug Info */}
+                  <div className="text-xs text-muted-foreground p-2 bg-gray-100 rounded">
+                    Debug: isProcessing={isProcessing.toString()}, jobId={jobId || 'null'}
+                  </div>
+
                   {/* Upload Section */}
                   {!isProcessing && (
                     <PDFUploadSection onUploadComplete={handleUploadComplete} />
