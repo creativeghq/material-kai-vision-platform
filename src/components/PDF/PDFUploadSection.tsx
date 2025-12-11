@@ -2,7 +2,7 @@
  * PDFUploadSection - Upload interface for PDF catalogs
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, FileUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,12 +13,58 @@ interface PDFUploadSectionProps {
   onUploadComplete: (jobId: string) => void;
 }
 
+interface MaterialCategory {
+  id: string;
+  category_key: string;
+  category_name: string;
+  display_name: string;
+}
+
 export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComplete }) => {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
-  const [category, setCategory] = useState<string>('products');
+  const [category, setCategory] = useState<string>('');
+  const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Load material categories from database
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('material_categories')
+          .select('id, category_key, category_name, display_name')
+          .eq('is_active', true)
+          .order('display_name');
+
+        if (error) throw error;
+
+        setCategories(data || []);
+        // Set first category as default
+        if (data && data.length > 0) {
+          setCategory(data[0].category_key);
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+        toast({
+          title: 'Warning',
+          description: 'Could not load categories. Using defaults.',
+          variant: 'destructive',
+        });
+        // Fallback to hardcoded categories
+        setCategories([
+          { id: '1', category_key: 'ceramic_tile', category_name: 'Ceramic Tile', display_name: 'Ceramic Tile' },
+          { id: '2', category_key: 'porcelain_tile', category_name: 'Porcelain Tile', display_name: 'Porcelain Tile' },
+          { id: '3', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
+          { id: '4', category_key: 'stone', category_name: 'Stone', display_name: 'Stone' },
+        ]);
+        setCategory('ceramic_tile');
+      }
+    };
+
+    loadCategories();
+  }, [toast]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -170,23 +216,27 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       {file && (
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-gray-700 mb-2 block font-medium">Category</label>
+            <label className="text-sm text-gray-700 mb-2 block font-medium">Material Category</label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="bg-white border-gray-300">
-                <SelectValue />
+                <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="products">Products</SelectItem>
-                <SelectItem value="certificates">Certificates</SelectItem>
-                <SelectItem value="logos">Logos</SelectItem>
-                <SelectItem value="specifications">Specifications</SelectItem>
+                {categories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.category_key}>
+                    {cat.display_name || cat.category_name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <p className="text-xs text-gray-500 mt-1">
+              Select the material category for products in this PDF
+            </p>
           </div>
 
           <Button
             onClick={handleUpload}
-            disabled={isUploading}
+            disabled={isUploading || !category}
             className="w-full"
           >
             {isUploading ? 'Uploading...' : 'Upload & Start Processing'}

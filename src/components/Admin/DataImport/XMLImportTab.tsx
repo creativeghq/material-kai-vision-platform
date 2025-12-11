@@ -158,56 +158,107 @@ const XMLImportTab: React.FC = () => {
 
         {/* File Upload Tab */}
         <TabsContent value="file" className="mt-4">
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors bg-gray-50">
-            <input
-              type="file"
-              accept=".xml"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="xml-file-input"
-            />
-            <label
-              htmlFor="xml-file-input"
-              className="cursor-pointer flex flex-col items-center gap-4"
-            >
-              <div className="p-4 bg-primary/10 rounded-full">
-                <FileText className="h-12 w-12 text-primary" />
-              </div>
-              <div>
-                <p className="text-lg font-semibold text-gray-900 mb-1">
-                  {selectedFile ? selectedFile.name : 'Choose XML File'}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {selectedFile
-                    ? `${(selectedFile.size / 1024).toFixed(2)} KB`
-                    : 'Click to browse or drag and drop'}
-                </p>
-              </div>
-              {!selectedFile && (
-                <Button variant="outline" className="mt-2 bg-white hover:bg-gray-50">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Select File
-                </Button>
-              )}
-            </label>
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors bg-gray-50">
+              <input
+                type="file"
+                accept=".xml"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="xml-file-input"
+              />
+              <label
+                htmlFor="xml-file-input"
+                className="cursor-pointer flex flex-col items-center gap-4"
+              >
+                <div className="p-4 bg-primary/10 rounded-full">
+                  <FileText className="h-12 w-12 text-primary" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900 mb-1">
+                    {selectedFile ? selectedFile.name : 'Choose XML File'}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {selectedFile
+                      ? `${(selectedFile.size / 1024).toFixed(2)} KB`
+                      : 'Click to browse or drag and drop'}
+                  </p>
+                </div>
+                {!selectedFile && (
+                  <Button variant="outline" className="mt-2 bg-white hover:bg-gray-50">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Select File
+                  </Button>
+                )}
+              </label>
+            </div>
+
+            {selectedFile && !detectedFields.length && (
+              <Button
+                onClick={handleDetectFields}
+                disabled={isDetecting}
+                size="lg"
+                className="w-full"
+              >
+                {isDetecting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Analyzing XML Structure...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-5 w-5 mr-2" />
+                    Detect Fields & Suggest Mappings
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </TabsContent>
 
         {/* URL Input Tab */}
         <TabsContent value="url" className="mt-4">
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm text-gray-700 mb-2 block font-medium">XML File URL</label>
-              <Input
-                type="url"
-                placeholder="https://example.com/products.xml"
-                value={remoteUrl}
-                onChange={(e) => setRemoteUrl(e.target.value)}
-                className="bg-white border-gray-300"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Enter the direct URL to an XML file (must be publicly accessible)
-              </p>
+          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 bg-gray-50">
+            <div className="flex flex-col items-center gap-4">
+              <div className="p-4 bg-primary/10 rounded-full">
+                <Link className="h-12 w-12 text-primary" />
+              </div>
+              <div className="w-full max-w-xl space-y-4">
+                <div>
+                  <label className="text-sm text-gray-700 mb-2 block font-medium">XML File URL</label>
+                  <Input
+                    type="url"
+                    placeholder="https://example.com/products.xml"
+                    value={remoteUrl}
+                    onChange={(e) => setRemoteUrl(e.target.value)}
+                    className="bg-white border-gray-300"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the direct URL to an XML file (must be publicly accessible)
+                  </p>
+                </div>
+
+                {remoteUrl && !detectedFields.length && (
+                  <Button
+                    onClick={handleDetectFields}
+                    disabled={isDetecting}
+                    size="lg"
+                    className="w-full"
+                  >
+                    {isDetecting ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        Analyzing XML Structure...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-5 w-5 mr-2" />
+                        Detect Fields & Suggest Mappings
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </TabsContent>
@@ -219,42 +270,6 @@ const XMLImportTab: React.FC = () => {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-      )}
-
-      {/* Source Selected - Show Detect Button */}
-      {((sourceType === 'file' && selectedFile) || (sourceType === 'url' && remoteUrl)) && !detectedFields.length && (
-        <div className="flex flex-col items-center gap-4">
-          <Alert className="bg-primary/10 border-primary/30">
-            <CheckCircle className="h-4 w-4 text-primary" />
-            <AlertDescription className="text-gray-700">
-              {sourceType === 'file' ? (
-                <>File selected: <strong>{selectedFile?.name}</strong></>
-              ) : (
-                <>URL provided: <strong>{remoteUrl}</strong></>
-              )}
-              <br />
-              Click "Detect Fields" to analyze the XML structure and get AI-assisted field mappings
-            </AlertDescription>
-          </Alert>
-
-          <Button
-            onClick={handleDetectFields}
-            disabled={isDetecting}
-            size="lg"
-          >
-            {isDetecting ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Analyzing XML Structure...
-              </>
-            ) : (
-              <>
-                <FileText className="h-5 w-5 mr-2" />
-                Detect Fields & Suggest Mappings
-              </>
-            )}
-          </Button>
-        </div>
       )}
 
       {/* Fields Detected - Show Summary */}
