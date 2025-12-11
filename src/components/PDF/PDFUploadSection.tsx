@@ -28,53 +28,29 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Load material categories from database
+  // Initialize material categories (hardcoded list)
   useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('material_categories')
-          .select('id, category_key, category_name, display_name')
-          .order('display_name');
+    // Material categories based on MIVAA PDF extractor category prototypes
+    const materialCategories = [
+      { id: '1', category_key: 'ceramic_tile', category_name: 'Ceramic Tile', display_name: 'Ceramic Tile' },
+      { id: '2', category_key: 'porcelain_tile', category_name: 'Porcelain Tile', display_name: 'Porcelain Tile' },
+      { id: '3', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
+      { id: '4', category_key: 'stone', category_name: 'Natural Stone', display_name: 'Natural Stone' },
+      { id: '5', category_key: 'marble', category_name: 'Marble', display_name: 'Marble' },
+      { id: '6', category_key: 'granite', category_name: 'Granite', display_name: 'Granite' },
+      { id: '7', category_key: 'terrazzo', category_name: 'Terrazzo', display_name: 'Terrazzo' },
+      { id: '8', category_key: 'concrete', category_name: 'Concrete', display_name: 'Concrete' },
+      { id: '9', category_key: 'glass', category_name: 'Glass', display_name: 'Glass' },
+      { id: '10', category_key: 'metal', category_name: 'Metal', display_name: 'Metal' },
+      { id: '11', category_key: 'fabric', category_name: 'Fabric', display_name: 'Fabric' },
+      { id: '12', category_key: 'leather', category_name: 'Leather', display_name: 'Leather' },
+      { id: '13', category_key: 'resin', category_name: 'Resin', display_name: 'Resin' },
+      { id: '14', category_key: 'composite', category_name: 'Composite', display_name: 'Composite' },
+    ];
 
-        if (error) {
-          console.error('Supabase error:', error);
-          throw error;
-        }
-
-        if (data && data.length > 0) {
-          setCategories(data);
-          // Set first category as default
-          setCategory(data[0].category_key);
-        } else {
-          // No data returned, use fallback
-          throw new Error('No categories found in database');
-        }
-      } catch (error) {
-        console.error('Failed to load categories:', error);
-        toast({
-          title: 'Warning',
-          description: 'Could not load categories from database. Using defaults.',
-          variant: 'destructive',
-        });
-        // Fallback to hardcoded categories
-        const fallbackCategories = [
-          { id: '1', category_key: 'ceramic_tile', category_name: 'Ceramic Tile', display_name: 'Ceramic Tile' },
-          { id: '2', category_key: 'porcelain_tile', category_name: 'Porcelain Tile', display_name: 'Porcelain Tile' },
-          { id: '3', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
-          { id: '4', category_key: 'stone', category_name: 'Stone', display_name: 'Stone' },
-          { id: '5', category_key: 'marble', category_name: 'Marble', display_name: 'Marble' },
-          { id: '6', category_key: 'granite', category_name: 'Granite', display_name: 'Granite' },
-          { id: '7', category_key: 'terrazzo', category_name: 'Terrazzo', display_name: 'Terrazzo' },
-          { id: '8', category_key: 'concrete', category_name: 'Concrete', display_name: 'Concrete' },
-        ];
-        setCategories(fallbackCategories);
-        setCategory('ceramic_tile');
-      }
-    };
-
-    loadCategories();
-  }, [toast]);
+    setCategories(materialCategories);
+    setCategory('ceramic_tile'); // Default to ceramic tile
+  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
