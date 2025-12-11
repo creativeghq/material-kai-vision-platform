@@ -44,7 +44,7 @@ import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import { UserProfilePage } from './pages/UserProfilePage';
 import HealthPage from './pages/Health';
-import { DataImport } from './pages/admin/DataImport';
+import { DataImport } from './pages/Admin/DataImport';
 import {
   CriticalErrorBoundary,
   PageErrorBoundary,
