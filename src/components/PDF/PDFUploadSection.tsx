@@ -66,19 +66,21 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
           description: 'Could not load categories from database. Using defaults.',
           variant: 'destructive',
         });
-        // Fallback to hardcoded categories
+        // Fallback to hardcoded categories (matches database structure)
         const fallbackCategories = [
-          { id: '1', category_key: 'ceramic_tile', category_name: 'Ceramic Tile', display_name: 'Ceramic Tile' },
-          { id: '2', category_key: 'porcelain_tile', category_name: 'Porcelain Tile', display_name: 'Porcelain Tile' },
-          { id: '3', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
-          { id: '4', category_key: 'stone', category_name: 'Stone', display_name: 'Stone' },
-          { id: '5', category_key: 'marble', category_name: 'Marble', display_name: 'Marble' },
-          { id: '6', category_key: 'granite', category_name: 'Granite', display_name: 'Granite' },
-          { id: '7', category_key: 'terrazzo', category_name: 'Terrazzo', display_name: 'Terrazzo' },
-          { id: '8', category_key: 'concrete', category_name: 'Concrete', display_name: 'Concrete' },
+          { id: '1', category_key: 'tiles', category_name: 'Tiles', display_name: 'Tiles' },
+          { id: '2', category_key: 'wood', category_name: 'Wood', display_name: 'Wood' },
+          { id: '3', category_key: 'decor', category_name: 'Decor', display_name: 'Decor' },
+          { id: '4', category_key: 'furniture', category_name: 'Furniture', display_name: 'Furniture' },
+          { id: '5', category_key: 'general_materials', category_name: 'General Materials', display_name: 'General Materials' },
+          { id: '6', category_key: 'paint_wall_decor', category_name: 'Paint / Wall Decors', display_name: 'Paint / Wall Decors' },
+          { id: '7', category_key: 'heating', category_name: 'Heating', display_name: 'Heating' },
+          { id: '8', category_key: 'sanitary', category_name: 'Sanitary', display_name: 'Sanitary' },
+          { id: '9', category_key: 'kitchen', category_name: 'Kitchen', display_name: 'Kitchen' },
+          { id: '10', category_key: 'lighting', category_name: 'Lighting', display_name: 'Lighting' },
         ];
         setCategories(fallbackCategories);
-        setCategory('ceramic_tile');
+        setCategory('tiles');
       }
     };
 
