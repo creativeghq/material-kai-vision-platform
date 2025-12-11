@@ -169,14 +169,6 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       setUploadStatus('Starting AI processing...');
       const MIVAA_API_URL = import.meta.env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
 
-      // Create FormData (API expects multipart/form-data, not JSON!)
-      const formData = new FormData();
-      formData.append('file_url', publicUrl);
-      formData.append('categories', category);
-      formData.append('workspace_id', user.id);
-      formData.append('title', file.name);
-      formData.append('processing_mode', 'standard');
-
       // Debug: Log what we're sending
       console.log('📤 Sending to MIVAA API:', {
         url: `${MIVAA_API_URL}/api/rag/documents/upload`,
@@ -187,14 +179,18 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         processing_mode: 'standard'
       });
 
-      // Log FormData contents
-      for (const [key, value] of formData.entries()) {
-        console.log(`  ${key}:`, value);
-      }
-
       const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/upload`, {
         method: 'POST',
-        body: formData, // Send as FormData, not JSON
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          file_url: publicUrl,
+          categories: category,
+          workspace_id: user.id,
+          title: file.name,
+          processing_mode: 'standard',
+        }),
       });
 
       if (!response.ok) {
