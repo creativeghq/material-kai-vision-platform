@@ -30,6 +30,13 @@ interface EnvironmentConfig {
     apiKey?: string;
   };
 
+  // AI API Keys
+  ai: {
+    openaiApiKey?: string;
+    huggingfaceApiToken?: string;
+    replicateApiToken?: string;
+  };
+
   // Stripe (if configured)
   stripe: {
     publicKey?: string;
@@ -120,40 +127,47 @@ function buildEnvironmentConfig(): EnvironmentConfig {
 
     // Supabase Configuration
     supabase: {
-      url: getEnvVar('VITE_SUPABASE_URL') || getEnvVar('SUPABASE_URL', ''),
-      anonKey: getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('SUPABASE_ANON_KEY', ''),
+      url: getEnvVar('SUPABASE_URL') || getEnvVar('NEXT_PUBLIC_SUPABASE_URL', ''),
+      anonKey: getEnvVar('SUPABASE_ANON_KEY') || getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY', ''),
       serviceRoleKey: getEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
     },
 
     // MIVAA Integration
     mivaa: {
-      apiUrl: getEnvVar('VITE_MIVAA_API_URL', 'https://v1api.materialshub.gr'),
+      apiUrl: getEnvVar('MIVAA_API_URL', 'https://v1api.materialshub.gr'),
       gatewayUrl: getEnvVar('MIVAA_GATEWAY_URL', 'https://v1api.materialshub.gr'),
       apiKey: getEnvVar('MIVAA_API_KEY'),
     },
 
+    // AI API Keys (using your existing Vercel environment variable names)
+    ai: {
+      openaiApiKey: getEnvVar('VITE_OPENAI_API_KEY') || getEnvVar('OPENAI_API_KEY'),
+      huggingfaceApiToken: getEnvVar('VITE_HUGGINGFACE_API_KEY') || getEnvVar('HUGGINGFACE_API_TOKEN'),
+      replicateApiToken: getEnvVar('VITE_REPLICATE_API_KEY') || getEnvVar('REPLICATE_API_TOKEN'),
+    },
+
     // Stripe Configuration
     stripe: {
-      publicKey: getEnvVar('VITE_STRIPE_PUBLIC_KEY'),
-      credits100PriceId: getEnvVar('VITE_STRIPE_CREDITS_100_PRICE_ID'),
-      credits500PriceId: getEnvVar('VITE_STRIPE_CREDITS_500_PRICE_ID'),
-      credits1000PriceId: getEnvVar('VITE_STRIPE_CREDITS_1000_PRICE_ID'),
-      credits5000PriceId: getEnvVar('VITE_STRIPE_CREDITS_5000_PRICE_ID'),
-      proPriceId: getEnvVar('VITE_STRIPE_PRO_PRICE_ID'),
-      enterprisePriceId: getEnvVar('VITE_STRIPE_ENTERPRISE_PRICE_ID'),
+      publicKey: getEnvVar('VITE_STRIPE_PUBLIC_KEY') || getEnvVar('STRIPE_PUBLIC_KEY'),
+      credits100PriceId: getEnvVar('VITE_STRIPE_CREDITS_100_PRICE_ID') || getEnvVar('STRIPE_CREDITS_100_PRICE_ID'),
+      credits500PriceId: getEnvVar('VITE_STRIPE_CREDITS_500_PRICE_ID') || getEnvVar('STRIPE_CREDITS_500_PRICE_ID'),
+      credits1000PriceId: getEnvVar('VITE_STRIPE_CREDITS_1000_PRICE_ID') || getEnvVar('STRIPE_CREDITS_1000_PRICE_ID'),
+      credits5000PriceId: getEnvVar('VITE_STRIPE_CREDITS_5000_PRICE_ID') || getEnvVar('STRIPE_CREDITS_5000_PRICE_ID'),
+      proPriceId: getEnvVar('VITE_STRIPE_PRO_PRICE_ID') || getEnvVar('STRIPE_PRO_PRICE_ID'),
+      enterprisePriceId: getEnvVar('VITE_STRIPE_ENTERPRISE_PRICE_ID') || getEnvVar('STRIPE_ENTERPRISE_PRICE_ID'),
     },
 
     // WebSocket Configuration
     websocket: {
-      url: getEnvVar('NEXT_PUBLIC_WS_URL') || getEnvVar('VITE_WS_URL'),
-      enabled: getBoolEnvVar('VITE_ENABLE_WEBSOCKET', nodeEnv === 'development'),
+      url: getEnvVar('WS_URL') || getEnvVar('NEXT_PUBLIC_WS_URL'),
+      enabled: getBoolEnvVar('ENABLE_WEBSOCKET', nodeEnv === 'development'),
     },
 
     // Feature Flags
     features: {
-      enableAnalytics: getBoolEnvVar('VITE_ENABLE_ANALYTICS', nodeEnv === 'production'),
-      enableCaching: getBoolEnvVar('VITE_ENABLE_CACHING', true),
-      enableLogging: getBoolEnvVar('VITE_ENABLE_LOGGING', true),
+      enableAnalytics: getBoolEnvVar('ENABLE_ANALYTICS', nodeEnv === 'production'),
+      enableCaching: getBoolEnvVar('ENABLE_CACHING', true),
+      enableLogging: getBoolEnvVar('ENABLE_LOGGING', true),
     },
   };
 }
@@ -169,10 +183,10 @@ function validateEnvironment(config: EnvironmentConfig): void {
   
   if (!isBuildTime) {
     if (!config.supabase.url) {
-      errors.push('VITE_SUPABASE_URL or SUPABASE_URL is required');
+      errors.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL is required');
     }
     if (!config.supabase.anonKey) {
-      errors.push('VITE_SUPABASE_ANON_KEY or SUPABASE_ANON_KEY is required');
+      errors.push('SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_ANON_KEY is required');
     }
   }
 

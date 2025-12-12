@@ -1,10 +1,13 @@
 /**
  * 3D Room Designer Page
  * Standalone page for AI-powered 3D interior design generation
+ *
+ * This page uses DIRECT API calls to Replicate/Hugging Face.
+ * It does NOT use the agent system (agents run on Supabase and have timeouts).
  */
 
 import React, { useState } from 'react';
-import { Cube, Sparkles, Loader2, Download, RefreshCw } from 'lucide-react';
+import { Cube, Sparkles, Loader2, Download, RefreshCw, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,9 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
-import { DesignCanvas } from '@/components/AI/DesignCanvas';
+import { designer3DService } from '@/services/designer3DService';
 
 const roomTypes = [
   { value: 'living_room', label: 'Living Room' },
@@ -48,6 +51,7 @@ export const Designer3DPage: React.FC = () => {
   const [style, setStyle] = useState('modern');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationResult, setGenerationResult] = useState<any>(null);
+  const [generationProgress, setGenerationProgress] = useState('');
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -60,28 +64,44 @@ export const Designer3DPage: React.FC = () => {
     }
 
     setIsGenerating(true);
+    setGenerationProgress('Initializing...');
+
     try {
-      const result = await MaterialAgent3DGenerationAPI.generate3D({
+      setGenerationProgress('Generating design with AI...');
+
+      // Use standalone service (NOT agent-based)
+      const result = await designer3DService.generateDesign({
         prompt: prompt.trim(),
         room_type: roomType,
         style: style,
-        specific_materials: [],
+        width: 768,
+        height: 768,
       });
 
       if (result.success) {
-        setGenerationResult(result);
+        setGenerationResult({
+          image_urls: result.image_urls,
+          generation_id: result.generation_id,
+          enhanced_prompt: result.enhanced_prompt,
+          processing_time_ms: result.processing_time_ms,
+        });
+
+        setGenerationProgress('');
+
         toast({
           title: 'Design Generated!',
-          description: 'Your 3D interior design has been created successfully.',
+          description: `Created in ${(result.processing_time_ms / 1000).toFixed(1)}s`,
         });
       } else {
-        throw new Error('Generation failed');
+        throw new Error(result.error || 'Generation failed');
       }
     } catch (error) {
       console.error('Generation error:', error);
+      setGenerationProgress('');
+
       toast({
         title: 'Generation Failed',
-        description: 'Failed to generate 3D design. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to generate 3D design. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -94,6 +114,7 @@ export const Designer3DPage: React.FC = () => {
     setRoomType('living_room');
     setStyle('modern');
     setGenerationResult(null);
+    setGenerationProgress('');
   };
 
   return (
@@ -108,7 +129,7 @@ export const Designer3DPage: React.FC = () => {
             <div>
               <h1 className="text-3xl font-bold">3D Room Designer</h1>
               <p className="text-muted-foreground">
-                AI-powered interior design generation with material matching
+                Standalone AI-powered interior design generation
               </p>
             </div>
           </div>
@@ -117,6 +138,15 @@ export const Designer3DPage: React.FC = () => {
 
       {/* Main Content */}
       <div className="page-container py-8">
+        {/* Info Alert */}
+        <Alert className="mb-6">
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            This designer uses <strong>direct API calls</strong> to Replicate/Hugging Face for image generation.
+            It does NOT use the agent system and can handle longer processing times.
+          </AlertDescription>
+        </Alert>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Panel - Controls */}
           <div className="lg:col-span-1">
@@ -183,7 +213,7 @@ export const Designer3DPage: React.FC = () => {
                     {isGenerating ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generating...
+                        {generationProgress || 'Generating...'}
                       </>
                     ) : (
                       <>
@@ -202,6 +232,14 @@ export const Designer3DPage: React.FC = () => {
                     </Button>
                   )}
                 </div>
+
+                {isGenerating && (
+                  <div className="mt-4 p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground text-center">
+                      ⏳ This may take 30-60 seconds...
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -209,13 +247,52 @@ export const Designer3DPage: React.FC = () => {
           {/* Right Panel - Results */}
           <div className="lg:col-span-2">
             {generationResult ? (
-              <DesignCanvas
-                images={generationResult.image_urls}
-                parsedRequest={generationResult.parsed_request}
-                matchedMaterials={generationResult.matched_materials}
-                qualityAssessment={generationResult.quality_assessment}
-                processingTimeMs={generationResult.processing_time_ms}
-              />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Generated Design</CardTitle>
+                  <CardDescription>
+                    Processing time: {(generationResult.processing_time_ms / 1000).toFixed(1)}s
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Image Gallery */}
+                  <div className="grid grid-cols-1 gap-4">
+                    {generationResult.image_urls.map((url: string, index: number) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={url}
+                          alt={`Generated design ${index + 1}`}
+                          className="w-full rounded-lg shadow-lg"
+                        />
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `design-${Date.now()}.png`;
+                            link.click();
+                          }}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Enhanced Prompt */}
+                  {generationResult.enhanced_prompt && (
+                    <div className="p-4 bg-muted rounded-lg">
+                      <h4 className="text-sm font-semibold mb-2">Enhanced Prompt</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {generationResult.enhanced_prompt}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             ) : (
               <Card className="h-full min-h-[600px] flex items-center justify-center">
                 <CardContent className="text-center space-y-4">
@@ -226,7 +303,7 @@ export const Designer3DPage: React.FC = () => {
                     <h3 className="text-lg font-semibold mb-2">No Design Yet</h3>
                     <p className="text-muted-foreground max-w-md">
                       Enter a description and click "Generate Design" to create your AI-powered
-                      3D interior design visualization.
+                      3D interior design visualization using direct API calls.
                     </p>
                   </div>
                 </CardContent>
