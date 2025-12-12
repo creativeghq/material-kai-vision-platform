@@ -107,6 +107,15 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "🚀 Deploying Supabase edge functions..."
+          echo "📋 Project Ref: ${{ secrets.SUPABASE_PROJECT_ID }}"
+          echo "🔑 Token present: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' && 'Yes' || 'No' }}"
+
+          # Test authentication first
+          echo "🔍 Testing Supabase authentication..."
+          supabase projects list || echo "⚠️ Authentication test failed"
+
+          # Deploy functions
+          echo "📦 Deploying functions..."
           supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
           echo "✅ Supabase functions deployed successfully"
 
