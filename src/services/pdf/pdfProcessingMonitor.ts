@@ -264,6 +264,12 @@ export function extractMetricsFromJob(metadata?: Record<string, any>): Record<st
 /**
  * Extract stage-specific metrics from checkpoint metadata
  * Maps backend metadata fields to user-friendly display metrics
+ *
+ * Note: Backend stores data in two places:
+ * 1. checkpoint_data - main processing results (counts, IDs, etc.)
+ * 2. metadata - additional context (models used, settings, etc.)
+ *
+ * The jobMetadata parameter may contain fields from both sources merged together.
  */
 export function extractStageMetrics(stageId: number, jobMetadata?: Record<string, any>): Record<string, any> {
   if (!jobMetadata) return {};
@@ -339,6 +345,14 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.embeddings_generated !== undefined) {
         metrics['Total Embeddings'] = jobMetadata.embeddings_generated;
       }
+      // Also check for text_embeddings field (from rag_routes.py checkpoint)
+      if (jobMetadata.text_embeddings !== undefined) {
+        metrics['Text Embeddings'] = jobMetadata.text_embeddings;
+      }
+      // Also check for text_embeddings_generated field (from stage_2_chunking.py)
+      if (jobMetadata.text_embeddings_generated !== undefined) {
+        metrics['Embeddings Generated'] = jobMetadata.text_embeddings_generated;
+      }
       metrics['Model'] = 'OpenAI text-embedding-3-small';
       metrics['Dimensions'] = '1536D';
       break;
@@ -364,6 +378,10 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.clip_embeddings !== undefined) {
         metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings;
       }
+      // Also check for clip_embeddings_generated field (from pipeline_orchestrator.py)
+      if (jobMetadata.clip_embeddings_generated !== undefined) {
+        metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings_generated;
+      }
       if (jobMetadata.specialized_embeddings !== undefined) {
         metrics['Specialized Embeddings'] = jobMetadata.specialized_embeddings;
       }
@@ -371,6 +389,10 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
         const embeddingsPerImage = 5;
         metrics['Embeddings/Image'] = embeddingsPerImage;
         metrics['Total Vectors'] = jobMetadata.images_saved * embeddingsPerImage;
+      }
+      // Also check for embeddings_per_image from metadata
+      if (jobMetadata.embeddings_per_image !== undefined) {
+        metrics['Embeddings/Image'] = jobMetadata.embeddings_per_image;
       }
       break;
 
@@ -393,6 +415,13 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.chunk_product_relationships !== undefined) {
         metrics['Chunk-Product Links'] = jobMetadata.chunk_product_relationships;
       }
+      // Also check for chunk_image_relationships and product_image_relationships (from pipeline_orchestrator.py)
+      if (jobMetadata.chunk_image_relationships !== undefined) {
+        metrics['Chunk-Image Links'] = jobMetadata.chunk_image_relationships;
+      }
+      if (jobMetadata.product_image_relationships !== undefined) {
+        metrics['Product-Image Links'] = jobMetadata.product_image_relationships;
+      }
       break;
 
     case 12: // Document Entities (Stage 5)
@@ -405,6 +434,25 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.logos_discovered !== undefined) {
         metrics['Logos'] = jobMetadata.logos_discovered;
       }
+      if (jobMetadata.specifications_discovered !== undefined) {
+        metrics['Specifications'] = jobMetadata.specifications_discovered;
+      }
+      // Also check for entity_types object (from stage_4_products.py)
+      if (jobMetadata.entity_types) {
+        if (jobMetadata.entity_types.certificates !== undefined) {
+          metrics['Certificates'] = jobMetadata.entity_types.certificates;
+        }
+        if (jobMetadata.entity_types.logos !== undefined) {
+          metrics['Logos'] = jobMetadata.entity_types.logos;
+        }
+        if (jobMetadata.entity_types.specifications !== undefined) {
+          metrics['Specifications'] = jobMetadata.entity_types.specifications;
+        }
+      }
+      // Also check for entity_product_relationships
+      if (jobMetadata.entity_product_relationships !== undefined) {
+        metrics['Entity-Product Links'] = jobMetadata.entity_product_relationships;
+      }
       break;
 
     case 13: // Metadata Extraction (Stage 5)
@@ -413,6 +461,19 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       }
       if (jobMetadata.knowledge_base_entries !== undefined) {
         metrics['KB Entries'] = jobMetadata.knowledge_base_entries;
+      }
+      // Also check for metadata_consolidation_count (from stage_4_products.py)
+      if (jobMetadata.metadata_consolidation_count !== undefined) {
+        metrics['Metadata Consolidated'] = jobMetadata.metadata_consolidation_count;
+      }
+      if (jobMetadata.metadata_consolidation_failed !== undefined && jobMetadata.metadata_consolidation_failed > 0) {
+        metrics['Failed'] = jobMetadata.metadata_consolidation_failed;
+      }
+      if (jobMetadata.products_with_metadata !== undefined) {
+        metrics['Products with Metadata'] = jobMetadata.products_with_metadata;
+      }
+      if (jobMetadata.metadata_consolidation_ai_calls !== undefined) {
+        metrics['AI Calls'] = jobMetadata.metadata_consolidation_ai_calls;
       }
       break;
 

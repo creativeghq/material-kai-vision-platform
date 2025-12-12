@@ -169,6 +169,13 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
       activeStageId,
     });
 
+    // Merge checkpoint_data and metadata for extractStageMetrics
+    // Backend stores data in both places, so we need to combine them
+    const mergedCheckpointData = {
+      ...(jobStatus.last_checkpoint?.checkpoint_data || {}),
+      ...(jobStatus.last_checkpoint?.metadata || {}),
+    };
+
     setSteps(prevSteps =>
       prevSteps.map(step => {
         // Mark completed stages
@@ -178,7 +185,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
             status: 'completed' as const,
             progress: 100,
             endTime: step.endTime || new Date(),
-            metrics: extractStageMetrics(step.id, jobStatus.last_checkpoint?.metadata),
+            metrics: extractStageMetrics(step.id, mergedCheckpointData),
           };
         }
         // Mark active stage
@@ -188,7 +195,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
             status: 'running' as const,
             progress: jobStatus.progress || 0,
             startTime: step.startTime || new Date(),
-            metrics: extractStageMetrics(step.id, jobStatus.last_checkpoint?.metadata),
+            metrics: extractStageMetrics(step.id, mergedCheckpointData),
           };
         }
         // Keep pending stages as-is
@@ -200,13 +207,17 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
     if (jobStatus.status === 'completed') {
       console.log('✅ Job completed successfully');
       // Mark all steps as completed
+      const mergedCheckpointData = {
+        ...(jobStatus.last_checkpoint?.checkpoint_data || {}),
+        ...(jobStatus.last_checkpoint?.metadata || {}),
+      };
       setSteps(prevSteps =>
         prevSteps.map(step => ({
           ...step,
           status: 'completed' as const,
           progress: 100,
           endTime: step.endTime || new Date(),
-          metrics: extractStageMetrics(step.id, jobStatus.last_checkpoint?.metadata),
+          metrics: extractStageMetrics(step.id, mergedCheckpointData),
         }))
       );
       onComplete?.();
