@@ -186,38 +186,34 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 ---
 
-## 5. 3D Generation Flow
+## 5. 3D Designer Flow
 
-**Purpose:** Generate 3D material visualizations using AI
+**Purpose:** Interactive 3D room designer for material visualization
 
 **User Journey:**
 ```
-1. User enters prompt describing desired 3D scene
+1. User accesses /designer route
    ↓
-2. User selects:
-   - Room type
-   - Style preferences
-   - Specific materials (optional)
+2. DesignerLayout loads with:
+   - Asset Library Panel (materials, furniture)
+   - 3D Canvas (React Three Fiber)
+   - Properties Panel (object properties)
+   - Toolbar (transform tools)
    ↓
-3. Frontend calls 3D generation Edge Function
+3. User can:
+   - Drag and drop materials/objects
+   - Transform objects (move, rotate, scale)
+   - Adjust room dimensions
+   - Configure lighting
    ↓
-4. Mastra Agent orchestrates workflow:
-   - Prompt enhancement
-   - Model selection (Stable Diffusion, Replicate)
-   - Image generation
-   - 3D mesh creation (optional)
-   ↓
-5. Results returned with:
-   - Generated images
-   - 3D models (if requested)
-   - Metadata
-   ↓
-6. Frontend displays in 3D viewer
+4. Real-time 3D rendering with:
+   - Camera controls (orbit, pan, zoom)
+   - Grid snapping
+   - Material previews
 ```
 
-**Edge Function:** `mastra-3d-generation`  
-**Frontend Component:** `Designer3DPage.tsx`  
-**AI Models:** Stable Diffusion, Replicate
+**Frontend Component:** `DesignerPage.tsx` → `DesignerLayout.tsx`
+**Route:** `/designer`
 
 ---
 

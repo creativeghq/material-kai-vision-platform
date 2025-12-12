@@ -374,24 +374,16 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
 
 ---
 
-### 8. **Stable Diffusion / FLUX** (3D Designer) 🎨
+### 8. **~~Stable Diffusion / FLUX~~ (REMOVED)** ❌
 
-**File**: `src/components/3D/Designer3DPage.tsx`
+**Status**: REMOVED - AI-powered image generation has been removed from the platform
 
-**Models**:
-- Stable Diffusion XL Base 1.0
-- FLUX-Schnell
-- Interior Design models (Replicate)
+**Previously Used For**:
+- ~~3D material visualization~~
+- ~~Interior design generation~~
+- ~~Material texture generation~~
 
-**Purpose**:
-- **3D material visualization**
-- **Interior design generation**
-- **Material texture generation**
-
-**Impact on Flow**:
-- ✅ **3D Designer**: Generates material visualizations
-- ✅ **Moodboards**: Creates design concepts
-- ❌ **PDF Processing**: Not used
+**Replacement**: Manual 3D designer at `/designer` route using React Three Fiber
 
 **Cost**: Varies by provider
 **Speed**: 5-30 seconds

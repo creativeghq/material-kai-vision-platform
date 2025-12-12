@@ -141,58 +141,7 @@ export class BrowserApiIntegrationService {
     });
   }
 
-  /**
-   * Interior design generation using the best available model
-   */
-  public async generateInteriorDesign(params: {
-    prompt: string;
-    roomType?: string;
-    style?: string;
-    width?: number;
-    height?: number;
-  }): Promise<StandardizedApiResponse> {
-    // Try Replicate first (usually better quality)
-    const replicateModels =
-      browserApiClientFactory.getAvailableModels('replicate');
-    const interiorModel = replicateModels.find(
-      (model) => model.includes('interior') || model.includes('design'),
-    );
 
-    if (interiorModel) {
-      const enhancedPrompt = this.enhanceInteriorPrompt(params);
-      return this.generateImageWithReplicate(interiorModel, {
-        prompt: enhancedPrompt,
-        width: params.width || 768,
-        height: params.height || 768,
-        num_inference_steps: 25,
-        guidance_scale: 7.5,
-      });
-    }
-
-    // Fallback to Hugging Face
-    const huggingfaceModels =
-      browserApiClientFactory.getAvailableModels('huggingface');
-    const fallbackModel = huggingfaceModels[0]; // Use first available model
-
-    if (fallbackModel) {
-      const enhancedPrompt = this.enhanceInteriorPrompt(params);
-      return this.generateImageWithHuggingFace(fallbackModel, enhancedPrompt);
-    }
-
-    return {
-      success: false,
-      error: {
-        message: 'No suitable models available for interior design generation',
-        code: 'NO_MODELS_AVAILABLE',
-        retryable: false,
-      },
-      metadata: {
-        apiType: 'interior-design',
-        timestamp: new Date().toISOString(),
-        requestId: crypto.randomUUID(),
-      },
-    };
-  }
 
   /**
    * Material recognition using MIVAA service via Supabase Edge Function
@@ -281,30 +230,35 @@ export class BrowserApiIntegrationService {
   }
 
   /**
-   * Private helper methods
+   * Interior design generation using the best available model
+   * @deprecated This method is deprecated and will be removed. AI-powered image generation has been removed from the platform.
    */
-  private enhanceInteriorPrompt(params: {
+  public async generateInteriorDesign(params: {
     prompt: string;
     roomType?: string;
     style?: string;
-  }): string {
-    let enhancedPrompt = params.prompt;
-
-    if (params.roomType) {
-      enhancedPrompt = `${params.roomType} interior: ${enhancedPrompt}`;
-    }
-
-    if (params.style) {
-      enhancedPrompt += `, ${params.style} style`;
-    }
-
-    // Add quality enhancers
-    enhancedPrompt +=
-      ', high quality, professional interior design, well-lit, detailed';
-
-    return enhancedPrompt;
+    width?: number;
+    height?: number;
+  }): Promise<StandardizedApiResponse> {
+    console.warn('⚠️ generateInteriorDesign is deprecated and will be removed');
+    return {
+      success: false,
+      error: {
+        message: 'AI-powered image generation has been removed from the platform',
+        code: 'FEATURE_REMOVED',
+        retryable: false,
+      },
+      metadata: {
+        apiType: 'interior-design',
+        timestamp: new Date().toISOString(),
+        requestId: crypto.randomUUID(),
+      },
+    };
   }
 
+  /**
+   * Private helper methods
+   */
   private async fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
