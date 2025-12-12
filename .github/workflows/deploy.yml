@@ -103,12 +103,12 @@ jobs:
           version: latest
 
       - name: 🚀 Deploy Supabase functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           echo "🚀 Deploying Supabase edge functions..."
           supabase functions deploy --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
           echo "✅ Supabase functions deployed successfully"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: 🔧 Install Vercel CLI
         run: |

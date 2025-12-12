@@ -19,6 +19,7 @@ import {
   Zap,
   Activity,
   ChevronRight,
+  ChevronDown,
   FileText,
   Image as ImageIcon,
   Package,
@@ -39,12 +40,13 @@ interface BackgroundJob {
   workspace_id: string;
   document_id: string | null;
   job_type: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'interrupted';
   progress: number;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
   failed_at: string | null;
+  interrupted_at: string | null;
   error: string | null;
   metadata: {
     filename?: string;
@@ -76,6 +78,8 @@ interface QueueMetrics {
     completed: number;
     failed: number;
     retrying: number;
+    interrupted: number;
+    cancelled: number;
     total: number;
     success_rate: number;
     avg_processing_time: number;
@@ -117,9 +121,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
+  const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
 
   // Debug log
   console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
+
+  const toggleStage = (stageId: number) => {
+    setExpandedStages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stageId)) {
+        newSet.delete(stageId);
+      } else {
+        newSet.add(stageId);
+      }
+      return newSet;
+    });
+  };
 
   // Fetch job details with checkpoints
   const fetchJobDetails = async (job: BackgroundJob) => {
@@ -191,6 +208,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         const completed = allJobs.filter((j) => j.status === 'completed').length;
         const failed = allJobs.filter((j) => j.status === 'failed').length;
         const retrying = allJobs.filter((j) => j.status === 'retrying').length;
+        const interrupted = allJobs.filter((j) => j.status === 'interrupted').length;
+        const cancelled = allJobs.filter((j) => j.status === 'cancelled').length;
         const total = allJobs.length;
 
         const completedJobs = allJobs.filter((j) => j.status === 'completed');
@@ -232,6 +251,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             completed,
             failed,
             retrying,
+            interrupted,
+            cancelled,
             total,
             success_rate: successRate,
             avg_processing_time: avgProcessingTime,
@@ -317,6 +338,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       processing: { color: 'bg-blue-100 text-blue-800', icon: '⚙️' },
       completed: { color: 'bg-green-100 text-green-800', icon: '✅' },
       failed: { color: 'bg-red-100 text-red-800', icon: '❌' },
+      cancelled: { color: 'bg-gray-100 text-gray-800', icon: '🚫' },
+      interrupted: { color: 'bg-orange-100 text-orange-800', icon: '⚠️' },
+      retrying: { color: 'bg-purple-100 text-purple-800', icon: '🔄' },
     };
     const config = statusConfig[status] || statusConfig.pending;
     return (
@@ -653,7 +677,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Status Breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                 <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
                   <div className="text-2xl font-bold text-yellow-700">
                     {metrics.pdf_processing.pending}
@@ -680,15 +704,27 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </div>
                 <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
                   <div className="text-2xl font-bold text-orange-700">
-                    {metrics.pdf_processing.retrying}
+                    {metrics.pdf_processing.interrupted}
                   </div>
-                  <div className="text-sm text-orange-600">Retrying</div>
+                  <div className="text-sm text-orange-600">Interrupted</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <div className="text-2xl font-bold text-gray-700">
+                    {metrics.pdf_processing.cancelled}
+                  </div>
+                  <div className="text-sm text-gray-600">Cancelled</div>
                 </div>
                 <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                   <div className="text-2xl font-bold text-purple-700">
+                    {metrics.pdf_processing.retrying}
+                  </div>
+                  <div className="text-sm text-purple-600">Retrying</div>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div className="text-2xl font-bold text-slate-700">
                     {metrics.pdf_processing.total}
                   </div>
-                  <div className="text-sm text-purple-600">Total</div>
+                  <div className="text-sm text-slate-600">Total</div>
                 </div>
               </div>
 
@@ -850,7 +886,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">Job Overview</CardTitle>
                     <div className="flex items-center gap-2">
-                      {selectedJob && (selectedJob.status === 'processing' || selectedJob.status === 'pending') && (
+                      {selectedJob && (selectedJob.status === 'processing' || selectedJob.status === 'pending' || selectedJob.status === 'interrupted') && (
                         <button
                           onClick={() => handleCancelJob(selectedJob.id)}
                           disabled={cancellingJob === selectedJob.id}
@@ -864,12 +900,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           ) : (
                             <>
                               <XCircle className="w-3.5 h-3.5" />
-                              Cancel Job
+                              {selectedJob.status === 'interrupted' ? 'Mark as Cancelled' : 'Cancel Job'}
                             </>
                           )}
                         </button>
                       )}
-                      {selectedJob && (selectedJob.status === 'completed' || selectedJob.status === 'failed' || selectedJob.status === 'cancelled') && (
+                      {selectedJob && (selectedJob.status === 'completed' || selectedJob.status === 'failed' || selectedJob.status === 'cancelled' || selectedJob.status === 'interrupted') && (
                         <button
                           onClick={() => handleDeleteJob(selectedJob.id)}
                           disabled={deletingJob === selectedJob.id}
@@ -919,7 +955,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Processing Metrics - MOVED TO TOP */}
+              {/* Processing Metrics */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -932,29 +968,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <Package className="h-4 w-4 text-primary" />
                       <div>
-                        <div className="text-xs text-muted-foreground">Products Found</div>
+                        <div className="text-xs text-muted-foreground">Products</div>
                         <div className="font-semibold text-lg">
-                          {selectedJob?.metadata?.products_created || selectedJob?.metadata?.products_discovered || 0}
+                          {selectedJob?.metadata?.result?.products_created ||
+                           selectedJob?.metadata?.products_created ||
+                           selectedJob?.metadata?.products_discovered || 0}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-primary" />
                       <div>
-                        <div className="text-xs text-muted-foreground">Chunks Created</div>
+                        <div className="text-xs text-muted-foreground">Chunks</div>
                         <div className="font-semibold text-lg">
-                          {selectedJob?.metadata?.chunks_created || 0}
+                          {selectedJob?.metadata?.result?.chunks_created ||
+                           selectedJob?.metadata?.chunks_created || 0}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <ImageIcon className="h-4 w-4 text-primary" />
                       <div>
-                        <div className="text-xs text-muted-foreground">Images Extracted</div>
+                        <div className="text-xs text-muted-foreground">Images</div>
                         <div className="font-semibold text-lg">
-                          {selectedJob?.metadata?.images_extracted || selectedJob?.metadata?.images_saved || 0}
-                          {selectedJob?.metadata?.total_images_extracted &&
-                            selectedJob.metadata.total_images_extracted > (selectedJob.metadata.images_extracted || 0) && (
+                          {selectedJob?.metadata?.result?.images_processed ||
+                           selectedJob?.metadata?.images_saved ||
+                           (jobCheckpoints.find(cp => cp.stage === 'images_extracted')?.checkpoint_data as any)?.images_saved || 0}
+                          {selectedJob?.metadata?.total_images_extracted && (
                             <span className="text-xs text-muted-foreground ml-1">
                               / {selectedJob.metadata.total_images_extracted}
                             </span>
@@ -967,33 +1007,79 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <div>
                         <div className="text-xs text-muted-foreground">Embeddings</div>
                         <div className="font-semibold text-lg">
-                          {selectedJob?.metadata?.embeddings_generated || 0}
+                          {(() => {
+                            const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
+                            const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
+                            const specializedEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.specialized_embeddings || 0;
+                            const totalEmbeddings = clipEmbeddings + specializedEmbeddings;
+                            return totalEmbeddings || selectedJob?.metadata?.embeddings_generated || 0;
+                          })()}
                         </div>
                       </div>
                     </div>
                   </div>
 
+                  {/* Relations Row */}
+                  {(() => {
+                    const productsCheckpoint = jobCheckpoints.find(cp => cp.stage === 'products_created');
+                    const entityLinks = (productsCheckpoint?.metadata as any)?.entity_links;
+                    const hasRelations = entityLinks && (entityLinks.image_product_links || entityLinks.chunk_product_links || entityLinks.image_chunk_links);
+
+                    return hasRelations && (
+                      <div className="mt-4 pt-4 border-t">
+                        <h4 className="text-sm font-medium mb-3 text-muted-foreground">Relations</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <div className="text-xs text-muted-foreground">Product-Image</div>
+                            <div className="font-semibold">{entityLinks.image_product_links || 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Product-Chunk</div>
+                            <div className="font-semibold">{entityLinks.chunk_product_links || 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Chunk-Image</div>
+                            <div className="font-semibold">{entityLinks.image_chunk_links || 0}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Total Relations</div>
+                            <div className="font-semibold text-primary">
+                              {(entityLinks.image_product_links || 0) +
+                               (entityLinks.chunk_product_links || 0) +
+                               (entityLinks.image_chunk_links || 0)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Additional Metrics Row */}
                   {(selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || selectedJob?.metadata?.database_records_created) && (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
-                      {selectedJob?.metadata?.total_pages && (
+                      {selectedJob?.metadata?.result?.pages_processed && (
                         <div>
-                          <div className="text-xs text-muted-foreground">Total Pages</div>
+                          <div className="text-xs text-muted-foreground">Pages Processed</div>
                           <div className="font-semibold">
-                            {selectedJob.metadata.extracted_pages || 0} / {selectedJob.metadata.total_pages}
+                            {selectedJob.metadata.result.pages_processed}
+                            {selectedJob.metadata.result.pages_skipped && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                ({selectedJob.metadata.result.pages_skipped} skipped)
+                              </span>
+                            )}
                           </div>
-                        </div>
-                      )}
-                      {selectedJob?.metadata?.database_records_created && (
-                        <div>
-                          <div className="text-xs text-muted-foreground">DB Records</div>
-                          <div className="font-semibold">{selectedJob.metadata.database_records_created}</div>
                         </div>
                       )}
                       {selectedJob?.metadata?.knowledge_base_entries && (
                         <div>
                           <div className="text-xs text-muted-foreground">KB Entries</div>
                           <div className="font-semibold">{selectedJob.metadata.knowledge_base_entries}</div>
+                        </div>
+                      )}
+                      {selectedJob?.metadata?.result?.confidence_score && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">Confidence</div>
+                          <div className="font-semibold">{(selectedJob.metadata.result.confidence_score * 100).toFixed(0)}%</div>
                         </div>
                       )}
                       {selectedJob?.metadata?.errors_count !== undefined && selectedJob.metadata.errors_count > 0 && (
@@ -1007,7 +1093,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Pipeline Stages - 14-Stage Workflow */}
+              {/* Pipeline Stages - 14-Stage Workflow WITH DETAILED ACCORDIONS */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
@@ -1015,11 +1101,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     14-Stage Processing Pipeline
                   </CardTitle>
                   <CardDescription>
-                    Complete workflow with all processing stages
+                    Click on any completed stage to see detailed metrics and data
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {PROCESSING_STAGES.map((stage) => {
                       // Find if this stage has a checkpoint
                       const checkpoint = jobCheckpoints.find(
@@ -1031,13 +1117,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         selectedJob?.status === 'processing' &&
                         !isCompleted &&
                         stage.id === (jobCheckpoints.length + 1);
+                      const isExpanded = expandedStages.has(stage.id);
 
                       const metadata = checkpoint?.metadata || {};
+                      const checkpointData = checkpoint?.checkpoint_data || {};
 
                       return (
                         <div
                           key={stage.id}
-                          className={`flex items-start gap-3 p-2 rounded-lg border ${
+                          className={`rounded-lg border ${
                             isFailed
                               ? 'bg-red-50 border-red-200'
                               : isActive
@@ -1047,88 +1135,119 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               : 'bg-slate-50 border-slate-200'
                           }`}
                         >
-                          {/* Status Icon */}
-                          <div className="flex-shrink-0 mt-0.5">
-                            {isFailed ? (
-                              <XCircle className="h-4 w-4 text-red-600" />
-                            ) : isActive ? (
-                              <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                            ) : isCompleted ? (
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <Clock className="h-4 w-4 text-slate-400" />
-                            )}
-                          </div>
-
-                          {/* Stage Content */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <div className="font-medium text-sm">
-                                {stage.id}. {stage.name}
-                              </div>
-                              {checkpoint && (
-                                <div className="text-xs text-muted-foreground">
-                                  {formatDate(checkpoint.created_at)}
-                                </div>
+                          {/* Stage Header - Clickable */}
+                          <button
+                            onClick={() => isCompleted && toggleStage(stage.id)}
+                            disabled={!isCompleted}
+                            className="w-full flex items-start gap-3 p-3 text-left hover:bg-black/5 transition-colors disabled:cursor-default"
+                          >
+                            {/* Status Icon */}
+                            <div className="flex-shrink-0 mt-0.5">
+                              {isFailed ? (
+                                <XCircle className="h-4 w-4 text-red-600" />
+                              ) : isActive ? (
+                                <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                              ) : isCompleted ? (
+                                <CheckCircle className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Clock className="h-4 w-4 text-slate-400" />
                               )}
                             </div>
 
-                            {/* Stage Details - Only show for completed stages */}
-                            {isCompleted && (
-                              <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                {metadata.ai_model && (
-                                  <div>
-                                    <span className="text-muted-foreground">AI Model:</span>
-                                    <span className="ml-1 font-medium">{metadata.ai_model}</span>
-                                  </div>
-                                )}
-                                {metadata.processing_time && (
-                                  <div>
-                                    <span className="text-muted-foreground">Time:</span>
-                                    <span className="ml-1 font-medium">{metadata.processing_time}s</span>
-                                  </div>
-                                )}
-                                {metadata.products_discovered !== undefined && (
-                                  <div>
-                                    <span className="text-muted-foreground">Products:</span>
-                                    <span className="ml-1 font-medium">{metadata.products_discovered}</span>
-                                  </div>
-                                )}
-                                {metadata.chunks_created !== undefined && (
-                                  <div>
-                                    <span className="text-muted-foreground">Chunks:</span>
-                                    <span className="ml-1 font-medium">{metadata.chunks_created}</span>
-                                  </div>
-                                )}
-                                {metadata.images_extracted !== undefined && (
-                                  <div>
-                                    <span className="text-muted-foreground">Images:</span>
-                                    <span className="ml-1 font-medium">{metadata.images_extracted}</span>
-                                  </div>
-                                )}
-                                {metadata.embeddings_generated !== undefined && (
-                                  <div>
-                                    <span className="text-muted-foreground">Embeddings:</span>
-                                    <span className="ml-1 font-medium">{metadata.embeddings_generated}</span>
-                                  </div>
-                                )}
+                            {/* Stage Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium text-sm">
+                                  {stage.id}. {stage.name}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {checkpoint && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {formatDate(checkpoint.created_at)}
+                                    </div>
+                                  )}
+                                  {isCompleted && (
+                                    <div className="flex-shrink-0">
+                                      {isExpanded ? (
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            )}
 
-                            {/* Active Stage Indicator */}
-                            {isActive && (
-                              <div className="mt-2 text-xs text-blue-600 font-medium">
-                                Currently processing...
-                              </div>
-                            )}
+                              {/* Quick Summary - Always visible for completed stages */}
+                              {isCompleted && !isExpanded && (
+                                <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                                  {metadata.discovery_model && (
+                                    <span>🤖 {metadata.discovery_model}</span>
+                                  )}
+                                  {checkpointData.products_detected && (
+                                    <span>📦 {checkpointData.products_detected} products</span>
+                                  )}
+                                  {checkpointData.chunks_created && (
+                                    <span>📄 {checkpointData.chunks_created} chunks</span>
+                                  )}
+                                  {checkpointData.images_saved && (
+                                    <span>🖼️ {checkpointData.images_saved} images</span>
+                                  )}
+                                  {checkpointData.products_created && (
+                                    <span>✅ {checkpointData.products_created} created</span>
+                                  )}
+                                </div>
+                              )}
 
-                            {/* Error Message */}
-                            {metadata.error && (
-                              <div className="mt-2 text-xs text-red-600 bg-red-100 p-2 rounded">
-                                {metadata.error}
+                              {/* Active Stage Indicator */}
+                              {isActive && (
+                                <div className="mt-2 text-xs text-blue-600 font-medium">
+                                  Currently processing...
+                                </div>
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Expanded Details - Accordion Content */}
+                          {isCompleted && isExpanded && (
+                            <div className="px-3 pb-3 pt-0 border-t border-black/10">
+                              <div className="mt-3 space-y-3">
+                                {/* Checkpoint Data Section */}
+                                {Object.keys(checkpointData).length > 0 && (
+                                  <div>
+                                    <h5 className="text-xs font-semibold text-muted-foreground mb-2">Stage Output Data</h5>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs bg-white/50 p-2 rounded">
+                                      {Object.entries(checkpointData).map(([key, value]) => (
+                                        <div key={key}>
+                                          <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+                                          <span className="ml-1 font-medium">
+                                            {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Metadata Section */}
+                                {Object.keys(metadata).length > 0 && (
+                                  <div>
+                                    <h5 className="text-xs font-semibold text-muted-foreground mb-2">Processing Metadata</h5>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs bg-white/50 p-2 rounded">
+                                      {Object.entries(metadata).map(([key, value]) => (
+                                        <div key={key}>
+                                          <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+                                          <span className="ml-1 font-medium">
+                                            {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
