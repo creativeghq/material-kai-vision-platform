@@ -12,7 +12,9 @@ export interface JobStatus {
   progress: number;
   last_checkpoint?: {
     stage: string;
+    checkpoint_data?: Record<string, any>;
     metadata?: Record<string, any>;
+    created_at?: string;
   };
   error?: string;
   created_at: string;
@@ -386,13 +388,14 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
         metrics['Specialized Embeddings'] = jobMetadata.specialized_embeddings;
       }
       if (jobMetadata.images_saved !== undefined) {
-        const embeddingsPerImage = 5;
+        // Determine the final embeddings per image value
+        // Prefer embeddings_per_image from metadata if available, otherwise default to 5
+        const embeddingsPerImage = jobMetadata.embeddings_per_image !== undefined
+          ? jobMetadata.embeddings_per_image
+          : 5;
+
         metrics['Embeddings/Image'] = embeddingsPerImage;
         metrics['Total Vectors'] = jobMetadata.images_saved * embeddingsPerImage;
-      }
-      // Also check for embeddings_per_image from metadata
-      if (jobMetadata.embeddings_per_image !== undefined) {
-        metrics['Embeddings/Image'] = jobMetadata.embeddings_per_image;
       }
       break;
 
