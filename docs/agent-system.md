@@ -25,7 +25,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Frontend (React)                        │
-│  - Agent Hub (/agents)                                      │
+│  - Agent Hub (/agent-hub)                                   │
 │  - Agent Configs Admin (/admin/agent-configs)              │
 └─────────────────────────────────────────────────────────────┘
                             │

@@ -10,7 +10,11 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "types:generate": "supabase gen types typescript --project-id bgbavxtjlbvgplozizxu > src/integrations/supabase/types.ts",
-    "types:generate:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts"
+    "types:generate:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts",
+    "prepare": "husky install",
+    "gitleaks:scan": "gitleaks detect --source . --verbose --redact",
+    "gitleaks:protect": "gitleaks protect --verbose --redact --staged",
+    "security:scan": "npm run gitleaks:scan"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.67.0",
@@ -77,6 +81,8 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "gitleaks": "^8.18.1",
+    "husky": "^9.0.11",
     "@types/babel__core": "^7.20.5",
     "@types/babel__generator": "^7.27.0",
     "@types/babel__template": "^7.4.4",

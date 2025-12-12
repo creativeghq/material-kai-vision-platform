@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Book,
   AlertTriangle,
+  ScrollText,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -159,6 +160,15 @@ const AdminDashboard: React.FC = () => {
       },
     ],
     'System Monitoring': [
+      {
+        title: 'Application Logs',
+        description:
+          'View real-time application logs with filtering and search capabilities',
+        icon: ScrollText,
+        path: '/admin/logs',
+        status: 'active',
+        count: 'Real-time',
+      },
       {
         title: 'Async Job Queue Monitor',
         description:

@@ -28,12 +28,6 @@ export const heroConfig = {
       text: 'Start Processing',
       path: '/pdf-processing',
     },
-    {
-      type: 'outline' as const,
-      icon: Brain,
-      text: 'AI Studio',
-      path: '/agents',
-    },
   ],
 };
 

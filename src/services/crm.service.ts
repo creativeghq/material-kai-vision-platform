@@ -1,12 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 
-// Get Supabase URL from environment
-const SUPABASE_URL = process.env.SUPABASE_URL;
-if (!SUPABASE_URL) {
-  throw new Error('SUPABASE_URL is not defined');
-}
+// Get Supabase URL from the Supabase client instance to ensure consistency
+// Remove any trailing slashes to prevent double slashes in URLs
+const getSupabaseUrl = (): string => {
+  // @ts-ignore - accessing internal supabaseUrl property
+  const url = supabase.supabaseUrl || process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  if (!url) {
+    throw new Error('SUPABASE_URL is not defined');
+  }
+  return url.replace(/\/$/, '');
+};
 
-const API_BASE = `${SUPABASE_URL}/functions/v1`;
+const API_BASE = `${getSupabaseUrl()}/functions/v1`;
 
 /**
  * CRM Service

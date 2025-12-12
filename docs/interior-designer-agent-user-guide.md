@@ -13,7 +13,7 @@ The Interior Designer Agent is your AI-powered interior design assistant that he
 
 ### 1. Access the Agent
 
-1. Navigate to **Agent Hub** (`/agents`)
+1. Navigate to **Agent Hub** (`/agent-hub`)
 2. Select **Interior Designer Agent** from the dropdown
 3. Start a new conversation or continue an existing one
 

@@ -33,7 +33,6 @@ import { SystemPerformance } from './components/Admin/SystemPerformance';
 import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
 import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
 import { MoodBoardDetailPage } from './components/MoodBoard/MoodBoardDetailPage';
-import { AIStudioPage } from './components/AI/AIStudioPage';
 import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
 import { Layout } from './components/Layout/Layout';
 // Removed: SearchHub - functionality available on frontend
@@ -149,16 +148,6 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <MoodBoardDetailPage />
-                    </Layout>
-                  </AuthGuard>
-                }
-              />
-              <Route
-                path="/agents"
-                element={
-                  <AuthGuard>
-                    <Layout>
-                      <AIStudioPage />
                     </Layout>
                   </AuthGuard>
                 }

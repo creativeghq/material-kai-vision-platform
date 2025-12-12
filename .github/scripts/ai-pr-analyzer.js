@@ -3,10 +3,31 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import path from 'path';
 
+// Security: Prevent API key exposure in error messages
+process.on('uncaughtException', (error) => {
+  console.error('❌ Fatal error occurred during PR analysis');
+  console.error('Error type:', error.constructor.name);
+  // DO NOT log error.message or error.stack as they may contain API keys
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled promise rejection during PR analysis');
+  console.error('Promise:', promise);
+  // DO NOT log reason as it may contain API keys
+  process.exit(1);
+});
+
 // Initialize clients
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
 });
+
+// Validate API key exists before initializing
+if (!process.env.OPENAI_API_KEY) {
+  console.error('❌ OPENAI_API_KEY environment variable is not set');
+  process.exit(1);
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -120,24 +141,36 @@ Generate a concise but informative changelog entry.
 
     console.log('🧠 Sending PR data to OpenAI for analysis...');
     
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert software developer and technical writer specializing in AI-powered platforms. You analyze pull requests and generate professional changelog entries that are both technical and business-focused."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.3
-    });
+    let aiAnalysis;
+    try {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "You are an expert software developer and technical writer specializing in AI-powered platforms. You analyze pull requests and generate professional changelog entries that are both technical and business-focused."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.3
+      });
 
-    const aiAnalysis = completion.choices[0].message.content;
-    console.log('✅ AI analysis completed');
+      aiAnalysis = completion.choices[0].message.content;
+      console.log('✅ AI analysis completed');
+    } catch (error) {
+      // Security: Don't log the full error as it may contain API key details
+      console.error('❌ OpenAI API call failed');
+      console.error('Error type:', error.constructor.name);
+      if (error.status) {
+        console.error('HTTP Status:', error.status);
+      }
+      // Don't log error.message, error.response, or error.stack
+      throw new Error('OpenAI_API_Error'); // Generic error for upstream handling
+    }
 
     // Update changelog
     await updateChangelog(aiAnalysis, prData);
@@ -145,7 +178,9 @@ Generate a concise but informative changelog entry.
     console.log('🎉 Changelog update completed successfully');
 
   } catch (error) {
-    console.error('❌ Error in AI PR analysis:', error);
+    console.error('❌ Error in AI PR analysis');
+    console.error('Error type:', error.constructor.name);
+    // Security: DO NOT log error.message or error.stack as they may contain sensitive data
     
     // Fallback: create basic changelog entry without AI
     console.log('🔄 Creating fallback changelog entry...');

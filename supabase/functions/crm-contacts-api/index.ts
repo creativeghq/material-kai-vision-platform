@@ -186,6 +186,20 @@ Deno.serve(async (req) => {
     if (method === 'DELETE' && path.length === 1 && !path[0].includes('unlink-user')) {
       const contactId = path[0];
 
+      // First check if contact exists
+      const { data: existingContact, error: checkError } = await supabase
+        .from('crm_contacts')
+        .select('id')
+        .eq('id', contactId)
+        .single();
+
+      if (checkError || !existingContact) {
+        return new Response(
+          JSON.stringify({ error: 'Contact not found' }),
+          { status: 404, headers: corsHeaders },
+        );
+      }
+
       // Delete relationships first
       await supabase
         .from('crm_contact_relationships')

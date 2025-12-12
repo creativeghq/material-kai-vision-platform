@@ -344,10 +344,6 @@ export const MATERIAL_CATEGORIES = {
   },
 } as const;
 
-// REMOVED: dynamicMaterialCategoriesService deleted during cleanup
-// Migrated to MIVAA API - these types are no longer used
-// If you need material categories, use mivaaApi.getMaterialCategories()
-
 // Type for material category with metadata (legacy format)
 export type MaterialCategoryData = {
   name: string;
@@ -364,10 +360,70 @@ export type LegacyCategoryData = {
 };
 
 /**
- * @deprecated These dynamic functions have been removed. Use MIVAA API instead:
- * - For categories: mivaaApi.getMaterialCategories()
- * - For properties: Use the MATERIAL_CATEGORIES constant above for static data
+ * Helper functions to extract filter options from MATERIAL_CATEGORIES
+ * These provide static data for UI filtering components
  */
+
+/**
+ * Get all material categories asynchronously
+ * @returns Promise resolving to array of category objects with name and value
+ */
+export const getMaterialCategoriesAsync = async (): Promise<
+  Array<{ name: string; value: string }>
+> => {
+  return Object.entries(MATERIAL_CATEGORIES).map(([key, value]) => ({
+    name: value.name,
+    value: key.toLowerCase(),
+  }));
+};
+
+/**
+ * Get all unique material finishes across all categories
+ * @returns Promise resolving to array of finish types
+ */
+export const getAllMaterialFinishes = async (): Promise<string[]> => {
+  const finishesSet = new Set<string>();
+  Object.values(MATERIAL_CATEGORIES).forEach((category) => {
+    category.finish.forEach((finish) => finishesSet.add(finish));
+  });
+  return Array.from(finishesSet).sort();
+};
+
+/**
+ * Get all unique material sizes across all categories
+ * @returns Promise resolving to array of size types
+ */
+export const getAllMaterialSizes = async (): Promise<string[]> => {
+  const sizesSet = new Set<string>();
+  Object.values(MATERIAL_CATEGORIES).forEach((category) => {
+    category.size.forEach((size) => sizesSet.add(size));
+  });
+  return Array.from(sizesSet).sort();
+};
+
+/**
+ * Get all unique installation methods across all categories
+ * @returns Promise resolving to array of installation methods
+ */
+export const getAllMaterialInstallationMethods = async (): Promise<string[]> => {
+  const methodsSet = new Set<string>();
+  Object.values(MATERIAL_CATEGORIES).forEach((category) => {
+    category.installationMethod.forEach((method) => methodsSet.add(method));
+  });
+  return Array.from(methodsSet).sort();
+};
+
+/**
+ * Get all unique applications across all categories
+ * @returns Promise resolving to array of application types
+ */
+export const getAllMaterialApplications = async (): Promise<string[]> => {
+  const applicationsSet = new Set<string>();
+  Object.values(MATERIAL_CATEGORIES).forEach((category) => {
+    category.application.forEach((app) => applicationsSet.add(app));
+  });
+  return Array.from(applicationsSet).sort();
+};
 
 // User preferences for material selection
 export interface UserPreferences {
