@@ -207,10 +207,6 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
     if (jobStatus.status === 'completed') {
       console.log('✅ Job completed successfully');
       // Mark all steps as completed
-      const mergedCheckpointData = {
-        ...(jobStatus.last_checkpoint?.checkpoint_data || {}),
-        ...(jobStatus.last_checkpoint?.metadata || {}),
-      };
       setSteps(prevSteps =>
         prevSteps.map(step => ({
           ...step,
