@@ -14,16 +14,18 @@ export const PlacementPreview: React.FC = () => {
   if (!asset) return null;
 
   // Simple box preview for now
-  const { width, height, depth } = asset.dimensions;
+  const width = asset.dimensions.width;
+  const height = asset.dimensions.height;
+  const depth = asset.dimensions.depth;
 
   return (
     <mesh position={[2.5, height / 2, 2]}>
       <boxGeometry args={[width, height, depth]} />
-      <meshStandardMaterial 
-        color="#4ade80" 
-        transparent 
-        opacity={0.5} 
-        wireframe 
+      <meshStandardMaterial
+        color="#4ade80"
+        transparent
+        opacity={0.5}
+        wireframe
       />
     </mesh>
   );
