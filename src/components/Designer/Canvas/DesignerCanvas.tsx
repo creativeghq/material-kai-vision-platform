@@ -11,6 +11,7 @@ import { PlacedItems } from './PlacedItems';
 import { TransformControls } from './TransformControls';
 import { useSceneStore } from '@/stores/sceneStore';
 import { useUIStore } from '@/stores/uiStore';
+import { logger } from '@/services/logger.service';
 
 export const DesignerCanvas: React.FC = () => {
   const { settings } = useSceneStore();
@@ -21,7 +22,7 @@ export const DesignerCanvas: React.FC = () => {
     const assetId = e.dataTransfer.getData('assetId');
     if (assetId) {
       // TODO: Calculate 3D position from drop coordinates
-      console.log('Dropped asset:', assetId);
+      logger.debug('Dropped asset', { assetId });
       // For now, just add at origin
       const newItem = {
         id: `item-${Date.now()}`,

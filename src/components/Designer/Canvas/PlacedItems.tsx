@@ -1,7 +1,7 @@
 /**
  * Placed Items - Renders all placed objects in the scene
  */
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { useSceneStore } from '@/stores/sceneStore';
 
@@ -13,6 +13,7 @@ interface PlacedItemMeshProps {
   locked: boolean;
   isSelected: boolean;
   onSelect: () => void;
+  meshRef?: React.RefObject<THREE.Mesh>;
 }
 
 const PlacedItemMesh: React.FC<PlacedItemMeshProps> = ({
@@ -22,15 +23,18 @@ const PlacedItemMesh: React.FC<PlacedItemMeshProps> = ({
   locked,
   isSelected,
   onSelect,
+  meshRef,
 }) => {
   return (
     <mesh
+      ref={meshRef}
       position={position}
       rotation={rotation}
       scale={scale}
       onClick={(e) => {
         e.stopPropagation();
-        if (!locked) onSelect();
+        // Allow selection of locked items so they can be unlocked
+        onSelect();
       }}
       castShadow
       receiveShadow
@@ -54,7 +58,29 @@ const PlacedItemMesh: React.FC<PlacedItemMeshProps> = ({
 };
 
 export const PlacedItems: React.FC = () => {
-  const { items, selectedIds, selectItem, deselectAll } = useSceneStore();
+  const { items, selectedIds, selectItem, deselectAll, setSelectedMeshRef } = useSceneStore();
+  const meshRefs = useRef<Map<string, React.RefObject<THREE.Mesh>>>(new Map());
+
+  // Create or get ref for each item
+  const getMeshRef = (itemId: string) => {
+    if (!meshRefs.current.has(itemId)) {
+      meshRefs.current.set(itemId, React.createRef<THREE.Mesh>());
+    }
+    return meshRefs.current.get(itemId)!;
+  };
+
+  // Update the selected mesh ref when selection changes
+  useEffect(() => {
+    if (selectedIds.length === 1) {
+      const selectedId = selectedIds[0];
+      const meshRef = meshRefs.current.get(selectedId);
+      if (meshRef?.current) {
+        setSelectedMeshRef(meshRef.current);
+      }
+    } else {
+      setSelectedMeshRef(null);
+    }
+  }, [selectedIds, setSelectedMeshRef]);
 
   const handleBackgroundClick = () => {
     deselectAll();
@@ -83,6 +109,7 @@ export const PlacedItems: React.FC = () => {
           locked={item.locked}
           isSelected={selectedIds.includes(item.id)}
           onSelect={() => selectItem(item.id, false)}
+          meshRef={getMeshRef(item.id)}
         />
       ))}
     </>

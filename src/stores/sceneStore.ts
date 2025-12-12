@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
+import type * as THREE from 'three';
 import type { RoomConfig, PlacedItem, SceneData, Light, SceneSettings } from '@/types/designer';
 
 interface HistoryState {
@@ -16,6 +17,7 @@ interface SceneStore {
   room: RoomConfig;
   items: PlacedItem[];
   selectedIds: string[];
+  selectedMeshRef: THREE.Mesh | null;
   lights: Light[];
   settings: SceneSettings;
   history: HistoryState;
@@ -30,6 +32,7 @@ interface SceneStore {
   selectItem: (id: string, multi?: boolean) => void;
   deselectAll: () => void;
   toggleItemLock: (id: string) => void;
+  setSelectedMeshRef: (mesh: THREE.Mesh | null) => void;
   setSettings: (settings: Partial<SceneSettings>) => void;
   loadScene: (sceneData: SceneData) => void;
   getSceneData: () => SceneData;
@@ -69,6 +72,7 @@ export const useSceneStore = create<SceneStore>()(
       room: defaultRoom,
       items: [],
       selectedIds: [],
+      selectedMeshRef: null,
       lights: defaultLights,
       settings: defaultSettings,
       history: { past: [], future: [] },
@@ -111,7 +115,7 @@ export const useSceneStore = create<SceneStore>()(
           if (item) {
             const newItem: PlacedItem = {
               ...item,
-              id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
               position: [item.position[0] + 0.5, item.position[1], item.position[2] + 0.5],
             };
             state.items.push(newItem);
@@ -132,7 +136,7 @@ export const useSceneStore = create<SceneStore>()(
           }
         }),
 
-      deselectAll: () => set({ selectedIds: [] }),
+      deselectAll: () => set({ selectedIds: [], selectedMeshRef: null }),
 
       toggleItemLock: (id) =>
         set((state) => {
@@ -141,6 +145,8 @@ export const useSceneStore = create<SceneStore>()(
             item.locked = !item.locked;
           }
         }),
+
+      setSelectedMeshRef: (mesh) => set({ selectedMeshRef: mesh }),
 
       setSettings: (settings) =>
         set((state) => {

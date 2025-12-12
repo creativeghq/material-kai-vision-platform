@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { useUIStore } from '@/stores/uiStore';
 import { useSceneStore } from '@/stores/sceneStore';
 import { cn } from '@/lib/utils';
+import { logger } from '@/services/logger.service';
 
 export const Toolbar: React.FC = () => {
   const { activeTool, setActiveTool, togglePanel, panelVisibility } = useUIStore();
@@ -28,32 +29,32 @@ export const Toolbar: React.FC = () => {
 
   const handleSave = () => {
     // TODO: Implement save functionality
-    console.log('Save project');
+    logger.debug('Save project');
   };
 
   const handleLoad = () => {
     // TODO: Implement load functionality
-    console.log('Load project');
+    logger.debug('Load project');
   };
 
   const handleExport = () => {
     // TODO: Implement export functionality
-    console.log('Export project');
+    logger.debug('Export project');
   };
 
   const handleShare = () => {
     // TODO: Implement share functionality
-    console.log('Share project');
+    logger.debug('Share project');
   };
 
   const handleUndo = () => {
     // TODO: Implement undo
-    console.log('Undo');
+    logger.debug('Undo');
   };
 
   const handleRedo = () => {
     // TODO: Implement redo
-    console.log('Redo');
+    logger.debug('Redo');
   };
 
   return (
