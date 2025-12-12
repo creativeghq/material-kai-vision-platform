@@ -127,9 +127,10 @@ export const QuotesPage: React.FC = () => {
       loadQuotes();
     } catch (error) {
       console.error('Error deleting quote:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete quote';
       toast({
         title: 'Error',
-        description: 'Failed to delete quote',
+        description: errorMessage,
         variant: 'destructive',
       });
     }

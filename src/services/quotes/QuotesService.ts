@@ -496,23 +496,52 @@ export class QuotesService {
 
   /**
    * Delete a quote request (and its associated quote)
+   * Note: quote_requests may not exist for draft quotes that haven't been submitted
+   * Cascade deletes: quote_items, quote_upsells, quote_timeline
    */
   async deleteQuoteRequest(quoteId: string): Promise<void> {
-    // First delete the quote_request entry
+    // Get current user for RLS verification
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    // Verify quote ownership before deletion
+    const { data: quote, error: fetchError } = await supabase
+      .from('quotes')
+      .select('id, user_id')
+      .eq('id', quoteId)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching quote for deletion:', fetchError);
+      throw new Error('Quote not found');
+    }
+
+    if (quote.user_id !== user.id) {
+      throw new Error('You do not have permission to delete this quote');
+    }
+
+    // First try to delete the quote_request entry (may not exist for draft quotes)
     const { error: requestError } = await supabase
       .from('quote_requests')
       .delete()
       .eq('quote_id', quoteId);
 
-    if (requestError) throw requestError;
+    // Ignore error if quote_request doesn't exist (draft quotes won't have one)
+    if (requestError && !requestError.message.includes('0 rows')) {
+      console.warn('Error deleting quote_request:', requestError);
+    }
 
-    // Then delete the quote (this will cascade delete quote_items)
+    // Then delete the quote (this will cascade delete quote_items, quote_upsells, quote_timeline)
     const { error: quoteError } = await supabase
       .from('quotes')
       .delete()
-      .eq('id', quoteId);
+      .eq('id', quoteId)
+      .eq('user_id', user.id); // Add user_id check for RLS
 
-    if (quoteError) throw quoteError;
+    if (quoteError) {
+      console.error('Error deleting quote:', quoteError);
+      throw new Error(`Failed to delete quote: ${quoteError.message}`);
+    }
   }
 
   // =====================================================
