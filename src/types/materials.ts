@@ -345,26 +345,8 @@ export const MATERIAL_CATEGORIES = {
 } as const;
 
 // REMOVED: dynamicMaterialCategoriesService deleted during cleanup
-// Import dynamic material categories service and types
-// import {
-//   MaterialCategory as DynamicMaterialCategory,
-//   MaterialProperty as DynamicMaterialProperty,
-//   LegacyMaterialCategories,
-//   getMaterialCategories,
-//   getMaterialProperties,
-//   dynamicMaterialCategoriesService,
-// } from '../services/dynamicMaterialCategoriesService';
-
-// Temporary types until migration to MIVAA API
-export type DynamicMaterialCategory = any;
-export type DynamicMaterialProperty = any;
-export type LegacyMaterialCategories = any;
-
-// Export deprecated service stubs
-export const dynamicMaterialCategoriesService = {
-  getMaterialCategories: async () => { throw new Error('Deprecated: Use MIVAA API'); },
-  getMaterialProperties: async () => { throw new Error('Deprecated: Use MIVAA API'); },
-};
+// Migrated to MIVAA API - these types are no longer used
+// If you need material categories, use mivaaApi.getMaterialCategories()
 
 // Type for material category with metadata (legacy format)
 export type MaterialCategoryData = {
@@ -381,76 +363,11 @@ export type LegacyCategoryData = {
   description: string;
 };
 
-// Dynamic functions that fetch from database instead of hardcoded values
-export async function getMaterialCategoriesAsync(): Promise<
-  DynamicMaterialCategory[]
-> {
-  return await getMaterialCategories();
-}
-
-export async function getAllMaterialFinishes(): Promise<string[]> {
-  const properties = await getMaterialProperties();
-  const finishProperty = properties.find((prop) => prop.key === 'finish');
-  return (
-    (finishProperty?.validationRules as any)?.examples || [
-      'matte',
-      'glossy',
-      'satin',
-      'textured',
-      'smooth',
-      'brushed',
-      'polished',
-    ]
-  );
-}
-
-export async function getAllMaterialSizes(): Promise<string[]> {
-  const properties = await getMaterialProperties();
-  const sizeProperty = properties.find((prop) => prop.key === 'size');
-  return (
-    (sizeProperty?.validationRules as any)?.examples || [
-      'small',
-      'medium',
-      'large',
-      'custom',
-      'standard',
-      'oversized',
-    ]
-  );
-}
-
-export async function getAllMaterialInstallationMethods(): Promise<string[]> {
-  const properties = await getMaterialProperties();
-  const installProperty = properties.find(
-    (prop) => prop.key === 'installation_method',
-  );
-  return (
-    (installProperty?.validationRules as any)?.examples || [
-      'adhesive',
-      'mechanical',
-      'welded',
-      'screwed',
-      'nailed',
-      'clipped',
-      'interlocking',
-    ]
-  );
-}
-
-export async function getAllMaterialApplications(): Promise<string[]> {
-  const properties = await getMaterialProperties();
-  const appProperty = properties.find((prop) => prop.key === 'application');
-  return (
-    (appProperty?.validationRules as any)?.examples || [
-      'interior',
-      'exterior',
-      'industrial',
-      'decorative',
-      'structural',
-      'functional',
-    ]
-  );
-}
+/**
+ * @deprecated These dynamic functions have been removed. Use MIVAA API instead:
+ * - For categories: mivaaApi.getMaterialCategories()
+ * - For properties: Use the MATERIAL_CATEGORIES constant above for static data
+ */
 
 // User preferences for material selection
 export interface UserPreferences {

@@ -209,20 +209,22 @@ export class MaterialAgentOrchestratorAPI {
 
       return result;
     } catch (error) {
-      // DIAGNOSTIC: Validating error handling issues
-      console.log('DEBUG: ErrorContext interface requires these fields:');
-      console.log('- operation: string');
-      console.log('- service: string');
-      console.log('- metadata?: Record<string, unknown>');
-      console.log('- timestamp: string');
-      console.log(
-        'DEBUG: Additional context like "endpoint" should go in metadata field',
+      const apiError = new APIError(
+        'Failed to execute Material Agent Orchestrator task',
+        {
+          operation: 'executeTask',
+          service: 'MaterialAgentOrchestratorAPI',
+          metadata: {
+            originalError: error instanceof Error ? error.message : String(error),
+          },
+          timestamp: new Date().toISOString(),
+        }
       );
-      console.log(
-        'DEBUG: logDiagnostic functions are undefined and need to be removed',
-      );
-      console.error('Error executing Material Agent Orchestrator task:', error);
-      throw error;
+      errorLogger.logError(apiError, {
+        service: 'MaterialAgentOrchestratorAPI',
+        method: 'executeTask',
+      });
+      throw apiError;
     }
   }
 

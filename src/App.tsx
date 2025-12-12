@@ -19,6 +19,7 @@ import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
 import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
+import { LogViewer } from './components/Admin/LogViewer';
 
 import { AgentConfigsPage } from './components/Admin/AgentConfigs';
 import { PromptTemplatesPage } from './components/Admin/PromptTemplates/PromptTemplatesPage';
@@ -302,6 +303,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <SystemPerformance />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/logs"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <LogViewer />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

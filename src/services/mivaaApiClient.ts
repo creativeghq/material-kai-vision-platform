@@ -12,10 +12,12 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { env } from '@/config/environment';
+import { createLogger } from '@/services/logger.service';
 
-// MIVAA API Configuration
-const MIVAA_API_URL =
-  import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+// MIVAA API Configuration from centralized config
+const MIVAA_API_URL = env.mivaa.apiUrl;
+const logger = createLogger('MivaaApiClient');
 
 /**
  * MIVAA API Response Types
