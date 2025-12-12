@@ -161,15 +161,6 @@ const AdminDashboard: React.FC = () => {
     ],
     'System Monitoring': [
       {
-        title: 'Application Logs',
-        description:
-          'View real-time application logs with filtering and search capabilities',
-        icon: ScrollText,
-        path: '/admin/logs',
-        status: 'active',
-        count: 'Real-time',
-      },
-      {
         title: 'Async Job Queue Monitor',
         description:
           'Monitor image processing and AI analysis job queues in real-time',
@@ -209,6 +200,15 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/packages',
         status: 'active',
         count: 'Dependencies',
+      },
+      {
+        title: 'Application Logs',
+        description:
+          'View real-time application logs with filtering and search capabilities',
+        icon: ScrollText,
+        path: '/admin/logs',
+        status: 'active',
+        count: 'Real-time',
       },
     ],
   };
