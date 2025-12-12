@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import { Cube, Sparkles, Loader2, Download, RefreshCw, Info } from 'lucide-react';
+import { Box, Sparkles, Loader2, Download, RefreshCw, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,7 +124,7 @@ export const Designer3DPage: React.FC = () => {
         <div className="page-container py-6">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-primary/10 rounded-lg">
-              <Cube className="h-8 w-8 text-primary" />
+              <Box className="h-8 w-8 text-primary" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">3D Room Designer</h1>
@@ -297,7 +297,7 @@ export const Designer3DPage: React.FC = () => {
               <Card className="h-full min-h-[600px] flex items-center justify-center">
                 <CardContent className="text-center space-y-4">
                   <div className="mx-auto w-20 h-20 bg-muted rounded-full flex items-center justify-center">
-                    <Cube className="h-10 w-10 text-muted-foreground" />
+                    <Box className="h-10 w-10 text-muted-foreground" />
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold mb-2">No Design Yet</h3>
