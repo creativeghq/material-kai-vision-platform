@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -21,8 +22,8 @@ import {
   FileText,
   Image as ImageIcon,
   Package,
-  Link as LinkIcon,
   XCircle,
+  Trash2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -85,7 +86,26 @@ interface QueueMetrics {
   total_images_extracted: number;
 }
 
+// 14-stage processing pipeline
+const PROCESSING_STAGES = [
+  { id: 1, name: 'Job Initialization', checkpoint: 'initialized' },
+  { id: 2, name: 'Product Discovery', checkpoint: 'products_detected' },
+  { id: 3, name: 'Focused Extraction', checkpoint: 'pdf_extracted' },
+  { id: 4, name: 'Chunking', checkpoint: 'chunks_created' },
+  { id: 5, name: 'Text Embeddings', checkpoint: 'text_embeddings_generated' },
+  { id: 6, name: 'Image Extraction', checkpoint: 'images_extracted' },
+  { id: 7, name: 'Image Classification', checkpoint: 'images_extracted' },
+  { id: 8, name: 'Image Analysis', checkpoint: 'images_extracted' },
+  { id: 9, name: 'CLIP Embeddings', checkpoint: 'image_embeddings_generated' },
+  { id: 10, name: 'Product Creation', checkpoint: 'products_created' },
+  { id: 11, name: 'Relationship Mapping', checkpoint: 'relationships_created' },
+  { id: 12, name: 'Document Entities', checkpoint: 'document_entities_created' },
+  { id: 13, name: 'Metadata Extraction', checkpoint: 'metadata_extracted' },
+  { id: 14, name: 'Quality Enhancement', checkpoint: 'completed' },
+];
+
 export const AsyncJobQueueMonitor: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [metrics, setMetrics] = useState<QueueMetrics | null>(null);
   const [jobs, setJobs] = useState<BackgroundJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,6 +115,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [jobCheckpoints, setJobCheckpoints] = useState<any[]>([]);
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(false);
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
+  const [clearingQueue, setClearingQueue] = useState(false);
+  const [deletingJob, setDeletingJob] = useState<string | null>(null);
 
   // Debug log
   console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
@@ -106,6 +128,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       setLoadingCheckpoints(true);
       setSelectedJob(job);
       console.log('Selected job set:', job);
+
+      // Fetch fresh job data
+      const { data: jobData, error: jobError } = await supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('id', job.id)
+        .single();
+
+      if (jobError) {
+        console.error('Error fetching job data:', jobError);
+        throw jobError;
+      }
+
+      // Update selected job with fresh data
+      if (jobData) {
+        setSelectedJob(jobData as BackgroundJob);
+      }
 
       // Fetch all checkpoints for this job
       const { data: checkpoints, error } = await supabase
@@ -245,6 +284,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     };
   }, [fetchQueueData, autoRefresh]);
 
+  // Auto-refresh selected job details when modal is open and job is processing
+  useEffect(() => {
+    if (!selectedJob || (selectedJob.status !== 'processing' && selectedJob.status !== 'pending')) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchJobDetails(selectedJob);
+    }, 3000); // Refresh every 3 seconds for active jobs
+
+    return () => clearInterval(interval);
+  }, [selectedJob]);
+
+  // Handle jobId query parameter - auto-open modal for specific job
+  useEffect(() => {
+    const jobId = searchParams.get('jobId');
+    if (jobId && jobs.length > 0 && !selectedJob) {
+      const job = jobs.find(j => j.id === jobId);
+      if (job) {
+        console.log('🎯 Auto-opening modal for job from URL:', jobId);
+        fetchJobDetails(job);
+        // Remove jobId from URL after opening
+        setSearchParams({});
+      }
+    }
+  }, [searchParams, jobs, selectedJob, setSearchParams]);
+
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; icon: string }> = {
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
@@ -305,6 +371,100 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
+  const handleClearQueue = async () => {
+    const pendingAndFailedJobs = jobs.filter(
+      (job) => job.status === 'pending' || job.status === 'failed'
+    );
+
+    if (pendingAndFailedJobs.length === 0) {
+      alert('No pending or failed jobs to clear');
+      return;
+    }
+
+    if (
+      !confirm(
+        `Are you sure you want to clear ${pendingAndFailedJobs.length} pending/failed jobs? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    setClearingQueue(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const job of pendingAndFailedJobs) {
+        try {
+          const response = await fetch(
+            `https://v1api.materialshub.gr/api/rag/documents/jobs/${job.id}`,
+            {
+              method: 'DELETE',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }
+          );
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to cancel job ${job.id}:`, error);
+          failCount++;
+        }
+      }
+
+      // Refresh the job list
+      await fetchQueueData();
+
+      alert(
+        `Queue cleared: ${successCount} jobs cancelled successfully${failCount > 0 ? `, ${failCount} failed` : ''}`
+      );
+    } catch (error) {
+      console.error('Error clearing queue:', error);
+      alert(`Failed to clear queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setClearingQueue(false);
+    }
+  };
+
+  const handleDeleteJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this job? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingJob(jobId);
+    try {
+      // Delete from Supabase directly (removes job and all related data)
+      const { error } = await supabase
+        .from('background_jobs')
+        .delete()
+        .eq('id', jobId);
+
+      if (error) {
+        throw error;
+      }
+
+      // Refresh the job list
+      await fetchQueueData();
+
+      // Close the dialog if this was the selected job
+      if (selectedJob?.id === jobId) {
+        setSelectedJob(null);
+      }
+
+      alert('Job deleted successfully');
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeletingJob(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -360,6 +520,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     );
   }
 
+  // Check if we came from data-import
+  const fromDataImport = searchParams.get('jobId');
+
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
@@ -369,6 +532,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       />
 
       <div className="p-6 space-y-6">
+        {/* Info Banner when coming from data-import */}
+        {fromDataImport && (
+          <Alert className="border-blue-300 bg-blue-50">
+            <Activity className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-900">
+              <p className="font-semibold">PDF Upload Successful!</p>
+              <p className="text-sm mt-1">
+                Your PDF has been queued for processing. The job details modal will open automatically.
+                You can monitor all 14 processing stages, view real-time metrics, and manage the job from here.
+              </p>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Overview Metrics - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="dashboard-card">
@@ -426,6 +603,24 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                 {/* Control Buttons */}
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleClearQueue}
+                    disabled={clearingQueue || jobs.filter(j => j.status === 'pending' || j.status === 'failed').length === 0}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Cancel all pending and failed jobs"
+                  >
+                    {clearingQueue ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
+                        Clearing...
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-3.5 h-3.5 inline mr-1.5" />
+                        Clear Queue ({jobs.filter(j => j.status === 'pending' || j.status === 'failed').length})
+                      </>
+                    )}
+                  </button>
                   <button
                     onClick={() => setAutoRefresh(!autoRefresh)}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
@@ -549,6 +744,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               )}
                             </button>
                           )}
+                          {(job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteJob(job.id);
+                              }}
+                              disabled={deletingJob === job.id}
+                              className="p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors disabled:opacity-50"
+                              title="Delete job"
+                            >
+                              {deletingJob === job.id ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </button>
+                          )}
                           <ChevronRight
                             className="h-4 w-4 text-slate-400 group-hover:text-primary transition cursor-pointer"
                             onClick={() => fetchJobDetails(job)}
@@ -637,25 +849,46 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">Job Overview</CardTitle>
-                    {selectedJob && (selectedJob.status === 'processing' || selectedJob.status === 'pending') && (
-                      <button
-                        onClick={() => handleCancelJob(selectedJob.id)}
-                        disabled={cancellingJob === selectedJob.id}
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                      >
-                        {cancellingJob === selectedJob.id ? (
-                          <>
-                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                            Cancelling...
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-3.5 h-3.5" />
-                            Cancel Job
-                          </>
-                        )}
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {selectedJob && (selectedJob.status === 'processing' || selectedJob.status === 'pending') && (
+                        <button
+                          onClick={() => handleCancelJob(selectedJob.id)}
+                          disabled={cancellingJob === selectedJob.id}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {cancellingJob === selectedJob.id ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              Cancelling...
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="w-3.5 h-3.5" />
+                              Cancel Job
+                            </>
+                          )}
+                        </button>
+                      )}
+                      {selectedJob && (selectedJob.status === 'completed' || selectedJob.status === 'failed' || selectedJob.status === 'cancelled') && (
+                        <button
+                          onClick={() => handleDeleteJob(selectedJob.id)}
+                          disabled={deletingJob === selectedJob.id}
+                          className="px-3 py-1.5 bg-gray-600 hover:bg-gray-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {deletingJob === selectedJob.id ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete Job
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -686,37 +919,129 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Pipeline Stages - Workflow Style */}
+              {/* Processing Metrics - MOVED TO TOP */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Activity className="h-4 w-4" />
-                    Pipeline Workflow
+                    Processing Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Products Found</div>
+                        <div className="font-semibold text-lg">
+                          {selectedJob?.metadata?.products_created || selectedJob?.metadata?.products_discovered || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Chunks Created</div>
+                        <div className="font-semibold text-lg">
+                          {selectedJob?.metadata?.chunks_created || 0}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ImageIcon className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Images Extracted</div>
+                        <div className="font-semibold text-lg">
+                          {selectedJob?.metadata?.images_extracted || selectedJob?.metadata?.images_saved || 0}
+                          {selectedJob?.metadata?.total_images_extracted &&
+                            selectedJob.metadata.total_images_extracted > (selectedJob.metadata.images_extracted || 0) && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              / {selectedJob.metadata.total_images_extracted}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-primary" />
+                      <div>
+                        <div className="text-xs text-muted-foreground">Embeddings</div>
+                        <div className="font-semibold text-lg">
+                          {selectedJob?.metadata?.embeddings_generated || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Additional Metrics Row */}
+                  {(selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || selectedJob?.metadata?.database_records_created) && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                      {selectedJob?.metadata?.total_pages && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">Total Pages</div>
+                          <div className="font-semibold">
+                            {selectedJob.metadata.extracted_pages || 0} / {selectedJob.metadata.total_pages}
+                          </div>
+                        </div>
+                      )}
+                      {selectedJob?.metadata?.database_records_created && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">DB Records</div>
+                          <div className="font-semibold">{selectedJob.metadata.database_records_created}</div>
+                        </div>
+                      )}
+                      {selectedJob?.metadata?.knowledge_base_entries && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">KB Entries</div>
+                          <div className="font-semibold">{selectedJob.metadata.knowledge_base_entries}</div>
+                        </div>
+                      )}
+                      {selectedJob?.metadata?.errors_count !== undefined && selectedJob.metadata.errors_count > 0 && (
+                        <div>
+                          <div className="text-xs text-muted-foreground">Errors</div>
+                          <div className="font-semibold text-red-600">{selectedJob.metadata.errors_count}</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Pipeline Stages - 14-Stage Workflow */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Activity className="h-4 w-4" />
+                    14-Stage Processing Pipeline
                   </CardTitle>
                   <CardDescription>
-                    {jobCheckpoints.length} stage{jobCheckpoints.length !== 1 ? 's' : ''} completed
+                    Complete workflow with all processing stages
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {jobCheckpoints.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Activity className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                      <p className="text-sm">No pipeline checkpoints found for this job.</p>
-                      <p className="text-xs mt-1">This may be an older job processed before checkpoint tracking was implemented.</p>
-                    </div>
-                  ) : (
-                  <div className="space-y-2">
-                    {jobCheckpoints.map((checkpoint) => {
-                      const metadata = checkpoint.metadata || {};
-                      const isCompleted = checkpoint.stage !== 'FAILED';
-                      const isFailed = checkpoint.stage === 'FAILED';
+                  <div className="space-y-1">
+                    {PROCESSING_STAGES.map((stage) => {
+                      // Find if this stage has a checkpoint
+                      const checkpoint = jobCheckpoints.find(
+                        (cp) => cp.stage.toLowerCase() === stage.checkpoint.toLowerCase()
+                      );
+                      const isCompleted = !!checkpoint;
+                      const isFailed = selectedJob?.status === 'failed' && !isCompleted;
+                      const isActive =
+                        selectedJob?.status === 'processing' &&
+                        !isCompleted &&
+                        stage.id === (jobCheckpoints.length + 1);
+
+                      const metadata = checkpoint?.metadata || {};
 
                       return (
                         <div
-                          key={checkpoint.id}
-                          className={`flex items-start gap-3 p-3 rounded-lg border ${
+                          key={stage.id}
+                          className={`flex items-start gap-3 p-2 rounded-lg border ${
                             isFailed
                               ? 'bg-red-50 border-red-200'
+                              : isActive
+                              ? 'bg-blue-50 border-blue-200'
                               : isCompleted
                               ? 'bg-green-50 border-green-200'
                               : 'bg-slate-50 border-slate-200'
@@ -725,11 +1050,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           {/* Status Icon */}
                           <div className="flex-shrink-0 mt-0.5">
                             {isFailed ? (
-                              <XCircle className="h-5 w-5 text-red-600" />
+                              <XCircle className="h-4 w-4 text-red-600" />
+                            ) : isActive ? (
+                              <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
                             ) : isCompleted ? (
-                              <CheckCircle className="h-5 w-5 text-green-600" />
+                              <CheckCircle className="h-4 w-4 text-green-600" />
                             ) : (
-                              <Clock className="h-5 w-5 text-slate-400" />
+                              <Clock className="h-4 w-4 text-slate-400" />
                             )}
                           </div>
 
@@ -737,52 +1064,63 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <div className="font-medium text-sm">
-                                {checkpoint.stage.replace(/_/g, ' ')}
+                                {stage.id}. {stage.name}
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                {formatDate(checkpoint.created_at)}
-                              </div>
+                              {checkpoint && (
+                                <div className="text-xs text-muted-foreground">
+                                  {formatDate(checkpoint.created_at)}
+                                </div>
+                              )}
                             </div>
+
+                            {/* Stage Details - Only show for completed stages */}
+                            {isCompleted && (
+                              <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                                {metadata.ai_model && (
+                                  <div>
+                                    <span className="text-muted-foreground">AI Model:</span>
+                                    <span className="ml-1 font-medium">{metadata.ai_model}</span>
+                                  </div>
+                                )}
+                                {metadata.processing_time && (
+                                  <div>
+                                    <span className="text-muted-foreground">Time:</span>
+                                    <span className="ml-1 font-medium">{metadata.processing_time}s</span>
+                                  </div>
+                                )}
+                                {metadata.products_discovered !== undefined && (
+                                  <div>
+                                    <span className="text-muted-foreground">Products:</span>
+                                    <span className="ml-1 font-medium">{metadata.products_discovered}</span>
+                                  </div>
+                                )}
+                                {metadata.chunks_created !== undefined && (
+                                  <div>
+                                    <span className="text-muted-foreground">Chunks:</span>
+                                    <span className="ml-1 font-medium">{metadata.chunks_created}</span>
+                                  </div>
+                                )}
+                                {metadata.images_extracted !== undefined && (
+                                  <div>
+                                    <span className="text-muted-foreground">Images:</span>
+                                    <span className="ml-1 font-medium">{metadata.images_extracted}</span>
+                                  </div>
+                                )}
+                                {metadata.embeddings_generated !== undefined && (
+                                  <div>
+                                    <span className="text-muted-foreground">Embeddings:</span>
+                                    <span className="ml-1 font-medium">{metadata.embeddings_generated}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
-                            {/* Stage Details */}
-                            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                              {metadata.ai_model && (
-                                <div>
-                                  <span className="text-muted-foreground">AI Model:</span>
-                                  <span className="ml-1 font-medium">{metadata.ai_model}</span>
-                                </div>
-                              )}
-                              {metadata.processing_time && (
-                                <div>
-                                  <span className="text-muted-foreground">Time:</span>
-                                  <span className="ml-1 font-medium">{metadata.processing_time}s</span>
-                                </div>
-                              )}
-                              {metadata.products_discovered !== undefined && (
-                                <div>
-                                  <span className="text-muted-foreground">Products:</span>
-                                  <span className="ml-1 font-medium">{metadata.products_discovered}</span>
-                                </div>
-                              )}
-                              {metadata.chunks_created !== undefined && (
-                                <div>
-                                  <span className="text-muted-foreground">Chunks:</span>
-                                  <span className="ml-1 font-medium">{metadata.chunks_created}</span>
-                                </div>
-                              )}
-                              {metadata.images_extracted !== undefined && (
-                                <div>
-                                  <span className="text-muted-foreground">Images:</span>
-                                  <span className="ml-1 font-medium">{metadata.images_extracted}</span>
-                                </div>
-                              )}
-                              {metadata.embeddings_generated !== undefined && (
-                                <div>
-                                  <span className="text-muted-foreground">Embeddings:</span>
-                                  <span className="ml-1 font-medium">{metadata.embeddings_generated}</span>
-                                </div>
-                              )}
-                            </div>
+                            {/* Active Stage Indicator */}
+                            {isActive && (
+                              <div className="mt-2 text-xs text-blue-600 font-medium">
+                                Currently processing...
+                              </div>
+                            )}
 
                             {/* Error Message */}
                             {metadata.error && (
@@ -795,121 +1133,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       );
                     })}
                   </div>
-                  )}
                 </CardContent>
               </Card>
 
-              {/* Metrics Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Processing Metrics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {/* Core Metrics */}
-                    <div>
-                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">Core Metrics</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-center gap-2">
-                          <Package className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Products</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.total_products || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Chunks</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.total_chunks || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <ImageIcon className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Images</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.total_images || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Embeddings</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.total_embeddings || 0}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Relations Breakdown */}
-                    <div>
-                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">Relations</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-center gap-2">
-                          <LinkIcon className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Product-Image</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.product_image_relations || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <LinkIcon className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Product-Chunk</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.product_chunk_relations || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <LinkIcon className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Chunk-Image</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.chunk_image_relations || 0}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <LinkIcon className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Total Relations</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.total_relations || 0}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Meta Fields */}
-                    <div>
-                      <h4 className="text-sm font-medium mb-3 text-muted-foreground">Meta Fields</h4>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-4 w-4 text-primary" />
-                          <div>
-                            <div className="text-xs text-muted-foreground">Total Metas</div>
-                            <div className="font-semibold">
-                              {selectedJob?.metadata?.total_metas || 0}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* REMOVED DUPLICATE METRICS SECTION - Metrics are now displayed at the top, before the 14-stage workflow */}
             </div>
           )}
         </DialogContent>

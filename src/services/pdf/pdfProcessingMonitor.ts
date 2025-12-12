@@ -48,33 +48,58 @@ export function usePDFProcessingMonitor(jobId: string) {
     const pollJobStatus = async () => {
       try {
         console.log('📊 PDF Monitor: Polling job status for:', jobId);
-        const { data, error: queryError } = await supabase
+
+        // Fetch job data
+        const { data: jobData, error: jobError } = await supabase
           .from('background_jobs')
           .select('*')
           .eq('id', jobId)
           .single();
 
-        if (queryError) {
-          console.error('❌ PDF Monitor: Query error:', queryError);
-          throw queryError;
+        if (jobError) {
+          console.error('❌ PDF Monitor: Query error:', jobError);
+          throw jobError;
         }
 
-        if (data) {
-          console.log('✅ PDF Monitor: Job status received:', {
-            status: data.status,
-            progress: data.progress,
-            checkpoint: data.last_checkpoint?.stage
-          });
-          setJobStatus(data as JobStatus);
-
-          // Stop polling if job is completed or failed
-          if (data.status === 'completed' || data.status === 'failed') {
-            console.log(`🏁 PDF Monitor: Job ${data.status}, stopping polling`);
-            setIsPolling(false);
-            clearInterval(intervalId);
-          }
-        } else {
+        if (!jobData) {
           console.warn('⚠️ PDF Monitor: No data returned for job:', jobId);
+          return;
+        }
+
+        // Fetch latest checkpoint
+        const { data: checkpoints, error: checkpointError } = await supabase
+          .from('job_checkpoints')
+          .select('*')
+          .eq('job_id', jobId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (checkpointError) {
+          console.warn('⚠️ PDF Monitor: Error fetching checkpoints:', checkpointError);
+        }
+
+        const lastCheckpoint = checkpoints && checkpoints.length > 0 ? checkpoints[0] : null;
+
+        // Combine job data with last checkpoint
+        const combinedStatus = {
+          ...jobData,
+          last_checkpoint: lastCheckpoint,
+        } as JobStatus;
+
+        console.log('✅ PDF Monitor: Job status received:', {
+          status: combinedStatus.status,
+          progress: combinedStatus.progress,
+          checkpoint: lastCheckpoint?.stage,
+          metadata: jobData.metadata,
+        });
+
+        setJobStatus(combinedStatus);
+
+        // Stop polling if job is completed or failed
+        if (jobData.status === 'completed' || jobData.status === 'failed') {
+          console.log(`🏁 PDF Monitor: Job ${jobData.status}, stopping polling`);
+          setIsPolling(false);
+          clearInterval(intervalId);
         }
       } catch (err) {
         console.error('❌ PDF Monitor: Error polling job status:', err);
