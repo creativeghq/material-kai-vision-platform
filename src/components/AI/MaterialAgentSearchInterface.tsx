@@ -809,9 +809,10 @@ export const MaterialAgentSearchInterface: React.FC<
                 matchedMaterials: generationResult.matched_materials,
                 qualityAssessment: generationResult.quality_assessment,
                 processingTime: generationResult.processing_time_ms,
+                spatialAnalysis: generationResult.spatial_analysis, // Include SpaceFormer analysis
               };
               // eslint-disable-next-line no-console
-              console.log('✅ 3D generation completed:', enhanced3DContent);
+              console.log('✅ 3D generation completed with spatial analysis:', enhanced3DContent);
             }
           }
         } catch (generationError) {

@@ -46,6 +46,7 @@ import { PromptLibrary } from './PromptLibrary';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
+import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 
 // Agent definitions with RBAC
 interface AgentDefinition {
@@ -580,6 +581,51 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         title: data.materialResults.title || 'Material Results',
       } : undefined;
 
+      // Generate 3D design + SpaceFormer analysis for Interior Designer Agent
+      let designData: Message['designData'] = undefined;
+      if (selectedAgent === 'interior-designer') {
+        try {
+          // Check if the user's message or agent's response contains design-related keywords
+          const designKeywords = ['design', 'interior', 'room', 'space', 'layout', 'furniture', 'decor', 'modern', 'minimalist', 'bedroom', 'living room', 'kitchen', 'bathroom'];
+          const combinedText = `${userInput} ${cleanedText}`.toLowerCase();
+          const containsDesignContent = designKeywords.some(keyword => combinedText.includes(keyword));
+
+          if (containsDesignContent) {
+            console.log('🎨 Triggering 3D generation + SpaceFormer analysis for Interior Designer...');
+
+            // Extract room type and style from user input (simple keyword matching)
+            const roomTypes = ['bedroom', 'living room', 'kitchen', 'bathroom', 'office', 'dining room'];
+            const styles = ['modern', 'minimalist', 'industrial', 'scandinavian', 'traditional', 'contemporary'];
+
+            const detectedRoomType = roomTypes.find(type => combinedText.includes(type)) || 'general';
+            const detectedStyle = styles.find(style => combinedText.includes(style)) || 'modern';
+
+            const generationResult = await MaterialAgent3DGenerationAPI.generate3D({
+              prompt: userInput,
+              room_type: detectedRoomType,
+              style: detectedStyle,
+              specific_materials: [],
+              enable_spatial_analysis: true, // Enable SpaceFormer analysis
+            });
+
+            if (generationResult.success) {
+              designData = {
+                images: generationResult.image_urls,
+                spatialAnalysis: generationResult.spatial_analysis, // SpaceFormer analysis included!
+                matchedMaterials: generationResult.matched_materials,
+                parsedRequest: generationResult.parsed_request,
+                qualityAssessment: generationResult.quality_assessment,
+                processingTimeMs: generationResult.processing_time_ms,
+              };
+              console.log('✅ 3D generation + SpaceFormer analysis completed:', designData);
+            }
+          }
+        } catch (generationError) {
+          console.warn('⚠️ 3D generation failed (non-critical):', generationError);
+          // Continue without design data - don't fail the entire message
+        }
+      }
+
       // Add assistant response to messages
       const assistantMessage: Message = {
         id: `msg-${Date.now()}-response`,
@@ -590,6 +636,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         model: data.model || selectedModel,
         demoData,
         materialData,
+        designData, // Include design data with spatial analysis
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -609,6 +656,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             cachedResponse: !!getCachedResponse(userInput, selectedAgent, workspaceId),
             demoData, // Save demo data for DemoAgent
             materialData, // Save material data for Search Agent
+            designData, // Save design data for Interior Designer Agent (includes spatial analysis)
           },
         });
       }
@@ -674,6 +722,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           model: msg.metadata?.model as string,
           demoData: msg.metadata?.demoData as any | undefined,
           materialData: msg.metadata?.materialData as any | undefined,
+          designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
         }))
       );
     },

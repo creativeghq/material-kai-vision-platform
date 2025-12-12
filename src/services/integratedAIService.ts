@@ -29,6 +29,8 @@ export interface MaterialAgentTaskRequest {
   input_data: MaterialAgentInputData;
   priority?: number;
   required_agents?: string[];
+  query?: string;
+  tools?: string[];
 }
 
 export interface AgentExecutionResult {
@@ -218,7 +220,7 @@ export class MaterialAgentOrchestratorAPI {
             originalError: error instanceof Error ? error.message : String(error),
           },
           timestamp: new Date().toISOString(),
-        }
+        },
       );
       errorLogger.logError(apiError, {
         service: 'MaterialAgentOrchestratorAPI',
@@ -305,62 +307,10 @@ export class MaterialAgentOrchestratorAPI {
   }
 }
 
-/**
- * SpaceFormer API - Wrapper around spaceformerAnalysisService
- * @deprecated Use spaceformerAnalysisService directly instead
- */
-export class SpaceFormerAPI {
-  /**
-   * Analyze spatial context and generate layout suggestions
-   */
-  static async analyzeSpatialContext(
-    request: SpaceFormerRequest,
-  ): Promise<SpaceFormerResult> {
-    return spaceformerAnalysisService.analyzeSpace({
-      image_url: request.image_url,
-      image_data: request.image_data,
-      room_type: request.room_type,
-      room_dimensions: request.room_dimensions,
-      user_preferences: request.user_preferences,
-      constraints: request.constraints,
-      analysis_type: request.analysis_type,
-    });
-  }
-
-  /**
-   * Get user's spatial analyses
-   */
-  static async getUserAnalyses(limit = 20) {
-    return spaceformerAnalysisService.listUserAnalyses(limit);
-  }
-
-  /**
-   * Get analysis by ID
-   */
-  static async getAnalysis(analysisId: string) {
-    return spaceformerAnalysisService.getAnalysisResults(analysisId);
-  }
-
-  /**
-   * Analyze room with integrated SVBRDF data
-   */
-  static async analyzeRoomComplete(
-    roomType: string,
-    svbrdfExtractionIds?: string[],
-    userPreferences?: UserPreferences,
-  ): Promise<SpaceFormerResult> {
-    return spaceformerAnalysisService.analyzeSpace({
-      room_type: roomType,
-      user_preferences: userPreferences,
-      constraints: {
-        svbrdf_extraction_ids: svbrdfExtractionIds,
-      },
-      analysis_type: 'full',
-    });
-  }
-}
-
+// REMOVED: SpaceFormerAPI class (deprecated)
+// Use spaceformerAnalysisService directly instead for spatial analysis features.
+//
 // REMOVED: IntegratedAIService class
 // This service was only used by the deleted AIStudioPage component.
-// The MaterialAgentOrchestratorAPI and SpaceFormerAPI classes above are still available
-// for future use if needed.
+//
+// The MaterialAgentOrchestratorAPI class above is still available for agent orchestration.

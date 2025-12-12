@@ -1,11 +1,13 @@
 import { supabase } from '@/integrations/supabase/client';
 import { BrowserApiIntegrationService } from './apiGateway/browserApiIntegrationService';
+import { spaceformerAnalysisService, type SpaceformerResult } from './spaceformerAnalysisService';
 
 export interface Generation3DRequest {
   prompt: string;
   room_type?: string;
   style?: string;
   specific_materials?: string[];
+  enable_spatial_analysis?: boolean; // Optional flag to enable/disable SpaceFormer analysis
 }
 
 export interface Generation3DResult {
@@ -31,6 +33,7 @@ export interface Generation3DResult {
     feedback: string;
   };
   processing_time_ms: number;
+  spatial_analysis?: SpaceformerResult; // SpaceFormer spatial analysis results
 }
 
 export interface Generation3DRecord {
@@ -119,6 +122,35 @@ export class MaterialAgent3DGenerationAPI {
         ? result.data.image_urls
         : [result.data.image_url].filter(Boolean);
 
+      // Run SpaceFormer spatial analysis on the first generated image (if enabled)
+      let spatialAnalysis: SpaceformerResult | undefined;
+      const enableSpatialAnalysis = request.enable_spatial_analysis !== false; // Default to true
+
+      if (enableSpatialAnalysis && imageUrls.length > 0 && request.room_type) {
+        try {
+          console.log('🔍 Running SpaceFormer spatial analysis on generated image...');
+          const spaceformerStartTime = Date.now();
+
+          spatialAnalysis = await spaceformerAnalysisService.analyzeSpace({
+            image_url: imageUrls[0], // Analyze the first generated image
+            room_type: request.room_type,
+            analysis_type: 'full', // Full analysis: layout, materials, accessibility, traffic flow
+            room_dimensions: undefined, // Let SpaceFormer estimate from image
+            user_preferences: {
+              style: request.style,
+              material_preferences: request.specific_materials,
+            },
+          });
+
+          const spaceformerTime = Date.now() - spaceformerStartTime;
+          console.log(`✅ SpaceFormer analysis completed in ${spaceformerTime}ms`);
+        } catch (error) {
+          console.error('⚠️ SpaceFormer analysis failed (non-critical):', error);
+          // Don't fail the entire generation if SpaceFormer fails
+          // Just log the error and continue without spatial analysis
+        }
+      }
+
       await supabase.from('generation_3d').insert({
         id: generationId,
         user_id: user.id,
@@ -133,6 +165,7 @@ export class MaterialAgent3DGenerationAPI {
         },
         output_data: {
           image_urls: imageUrls,
+          spatial_analysis: spatialAnalysis, // Store spatial analysis in output_data
         },
         processing_time_ms: processingTime,
         file_urls: imageUrls,
@@ -140,7 +173,7 @@ export class MaterialAgent3DGenerationAPI {
         completed_at: new Date().toISOString(),
       });
 
-      // Return standardized response
+      // Return standardized response with spatial analysis
       return {
         success: true,
         generation_id: generationId,
@@ -159,6 +192,7 @@ export class MaterialAgent3DGenerationAPI {
           feedback: 'Generated using AI image generation',
         },
         processing_time_ms: processingTime,
+        spatial_analysis: spatialAnalysis, // Include spatial analysis in response
       };
     } catch (error) {
       console.error('❌ 3D generation error:', error);

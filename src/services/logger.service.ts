@@ -1,16 +1,19 @@
 /**
  * Centralized Logging Service
- * 
- * Replaces direct console.* calls with a structured logging system
- * that can be configured, filtered, and routed to external monitoring services.
- * 
- * Usage:
+ *
+ * Provides structured logging with environment-aware behavior:
+ * - Development: Logs to console
+ * - Production: Can be extended to send to monitoring services (Sentry, LogRocket, etc.)
+ *
+ * @example
+ * ```typescript
  * import { logger } from '@/services/logger.service';
+ * 
  * logger.info('User logged in', { userId: '123' });
- * logger.error('API call failed', error, { endpoint: '/api/users' });
+ * logger.error('Failed to fetch data', error, { endpoint: '/api/data' });
+ * logger.debug('Processing item', { itemId: 'abc' });
+ * ```
  */
-
-import { env } from '@/config/environment';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -22,6 +25,7 @@ export enum LogLevel {
 
 export interface LogMetadata {
   [key: string]: unknown;
+  service?: string;
 }
 
 export interface LogEntry {
@@ -31,75 +35,124 @@ export interface LogEntry {
   metadata?: LogMetadata;
   error?: Error;
   service?: string;
-  userId?: string;
 }
 
 export interface LoggerConfig {
-  minLevel: LogLevel;
-  enableConsole: boolean;
-  enableRemote: boolean;
-  remoteEndpoint?: string;
-  serviceName: string;
+  minLevel?: LogLevel;
+  enableConsole?: boolean;
+  enableRemote?: boolean;
+  serviceName?: string;
+  bufferSize?: number;
 }
 
-/**
- * Logger Class
- * Provides structured logging with multiple output targets
- */
-class Logger {
+class LoggerService {
+  private isProduction: boolean;
+  private isDevelopment: boolean;
+  private logBuffer: LogEntry[] = [];
+  private maxBufferSize: number = 100;
   private config: LoggerConfig;
-  private buffer: LogEntry[] = [];
-  private readonly MAX_BUFFER_SIZE = 100;
 
-  constructor(config?: Partial<LoggerConfig>) {
+  constructor() {
+    // Check both Vite and Node.js environment indicators
+    this.isProduction = import.meta.env?.PROD || process.env.NODE_ENV === 'production';
+    this.isDevelopment = import.meta.env?.DEV || process.env.NODE_ENV === 'development';
+    
+    // Default configuration
     this.config = {
-      minLevel: env.isProduction ? LogLevel.INFO : LogLevel.DEBUG,
-      enableConsole: env.features.enableLogging,
-      enableRemote: env.isProduction && env.features.enableAnalytics,
+      minLevel: this.isDevelopment ? LogLevel.DEBUG : LogLevel.INFO,
+      enableConsole: true,
+      enableRemote: this.isProduction,
       serviceName: 'MaterialKAI',
-      ...config,
+      bufferSize: 100,
     };
+    
+    this.maxBufferSize = this.config.bufferSize || 100;
   }
 
   /**
    * Update logger configuration
    */
-  public configure(config: Partial<LoggerConfig>): void {
+  configure(config: Partial<LoggerConfig>): void {
     this.config = { ...this.config, ...config };
+    if (config.bufferSize) {
+      this.maxBufferSize = config.bufferSize;
+      this.trimBuffer();
+    }
   }
 
   /**
-   * Log debug message (development only)
+   * Get recent logs from buffer
    */
-  public debug(message: string, metadata?: LogMetadata): void {
-    this.log(LogLevel.DEBUG, message, metadata);
+  getRecentLogs(count?: number): LogEntry[] {
+    const limit = count || this.logBuffer.length;
+    return this.logBuffer.slice(-limit).reverse();
   }
 
   /**
-   * Log info message
+   * Clear log buffer
    */
-  public info(message: string, metadata?: LogMetadata): void {
-    this.log(LogLevel.INFO, message, metadata);
+  clearBuffer(): void {
+    this.logBuffer = [];
   }
 
   /**
-   * Log warning message
+   * Get buffer size
    */
-  public warn(message: string, metadata?: LogMetadata): void {
-    this.log(LogLevel.WARN, message, metadata);
+  getBufferSize(): number {
+    return this.logBuffer.length;
   }
 
   /**
-   * Log error message
+   * Trim buffer to max size
    */
-  public error(message: string, error?: Error | unknown, metadata?: LogMetadata): void {
+  private trimBuffer(): void {
+    if (this.logBuffer.length > this.maxBufferSize) {
+      this.logBuffer = this.logBuffer.slice(-this.maxBufferSize);
+    }
+  }
+
+  /**
+   * Add log entry to buffer
+   */
+  private addToBuffer(entry: LogEntry): void {
+    this.logBuffer.push(entry);
+    this.trimBuffer();
+  }
+
+  /**
+   * Log informational messages
+   */
+  info(message: string, metadata?: LogMetadata): void {
+    this.log(LogLevel.INFO, message, undefined, metadata);
+  }
+
+  /**
+   * Log warning messages
+   */
+  warn(message: string, metadata?: LogMetadata): void {
+    this.log(LogLevel.WARN, message, undefined, metadata);
+  }
+
+  /**
+   * Log error messages
+   */
+  error(message: string, error?: Error | unknown, metadata?: LogMetadata): void {
     const errorObj = error instanceof Error ? error : undefined;
-    const combinedMetadata = {
-      ...metadata,
-      ...(error && !(error instanceof Error) ? { errorData: error } : {}),
-    };
+    const errorMetadata = error instanceof Error ? undefined : (error as LogMetadata);
 
-    this.log(LogLevel.ERROR, message, combinedMetadata, errorObj);
+    this.log(LogLevel.ERROR, message, errorObj, {
+      ...metadata,
+      ...errorMetadata,
+    });
+  }
+
+  /**
+   * Log debug messages (only in development)
+   */
+  debug(message: string, metadata?: LogMetadata): void {
+    if (this.isDevelopment) {
+      this.log(LogLevel.DEBUG, message, undefined, metadata);
+    }
   }
 
   /**
@@ -108,11 +161,11 @@ class Logger {
   private log(
     level: LogLevel,
     message: string,
+    error?: Error,
     metadata?: LogMetadata,
-    error?: Error
   ): void {
-    // Check if log level meets minimum threshold
-    if (level < this.config.minLevel) {
+    // Check minimum log level
+    if (level < (this.config.minLevel || LogLevel.DEBUG)) {
       return;
     }
 
@@ -128,95 +181,21 @@ class Logger {
     // Add to buffer
     this.addToBuffer(entry);
 
-    // Output to console if enabled
-    if (this.config.enableConsole) {
-      this.consoleOutput(entry);
+    // In development, log to console with formatting
+    if (this.isDevelopment && this.config.enableConsole) {
+      this.logToConsole(entry);
     }
 
-    // Send to remote logging service if enabled
-    if (this.config.enableRemote && level >= LogLevel.WARN) {
-      this.remoteOutput(entry);
-    }
-  }
-
-  /**
-   * Output to console with appropriate formatting
-   */
-  private consoleOutput(entry: LogEntry): void {
-    const { level, message, metadata, error } = entry;
-    const prefix = `[${this.getLevelLabel(level)}] ${entry.timestamp}:`;
-
-    switch (level) {
-      case LogLevel.DEBUG:
-        console.debug(prefix, message, metadata || '');
-        break;
-      case LogLevel.INFO:
-        console.info(prefix, message, metadata || '');
-        break;
-      case LogLevel.WARN:
-        console.warn(prefix, message, metadata || '');
-        break;
-      case LogLevel.ERROR:
-        console.error(prefix, message, metadata || '', error || '');
-        if (error?.stack) {
-          console.error('Stack trace:', error.stack);
-        }
-        break;
+    // In production, you can extend this to send to monitoring services
+    if (this.isProduction && this.config.enableRemote) {
+      this.logToMonitoringService(entry);
     }
   }
 
   /**
-   * Send log to remote monitoring service
+   * Get log level name
    */
-  private async remoteOutput(entry: LogEntry): Promise<void> {
-    try {
-      // Only send in production and if endpoint is configured
-      if (!this.config.remoteEndpoint || !env.isProduction) {
-        return;
-      }
-
-      // Serialize the log entry
-      const payload = {
-        ...entry,
-        error: entry.error
-          ? {
-              message: entry.error.message,
-              stack: entry.error.stack,
-              name: entry.error.name,
-            }
-          : undefined,
-      };
-
-      // Send to remote endpoint (non-blocking)
-      fetch(this.config.remoteEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      }).catch((err) => {
-        // Silently fail - don't break app if logging fails
-        console.error('Failed to send log to remote service:', err);
-      });
-    } catch (err) {
-      // Silently fail - logging shouldn't break the app
-    }
-  }
-
-  /**
-   * Add entry to buffer
-   */
-  private addToBuffer(entry: LogEntry): void {
-    this.buffer.push(entry);
-    
-    // Keep buffer size under control
-    if (this.buffer.length > this.MAX_BUFFER_SIZE) {
-      this.buffer = this.buffer.slice(-this.MAX_BUFFER_SIZE);
-    }
-  }
-
-  /**
-   * Get human-readable label for log level
-   */
-  private getLevelLabel(level: LogLevel): string {
+  private getLevelName(level: LogLevel): string {
     switch (level) {
       case LogLevel.DEBUG:
         return 'DEBUG';
@@ -232,66 +211,79 @@ class Logger {
   }
 
   /**
-   * Get recent logs from buffer
+   * Log to console with appropriate formatting
    */
-  public getRecentLogs(count = 50): LogEntry[] {
-    return this.buffer.slice(-count);
+  private logToConsole(entry: LogEntry): void {
+    const prefix = `[${entry.timestamp}] [${this.getLevelName(entry.level)}]`;
+
+    switch (entry.level) {
+      case LogLevel.DEBUG:
+        console.debug(prefix, entry.message, entry.metadata || '');
+        break;
+      case LogLevel.INFO:
+        console.info(prefix, entry.message, entry.metadata || '');
+        break;
+      case LogLevel.WARN:
+        console.warn(prefix, entry.message, entry.metadata || '');
+        break;
+      case LogLevel.ERROR:
+        console.error(prefix, entry.message, entry.error || '', entry.metadata || '');
+        if (entry.error?.stack) {
+          console.error('Stack trace:', entry.error.stack);
+        }
+        break;
+    }
   }
 
   /**
-   * Clear log buffer
+   * Send logs to monitoring service in production
+   * This is a placeholder - integrate with your monitoring service (Sentry, LogRocket, etc.)
    */
-  public clearBuffer(): void {
-    this.buffer = [];
+  private logToMonitoringService(entry: LogEntry): void {
+    // Only log errors and warnings in production to reduce noise
+    if (entry.level === LogLevel.ERROR || entry.level === LogLevel.WARN) {
+      // TODO: Integrate with monitoring service
+      // Example with Sentry:
+      // import * as Sentry from '@sentry/react';
+      // if (entry.error) {
+      //   Sentry.captureException(entry.error, {
+      //     level: entry.level,
+      //     extra: entry.metadata,
+      //   });
+      // } else {
+      //   Sentry.captureMessage(entry.message, {
+      //     level: entry.level,
+      //     extra: entry.metadata,
+      //   });
+      // }
+
+      // For now, still log to console in production for critical issues
+      console.error(`[PRODUCTION ${this.getLevelName(entry.level)}]`, entry.message, entry.metadata);
+    }
   }
 
   /**
-   * Create a scoped logger for a specific service/component
+   * Create a scoped logger for a specific module/service
    */
-  public createScoped(serviceName: string): ScopedLogger {
-    return new ScopedLogger(this, serviceName);
+  createLogger(scope: string) {
+    return {
+      info: (message: string, metadata?: LogMetadata) =>
+        this.info(`[${scope}] ${message}`, { ...metadata, service: scope }),
+      warn: (message: string, metadata?: LogMetadata) =>
+        this.warn(`[${scope}] ${message}`, { ...metadata, service: scope }),
+      error: (message: string, error?: Error | unknown, metadata?: LogMetadata) =>
+        this.error(`[${scope}] ${message}`, error, { ...metadata, service: scope }),
+      debug: (message: string, metadata?: LogMetadata) =>
+        this.debug(`[${scope}] ${message}`, { ...metadata, service: scope }),
+    };
   }
 }
 
-/**
- * Scoped Logger
- * Automatically adds service context to all logs
- */
-class ScopedLogger {
-  constructor(
-    private parent: Logger,
-    private serviceName: string
-  ) {}
+// Export singleton instance
+export const logger = new LoggerService();
 
-  public debug(message: string, metadata?: LogMetadata): void {
-    this.parent.debug(message, { ...metadata, service: this.serviceName });
-  }
+// Helper function to create scoped loggers
+export const createLogger = (scope: string) => logger.createLogger(scope);
 
-  public info(message: string, metadata?: LogMetadata): void {
-    this.parent.info(message, { ...metadata, service: this.serviceName });
-  }
-
-  public warn(message: string, metadata?: LogMetadata): void {
-    this.parent.warn(message, { ...metadata, service: this.serviceName });
-  }
-
-  public error(message: string, error?: Error | unknown, metadata?: LogMetadata): void {
-    this.parent.error(message, error, { ...metadata, service: this.serviceName });
-  }
-}
-
-/**
- * Singleton logger instance
- */
-export const logger = new Logger();
-
-/**
- * Export scoped logger creator
- */
-export function createLogger(serviceName: string): ScopedLogger {
-  return logger.createScoped(serviceName);
-}
-
-/**
- * Types are exported inline with their definitions above
- */
+// Export type for scoped loggers
+export type ScopedLogger = ReturnType<typeof logger.createLogger>;
