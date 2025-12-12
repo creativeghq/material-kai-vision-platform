@@ -61,6 +61,7 @@ export const TransformControls: React.FC = () => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       const { setActiveTool } = useUIStore.getState();
+      const { room, setAllWallsVisibility } = useSceneStore.getState();
 
       switch (e.key.toLowerCase()) {
         case 'g':
@@ -71,6 +72,11 @@ export const TransformControls: React.FC = () => {
           break;
         case 's':
           setActiveTool('scale');
+          break;
+        case 'w':
+          // Toggle all walls visibility
+          const anyWallHidden = room.walls.some((wall) => wall.visible === false);
+          setAllWallsVisibility(anyWallHidden);
           break;
         case 'delete':
         case 'backspace':
@@ -84,6 +90,18 @@ export const TransformControls: React.FC = () => {
       if (e.ctrlKey && e.key === 'd' && selectedItem) {
         e.preventDefault();
         useSceneStore.getState().duplicateItem(selectedItem.id);
+      }
+
+      // Ctrl+Z for undo
+      if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        useSceneStore.getState().undo();
+      }
+
+      // Ctrl+Shift+Z or Ctrl+Y for redo
+      if ((e.ctrlKey && e.shiftKey && e.key === 'z') || (e.ctrlKey && e.key === 'y')) {
+        e.preventDefault();
+        useSceneStore.getState().redo();
       }
     };
 

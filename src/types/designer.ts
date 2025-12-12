@@ -28,6 +28,7 @@ export interface Wall {
   height: number;
   thickness: number;
   material: string;
+  visible?: boolean; // Wall visibility toggle
 }
 
 export interface Opening {
@@ -58,6 +59,8 @@ export interface PlacedItem {
   scale: [number, number, number];
   variantIndex: number;
   locked: boolean;
+  parentId?: string; // For countertop items - ID of the item this is placed on
+  attachedToWall?: string; // For wall-mounted items - ID of the wall
 }
 
 export interface Asset {
@@ -83,10 +86,16 @@ export interface SnapPoint {
   type: 'side' | 'surface' | 'wall';
 }
 
+export type PlacementType = 'floor' | 'wall' | 'ceiling' | 'countertop' | 'freestanding';
+
 export interface PlacementRules {
-  type: 'floor' | 'wall' | 'ceiling' | 'freestanding';
-  wallOffset?: number;
-  floorOffset?: number;
+  type: PlacementType;
+  wallOffset?: number; // Distance from wall for wall-mounted items (in meters)
+  floorOffset?: number; // Height from floor for wall-mounted items (in meters)
+  ceilingOffset?: number; // Distance from ceiling for ceiling-mounted items (in meters)
+  requiresSurface?: boolean; // For countertop items - must be placed on another object
+  canBePlacedOn?: string[]; // Asset IDs or categories this can be placed on
+  allowsItemsOnTop?: boolean; // Whether other items can be placed on this item's surface
 }
 
 export interface AssetVariant {

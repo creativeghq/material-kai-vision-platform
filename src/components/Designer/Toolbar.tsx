@@ -1,7 +1,7 @@
 /**
  * Toolbar - Top toolbar with file, edit, view, tools menus
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Save,
   FolderOpen,
@@ -14,18 +14,48 @@ import {
   RotateCw,
   Maximize,
   Eye,
+  EyeOff,
   Settings,
+  Layers,
+  Home,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useUIStore } from '@/stores/uiStore';
 import { useSceneStore } from '@/stores/sceneStore';
 import { cn } from '@/lib/utils';
 import { logger } from '@/services/logger.service';
+import { RoomSettingsModal } from './RoomSettingsModal';
 
 export const Toolbar: React.FC = () => {
   const { activeTool, setActiveTool, togglePanel, panelVisibility } = useUIStore();
-  const { settings, setSettings } = useSceneStore();
+  const {
+    settings,
+    setSettings,
+    room,
+    toggleWallVisibility,
+    setAllWallsVisibility,
+    history,
+    undo,
+    redo,
+  } = useSceneStore();
+  const [roomSettingsOpen, setRoomSettingsOpen] = useState(false);
+
+  // Check if all walls are visible
+  const allWallsVisible = room.walls.every((wall) => wall.visible !== false);
+  const anyWallHidden = room.walls.some((wall) => wall.visible === false);
+
+  // Check if undo/redo is available
+  const canUndo = history.past.length > 0;
+  const canRedo = history.future.length > 0;
 
   const handleSave = () => {
     // TODO: Implement save functionality
@@ -48,13 +78,17 @@ export const Toolbar: React.FC = () => {
   };
 
   const handleUndo = () => {
-    // TODO: Implement undo
-    logger.debug('Undo');
+    if (canUndo) {
+      undo();
+      logger.debug('Undo');
+    }
   };
 
   const handleRedo = () => {
-    // TODO: Implement redo
-    logger.debug('Redo');
+    if (canRedo) {
+      redo();
+      logger.debug('Redo');
+    }
   };
 
   return (
@@ -83,11 +117,38 @@ export const Toolbar: React.FC = () => {
 
       {/* Edit Actions */}
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" onClick={handleUndo} title="Undo (Ctrl+Z)">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleUndo}
+          disabled={!canUndo}
+          title="Undo (Ctrl+Z)"
+        >
           <Undo className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={handleRedo} title="Redo (Ctrl+Shift+Z)">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleRedo}
+          disabled={!canRedo}
+          title="Redo (Ctrl+Shift+Z)"
+        >
           <Redo className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Separator orientation="vertical" className="h-8" />
+
+      {/* Room Settings */}
+      <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setRoomSettingsOpen(true)}
+          title="Room Settings"
+        >
+          <Home className="h-4 w-4" />
+          <span className="ml-2">Room</span>
         </Button>
       </div>
 
@@ -133,6 +194,43 @@ export const Toolbar: React.FC = () => {
         >
           <Grid3x3 className="h-4 w-4" />
         </Button>
+
+        {/* Wall Visibility Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant={anyWallHidden ? 'default' : 'ghost'}
+              size="icon"
+              title="Wall Visibility"
+            >
+              <Layers className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuLabel>Wall Visibility</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setAllWallsVisibility(true)}>
+              <Eye className="mr-2 h-4 w-4" />
+              Show All Walls
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setAllWallsVisibility(false)}>
+              <EyeOff className="mr-2 h-4 w-4" />
+              Hide All Walls
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {room.walls.map((wall, index) => (
+              <DropdownMenuItem key={wall.id} onClick={() => toggleWallVisibility(wall.id)}>
+                {wall.visible !== false ? (
+                  <Eye className="mr-2 h-4 w-4" />
+                ) : (
+                  <EyeOff className="mr-2 h-4 w-4 opacity-50" />
+                )}
+                Wall {index + 1}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button
           variant="ghost"
           size="icon"
@@ -156,6 +254,9 @@ export const Toolbar: React.FC = () => {
       <div className="ml-auto text-sm text-muted-foreground">
         <span className="font-medium">3D Room Designer</span>
       </div>
+
+      {/* Room Settings Modal */}
+      <RoomSettingsModal open={roomSettingsOpen} onOpenChange={setRoomSettingsOpen} />
     </div>
   );
 };

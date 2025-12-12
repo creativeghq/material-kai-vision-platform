@@ -7,56 +7,67 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { useAssetStore } from '@/stores/assetStore';
+import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { assetLibrary } from '@/data/assetLibrary';
 
-// Mock categories for now
-const mockCategories = [
-  { id: 'kitchen', name: 'Kitchen', icon: Utensils, count: 24 },
-  { id: 'living-room', name: 'Living Room', icon: Sofa, count: 18 },
-  { id: 'bedroom', name: 'Bedroom', icon: Bed, count: 15 },
-  { id: 'lighting', name: 'Lighting', icon: Lamp, count: 12 },
-  { id: 'storage', name: 'Storage', icon: Package, count: 20 },
-];
-
-// Mock assets for now
-const mockAssets = [
+// Categories with counts from asset library
+const categories = [
   {
-    id: 'asset-1',
-    name: 'Base Cabinet',
-    category: 'kitchen',
-    thumbnail: '/placeholder.svg',
-    dimensions: '0.6m × 0.6m × 0.9m',
+    id: 'kitchen',
+    name: 'Kitchen',
+    icon: Utensils,
+    count: assetLibrary.filter(a => a.category_id === 'kitchen').length
   },
   {
-    id: 'asset-2',
-    name: 'Wall Cabinet',
-    category: 'kitchen',
-    thumbnail: '/placeholder.svg',
-    dimensions: '0.6m × 0.3m × 0.7m',
+    id: 'living-room',
+    name: 'Living Room',
+    icon: Sofa,
+    count: assetLibrary.filter(a => a.category_id === 'living-room').length
   },
   {
-    id: 'asset-3',
-    name: 'Refrigerator',
-    category: 'kitchen',
-    thumbnail: '/placeholder.svg',
-    dimensions: '0.7m × 0.7m × 1.8m',
+    id: 'bedroom',
+    name: 'Bedroom',
+    icon: Bed,
+    count: assetLibrary.filter(a => a.category_id === 'bedroom').length
+  },
+  {
+    id: 'lighting',
+    name: 'Lighting',
+    icon: Lamp,
+    count: assetLibrary.filter(a => a.category_id === 'lighting').length
+  },
+  {
+    id: 'storage',
+    name: 'Storage',
+    icon: Package,
+    count: assetLibrary.filter(a => a.category_id === 'storage').length
   },
 ];
 
 export const AssetLibraryPanel: React.FC = () => {
   const { selectedCategory, setSelectedCategory, searchQuery, setSearchQuery } = useAssetStore();
+  const { setHoveredAssetId, setIsDragging } = useUIStore();
   const [hoveredAsset, setHoveredAsset] = useState<string | null>(null);
 
-  const filteredAssets = mockAssets.filter((asset) => {
-    const matchesCategory = !selectedCategory || asset.category === selectedCategory;
+  const filteredAssets = assetLibrary.filter((asset) => {
+    const matchesCategory = !selectedCategory || asset.category_id === selectedCategory;
     const matchesSearch =
       !searchQuery || asset.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+    const isActive = asset.is_active;
+    return matchesCategory && matchesSearch && isActive;
   });
 
   const handleDragStart = (e: React.DragEvent, assetId: string) => {
     e.dataTransfer.setData('assetId', assetId);
     e.dataTransfer.effectAllowed = 'copy';
+    setHoveredAssetId(assetId);
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setHoveredAssetId(null);
+    setIsDragging(false);
   };
 
   return (
@@ -87,7 +98,7 @@ export const AssetLibraryPanel: React.FC = () => {
             <Package className="mr-2 h-4 w-4" />
             All Assets
           </Button>
-          {mockCategories.map((category) => {
+          {categories.map((category) => {
             const Icon = category.icon;
             return (
               <Button
@@ -113,6 +124,7 @@ export const AssetLibraryPanel: React.FC = () => {
               key={asset.id}
               draggable
               onDragStart={(e) => handleDragStart(e, asset.id)}
+              onDragEnd={handleDragEnd}
               onMouseEnter={() => setHoveredAsset(asset.id)}
               onMouseLeave={() => setHoveredAsset(null)}
               className={cn(

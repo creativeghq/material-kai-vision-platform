@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useSceneStore } from '@/stores/sceneStore';
+import { SnapSettingsPanel } from './SnapSettingsPanel';
 
 export const PropertiesPanel: React.FC = () => {
   const { items, selectedIds, updateItem, duplicateItem, deleteItem, toggleItemLock } =
@@ -22,11 +23,17 @@ export const PropertiesPanel: React.FC = () => {
         <div className="border-b p-4">
           <h2 className="text-lg font-semibold">Properties</h2>
         </div>
-        <div className="flex flex-1 items-center justify-center p-4 text-center">
-          <p className="text-sm text-muted-foreground">
-            Select an object to view and edit its properties
-          </p>
-        </div>
+        <ScrollArea className="flex-1">
+          <div className="space-y-4 p-4">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">
+                Select an object to view and edit its properties
+              </p>
+            </div>
+            <Separator />
+            <SnapSettingsPanel />
+          </div>
+        </ScrollArea>
       </div>
     );
   }

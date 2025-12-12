@@ -46,6 +46,9 @@ export const Room: React.FC = () => {
 
       {/* Walls */}
       {room.walls.map((wall) => {
+        // Skip rendering if wall is hidden
+        if (wall.visible === false) return null;
+
         const start = new THREE.Vector2(wall.start[0], wall.start[1]);
         const end = new THREE.Vector2(wall.end[0], wall.end[1]);
         const length = start.distanceTo(end);

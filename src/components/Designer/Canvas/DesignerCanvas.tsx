@@ -9,30 +9,54 @@ import { Grid } from './Grid';
 import { Room } from './Room';
 import { PlacedItems } from './PlacedItems';
 import { TransformControls } from './TransformControls';
+import { PlacementPreview } from './PlacementPreview';
 import { useSceneStore } from '@/stores/sceneStore';
 import { useUIStore } from '@/stores/uiStore';
 import { logger } from '@/services/logger.service';
+import { getAssetById } from '@/data/assetLibrary';
+import { getPlacementContext } from '@/utils/placement';
 
 export const DesignerCanvas: React.FC = () => {
-  const { settings } = useSceneStore();
+  const { settings, room, items } = useSceneStore();
   const { setIsDragging } = useUIStore();
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const assetId = e.dataTransfer.getData('assetId');
     if (assetId) {
+      const asset = getAssetById(assetId);
+
+      if (!asset) {
+        logger.error('Asset not found', { assetId });
+        setIsDragging(false);
+        return;
+      }
+
       // TODO: Calculate 3D position from drop coordinates
-      logger.debug('Dropped asset', { assetId });
-      // For now, just add at origin
-      const newItem = {
-        id: `item-${Date.now()}`,
+      // For now, place at center of room
+      const targetPosition: [number, number, number] = [2.5, 0, 2];
+
+      // Get placement context based on asset type
+      const placementContext = getPlacementContext(asset, targetPosition, room, items);
+
+      logger.debug('Dropped asset with placement', {
         assetId,
-        position: [0, 0, 0] as [number, number, number],
-        rotation: [0, 0, 0] as [number, number, number],
+        placementType: asset.placement_rules.type,
+        context: placementContext
+      });
+
+      const newItem = {
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+        assetId,
+        position: placementContext.position,
+        rotation: placementContext.rotation,
         scale: [1, 1, 1] as [number, number, number],
         variantIndex: 0,
         locked: false,
+        parentId: placementContext.parentId,
+        attachedToWall: placementContext.attachedToWall,
       };
+
       useSceneStore.getState().addItem(newItem);
     }
     setIsDragging(false);
@@ -66,6 +90,7 @@ export const DesignerCanvas: React.FC = () => {
           {settings.gridVisible && <Grid />}
           <Room />
           <PlacedItems />
+          <PlacementPreview />
           <TransformControls />
         </Suspense>
       </Canvas>

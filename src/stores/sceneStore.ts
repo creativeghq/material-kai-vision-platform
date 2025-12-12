@@ -6,6 +6,7 @@ import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import type * as THREE from 'three';
 import type { RoomConfig, PlacedItem, SceneData, Light, SceneSettings } from '@/types/designer';
+import { applyAllConstraints } from '@/utils/constraints';
 
 interface HistoryState {
   past: SceneData[];
@@ -39,6 +40,8 @@ interface SceneStore {
   undo: () => void;
   redo: () => void;
   saveToHistory: () => void;
+  toggleWallVisibility: (wallId: string) => void;
+  setAllWallsVisibility: (visible: boolean) => void;
 }
 
 const defaultRoom: RoomConfig = {
@@ -80,36 +83,56 @@ export const useSceneStore = create<SceneStore>()(
       // Actions
       setRoom: (room) => set({ room }),
 
-      addItem: (item) =>
+      addItem: (item) => {
+        get().saveToHistory();
         set((state) => {
+          // Apply constraints to initial position
+          const constraintResult = applyAllConstraints(item.position, state.room, item);
+          item.position = constraintResult.position;
+
           state.items.push(item);
           state.selectedIds = [item.id];
-        }),
+        });
+      },
 
       updateItem: (id, updates) =>
         set((state) => {
           const item = state.items.find((i) => i.id === id);
           if (item && !item.locked) {
+            // If position is being updated, apply constraints
+            if (updates.position) {
+              const constraintResult = applyAllConstraints(
+                updates.position,
+                state.room,
+                item
+              );
+              updates.position = constraintResult.position;
+            }
             Object.assign(item, updates);
           }
         }),
 
-      deleteItem: (id) =>
+      deleteItem: (id) => {
+        get().saveToHistory();
         set((state) => {
           state.items = state.items.filter((i) => i.id !== id);
           state.selectedIds = state.selectedIds.filter((sid) => sid !== id);
-        }),
+        });
+      },
 
-      deleteSelectedItems: () =>
+      deleteSelectedItems: () => {
+        get().saveToHistory();
         set((state) => {
           const unlockedSelected = state.selectedIds.filter(
             (id) => !state.items.find((i) => i.id === id)?.locked
           );
           state.items = state.items.filter((i) => !unlockedSelected.includes(i.id));
           state.selectedIds = [];
-        }),
+        });
+      },
 
-      duplicateItem: (id) =>
+      duplicateItem: (id) => {
+        get().saveToHistory();
         set((state) => {
           const item = state.items.find((i) => i.id === id);
           if (item) {
@@ -121,7 +144,8 @@ export const useSceneStore = create<SceneStore>()(
             state.items.push(newItem);
             state.selectedIds = [newItem.id];
           }
-        }),
+        });
+      },
 
       selectItem: (id, multi = false) =>
         set((state) => {
@@ -175,16 +199,75 @@ export const useSceneStore = create<SceneStore>()(
       },
 
       saveToHistory: () => {
-        // Implementation for undo/redo will be added
+        set((state) => {
+          const currentState = get().getSceneData();
+
+          // Limit history to 50 entries
+          const newPast = [...state.history.past, currentState].slice(-50);
+
+          state.history.past = newPast;
+          state.history.future = []; // Clear future when new action is performed
+        });
       },
 
       undo: () => {
-        // Implementation for undo will be added
+        set((state) => {
+          if (state.history.past.length === 0) return;
+
+          const currentState = get().getSceneData();
+          const previousState = state.history.past[state.history.past.length - 1];
+
+          // Move current state to future
+          state.history.future = [currentState, ...state.history.future];
+
+          // Remove last state from past
+          state.history.past = state.history.past.slice(0, -1);
+
+          // Restore previous state
+          state.room = previousState.room;
+          state.items = previousState.items;
+          state.lights = previousState.lights;
+          state.settings = previousState.settings;
+          state.selectedIds = [];
+        });
       },
 
       redo: () => {
-        // Implementation for redo will be added
+        set((state) => {
+          if (state.history.future.length === 0) return;
+
+          const currentState = get().getSceneData();
+          const nextState = state.history.future[0];
+
+          // Move current state to past
+          state.history.past = [...state.history.past, currentState];
+
+          // Remove first state from future
+          state.history.future = state.history.future.slice(1);
+
+          // Restore next state
+          state.room = nextState.room;
+          state.items = nextState.items;
+          state.lights = nextState.lights;
+          state.settings = nextState.settings;
+          state.selectedIds = [];
+        });
       },
+
+      toggleWallVisibility: (wallId) =>
+        set((state) => {
+          const wall = state.room.walls.find((w) => w.id === wallId);
+          if (wall) {
+            wall.visible = wall.visible === false ? true : false;
+          }
+        }),
+
+      setAllWallsVisibility: (visible) =>
+        set((state) => {
+          state.room.walls.forEach((wall) => {
+            wall.visible = visible;
+          });
+        }),
     })),
     { name: 'SceneStore' }
   )
