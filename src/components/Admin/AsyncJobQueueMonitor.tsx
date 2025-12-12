@@ -1101,7 +1101,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     14-Stage Processing Pipeline
                   </CardTitle>
                   <CardDescription>
-                    Click on any completed stage to see detailed metrics and data
+                    Click on completed stages (green) to see detailed metrics, or skipped stages (amber) to understand why they were not applicable
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1112,10 +1112,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         (cp) => cp.stage.toLowerCase() === stage.checkpoint.toLowerCase()
                       );
                       const isCompleted = !!checkpoint;
+
+                      // Check if this stage was skipped (job completed but this checkpoint doesn't exist)
+                      const isSkipped = selectedJob?.status === 'completed' && !isCompleted &&
+                        jobCheckpoints.some(cp => cp.stage === 'completed');
+
                       const isFailed = selectedJob?.status === 'failed' && !isCompleted;
                       const isActive =
                         selectedJob?.status === 'processing' &&
                         !isCompleted &&
+                        !isSkipped &&
                         stage.id === (jobCheckpoints.length + 1);
                       const isExpanded = expandedStages.has(stage.id);
 
@@ -1132,13 +1138,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               ? 'bg-blue-50 border-blue-200'
                               : isCompleted
                               ? 'bg-green-50 border-green-200'
+                              : isSkipped
+                              ? 'bg-amber-50 border-amber-200'
                               : 'bg-slate-50 border-slate-200'
                           }`}
                         >
-                          {/* Stage Header - Clickable */}
+                          {/* Stage Header - Clickable for completed and skipped stages */}
                           <button
-                            onClick={() => isCompleted && toggleStage(stage.id)}
-                            disabled={!isCompleted}
+                            onClick={() => (isCompleted || isSkipped) && toggleStage(stage.id)}
+                            disabled={!isCompleted && !isSkipped}
                             className="w-full flex items-start gap-3 p-3 text-left hover:bg-black/5 transition-colors disabled:cursor-default"
                           >
                             {/* Status Icon */}
@@ -1149,6 +1157,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
                               ) : isCompleted ? (
                                 <CheckCircle className="h-4 w-4 text-green-600" />
+                              ) : isSkipped ? (
+                                <div className="relative">
+                                  <Clock className="h-4 w-4 text-amber-500" />
+                                  <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="w-3 h-0.5 bg-amber-500 rotate-45"></div>
+                                  </div>
+                                </div>
                               ) : (
                                 <Clock className="h-4 w-4 text-slate-400" />
                               )}
@@ -1157,8 +1172,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             {/* Stage Content */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <div className="font-medium text-sm">
-                                  {stage.id}. {stage.name}
+                                <div className="font-medium text-sm flex items-center gap-2">
+                                  <span>{stage.id}. {stage.name}</span>
+                                  {isSkipped && (
+                                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-normal">
+                                      Skipped
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {checkpoint && (
@@ -1166,7 +1186,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                       {formatDate(checkpoint.created_at)}
                                     </div>
                                   )}
-                                  {isCompleted && (
+                                  {(isCompleted || isSkipped) && (
                                     <div className="flex-shrink-0">
                                       {isExpanded ? (
                                         <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -1196,6 +1216,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   {checkpointData.products_created && (
                                     <span>✅ {checkpointData.products_created} created</span>
                                   )}
+                                </div>
+                              )}
+
+                              {/* Skipped Stage Explanation */}
+                              {isSkipped && !isExpanded && (
+                                <div className="mt-1 text-xs text-amber-600">
+                                  This stage was not applicable for this document
                                 </div>
                               )}
 
@@ -1245,6 +1272,37 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     </div>
                                   </div>
                                 )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Expanded Details - Accordion Content for Skipped Stages */}
+                          {isSkipped && isExpanded && (
+                            <div className="px-3 pb-3 pt-0 border-t border-amber-200">
+                              <div className="mt-3 space-y-3">
+                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                                  <h5 className="text-sm font-semibold text-amber-800 mb-2">Why was this stage skipped?</h5>
+                                  <div className="text-xs text-amber-700 space-y-1">
+                                    {stage.name === 'Text Embeddings' && (
+                                      <p>Text embeddings are generated as part of the Chunking stage. This separate checkpoint is only created in specific processing modes.</p>
+                                    )}
+                                    {stage.name === 'CLIP Embeddings' && (
+                                      <p>CLIP embeddings are generated as part of the Image Extraction stage. This separate checkpoint is only created when specialized embedding generation is enabled.</p>
+                                    )}
+                                    {stage.name === 'Relationship Mapping' && (
+                                      <p>Relationship mapping was not performed for this document, likely because there were no images or chunks to link to products.</p>
+                                    )}
+                                    {stage.name === 'Document Entities' && (
+                                      <p>No document entities (certificates, logos, specifications) were detected in this document.</p>
+                                    )}
+                                    {stage.name === 'Metadata Extraction' && (
+                                      <p>No factory metadata or product-level metadata was extracted from this document.</p>
+                                    )}
+                                    {!['Text Embeddings', 'CLIP Embeddings', 'Relationship Mapping', 'Document Entities', 'Metadata Extraction'].includes(stage.name) && (
+                                      <p>This stage was not applicable or required for this particular document processing job.</p>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           )}
