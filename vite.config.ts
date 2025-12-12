@@ -20,35 +20,17 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
-
-      // Supabase environment variables
-      'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL),
-      'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-      'process.env.NEXT_PUBLIC_SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL),
-      'process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-
+      // Supabase environment variables (as set in Vercel)
+      'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL),
+      'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY),
       // MIVAA environment variables
-      'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL || env.NEXT_PUBLIC_MIVAA_GATEWAY_URL),
+      'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
       'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
-      'process.env.NEXT_PUBLIC_MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL || env.NEXT_PUBLIC_MIVAA_GATEWAY_URL),
-
-      // WebSocket URL
-      'process.env.WS_URL': JSON.stringify(env.WS_URL || env.NEXT_PUBLIC_WS_URL),
-      'process.env.NEXT_PUBLIC_WS_URL': JSON.stringify(env.WS_URL || env.NEXT_PUBLIC_WS_URL),
-
-      // AI API Keys (mapped from your existing Vercel environment variables)
-      'process.env.OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY || env.OPENAI_API_KEY),
-      'process.env.HUGGINGFACE_API_TOKEN': JSON.stringify(env.VITE_HUGGINGFACE_API_KEY || env.HUGGINGFACE_API_TOKEN),
-      'process.env.REPLICATE_API_TOKEN': JSON.stringify(env.VITE_REPLICATE_API_KEY || env.REPLICATE_API_TOKEN),
-
-      // Stripe Keys
-      'process.env.STRIPE_PUBLIC_KEY': JSON.stringify(env.VITE_STRIPE_PUBLIC_KEY),
-      'process.env.STRIPE_CREDITS_100_PRICE_ID': JSON.stringify(env.VITE_STRIPE_CREDITS_100_PRICE_ID),
-      'process.env.STRIPE_CREDITS_500_PRICE_ID': JSON.stringify(env.VITE_STRIPE_CREDITS_500_PRICE_ID),
-      'process.env.STRIPE_CREDITS_1000_PRICE_ID': JSON.stringify(env.VITE_STRIPE_CREDITS_1000_PRICE_ID),
-      'process.env.STRIPE_CREDITS_5000_PRICE_ID': JSON.stringify(env.VITE_STRIPE_CREDITS_5000_PRICE_ID),
-      'process.env.STRIPE_PRO_PRICE_ID': JSON.stringify(env.VITE_STRIPE_PRO_PRICE_ID),
-      'process.env.STRIPE_ENTERPRISE_PRICE_ID': JSON.stringify(env.VITE_STRIPE_ENTERPRISE_PRICE_ID),
+      // AI API Keys
+      'process.env.VITE_OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
+      'process.env.OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
+      'process.env.HUGGINGFACE_API_TOKEN': JSON.stringify(env.HUGGINGFACE_API_TOKEN),
+      'process.env.REPLICATE_API_TOKEN': JSON.stringify(env.REPLICATE_API_TOKEN),
     },
     build: {
       rollupOptions: {
