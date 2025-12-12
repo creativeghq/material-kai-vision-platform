@@ -71,6 +71,7 @@ import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
 import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
 import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
+import Designer3DPage from './pages/Designer3DPage';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -158,6 +159,16 @@ const App = () => (
                   <AuthGuard>
                     <Layout>
                       <AnalyticsDashboard />
+                    </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/3d-designer"
+                element={
+                  <AuthGuard>
+                    <Layout>
+                      <Designer3DPage />
                     </Layout>
                   </AuthGuard>
                 }
