@@ -5,6 +5,7 @@ import React, { useRef, useEffect } from 'react';
 import { TransformControls as DreiTransformControls } from '@react-three/drei';
 import { useSceneStore } from '@/stores/sceneStore';
 import { useUIStore } from '@/stores/uiStore';
+import { applyAllConstraints } from '@/utils/constraints';
 import type { TransformControls as TransformControlsType } from 'three-stdlib';
 
 export const TransformControls: React.FC = () => {
@@ -34,9 +35,29 @@ export const TransformControls: React.FC = () => {
 
         // Update item position, rotation, or scale based on active tool
         if (activeTool === 'translate') {
+          const newPosition: [number, number, number] = [
+            object.position.x,
+            object.position.y,
+            object.position.z,
+          ];
+
+          // Apply constraints to prevent going through walls/floor/ceiling
+          const { room } = useSceneStore.getState();
+          const constraintResult = applyAllConstraints(newPosition, room, selectedItem);
+
+          // Update both the item and the mesh position
           updateItem(selectedItem.id, {
-            position: [object.position.x, object.position.y, object.position.z],
+            position: constraintResult.position,
           });
+
+          // If constrained, update the mesh to show the constrained position
+          if (constraintResult.constrained) {
+            object.position.set(
+              constraintResult.position[0],
+              constraintResult.position[1],
+              constraintResult.position[2]
+            );
+          }
         } else if (activeTool === 'rotate') {
           updateItem(selectedItem.id, {
             rotation: [object.rotation.x, object.rotation.y, object.rotation.z],

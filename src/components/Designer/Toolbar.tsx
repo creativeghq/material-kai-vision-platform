@@ -36,7 +36,7 @@ import { logger } from '@/services/logger.service';
 import { RoomSettingsModal } from './RoomSettingsModal';
 
 export const Toolbar: React.FC = () => {
-  const { activeTool, setActiveTool, togglePanel, panelVisibility } = useUIStore();
+  const { activeTool, setActiveTool, togglePanel, panelVisibility, cameraMode, setCameraMode } = useUIStore();
   const {
     settings,
     setSettings,
@@ -186,6 +186,20 @@ export const Toolbar: React.FC = () => {
 
       {/* View Options */}
       <div className="flex items-center gap-1">
+        {/* 2D/3D View Toggle */}
+        <Button
+          variant={cameraMode === 'topDown' ? 'default' : 'ghost'}
+          size="icon"
+          onClick={() => setCameraMode(cameraMode === 'topDown' ? 'orbit' : 'topDown')}
+          title={cameraMode === 'topDown' ? 'Switch to 3D View' : 'Switch to 2D Top-Down View'}
+        >
+          {cameraMode === 'topDown' ? (
+            <span className="text-xs font-bold">3D</span>
+          ) : (
+            <span className="text-xs font-bold">2D</span>
+          )}
+        </Button>
+
         <Button
           variant={settings.gridVisible ? 'default' : 'ghost'}
           size="icon"
