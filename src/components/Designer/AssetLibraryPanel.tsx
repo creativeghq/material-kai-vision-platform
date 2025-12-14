@@ -134,14 +134,16 @@ export const AssetLibraryPanel: React.FC = () => {
             >
               <div className="mb-2 aspect-square overflow-hidden rounded-md bg-muted">
                 <img
-                  src={asset.thumbnail}
+                  src={asset.thumbnail_url}
                   alt={asset.name}
                   className="h-full w-full object-cover"
                 />
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium leading-none">{asset.name}</p>
-                <p className="text-xs text-muted-foreground">{asset.dimensions}</p>
+                <p className="text-xs text-muted-foreground">
+                  {asset.dimensions.width}×{asset.dimensions.depth}×{asset.dimensions.height}m
+                </p>
               </div>
             </div>
           ))}
