@@ -44,7 +44,6 @@ import { MaterialScraperPage } from './components/Scraper/MaterialScraperPage';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import { UserProfilePage } from './pages/UserProfilePage';
 import HealthPage from './pages/Health';
-import { DesignerPage } from './pages/Designer/DesignerPage';
 import {
   CriticalErrorBoundary,
   PageErrorBoundary,
@@ -123,16 +122,7 @@ const App = () => (
                   </PageErrorBoundary>
                 }
               />
-              <Route
-                path="/designer"
-                element={
-                  <PageErrorBoundary name="3D Designer">
-                    <AuthGuard>
-                      <DesignerPage />
-                    </AuthGuard>
-                  </PageErrorBoundary>
-                }
-              />
+
               <Route
                 path="/recognition"
                 element={
