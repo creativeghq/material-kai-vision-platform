@@ -179,24 +179,30 @@ serve(async (req) => {
       .insert({
         user_id,
         workspace_id,
-        generation_name: `Interior Design: ${room_type || 'Room'}`,
-        generation_type: 'interior_design',
+        prompt,
+        room_type,
+        style,
         generation_status: 'processing',
-        input_data: { prompt, room_type, style, width, height, image_url },
         progress_percentage: 0,
-        // Create placeholder slots for each model
-        output_data: {
-          enhanced_prompt: enhancedPrompt,
-          has_reference_image: hasReferenceImage,
-          model_results: modelsToUse.map(m => ({
-            model_id: m.id,
-            model_name: m.name,
-            provider: m.provider,
-            capability: m.capability,
-            status: 'pending',
-            image_urls: [],
-          })),
-        },
+        workflow_status: 'generating',
+        request_type: hasReferenceImage ? 'image-to-image' : 'text-to-image',
+        // Store model queue and results
+        models_queue: modelsToUse.map(m => ({
+          id: m.id,
+          name: m.name,
+          provider: m.provider,
+          capability: m.capability,
+        })),
+        models_results: modelsToUse.map(m => ({
+          model_id: m.id,
+          model_name: m.name,
+          provider: m.provider,
+          capability: m.capability,
+          status: 'pending',
+          image_urls: [],
+        })),
+        input_images: hasReferenceImage ? { reference: image_url } : null,
+        style_preferences: { enhanced_prompt: enhancedPrompt },
       })
       .select()
       .single();
@@ -466,14 +472,13 @@ async function updateJobWithModelResult(jobId: string, modelId: string, imageUrl
   // Fetch current job data
   const { data: job } = await supabase
     .from('generation_3d')
-    .select('output_data')
+    .select('models_results')
     .eq('id', jobId)
     .single();
 
   if (!job) return;
 
-  const outputData = job.output_data as any;
-  const modelResults = outputData.model_results || [];
+  const modelResults = (job.models_results as any) || [];
 
   // Update the specific model's result
   const updatedResults = modelResults.map((m: any) => {
@@ -492,9 +497,8 @@ async function updateJobWithModelResult(jobId: string, modelId: string, imageUrl
   await supabase
     .from('generation_3d')
     .update({
-      output_data: { ...outputData, model_results: updatedResults },
+      models_results: updatedResults,
       progress_percentage: progress,
-      updated_at: new Date().toISOString(),
     })
     .eq('id', jobId);
 }
@@ -503,14 +507,13 @@ async function updateJobWithModelError(jobId: string, modelId: string, error: st
   // Fetch current job data
   const { data: job } = await supabase
     .from('generation_3d')
-    .select('output_data')
+    .select('models_results')
     .eq('id', jobId)
     .single();
 
   if (!job) return;
 
-  const outputData = job.output_data as any;
-  const modelResults = outputData.model_results || [];
+  const modelResults = (job.models_results as any) || [];
 
   // Update the specific model's result with error
   const updatedResults = modelResults.map((m: any) => {
@@ -529,8 +532,7 @@ async function updateJobWithModelError(jobId: string, modelId: string, error: st
   await supabase
     .from('generation_3d')
     .update({
-      output_data: { ...outputData, model_results: updatedResults },
-      updated_at: new Date().toISOString(),
+      models_results: updatedResults,
     })
     .eq('id', jobId);
 }
