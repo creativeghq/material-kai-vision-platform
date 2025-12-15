@@ -175,7 +175,7 @@ serve(async (req) => {
 
     // Create job record with placeholder images
     const { data: job, error: jobError } = await supabase
-      .from('material_agent_3d_generations')
+      .from('generation_3d')
       .insert({
         user_id,
         workspace_id,
@@ -281,7 +281,7 @@ async function processModelsInBackground(
 
   // Mark job as completed
   await supabase
-    .from('material_agent_3d_generations')
+    .from('generation_3d')
     .update({
       generation_status: 'completed',
       progress_percentage: 100,
@@ -394,14 +394,14 @@ async function generateWithReplicate(
 
   // Extract image URL
   const imageUrls = Array.isArray(result.output) ? result.output : [result.output];
-  const imageUrl = imageUrls[0];
+  const generatedImageUrl = imageUrls[0];
 
-  if (!imageUrl) {
+  if (!generatedImageUrl) {
     throw new Error('No image URL in response');
   }
 
   console.log(`✅ Replicate: ${model.name} completed`);
-  return imageUrl;
+  return generatedImageUrl;
 }
 
 // Hugging Face API implementation
@@ -464,7 +464,7 @@ async function generateWithHuggingFace(
 async function updateJobWithModelResult(jobId: string, modelId: string, imageUrl: string, progress: number) {
   // Fetch current job data
   const { data: job } = await supabase
-    .from('material_agent_3d_generations')
+    .from('generation_3d')
     .select('output_data')
     .eq('id', jobId)
     .single();
@@ -489,7 +489,7 @@ async function updateJobWithModelResult(jobId: string, modelId: string, imageUrl
 
   // Update job
   await supabase
-    .from('material_agent_3d_generations')
+    .from('generation_3d')
     .update({
       output_data: { ...outputData, model_results: updatedResults },
       progress_percentage: progress,
@@ -501,7 +501,7 @@ async function updateJobWithModelResult(jobId: string, modelId: string, imageUrl
 async function updateJobWithModelError(jobId: string, modelId: string, error: string) {
   // Fetch current job data
   const { data: job } = await supabase
-    .from('material_agent_3d_generations')
+    .from('generation_3d')
     .select('output_data')
     .eq('id', jobId)
     .single();
@@ -526,7 +526,7 @@ async function updateJobWithModelError(jobId: string, modelId: string, error: st
 
   // Update job
   await supabase
-    .from('material_agent_3d_generations')
+    .from('generation_3d')
     .update({
       output_data: { ...outputData, model_results: updatedResults },
       updated_at: new Date().toISOString(),
