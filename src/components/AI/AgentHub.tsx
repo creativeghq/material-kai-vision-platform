@@ -440,6 +440,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
 
         console.log('🚀 Calling agent-chat edge function...');
+        console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
         const response = await fetch(
           `${supabaseUrl}/functions/v1/agent-chat`,
           {
