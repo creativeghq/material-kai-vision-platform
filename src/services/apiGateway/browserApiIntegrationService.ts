@@ -8,6 +8,7 @@
 
 import { browserApiClientFactory } from './browserApiClientFactory';
 import type { StandardizedApiResponse } from './standardizedApiClient';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Common parameter types for different API operations
@@ -230,8 +231,7 @@ export class BrowserApiIntegrationService {
   }
 
   /**
-   * Interior design generation using the best available model
-   * @deprecated This method is deprecated and will be removed. AI-powered image generation has been removed from the platform.
+   * Interior design generation using Supabase Edge Function (calls Replicate API server-side)
    */
   public async generateInteriorDesign(params: {
     prompt: string;
@@ -240,20 +240,61 @@ export class BrowserApiIntegrationService {
     width?: number;
     height?: number;
   }): Promise<StandardizedApiResponse> {
-    console.warn('⚠️ generateInteriorDesign is deprecated and will be removed');
-    return {
-      success: false,
-      error: {
-        message: 'AI-powered image generation has been removed from the platform',
-        code: 'FEATURE_REMOVED',
-        retryable: false,
-      },
-      metadata: {
-        apiType: 'interior-design',
-        timestamp: new Date().toISOString(),
-        requestId: crypto.randomUUID(),
-      },
-    };
+    try {
+      console.log('🎨 Starting interior design generation via Supabase Edge Function...');
+
+      // Call Supabase Edge Function
+      const { data, error } = await supabase.functions.invoke('generate-interior-design', {
+        body: {
+          prompt: params.prompt,
+          room_type: params.roomType,
+          style: params.style,
+          width: params.width || 768,
+          height: params.height || 768,
+        },
+      });
+
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
+      }
+
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Image generation failed');
+      }
+
+      console.log('✅ Image generation completed:', data);
+
+      return {
+        success: true,
+        data: {
+          image_urls: data.image_urls,
+          image_url: data.image_urls[0],
+          prediction_id: data.prediction_id,
+          processing_time_ms: data.processing_time_ms,
+        },
+        metadata: {
+          apiType: 'replicate',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
+      };
+    } catch (error) {
+      console.error('❌ Interior design generation failed:', error);
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Failed to generate interior design',
+          code: 'GENERATION_FAILED',
+          details: error instanceof Error ? { stack: error.stack } : undefined,
+          retryable: true,
+        },
+        metadata: {
+          apiType: 'replicate',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
+      };
+    }
   }
 
   /**

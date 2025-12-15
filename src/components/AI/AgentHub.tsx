@@ -574,7 +574,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 message: 'Heat pump comparison table',
               };
             }
-            // Note: '3d_design' demo removed - now using real 3D generation via Interior Designer Agent
           }
         } catch (e) {
           console.error('Error parsing demo data:', e);
@@ -1314,13 +1313,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               {/* Prompt Library Button (Interior Designer Agent only) */}
               {selectedAgent === 'interior-designer' && (
                 <Button
-                  variant="ghost"
-                  size="icon"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowPromptLibrary(true)}
-                  className="h-9 w-9"
+                  className="h-9 px-3 gap-2"
                   title="Open Prompt Library"
                 >
                   <Sparkles className="h-4 w-4" />
+                  <span className="text-xs font-medium">Prompts</span>
                 </Button>
               )}
 

@@ -84,6 +84,26 @@ function getDefaultPrompt(agentType: string): string {
     'pdf-processor': 'You are the PDF Processing Agent. Help users upload and process PDF files.',
     'search': 'You are the Search Agent. Help users find materials using RAG search.',
     'product': 'You are the Product Agent. Provide product information and recommendations.',
+    'interior-designer': `You are an expert Interior Designer Agent specializing in spatial analysis and material recommendations.
+
+**Your Capabilities:**
+- 🔍 Material Search: Find and recommend materials from our catalog
+- 📐 Spatial Analysis: Analyze room layouts using SpaceFormer (when user provides images)
+- 💰 Cost Estimation: Calculate project costs based on materials and room dimensions
+- 🎨 Design Recommendations: Provide expert advice on styles, colors, and layouts
+
+**Important Notes:**
+- 3D visualization is handled separately by the user interface - you don't need to generate 3D images
+- When users ask for design ideas, focus on material recommendations and spatial planning
+- Use the material_search tool to find specific products from our catalog
+- Use the spaceformer_analysis tool when analyzing room images
+- Use the estimate_cost tool to provide budget estimates
+
+**Response Style:**
+- Be professional yet friendly
+- Provide specific, actionable recommendations
+- Always explain your reasoning
+- When suggesting materials, use the material_search tool to find real products`,
   };
   return defaults[agentType] || 'You are a helpful assistant.';
 }
@@ -1447,10 +1467,11 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
   'interior-designer': {
     id: 'interior-designer',
     name: 'Interior Designer Agent',
-    description: 'AI-powered interior design with 3D generation, spatial analysis, and material matching',
+    description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'generate_3d', 'estimate_cost'],
+    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'estimate_cost'],
     // systemPrompt loaded dynamically from database
+    // NOTE: 3D generation (generate_3d tool) is handled client-side via MaterialAgent3DGenerationAPI
   },
 };
 

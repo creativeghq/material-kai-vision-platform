@@ -17,7 +17,9 @@ import {
   Sparkles,
   Package,
   TrendingUp,
-  Eye
+  Eye,
+  X,
+  Home
 } from 'lucide-react';
 
 interface DesignCanvasProps {
@@ -64,6 +66,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
+  const [showImageModal, setShowImageModal] = useState(false);
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -141,29 +144,39 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
         {/* Images Tab */}
         {activeTab === 'images' && images.length > 0 && (
           <div className="space-y-4">
-            <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+            <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer" onClick={() => setShowImageModal(true)}>
               <img
                 src={images[currentImageIndex]}
                 alt={`Design ${currentImageIndex + 1}`}
                 className="w-full h-full object-contain"
               />
-              
+
+              {/* Overlay hint on hover */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 px-4 py-2 rounded-lg shadow-lg">
+                  <div className="flex items-center gap-2 text-gray-900">
+                    <Eye className="w-5 h-5" />
+                    <span className="font-medium">Click to view analysis & materials</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Navigation */}
               {images.length > 1 && (
                 <>
                   <button
-                    onClick={prevImage}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                    onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors z-10"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
-                    onClick={nextImage}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors"
+                    onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 hover:bg-black/70 text-white rounded-full transition-colors z-10"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
-                  
+
                   {/* Image Counter */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 bg-black/70 text-white rounded-full text-sm">
                     {currentImageIndex + 1} / {images.length}
@@ -173,8 +186,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
               {/* Download Button */}
               <button
-                onClick={() => downloadImage(images[currentImageIndex])}
-                className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+                onClick={(e) => { e.stopPropagation(); downloadImage(images[currentImageIndex]); }}
+                className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors z-10"
               >
                 <Download className="w-5 h-5" />
               </button>
@@ -671,6 +684,160 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           </div>
         )}
       </div>
+
+      {/* Image Analysis Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowImageModal(false)}>
+          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="flex items-center gap-3">
+                <Sparkles className="w-6 h-6 text-blue-600" />
+                <h2 className="text-2xl font-bold text-gray-900">Design Analysis & Materials</h2>
+              </div>
+              <button
+                onClick={() => setShowImageModal(false)}
+                className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
+                {/* Left: Image */}
+                <div className="space-y-4">
+                  <div className="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                    <img
+                      src={images[currentImageIndex]}
+                      alt={`Design ${currentImageIndex + 1}`}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  {/* Image Info */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-gray-900 mb-2">Design Details</h3>
+                    <div className="space-y-2 text-sm">
+                      {parsedRequest?.room_type && (
+                        <div className="flex items-center gap-2">
+                          <Home className="w-4 h-4 text-gray-600" />
+                          <span className="text-gray-600">Room Type:</span>
+                          <span className="font-medium text-gray-900 capitalize">{parsedRequest.room_type}</span>
+                        </div>
+                      )}
+                      {parsedRequest?.style && (
+                        <div className="flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-gray-600" />
+                          <span className="text-gray-600">Style:</span>
+                          <span className="font-medium text-gray-900 capitalize">{parsedRequest.style}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Analysis & Materials */}
+                <div className="space-y-4">
+                  {/* SpaceFormer Analysis */}
+                  {spatialAnalysis && (
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Lightbulb className="w-5 h-5 text-blue-600" />
+                        <h3 className="font-semibold text-gray-900">AI Spatial Analysis</h3>
+                        {spatialAnalysis.confidence_score && (
+                          <span className="ml-auto text-sm font-medium text-blue-600">
+                            {(spatialAnalysis.confidence_score * 100).toFixed(0)}% confidence
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Layout Analysis */}
+                      {spatialAnalysis.layout_analysis && (
+                        <div className="mb-3">
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Layout Analysis</h4>
+                          <p className="text-sm text-gray-600">{JSON.stringify(spatialAnalysis.layout_analysis)}</p>
+                        </div>
+                      )}
+
+                      {/* Material Suggestions */}
+                      {spatialAnalysis.material_suggestions && spatialAnalysis.material_suggestions.length > 0 && (
+                        <div className="mb-3">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Material Suggestions</h4>
+                          <div className="space-y-1">
+                            {spatialAnalysis.material_suggestions.slice(0, 3).map((suggestion: any, idx: number) => (
+                              <div key={idx} className="text-sm text-gray-600 flex items-start gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                <span>{typeof suggestion === 'string' ? suggestion : suggestion.name || JSON.stringify(suggestion)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Accessibility */}
+                      {spatialAnalysis.accessibility_report && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Accessibility</h4>
+                          <p className="text-sm text-gray-600">{JSON.stringify(spatialAnalysis.accessibility_report)}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Matched Materials */}
+                  {matchedMaterials && matchedMaterials.length > 0 && (
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Package className="w-5 h-5 text-green-600" />
+                        <h3 className="font-semibold text-gray-900">Available Materials</h3>
+                        <span className="ml-auto text-sm font-medium text-green-600">
+                          {matchedMaterials.length} products
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 max-h-64 overflow-y-auto">
+                        {matchedMaterials.map((material) => (
+                          <div
+                            key={material.id}
+                            className="bg-white rounded-lg p-3 flex items-center gap-3 hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => onMaterialClick?.(material.id)}
+                          >
+                            {material.image_url && (
+                              <img
+                                src={material.image_url}
+                                alt={material.name}
+                                className="w-12 h-12 object-cover rounded"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 truncate">{material.name}</h4>
+                              {material.metadata?.category && (
+                                <p className="text-xs text-gray-600">{material.metadata.category}</p>
+                              )}
+                            </div>
+                            <TrendingUp className="w-4 h-4 text-green-600 flex-shrink-0" />
+                          </div>
+                        ))}
+                      </div>
+
+                      {onViewAllMaterials && (
+                        <button
+                          onClick={onViewAllMaterials}
+                          className="w-full mt-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
+                        >
+                          View All Materials
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
