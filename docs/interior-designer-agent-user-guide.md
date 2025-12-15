@@ -241,7 +241,6 @@ Click the **✨ Sparkles button** in the input area to open the Prompt Library:
 ## Support
 
 Need help?
-- Check the [Testing Guide](./interior-designer-agent-testing.md) for technical details
 - Contact support at support@materialshub.gr
 - Join our community forum for tips and inspiration
 

@@ -1145,8 +1145,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           }}
                           onFindMaterials={async (imageUrl) => {
                             console.log('🔍 Find Materials clicked for image:', imageUrl);
-                            // Send a message to the agent to search for materials in this image
-                            const findMaterialsPrompt = `Analyze this interior design image and find matching materials from our catalog: ${imageUrl}`;
+                            // Send a clear message that triggers material_search tool
+                            // Use explicit keywords that match the system prompt conditions
+                            const findMaterialsPrompt = `Find materials and products that match this interior design image: ${imageUrl}`;
                             setInput(findMaterialsPrompt);
                             // Wait for input to be set, then send
                             setTimeout(async () => {
