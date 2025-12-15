@@ -40,6 +40,22 @@ body {
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--background));
 }
 
+/* Fade-in animation for progressive image loading */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here.
 All colors MUST be HSL.
 */

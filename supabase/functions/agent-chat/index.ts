@@ -1608,9 +1608,15 @@ async function executeAgent(
   const tools: any[] = [];
 
   // DYNAMIC TOOL INJECTION: Only add material_search if user explicitly asks for it
+  console.log(`🔧 Tool injection starting for agent: ${agentId}`);
+  console.log(`📝 User input: "${userInput}"`);
+
   const userInputLower = userInput.toLowerCase();
   const materialSearchKeywords = ['find materials', 'search for materials', 'show me products', 'what materials', 'matching materials', 'search materials'];
   const shouldEnableMaterialSearch = materialSearchKeywords.some(keyword => userInputLower.includes(keyword));
+
+  console.log(`🔍 Should enable material search: ${shouldEnableMaterialSearch}`);
+  console.log(`🛠️ Agent tools config: ${JSON.stringify(config.tools)}`);
 
   if (config.tools.includes('material_search')) {
     // For Interior Designer: Only add tool if user explicitly asks
@@ -1623,6 +1629,7 @@ async function executeAgent(
       }
     } else {
       // For other agents: Always add the tool
+      console.log(`✅ Material search enabled for ${agentId} (always available)`);
       tools.push(createSearchTool(workspaceId));
     }
   }
@@ -1677,13 +1684,18 @@ async function executeAgent(
     console.log(`🔄 Current messages count: ${currentMessages.length}`);
     console.log(`🔄 ========================================`);
 
-    // Send iteration status via streaming
-    onChunk?.({
-      type: 'iteration',
-      iteration,
-      maxIterations,
-      message: `Processing step ${iteration}/${maxIterations}...`
-    });
+    // Send iteration status via streaming (wrapped in try-catch)
+    try {
+      onChunk?.({
+        type: 'iteration',
+        iteration,
+        maxIterations,
+        message: `Processing step ${iteration}/${maxIterations}...`
+      });
+    } catch (e) {
+      // Stream closed - continue execution but don't send chunks
+      console.log('⚠️ Stream closed, continuing without streaming');
+    }
 
     // Invoke model with current messages
     console.log(`🤖 Calling Claude API...`);
@@ -1694,12 +1706,16 @@ async function executeAgent(
     const invokeElapsed = Date.now() - invokeStartTime;
     console.log(`✅ Claude API responded in ${invokeElapsed}ms`);
 
-    // Send Claude's response via streaming
-    onChunk?.({
-      type: 'assistant_thinking',
-      content: response.content,
-      hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
-    });
+    // Send Claude's response via streaming (wrapped in try-catch)
+    try {
+      onChunk?.({
+        type: 'assistant_thinking',
+        content: response.content,
+        hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
+      });
+    } catch (e) {
+      // Stream closed - continue
+    }
 
     // Add assistant response to messages
     currentMessages.push({
@@ -1745,13 +1761,17 @@ async function executeAgent(
       console.log(`  📞 Tool: ${toolCall.name}`);
       console.log(`  📞 Args:`, JSON.stringify(toolCall.args, null, 2));
 
-      // Send tool call status via streaming
-      onChunk?.({
-        type: 'tool_call',
-        tool: toolCall.name,
-        args: toolCall.args,
-        message: `Calling ${toolCall.name}...`
-      });
+      // Send tool call status via streaming (wrapped in try-catch)
+      try {
+        onChunk?.({
+          type: 'tool_call',
+          tool: toolCall.name,
+          args: toolCall.args,
+          message: `Calling ${toolCall.name}...`
+        });
+      } catch (e) {
+        // Stream closed - continue
+      }
 
       try {
         // Find the tool
@@ -1767,13 +1787,17 @@ async function executeAgent(
         const toolElapsed = Date.now() - toolStartTime;
         console.log(`  ✅ ${toolCall.name} completed in ${toolElapsed}ms (${(toolElapsed / 1000).toFixed(2)}s)`);
 
-        // Send tool result via streaming
-        onChunk?.({
-          type: 'tool_result',
-          tool: toolCall.name,
-          result: toolResult,
-          message: `${toolCall.name} completed`
-        });
+        // Send tool result via streaming (wrapped in try-catch)
+        try {
+          onChunk?.({
+            type: 'tool_result',
+            tool: toolCall.name,
+            result: toolResult,
+            message: `${toolCall.name} completed`
+          });
+        } catch (e) {
+          // Stream closed - continue
+        }
 
         // Capture search results for materialResults
         if (toolCall.name === 'material_search') {
@@ -1829,13 +1853,17 @@ async function executeAgent(
       } catch (error) {
         console.error(`  ❌ Tool ${toolCall.name} failed:`, error);
 
-        // Send tool error via streaming
-        onChunk?.({
-          type: 'tool_error',
-          tool: toolCall.name,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          message: `${toolCall.name} failed`
-        });
+        // Send tool error via streaming (wrapped in try-catch)
+        try {
+          onChunk?.({
+            type: 'tool_error',
+            tool: toolCall.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            message: `${toolCall.name} failed`
+          });
+        } catch (e) {
+          // Stream closed - continue
+        }
 
         // Add error result to messages
         currentMessages.push({
@@ -2095,14 +2123,13 @@ After uploading, monitor the processing job and verify completion.`;
               // Streaming callback
               (chunk) => {
                 if (streamClosed) {
-                  console.warn('⚠️ Stream already closed, skipping chunk:', chunk.type);
+                  // Silently skip - stream is closed
                   return;
                 }
                 try {
-                  console.log('📨 Streaming callback received chunk:', chunk.type);
                   controller.enqueue(JSON.stringify(chunk) + '\n');
                 } catch (enqueueError) {
-                  console.warn('⚠️ Failed to enqueue chunk (stream may be closed):', enqueueError);
+                  // Stream closed - mark it and stop trying to send
                   streamClosed = true;
                 }
               }
