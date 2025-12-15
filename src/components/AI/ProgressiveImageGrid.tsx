@@ -56,7 +56,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     const pollJob = async () => {
       const { data, error } = await supabase
         .from('generation_3d')
-        .select('models_results, progress_percentage, generation_status')
+        .select('metadata, progress_percentage, generation_status')
         .eq('id', jobId)
         .single();
 
@@ -66,7 +66,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
       }
 
       if (data) {
-        const newResults = (data.models_results as any) || [];
+        // Extract models_results from metadata JSONB field
+        const metadata = data.metadata as any;
+        const newResults = metadata?.models_results || [];
 
         // Only update if there are actual changes
         setModelResults(prev => {

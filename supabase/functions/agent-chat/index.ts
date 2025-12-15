@@ -419,64 +419,72 @@ const createSpaceformerTool = (workspaceId: string) => {
 };
 
 /**
- * LangChain Tool: 3D Interior Design Generation (Async)
+ * LangChain Tool: Interior Design Generation
  *
- * Triggers async generation and returns job ID + grid structure immediately
- * Frontend polls the job for real-time updates
+ * Calls MIVAA API to create generation job
+ * Frontend polls database for real-time updates
  */
-const create3DGenerationTool = (userId: string, workspaceId: string) => {
+const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (chunk: any) => void) => {
   return tool(
-    async ({ prompt, roomType, style, referenceImageUrl }) => {
+    async ({ prompt, roomType, style, referenceImageUrl, models }) => {
       try {
-        console.log('🎨 Starting async 3D interior design generation...');
+        console.log('🎨 Starting interior design generation...');
 
-        // Call the async generation edge function
-        const { data, error } = await supabase.functions.invoke('generate-interior-design-async', {
-          body: {
-            user_id: userId,
-            workspace_id: workspaceId,
+        // Call MIVAA API to create job
+        const response = await fetch('http://localhost:8000/api/interior', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             prompt,
             room_type: roomType,
             style,
-            image_url: referenceImageUrl,
+            image: referenceImageUrl,
+            models: models || undefined, // undefined = all models
+            user_id: userId,
+            workspace_id: workspaceId,
             width: 768,
             height: 768,
-          },
+          }),
         });
 
-        if (error) {
-          throw new Error(`3D generation failed: ${error.message}`);
+        if (!response.ok) {
+          throw new Error(`MIVAA API error: ${response.statusText}`);
         }
 
-        console.log('✅ Async generation job created:', data);
+        const result = await response.json();
 
-        // Return job info immediately - frontend will poll for updates
+        if (!result.success) {
+          throw new Error(result.error || 'Generation failed');
+        }
+
+        console.log('✅ Generation job created:', result);
+
+        // Return job info for frontend polling
         return JSON.stringify({
           success: true,
           async_job: true,
-          job_id: data.job_id,
-          model_count: data.model_count,
-          models: data.models,
-          estimated_time_minutes: data.estimated_time_minutes,
-          message: `Started generating ${data.model_count} interior design variations. This will take approximately ${data.estimated_time_minutes} minutes.`,
-          frontend_action: 'SHOW_PROGRESSIVE_GRID', // Signal to frontend to show the grid
+          job_id: result.job_id,
+          model_count: result.model_count,
+          models: result.models,
+          message: result.message,
         });
       } catch (error) {
-        console.error('3D generation tool error:', error);
+        console.error('Interior design generation error:', error);
         return JSON.stringify({
           success: false,
-          error: error instanceof Error ? error.message : '3D generation failed',
+          error: error instanceof Error ? error.message : 'Generation failed',
         });
       }
     },
     {
       name: 'generate_3d',
-      description: 'Generate 3D interior design images using AI models. Supports text-to-image and image-to-image generation with 10 different AI models. Can match materials from the catalog and provide quality assessments.',
+      description: 'Generate interior design images using multiple AI models. Creates async job that frontend polls for updates. Supports text-to-image and image-to-image generation.',
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
         style: z.string().optional().describe('Design style (modern, minimalist, industrial, scandinavian, traditional, etc.)'),
         referenceImageUrl: z.string().optional().describe('Reference image URL for image-to-image generation'),
+        models: z.array(z.string()).optional().describe('Specific model IDs to use (e.g., ["flux-dev", "sdxl"]), or omit to use all 7 models'),
       }),
     }
   );
@@ -1669,9 +1677,9 @@ async function executeAgent(
   if (config.tools.includes('spaceformer_analysis')) {
     tools.push(createSpaceformerTool(workspaceId));
   }
-  // Async 3D generation tool - returns job ID immediately for frontend polling
+  // Interior design generation with streaming progress
   if (config.tools.includes('generate_3d')) {
-    tools.push(create3DGenerationTool(userId, workspaceId));
+    tools.push(create3DGenerationTool(userId, workspaceId, onChunk));
   }
   if (config.tools.includes('estimate_cost')) {
     tools.push(createCostEstimationTool(workspaceId));
