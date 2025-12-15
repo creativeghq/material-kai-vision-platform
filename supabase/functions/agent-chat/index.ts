@@ -167,26 +167,53 @@ const createSearchTool = (workspaceId: string) => {
         url.searchParams.set('strategy', strategy);
 
         console.log(`🔍 Material search: query="${query}", strategy="${strategy}", workspace="${workspaceId}"`);
+        const startTime = Date.now();
 
-        const response = await fetch(url.toString(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            workspace_id: workspaceId,
-            top_k: limit,
-          }),
-        });
+        // Add timeout to prevent edge function from hanging
+        // Set timeout to 300 seconds (5 minutes) to leave buffer for edge function (400s limit)
+        const TIMEOUT_MS = 300000; // 5 minutes
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ MIVAA API error: ${response.status} - ${errorText}`);
-          throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          const response = await fetch(url.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query,
+              workspace_id: workspaceId,
+              top_k: limit,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ MIVAA API responded in ${elapsed}ms`);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ MIVAA API error: ${response.status} - ${errorText}`);
+            throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log(`✅ Search returned ${data.results?.length || 0} results`);
+          return JSON.stringify(data);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            const elapsed = Date.now() - startTime;
+            console.error(`⏱️ MIVAA API timeout after ${elapsed}ms (limit: ${TIMEOUT_MS}ms)`);
+            return JSON.stringify({
+              error: `Search timeout - MIVAA API took longer than ${TIMEOUT_MS / 1000} seconds. Please try a simpler query or contact support.`,
+              timeout: true,
+            });
+          }
+          throw fetchError;
         }
-
-        const data = await response.json();
-        console.log(`✅ Search returned ${data.results?.length || 0} results`);
-        return JSON.stringify(data);
       } catch (error) {
         console.error('Material search error:', error);
         return JSON.stringify({
@@ -213,29 +240,59 @@ const createImageAnalysisTool = (workspaceId: string) => {
     async ({ imageUrl, analysisType = 'material_recognition' }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_url: imageUrl,
-            analysis_type: analysisType,
-            workspace_id: workspaceId,
-          }),
-        });
 
-        if (!response.ok) {
-          throw new Error(`Image analysis failed: ${response.statusText}`);
+        console.log(`🖼️ Image analysis: type="${analysisType}"`);
+        const startTime = Date.now();
+
+        // Add timeout to prevent edge function from hanging
+        const TIMEOUT_MS = 180000; // 3 minutes (image analysis is usually faster)
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image_url: imageUrl,
+              analysis_type: analysisType,
+              workspace_id: workspaceId,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ Image analysis API responded in ${elapsed}ms`);
+
+          if (!response.ok) {
+            throw new Error(`Image analysis failed: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          return JSON.stringify({
+            success: true,
+            analysis: data.analysis || {},
+            materials: data.materials || [],
+          });
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            const elapsed = Date.now() - startTime;
+            console.error(`⏱️ Image analysis timeout after ${elapsed}ms (limit: ${TIMEOUT_MS}ms)`);
+            return JSON.stringify({
+              success: false,
+              error: `Image analysis timeout - took longer than ${TIMEOUT_MS / 1000} seconds. Please try again with a smaller image.`,
+              timeout: true,
+            });
+          }
+          throw fetchError;
         }
-
-        const data = await response.json();
-
-        return JSON.stringify({
-          success: true,
-          analysis: data.analysis || {},
-          materials: data.materials || [],
-        });
       } catch (error) {
         console.error('Image analysis tool error:', error);
         return JSON.stringify({
@@ -266,34 +323,65 @@ const createSpaceformerTool = (workspaceId: string) => {
     async ({ imageUrl, roomType, analysisType = 'full' }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-        const response = await fetch(`${MIVAA_GATEWAY_URL}/api/spaceformer/analyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_url: imageUrl,
-            room_type: roomType,
-            analysis_type: analysisType,
-            workspace_id: workspaceId,
-          }),
-        });
 
-        if (!response.ok) {
-          throw new Error(`Spaceformer analysis failed: ${response.statusText}`);
+        console.log(`🏠 Spaceformer analysis: room="${roomType}", type="${analysisType}"`);
+        const startTime = Date.now();
+
+        // Add timeout to prevent edge function from hanging
+        // Spaceformer can take a long time for complex analysis
+        const TIMEOUT_MS = 300000; // 5 minutes
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          const response = await fetch(`${MIVAA_GATEWAY_URL}/api/spaceformer/analyze`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              image_url: imageUrl,
+              room_type: roomType,
+              analysis_type: analysisType,
+              workspace_id: workspaceId,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ Spaceformer API responded in ${elapsed}ms`);
+
+          if (!response.ok) {
+            throw new Error(`Spaceformer analysis failed: ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          return JSON.stringify({
+            success: true,
+            analysis_id: data.analysis_id,
+            room_type: data.room_type,
+            layout_analysis: data.layout_analysis || {},
+            material_suggestions: data.material_suggestions || [],
+            accessibility_report: data.accessibility_report || {},
+            spatial_metrics: data.spatial_metrics || {},
+          });
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            const elapsed = Date.now() - startTime;
+            console.error(`⏱️ Spaceformer timeout after ${elapsed}ms (limit: ${TIMEOUT_MS}ms)`);
+            return JSON.stringify({
+              success: false,
+              error: `Spatial analysis timeout - Spaceformer took longer than ${TIMEOUT_MS / 1000} seconds. Please try again or use a simpler analysis type.`,
+              timeout: true,
+            });
+          }
+          throw fetchError;
         }
-
-        const data = await response.json();
-
-        return JSON.stringify({
-          success: true,
-          analysis_id: data.analysis_id,
-          room_type: data.room_type,
-          layout_analysis: data.layout_analysis || {},
-          material_suggestions: data.material_suggestions || [],
-          accessibility_report: data.accessibility_report || {},
-          spatial_metrics: data.spatial_metrics || {},
-        });
       } catch (error) {
         console.error('Spaceformer tool error:', error);
         return JSON.stringify({
@@ -1553,7 +1641,10 @@ async function executeAgent(
 
   while (iteration < maxIterations) {
     iteration++;
+    console.log(`🔄 ========================================`);
     console.log(`🔄 Agent iteration ${iteration}/${maxIterations}`);
+    console.log(`🔄 Current messages count: ${currentMessages.length}`);
+    console.log(`🔄 ========================================`);
 
     // Send iteration status via streaming
     onChunk?.({
@@ -1564,9 +1655,13 @@ async function executeAgent(
     });
 
     // Invoke model with current messages
+    console.log(`🤖 Calling Claude API...`);
+    const invokeStartTime = Date.now();
     const response = await modelWithTools.invoke(currentMessages, {
       system: systemPrompt,
     });
+    const invokeElapsed = Date.now() - invokeStartTime;
+    console.log(`✅ Claude API responded in ${invokeElapsed}ms`);
 
     // Send Claude's response via streaming
     onChunk?.({
@@ -1611,10 +1706,13 @@ async function executeAgent(
     }
 
     // Execute tool calls
+    console.log(`🔧 ========================================`);
     console.log(`🔧 Executing ${response.tool_calls.length} tool call(s)`);
+    console.log(`🔧 ========================================`);
 
     for (const toolCall of response.tool_calls) {
-      console.log(`  📞 Calling tool: ${toolCall.name}`);
+      console.log(`  📞 Tool: ${toolCall.name}`);
+      console.log(`  📞 Args:`, JSON.stringify(toolCall.args, null, 2));
 
       // Send tool call status via streaming
       onChunk?.({
@@ -1632,8 +1730,11 @@ async function executeAgent(
         }
 
         // Execute the tool
+        console.log(`  ⏳ Executing ${toolCall.name}...`);
+        const toolStartTime = Date.now();
         const toolResult = await tool.invoke(toolCall.args);
-        console.log(`  ✅ Tool ${toolCall.name} completed`);
+        const toolElapsed = Date.now() - toolStartTime;
+        console.log(`  ✅ ${toolCall.name} completed in ${toolElapsed}ms (${(toolElapsed / 1000).toFixed(2)}s)`);
 
         // Send tool result via streaming
         onChunk?.({
@@ -1903,6 +2004,12 @@ After uploading, monitor the processing job and verify completion.`;
 
     // Execute agent with STREAMING
     console.log('🚀 Creating ReadableStream for agent execution...');
+    console.log('📋 Agent:', agentId);
+    console.log('📋 Workspace:', workspaceId);
+    console.log('📋 User:', user.id);
+    console.log('📋 Message count:', messages.length);
+    console.log('📋 User input:', userInput.substring(0, 100) + (userInput.length > 100 ? '...' : ''));
+
     const stream = new ReadableStream({
       async start(controller) {
         console.log('🎬 Stream start() called');
@@ -1943,6 +2050,10 @@ After uploading, monitor the processing job and verify completion.`;
           try {
             // Execute agent with streaming callback
             console.log('🤖 Calling executeAgent...');
+            console.log('🤖 Agent ID:', agentId);
+            console.log('🤖 Workspace ID:', workspaceId);
+            console.log('🤖 User input:', userInput);
+
             finalResult = await executeAgent(
               agentId,
               workspaceId,
@@ -1965,7 +2076,16 @@ After uploading, monitor the processing job and verify completion.`;
                 }
               }
             );
-            console.log('✅ executeAgent completed');
+            console.log('✅ executeAgent completed, result:', finalResult ? 'SUCCESS' : 'NULL');
+            if (finalResult) {
+              console.log('✅ Result text length:', finalResult.text?.length || 0);
+              console.log('✅ Has material results:', !!finalResult.materialResults);
+            }
+          } catch (executeError) {
+            console.error('❌ executeAgent threw an error:', executeError);
+            console.error('❌ Error message:', executeError instanceof Error ? executeError.message : String(executeError));
+            console.error('❌ Error stack:', executeError instanceof Error ? executeError.stack : 'No stack');
+            throw executeError; // Re-throw to be caught by outer catch
           } finally {
             // Stop heartbeat
             clearInterval(heartbeatInterval);
