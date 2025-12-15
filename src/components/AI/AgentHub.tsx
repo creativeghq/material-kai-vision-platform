@@ -573,10 +573,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 },
                 message: 'Heat pump comparison table',
               };
-            } else if (command === '3d_design') {
-              const designData = await import('@/data/demo/3d-design.json');
-              demoData = { type: '3d_design', data: designData.default.design, message: 'Modern living room 3D design' };
             }
+            // Note: '3d_design' demo removed - now using real 3D generation via Interior Designer Agent
           }
         } catch (e) {
           console.error('Error parsing demo data:', e);
