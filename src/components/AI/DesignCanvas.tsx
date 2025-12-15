@@ -22,8 +22,21 @@ import {
   Home
 } from 'lucide-react';
 
+interface ModelResult {
+  model_id: string;
+  model_name: string;
+  provider: 'replicate' | 'huggingface';
+  image_urls: string[];
+  processing_time_ms: number;
+  success: boolean;
+  error?: string;
+}
+
 interface DesignCanvasProps {
   images?: string[];
+  modelResults?: ModelResult[]; // NEW: Per-model results with attribution
+  totalModels?: number;
+  successfulModels?: number;
   spatialAnalysis?: {
     layout_analysis?: any;
     material_suggestions?: any[];
@@ -56,6 +69,9 @@ interface DesignCanvasProps {
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   images = [],
+  modelResults = [],
+  totalModels,
+  successfulModels,
   spatialAnalysis,
   matchedMaterials = [],
   parsedRequest,
@@ -67,6 +83,11 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
   const [showImageModal, setShowImageModal] = useState(false);
+
+  // Helper function to get model info for an image
+  const getModelForImage = (imageUrl: string): ModelResult | undefined => {
+    return modelResults.find(model => model.image_urls.includes(imageUrl));
+  };
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -151,6 +172,27 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 className="w-full h-full object-contain"
               />
 
+              {/* Model Attribution Badge */}
+              {(() => {
+                const modelInfo = getModelForImage(images[currentImageIndex]);
+                if (modelInfo) {
+                  return (
+                    <div className="absolute top-3 left-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-blue-400" />
+                        <div className="text-white text-sm">
+                          <span className="font-semibold">{modelInfo.model_name}</span>
+                          <span className="text-gray-300 ml-2">
+                            ({modelInfo.provider === 'replicate' ? '🔵 Replicate' : '🟡 Hugging Face'})
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Overlay hint on hover */}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
                 <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 px-4 py-2 rounded-lg shadow-lg">
@@ -193,22 +235,57 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
               </button>
             </div>
 
+            {/* Multi-Model Summary Banner */}
+            {modelResults.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-blue-600" />
+                    <span className="font-semibold text-gray-900">
+                      {successfulModels}/{totalModels} AI Models Generated Images
+                    </span>
+                  </div>
+                  <div className="flex gap-2 text-sm">
+                    {modelResults.filter(m => m.provider === 'replicate' && m.success).length > 0 && (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                        🔵 Replicate ({modelResults.filter(m => m.provider === 'replicate' && m.success).length})
+                      </span>
+                    )}
+                    {modelResults.filter(m => m.provider === 'huggingface' && m.success).length > 0 && (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                        🟡 Hugging Face ({modelResults.filter(m => m.provider === 'huggingface' && m.success).length})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Thumbnails */}
             {images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-2">
-                {images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
-                      idx === currentImageIndex
-                        ? 'border-blue-600 ring-2 ring-blue-200'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
-                  </button>
-                ))}
+                {images.map((img, idx) => {
+                  const modelInfo = getModelForImage(img);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setCurrentImageIndex(idx)}
+                      className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                        idx === currentImageIndex
+                          ? 'border-blue-600 ring-2 ring-blue-200'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <img src={img} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                      {/* Model badge on thumbnail */}
+                      {modelInfo && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] px-1 py-0.5 text-center truncate">
+                          {modelInfo.provider === 'replicate' ? '🔵' : '🟡'} {modelInfo.model_name}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

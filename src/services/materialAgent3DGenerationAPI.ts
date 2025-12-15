@@ -8,12 +8,26 @@ export interface Generation3DRequest {
   style?: string;
   specific_materials?: string[];
   enable_spatial_analysis?: boolean; // Optional flag to enable/disable SpaceFormer analysis
+  reference_image_url?: string; // Optional reference image for image-to-image generation
+}
+
+export interface ModelResult {
+  model_id: string;
+  model_name: string;
+  provider: 'replicate' | 'huggingface';
+  image_urls: string[];
+  processing_time_ms: number;
+  success: boolean;
+  error?: string;
 }
 
 export interface Generation3DResult {
   success: boolean;
   generation_id: string;
-  image_urls: string[];
+  image_urls: string[]; // All images from all models
+  model_results?: ModelResult[]; // Detailed results per model
+  total_models?: number;
+  successful_models?: number;
   parsed_request: {
     room_type: string;
     style: string;
@@ -87,9 +101,10 @@ export class MaterialAgent3DGenerationAPI {
         room_type: request.room_type,
         style: request.style,
         specific_materials: request.specific_materials,
+        has_reference_image: !!request.reference_image_url,
       });
 
-      // Use BrowserApiIntegrationService for image generation
+      // Use BrowserApiIntegrationService for multi-model image generation
       const apiService = BrowserApiIntegrationService.getInstance();
 
       // Build enhanced prompt with materials if provided
@@ -98,15 +113,18 @@ export class MaterialAgent3DGenerationAPI {
         enhancedPrompt += ` featuring ${request.specific_materials.join(', ')}`;
       }
 
+      // Call multi-model generation (Replicate + Hugging Face in parallel)
       const result = await apiService.generateInteriorDesign({
         prompt: enhancedPrompt,
         roomType: request.room_type,
         style: request.style,
         width: 768,
         height: 768,
+        imageUrl: request.reference_image_url, // Pass reference image for image-to-image models
       });
 
-      console.log('✅ Image generation response:', result);
+      console.log('✅ Multi-model generation response:', result);
+      console.log(`📊 Generated ${result.data?.image_urls?.length || 0} images from ${result.data?.successful_models || 0}/${result.data?.total_models || 0} models`);
 
       if (!result.success || !result.data) {
         throw new Error(
@@ -173,11 +191,14 @@ export class MaterialAgent3DGenerationAPI {
         completed_at: new Date().toISOString(),
       });
 
-      // Return standardized response with spatial analysis
+      // Return standardized response with spatial analysis and model results
       return {
         success: true,
         generation_id: generationId,
         image_urls: imageUrls,
+        model_results: result.data.model_results, // Include per-model results
+        total_models: result.data.total_models,
+        successful_models: result.data.successful_models,
         parsed_request: {
           room_type: request.room_type || 'general',
           style: request.style || 'modern',
@@ -189,7 +210,7 @@ export class MaterialAgent3DGenerationAPI {
         matched_materials: [],
         quality_assessment: {
           score: 0.85,
-          feedback: 'Generated using AI image generation',
+          feedback: `Generated using ${result.data.successful_models}/${result.data.total_models} AI models`,
         },
         processing_time_ms: processingTime,
         spatial_analysis: spatialAnalysis, // Include spatial analysis in response

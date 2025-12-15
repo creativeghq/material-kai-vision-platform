@@ -166,6 +166,17 @@ interface Message {
   }; // Real material/product data from database
   designData?: {
     images?: string[];
+    modelResults?: Array<{
+      model_id: string;
+      model_name: string;
+      provider: 'replicate' | 'huggingface';
+      image_urls: string[];
+      processing_time_ms: number;
+      success: boolean;
+      error?: string;
+    }>;
+    totalModels?: number;
+    successfulModels?: number;
     spatialAnalysis?: any;
     matchedMaterials?: any[];
     parsedRequest?: any;
@@ -617,13 +628,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             if (generationResult.success) {
               designData = {
                 images: generationResult.image_urls,
+                modelResults: generationResult.model_results, // Per-model results with attribution
+                totalModels: generationResult.total_models,
+                successfulModels: generationResult.successful_models,
                 spatialAnalysis: generationResult.spatial_analysis, // SpaceFormer analysis included!
                 matchedMaterials: generationResult.matched_materials,
                 parsedRequest: generationResult.parsed_request,
                 qualityAssessment: generationResult.quality_assessment,
                 processingTimeMs: generationResult.processing_time_ms,
               };
-              console.log('✅ 3D generation + SpaceFormer analysis completed:', designData);
+              console.log(`✅ Multi-model generation completed: ${generationResult.successful_models}/${generationResult.total_models} models succeeded`);
+              console.log('📊 Design data with model results:', designData);
             }
           }
         } catch (generationError) {
@@ -1084,6 +1099,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         {/* Display design results with DesignCanvas */}
                         <DesignCanvas
                           images={message.designData.images}
+                          modelResults={message.designData.modelResults}
+                          totalModels={message.designData.totalModels}
+                          successfulModels={message.designData.successfulModels}
                           spatialAnalysis={message.designData.spatialAnalysis}
                           matchedMaterials={message.designData.matchedMaterials}
                           parsedRequest={message.designData.parsedRequest}

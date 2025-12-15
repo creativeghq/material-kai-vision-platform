@@ -231,7 +231,9 @@ export class BrowserApiIntegrationService {
   }
 
   /**
-   * Interior design generation using Supabase Edge Function (calls Replicate API server-side)
+   * Interior design generation using Supabase Edge Function
+   * Calls multiple AI models in parallel (Replicate + Hugging Face)
+   * Returns images from all successful models
    */
   public async generateInteriorDesign(params: {
     prompt: string;
@@ -239,11 +241,14 @@ export class BrowserApiIntegrationService {
     style?: string;
     width?: number;
     height?: number;
+    imageUrl?: string; // Optional reference image for image-to-image models
   }): Promise<StandardizedApiResponse> {
     try {
-      console.log('🎨 Starting interior design generation via Supabase Edge Function...');
+      console.log('🎨 Starting multi-model interior design generation...');
+      console.log('📝 Prompt:', params.prompt);
+      console.log('🖼️ Has reference image:', !!params.imageUrl);
 
-      // Call Supabase Edge Function
+      // Call Supabase Edge Function (runs multiple models in parallel)
       const { data, error } = await supabase.functions.invoke('generate-interior-design', {
         body: {
           prompt: params.prompt,
@@ -251,6 +256,7 @@ export class BrowserApiIntegrationService {
           style: params.style,
           width: params.width || 768,
           height: params.height || 768,
+          image_url: params.imageUrl, // Pass reference image if provided
         },
       });
 
@@ -262,18 +268,20 @@ export class BrowserApiIntegrationService {
         throw new Error(data?.error || 'Image generation failed');
       }
 
-      console.log('✅ Image generation completed:', data);
+      console.log(`✅ Multi-model generation completed: ${data.successful_models}/${data.total_models} models succeeded`);
+      console.log('📊 Model results:', data.model_results);
 
       return {
         success: true,
         data: {
-          image_urls: data.image_urls,
-          image_url: data.image_urls[0],
-          prediction_id: data.prediction_id,
-          processing_time_ms: data.processing_time_ms,
+          image_urls: data.image_urls, // All images from all successful models
+          image_url: data.image_urls[0], // First image for backward compatibility
+          model_results: data.model_results, // Detailed results per model
+          total_models: data.total_models,
+          successful_models: data.successful_models,
         },
         metadata: {
-          apiType: 'replicate',
+          apiType: 'multi-model',
           timestamp: new Date().toISOString(),
           requestId: crypto.randomUUID(),
         },
@@ -289,7 +297,7 @@ export class BrowserApiIntegrationService {
           retryable: true,
         },
         metadata: {
-          apiType: 'replicate',
+          apiType: 'multi-model',
           timestamp: new Date().toISOString(),
           requestId: crypto.randomUUID(),
         },
