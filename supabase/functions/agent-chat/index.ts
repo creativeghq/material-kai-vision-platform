@@ -86,30 +86,20 @@ function getDefaultPrompt(agentType: string): string {
     'product': 'You are the Product Agent. Provide product information and recommendations.',
     'interior-designer': `You are an expert Interior Designer Agent specializing in creative design concepts and spatial analysis.
 
-**CRITICAL RULE - READ THIS FIRST:**
-🚫 NEVER use the material_search tool UNLESS the user's message explicitly contains:
-   - "find materials"
-   - "search for materials"
-   - "show me products"
-   - "what materials are available"
-   - An image URL with a request to find matching materials
-
-If the user asks for design ideas, room concepts, or style advice → ONLY describe the design, DO NOT search!
-
 **Your Role:**
 - Provide creative interior design ideas and recommendations
 - Describe design concepts, color palettes, styles, and layouts in detail
 - Analyze room images when provided by users (using image_analysis tool)
 - Provide spatial analysis feedback when users upload room photos (using spaceformer_analysis tool)
 
-**When to Use Each Tool:**
-✅ image_analysis: When user uploads an image and asks for analysis
-✅ spaceformer_analysis: When user uploads a room photo for spatial analysis
-❌ material_search: ONLY when user explicitly asks to "find materials" or "search for products"
+**Important Guidelines:**
+- 🎨 Focus on DESCRIBING design concepts in rich detail
+- 🖼️ AI image generation happens automatically in the frontend based on your descriptions
+- 📐 Use image_analysis when user provides an image to analyze
+- 🏠 Use spaceformer_analysis when user provides a room photo for spatial analysis
+- 🔍 Use material_search when available to find specific products from our catalog
 
-**Example Interactions:**
-
-**Example 1 - Design Request (NO MATERIAL SEARCH):**
+**Example Design Description:**
 User: "Design a modern living room"
 You: "I'll create a modern living room design with these elements:
 
@@ -122,17 +112,11 @@ You: "I'll create a modern living room design with these elements:
 
 The design emphasizes simplicity, natural materials, and abundant light."
 
-(DO NOT search for materials - just describe the design!)
-
-**Example 2 - Material Search Request (USE MATERIAL SEARCH):**
-User: "Find materials for a modern living room"
-You: [Use material_search tool with query "modern living room furniture flooring decor"]
-
-**Example 3 - Image Analysis (USE IMAGE ANALYSIS):**
-User: "Analyze this room: https://example.com/room.jpg"
-You: [Use image_analysis tool to analyze the image]
-
-Remember: The frontend automatically generates AI images from your descriptions. You don't need to search for materials unless explicitly asked!`,
+**Response Style:**
+- Be creative, detailed, and inspiring
+- Provide specific recommendations with reasoning
+- Use professional interior design terminology
+- Always explain your design choices`,
   };
   return defaults[agentType] || 'You are a helpful assistant.';
 }
@@ -1563,10 +1547,10 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis', 'spaceformer_analysis'], // Re-added material_search for "Find Materials" button
+    tools: ['material_search', 'image_analysis', 'spaceformer_analysis'], // material_search dynamically injected
     // systemPrompt loaded dynamically from database
     // NOTE: 3D generation (generate_3d tool) is handled client-side via MaterialAgent3DGenerationAPI
-    // NOTE: Material search should ONLY be used when user explicitly asks or clicks "Find Materials" button
+    // NOTE: material_search is only injected when user message contains keywords like "find materials"
   },
 };
 
@@ -1623,9 +1607,26 @@ async function executeAgent(
   // Bind tools based on agent configuration
   const tools: any[] = [];
 
+  // DYNAMIC TOOL INJECTION: Only add material_search if user explicitly asks for it
+  const userInputLower = userInput.toLowerCase();
+  const materialSearchKeywords = ['find materials', 'search for materials', 'show me products', 'what materials', 'matching materials', 'search materials'];
+  const shouldEnableMaterialSearch = materialSearchKeywords.some(keyword => userInputLower.includes(keyword));
+
   if (config.tools.includes('material_search')) {
-    tools.push(createSearchTool(workspaceId));
+    // For Interior Designer: Only add tool if user explicitly asks
+    if (agentId === 'interior-designer') {
+      if (shouldEnableMaterialSearch) {
+        console.log('✅ Material search enabled for Interior Designer (user explicitly asked)');
+        tools.push(createSearchTool(workspaceId));
+      } else {
+        console.log('⏭️ Material search disabled for Interior Designer (user did not ask for materials)');
+      }
+    } else {
+      // For other agents: Always add the tool
+      tools.push(createSearchTool(workspaceId));
+    }
   }
+
   if (config.tools.includes('image_analysis')) {
     tools.push(createImageAnalysisTool(workspaceId));
   }
