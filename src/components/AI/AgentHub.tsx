@@ -195,6 +195,8 @@ interface AgentHubProps {
   onMaterialSelect?: (materialId: string) => void;
 }
 
+
+
 export const AgentHub: React.FC<AgentHubProps> = ({
   userRole = 'member',
   onMaterialSelect,
@@ -462,6 +464,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           throw new Error(`Agent execution failed: ${response.status} - ${errorText}`);
         }
 
+        // Streaming response
         if (!response.body) {
           throw new Error('No response body');
         }
@@ -547,16 +550,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
         data = finalResult;
 
-        // Cache the response for future use
-        if (canUseCache && data) {
-          cacheResponse(userInput, selectedAgent, {
-            text: data.text,
-            model: data.model,
-            products: data.materialResults?.products,
-          }, workspaceId);
-          console.log('💾 Cached response for query:', userInput);
-        }
-      }
+          // Cache the response for future use
+          if (canUseCache && data) {
+            cacheResponse(userInput, selectedAgent, {
+              text: data.text,
+              model: data.model,
+              products: data.materialResults?.products,
+            }, workspaceId);
+            console.log('💾 Cached response for query:', userInput);
+          }
+        } // End of streaming response handling
 
       // Parse demo data if this is from DemoAgent
       let demoData = undefined;

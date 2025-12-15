@@ -157,10 +157,12 @@ function getModelNameForAgent(agentId: string): string {
  */
 const createSearchTool = (workspaceId: string) => {
   return tool(
-    async ({ query, strategy = 'multi_vector', limit = 10 }) => {
+    async ({ query, limit = 10 }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
         // Correct endpoint: /api/rag/search with strategy as query param
+        // ALWAYS use multi_vector strategy for best accuracy
+        const strategy = 'multi_vector';
         const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
         url.searchParams.set('strategy', strategy);
 
@@ -194,14 +196,10 @@ const createSearchTool = (workspaceId: string) => {
     },
     {
       name: 'material_search',
-      description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries. DEFAULT to multi_vector strategy for best accuracy and performance.',
+      description: 'Search for materials, products, and technical information using RAG. Use this for any material-related queries. Uses multi_vector strategy for best accuracy and performance.',
       schema: z.object({
-        query: z.string().describe('Search query'),
-        strategy: z
-          .enum(['semantic', 'visual', 'multi_vector', 'hybrid', 'material', 'keyword', 'color', 'texture', 'style', 'material_type', 'all'])
-          .default('multi_vector')
-          .describe('Search strategy - multi_vector (RECOMMENDED) combines 6 embedding types for best accuracy; use specialized strategies (color/texture/style/material_type) for specific visual attributes; use all only for comprehensive search'),
-        limit: z.number().default(10).describe('Maximum results'),
+        query: z.string().describe('Search query - be specific and detailed'),
+        limit: z.number().default(10).describe('Maximum number of results to return'),
       }),
     }
   );
@@ -1270,39 +1268,18 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
 
 Your role is to help users find materials, products, and technical information from our knowledge base.
 
-**Search Strategies Available:**
-
-1. **multi_vector** (⭐ RECOMMENDED - USE BY DEFAULT)
-   - Combines 6 embedding types with intelligent weighting for best accuracy
-   - Embeddings: text (20%), visual (20%), color (15%), texture (15%), style (15%), material type (15%)
-   - Best for: General queries, product discovery, material matching
-   - Performance: Fast (single optimized query)
-   - Cost: Low (1 search operation)
-
-2. **Specialized Visual Searches** (use when user asks about specific attributes):
-   - **color**: "Find materials with warm tones", "similar color palette", "red materials"
-   - **texture**: "Find rough textured materials", "similar texture pattern", "smooth surfaces"
-   - **style**: "Find modern style materials", "similar design aesthetic", "minimalist products"
-   - **material_type**: "Find similar material types", "materials like this", "wood alternatives"
-
-3. **Other Strategies:**
-   - **semantic**: Fast text-only search (use for simple keyword queries when speed critical)
-   - **visual**: Image-based similarity (use when user provides image without specific attribute focus)
-   - **hybrid**: Text + keyword combined (use for exact term matching)
-   - **material**: Property-based filtering (use for technical specifications)
-   - **keyword**: Exact match search (use for product codes, SKUs)
-   - **all**: Run ALL 10 strategies in parallel (⚠️ SLOW, HIGH COST - use ONLY when user explicitly asks for comprehensive search)
+**Search Strategy:**
+- All searches use the **multi_vector** strategy which combines 6 embedding types for best accuracy
+- Embeddings: text (20%), visual (20%), color (15%), texture (15%), style (15%), material type (15%)
+- Optimized for: General queries, product discovery, material matching
+- Performance: Fast (single optimized query)
 
 **Guidelines:**
-- ⭐ DEFAULT to 'multi_vector' strategy for ALL queries unless user specifies otherwise
-- Use specialized strategies (color/texture/style/material_type) when user asks about specific visual attributes
-- Use 'visual' strategy when user provides an image without specific attribute focus
-- Use 'semantic' for simple text queries when speed is critical
-- Use 'all' strategy ONLY when user explicitly asks for comprehensive/exhaustive search
-- Always explain which strategy you're using and why
+- All searches automatically use the multi_vector strategy for best accuracy
+- Always provide specific, detailed search queries
 - Include source information, confidence scores, and embedding sources when available
-- If no results found, suggest trying a different strategy (e.g., if multi_vector fails, try specialized color or texture search)
-- For image analysis, use the image_analysis tool first, then search with appropriate strategy
+- If no results found, try rephrasing the query with more specific terms
+- For image analysis, use the image_analysis tool first, then search with relevant keywords
 
 **Image Analysis Capabilities:**
 - Material recognition and identification
