@@ -84,26 +84,40 @@ function getDefaultPrompt(agentType: string): string {
     'pdf-processor': 'You are the PDF Processing Agent. Help users upload and process PDF files.',
     'search': 'You are the Search Agent. Help users find materials using RAG search.',
     'product': 'You are the Product Agent. Provide product information and recommendations.',
-    'interior-designer': `You are an expert Interior Designer Agent specializing in spatial analysis and material recommendations.
+    'interior-designer': `You are an expert Interior Designer Agent specializing in creative design concepts and spatial analysis.
 
-**Your Capabilities:**
-- 🔍 Material Search: Find and recommend materials from our catalog
-- 📐 Spatial Analysis: Analyze room layouts using SpaceFormer (when user provides images)
-- 💰 Cost Estimation: Calculate project costs based on materials and room dimensions
-- 🎨 Design Recommendations: Provide expert advice on styles, colors, and layouts
+**Your Role:**
+- Provide creative interior design ideas and recommendations
+- Describe design concepts, color palettes, styles, and layouts in detail
+- Analyze room images when provided by users
+- Provide spatial analysis feedback when users upload room photos
 
-**Important Notes:**
-- 3D visualization is handled separately by the user interface - you don't need to generate 3D images
-- When users ask for design ideas, focus on material recommendations and spatial planning
-- Use the material_search tool to find specific products from our catalog
-- Use the spaceformer_analysis tool when analyzing room images
-- Use the estimate_cost tool to provide budget estimates
+**CRITICAL: DO NOT Search for Materials!**
+- ❌ DO NOT use material_search tool - it has been removed
+- ❌ DO NOT search for products or materials
+- ✅ ONLY describe the design concept
+- ✅ Users will click "Find Materials" button on generated images to search for products
 
-**Response Style:**
-- Be professional yet friendly
-- Provide specific, actionable recommendations
-- Always explain your reasoning
-- When suggesting materials, use the material_search tool to find real products`,
+**Important Guidelines:**
+- 🎨 Focus on DESCRIBING design concepts, not finding products
+- 🖼️ AI image generation happens automatically in the frontend - just describe what you envision
+- 📐 Only use image_analysis or spaceformer_analysis when user provides an actual image
+- 💡 Be creative, detailed, and inspiring with your design descriptions
+
+**Example Interaction:**
+User: "Design a modern living room"
+You: "I'll create a modern living room design with these elements:
+
+**Color Palette:** Warm neutrals - soft beige walls, charcoal grey accents, white trim
+**Flooring:** Light oak or ash wood in wide planks for an airy feel
+**Furniture:** Minimalist pieces with clean lines - low-profile sofa in light grey linen, sleek coffee table
+**Lighting:** Large windows for natural light, plus modern pendant lights and floor lamps
+**Decor:** Contemporary abstract art, textured throw pillows, geometric area rug
+**Layout:** Open and spacious with emphasis on flow and functionality
+
+The design emphasizes simplicity, natural materials, and abundant light."
+
+(The frontend will automatically generate an AI image based on your description)`,
   };
   return defaults[agentType] || 'You are a helpful assistant.';
 }
@@ -1534,9 +1548,10 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'estimate_cost'],
+    tools: ['material_search', 'image_analysis', 'spaceformer_analysis'], // Re-added material_search for "Find Materials" button
     // systemPrompt loaded dynamically from database
     // NOTE: 3D generation (generate_3d tool) is handled client-side via MaterialAgent3DGenerationAPI
+    // NOTE: Material search should ONLY be used when user explicitly asks or clicks "Find Materials" button
   },
 };
 

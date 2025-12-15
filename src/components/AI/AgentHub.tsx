@@ -469,7 +469,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           throw new Error('No response body');
         }
 
+        console.log('✅ ========================================');
         console.log('✅ Starting to read stream...');
+        console.log('✅ ========================================');
 
         // Read streaming response
         const reader = response.body.getReader();
@@ -477,17 +479,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         let buffer = '';
         let finalResult: any = null;
         let chunkCount = 0;
+        const streamStartTime = Date.now();
 
         while (true) {
           const { done, value } = await reader.read();
 
           if (done) {
-            console.log('📭 Stream ended. Total chunks received:', chunkCount);
+            const streamElapsed = Date.now() - streamStartTime;
+            console.log('📭 ========================================');
+            console.log('📭 Stream ended');
+            console.log('📭 Total chunks received:', chunkCount);
+            console.log('📭 Total time:', streamElapsed + 'ms', `(${(streamElapsed / 1000).toFixed(2)}s)`);
+            console.log('📭 ========================================');
             break;
           }
 
           const decoded = decoder.decode(value, { stream: true });
-          console.log('📦 Received chunk:', decoded.substring(0, 100) + (decoded.length > 100 ? '...' : ''));
+          console.log('📦 Raw chunk received:', decoded.substring(0, 200) + (decoded.length > 200 ? '...' : ''));
           buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -498,23 +506,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             try {
               const chunk = JSON.parse(line);
               chunkCount++;
-              console.log(`📨 Chunk #${chunkCount} [${chunk.type}]:`, chunk);
+              const elapsed = Date.now() - streamStartTime;
+              console.log(`📨 ========================================`);
+              console.log(`📨 Chunk #${chunkCount} [${chunk.type}] at ${elapsed}ms`);
+              console.log(`📨 Data:`, chunk);
+              console.log(`📨 ========================================`);
 
               // Handle different chunk types
               if (chunk.type === 'status') {
-                console.log('📊 Status:', chunk.message);
+                console.log('📊 [STATUS]:', chunk.message);
               } else if (chunk.type === 'iteration') {
-                console.log(`🔄 Iteration ${chunk.iteration}/${chunk.maxIterations}`);
+                console.log(`🔄 [ITERATION] ${chunk.iteration}/${chunk.maxIterations}:`, chunk.message);
               } else if (chunk.type === 'tool_call') {
-                console.log(`🔧 Calling tool: ${chunk.tool}`, chunk.args);
+                console.log(`🔧 [TOOL_CALL] ${chunk.tool}`);
+                console.log('   Args:', chunk.args);
               } else if (chunk.type === 'tool_result') {
-                console.log(`✅ Tool ${chunk.tool} completed`);
+                console.log(`✅ [TOOL_RESULT] ${chunk.tool} completed`);
+                console.log('   Result preview:', JSON.stringify(chunk.result).substring(0, 200));
               } else if (chunk.type === 'tool_error') {
-                console.error(`❌ Tool ${chunk.tool} failed:`, chunk.error);
+                console.error(`❌ [TOOL_ERROR] ${chunk.tool} failed:`, chunk.error);
               } else if (chunk.type === 'assistant_thinking') {
-                console.log('💭 Assistant thinking...', chunk.hasToolCalls ? '(has tool calls)' : '(final response)');
+                console.log('💭 [THINKING]', chunk.hasToolCalls ? 'Has tool calls to execute' : 'Generating final response');
               } else if (chunk.type === 'heartbeat') {
-                console.log('💓 Heartbeat');
+                console.log('💓 [HEARTBEAT] Stream alive');
+              } else if (chunk.type === 'error') {
+                console.error('❌ [ERROR] Edge function error:', chunk.message);
               } else if (chunk.type === 'final_result') {
                 console.log('🎯 Final result received!', chunk);
                 finalResult = chunk;
@@ -540,11 +556,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         });
 
         if (!finalResult) {
-          console.error('❌ No final_result chunk received. This usually means:');
+          console.error('❌ ========================================');
+          console.error('❌ NO FINAL_RESULT CHUNK RECEIVED');
+          console.error('❌ ========================================');
+          console.error('❌ Total chunks received:', chunkCount);
+          console.error('❌ Stream duration:', (Date.now() - streamStartTime) + 'ms');
+          console.error('❌ This usually means:');
           console.error('   1. Edge function threw an error before sending final_result');
-          console.error('   2. Edge function timed out');
-          console.error('   3. Tool execution failed');
-          console.error('   Check Supabase Edge Function logs for details');
+          console.error('   2. Edge function timed out (400s limit on paid plan)');
+          console.error('   3. Tool execution failed (check tool logs above)');
+          console.error('   4. MIVAA/Spaceformer API timeout (5 minute limit)');
+          console.error('❌ ========================================');
+          console.error('❌ ACTION: Check Supabase Edge Function logs:');
+          console.error('   supabase functions logs agent-chat --tail');
+          console.error('❌ ========================================');
           throw new Error('No final result received from agent. Check edge function logs for details.');
         }
 
@@ -1117,6 +1142,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           onMaterialClick={(materialId) => {
                             console.log('Material clicked:', materialId);
                             // Could open material details modal or navigate
+                          }}
+                          onFindMaterials={async (imageUrl) => {
+                            console.log('🔍 Find Materials clicked for image:', imageUrl);
+                            // Send a message to the agent to search for materials in this image
+                            const findMaterialsPrompt = `Analyze this interior design image and find matching materials from our catalog: ${imageUrl}`;
+                            setInput(findMaterialsPrompt);
+                            // Wait for input to be set, then send
+                            setTimeout(async () => {
+                              await handleSendMessage();
+                            }, 100);
                           }}
                           onViewAllMaterials={() => {
                             setSelectedMaterialsData({

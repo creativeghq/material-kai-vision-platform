@@ -19,7 +19,8 @@ import {
   TrendingUp,
   Eye,
   X,
-  Home
+  Home,
+  Search
 } from 'lucide-react';
 
 interface ModelResult {
@@ -65,6 +66,7 @@ interface DesignCanvasProps {
   processingTimeMs?: number;
   onMaterialClick?: (materialId: string) => void;
   onViewAllMaterials?: () => void;
+  onFindMaterials?: (imageUrl: string) => void; // NEW: Callback to trigger material search
 }
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
@@ -78,6 +80,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   qualityAssessment,
   processingTimeMs,
   onMaterialClick,
+  onFindMaterials,
   onViewAllMaterials,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -226,13 +229,32 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 </>
               )}
 
-              {/* Download Button */}
-              <button
-                onClick={(e) => { e.stopPropagation(); downloadImage(images[currentImageIndex]); }}
-                className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors z-10"
-              >
-                <Download className="w-5 h-5" />
-              </button>
+              {/* Action Buttons */}
+              <div className="absolute top-4 right-4 flex gap-2 z-10">
+                {/* Find Materials Button */}
+                {onFindMaterials && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFindMaterials(images[currentImageIndex]);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-lg"
+                    title="Find matching materials for this design"
+                  >
+                    <Search className="w-5 h-5" />
+                    <span className="font-medium">Find Materials</span>
+                  </button>
+                )}
+
+                {/* Download Button */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); downloadImage(images[currentImageIndex]); }}
+                  className="p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg transition-colors"
+                  title="Download image"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Multi-Model Summary Banner */}
