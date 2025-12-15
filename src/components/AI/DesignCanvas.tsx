@@ -1,5 +1,24 @@
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, Maximize2, Grid3x3, LayoutGrid, DollarSign } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Maximize2,
+  Grid3x3,
+  LayoutGrid,
+  DollarSign,
+  Ruler,
+  Sofa,
+  Lightbulb,
+  Wind,
+  Accessibility,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  Package,
+  TrendingUp,
+  Eye
+} from 'lucide-react';
 
 interface DesignCanvasProps {
   images?: string[];
@@ -8,6 +27,7 @@ interface DesignCanvasProps {
     material_suggestions?: any[];
     accessibility_report?: any;
     spatial_metrics?: any;
+    confidence_score?: number;
   };
   matchedMaterials?: Array<{
     id: string;
@@ -29,6 +49,7 @@ interface DesignCanvasProps {
   };
   processingTimeMs?: number;
   onMaterialClick?: (materialId: string) => void;
+  onViewAllMaterials?: () => void;
 }
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
@@ -39,6 +60,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   qualityAssessment,
   processingTimeMs,
   onMaterialClick,
+  onViewAllMaterials,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
@@ -182,40 +204,327 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
         {/* Spatial Analysis Tab */}
         {activeTab === 'analysis' && spatialAnalysis && (
           <div className="space-y-6">
+            {/* AI Analysis Header */}
+            <div className="bg-gradient-to-r from-violet-500 to-purple-600 rounded-xl p-6 text-white">
+              <div className="flex items-center gap-3 mb-2">
+                <Sparkles className="w-6 h-6" />
+                <h3 className="text-xl font-bold">AI Spatial Analysis</h3>
+              </div>
+              <p className="text-white/90 text-sm">
+                Powered by SpaceFormer AI - Advanced spatial understanding and design optimization
+              </p>
+            </div>
+
             {/* Layout Analysis */}
             {spatialAnalysis.layout_analysis && (
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Maximize2 className="w-5 h-5 text-blue-600" />
-                  Layout Analysis
-                </h3>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {JSON.stringify(spatialAnalysis.layout_analysis, null, 2)}
-                </pre>
+              <div className="bg-white rounded-xl border-2 border-blue-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-blue-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <Maximize2 className="w-5 h-5 text-blue-600" />
+                    Layout & Spatial Design
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Room Dimensions */}
+                    {spatialAnalysis.layout_analysis.room_dimensions && (
+                      <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Ruler className="w-5 h-5 text-blue-600" />
+                          <h4 className="font-semibold text-gray-900">Dimensions</h4>
+                        </div>
+                        <div className="space-y-2">
+                          {spatialAnalysis.layout_analysis.room_dimensions.width && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Width:</span>
+                              <span className="font-bold text-gray-900">
+                                {spatialAnalysis.layout_analysis.room_dimensions.width}m
+                              </span>
+                            </div>
+                          )}
+                          {spatialAnalysis.layout_analysis.room_dimensions.length && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Length:</span>
+                              <span className="font-bold text-gray-900">
+                                {spatialAnalysis.layout_analysis.room_dimensions.length}m
+                              </span>
+                            </div>
+                          )}
+                          {spatialAnalysis.layout_analysis.room_dimensions.height && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Height:</span>
+                              <span className="font-bold text-gray-900">
+                                {spatialAnalysis.layout_analysis.room_dimensions.height}m
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Furniture Placement */}
+                    {spatialAnalysis.layout_analysis.furniture_placement && (
+                      <div className="bg-gradient-to-br from-green-50 to-emerald-100 rounded-lg p-4 border border-green-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Sofa className="w-5 h-5 text-green-600" />
+                          <h4 className="font-semibold text-gray-900">Furniture</h4>
+                        </div>
+                        <div className="space-y-2 text-sm">
+                          {Array.isArray(spatialAnalysis.layout_analysis.furniture_placement) ? (
+                            spatialAnalysis.layout_analysis.furniture_placement.map((item: any, idx: number) => (
+                              <div key={idx} className="flex items-start gap-2">
+                                <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                <span className="text-gray-700">
+                                  {typeof item === 'string' ? item : item.name || item.description || JSON.stringify(item)}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-gray-700">{String(spatialAnalysis.layout_analysis.furniture_placement)}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lighting */}
+                    {spatialAnalysis.layout_analysis.lighting && (
+                      <div className="bg-gradient-to-br from-amber-50 to-yellow-100 rounded-lg p-4 border border-amber-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Lightbulb className="w-5 h-5 text-amber-600" />
+                          <h4 className="font-semibold text-gray-900">Lighting</h4>
+                        </div>
+                        <p className="text-sm text-gray-700">
+                          {typeof spatialAnalysis.layout_analysis.lighting === 'string'
+                            ? spatialAnalysis.layout_analysis.lighting
+                            : JSON.stringify(spatialAnalysis.layout_analysis.lighting)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Traffic Flow */}
+                    {spatialAnalysis.layout_analysis.traffic_flow && (
+                      <div className="bg-gradient-to-br from-purple-50 to-violet-100 rounded-lg p-4 border border-purple-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Wind className="w-5 h-5 text-purple-600" />
+                          <h4 className="font-semibold text-gray-900">Traffic Flow</h4>
+                        </div>
+                        <p className="text-sm text-gray-700">
+                          {typeof spatialAnalysis.layout_analysis.traffic_flow === 'string'
+                            ? spatialAnalysis.layout_analysis.traffic_flow
+                            : JSON.stringify(spatialAnalysis.layout_analysis.traffic_flow)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Space Utilization */}
+                    {spatialAnalysis.layout_analysis.space_utilization && (
+                      <div className="bg-gradient-to-br from-cyan-50 to-blue-100 rounded-lg p-4 border border-cyan-200">
+                        <div className="flex items-center gap-2 mb-3">
+                          <TrendingUp className="w-5 h-5 text-cyan-600" />
+                          <h4 className="font-semibold text-gray-900">Space Efficiency</h4>
+                        </div>
+                        <div className="space-y-2">
+                          {typeof spatialAnalysis.layout_analysis.space_utilization === 'number' ? (
+                            <>
+                              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                                <div
+                                  className="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all"
+                                  style={{ width: `${spatialAnalysis.layout_analysis.space_utilization}%` }}
+                                />
+                              </div>
+                              <p className="text-center font-bold text-gray-900">
+                                {spatialAnalysis.layout_analysis.space_utilization}% Utilized
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-700">
+                              {String(spatialAnalysis.layout_analysis.space_utilization)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Layout Info */}
+                  {spatialAnalysis.layout_analysis.description && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {spatialAnalysis.layout_analysis.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {/* Material Suggestions */}
             {spatialAnalysis.material_suggestions && spatialAnalysis.material_suggestions.length > 0 && (
-              <div className="bg-green-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Material Suggestions</h3>
-                <ul className="space-y-2">
-                  {spatialAnalysis.material_suggestions.map((suggestion: any, idx: number) => (
-                    <li key={idx} className="text-sm text-gray-700">
-                      • {typeof suggestion === 'string' ? suggestion : JSON.stringify(suggestion)}
-                    </li>
-                  ))}
-                </ul>
+              <div className="bg-white rounded-xl border-2 border-green-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-green-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-green-600" />
+                    AI Material Recommendations
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {spatialAnalysis.material_suggestions.map((suggestion: any, idx: number) => {
+                      const suggestionText = typeof suggestion === 'string'
+                        ? suggestion
+                        : suggestion.name || suggestion.material || suggestion.description || JSON.stringify(suggestion);
+
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-3 p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex-shrink-0 w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                            {idx + 1}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 leading-relaxed">
+                              {suggestionText}
+                            </p>
+                            {suggestion.location && (
+                              <p className="text-xs text-gray-600 mt-1">
+                                📍 {suggestion.location}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             )}
 
             {/* Accessibility Report */}
             {spatialAnalysis.accessibility_report && (
-              <div className="bg-purple-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-3">Accessibility Report</h3>
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                  {JSON.stringify(spatialAnalysis.accessibility_report, null, 2)}
-                </pre>
+              <div className="bg-white rounded-xl border-2 border-purple-100 overflow-hidden">
+                <div className="bg-gradient-to-r from-purple-50 to-violet-50 px-6 py-4 border-b border-purple-100">
+                  <h3 className="font-bold text-gray-900 flex items-center gap-2">
+                    <Accessibility className="w-5 h-5 text-purple-600" />
+                    Accessibility Analysis
+                  </h3>
+                </div>
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Wheelchair Accessible */}
+                    {spatialAnalysis.accessibility_report.wheelchair_accessible !== undefined && (
+                      <div className={`p-4 rounded-lg border-2 ${
+                        spatialAnalysis.accessibility_report.wheelchair_accessible
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          {spatialAnalysis.accessibility_report.wheelchair_accessible ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <AlertCircle className="w-5 h-5 text-red-600" />
+                          )}
+                          <h4 className="font-semibold text-gray-900">Wheelchair Access</h4>
+                        </div>
+                        <p className={`text-sm font-medium ${
+                          spatialAnalysis.accessibility_report.wheelchair_accessible
+                            ? 'text-green-700'
+                            : 'text-red-700'
+                        }`}>
+                          {spatialAnalysis.accessibility_report.wheelchair_accessible ? 'Accessible' : 'Not Accessible'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Clearance */}
+                    {spatialAnalysis.accessibility_report.clearance && (
+                      <div className="p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Eye className="w-5 h-5 text-blue-600" />
+                          <h4 className="font-semibold text-gray-900">Clearance</h4>
+                        </div>
+                        <p className="text-sm text-gray-700">
+                          {typeof spatialAnalysis.accessibility_report.clearance === 'string'
+                            ? spatialAnalysis.accessibility_report.clearance
+                            : JSON.stringify(spatialAnalysis.accessibility_report.clearance)}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* ADA Compliance */}
+                    {spatialAnalysis.accessibility_report.ada_compliant !== undefined && (
+                      <div className={`p-4 rounded-lg border-2 ${
+                        spatialAnalysis.accessibility_report.ada_compliant
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-amber-50 border-amber-200'
+                      }`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          {spatialAnalysis.accessibility_report.ada_compliant ? (
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <AlertCircle className="w-5 h-5 text-amber-600" />
+                          )}
+                          <h4 className="font-semibold text-gray-900">ADA Compliance</h4>
+                        </div>
+                        <p className={`text-sm font-medium ${
+                          spatialAnalysis.accessibility_report.ada_compliant
+                            ? 'text-green-700'
+                            : 'text-amber-700'
+                        }`}>
+                          {spatialAnalysis.accessibility_report.ada_compliant ? 'Compliant' : 'Review Needed'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Safety Notes */}
+                    {spatialAnalysis.accessibility_report.safety_notes && (
+                      <div className="p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertCircle className="w-5 h-5 text-purple-600" />
+                          <h4 className="font-semibold text-gray-900">Safety Notes</h4>
+                        </div>
+                        <p className="text-sm text-gray-700">
+                          {typeof spatialAnalysis.accessibility_report.safety_notes === 'string'
+                            ? spatialAnalysis.accessibility_report.safety_notes
+                            : JSON.stringify(spatialAnalysis.accessibility_report.safety_notes)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Accessibility Info */}
+                  {spatialAnalysis.accessibility_report.recommendations && (
+                    <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-100">
+                      <h4 className="font-semibold text-gray-900 mb-2">Recommendations</h4>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {typeof spatialAnalysis.accessibility_report.recommendations === 'string'
+                          ? spatialAnalysis.accessibility_report.recommendations
+                          : JSON.stringify(spatialAnalysis.accessibility_report.recommendations)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Confidence Score */}
+            {spatialAnalysis.confidence_score !== undefined && (
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-6 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold mb-1">AI Confidence Score</h4>
+                    <p className="text-white/80 text-sm">Analysis reliability rating</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-4xl font-bold">
+                      {Math.round(spatialAnalysis.confidence_score * 100)}%
+                    </div>
+                    <div className="text-sm text-white/80 mt-1">
+                      {spatialAnalysis.confidence_score >= 0.8 ? 'High' :
+                       spatialAnalysis.confidence_score >= 0.6 ? 'Medium' : 'Low'}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -223,38 +532,52 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
         {/* Materials Tab */}
         {activeTab === 'materials' && matchedMaterials.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {matchedMaterials.map(material => (
+          <div className="space-y-4">
+            {/* View All Materials Button */}
+            {onViewAllMaterials && (
               <button
-                key={material.id}
-                onClick={() => onMaterialClick?.(material.id)}
-                className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-600 hover:shadow-lg transition-all group"
+                onClick={onViewAllMaterials}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
               >
-                <div className="aspect-square bg-gray-100">
-                  {material.image_url ? (
-                    <img
-                      src={material.image_url}
-                      alt={material.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <LayoutGrid className="w-8 h-8" />
-                    </div>
-                  )}
-                </div>
-                <div className="p-3">
-                  <p className="font-medium text-sm text-gray-900 line-clamp-1 group-hover:text-blue-600">
-                    {material.name}
-                  </p>
-                  {material.metadata?.price && (
-                    <p className="text-xs text-blue-600 font-semibold mt-1">
-                      ${material.metadata.price}
-                    </p>
-                  )}
-                </div>
+                <Package className="w-5 h-5" />
+                View All Materials with AI Context
+                <Sparkles className="w-5 h-5" />
               </button>
-            ))}
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {matchedMaterials.map(material => (
+                <button
+                  key={material.id}
+                  onClick={() => onMaterialClick?.(material.id)}
+                  className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-600 hover:shadow-lg transition-all group"
+                >
+                  <div className="aspect-square bg-gray-100">
+                    {material.image_url ? (
+                      <img
+                        src={material.image_url}
+                        alt={material.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <LayoutGrid className="w-8 h-8" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3">
+                    <p className="font-medium text-sm text-gray-900 line-clamp-1 group-hover:text-blue-600">
+                      {material.name}
+                    </p>
+                    {material.metadata?.price && (
+                      <p className="text-xs text-blue-600 font-semibold mt-1">
+                        ${material.metadata.price}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

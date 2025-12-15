@@ -207,6 +207,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // REMOVED: pdfInputRef - PDF processing moved to /admin/data-import page
 
+  // Material Modal State
+  const [showMaterialModal, setShowMaterialModal] = useState(false);
+  const [selectedMaterialsData, setSelectedMaterialsData] = useState<{
+    materials: any[];
+    spatialAnalysis?: any;
+    roomType?: string;
+    style?: string;
+  } | null>(null);
+
   // Voice input hook
   const {
     isRecording,
@@ -1087,6 +1096,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             console.log('Material clicked:', materialId);
                             // Could open material details modal or navigate
                           }}
+                          onViewAllMaterials={() => {
+                            setSelectedMaterialsData({
+                              materials: message.designData.matchedMaterials || [],
+                              spatialAnalysis: message.designData.spatialAnalysis,
+                              roomType: message.designData.parsedRequest?.room_type,
+                              style: message.designData.parsedRequest?.style,
+                            });
+                            setShowMaterialModal(true);
+                          }}
                         />
                         {/* Display cost estimate if available */}
                         {message.designData.costEstimate && (
@@ -1361,6 +1379,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             setInput(promptText);
           }}
           onClose={() => setShowPromptLibrary(false)}
+        />
+      )}
+
+      {/* Material Matching Modal with SpaceFormer Context */}
+      {showMaterialModal && selectedMaterialsData && (
+        <MaterialMatchingModal
+          materials={selectedMaterialsData.materials}
+          spatialAnalysis={selectedMaterialsData.spatialAnalysis}
+          roomType={selectedMaterialsData.roomType}
+          style={selectedMaterialsData.style}
+          onClose={() => {
+            setShowMaterialModal(false);
+            setSelectedMaterialsData(null);
+          }}
+          onExportToMoodboard={(materials) => {
+            console.log('Export to moodboard:', materials);
+            toast({
+              title: 'Materials Exported',
+              description: `${materials.length} materials added to moodboard`,
+            });
+          }}
+          onEstimateCost={(materialIds) => {
+            console.log('Estimate cost for:', materialIds);
+            toast({
+              title: 'Cost Estimation',
+              description: 'Calculating cost estimate...',
+            });
+          }}
         />
       )}
     </div>
