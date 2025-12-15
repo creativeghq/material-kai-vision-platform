@@ -292,7 +292,10 @@ async function processModelsInBackground(
   console.log(`🏁 Job ${jobId} completed`);
 }
 
-// Helper functions (to be implemented)
+// ============================================
+// IMAGE GENERATION IMPLEMENTATION
+// ============================================
+
 async function generateImage(
   model: any,
   prompt: string,
@@ -302,9 +305,160 @@ async function generateImage(
   replicateToken: string | undefined,
   hfToken: string | undefined
 ): Promise<string> {
-  // TODO: Implement actual API calls to Replicate/Hugging Face
-  // For now, return placeholder
-  return 'placeholder-url';
+  if (model.provider === 'replicate') {
+    return await generateWithReplicate(model, prompt, width, height, referenceImageUrl, replicateToken!);
+  } else if (model.provider === 'huggingface') {
+    return await generateWithHuggingFace(model, prompt, width, height, hfToken!);
+  } else {
+    throw new Error(`Unknown provider: ${model.provider}`);
+  }
+}
+
+// Replicate API implementation
+async function generateWithReplicate(
+  model: any,
+  prompt: string,
+  width: number,
+  height: number,
+  imageUrl: string | undefined,
+  apiToken: string
+): Promise<string> {
+  console.log(`🔵 Replicate: Starting ${model.name}...`);
+
+  // Build input based on model capability
+  const input: any = {
+    prompt,
+    num_inference_steps: 25,
+    guidance_scale: 7.5,
+    num_outputs: 1,
+  };
+
+  // Add dimensions for text-to-image models
+  if (model.capability === 'text-to-image') {
+    input.width = width;
+    input.height = height;
+  }
+
+  // Add image for image-to-image models
+  if (model.capability === 'image-to-image' && imageUrl) {
+    input.image = imageUrl;
+    input.strength = 0.8;
+  }
+
+  // Create prediction
+  const response = await fetch('https://api.replicate.com/v1/predictions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Token ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      version: model.version,
+      input,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Replicate API error (${response.status}): ${error}`);
+  }
+
+  const prediction = await response.json();
+  console.log(`⏳ Replicate: Prediction created ${prediction.id}`);
+
+  // Poll for completion (max 60 attempts = 5 minutes)
+  let result = prediction;
+  for (let i = 0; i < 60; i++) {
+    if (result.status === 'succeeded' || result.status === 'failed' || result.status === 'canceled') {
+      break;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+    const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+      headers: {
+        'Authorization': `Token ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (statusResponse.ok) {
+      result = await statusResponse.json();
+      console.log(`⏳ Replicate: ${model.name} status: ${result.status}`);
+    }
+  }
+
+  if (result.status !== 'succeeded') {
+    throw new Error(`Generation failed: ${result.error || result.status}`);
+  }
+
+  // Extract image URL
+  const imageUrls = Array.isArray(result.output) ? result.output : [result.output];
+  const imageUrl = imageUrls[0];
+
+  if (!imageUrl) {
+    throw new Error('No image URL in response');
+  }
+
+  console.log(`✅ Replicate: ${model.name} completed`);
+  return imageUrl;
+}
+
+// Hugging Face API implementation
+async function generateWithHuggingFace(
+  model: any,
+  prompt: string,
+  width: number,
+  height: number,
+  apiToken: string
+): Promise<string> {
+  console.log(`🟡 Hugging Face: Starting ${model.name}...`);
+
+  const response = await fetch(`https://api-inference.huggingface.co/models/${model.id}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        width,
+        height,
+        num_inference_steps: 25,
+        guidance_scale: 7.5,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Hugging Face API error (${response.status}): ${error}`);
+  }
+
+  // HF returns image as blob
+  const blob = await response.blob();
+
+  // Upload to Supabase Storage
+  const fileName = `${model.id.replace('/', '-')}-${Date.now()}.png`;
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from('ai-generations')
+    .upload(fileName, blob, {
+      contentType: 'image/png',
+      cacheControl: '3600',
+    });
+
+  if (uploadError) {
+    throw new Error(`Storage upload failed: ${uploadError.message}`);
+  }
+
+  // Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('ai-generations')
+    .getPublicUrl(uploadData.path);
+
+  console.log(`✅ Hugging Face: ${model.name} completed`);
+  return publicUrl;
 }
 
 async function updateJobWithModelResult(jobId: string, modelId: string, imageUrl: string, progress: number) {
