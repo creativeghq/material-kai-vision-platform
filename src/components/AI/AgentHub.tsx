@@ -529,14 +529,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 console.log('💭 [THINKING]', chunk.hasToolCalls ? 'Has tool calls to execute' : 'Generating final response');
               } else if (chunk.type === 'heartbeat') {
                 console.log('💓 [HEARTBEAT] Stream alive');
-              } else if (chunk.type === 'error') {
-                console.error('❌ [ERROR] Edge function error:', chunk.message);
               } else if (chunk.type === 'final_result') {
                 console.log('🎯 Final result received!', chunk);
                 finalResult = chunk;
-              } else if (chunk.type === 'error') {
-                console.error('❌ Error chunk received:', chunk.message);
-                throw new Error(chunk.message);
+                // Check if this is an error result
+                if (chunk.error) {
+                  console.error('❌ Final result contains error:', chunk.errorMessage);
+                }
               } else if (chunk.type === 'done') {
                 console.log('✅ Done chunk received');
               } else {
@@ -571,6 +570,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           console.error('   supabase functions logs agent-chat --tail');
           console.error('❌ ========================================');
           throw new Error('No final result received from agent. Check edge function logs for details.');
+        }
+
+        // Check if final result contains an error
+        if (finalResult.error) {
+          console.error('❌ Agent execution failed:', finalResult.errorMessage);
+          throw new Error(finalResult.errorMessage || 'Agent execution failed');
         }
 
         data = finalResult;

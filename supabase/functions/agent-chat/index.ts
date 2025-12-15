@@ -2187,12 +2187,21 @@ After uploading, monitor the processing job and verify completion.`;
           console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
           streamClosed = true;
           try {
+            // Send error as final_result so client knows the stream is complete
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             controller.enqueue(JSON.stringify({
-              type: 'error',
-              message: error instanceof Error ? error.message : 'Unknown error'
+              type: 'final_result',
+              text: `Error: ${errorMessage}`,
+              agentId,
+              model: getModelNameForAgent(agentId),
+              error: true,
+              errorMessage: errorMessage
             }) + '\n');
+
+            // Send done chunk
+            controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
           } catch (enqueueError) {
-            console.error('❌ Failed to enqueue error chunk:', enqueueError);
+            console.error('❌ Failed to enqueue error chunks:', enqueueError);
           }
           controller.close();
         }
