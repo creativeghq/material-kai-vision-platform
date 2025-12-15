@@ -494,7 +494,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             try {
               const chunk = JSON.parse(line);
               chunkCount++;
-              console.log(`📨 Chunk #${chunkCount}:`, chunk.type, chunk);
+              console.log(`📨 Chunk #${chunkCount} [${chunk.type}]:`, chunk);
 
               // Handle different chunk types
               if (chunk.type === 'status') {
@@ -502,17 +502,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'iteration') {
                 console.log(`🔄 Iteration ${chunk.iteration}/${chunk.maxIterations}`);
               } else if (chunk.type === 'tool_call') {
-                console.log(`🔧 Calling tool: ${chunk.tool}`);
+                console.log(`🔧 Calling tool: ${chunk.tool}`, chunk.args);
               } else if (chunk.type === 'tool_result') {
                 console.log(`✅ Tool ${chunk.tool} completed`);
+              } else if (chunk.type === 'tool_error') {
+                console.error(`❌ Tool ${chunk.tool} failed:`, chunk.error);
+              } else if (chunk.type === 'assistant_thinking') {
+                console.log('💭 Assistant thinking...', chunk.hasToolCalls ? '(has tool calls)' : '(final response)');
+              } else if (chunk.type === 'heartbeat') {
+                console.log('💓 Heartbeat');
               } else if (chunk.type === 'final_result') {
-                console.log('🎯 Final result received!');
+                console.log('🎯 Final result received!', chunk);
                 finalResult = chunk;
               } else if (chunk.type === 'error') {
                 console.error('❌ Error chunk received:', chunk.message);
                 throw new Error(chunk.message);
               } else if (chunk.type === 'done') {
                 console.log('✅ Done chunk received');
+              } else {
+                console.warn('⚠️ Unknown chunk type:', chunk.type, chunk);
               }
             } catch (parseError) {
               console.warn('⚠️ Failed to parse chunk:', line, parseError);
