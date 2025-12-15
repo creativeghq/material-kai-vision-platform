@@ -521,9 +521,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         }
 
         console.log('🔍 Final result check:', finalResult ? 'Found' : 'NOT FOUND');
+        console.log('📊 Stream summary:', {
+          totalChunks: chunkCount,
+          finalResultReceived: !!finalResult,
+          lastChunkType: finalResult ? 'final_result' : 'unknown'
+        });
 
         if (!finalResult) {
-          throw new Error('No final result received from agent');
+          console.error('❌ No final_result chunk received. This usually means:');
+          console.error('   1. Edge function threw an error before sending final_result');
+          console.error('   2. Edge function timed out');
+          console.error('   3. Tool execution failed');
+          console.error('   Check Supabase Edge Function logs for details');
+          throw new Error('No final result received from agent. Check edge function logs for details.');
         }
 
         data = finalResult;

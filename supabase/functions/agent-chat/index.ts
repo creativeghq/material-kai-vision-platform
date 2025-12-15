@@ -1995,6 +1995,12 @@ After uploading, monitor the processing job and verify completion.`;
             console.log('💓 Heartbeat stopped');
           }
 
+          // Check if we got a valid result
+          if (!finalResult || !finalResult.text) {
+            console.error('❌ executeAgent returned null or invalid result');
+            throw new Error('Agent execution failed to return a valid result');
+          }
+
           // Save conversation
           console.log('💾 Saving conversation...');
           await saveConversation(user.id, agentId, messages, finalResult.text);
