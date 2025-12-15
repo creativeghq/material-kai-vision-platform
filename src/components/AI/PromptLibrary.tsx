@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Sparkles, Search, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface PromptTemplate {
@@ -9,9 +8,11 @@ interface PromptTemplate {
   name: string;
   description: string;
   prompt_text: string;
+  prompt_type: string;
   category: string;
-  industry: string;
-  stage: string;
+  subcategory?: string;
+  industry?: string;
+  stage?: string;
   is_active: boolean;
 }
 
@@ -27,7 +28,9 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
     name: 'Modern Living Room',
     description: 'Contemporary living space with clean lines and neutral tones',
     prompt_text: 'Design a modern living room with minimalist furniture, neutral color palette (whites, grays, beige), large windows for natural light, and contemporary art pieces. Include a comfortable sofa, coffee table, and accent lighting.',
-    category: 'interior',
+    prompt_type: 'template',
+    category: 'interior-designer',
+    subcategory: 'living-room',
     industry: 'residential',
     stage: 'design',
     is_active: true,
@@ -37,7 +40,9 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
     name: 'Cozy Bedroom',
     description: 'Warm and inviting bedroom with soft textures',
     prompt_text: 'Create a cozy bedroom with warm lighting, soft textiles (plush bedding, curtains), wooden furniture, and calming earth tones. Include a comfortable bed, nightstands, and ambient lighting for a relaxing atmosphere.',
-    category: 'interior',
+    prompt_type: 'template',
+    category: 'interior-designer',
+    subcategory: 'bedroom',
     industry: 'residential',
     stage: 'design',
     is_active: true,
@@ -47,7 +52,9 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
     name: 'Industrial Kitchen',
     description: 'Modern kitchen with industrial elements',
     prompt_text: 'Design an industrial-style kitchen with exposed brick walls, stainless steel appliances, concrete countertops, and pendant lighting. Include open shelving, bar stools, and a mix of metal and wood materials.',
-    category: 'interior',
+    prompt_type: 'template',
+    category: 'interior-designer',
+    subcategory: 'kitchen',
     industry: 'residential',
     stage: 'design',
     is_active: true,
@@ -57,7 +64,9 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
     name: 'Scandinavian Home Office',
     description: 'Bright and functional workspace with Nordic design',
     prompt_text: 'Create a Scandinavian-inspired home office with light wood furniture, white walls, minimalist desk setup, ergonomic chair, and plenty of natural light. Include plants, simple storage solutions, and a clean aesthetic.',
-    category: 'interior',
+    prompt_type: 'template',
+    category: 'interior-designer',
+    subcategory: 'office',
     industry: 'residential',
     stage: 'design',
     is_active: true,
@@ -67,7 +76,9 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
     name: 'Luxury Bathroom',
     description: 'Spa-like bathroom with premium finishes',
     prompt_text: 'Design a luxury bathroom with marble tiles, freestanding bathtub, rainfall shower, double vanity, and ambient lighting. Include high-end fixtures, heated floors, and a spa-like atmosphere with neutral tones.',
-    category: 'interior',
+    prompt_type: 'template',
+    category: 'interior-designer',
+    subcategory: 'bathroom',
     industry: 'residential',
     stage: 'design',
     is_active: true,
@@ -77,7 +88,9 @@ const DEFAULT_PROMPTS: PromptTemplate[] = [
     name: 'Bohemian Living Space',
     description: 'Eclectic and colorful living area',
     prompt_text: 'Create a bohemian living room with vibrant colors, mixed patterns, layered textiles (rugs, cushions, throws), plants, and eclectic furniture. Include vintage pieces, macramé wall hangings, and a relaxed, artistic vibe.',
-    category: 'interior',
+    prompt_type: 'template',
+    category: 'interior-designer',
+    subcategory: 'living-room',
     industry: 'residential',
     stage: 'design',
     is_active: true,
@@ -98,10 +111,10 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('prompt_templates')
+        .from('prompts')
         .select('*')
-        .eq('stage', 'design')
-        .eq('category', 'interior')
+        .eq('prompt_type', 'template')
+        .eq('category', 'interior-designer')  // STRICT: Only interior-designer category
         .eq('is_active', true)
         .order('name');
 
@@ -109,10 +122,26 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
         console.warn('Error loading prompts from database, using defaults:', error);
         setPrompts(DEFAULT_PROMPTS);
       } else if (!data || data.length === 0) {
-        console.log('No prompts in database, using defaults');
+        console.log('No interior design prompts in database, using defaults');
         setPrompts(DEFAULT_PROMPTS);
       } else {
-        setPrompts(data);
+        // ADDITIONAL FILTER: Only include prompts that are truly for interior design
+        // Filter out any prompts with categories like 'products', 'extraction', etc.
+        const interiorPrompts = data.filter((p: any) =>
+          p.category === 'interior-designer' &&
+          p.prompt_type === 'template' &&
+          !p.subcategory?.includes('extraction') &&
+          !p.subcategory?.includes('metadata') &&
+          !p.subcategory?.includes('entity_creation')
+        );
+
+        if (interiorPrompts.length === 0) {
+          console.log('No valid interior design prompts found, using defaults');
+          setPrompts(DEFAULT_PROMPTS);
+        } else {
+          console.log(`✅ Loaded ${interiorPrompts.length} interior design prompts`);
+          setPrompts(interiorPrompts as PromptTemplate[]);
+        }
       }
     } catch (error) {
       console.error('Error loading prompts:', error);
@@ -124,12 +153,12 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
 
   const filteredPrompts = prompts.filter(prompt => {
     const matchesSearch = prompt.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         prompt.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || prompt.industry === selectedCategory;
+                         (prompt.description?.toLowerCase() || '').includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || prompt.subcategory === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ['all', ...Array.from(new Set(prompts.map(p => p.industry)))];
+  const categories = ['all', ...Array.from(new Set(prompts.map(p => p.subcategory).filter(Boolean)))];
 
   const handleSelectPrompt = (prompt: PromptTemplate) => {
     onSelectPrompt(prompt.prompt_text);
@@ -138,63 +167,55 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-3xl shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden border border-border">
+      <div className="bg-card rounded-lg shadow-2xl max-w-4xl w-full max-h-[85vh] overflow-hidden border border-border">
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 p-6 text-white relative overflow-hidden">
-          {/* Decorative background pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <div className="absolute top-0 left-0 w-64 h-64 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-            <div className="absolute bottom-0 right-0 w-64 h-64 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+        <div className="p-6 border-b border-border">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Sparkles className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">Design Prompt Library</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Quick-start templates for interior design</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold">Design Prompt Library</h2>
-                  <p className="text-sm text-white/80 mt-0.5">Quick-start templates for interior design</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="text-white hover:bg-white/20 h-10 w-10"
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/60" />
-              <Input
-                type="text"
-                placeholder="Search design prompts..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 backdrop-blur-sm"
-              />
-            </div>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search design prompts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-lg"
+            />
           </div>
         </div>
 
         {/* Category Filter */}
-        <div className="p-4 border-b border-border bg-muted/30">
+        <div className="px-6 py-4 border-b border-border bg-background">
           <div className="flex gap-2 flex-wrap">
             {categories.map(category => (
-              <Button
+              <button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                variant={selectedCategory === category ? 'default' : 'outline'}
-                size="sm"
-                className={selectedCategory === category ? 'shadow-md' : ''}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === category
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
               >
                 {category === 'all' ? 'All Styles' : category.charAt(0).toUpperCase() + category.slice(1)}
-              </Button>
+              </button>
             ))}
           </div>
         </div>
@@ -225,9 +246,11 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
                     <h3 className="font-bold text-foreground group-hover:text-primary transition-colors text-base">
                       {prompt.name}
                     </h3>
-                    <span className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-semibold whitespace-nowrap ml-2">
-                      {prompt.industry}
-                    </span>
+                    {prompt.subcategory && (
+                      <span className="text-xs px-3 py-1 bg-primary/10 text-primary rounded-full font-semibold whitespace-nowrap ml-2 capitalize">
+                        {prompt.subcategory.replace('-', ' ')}
+                      </span>
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{prompt.description}</p>
 

@@ -134,7 +134,7 @@ const AGENTS: AgentDefinition[] = [
   },
   {
     id: 'interior-designer',
-    name: 'Interior Designer Agent',
+    name: 'Interior Agent',
     description: 'AI-powered interior design with 3D generation and material matching',
     icon: Sparkles,
     color: 'text-violet-500',
@@ -1009,22 +1009,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </Select>
               </div>
 
-              {/* Model Selection */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">Model:</label>
-                <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger className="w-[200px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AI_MODELS.map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        {model.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+
 
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Settings className="h-4 w-4" />
@@ -1328,18 +1313,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </>
               )}
 
-              {/* Prompt Library Button (Interior Designer Agent only) */}
+              {/* Prompt Library Icon (Interior Designer Agent only) */}
               {selectedAgent === 'interior-designer' && (
-                <Button
-                  variant="outline"
-                  size="sm"
+                <button
                   onClick={() => setShowPromptLibrary(true)}
-                  className="h-9 px-3 gap-2"
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                   title="Open Prompt Library"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span className="text-xs font-medium">Prompts</span>
-                </Button>
+                  <Sparkles className="h-5 w-5" />
+                </button>
               )}
 
               <Button
