@@ -183,10 +183,11 @@ serve(async (req) => {
         generation_type: 'interior_design',
         generation_status: 'processing',
         input_data: { prompt, room_type, style, width, height, image_url },
-        generation_config: { enhanced_prompt: enhancedPrompt, has_reference_image: hasReferenceImage },
         progress_percentage: 0,
         // Create placeholder slots for each model
         output_data: {
+          enhanced_prompt: enhancedPrompt,
+          has_reference_image: hasReferenceImage,
           model_results: modelsToUse.map(m => ({
             model_id: m.id,
             model_name: m.name,
