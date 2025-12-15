@@ -1562,7 +1562,8 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
 
 /**
  * Execute agent with tools using LangChain - STREAMING VERSION
- * Returns { text, materialResults } where materialResults contains search products
+ * Returns { text, materialResults, toolResults } where materialResults contains search products
+ * and toolResults contains all tool execution results
  * onChunk callback receives real-time progress updates
  */
 async function executeAgent(
@@ -1573,7 +1574,11 @@ async function executeAgent(
   messages: any[],
   pdfFile?: { name: string; base64: string; category: string },
   onChunk?: (chunk: any) => void
-): Promise<{ text: string; materialResults?: { products: any[]; images?: Record<string, string>; title?: string } }> {
+): Promise<{
+  text: string;
+  materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
+  toolResults?: any[];
+}> {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
@@ -1581,6 +1586,8 @@ async function executeAgent(
 
   // Collect material results from search tool calls
   let collectedProducts: any[] = [];
+  // Collect all tool results for frontend
+  let collectedToolResults: any[] = [];
 
   // Load system prompt from database (or use hardcoded fallback)
   let systemPrompt: string;
@@ -1754,7 +1761,8 @@ async function executeAgent(
 
       return {
         text: textContent,
-        materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined
+        materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
+        toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined
       };
     }
 
@@ -1805,14 +1813,22 @@ async function executeAgent(
           // Stream closed - continue
         }
 
-        // Capture search results for materialResults
-        if (toolCall.name === 'material_search') {
-          try {
-            const resultStr = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
-            const searchData = JSON.parse(resultStr);
-            if (searchData.results && Array.isArray(searchData.results)) {
+        // Collect tool results for frontend
+        try {
+          const resultStr = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+          const parsedResult = JSON.parse(resultStr);
+
+          // Store all tool results
+          collectedToolResults.push({
+            tool: toolCall.name,
+            result: parsedResult,
+          });
+
+          // Capture search results for materialResults
+          if (toolCall.name === 'material_search') {
+            if (parsedResult.results && Array.isArray(parsedResult.results)) {
               // Transform search results to Product interface format for ProductStrip
-              const products = searchData.results.map((r: any) => {
+              const products = parsedResult.results.map((r: any) => {
                 const imageUrl = r.image_url || r.thumbnail || r.metadata?.image_url || r.metadata?.thumbnail;
                 return {
                   id: r.id || r.product_id || `product-${Date.now()}-${Math.random()}`,
@@ -1844,9 +1860,9 @@ async function executeAgent(
               collectedProducts = [...collectedProducts, ...products];
               console.log(`  📦 Collected ${products.length} products from search`);
             }
-          } catch (parseError) {
-            console.warn('  ⚠️ Could not parse search results:', parseError);
           }
+        } catch (parseError) {
+          console.warn('  ⚠️ Could not parse tool result:', parseError);
         }
 
         // Add tool result to messages
@@ -1886,7 +1902,8 @@ async function executeAgent(
   console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
   return {
     text: 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.',
-    materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined
+    materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
+    toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined
   };
 }
 
@@ -2176,6 +2193,7 @@ After uploading, monitor the processing job and verify completion.`;
             agentId,
             model: modelUsed,
             materialResults: finalResult.materialResults,
+            tool_results: finalResult.toolResults,
           }) + '\n');
           console.log('✅ Final result chunk sent');
 

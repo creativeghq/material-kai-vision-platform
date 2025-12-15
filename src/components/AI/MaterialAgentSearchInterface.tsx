@@ -759,17 +759,24 @@ export const MaterialAgentSearchInterface: React.FC<
 
       // Check if response contains async job info (from generate_3d tool)
       let asyncJobInfo = null;
-      if (data.data && typeof data.data === 'object') {
-        const toolResults = (data.data as any).tool_results || [];
-        const asyncJobResult = toolResults.find((r: any) => r.async_job && r.job_id);
-        if (asyncJobResult) {
+      const toolResults = (data as any).tool_results || [];
+      console.log('🔍 Checking for async job in tool_results:', toolResults);
+
+      // Find generate_3d tool result
+      const generate3DResult = toolResults.find((r: any) => r.tool === 'generate_3d');
+      if (generate3DResult?.result) {
+        const result = generate3DResult.result;
+        console.log('🎨 Found generate_3d result:', result);
+
+        // Check if it's an async job
+        if (result.async_job && result.job_id) {
           asyncJobInfo = {
-            job_id: asyncJobResult.job_id,
-            model_count: asyncJobResult.model_count,
-            models: asyncJobResult.models,
-            estimated_time_minutes: asyncJobResult.estimated_time_minutes,
+            job_id: result.job_id,
+            model_count: result.model_count,
+            models: result.models,
+            estimated_time_minutes: result.estimated_time_minutes,
           };
-          console.log('🎨 Detected async 3D generation job:', asyncJobInfo);
+          console.log('✅ Detected async 3D generation job:', asyncJobInfo);
         }
       }
 
