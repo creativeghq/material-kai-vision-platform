@@ -419,25 +419,28 @@ const createSpaceformerTool = (workspaceId: string) => {
 };
 
 /**
- * LangChain Tool: 3D Interior Design Generation
+ * LangChain Tool: 3D Interior Design Generation (Async)
  *
- * DISABLED: The mastra-3d-generation edge function has been removed.
- * 3D generation is now handled client-side via MaterialAgent3DGenerationAPI
- * which uses BrowserApiIntegrationService.generateInteriorDesign()
+ * Triggers async generation and returns job ID + grid structure immediately
+ * Frontend polls the job for real-time updates
  */
-/* DISABLED - Use MaterialAgent3DGenerationAPI on frontend instead
 const create3DGenerationTool = (userId: string, workspaceId: string) => {
   return tool(
     async ({ prompt, roomType, style, referenceImageUrl }) => {
       try {
-        const { data, error } = await supabase.functions.invoke('mastra-3d-generation', {
+        console.log('🎨 Starting async 3D interior design generation...');
+
+        // Call the async generation edge function
+        const { data, error } = await supabase.functions.invoke('generate-interior-design-async', {
           body: {
             user_id: userId,
             workspace_id: workspaceId,
             prompt,
             room_type: roomType,
             style,
-            reference_image_url: referenceImageUrl,
+            image_url: referenceImageUrl,
+            width: 768,
+            height: 768,
           },
         });
 
@@ -445,14 +448,18 @@ const create3DGenerationTool = (userId: string, workspaceId: string) => {
           throw new Error(`3D generation failed: ${error.message}`);
         }
 
+        console.log('✅ Async generation job created:', data);
+
+        // Return job info immediately - frontend will poll for updates
         return JSON.stringify({
           success: true,
-          generation_id: data.generationId,
-          image_urls: data.image_urls || [],
-          parsed_request: data.parsed_request || {},
-          matched_materials: data.matched_materials || [],
-          quality_assessment: data.quality_assessment || {},
-          processing_time_ms: data.processing_time_ms,
+          async_job: true,
+          job_id: data.job_id,
+          model_count: data.model_count,
+          models: data.models,
+          estimated_time_minutes: data.estimated_time_minutes,
+          message: `Started generating ${data.model_count} interior design variations. This will take approximately ${data.estimated_time_minutes} minutes.`,
+          frontend_action: 'SHOW_PROGRESSIVE_GRID', // Signal to frontend to show the grid
         });
       } catch (error) {
         console.error('3D generation tool error:', error);
@@ -474,7 +481,6 @@ const create3DGenerationTool = (userId: string, workspaceId: string) => {
     }
   );
 };
-*/
 
 /**
  * LangChain Tool: Material Cost Estimation
@@ -1547,9 +1553,9 @@ DEMO_DATA: {"data":{"command":"green_wood"}}
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis', 'spaceformer_analysis'], // material_search dynamically injected
+    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'generate_3d'], // generate_3d for async 3D generation
     // systemPrompt loaded dynamically from database
-    // NOTE: 3D generation (generate_3d tool) is handled client-side via MaterialAgent3DGenerationAPI
+    // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
   },
 };
@@ -1656,10 +1662,10 @@ async function executeAgent(
   if (config.tools.includes('spaceformer_analysis')) {
     tools.push(createSpaceformerTool(workspaceId));
   }
-  // DISABLED: 3D generation tool removed - use MaterialAgent3DGenerationAPI on frontend instead
-  // if (config.tools.includes('generate_3d')) {
-  //   tools.push(create3DGenerationTool(userId, workspaceId));
-  // }
+  // Async 3D generation tool - returns job ID immediately for frontend polling
+  if (config.tools.includes('generate_3d')) {
+    tools.push(create3DGenerationTool(userId, workspaceId));
+  }
   if (config.tools.includes('estimate_cost')) {
     tools.push(createCostEstimationTool(workspaceId));
   }

@@ -30,6 +30,7 @@ import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 // import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
+import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 
 interface AttachedFile {
   id: string;
@@ -65,6 +66,12 @@ interface MessageMetadata {
   crewAI?: boolean | undefined;
   has3DContent?: boolean;
   designGeneration?: Record<string, unknown>;
+  asyncJob?: {
+    job_id: string;
+    model_count: number;
+    models: Array<{ id: string; name: string; provider: string }>;
+    estimated_time_minutes: number;
+  };
 }
 
 interface APIResponse {
@@ -750,6 +757,22 @@ export const MaterialAgentSearchInterface: React.FC<
         );
       }
 
+      // Check if response contains async job info (from generate_3d tool)
+      let asyncJobInfo = null;
+      if (data.data && typeof data.data === 'object') {
+        const toolResults = (data.data as any).tool_results || [];
+        const asyncJobResult = toolResults.find((r: any) => r.async_job && r.job_id);
+        if (asyncJobResult) {
+          asyncJobInfo = {
+            job_id: asyncJobResult.job_id,
+            model_count: asyncJobResult.model_count,
+            models: asyncJobResult.models,
+            estimated_time_minutes: asyncJobResult.estimated_time_minutes,
+          };
+          console.log('🎨 Detected async 3D generation job:', asyncJobInfo);
+        }
+      }
+
       // Transform Material Agent response to expected format
       const hybridData = data as any; // HybridResponse type
       const transformedData = {
@@ -765,6 +788,7 @@ export const MaterialAgentSearchInterface: React.FC<
           processingTime: hybridData.total_processing_time_ms,
           finalScore: hybridData.final_score,
           attempts: hybridData.attempts?.length || 0,
+          ...(asyncJobInfo && { asyncJob: asyncJobInfo }),
         },
       };
 
@@ -1226,6 +1250,25 @@ export const MaterialAgentSearchInterface: React.FC<
                           </div>
                         </div>
                       )}
+
+                    {/* Async 3D Generation Grid */}
+                    {message.metadata?.asyncJob && (
+                      <div className="space-y-2 mt-4">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Sparkles className="h-4 w-4 text-purple-500" />
+                          Generating {message.metadata.asyncJob.model_count} Design Variations
+                        </div>
+                        <ProgressiveImageGrid
+                          jobId={message.metadata.asyncJob.job_id}
+                          modelCount={message.metadata.asyncJob.model_count}
+                          models={message.metadata.asyncJob.models}
+                          onImageClick={(imageUrl, modelName) => {
+                            console.log('Image clicked:', imageUrl, modelName);
+                            // TODO: Trigger related material search
+                          }}
+                        />
+                      </div>
+                    )}
 
                     {/* 3D Generation Matched Materials */}
                     {message.metadata?.has3DContent &&
