@@ -51,8 +51,11 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
   // Adaptive polling: 1s → 3s → 5s → 10s (66% reduction in DB queries)
   useEffect(() => {
-    let pollInterval: NodeJS.Timeout;
+    if (!jobId) return;
+
     let pollCount = 0;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let isCancelled = false;
 
     const getAdaptiveInterval = (count: number): number => {
       if (count < 5) return 1000;      // First 5 polls: 1s (fast initial feedback)
@@ -62,9 +65,11 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     };
 
     const pollJob = async () => {
+      if (isCancelled) return;
+
       const { data, error } = await supabase
         .from('generation_3d')
-        .select('metadata, progress_percentage, generation_status')
+        .select('models_results, progress_percentage, generation_status')
         .eq('id', jobId)
         .single();
 
@@ -74,9 +79,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
       }
 
       if (data) {
-        // Extract models_results from metadata JSONB field
-        const metadata = data.metadata as any;
-        const newResults = metadata?.models_results || [];
+        // models_results is a DICT at top level, not in metadata
+        const modelsResultsDict = (data.models_results as any) || {};
+        const newResults = Object.values(modelsResultsDict) as ModelResult[];
 
         // Only update if there are actual changes
         setModelResults(prev => {
@@ -89,18 +94,14 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
         // Stop polling if completed or failed
         if (data.generation_status === 'completed' || data.generation_status === 'failed') {
-          clearInterval(pollInterval);
           return;
         }
 
-        // Adaptive polling: adjust interval based on poll count
-        pollCount++;
-        const newInterval = getAdaptiveInterval(pollCount);
-
-        // Restart interval with new timing if it changed
-        if (pollInterval) {
-          clearInterval(pollInterval);
-          pollInterval = setInterval(pollJob, newInterval);
+        // Schedule next poll with adaptive interval (using setTimeout to avoid nested intervals)
+        if (!isCancelled) {
+          pollCount++;
+          const interval = getAdaptiveInterval(pollCount);
+          timeoutId = setTimeout(pollJob, interval);
         }
       }
     };
@@ -108,10 +109,12 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     // Initial fetch
     pollJob();
 
-    // Start polling with initial 1s interval
-    pollInterval = setInterval(pollJob, 1000);
-
-    return () => clearInterval(pollInterval);
+    return () => {
+      isCancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [jobId]);
 
   const handleImageClick = (result: ModelResult) => {
