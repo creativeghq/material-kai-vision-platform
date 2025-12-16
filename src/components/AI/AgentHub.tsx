@@ -145,8 +145,8 @@ const AGENTS: AgentDefinition[] = [
 
 // AI Models available (format: provider/model-name for Mastra)
 const AI_MODELS = [
-  { id: 'anthropic/claude-sonnet-4-20250514', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-  { id: 'anthropic/claude-haiku-4-20250514', name: 'Claude Haiku 4.5', provider: 'anthropic' },
+  { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
+  { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic' },
   { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai' },
   { id: 'together/meta-llama/Llama-4-Scout-17B-16E-Instruct', name: 'Llama 4 Scout 17B', provider: 'together' },
 ];

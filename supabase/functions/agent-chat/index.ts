@@ -127,13 +127,13 @@ let modelHaiku: ChatAnthropic;
 let modelSonnet: ChatAnthropic;
 
 try {
-  // Claude Haiku 3.5 - Fast model for search queries (~3-5 seconds)
+  // Claude Haiku 4.5 - Fast model for search queries (~3-5 seconds)
   modelHaiku = new ChatAnthropic({
-    model: 'claude-3-5-haiku-20241022',
+    model: 'claude-haiku-4-5-20251001',
     temperature: 0.7,
     maxTokens: 4096,
   });
-  console.log('✅ Claude Haiku 3.5 model initialized (fast search)');
+  console.log('✅ Claude Haiku 4.5 model initialized (fast search)');
 
   // Claude Sonnet 4.5 - Full model for complex tasks
   modelSonnet = new ChatAnthropic({

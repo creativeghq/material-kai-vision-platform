@@ -108,7 +108,7 @@ Response format:
 
     // Call Claude Sonnet
     const response = await anthropic.messages.create({
-      model: model === 'claude-sonnet-4-5' ? 'claude-sonnet-4-20250514' : 'claude-4-5-haiku-20250514',
+      model: model === 'claude-sonnet-4-5' ? 'claude-sonnet-4-5-20250929' : 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       temperature: 0.1,
       messages: [
