@@ -431,7 +431,10 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
         console.log('🎨 Starting interior design generation...');
 
         // Call MIVAA API to create job
-        const response = await fetch('http://localhost:8000/api/interior', {
+        const interiorApiUrl = `${MIVAA_GATEWAY_URL}/api/interior`;
+        console.log('🔗 Interior API URL:', interiorApiUrl);
+
+        const response = await fetch(interiorApiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -2217,25 +2220,35 @@ After uploading, monitor the processing job and verify completion.`;
         } catch (error) {
           console.error('❌ Streaming error:', error);
           console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
-          streamClosed = true;
-          try {
-            // Send error as final_result so client knows the stream is complete
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            controller.enqueue(JSON.stringify({
-              type: 'final_result',
-              text: `Error: ${errorMessage}`,
-              agentId,
-              model: getModelNameForAgent(agentId),
-              error: true,
-              errorMessage: errorMessage
-            }) + '\n');
 
-            // Send done chunk
-            controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
-          } catch (enqueueError) {
-            console.error('❌ Failed to enqueue error chunks:', enqueueError);
+          // Only try to send error if stream is not already closed
+          if (!streamClosed) {
+            streamClosed = true;
+            try {
+              // Send error as final_result so client knows the stream is complete
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              controller.enqueue(JSON.stringify({
+                type: 'final_result',
+                text: `Error: ${errorMessage}`,
+                agentId,
+                model: getModelNameForAgent(agentId),
+                error: true,
+                errorMessage: errorMessage
+              }) + '\n');
+
+              // Send done chunk
+              controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
+            } catch (enqueueError) {
+              console.error('❌ Failed to enqueue error chunks:', enqueueError);
+            }
           }
-          controller.close();
+
+          // Close controller if not already closed
+          try {
+            controller.close();
+          } catch (closeError) {
+            console.warn('⚠️ Controller already closed');
+          }
         }
       }
     });
