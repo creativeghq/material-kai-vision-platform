@@ -1661,6 +1661,14 @@ async function executeAgent(
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
   toolResults?: any[];
+  generationJob?: {
+    job_id: string;
+    model_count: number;
+    models: Array<{ id: string; name: string; provider: string }>;
+    prompt: string;
+    room_type?: string;
+    style?: string;
+  };
 }> {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
