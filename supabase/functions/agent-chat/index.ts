@@ -2400,13 +2400,14 @@ After uploading, monitor the processing job and verify completion.`;
 
             streamClosed = true;
           }
-
+        } finally {
           // Close controller if not already closed
           try {
             controller.close();
           } catch (closeError) {
             console.warn('⚠️ Controller already closed:', closeError);
           }
+        }
         })(); // End of async IIFE
       }
     });
