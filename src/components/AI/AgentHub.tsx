@@ -544,7 +544,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'heartbeat') {
                 console.log('💓 [HEARTBEAT] Stream alive');
               } else if (chunk.type === 'final_result') {
-                console.log('🎯 Final result received!', chunk);
+                console.log('🎯 ========================================');
+                console.log('🎯 FINAL RESULT RECEIVED!');
+                console.log('🎯 ========================================');
+                console.log('🎯 Full chunk:', chunk);
+                console.log('🎯 Has generation_job:', !!chunk.generation_job);
+                if (chunk.generation_job) {
+                  console.log('🎨 Generation job details:', chunk.generation_job);
+                }
+                console.log('🎯 ========================================');
                 finalResult = chunk;
                 // Check if this is an error result
                 if (chunk.error) {
