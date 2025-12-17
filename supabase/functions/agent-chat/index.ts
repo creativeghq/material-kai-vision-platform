@@ -2224,21 +2224,31 @@ serve(async (req) => {
         const safeEnqueue = (data: any): boolean => {
           if (streamClosed) {
             // Stream already closed, silently skip
+            console.log(`⏭️ Skipping chunk (stream closed): ${data.type}`);
             return false;
           }
           try {
             controller.enqueue(JSON.stringify(data) + '\n');
+            console.log(`✅ Enqueued chunk: ${data.type}`);
             return true;
           } catch (error) {
-            // Stream closed by client or network - this is expected behavior
-            // Only log if it's not a standard "controller cannot enqueue" error
-            if (error instanceof Error && !error.message.includes('cannot close or enqueue')) {
-              console.warn('⚠️ Unexpected enqueue error:', error);
-            }
-            streamClosed = true;
-            if (heartbeatInterval) {
-              clearInterval(heartbeatInterval);
-              heartbeatInterval = null;
+            // Stream closed by client or network
+            console.error('❌ Enqueue failed:', error);
+            console.error('   Chunk type:', data.type);
+            console.error('   Error message:', error instanceof Error ? error.message : 'Unknown');
+
+            // DON'T set streamClosed = true here!
+            // The stream might still be open, just had a transient error
+            // Let the heartbeat and final result sending continue
+
+            // Only stop heartbeat if it's a "cannot enqueue" error (stream truly closed)
+            if (error instanceof Error && error.message.includes('cannot close or enqueue')) {
+              console.warn('⚠️ Stream truly closed, stopping heartbeat');
+              streamClosed = true;
+              if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+              }
             }
             return false;
           }
@@ -2305,12 +2315,6 @@ serve(async (req) => {
             }
           }
 
-          // Check if stream is still open before proceeding
-          if (streamClosed) {
-            console.warn('⚠️ Stream closed during execution, skipping final result');
-            return;
-          }
-
           // Check if we got a valid result
           if (!finalResult || !finalResult.text) {
             console.error('❌ executeAgent returned null or invalid result');
@@ -2322,33 +2326,44 @@ serve(async (req) => {
           await saveConversation(user.id, agentId, messages, finalResult.text);
           console.log('✅ Conversation saved');
 
-          // Send final result
-          console.log('📤 Sending final result chunk...');
+          // Send final result - ALWAYS TRY, even if stream appears closed
+          console.log('📤 Attempting to send final result chunk...');
+          console.log('📤 Stream closed flag:', streamClosed);
+
           const modelUsed = getModelNameForAgent(agentId);
-          if (!safeEnqueue({
-            type: 'final_result',
-            text: finalResult.text,
-            agentId,
-            model: modelUsed,
-            materialResults: finalResult.materialResults,
-            tool_results: finalResult.toolResults,
-            generation_job: finalResult.generationJob,
-          })) {
-            console.warn('⚠️ Failed to send final result, stream closed');
-            return;
-          }
-          console.log('✅ Final result chunk sent');
-          if (finalResult.generationJob) {
-            console.log('🎨 Generation job included in response:', finalResult.generationJob.job_id);
+
+          // Try to send final result directly to controller, bypassing safeEnqueue check
+          try {
+            const finalChunk = {
+              type: 'final_result',
+              text: finalResult.text,
+              agentId,
+              model: modelUsed,
+              materialResults: finalResult.materialResults,
+              tool_results: finalResult.toolResults,
+              generation_job: finalResult.generationJob,
+            };
+
+            controller.enqueue(JSON.stringify(finalChunk) + '\n');
+            console.log('✅ Final result chunk sent successfully');
+
+            if (finalResult.generationJob) {
+              console.log('🎨 Generation job included in response:', finalResult.generationJob.job_id);
+            }
+          } catch (enqueueError) {
+            console.error('❌ CRITICAL: Failed to send final result:', enqueueError);
+            console.error('   This means the client will show "No final result received"');
+            // Don't return - try to send done chunk anyway
           }
 
-          // Send completion
+          // Send completion - try directly
           console.log('📤 Sending done chunk...');
-          if (!safeEnqueue({ type: 'done' })) {
-            console.warn('⚠️ Failed to send done chunk, stream closed');
-            return;
+          try {
+            controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
+            console.log('✅ Done chunk sent');
+          } catch (doneError) {
+            console.warn('⚠️ Failed to send done chunk:', doneError);
           }
-          console.log('✅ Done chunk sent');
 
           console.log('🏁 Closing stream');
           streamClosed = true;
