@@ -1850,7 +1850,8 @@ async function executeAgent(
       for (const toolResult of collectedToolResults) {
         if (toolResult.tool === 'generate_3d') {
           try {
-            const result = JSON.parse(toolResult.result);
+            // toolResult.result is already a parsed object, no need to JSON.parse
+            const result = toolResult.result;
             if (result.success && result.async_job) {
               generationJob = {
                 job_id: result.job_id,
@@ -2016,7 +2017,8 @@ async function executeAgent(
   for (const toolResult of collectedToolResults) {
     if (toolResult.tool === 'generate_3d') {
       try {
-        const result = JSON.parse(toolResult.result);
+        // toolResult.result is already a parsed object, no need to JSON.parse
+        const result = toolResult.result;
         if (result.success && result.async_job) {
           generationJob = {
             job_id: result.job_id,
