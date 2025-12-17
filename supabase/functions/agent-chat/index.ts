@@ -2141,8 +2141,12 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🎯 Handler started - parsing request body...');
+
     // Get request body
     const { messages = [], agentId = 'search', pdfFile } = await req.json();
+
+    console.log('✅ Request body parsed successfully');
 
     console.log(`📨 Received request for agent: ${agentId}, messages: ${messages.length}, hasPDF: ${!!pdfFile}`);
 
