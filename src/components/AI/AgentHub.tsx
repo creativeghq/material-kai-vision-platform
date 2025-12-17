@@ -459,25 +459,42 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }
         );
 
+        // Debug: Log response details
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
         if (!response.ok) {
           const errorText = await response.text();
+          logger.error(`Agent request failed: ${response.status}`, {
+            service: 'AgentHub',
+            metadata: { status: response.status, error: errorText }
+          });
           throw new Error(`Agent execution failed: ${response.status} - ${errorText}`);
         }
 
         if (!response.body) {
+          logger.error('No response body from agent', { service: 'AgentHub' });
           throw new Error('No response body');
         }
 
+        console.log('Starting to read stream...');
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let finalResult: any = null;
+        let chunkCount = 0;
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+
+          if (done) {
+            console.log('Stream ended. Total chunks:', chunkCount);
+            break;
+          }
 
           const decoded = decoder.decode(value, { stream: true });
+          console.log('Raw chunk:', decoded.substring(0, 100));
           buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -487,6 +504,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
             try {
               const chunk = JSON.parse(line);
+              chunkCount++;
+              console.log(`Chunk #${chunkCount}:`, chunk.type);
 
               // Handle generation_job_created - IMMEDIATE response
               if (chunk.type === 'generation_job_created') {
@@ -523,10 +542,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 });
               }
             } catch (parseError) {
-              logger.warn('Failed to parse stream chunk', {
-                service: 'AgentHub',
-                metadata: { line, error: parseError }
-              });
+              console.warn('Parse error:', parseError);
             }
           }
         }
