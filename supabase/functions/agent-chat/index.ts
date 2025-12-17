@@ -38,13 +38,17 @@ console.log('✅ process.env polyfill set up for npm packages');
 
 // NOW import dependencies (after polyfill is set up)
 import { serve } from 'http/server.ts';
-import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 
-// LangChain imports - using bare imports resolved by deno.json
-import { ChatAnthropic } from '@langchain/anthropic';
-import { tool } from '@langchain/core/tools';
-import { z } from 'zod';
+// Import types only to avoid side effects
+import type { ChatAnthropic } from '@langchain/anthropic';
+
+// We use dynamic imports for libraries that might access process.env at top-level
+// This ensures the polyfill runs BEFORE these modules are loaded
+const { createClient } = await import('@supabase/supabase-js');
+const { ChatAnthropic } = await import('@langchain/anthropic');
+const { tool } = await import('@langchain/core/tools');
+const { z } = await import('zod');
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -434,21 +438,37 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
         const interiorApiUrl = `${MIVAA_GATEWAY_URL}/api/interior`;
         console.log('🔗 Interior API URL:', interiorApiUrl);
 
-        const response = await fetch(interiorApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt,
-            room_type: roomType,
-            style,
-            image: referenceImageUrl,
-            models: models || undefined, // undefined = all models
-            user_id: userId,
-            workspace_id: workspaceId,
-            width: 768,
-            height: 768,
-          }),
-        });
+        // Add timeout to prevent edge function from hanging
+        const TIMEOUT_MS = 60000; // 60 seconds (creating a job should be fast)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        let response;
+        try {
+          response = await fetch(interiorApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt,
+              room_type: roomType,
+              style,
+              image: referenceImageUrl,
+              models: models || undefined, // undefined = all models
+              user_id: userId,
+              workspace_id: workspaceId,
+              width: 768,
+              height: 768,
+            }),
+            signal: controller.signal,
+          });
+        } catch (fetchError) {
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            throw new Error(`Request timed out after ${TIMEOUT_MS}ms`);
+          }
+          throw fetchError;
+        } finally {
+          clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
           throw new Error(`MIVAA API error: ${response.statusText}`);
@@ -2234,7 +2254,7 @@ serve(async (req) => {
       start(controller) {
         console.log('🎬 Stream start() called');
         let streamClosed = false;
-        let heartbeatInterval: number | null = null;
+        let heartbeatInterval: any = null;
         let cancelRequested = false;
 
         // Safe enqueue helper that checks if stream is still open
@@ -2354,31 +2374,29 @@ serve(async (req) => {
             generation_job: finalResult.generationJob,
           };
 
-          // Send final result - ALWAYS TRY, even if stream appears closed
+          // Send final result - use safeEnqueue to check if stream is still open
           console.log('📤 Attempting to send final result chunk...');
           console.log('📤 Stream closed flag:', streamClosed);
 
-          // Try to send final result directly to controller
-          try {
-            controller.enqueue(JSON.stringify(finalChunk) + '\n');
+          const finalSent = safeEnqueue(finalChunk);
+          if (finalSent) {
             console.log('✅ Final result chunk sent successfully via stream');
-
             if (finalResult.generationJob) {
               console.log('🎨 Generation job included in response:', finalResult.generationJob.job_id);
             }
-          } catch (enqueueError) {
-            console.error('❌ Stream enqueue failed:', enqueueError);
+          } else {
+            console.error('❌ Failed to send final result chunk (stream closed)');
             console.error('   Note: generation_job_created was already sent immediately');
             // Don't throw - generation job was already sent via generation_job_created chunk
           }
 
-          // Send completion - try directly
+          // Send completion
           console.log('📤 Sending done chunk...');
-          try {
-            controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
+          const doneSent = safeEnqueue({ type: 'done' });
+          if (doneSent) {
             console.log('✅ Done chunk sent');
-          } catch (doneError) {
-            console.warn('⚠️ Failed to send done chunk:', doneError);
+          } else {
+            console.warn('⚠️ Failed to send done chunk (stream closed)');
           }
 
           console.log('🏁 Closing stream');

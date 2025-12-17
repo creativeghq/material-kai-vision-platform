@@ -634,8 +634,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       } : undefined;
 
       // Generate 3D design + SpaceFormer analysis for Interior Designer Agent
+      // IMPORTANT: Only generate if backend didn't already create a generation job
       let designData: Message['designData'] = undefined;
-      if (selectedAgent === 'interior-designer') {
+      if (selectedAgent === 'interior-designer' && !data.generation_job) {
         try {
           // Check if the user's message or agent's response contains design-related keywords
           const designKeywords = ['design', 'interior', 'room', 'space', 'layout', 'furniture', 'decor', 'modern', 'minimalist', 'bedroom', 'living room', 'kitchen', 'bathroom'];
@@ -680,6 +681,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           console.warn('⚠️ 3D generation failed (non-critical):', generationError);
           // Continue without design data - don't fail the entire message
         }
+      } else if (selectedAgent === 'interior-designer' && data.generation_job) {
+        console.log('✅ Backend already created generation job, skipping frontend generation');
       }
 
       // Add assistant response to messages
