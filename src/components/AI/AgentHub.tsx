@@ -46,7 +46,7 @@ import { PromptLibrary } from './PromptLibrary';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
-import { getCachedResponse, cacheResponse } from '@/services/agents/agentCacheCache';
+import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 
 // Agent definitions with RBAC
