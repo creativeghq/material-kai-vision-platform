@@ -178,6 +178,14 @@ const AdminDashboard: React.FC = () => {
         count: 'Real-time',
       },
       {
+        title: 'Interior Design Analytics',
+        description: 'Track interior design generation costs and model usage',
+        icon: BarChart3,
+        path: '/admin/interior-design-analytics',
+        status: 'active',
+        count: 'Cost Tracking',
+      },
+      {
         title: 'AI Configurations',
         description: 'Manage all AI prompts: agents, extraction, templates, and search',
         icon: Bot,

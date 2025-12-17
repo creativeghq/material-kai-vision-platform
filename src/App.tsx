@@ -29,6 +29,7 @@ import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
 import { AIMonitoringDashboard } from './components/Admin/AIMonitoringDashboard';
 import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
+import { InteriorDesignAnalytics } from './components/Admin/InteriorDesignAnalytics';
 import { SystemPerformance } from './components/Admin/SystemPerformance';
 import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
 import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
@@ -330,6 +331,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <AIMonitoringDashboard />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/interior-design-analytics"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <InteriorDesignAnalytics />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>
