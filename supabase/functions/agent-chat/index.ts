@@ -462,15 +462,34 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
 
         console.log('✅ Generation job created:', result);
 
-        // Return job info for frontend polling
-        return JSON.stringify({
+        const jobInfo = {
           success: true,
           async_job: true,
           job_id: result.job_id,
           model_count: result.model_count,
           models: result.models,
           message: result.message,
-        });
+        };
+
+        // IMMEDIATELY send generation job info via streaming callback
+        // This bypasses waiting for the agent to finish
+        try {
+          onChunk?.({
+            type: 'generation_job_created',
+            job_id: result.job_id,
+            model_count: result.model_count,
+            models: result.models,
+            prompt: prompt,
+            room_type: roomType,
+            style: style,
+          });
+          console.log('✅ Sent generation_job_created chunk immediately');
+        } catch (e) {
+          console.warn('⚠️ Failed to send generation_job_created chunk:', e);
+        }
+
+        // Return job info for agent context
+        return JSON.stringify(jobInfo);
       } catch (error) {
         console.error('Interior design generation error:', error);
         return JSON.stringify({
@@ -2219,6 +2238,7 @@ serve(async (req) => {
         console.log('🎬 Stream start() called');
         let streamClosed = false;
         let heartbeatInterval: number | null = null;
+        let cancelRequested = false;
 
         // Safe enqueue helper that checks if stream is still open
         const safeEnqueue = (data: any): boolean => {
@@ -2326,34 +2346,33 @@ serve(async (req) => {
           await saveConversation(user.id, agentId, messages, finalResult.text);
           console.log('✅ Conversation saved');
 
+          const modelUsed = getModelNameForAgent(agentId);
+          const finalChunk = {
+            type: 'final_result',
+            text: finalResult.text,
+            agentId,
+            model: modelUsed,
+            materialResults: finalResult.materialResults,
+            tool_results: finalResult.toolResults,
+            generation_job: finalResult.generationJob,
+          };
+
           // Send final result - ALWAYS TRY, even if stream appears closed
           console.log('📤 Attempting to send final result chunk...');
           console.log('📤 Stream closed flag:', streamClosed);
 
-          const modelUsed = getModelNameForAgent(agentId);
-
-          // Try to send final result directly to controller, bypassing safeEnqueue check
+          // Try to send final result directly to controller
           try {
-            const finalChunk = {
-              type: 'final_result',
-              text: finalResult.text,
-              agentId,
-              model: modelUsed,
-              materialResults: finalResult.materialResults,
-              tool_results: finalResult.toolResults,
-              generation_job: finalResult.generationJob,
-            };
-
             controller.enqueue(JSON.stringify(finalChunk) + '\n');
-            console.log('✅ Final result chunk sent successfully');
+            console.log('✅ Final result chunk sent successfully via stream');
 
             if (finalResult.generationJob) {
               console.log('🎨 Generation job included in response:', finalResult.generationJob.job_id);
             }
           } catch (enqueueError) {
-            console.error('❌ CRITICAL: Failed to send final result:', enqueueError);
-            console.error('   This means the client will show "No final result received"');
-            // Don't return - try to send done chunk anyway
+            console.error('❌ Stream enqueue failed:', enqueueError);
+            console.error('   Note: generation_job_created was already sent immediately');
+            // Don't throw - generation job was already sent via generation_job_created chunk
           }
 
           // Send completion - try directly

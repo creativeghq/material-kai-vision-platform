@@ -534,6 +534,31 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 console.log('💭 [THINKING]', chunk.hasToolCalls ? 'Has tool calls to execute' : 'Generating final response');
               } else if (chunk.type === 'heartbeat') {
                 console.log('💓 [HEARTBEAT] Stream alive');
+              } else if (chunk.type === 'generation_job_created') {
+                console.log('🎨 ========================================');
+                console.log('🎨 GENERATION JOB CREATED IMMEDIATELY!');
+                console.log('🎨 ========================================');
+                console.log('🎨 Job ID:', chunk.job_id);
+                console.log('🎨 Model count:', chunk.model_count);
+                console.log('🎨 Models:', chunk.models);
+                console.log('🎨 ========================================');
+
+                // Store as final result immediately so frontend can start polling
+                finalResult = {
+                  type: 'final_result',
+                  text: `Started generating ${chunk.model_count} interior design variations. You can monitor progress in the generation panel.`,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  generation_job: {
+                    job_id: chunk.job_id,
+                    model_count: chunk.model_count,
+                    models: chunk.models,
+                    prompt: chunk.prompt || '',
+                    room_type: chunk.room_type,
+                    style: chunk.style,
+                  },
+                };
+                console.log('✅ Stored generation job as final result for immediate use');
               } else if (chunk.type === 'final_result') {
                 console.log('🎯 ========================================');
                 console.log('🎯 FINAL RESULT RECEIVED!');
