@@ -2401,11 +2401,10 @@ After uploading, monitor the processing job and verify completion.`;
             streamClosed = true;
           }
         } finally {
-          // Close controller if not already closed
-          try {
-            controller.close();
-          } catch (closeError) {
-            console.warn('⚠️ Controller already closed:', closeError);
+          // Stop heartbeat on cleanup
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
           }
         }
         })(); // End of async IIFE
