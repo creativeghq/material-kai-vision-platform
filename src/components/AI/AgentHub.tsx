@@ -357,9 +357,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   });
 
   const handleSendMessage = useCallback(async () => {
-    if (!input.trim() && attachedImages.length === 0) return;
-    if (!userId) return;
+    console.log('🎯 handleSendMessage CALLED');
+    console.log('Input:', input);
+    console.log('UserId:', userId);
 
+    if (!input.trim() && attachedImages.length === 0) {
+      console.log('❌ No input or images, returning');
+      return;
+    }
+    if (!userId) {
+      console.log('❌ No userId, returning');
+      return;
+    }
+
+    console.log('✅ Validation passed, creating user message');
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
@@ -371,6 +382,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const userInput = input;
     setInput('');
     setIsLoading(true);
+    console.log('✅ State updated, starting try block');
 
     try {
       // Get current user session
@@ -447,7 +459,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         // Get Supabase URL from the client
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
 
-        const response = await fetch(
+        console.log('🚀 STARTING FETCH TO:', `${supabaseUrl}/functions/v1/agent-chat`);
+        console.log('🚀 REQUEST BODY:', requestBody);
+
+        const fetchPromise = fetch(
           `${supabaseUrl}/functions/v1/agent-chat`,
           {
             method: 'POST',
@@ -459,7 +474,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }
         );
 
-        // Debug: Log response details
+        console.log('⏳ WAITING FOR RESPONSE...');
+        const response = await fetchPromise;
+        console.log('✅ GOT RESPONSE!');
         console.log('Response status:', response.status);
         console.log('Response ok:', response.ok);
         console.log('Response headers:', Object.fromEntries(response.headers.entries()));
@@ -518,6 +535,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     agent: selectedAgent
                   }
                 });
+
+                // IMMEDIATELY add a message with the generation grid
+                const generationMessage: Message = {
+                  id: `msg-gen-${Date.now()}`,
+                  role: 'assistant',
+                  content: `🎨 Generating ${chunk.model_count} interior design variations...`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  generation_job: {
+                    job_id: chunk.job_id,
+                    model_count: chunk.model_count,
+                    models: chunk.models,
+                    prompt: chunk.prompt || '',
+                    room_type: chunk.room_type,
+                    style: chunk.style,
+                  },
+                };
+
+                setMessages((prev) => [...prev, generationMessage]);
 
                 finalResult = {
                   type: 'final_result',

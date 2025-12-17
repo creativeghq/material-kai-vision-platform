@@ -482,15 +482,6 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
 
         console.log('✅ Generation job created:', result);
 
-        const jobInfo = {
-          success: true,
-          async_job: true,
-          job_id: result.job_id,
-          model_count: result.model_count,
-          models: result.models,
-          message: result.message,
-        };
-
         // IMMEDIATELY send generation job info via streaming callback
         try {
           onChunk?.({
@@ -506,7 +497,14 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
           console.error('Failed to send generation_job_created chunk:', e);
         }
 
-        return JSON.stringify(jobInfo);
+        // Return a conversational response - agent can continue talking
+        return JSON.stringify({
+          success: true,
+          job_id: result.job_id,
+          model_count: result.model_count,
+          models: result.models,
+          message: `I've started generating ${result.model_count} interior design variations for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. The generation is running in the background - you can see the progress in the generation panel below. Feel free to continue our conversation or ask me anything else while it processes!`,
+        });
       } catch (error) {
         console.error('Interior design generation error:', error);
         return JSON.stringify({
