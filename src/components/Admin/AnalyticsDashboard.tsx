@@ -21,6 +21,7 @@ import {
   CreditCard,
   DollarSign,
   Crown,
+  Image,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -178,6 +179,21 @@ interface AIUsageLog {
   created_at: string;
 }
 
+interface InteriorDesignStats {
+  total_generations: number;
+  total_cost: number;
+  total_images: number;
+  unique_users: number;
+}
+
+interface ModelUsage {
+  model_id: string;
+  model_name: string;
+  usage_count: number;
+  total_cost: number;
+  success_rate: number;
+}
+
 export const AnalyticsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -199,6 +215,13 @@ export const AnalyticsDashboard: React.FC = () => {
   });
   const [userProfiles, setUserProfiles] = useState<UserProfile[]>([]);
   const [aiUsageLogs, setAIUsageLogs] = useState<AIUsageLog[]>([]);
+  const [interiorDesignStats, setInteriorDesignStats] = useState<InteriorDesignStats>({
+    total_generations: 0,
+    total_cost: 0,
+    total_images: 0,
+    unique_users: 0,
+  });
+  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -382,6 +405,68 @@ export const AnalyticsDashboard: React.FC = () => {
           totalCreditsUsed,
         }));
       }
+
+      // Fetch Interior Design Analytics
+      const { data: generations, error: genError } = await supabase
+        .from('generation_3d')
+        .select('id, user_id, total_cost, models_results')
+        .eq('generation_status', 'completed')
+        .not('total_cost', 'is', null);
+
+      if (genError) {
+        console.error('Error fetching interior design analytics:', genError);
+      } else if (generations) {
+        const totalCost = generations.reduce((sum, g) => sum + (Number(g.total_cost) || 0), 0);
+        const uniqueUsers = new Set(generations.map(g => g.user_id)).size;
+
+        let totalImages = 0;
+        generations.forEach(g => {
+          if (g.models_results) {
+            Object.values(g.models_results as Record<string, any>).forEach((model: any) => {
+              if (model.status === 'completed' && model.image_urls) {
+                totalImages += model.image_urls.length;
+              }
+            });
+          }
+        });
+
+        setInteriorDesignStats({
+          total_generations: generations.length,
+          total_cost: totalCost,
+          total_images: totalImages,
+          unique_users: uniqueUsers,
+        });
+
+        // Calculate model usage
+        const modelStats: Record<string, { count: number; cost: number; successes: number; total: number }> = {};
+
+        generations.forEach(g => {
+          if (g.models_results) {
+            Object.entries(g.models_results as Record<string, any>).forEach(([modelId, modelData]: [string, any]) => {
+              if (!modelStats[modelId]) {
+                modelStats[modelId] = { count: 0, cost: 0, successes: 0, total: 0 };
+              }
+              modelStats[modelId].total++;
+              if (modelData.status === 'completed') {
+                modelStats[modelId].count++;
+                modelStats[modelId].cost += Number(modelData.cost) || 0;
+                modelStats[modelId].successes++;
+              }
+            });
+          }
+        });
+
+        const modelUsageArray: ModelUsage[] = Object.entries(modelStats).map(([modelId, data]) => ({
+          model_id: modelId,
+          model_name: modelId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+          usage_count: data.count,
+          total_cost: data.cost,
+          success_rate: data.total > 0 ? (data.successes / data.total) * 100 : 0,
+        }));
+
+        modelUsageArray.sort((a, b) => b.total_cost - a.total_cost);
+        setModelUsage(modelUsageArray);
+      }
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -504,7 +589,7 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="agent-chat" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="agent-chat">
               <Bot className="h-4 w-4 mr-2" />
               Agent Chat
@@ -512,6 +597,10 @@ export const AnalyticsDashboard: React.FC = () => {
             <TabsTrigger value="subscriptions">
               <CreditCard className="h-4 w-4 mr-2" />
               Subscriptions
+            </TabsTrigger>
+            <TabsTrigger value="interior-design">
+              <Image className="h-4 w-4 mr-2" />
+              Interior Design
             </TabsTrigger>
             <TabsTrigger value="ai-models">
               <Settings className="h-4 w-4 mr-2" />
@@ -770,6 +859,105 @@ export const AnalyticsDashboard: React.FC = () => {
                 {userProfiles.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No user profiles found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Interior Design Analytics Tab */}
+          <TabsContent value="interior-design" className="space-y-4">
+            {/* Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">${interiorDesignStats.total_cost.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {interiorDesignStats.total_generations} generations
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Images Generated</CardTitle>
+                  <Image className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{interiorDesignStats.total_images}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Avg Cost/Generation</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Per generation</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Unique Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{interiorDesignStats.unique_users}</div>
+                  <p className="text-xs text-muted-foreground">Active users</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Model Usage Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Model Usage & Costs</CardTitle>
+                <CardDescription>Performance and cost breakdown by model</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Model</TableHead>
+                      <TableHead className="text-right">Usage Count</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead className="text-right">Avg Cost</TableHead>
+                      <TableHead className="text-right">Success Rate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {modelUsage.map((model) => (
+                      <TableRow key={model.model_id}>
+                        <TableCell className="font-medium">{model.model_name}</TableCell>
+                        <TableCell className="text-right">{model.usage_count}</TableCell>
+                        <TableCell className="text-right">${model.total_cost.toFixed(3)}</TableCell>
+                        <TableCell className="text-right">
+                          ${(model.total_cost / Math.max(model.usage_count, 1)).toFixed(3)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={model.success_rate >= 90 ? 'default' : 'secondary'}>
+                            {model.success_rate.toFixed(1)}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {modelUsage.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No interior design generations found.
                   </div>
                 )}
               </CardContent>
