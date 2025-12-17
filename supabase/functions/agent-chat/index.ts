@@ -494,6 +494,78 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
 };
 
 /**
+ * LangChain Tool: Check Generation Status
+ *
+ * Allows agent to query the status of ongoing 3D generation jobs
+ * Returns progress, completed/failed counts, and elapsed time
+ */
+const createGenerationStatusTool = () => {
+  return tool(
+    async ({ jobId }) => {
+      try {
+        console.log('🔍 Checking generation status for job:', jobId);
+
+        const { data, error } = await supabase
+          .from('generation_3d')
+          .select('generation_status, progress_percentage, metadata, created_at')
+          .eq('id', jobId)
+          .single();
+
+        if (error || !data) {
+          return JSON.stringify({
+            success: false,
+            error: 'Job not found'
+          });
+        }
+
+        const metadata = data.metadata as any;
+        const modelsResults = metadata?.models_results || [];
+
+        const completedCount = modelsResults.filter(
+          (m: any) => m.status === 'completed'
+        ).length;
+
+        const failedCount = modelsResults.filter(
+          (m: any) => m.status === 'failed'
+        ).length;
+
+        const elapsedSeconds = Math.floor(
+          (Date.now() - new Date(data.created_at).getTime()) / 1000
+        );
+
+        return JSON.stringify({
+          success: true,
+          status: data.generation_status,
+          progress: data.progress_percentage,
+          completed_models: completedCount,
+          failed_models: failedCount,
+          total_models: modelsResults.length,
+          elapsed_seconds: elapsedSeconds,
+          models_details: modelsResults.map((m: any) => ({
+            name: m.model_name,
+            status: m.status,
+            has_images: m.image_urls?.length > 0
+          }))
+        });
+      } catch (error) {
+        console.error('Generation status check error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Status check failed'
+        });
+      }
+    },
+    {
+      name: 'check_generation_status',
+      description: 'Check the status and progress of a 3D interior design generation job. Use this when user asks about generation progress, status, or "how is it going".',
+      schema: z.object({
+        jobId: z.string().describe('The generation job ID (UUID) to check status for')
+      })
+    }
+  );
+};
+
+/**
  * LangChain Tool: Material Cost Estimation
  */
 const createCostEstimationTool = (workspaceId: string) => {
@@ -1683,6 +1755,8 @@ async function executeAgent(
   // Interior design generation with streaming progress
   if (config.tools.includes('generate_3d')) {
     tools.push(create3DGenerationTool(userId, workspaceId, onChunk));
+    // Also add status check tool when generation is available
+    tools.push(createGenerationStatusTool());
   }
   if (config.tools.includes('estimate_cost')) {
     tools.push(createCostEstimationTool(workspaceId));
@@ -1770,10 +1844,35 @@ async function executeAgent(
         textContent = String(response.content);
       }
 
+      // Detect if any tool results contain 3D generation job
+      let generationJob = null;
+
+      for (const toolResult of collectedToolResults) {
+        if (toolResult.tool === 'generate_3d') {
+          try {
+            const result = JSON.parse(toolResult.result);
+            if (result.success && result.async_job) {
+              generationJob = {
+                job_id: result.job_id,
+                model_count: result.model_count,
+                models: result.models,
+                prompt: toolResult.args?.prompt || '',
+                room_type: toolResult.args?.roomType,
+                style: toolResult.args?.style
+              };
+              console.log('✅ Detected generation job:', generationJob);
+            }
+          } catch (e) {
+            console.error('Failed to parse generate_3d result:', e);
+          }
+        }
+      }
+
       return {
         text: textContent,
         materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
-        toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined
+        toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined,
+        generationJob: generationJob
       };
     }
 
@@ -1911,10 +2010,34 @@ async function executeAgent(
 
   // Max iterations reached
   console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
+
+  // Detect generation job even in max iterations case
+  let generationJob = null;
+  for (const toolResult of collectedToolResults) {
+    if (toolResult.tool === 'generate_3d') {
+      try {
+        const result = JSON.parse(toolResult.result);
+        if (result.success && result.async_job) {
+          generationJob = {
+            job_id: result.job_id,
+            model_count: result.model_count,
+            models: result.models,
+            prompt: toolResult.args?.prompt || '',
+            room_type: toolResult.args?.roomType,
+            style: toolResult.args?.style
+          };
+        }
+      } catch (e) {
+        console.error('Failed to parse generate_3d result:', e);
+      }
+    }
+  }
+
   return {
     text: 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.',
     materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
-    toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined
+    toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined,
+    generationJob: generationJob
   };
 }
 
@@ -2107,36 +2230,43 @@ After uploading, monitor the processing job and verify completion.`;
       async start(controller) {
         console.log('🎬 Stream start() called');
         let streamClosed = false;
+        let heartbeatInterval: number | null = null;
+
+        // Safe enqueue helper that checks if stream is still open
+        const safeEnqueue = (data: any): boolean => {
+          if (streamClosed) {
+            console.warn('⚠️ Attempted to enqueue after stream closed, skipping');
+            return false;
+          }
+          try {
+            controller.enqueue(JSON.stringify(data) + '\n');
+            return true;
+          } catch (error) {
+            console.warn('⚠️ Enqueue failed, marking stream as closed:', error);
+            streamClosed = true;
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval);
+              heartbeatInterval = null;
+            }
+            return false;
+          }
+        };
 
         try {
           // Send initial status IMMEDIATELY to keep stream alive
           console.log('📤 Sending initial status chunk...');
-          try {
-            controller.enqueue(JSON.stringify({
-              type: 'status',
-              message: 'Initializing agent...'
-            }) + '\n');
-            console.log('✅ Initial status chunk sent');
-          } catch (enqueueError) {
-            console.error('❌ Failed to send initial chunk:', enqueueError);
-            throw enqueueError;
+          if (!safeEnqueue({ type: 'status', message: 'Initializing agent...' })) {
+            console.error('❌ Failed to send initial chunk, aborting');
+            return;
           }
+          console.log('✅ Initial status chunk sent');
 
           let finalResult: any = null;
 
           // Start heartbeat to keep stream alive during long operations
-          const heartbeatInterval = setInterval(() => {
+          heartbeatInterval = setInterval(() => {
             if (!streamClosed) {
-              try {
-                controller.enqueue(JSON.stringify({
-                  type: 'heartbeat',
-                  timestamp: Date.now()
-                }) + '\n');
-                console.log('💓 Heartbeat sent');
-              } catch (error) {
-                console.warn('⚠️ Heartbeat failed, stream may be closed');
-                clearInterval(heartbeatInterval);
-              }
+              safeEnqueue({ type: 'heartbeat', timestamp: Date.now() });
             }
           }, 5000); // Send heartbeat every 5 seconds
 
@@ -2154,17 +2284,10 @@ After uploading, monitor the processing job and verify completion.`;
               userInput,
               anthropicMessages,
               pdfFile,
-              // Streaming callback
+              // Streaming callback with safe enqueue
               (chunk) => {
-                if (streamClosed) {
-                  // Silently skip - stream is closed
-                  return;
-                }
-                try {
-                  controller.enqueue(JSON.stringify(chunk) + '\n');
-                } catch (enqueueError) {
-                  // Stream closed - mark it and stop trying to send
-                  streamClosed = true;
+                if (!streamClosed) {
+                  safeEnqueue(chunk);
                 }
               }
             );
@@ -2180,8 +2303,17 @@ After uploading, monitor the processing job and verify completion.`;
             throw executeError; // Re-throw to be caught by outer catch
           } finally {
             // Stop heartbeat
-            clearInterval(heartbeatInterval);
-            console.log('💓 Heartbeat stopped');
+            if (heartbeatInterval) {
+              clearInterval(heartbeatInterval);
+              heartbeatInterval = null;
+              console.log('💓 Heartbeat stopped');
+            }
+          }
+
+          // Check if stream is still open before proceeding
+          if (streamClosed) {
+            console.warn('⚠️ Stream closed during execution, skipping final result');
+            return;
           }
 
           // Check if we got a valid result
@@ -2198,56 +2330,74 @@ After uploading, monitor the processing job and verify completion.`;
           // Send final result
           console.log('📤 Sending final result chunk...');
           const modelUsed = getModelNameForAgent(agentId);
-          controller.enqueue(JSON.stringify({
+          if (!safeEnqueue({
             type: 'final_result',
             text: finalResult.text,
             agentId,
             model: modelUsed,
             materialResults: finalResult.materialResults,
             tool_results: finalResult.toolResults,
-          }) + '\n');
+            generation_job: finalResult.generationJob,
+          })) {
+            console.warn('⚠️ Failed to send final result, stream closed');
+            return;
+          }
           console.log('✅ Final result chunk sent');
+          if (finalResult.generationJob) {
+            console.log('🎨 Generation job included in response:', finalResult.generationJob.job_id);
+          }
 
           // Send completion
           console.log('📤 Sending done chunk...');
-          controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
+          if (!safeEnqueue({ type: 'done' })) {
+            console.warn('⚠️ Failed to send done chunk, stream closed');
+            return;
+          }
           console.log('✅ Done chunk sent');
 
           console.log('🏁 Closing stream');
           streamClosed = true;
-          controller.close();
-          console.log('✅ Stream closed successfully');
+          try {
+            controller.close();
+            console.log('✅ Stream closed successfully');
+          } catch (closeError) {
+            console.warn('⚠️ Stream already closed:', closeError);
+          }
         } catch (error) {
           console.error('❌ Streaming error:', error);
           console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
 
+          // Stop heartbeat on error
+          if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+          }
+
           // Only try to send error if stream is not already closed
           if (!streamClosed) {
-            streamClosed = true;
-            try {
-              // Send error as final_result so client knows the stream is complete
-              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-              controller.enqueue(JSON.stringify({
-                type: 'final_result',
-                text: `Error: ${errorMessage}`,
-                agentId,
-                model: getModelNameForAgent(agentId),
-                error: true,
-                errorMessage: errorMessage
-              }) + '\n');
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-              // Send done chunk
-              controller.enqueue(JSON.stringify({ type: 'done' }) + '\n');
-            } catch (enqueueError) {
-              console.error('❌ Failed to enqueue error chunks:', enqueueError);
-            }
+            // Try to send error using safe enqueue
+            safeEnqueue({
+              type: 'final_result',
+              text: `Error: ${errorMessage}`,
+              agentId,
+              model: getModelNameForAgent(agentId),
+              error: true,
+              errorMessage: errorMessage
+            });
+
+            // Try to send done chunk
+            safeEnqueue({ type: 'done' });
+
+            streamClosed = true;
           }
 
           // Close controller if not already closed
           try {
             controller.close();
           } catch (closeError) {
-            console.warn('⚠️ Controller already closed');
+            console.warn('⚠️ Controller already closed:', closeError);
           }
         }
       }

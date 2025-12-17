@@ -45,7 +45,8 @@ import { MaterialMatchingModal } from './MaterialMatchingModal';
 import { PromptLibrary } from './PromptLibrary';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
-import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
+import { ProgressiveImageGrid } from './ProgressiveImageGrid';
+import { getCachedResponse, cacheResponse } from '@/services/agents/agentCacheCache';
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 
 // Agent definitions with RBAC
@@ -188,6 +189,18 @@ interface Message {
       currency: string;
     };
   }; // Interior design results (3D images, spatial analysis, materials, cost)
+  generation_job?: {
+    job_id: string;
+    model_count: number;
+    models: Array<{
+      id: string;
+      name: string;
+      provider: string;
+    }>;
+    prompt: string;
+    room_type?: string;
+    style?: string;
+  }; // Async 3D generation job info for progressive loading
 }
 
 interface AgentHubProps {
@@ -205,6 +218,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedAgent, setSelectedAgent] = useState<string>('search');
   const [selectedModel, setSelectedModel] = useState<string>('anthropic/claude-sonnet-4-20250514');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -710,7 +724,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         demoData,
         materialData,
         designData, // Include design data with spatial analysis
+        generation_job: data.generation_job, // Async 3D generation job info
       };
+
+      // Track active generation job if present
+      if (data.generation_job) {
+        console.log('🎨 Generation job detected:', data.generation_job);
+        setActiveGenerationJobs((prev) => {
+          const updated = new Map(prev);
+          updated.set(data.generation_job.job_id, {
+            ...data.generation_job,
+            messageId: assistantMessage.id,
+            startTime: Date.now(),
+          });
+          return updated;
+        });
+      }
 
       setMessages((prev) => [...prev, assistantMessage]);
 
@@ -1207,6 +1236,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             products={message.materialData.products}
                             title={`Found ${message.materialData.products.length} products`}
                           />
+                        )}
+
+                        {/* Show ProgressiveImageGrid for async 3D generation jobs */}
+                        {message.role === 'assistant' && message.generation_job && (
+                          <div className="mt-4">
+                            <ProgressiveImageGrid
+                              jobId={message.generation_job.job_id}
+                              modelCount={message.generation_job.model_count}
+                              models={message.generation_job.models}
+                              onImageClick={(url, name) => {
+                                console.log('🖼️ Image clicked:', url, name);
+                                // TODO: Open modal or add to mood board
+                              }}
+                            />
+                          </div>
                         )}
                       </div>
                     )}
