@@ -24,6 +24,7 @@ import {
   ThumbsDown,
   Trash2,
 } from 'lucide-react';
+import { logger } from '@/config';
 
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -446,8 +447,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         // Get Supabase URL from the client
         const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
 
-        console.log('🚀 Calling agent-chat edge function...');
-        console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
         const response = await fetch(
           `${supabaseUrl}/functions/v1/agent-chat`,
           {
@@ -460,47 +459,25 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }
         );
 
-        console.log('📡 Response status:', response.status);
-        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('❌ Error response:', errorText);
           throw new Error(`Agent execution failed: ${response.status} - ${errorText}`);
         }
 
-        // Streaming response
         if (!response.body) {
           throw new Error('No response body');
         }
 
-        console.log('✅ ========================================');
-        console.log('✅ Starting to read stream...');
-        console.log('✅ ========================================');
-
-        // Read streaming response
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
         let finalResult: any = null;
-        let chunkCount = 0;
-        const streamStartTime = Date.now();
 
         while (true) {
           const { done, value } = await reader.read();
-
-          if (done) {
-            const streamElapsed = Date.now() - streamStartTime;
-            console.log('📭 ========================================');
-            console.log('📭 Stream ended');
-            console.log('📭 Total chunks received:', chunkCount);
-            console.log('📭 Total time:', streamElapsed + 'ms', `(${(streamElapsed / 1000).toFixed(2)}s)`);
-            console.log('📭 ========================================');
-            break;
-          }
+          if (done) break;
 
           const decoded = decoder.decode(value, { stream: true });
-          console.log('📦 Raw chunk received:', decoded.substring(0, 200) + (decoded.length > 200 ? '...' : ''));
           buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
@@ -510,43 +487,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
             try {
               const chunk = JSON.parse(line);
-              chunkCount++;
-              const elapsed = Date.now() - streamStartTime;
-              console.log(`📨 ========================================`);
-              console.log(`📨 Chunk #${chunkCount} [${chunk.type}] at ${elapsed}ms`);
-              console.log(`📨 Data:`, chunk);
-              console.log(`📨 ========================================`);
 
-              // Handle different chunk types
-              if (chunk.type === 'status') {
-                console.log('📊 [STATUS]:', chunk.message);
-              } else if (chunk.type === 'iteration') {
-                console.log(`🔄 [ITERATION] ${chunk.iteration}/${chunk.maxIterations}:`, chunk.message);
-              } else if (chunk.type === 'tool_call') {
-                console.log(`🔧 [TOOL_CALL] ${chunk.tool}`);
-                console.log('   Args:', chunk.args);
-              } else if (chunk.type === 'tool_result') {
-                console.log(`✅ [TOOL_RESULT] ${chunk.tool} completed`);
-                console.log('   Result preview:', JSON.stringify(chunk.result).substring(0, 200));
-              } else if (chunk.type === 'tool_error') {
-                console.error(`❌ [TOOL_ERROR] ${chunk.tool} failed:`, chunk.error);
-              } else if (chunk.type === 'assistant_thinking') {
-                console.log('💭 [THINKING]', chunk.hasToolCalls ? 'Has tool calls to execute' : 'Generating final response');
-              } else if (chunk.type === 'heartbeat') {
-                console.log('💓 [HEARTBEAT] Stream alive');
-              } else if (chunk.type === 'generation_job_created') {
-                console.log('🎨 ========================================');
-                console.log('🎨 GENERATION JOB CREATED IMMEDIATELY!');
-                console.log('🎨 ========================================');
-                console.log('🎨 Job ID:', chunk.job_id);
-                console.log('🎨 Model count:', chunk.model_count);
-                console.log('🎨 Models:', chunk.models);
-                console.log('🎨 ========================================');
+              // Handle generation_job_created - IMMEDIATE response
+              if (chunk.type === 'generation_job_created') {
+                logger.info(`Generation job created: ${chunk.job_id}`, {
+                  service: 'AgentHub',
+                  metadata: {
+                    job_id: chunk.job_id,
+                    model_count: chunk.model_count,
+                    models: chunk.models,
+                    agent: selectedAgent
+                  }
+                });
 
-                // Store as final result immediately so frontend can start polling
                 finalResult = {
                   type: 'final_result',
-                  text: `Started generating ${chunk.model_count} interior design variations. You can monitor progress in the generation panel.`,
+                  text: `Started generating ${chunk.model_count} interior design variations.`,
                   agentId: selectedAgent,
                   model: selectedModel,
                   generation_job: {
@@ -558,56 +514,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     style: chunk.style,
                   },
                 };
-                console.log('✅ Stored generation job as final result for immediate use');
               } else if (chunk.type === 'final_result') {
-                console.log('🎯 ========================================');
-                console.log('🎯 FINAL RESULT RECEIVED!');
-                console.log('🎯 ========================================');
-                console.log('🎯 Full chunk:', chunk);
-                console.log('🎯 Has generation_job:', !!chunk.generation_job);
-                if (chunk.generation_job) {
-                  console.log('🎨 Generation job details:', chunk.generation_job);
-                }
-                console.log('🎯 ========================================');
                 finalResult = chunk;
-                // Check if this is an error result
-                if (chunk.error) {
-                  console.error('❌ Final result contains error:', chunk.errorMessage);
-                }
-              } else if (chunk.type === 'done') {
-                console.log('✅ Done chunk received');
-              } else {
-                console.warn('⚠️ Unknown chunk type:', chunk.type, chunk);
+              } else if (chunk.type === 'tool_error') {
+                logger.error(`Tool ${chunk.tool} failed: ${chunk.error}`, {
+                  service: 'AgentHub',
+                  metadata: { tool: chunk.tool, error: chunk.error }
+                });
               }
             } catch (parseError) {
-              console.warn('⚠️ Failed to parse chunk:', line, parseError);
+              logger.warn('Failed to parse stream chunk', {
+                service: 'AgentHub',
+                metadata: { line, error: parseError }
+              });
             }
           }
         }
 
-        console.log('🔍 Final result check:', finalResult ? 'Found' : 'NOT FOUND');
-        console.log('📊 Stream summary:', {
-          totalChunks: chunkCount,
-          finalResultReceived: !!finalResult,
-          lastChunkType: finalResult ? 'final_result' : 'unknown'
-        });
-
         if (!finalResult) {
-          console.error('❌ ========================================');
-          console.error('❌ NO FINAL_RESULT CHUNK RECEIVED');
-          console.error('❌ ========================================');
-          console.error('❌ Total chunks received:', chunkCount);
-          console.error('❌ Stream duration:', (Date.now() - streamStartTime) + 'ms');
-          console.error('❌ This usually means:');
-          console.error('   1. Edge function threw an error before sending final_result');
-          console.error('   2. Edge function timed out (400s limit on paid plan)');
-          console.error('   3. Tool execution failed (check tool logs above)');
-          console.error('   4. MIVAA/Spaceformer API timeout (5 minute limit)');
-          console.error('❌ ========================================');
-          console.error('❌ ACTION: Check Supabase Edge Function logs:');
-          console.error('   supabase functions logs agent-chat --tail');
-          console.error('❌ ========================================');
-          throw new Error('No final result received from agent. Check edge function logs for details.');
+          logger.error('No final result received from agent', {
+            service: 'AgentHub',
+            metadata: { agent: selectedAgent }
+          });
+          throw new Error('No final result received from agent');
         }
 
         // Check if final result contains an error

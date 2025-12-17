@@ -472,7 +472,6 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
         };
 
         // IMMEDIATELY send generation job info via streaming callback
-        // This bypasses waiting for the agent to finish
         try {
           onChunk?.({
             type: 'generation_job_created',
@@ -483,12 +482,10 @@ const create3DGenerationTool = (userId: string, workspaceId: string, onChunk?: (
             room_type: roomType,
             style: style,
           });
-          console.log('✅ Sent generation_job_created chunk immediately');
         } catch (e) {
-          console.warn('⚠️ Failed to send generation_job_created chunk:', e);
+          console.error('Failed to send generation_job_created chunk:', e);
         }
 
-        // Return job info for agent context
         return JSON.stringify(jobInfo);
       } catch (error) {
         console.error('Interior design generation error:', error);
