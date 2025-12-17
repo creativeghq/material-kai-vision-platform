@@ -81,7 +81,7 @@ async function getAgentSystemPrompt(agentType: string): Promise<string> {
  */
 function getDefaultPrompt(agentType: string): string {
   const defaults: Record<string, string> = {
-    'pdf-processor': 'You are the PDF Processing Agent. Help users upload and process PDF files.',
+    // REMOVED: 'pdf-processor' - PDF processing moved to /admin/data-import page
     'search': 'You are the Search Agent. Help users find materials using RAG search.',
     'product': 'You are the Product Agent. Provide product information and recommendations.',
     'interior-designer': `You are an expert Interior Designer Agent specializing in creative design concepts and spatial analysis.
@@ -1655,7 +1655,7 @@ async function executeAgent(
   userId: string,
   userInput: string,
   messages: any[],
-  pdfFile?: { name: string; base64: string; category: string },
+  // REMOVED: pdfFile parameter - pdf-processor agent removed
   onChunk?: (chunk: any) => void
 ): Promise<{
   text: string;
@@ -2154,11 +2154,12 @@ serve(async (req) => {
     console.log('🎯 Handler started - parsing request body...');
 
     // Get request body
-    const { messages = [], agentId = 'search', pdfFile } = await req.json();
+    const { messages = [], agentId = 'search' } = await req.json();
+    // REMOVED: pdfFile - pdf-processor agent removed, use /admin/data-import instead
 
     console.log('✅ Request body parsed successfully');
 
-    console.log(`📨 Received request for agent: ${agentId}, messages: ${messages.length}, hasPDF: ${!!pdfFile}`);
+    console.log(`📨 Received request for agent: ${agentId}, messages: ${messages.length}`);
 
     // Get user from auth header
     const authHeader = req.headers.get('Authorization');
@@ -2203,34 +2204,7 @@ serve(async (req) => {
       content: msg.content,
     }));
 
-    // If PDF file is provided, instruct the agent to upload it
-    if (pdfFile && agentId === 'pdf-processor') {
-      console.log(`📎 PDF file attached: ${pdfFile.name}, category: ${pdfFile.category}`);
-
-      // Update the last user message to include upload instruction with PDF data
-      const uploadInstruction = `Please upload this PDF file using the uploadPDF tool:
-- File name: ${pdfFile.name}
-- Category: ${pdfFile.category}
-- File data: [base64 data provided]
-
-After uploading, monitor the processing job and verify completion.`;
-
-      // If messages array is empty or last message is empty, create a new message
-      if (anthropicMessages.length === 0 || !anthropicMessages[anthropicMessages.length - 1]?.content) {
-        anthropicMessages.push({
-          role: 'user',
-          content: uploadInstruction,
-        });
-      } else {
-        // Replace the last message with the upload instruction
-        anthropicMessages[anthropicMessages.length - 1] = {
-          role: 'user',
-          content: uploadInstruction,
-        };
-      }
-
-      userInput = uploadInstruction;
-    }
+    // REMOVED: PDF file handling - pdf-processor agent removed, use /admin/data-import instead
 
     // Execute agent with STREAMING
     console.log('🚀 Creating ReadableStream for agent execution...');
@@ -2305,9 +2279,8 @@ After uploading, monitor the processing job and verify completion.`;
               user.id,
               userInput,
               anthropicMessages,
-              pdfFile,
               // Streaming callback with safe enqueue
-              (chunk) => {
+              (chunk: any) => {
                 if (!streamClosed) {
                   safeEnqueue(chunk);
                 }

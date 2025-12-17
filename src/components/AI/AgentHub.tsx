@@ -19,7 +19,6 @@ import {
   User,
   Download,
   Upload,
-  FileUp,
   Sparkles,
   ThumbsUp,
   ThumbsDown,
@@ -124,15 +123,7 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'admin',
     available: true,
   },
-  {
-    id: 'pdf-processor',
-    name: 'PDF Processing Agent',
-    description: 'Intelligent PDF processing with multi-tool monitoring',
-    icon: FileUp,
-    color: 'text-indigo-500',
-    requiredRole: 'admin',
-    available: true,
-  },
+  // REMOVED: 'pdf-processor' agent - PDF processing moved to /admin/data-import page
   {
     id: 'interior-designer',
     name: 'Interior Agent',
@@ -1406,27 +1397,23 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               />
               {/* REMOVED: PDF upload input and button - PDF processing moved to /admin/data-import page */}
 
-              {/* Image Upload Buttons (hidden for pdf-processor agent) */}
-              {selectedAgent !== 'pdf-processor' && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-9 w-9"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-9 w-9"
-                  >
-                    <ImageIcon className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
+              {/* Image Upload Buttons */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 w-9"
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                className="h-9 w-9"
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
 
               {/* Prompt Library Icon (Interior Designer Agent only) */}
               {selectedAgent === 'interior-designer' && (
