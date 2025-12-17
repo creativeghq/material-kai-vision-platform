@@ -2231,7 +2231,7 @@ After uploading, monitor the processing job and verify completion.`;
     console.log('📋 User input:', userInput.substring(0, 100) + (userInput.length > 100 ? '...' : ''));
 
     const stream = new ReadableStream({
-      async start(controller) {
+      start(controller) {
         console.log('🎬 Stream start() called');
         let streamClosed = false;
         let heartbeatInterval: number | null = null;
@@ -2256,16 +2256,20 @@ After uploading, monitor the processing job and verify completion.`;
           }
         };
 
-        try {
-          // Send initial status IMMEDIATELY to keep stream alive
-          console.log('📤 Sending initial status chunk...');
-          if (!safeEnqueue({ type: 'status', message: 'Initializing agent...' })) {
-            console.error('❌ Failed to send initial chunk, aborting');
-            return;
-          }
-          console.log('✅ Initial status chunk sent');
+        // Send initial status IMMEDIATELY (synchronously) to keep stream alive
+        console.log('📤 Sending initial status chunk...');
+        if (!safeEnqueue({ type: 'status', message: 'Initializing agent...' })) {
+          console.error('❌ Failed to send initial chunk, aborting');
+          controller.close();
+          return;
+        }
+        console.log('✅ Initial status chunk sent');
 
+        // Now run the async agent execution
+        (async () => {
           let finalResult: any = null;
+
+          try {
 
           // Start heartbeat to keep stream alive during long operations
           heartbeatInterval = setInterval(() => {
@@ -2403,7 +2407,7 @@ After uploading, monitor the processing job and verify completion.`;
           } catch (closeError) {
             console.warn('⚠️ Controller already closed:', closeError);
           }
-        }
+        })(); // End of async IIFE
       }
     });
     console.log('✅ ReadableStream created');
