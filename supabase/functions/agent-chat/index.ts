@@ -2241,14 +2241,18 @@ After uploading, monitor the processing job and verify completion.`;
         // Safe enqueue helper that checks if stream is still open
         const safeEnqueue = (data: any): boolean => {
           if (streamClosed) {
-            console.warn('⚠️ Attempted to enqueue after stream closed, skipping');
+            // Stream already closed, silently skip
             return false;
           }
           try {
             controller.enqueue(JSON.stringify(data) + '\n');
             return true;
           } catch (error) {
-            console.warn('⚠️ Enqueue failed, marking stream as closed:', error);
+            // Stream closed by client or network - this is expected behavior
+            // Only log if it's not a standard "controller cannot enqueue" error
+            if (error instanceof Error && !error.message.includes('cannot close or enqueue')) {
+              console.warn('⚠️ Unexpected enqueue error:', error);
+            }
             streamClosed = true;
             if (heartbeatInterval) {
               clearInterval(heartbeatInterval);
