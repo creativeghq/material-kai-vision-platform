@@ -462,6 +462,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         console.log('🚀 STARTING FETCH TO:', `${supabaseUrl}/functions/v1/agent-chat`);
         console.log('🚀 REQUEST BODY:', requestBody);
 
+        // Create AbortController to prevent premature cancellation
+        const abortController = new AbortController();
+
         const fetchPromise = fetch(
           `${supabaseUrl}/functions/v1/agent-chat`,
           {
@@ -471,6 +474,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestBody),
+            signal: abortController.signal,
+            // Prevent browser from timing out the connection
+            keepalive: true,
           }
         );
 
@@ -501,17 +507,22 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         let buffer = '';
         let finalResult: any = null;
         let chunkCount = 0;
+        let lastChunkTime = Date.now();
 
         while (true) {
+          console.log('📖 Waiting for next chunk...');
           const { done, value } = await reader.read();
+          const now = Date.now();
+          console.log(`⏱️ Time since last chunk: ${now - lastChunkTime}ms`);
+          lastChunkTime = now;
 
           if (done) {
-            console.log('Stream ended. Total chunks:', chunkCount);
+            console.log('✅ Stream ended. Total chunks:', chunkCount);
             break;
           }
 
           const decoded = decoder.decode(value, { stream: true });
-          console.log('Raw chunk:', decoded.substring(0, 100));
+          console.log('📦 Raw chunk received:', decoded.substring(0, 200));
           buffer += decoded;
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';

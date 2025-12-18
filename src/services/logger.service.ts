@@ -96,6 +96,23 @@ class LoggerService {
   }
 
   /**
+   * Clear all logs (alias for clearBuffer)
+   */
+  clearAllLogs(): void {
+    this.clearBuffer();
+  }
+
+  /**
+   * Clear logs older than a specific timestamp
+   */
+  clearOldLogs(timestampMs: number): void {
+    this.logBuffer = this.logBuffer.filter(log => {
+      const logTime = new Date(log.timestamp).getTime();
+      return logTime >= timestampMs;
+    });
+  }
+
+  /**
    * Get buffer size
    */
   getBufferSize(): number {

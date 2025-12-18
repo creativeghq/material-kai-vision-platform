@@ -2248,6 +2248,7 @@ serve(async (req) => {
     console.log('📋 Message count:', messages.length);
     console.log('📋 User input:', userInput.substring(0, 100) + (userInput.length > 100 ? '...' : ''));
 
+    const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
         console.log('🎬 Stream start() called');
@@ -2263,7 +2264,8 @@ serve(async (req) => {
             return false;
           }
           try {
-            controller.enqueue(JSON.stringify(data) + '\n');
+            const chunk = encoder.encode(JSON.stringify(data) + '\n');
+            controller.enqueue(chunk);
             console.log(`✅ Enqueued chunk: ${data.type}`);
             return true;
           } catch (error) {
@@ -2298,6 +2300,10 @@ serve(async (req) => {
         }
         console.log('✅ Initial status chunk sent');
 
+        // Send immediate heartbeat to keep connection alive
+        safeEnqueue({ type: 'heartbeat', timestamp: Date.now() });
+        console.log('💓 Sent immediate heartbeat');
+
         // Now run the async agent execution
         (async () => {
           let finalResult: any = null;
@@ -2307,9 +2313,10 @@ serve(async (req) => {
           // Start heartbeat to keep stream alive during long operations
           heartbeatInterval = setInterval(() => {
             if (!streamClosed) {
+              console.log('💓 Sending heartbeat...');
               safeEnqueue({ type: 'heartbeat', timestamp: Date.now() });
             }
-          }, 5000); // Send heartbeat every 5 seconds
+          }, 1000); // Send heartbeat every 1 second (reduced from 5s)
 
           try {
             // Execute agent with streaming callback

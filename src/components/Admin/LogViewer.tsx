@@ -11,23 +11,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Download, RefreshCw, Search, Filter, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Download, RefreshCw, Search, Filter, X, Trash2, Clock, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export function LogViewer() {
+  const { toast } = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | 'all'>('all');
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [selectedService, setSelectedService] = useState<string>('all');
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   // Get unique services from logs
   const services = Array.from(new Set(logs.map(log => log.metadata?.service).filter(Boolean))) as string[];
 
-  // Load logs
+  // Load logs and auto-cleanup old ones
   const loadLogs = () => {
     const recentLogs = logger.getRecentLogs(100);
     setLogs(recentLogs);
+
+    // Auto-cleanup logs older than 2 days
+    const twoDaysAgo = Date.now() - (2 * 24 * 60 * 60 * 1000);
+    logger.clearOldLogs(twoDaysAgo);
+  };
+
+  // Clear all logs
+  const clearAllLogs = () => {
+    logger.clearAllLogs();
+    setLogs([]);
+    toast({
+      title: 'Logs cleared',
+      description: 'All application logs have been cleared.',
+    });
   };
 
   // Auto-refresh every 2 seconds
@@ -83,7 +102,7 @@ export function LogViewer() {
     }
   };
 
-  // Format timestamp
+  // Format timestamp with relative time
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const time = date.toLocaleTimeString('en-US', {
@@ -94,6 +113,38 @@ export function LogViewer() {
     });
     const ms = date.getMilliseconds().toString().padStart(3, '0');
     return `${time}.${ms}`;
+  };
+
+  // Get relative time (e.g., "2 minutes ago")
+  const getRelativeTime = (timestamp: string) => {
+    const now = Date.now();
+    const then = new Date(timestamp).getTime();
+    const diff = now - then;
+
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    if (seconds > 0) return `${seconds}s ago`;
+    return 'just now';
+  };
+
+  // Get full datetime string
+  const getFullDateTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
   };
 
   // Export logs as JSON
@@ -108,11 +159,10 @@ export function LogViewer() {
     URL.revokeObjectURL(url);
   };
 
-  // Clear logs
-  const clearLogs = () => {
-    logger.clearBuffer();
-    setLogs([]);
-    setFilteredLogs([]);
+  // Open details modal
+  const openDetailsModal = (log: LogEntry) => {
+    setSelectedLog(log);
+    setShowDetailsModal(true);
   };
 
   return (
@@ -155,11 +205,11 @@ export function LogViewer() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={clearLogs}
+                onClick={clearAllLogs}
                 disabled={logs.length === 0}
               >
-                <X className="h-4 w-4 mr-2" />
-                Clear
+                <Trash2 className="h-4 w-4 mr-2" />
+                Clear All
               </Button>
             </div>
           </div>
@@ -239,49 +289,45 @@ export function LogViewer() {
                   <tbody className="divide-y divide-gray-200">
                     {filteredLogs.map((log, index) => (
                       <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-xs font-mono text-gray-600 whitespace-nowrap">
-                          {formatTime(log.timestamp)}
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-mono text-gray-900">
+                              {formatTime(log.timestamp)}
+                            </span>
+                            <span className="text-xs text-gray-500 flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {getRelativeTime(log.timestamp)}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {getLevelBadge(log.level)}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {String(log.metadata?.service || log.service || '-')}
+                          <Badge variant="outline" className="text-xs">
+                            {String(log.metadata?.service || log.service || 'System')}
+                          </Badge>
                         </td>
                         <td className="px-4 py-3 text-sm max-w-md">
                           <div className="truncate" title={log.message}>
                             {log.message}
                           </div>
+                          {log.error && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
+                              <AlertCircle className="h-3 w-3" />
+                              {log.error.message}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3">
-                          <details className="cursor-pointer">
-                            <summary className="text-xs text-blue-500 hover:text-blue-700">
-                              View Details
-                            </summary>
-                            <div className="mt-2 p-2 bg-gray-50 rounded text-xs font-mono max-w-2xl overflow-auto">
-                              {log.metadata && (
-                                <div className="mb-2">
-                                  <div className="font-semibold text-gray-700 mb-1">Metadata:</div>
-                                  <pre className="whitespace-pre-wrap">
-                                    {JSON.stringify(log.metadata, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                              {log.error && (
-                                <div>
-                                  <div className="font-semibold text-red-700 mb-1">Error:</div>
-                                  <div className="text-red-600">
-                                    <div className="font-semibold">{log.error.message}</div>
-                                    {log.error.stack && (
-                                      <pre className="mt-1 text-xs whitespace-pre-wrap">
-                                        {log.error.stack}
-                                      </pre>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </details>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openDetailsModal(log)}
+                            className="text-xs text-blue-500 hover:text-blue-700"
+                          >
+                            View Details
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -317,6 +363,96 @@ export function LogViewer() {
           )}
         </CardContent>
       </Card>
+
+      {/* Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedLog && getLevelBadge(selectedLog.level)}
+              Log Details
+            </DialogTitle>
+            <DialogDescription>
+              {selectedLog && getFullDateTime(selectedLog.timestamp)}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedLog && (
+            <div className="space-y-4">
+              {/* Message */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Message</h3>
+                <p className="text-sm bg-gray-50 p-3 rounded border">{selectedLog.message}</p>
+              </div>
+
+              {/* Service */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Service</h3>
+                <Badge variant="outline">
+                  {String(selectedLog.metadata?.service || selectedLog.service || 'System')}
+                </Badge>
+              </div>
+
+              {/* Timestamp Details */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Timestamp</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="bg-gray-50 p-2 rounded">
+                    <span className="text-gray-600">Full Time:</span>
+                    <div className="font-mono">{getFullDateTime(selectedLog.timestamp)}</div>
+                  </div>
+                  <div className="bg-gray-50 p-2 rounded">
+                    <span className="text-gray-600">Relative:</span>
+                    <div className="font-mono">{getRelativeTime(selectedLog.timestamp)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Metadata */}
+              {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">Metadata</h3>
+                  <pre className="text-xs font-mono bg-gray-50 p-3 rounded border overflow-x-auto">
+                    {JSON.stringify(selectedLog.metadata, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Error Details */}
+              {selectedLog.error && (
+                <div>
+                  <h3 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    Error Details
+                  </h3>
+                  <div className="bg-red-50 border border-red-200 rounded p-3 space-y-2">
+                    <div>
+                      <span className="text-xs font-semibold text-red-700">Message:</span>
+                      <p className="text-sm text-red-900 mt-1">{selectedLog.error.message}</p>
+                    </div>
+                    {selectedLog.error.stack && (
+                      <div>
+                        <span className="text-xs font-semibold text-red-700">Stack Trace:</span>
+                        <pre className="text-xs font-mono text-red-800 mt-1 overflow-x-auto whitespace-pre-wrap">
+                          {selectedLog.error.stack}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Raw Log Data */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Raw Log Data</h3>
+                <pre className="text-xs font-mono bg-gray-900 text-green-400 p-3 rounded overflow-x-auto">
+                  {JSON.stringify(selectedLog, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
