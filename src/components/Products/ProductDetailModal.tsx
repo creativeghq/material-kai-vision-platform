@@ -19,6 +19,7 @@ import { ChevronLeft, ChevronRight, Factory } from 'lucide-react';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
+import { SimilarMaterials } from '@/components/recommendations';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -418,6 +419,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
           </CardContent>
         </Card>
+
+        {/* Similar Materials Section */}
+        <div className="mt-6">
+          <SimilarMaterials materialId={product.id} limit={10} />
+        </div>
       </DialogContent>
     </Dialog>
   );

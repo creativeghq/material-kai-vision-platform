@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { HeroSection } from './HeroSection';
 import { MetricsGrid } from './MetricsGrid';
+import { RecommendedForYou } from '@/components/recommendations';
 import styles from './Dashboard.module.css';
 
 export const Dashboard: React.FC = () => {
@@ -19,6 +20,11 @@ export const Dashboard: React.FC = () => {
 
       {/* Enhanced System Metrics */}
       <MetricsGrid />
+
+      {/* Personalized Recommendations */}
+      <div className="mt-8">
+        <RecommendedForYou limit={20} algorithm="user_user" />
+      </div>
     </div>
   );
 };
