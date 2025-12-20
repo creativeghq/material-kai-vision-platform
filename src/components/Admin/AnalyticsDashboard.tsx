@@ -43,6 +43,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './PDFProcessingMonitor';
+import { SystemHealthMonitor } from './SystemHealthMonitor';
 
 // Model pricing per 1M tokens (in USD)
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -589,7 +590,11 @@ export const AnalyticsDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="agent-chat" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
+            <TabsTrigger value="system-health">
+              <Activity className="h-4 w-4 mr-2" />
+              System Health
+            </TabsTrigger>
             <TabsTrigger value="agent-chat">
               <Bot className="h-4 w-4 mr-2" />
               Agent Chat
@@ -611,7 +616,7 @@ export const AnalyticsDashboard: React.FC = () => {
               PDF Processing
             </TabsTrigger>
             <TabsTrigger value="api-usage">
-              <Activity className="h-4 w-4 mr-2" />
+              <Zap className="h-4 w-4 mr-2" />
               API Usage
             </TabsTrigger>
             <TabsTrigger value="quality-metrics">
@@ -619,6 +624,11 @@ export const AnalyticsDashboard: React.FC = () => {
               Quality Metrics
             </TabsTrigger>
           </TabsList>
+
+          {/* System Health Tab */}
+          <TabsContent value="system-health" className="space-y-4">
+            <SystemHealthMonitor />
+          </TabsContent>
 
           {/* Agent Chat Analytics Tab */}
           <TabsContent value="agent-chat" className="space-y-4">
