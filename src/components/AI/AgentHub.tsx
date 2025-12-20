@@ -277,6 +277,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const loadConversations = async () => {
       const convos = await agentChatHistoryService.getUserConversations(userId, selectedAgent);
       setConversations(convos);
+
+      // IMPORTANT: Reset current conversation when switching agents
+      // This prevents using a conversation ID from a different agent
+      setCurrentConversationId(null);
+      setMessages([]);
     };
 
     loadConversations();

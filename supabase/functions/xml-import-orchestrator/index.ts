@@ -409,13 +409,12 @@ Deno.serve(async (req) => {
       source_name || 'xml_upload',
       xml_content, // Store original XML for re-runs
       field_mappings,
-      mapping_template_id,
-      parent_job_id
+      mapping_template_id
     );
     console.log(`Created import job: ${jobId}`);
 
     // Call Python API to start processing (non-blocking)
-    callPythonAPI(jobId, workspace_id, authHeader).catch((error) => {
+    callPythonAPI(supabase, jobId, workspace_id, authHeader).catch((error) => {
       console.error(`Error calling Python API for job ${jobId}:`, error);
     });
 
@@ -609,10 +608,10 @@ async function createImportJob(
   source_name: string,
   original_xml_content?: string,
   field_mappings?: Record<string, string>,
-  mapping_template_id?: string,
-  parent_job_id?: string
+  mapping_template_id?: string
 ): Promise<string> {
   // Create job record with products in metadata
+  // Note: background_job_id will be auto-created by trigger
   const { data: jobData, error: jobError } = await supabase
     .from('data_import_jobs')
     .insert({
@@ -627,7 +626,6 @@ async function createImportJob(
       original_xml_content,
       field_mappings,
       mapping_template_id,
-      parent_job_id,
       metadata: {
         created_by: 'xml-import-orchestrator',
         products: products, // Store products for Python API to process
@@ -642,38 +640,137 @@ async function createImportJob(
 
   const jobId = jobData.id;
 
+  console.log(`✅ Created data_import_job ${jobId} (background_job auto-created by trigger)`);
+
   return jobId;
 }
 
 /**
- * Call Python API to start processing (non-blocking)
+ * Call Python API to start processing with webhook tracking and retry logic
  */
-async function callPythonAPI(jobId: string, workspace_id: string, authHeader: string): Promise<void> {
+async function callPythonAPI(
+  supabase: any,
+  jobId: string,
+  workspace_id: string,
+  authHeader: string
+): Promise<void> {
   const pythonApiUrl = Deno.env.get('PYTHON_API_URL') || 'https://v1api.materialshub.gr';
+  const apiUrl = `${pythonApiUrl}/api/import/process`;
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 2000;
 
-  try {
-    const response = await fetch(`${pythonApiUrl}/api/import/process`, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        job_id: jobId,
+  const requestPayload = {
+    job_id: jobId,
+    workspace_id,
+  };
+
+  // 🆕 Create webhook_call record
+  const { data: webhookCall } = await supabase
+    .from('webhook_calls')
+    .insert({
+      source_type: 'xml_import',
+      source_id: jobId,
+      webhook_url: apiUrl,
+      webhook_method: 'POST',
+      request_payload: requestPayload,
+      retry_count: 0,
+      max_retries: MAX_RETRIES,
+      status: 'pending',
+      metadata: {
         workspace_id,
-      }),
-    });
+        job_id: jobId,
+      },
+    })
+    .select('id')
+    .single();
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Python API error: ${response.status} - ${errorText}`);
+  const webhookCallId = webhookCall?.id;
+  console.log(`📝 Created webhook_call record: ${webhookCallId}`);
+
+  // Retry loop with exponential backoff
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const startTime = Date.now();
+
+    try {
+      console.log(`📡 Calling Python API (attempt ${attempt + 1}/${MAX_RETRIES}): POST ${apiUrl}`);
+
+      // Update retry count if not first attempt
+      if (attempt > 0 && webhookCallId) {
+        await supabase
+          .from('webhook_calls')
+          .update({ retry_count: attempt, status: 'retrying' })
+          .eq('id', webhookCallId);
+      }
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      const responseTime = Date.now() - startTime;
+      const responseText = await response.text();
+
+      if (!response.ok) {
+        throw new Error(`Python API error: ${response.status} - ${responseText}`);
+      }
+
+      const result = JSON.parse(responseText);
+      console.log(`✅ Python API response for job ${jobId} (${responseTime}ms):`, result);
+
+      // 🆕 Update webhook_call with success
+      if (webhookCallId) {
+        await supabase
+          .from('webhook_calls')
+          .update({
+            response_status: response.status,
+            response_body: result,
+            response_time_ms: responseTime,
+            status: 'success',
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', webhookCallId);
+
+        console.log(`✅ Updated webhook_call ${webhookCallId} to 'success'`);
+      }
+
+      // Success - exit retry loop
+      return;
+
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES - 1;
+      const responseTime = Date.now() - startTime;
+
+      console.error(`❌ Attempt ${attempt + 1} failed:`, error.message);
+
+      // 🆕 Update webhook_call with error
+      if (webhookCallId) {
+        await supabase
+          .from('webhook_calls')
+          .update({
+            error_message: error.message,
+            response_time_ms: responseTime,
+            status: isLastAttempt ? 'failed' : 'retrying',
+            retry_count: attempt,
+            next_retry_at: isLastAttempt ? null : new Date(Date.now() + BASE_DELAY_MS * Math.pow(2, attempt)).toISOString(),
+            completed_at: isLastAttempt ? new Date().toISOString() : null,
+          })
+          .eq('id', webhookCallId);
+      }
+
+      if (isLastAttempt) {
+        console.error(`❌ All ${MAX_RETRIES} attempts failed for job ${jobId}`);
+        throw error; // Re-throw on final failure
+      } else {
+        // Calculate exponential backoff delay
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt);
+        console.log(`⏳ Retrying in ${delayMs}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
     }
-
-    const result = await response.json();
-    console.log(`Python API response for job ${jobId}:`, result);
-  } catch (error) {
-    console.error(`Failed to call Python API for job ${jobId}:`, error);
-    throw error;
   }
 }
 

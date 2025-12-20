@@ -61,6 +61,39 @@ Complete documentation for Material Kai Vision Platform.
 - API endpoints (4 total)
 - Phase 1 & 2 complete
 
+**[async-processing-and-limits.md](async-processing-and-limits.md)** - Async processing & concurrency limits ✨ NEW
+- Fully async architecture across all methods (PDF, Web, XML)
+- Unified concurrency limits (5 Llama, 2 Claude, 10 uploads, 20 CLIP)
+- Timeout configuration (300s discovery, 120s AI, 30s downloads)
+- Rate limiting (10 req/min TogetherAI, circuit breaker Claude)
+- Shared services (ImageProcessingService, RealEmbeddingsService, AsyncQueueService)
+- Memory optimization (batch processing prevents OOM)
+- Network optimization (semaphores prevent congestion)
+- API optimization (rate limiting prevents throttling)
+- Performance comparison table
+- Best practices and monitoring
+
+**[unified-product-generation-flow.md](unified-product-generation-flow.md)** - Unified product generation flow ✨ NEW
+- Complete architecture diagram (all 3 methods → unified storage → unified search)
+- Method comparison (PDF vs Web vs XML)
+- Detailed flow verification for each method
+- Unified storage (same tables + VECS collections)
+- Unified search (multi-vector search across all sources)
+- Verification checklist (product generation, storage, search, async)
+- Visual flow diagrams and code examples
+
+**[collaborative-filtering-recommendations.md](collaborative-filtering-recommendations.md)** - Collaborative filtering recommendations ✨ NEW
+- User-user collaborative filtering ("Users like you also liked...")
+- Item-item collaborative filtering ("Materials similar to this...")
+- Hybrid recommendations (collaborative + content-based)
+- Interaction tracking (view, click, save, purchase, rate, add_to_quote, share)
+- Smart caching (7-day TTL with automatic invalidation)
+- Real-time analytics and performance monitoring
+- Complete API reference (5 endpoints)
+- Frontend integration guide with code examples
+- Database schema (2 tables with indexes and RLS)
+- Cosine similarity and matrix factorization algorithms
+
 **[search-strategies.md](search-strategies.md)** - Complete search system guide
 - 6 search strategies (100% implemented)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image

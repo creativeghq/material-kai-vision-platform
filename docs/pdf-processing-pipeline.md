@@ -2,6 +2,11 @@
 
 14-stage intelligent pipeline for transforming material catalogs into searchable knowledge.
 
+> **📚 Related Documentation:**
+> - [Async Processing & Limits](./async-processing-and-limits.md) - Concurrency limits and async architecture
+> - [Product Discovery Architecture](./product-discovery-architecture.md) - AI-powered product extraction
+> - [System Architecture](./system-architecture.md) - Overall platform architecture
+
 ---
 
 ## 🎯 Pipeline Overview

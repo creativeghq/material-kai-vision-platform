@@ -200,11 +200,21 @@ Return a list of materials found on the page.`);
       }
       const currentUserId = user.id;
 
+      // Get user's workspace
+      const { data: workspaceData, error: workspaceError } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('user_id', currentUserId)
+        .single();
+
+      const workspaceId = workspaceData?.id || null;
+
       // Create session in Supabase database
       const sessionId = crypto.randomUUID();
       const sessionData = {
         id: sessionId,
         user_id: currentUserId,
+        workspace_id: workspaceId,
         session_id: sessionId,
         source_url: sourceUrl,
         status: 'pending',

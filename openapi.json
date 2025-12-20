@@ -3,7 +3,7 @@
   "info": {
     "title": "MIVAA - Material Intelligence Vision and Analysis Agent",
     "description": "\n**Production API v2.2.0** - AI-powered material recognition and knowledge management platform serving 5,000+ users.\n\n## 🎯 Overview\n\nMIVAA is the core backend service powering the Material Kai Vision Platform, providing comprehensive PDF processing, AI analysis, and multi-vector search capabilities.\n\n## ✨ API Organization (v2.2.0)\n\n**Comprehensive API with 106 endpoints organized into 15 categories**\n\n**Key Features:**\n- ✅ **Consolidated Upload**: `/api/rag/documents/upload` with processing modes (quick/standard/deep) and categories\n- ✅ **Unified Search**: `/api/rag/search?strategy={strategy}` with 6 strategies (semantic, vector, multi_vector, hybrid, material, image)\n- ✅ **Comprehensive Health**: `/health` for all services (database, storage, AI models)\n- ✅ **Well-Organized**: 15 endpoint categories covering RAG, documents, search, AI services, admin, and more\n- ✅ **Preserved**: Prompt enhancement system, category extraction, all processing modes\n\n### Key Capabilities\n- **PDF Processing**: 14-stage pipeline with PyMuPDF4LLM extraction\n- **Products + Metadata**: Inseparable extraction (Stage 0A) - all metadata stored in product.metadata JSONB\n- **Document Entities**: Certificates, logos, specifications as separate knowledge base (Stage 0B)\n- **AI Analysis**: 12 AI models across 7 pipeline stages\n- **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)\n- **Knowledge Base**: Semantic chunking, quality scoring, deduplication\n- **Image Analysis**: CLIP + Llama 4 Scout Vision (69.4% MMMU, #1 OCR)\n- **Agentic Queries**: Factory/group filtering for certificates, logos, specifications\n\n### AI Models\n1. **OpenAI**: text-embedding-3-small (1536D embeddings)\n2. **Anthropic**: Claude Haiku 4.5 (fast classification), Claude Sonnet 4.5 (deep enrichment)\n3. **Together AI**: Llama 4 Scout 17B Vision\n4. **CLIP**: Visual embeddings (512D)\n5. **Custom**: Color, texture, application embeddings\n\n### API Endpoints\n- **Total**: 106 endpoints across 15 categories (18 legacy endpoints removed)\n- **RAG System**: 23 endpoints for document upload, search, query, chat, embeddings\n- **AI Services**: 10 endpoints for classification, validation, boundary detection\n- **Admin**: 10 endpoints for chunk quality, extraction config, prompts\n- **Search**: 8 endpoints for semantic, image, material, multimodal search\n- **Jobs**: 7 endpoints for progress tracking, statistics, status\n- **Document Entities**: 5 endpoints for certificates, logos, specifications\n\n### Performance\n- **Search Accuracy**: 85%+\n- **Processing Success**: 95%+\n- **Response Time**: 200-800ms (search), 1-4s (analysis)\n- **Uptime**: 99.5%+\n\n## 🔐 Authentication\n\nAll API endpoints require JWT authentication:\n```\nAuthorization: Bearer your-jwt-token\n```\n\nGet your token from the frontend application or Supabase authentication.\n\n## 📊 Latest Enhancements (October 2025)\n\n✅ **Product Detection Pipeline** - 60-70% false positive reduction with 4-layer validation\n✅ **Chunk Quality System** - Hash-based + semantic deduplication, quality scoring\n✅ **Two-Stage Classification** - 60% faster, 40% cost reduction\n✅ **Multi-Vector Embeddings** - 6 embedding types for 85%+ accuracy improvement\n✅ **Admin Dashboard** - Chunk quality monitoring and review workflow\n✅ **Metadata Synchronization** - 100% accuracy in job status reporting\n\n## 🚀 API Categories (106 Endpoints)\n\n### 📄 PDF Processing (`/api/pdf/*`)\n- Extract markdown, tables, images from PDFs\n- PyMuPDF4LLM integration\n- Batch processing support\n\n### 🧠 RAG System (`/api/rag/*`)\n- Document upload and processing\n- Query and chat interfaces\n- Semantic search\n- Job monitoring with real-time progress\n\n### 🤖 AI Analysis (`/api/semantic-analysis`)\n- Llama 4 Scout Vision material analysis\n- Multi-modal text + image processing\n- Entity extraction and classification\n\n### 🔍 Search APIs (`/api/search/*`)\n- Semantic search (text embeddings)\n- Vector search (multi-vector)\n- Hybrid search (combined)\n- Recommendations\n\n### 🔗 Embedding APIs (`/api/embeddings/*`)\n- Generate text embeddings (1536D)\n- Generate CLIP embeddings (512D)\n- Batch processing\n- Multi-vector generation (6 types)\n\n### 💬 Chat APIs (`/api/chat/*`)\n- Chat completions\n- Contextual responses\n- Conversation history\n\n### 📦 Products API (`/api/products/*`)\n- Two-stage product classification\n- Product enrichment\n- Product management\n- Health monitoring\n\n### 👨‍💼 Admin APIs (`/api/admin/*`)\n- Chunk quality dashboard\n- Quality statistics\n- Flagged chunks review\n- Metadata management\n\n### 🏥 Health & Monitoring\n- `/health` - Service health check\n- `/metrics` - Performance metrics\n- `/performance/summary` - Comprehensive stats\n\n## 📖 Documentation\n\n- **Interactive API Docs**: [/docs](/docs) (Swagger UI)\n- **Alternative Docs**: [/redoc](/redoc) (ReDoc)\n- **OpenAPI Schema**: [/openapi.json](/openapi.json)\n- **Complete Documentation**: https://basilakis.github.io\n\n## 🔗 Related Services\n\n- **Frontend**: https://materialshub.gr\n- **Documentation Site**: https://basilakis.github.io\n- **GitHub**: https://github.com/creativeghq/material-kai-vision-platform\n\n        ",
-    "version": "2.3.1",
+    "version": "2.4.0",
     "x-api-features": {
       "api_consolidation": "Consolidated and organized endpoints with clear categorization",
       "consolidated_upload": "/api/rag/documents/upload with modes (quick/standard/deep) + categories",
@@ -22,7 +22,8 @@
       "embedding_models": "OpenAI text-embedding-3-small (1536D), CLIP ViT-B/32 (512D)",
       "performance": "95%+ product detection, 85%+ search accuracy, 200-800ms response time",
       "scalability": "5,000+ users, 99.5%+ uptime",
-      "agentic_queries": "Factory/group filtering for certificates, logos, specifications"
+      "agentic_queries": "Factory/group filtering for certificates, logos, specifications",
+      "web_scraping": "Firecrawl integration with automatic product discovery from web content"
     },
     "x-endpoint-categories": {
       "rag_routes": "/api/rag/* (27 endpoints) - Document upload, search, query, chat, embeddings, jobs, relationships",
@@ -39,12 +40,13 @@
       "pdf_routes": "/api/pdf/* (4 endpoints) - Extract markdown, tables, images",
       "anthropic_routes": "/api/v1/anthropic/* (3 endpoints) - Claude image validation, product enrichment",
       "products_routes": "/api/products/* (3 endpoints) - Product creation from chunks/layout",
+      "web_scraping_routes": "/api/scraping/* (2 NEW endpoints) - Firecrawl integration, web content to products",
       "ai_metrics_routes": "/api/v1/ai-metrics/* (2 endpoints) - Job metrics, summary",
-      "relationship_routes": "/api/rag/product-image-relationships, /api/rag/chunk-product-relationships (2 NEW endpoints) - Relationship queries for validation"
+      "relationship_routes": "/api/rag/product-image-relationships, /api/rag/chunk-product-relationships (2 endpoints) - Relationship queries for validation"
     },
     "x-platform-stats": {
-      "total_endpoints": 110,
-      "endpoint_categories": 16,
+      "total_endpoints": 112,
+      "endpoint_categories": 17,
       "ai_models": 13,
       "processing_stages": 14,
       "embedding_types": 6,
@@ -52,9 +54,9 @@
       "specialized_clip_embeddings": 6,
       "users": "5,000+",
       "uptime": "99.5%+",
-      "version": "2.3.1",
-      "last_updated": "2025-11-22",
-      "latest_enhancement": "Relationship Query Endpoints (product-image, chunk-product) + Comprehensive Embedding Generation",
+      "version": "2.4.0",
+      "last_updated": "2025-12-20",
+      "latest_enhancement": "Web Scraping Integration - Firecrawl to Products with AI Discovery",
       "legacy_removed": "Removed 18 duplicate /api/documents/* endpoints (13 from documents.py + 5 from search.py)"
     }
   },
@@ -3323,6 +3325,93 @@
                 "schema": {
                   "type": "object",
                   "title": "Response Products Health Check Api Products Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scraping/process-session": {
+      "post": {
+        "tags": [
+          "web-scraping"
+        ],
+        "summary": "Process Scraping Session",
+        "description": "**🌐 WEB SCRAPING - Process Firecrawl Scraping Session**\n\nThis endpoint is called by the Edge Function (scrape-session-manager) when web scraping completes.\nIt processes the scraped markdown content and creates products using AI discovery.\n\n## 🎯 Overview\n\nConverts web scraping sessions into products:\n- Fetches scraping session from Supabase\n- Retrieves markdown content from all scraped pages\n- Uses ProductDiscoveryService.discover_products_from_text() for AI analysis\n- Creates products with metadata and images\n- Links products to scraping session\n\n## 🔄 Processing Flow\n\n1. **Fetch Session** (0-10%)\n   - Retrieve scraping_sessions record\n   - Validate session status\n   - Get workspace context\n\n2. **Retrieve Content** (10-20%)\n   - Fetch all scraping_pages for session\n   - Combine markdown content\n   - Extract images and metadata\n\n3. **AI Discovery** (20-80%)\n   - Analyze markdown with Claude/GPT\n   - Extract product information\n   - Identify materials and specifications\n   - Map images to products\n\n4. **Create Products** (80-95%)\n   - Insert products into database\n   - Link to scraping session\n   - Attach images and metadata\n   - Generate embeddings (async)\n\n5. **Finalize** (95-100%)\n   - Update session status\n   - Store processing metrics\n   - Return results\n\n## 🤖 AI Models\n\n- **Claude Sonnet 4.5** (default): Best quality, comprehensive analysis\n- **GPT-5**: Fast processing, good quality\n- **Claude Haiku 4.5**: Fastest, lower cost\n\n## 📊 Background Processing\n\nLarge scraping sessions are processed in background:\n- Job queued in AsyncQueueService\n- Real-time progress updates\n- Automatic retry on failure\n- Webhook notifications\n\n## 🔐 Authentication\n\nRequires Material Kai API key:\n```\nAuthorization: Bearer mk_your_api_key\n```\n\n## 📝 Example Request\n\n```bash\ncurl -X POST \"/api/scraping/process-session\" \\\n  -H \"Content-Type: application/json\" \\\n  -H \"Authorization: Bearer mk_your_api_key\" \\\n  -d '{\n    \"session_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"workspace_id\": \"my-workspace\",\n    \"categories\": [\"products\"],\n    \"model\": \"claude\"\n  }'\n```\n\n## ✅ Success Response\n\n```json\n{\n  \"success\": true,\n  \"session_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"message\": \"Scraping session processed successfully\",\n  \"products_created\": 12,\n  \"job_id\": \"job-123\" // If background processing\n}\n```\n\n## ❌ Error Response\n\n```json\n{\n  \"success\": false,\n  \"session_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"message\": \"Session not found or already processed\"\n}\n```\n\n## 🔗 Related Endpoints\n\n- `GET /api/scraping/session/{session_id}/status` - Check processing status\n- `POST /api/scraping/session/{session_id}/retry` - Retry failed session",
+        "operationId": "process_scraping_session_api_scraping_process_session_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessSessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scraping/session/{session_id}/status": {
+      "get": {
+        "tags": [
+          "web-scraping"
+        ],
+        "summary": "Get Session Status",
+        "description": "**🌐 WEB SCRAPING - Get Scraping Session Status**\n\nRetrieve the current status and progress of a web scraping session.\n\n## 📊 Status Values\n\n- `pending` - Session created, scraping not started\n- `scraping` - Firecrawl actively scraping pages\n- `processing` - AI processing scraped content\n- `completed` - All processing complete, products created\n- `failed` - Scraping or processing failed\n\n## 📝 Response Fields\n\n- `session_id` - Unique session identifier\n- `status` - Current processing status\n- `source_url` - Original URL being scraped\n- `progress_percentage` - Overall progress (0-100)\n- `total_pages` - Total pages to scrape\n- `completed_pages` - Pages successfully scraped\n- `failed_pages` - Pages that failed to scrape\n- `materials_processed` - Number of materials discovered\n- `products_created` - Number of products created\n- `error_message` - Error details if failed\n- `created_at` - Session creation timestamp\n- `updated_at` - Last update timestamp\n\n## 📝 Example Request\n\n```bash\ncurl -X GET \"/api/scraping/session/550e8400-e29b-41d4-a716-446655440000/status\" \\\n  -H \"Authorization: Bearer mk_your_api_key\"\n```\n\n## ✅ Example Response\n\n```json\n{\n  \"session_id\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"status\": \"processing\",\n  \"source_url\": \"https://example.com/products\",\n  \"progress_percentage\": 65,\n  \"total_pages\": 10,\n  \"completed_pages\": 10,\n  \"failed_pages\": 0,\n  \"materials_processed\": 8,\n  \"products_created\": 0,\n  \"error_message\": null,\n  \"created_at\": \"2025-01-20T10:00:00Z\",\n  \"updated_at\": \"2025-01-20T10:05:30Z\"\n}\n```",
+        "operationId": "get_session_status_api_scraping_session__session_id__status_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Scraping session ID",
+              "title": "Session Id"
+            },
+            "description": "Scraping session ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -12489,6 +12578,213 @@
         ],
         "title": "SearchResponse",
         "description": "Response model for search operations."
+      },
+      "ProcessSessionRequest": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id",
+            "description": "Scraping session ID"
+          },
+          "workspace_id": {
+            "type": "string",
+            "title": "Workspace Id",
+            "description": "Workspace ID"
+          },
+          "categories": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categories",
+            "description": "Categories to discover (default: ['products'])"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "AI model to use (claude, gpt)",
+            "default": "claude"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "workspace_id"
+        ],
+        "title": "ProcessSessionRequest",
+        "description": "Request model for processing a scraping session"
+      },
+      "ProcessSessionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "products_created": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Products Created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "session_id",
+          "message"
+        ],
+        "title": "ProcessSessionResponse",
+        "description": "Process session response"
+      },
+      "SessionStatusResponse": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "pending, processing, completed, failed"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "progress_percentage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Percentage"
+          },
+          "total_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Pages"
+          },
+          "completed_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed Pages"
+          },
+          "failed_pages": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Pages"
+          },
+          "materials_processed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Materials Processed"
+          },
+          "products_created": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Products Created"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "status",
+          "source_url",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SessionStatusResponse",
+        "description": "Scraping session status response"
       }
     },
     "securitySchemes": {
@@ -12528,6 +12824,10 @@
     {
       "name": "Products",
       "description": "📦 Product management - Two-stage AI classification (Claude Haiku 4.5 + Sonnet 4.5), product enrichment, and metadata extraction with 60% performance improvement"
+    },
+    {
+      "name": "web-scraping",
+      "description": "🌐 Web Scraping Integration - Process Firecrawl scraping sessions and convert web content to products using AI discovery. Supports automatic product creation from scraped markdown with retry logic and background processing."
     },
     {
       "name": "Admin",

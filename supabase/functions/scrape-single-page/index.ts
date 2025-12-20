@@ -92,6 +92,7 @@ Deno.serve(async (req) => {
       .eq('id', pageId);
 
     let materials: MaterialData[] = [];
+    let markdownContent: string | null = null;
     let errorMessage: string | null = null;
 
     try {
@@ -99,12 +100,17 @@ Deno.serve(async (req) => {
       const service = options.service || 'firecrawl';
 
       if (service === 'firecrawl') {
-        materials = await scrapeWithFirecrawl(pageUrl, options);
+        const result = await scrapeWithFirecrawl(pageUrl, options);
+        materials = result.materials;
+        markdownContent = result.markdown;
       } else {
-        materials = await scrapeWithJina(pageUrl, options);
+        const result = await scrapeWithJina(pageUrl, options);
+        materials = result.materials;
+        markdownContent = result.markdown;
       }
 
       console.log(`Extracted ${materials.length} materials from ${pageUrl}`);
+      console.log(`Markdown content length: ${markdownContent?.length || 0} characters`);
 
     } catch (scrapeError) {
       console.error(`Scraping error for ${pageUrl}:`, scrapeError);
@@ -114,13 +120,14 @@ Deno.serve(async (req) => {
     const endTime = new Date();
     const processingTime = endTime.getTime() - startTime.getTime();
 
-    // Update page with results
+    // Update page with results (including markdown content)
     await supabase
       .from('scraping_pages')
       .update({
         status: errorMessage ? 'failed' : 'completed',
         completed_at: endTime.toISOString(),
         materials_found: materials.length,
+        markdown_content: markdownContent,
         error_message: errorMessage,
         processing_time_ms: processingTime,
       })
@@ -171,7 +178,7 @@ Deno.serve(async (req) => {
   }
 });
 
-async function scrapeWithFirecrawl(url: string, options: any): Promise<MaterialData[]> {
+async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materials: MaterialData[], markdown: string | null }> {
   const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
   if (!apiKey) {
     throw new Error('Firecrawl API key not configured');
@@ -185,7 +192,7 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<MaterialD
       mode: 'llm-extraction',
       extractionPrompt: options.prompt || `Extract material information from this page. Look for:
 - Material name
-- Price (if available)  
+- Price (if available)
 - Description
 - Images
 - Properties like dimensions, color, finish
@@ -216,6 +223,9 @@ Return a list of materials found on the page.`,
     throw new Error(result.error || 'Firecrawl extraction failed');
   }
 
+  // Extract markdown content
+  const markdown = result.data?.markdown || null;
+
   // Parse extracted data into our material format
   const materials: MaterialData[] = [];
 
@@ -242,10 +252,10 @@ Return a list of materials found on the page.`,
     }
   }
 
-  return materials;
+  return { materials, markdown };
 }
 
-async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]> {
+async function scrapeWithJina(url: string, options: any): Promise<{ materials: MaterialData[], markdown: string | null }> {
   const apiKey = Deno.env.get('JINA_API_KEY');
   if (!apiKey) {
     throw new Error('Jina API key not configured');
@@ -263,7 +273,7 @@ async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]
     throw new Error(`Jina Reader API error: ${readerResponse.status}`);
   }
 
-  const content = await readerResponse.text();
+  const markdown = await readerResponse.text();
 
   // Use simple pattern matching to extract material information
   const materials: MaterialData[] = [];
@@ -274,7 +284,7 @@ async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]
   ];
 
   for (const pattern of materialPatterns) {
-    const matches = content.match(pattern);
+    const matches = markdown.match(pattern);
     if (matches) {
       for (const match of matches) {
         materials.push({
@@ -291,5 +301,5 @@ async function scrapeWithJina(url: string, options: any): Promise<MaterialData[]
     }
   }
 
-  return materials;
+  return { materials, markdown };
 }

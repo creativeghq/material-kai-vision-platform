@@ -2,26 +2,37 @@
  * Complete Database Reset Script
  *
  * This script:
- * 1. Deletes knowledge base data (chunks, embeddings, products, images, etc.)
- * 2. PRESERVES user data (users, profiles, workspaces, API keys)
+ * 1. Deletes all user-generated data (70+ tables)
+ * 2. PRESERVES system configuration and user accounts
  * 3. Deletes all files from storage buckets EXCEPT pdf-documents folder
  * 4. Verifies cleanup was successful
  * 5. Reports storage and resource usage
  *
- * ⚠️ PRESERVED DATA:
- * - Users and authentication (auth.users)
- * - User profiles
- * - Workspaces and workspace members
- * - API keys and usage logs
- * - PDF documents in pdf-documents folder
+ * ⚠️ PRESERVED DATA (NEVER DELETED):
+ * 1. User data (users, profiles, workspaces, API keys)
+ * 2. Global upsells (admin-managed upsell items)
+ * 3. Global timeline elements (timeline_steps)
+ * 4. Material metadata field definitions (schema)
+ * 5. PDF files in pdf-documents folder
+ * 6. System settings and configuration
  *
- * 🗑️ DELETED DATA:
- * - All PDF processing data (chunks, embeddings, images)
- * - All products and materials
- * - All background jobs and processing results
- * - All analytics and agent tasks
- * - All 3D generation history
- * - Storage files (except pdf-documents folder)
+ * 🗑️ DELETED DATA (70+ tables):
+ * - Agent Chat (conversations, messages, uploaded files)
+ * - CRM (contacts, relationships)
+ * - Quotes System (quotes, items, timeline, upsells, status tags)
+ * - Moodboards (moodboards, items, products, quote requests)
+ * - 3D Generation History
+ * - Analytics (events, quality metrics, scoring logs, recommendations)
+ * - Document Entities & Relationships
+ * - Relevancy Relationships (product-chunk, chunk-image, product-image)
+ * - Metadata Values & Relevancy
+ * - PDF Processing (jobs, checkpoints, progress, AI queue, image queue)
+ * - Knowledge Base (chunks, embeddings, images, documents)
+ * - Products & Materials Catalog
+ * - Processing Results & Quality Data
+ * - Web Scraping (sessions, pages, temp materials)
+ * - Data Import (jobs, history)
+ * - Storage files (pdf-tiles, material-images, moodboard-images, 3d-renders)
  */
 
 const SUPABASE_URL = 'https://bgbavxtjlbvgplozizxu.supabase.co';
@@ -36,22 +47,79 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 // TABLES TO PRESERVE (NEVER DELETE)
 // ═══════════════════════════════════════════════════════════
 // These tables contain critical user and system data that must be preserved:
-// - users (auth.users) - User authentication data
-// - profiles - User profile information
-// - workspaces - Workspace/tenant data
-// - workspace_members - Workspace membership
-// - api_keys - API authentication keys
-// - api_usage_logs - API usage tracking
+// 1. User Data:
+//    - users (auth.users) - User authentication data
+//    - profiles - User profile information
+//    - workspaces - Workspace/tenant data
+//    - workspace_members - Workspace membership
+//    - api_keys - API authentication keys
+//    - api_usage_logs - API usage tracking
+//
+// 2. Global Configuration:
+//    - upsells - Global upsells (admin-managed upsell items)
+//    - timeline_steps - Global timeline elements
+//    - material_metadata_fields - Material metadata field definitions (schema)
+//
+// 3. System Settings:
+//    - Any system configuration tables
+//
+// 4. Storage:
+//    - pdf-documents bucket - All PDF files preserved
 
 // ═══════════════════════════════════════════════════════════
-// TABLES TO CLEAR (Knowledge Base & Processing Data)
+// TABLES TO CLEAR (User-Generated Data)
 // ═══════════════════════════════════════════════════════════
 // Clear in order to respect foreign key constraints
+// Order matters! Delete child tables before parent tables
 const TABLES_TO_CLEAR = [
-  // PDF Processing & Knowledge Base (CLEAR)
-  // Order matters! Delete child tables before parent tables
-  'job_progress',                  // Job progress tracking (MUST BE FIRST - references processed_documents)
-  'ai_analysis_queue',             // AI analysis queue (must be before processed_documents)
+  // Agent Chat System (DELETE)
+  'agent_chat_messages',           // Chat messages (child of conversations)
+  'agent_chat_conversations',      // Chat conversations
+  'agent_uploaded_files',          // Files uploaded in chat
+
+  // CRM Contacts (DELETE)
+  'crm_contact_relationships',     // Contact relationships (child of contacts)
+  'crm_contacts',                  // CRM contacts
+
+  // Quotes System (DELETE - except global upsells and timeline steps)
+  'quote_timeline',                // Quote timeline progress (child of quotes)
+  'quote_upsells',                 // Quote upsells junction (child of quotes)
+  'quote_items',                   // Quote items (child of quotes)
+  'quotes',                        // Quotes
+  'status_tags',                   // Custom status tags
+  // NOTE: 'upsells' and 'timeline_steps' are PRESERVED (global data)
+
+  // Moodboards (DELETE)
+  'moodboard_quote_requests',      // Moodboard quote requests (child of moodboards)
+  'moodboard_products',            // Moodboard products (child of moodboards)
+  'moodboard_items',               // Moodboard items (child of moodboards)
+  'moodboards',                    // Moodboards
+
+  // 3D Generation (DELETE)
+  'generation_3d',                 // 3D generation history
+
+  // Analytics (DELETE)
+  'analytics_events',              // Analytics events
+  'quality_metrics_daily',         // Daily quality metrics
+  'quality_scoring_logs',          // Quality scoring logs
+  'recommendation_analytics',      // Recommendation analytics
+
+  // Document Entities & Relationships (DELETE)
+  'product_document_relationships', // Product-document entity relationships
+  'document_entities',             // Document entities (certificates, logos, specs)
+
+  // Relevancy Relationships (DELETE)
+  'product_chunk_relationships',   // Product-chunk relevancies
+  'chunk_image_relationships',     // Chunk-image relevancies
+  'product_image_relationships',   // Product-image relevancies
+  'material_metadata_values',      // Material metadata values
+  'material_metadata_relevancy',   // Material metadata relevancy
+
+  // PDF Processing & Knowledge Base (DELETE)
+  'job_checkpoints',               // Job checkpoints (child of background_jobs)
+  'job_progress',                  // Job progress tracking (child of background_jobs)
+  'ai_analysis_queue',             // AI analysis queue
+  'image_processing_queue',        // Image processing queue
   'embeddings',                    // Text and image embeddings
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
@@ -60,26 +128,24 @@ const TABLES_TO_CLEAR = [
   'documents',                     // PDF documents metadata
   'processed_documents',           // Processed document records
 
-  // Materials & Catalog (CLEAR)
+  // Materials & Catalog (DELETE)
   'materials_catalog',             // Materials catalog entries
   'material_visual_analysis',      // Visual analysis results
 
-  // Processing & Quality (CLEAR)
+  // Processing & Quality (DELETE)
   'processing_results',            // Processing results
-  'quality_metrics_daily',         // Daily quality metrics
-  'quality_scoring_logs',          // Quality scoring logs
 
-  // Analytics & Tasks (CLEAR)
-  'analytics_events',              // Analytics events
+  // Agent Tasks (DELETE)
   'agent_tasks',                   // Agent task records
 
-  // 3D Generation (CLEAR)
-  'generation_3d',                 // 3D generation history
-
-  // Scraping (CLEAR - if you use web scraping)
+  // Web Scraping (DELETE)
   'scraped_materials_temp',        // Temporary scraped materials
   'scraping_sessions',             // Scraping sessions
-  'scraping_pages'                 // Scraping pages
+  'scraping_pages',                // Scraping pages
+
+  // Data Import (DELETE)
+  'data_import_jobs',              // Data import jobs
+  'data_import_history',           // Data import history
 ];
 
 // Storage buckets configuration
@@ -96,6 +162,14 @@ const BUCKETS_CONFIG = [
   {
     name: 'material-images',
     excludeFolders: []  // Clear everything - material images
+  },
+  {
+    name: 'moodboard-images',
+    excludeFolders: []  // Clear everything - moodboard images
+  },
+  {
+    name: '3d-renders',
+    excludeFolders: []  // Clear everything - 3D generation renders
   }
 ];
 

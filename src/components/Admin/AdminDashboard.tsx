@@ -22,6 +22,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
+import { ResetPlatformDialog } from './ResetPlatformDialog';
 
 // Types for our data structures
 type SystemMetrics = {
@@ -281,6 +282,7 @@ const AdminDashboard: React.FC = () => {
               Sentry
               <ExternalLink className="h-3 w-3" />
             </Button>
+            <ResetPlatformDialog />
             <Button
               onClick={() => window.open('https://v1api.materialshub.gr/docs', '_blank')}
               className="flex items-center gap-2 px-3 py-1 text-sm hover:bg-white/10"

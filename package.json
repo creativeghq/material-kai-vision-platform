@@ -11,6 +11,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "types:generate": "supabase gen types typescript --project-id bgbavxtjlbvgplozizxu > src/integrations/supabase/types.ts",
     "types:generate:local": "supabase gen types typescript --local > src/integrations/supabase/types.ts",
+    "db:migrate": "node scripts/database/apply-migrations.js",
+    "db:migrate:dry-run": "node scripts/database/apply-migrations.js --dry-run",
     "prepare": "husky install"
   },
   "dependencies": {

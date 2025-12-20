@@ -494,6 +494,7 @@ export type Database = {
           id: string;
           session_id: string;
           user_id: string | null;
+          workspace_id: string | null;
           source_url: string;
           status: string;
           scraping_config: Json | null;
@@ -509,6 +510,7 @@ export type Database = {
           id?: string;
           session_id: string;
           user_id?: string | null;
+          workspace_id?: string | null;
           source_url: string;
           status?: string;
           scraping_config?: Json | null;
@@ -524,6 +526,7 @@ export type Database = {
           id?: string;
           session_id?: string;
           user_id?: string | null;
+          workspace_id?: string | null;
           source_url?: string;
           status?: string;
           scraping_config?: Json | null;
@@ -535,7 +538,15 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'scraping_sessions_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspaces';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       scraping_pages: {
         Row: {
@@ -549,6 +560,7 @@ export type Database = {
           error_message: string | null;
           started_at: string | null;
           completed_at: string | null;
+          markdown_content: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -560,6 +572,7 @@ export type Database = {
           page_index?: number | null;
           materials_found?: number | null;
           processing_time_ms?: number | null;
+          markdown_content?: string | null;
           error_message?: string | null;
           started_at?: string | null;
           completed_at?: string | null;
@@ -574,6 +587,7 @@ export type Database = {
           page_index?: number | null;
           materials_found?: number | null;
           processing_time_ms?: number | null;
+          markdown_content?: string | null;
           error_message?: string | null;
           started_at?: string | null;
           completed_at?: string | null;

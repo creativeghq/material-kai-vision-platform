@@ -85,6 +85,11 @@ const MIVAA_ENDPOINTS = {
   'admin_prompts_history': { path: '/api/admin/prompts/history/{prompt_id}', method: 'GET' },  // Prompt history
   'admin_prompts_test': { path: '/api/admin/prompts/test', method: 'POST' },  // Test prompt
 
+  // ==================== WEB SCRAPING ROUTES ====================
+  'process_scraping_session': { path: '/api/scraping/process-session', method: 'POST' },  // Process scraping session to products
+  'get_scraping_session_status': { path: '/api/scraping/session/{session_id}/status', method: 'GET' },  // Get session status
+  'retry_scraping_session': { path: '/api/scraping/session/{session_id}/retry', method: 'POST' },  // Retry failed session
+
   // ==================== DOCUMENTS ROUTES (Migrated to RAG) ====================
   // Legacy /api/documents/* endpoints removed - use /api/rag/* instead
   'documents_list': { path: '/api/rag/documents', method: 'GET' },  // List documents
@@ -426,6 +431,9 @@ serve(async (req) => {
     }
     if (payload && payload.document_id && finalPath.includes('{document_id}')) {
       finalPath = finalPath.replace('{document_id}', payload.document_id);
+    }
+    if (payload && payload.session_id && finalPath.includes('{session_id}')) {
+      finalPath = finalPath.replace('{session_id}', payload.session_id);
     }
 
     // Handle query parameters for GET requests

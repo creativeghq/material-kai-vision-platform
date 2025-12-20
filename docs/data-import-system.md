@@ -2,6 +2,11 @@
 
 Complete documentation for the unified data import system supporting XML files and web scraping.
 
+> **📚 Related Documentation:**
+> - [Async Processing & Limits](./async-processing-and-limits.md) - Concurrency limits and async architecture
+> - [Web Scraping Integration](./web-scraping-integration.md) - Web scraping details
+> - [Product Discovery Architecture](./product-discovery-architecture.md) - AI-powered product extraction
+
 ---
 
 ## 📋 Table of Contents
@@ -36,6 +41,23 @@ The Data Import System enables ingesting products from multiple sources includin
 - Async text processing (chunking, embeddings)
 - Checkpoint recovery for failed jobs
 - Comprehensive error handling
+
+### Async Processing & Limits
+
+XML Import uses **fully async processing** with unified concurrency limits:
+
+| Feature | Limit | Purpose |
+|---------|-------|---------|
+| **Product Batch Size** | 10 products | Memory optimization |
+| **Image Downloads** | 5 concurrent | Network optimization |
+| **Image Upload** | 10 concurrent | Supabase Storage limit |
+| **Llama Vision** | 5 concurrent | AI classification |
+| **Claude Validation** | 2 concurrent | Validation |
+| **CLIP Batch** | 20 images | Embedding generation |
+| **Download Timeout** | 30 seconds | Per-image timeout |
+| **Max File Size** | 10 MB | Image size limit |
+
+See [Async Processing & Limits](./async-processing-and-limits.md) for complete details.
 
 ### Use Cases
 

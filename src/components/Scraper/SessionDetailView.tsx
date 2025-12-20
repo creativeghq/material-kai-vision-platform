@@ -166,6 +166,50 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
     }
   };
 
+  const processToProducts = async () => {
+    if (!session) return;
+
+    setProcessing(true);
+    try {
+      // Call Python backend to process scraping session
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction(
+        'mivaa-gateway',
+        {
+          action: 'process_scraping_session',
+          payload: {
+            session_id: sessionId,
+            workspace_id: 'default', // TODO: Get from user context
+            categories: ['products'],
+            model: 'claude'
+          },
+        },
+      );
+
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to process session');
+      }
+
+      toast({
+        title: 'Success',
+        description: `Processing started! ${result.data?.products_created || 0} products will be created.`,
+      });
+
+      // Reload session to show updated status
+      await loadSession();
+    } catch (error) {
+      console.error('Error processing to products:', error);
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to process session',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -210,6 +254,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
 
   const canStart = ['pending', 'paused', 'failed'].includes(session.status);
   const canPause = session.status === 'processing';
+  const canProcessToProducts = session.status === 'completed' && (session.completed_pages || 0) > 0;
 
   return (
     <div className="space-y-6">
@@ -250,6 +295,17 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             >
               <Pause className="h-4 w-4 mr-2" />
               Pause
+            </Button>
+          )}
+          {canProcessToProducts && (
+            <Button
+              onClick={processToProducts}
+              onKeyDown={(e) => e.key === 'Enter' && processToProducts()}
+              disabled={processing}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Process to Products
             </Button>
           )}
         </div>
