@@ -22,6 +22,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -32,7 +45,10 @@ import {
   Upload,
   Loader2,
   Sparkles,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { XMLProductPreviewModal } from './XMLProductPreviewModal';
 
@@ -72,6 +88,101 @@ const TARGET_FIELDS = [
   { value: 'images', label: 'Image URLs', required: false },
   { value: 'metadata', label: 'Additional Metadata', required: false },
 ];
+
+// Searchable Combobox for field mapping
+interface FieldMappingComboboxProps {
+  value: string;
+  onValueChange: (value: string) => void;
+  disabled?: boolean;
+}
+
+const FieldMappingCombobox: React.FC<FieldMappingComboboxProps> = ({
+  value,
+  onValueChange,
+  disabled = false,
+}) => {
+  const [open, setOpen] = useState(false);
+
+  const selectedField = TARGET_FIELDS.find((field) => field.value === value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          disabled={disabled}
+          className={cn(
+            'w-full justify-between bg-white hover:bg-gray-50',
+            !value && 'text-muted-foreground'
+          )}
+        >
+          <span className="truncate">
+            {selectedField ? (
+              <>
+                {selectedField.label}
+                {selectedField.required && <span className="text-red-500 ml-1">*</span>}
+              </>
+            ) : (
+              'Select field...'
+            )}
+          </span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[300px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search fields..." />
+          <CommandList>
+            <CommandEmpty>No field found.</CommandEmpty>
+            <CommandGroup heading="Required Fields">
+              {TARGET_FIELDS.filter((f) => f.required).map((field) => (
+                <CommandItem
+                  key={field.value}
+                  value={field.value}
+                  onSelect={(currentValue) => {
+                    onValueChange(currentValue === value ? '' : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === field.value ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  {field.label}
+                  <span className="text-red-500 ml-1">*</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading="Optional Fields">
+              {TARGET_FIELDS.filter((f) => !f.required).map((field) => (
+                <CommandItem
+                  key={field.value}
+                  value={field.value}
+                  onSelect={(currentValue) => {
+                    onValueChange(currentValue === value ? '' : currentValue);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      value === field.value ? 'opacity-100' : 'opacity-0'
+                    )}
+                  />
+                  {field.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   isOpen,
@@ -397,22 +508,10 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
                 </div>
 
                 <div className="col-span-4">
-                  <Select
+                  <FieldMappingCombobox
                     value={fieldMappings[field.xml_field] || 'metadata'}
                     onValueChange={(value) => handleMappingChange(field.xml_field, value)}
-                  >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TARGET_FIELDS.map((target) => (
-                        <SelectItem key={target.value} value={target.value}>
-                          {target.label}
-                          {target.required && <span className="text-destructive ml-1">*</span>}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
 
                 <div className="col-span-2">{getConfidenceBadge(field.confidence)}</div>
