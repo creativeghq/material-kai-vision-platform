@@ -729,6 +729,7 @@ Return a list of materials found on the page.`);
               <FieldMappingStep
                 fields={fieldMappings}
                 onChange={setFieldMappings}
+                sampleUrl={url}
               />
             </CardContent>
           </Card>

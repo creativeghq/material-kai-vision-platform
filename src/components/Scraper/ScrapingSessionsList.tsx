@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Play,
   Trash2,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,6 +48,8 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
   const { toast } = useToast();
   const [sessions, setSessions] = useState<ScrapingSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadSessions();
@@ -162,18 +166,46 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
     );
   }
 
+  const toggleSessionSelection = (sessionId: string) => {
+    const newSelected = new Set(selectedSessions);
+    if (newSelected.has(sessionId)) {
+      newSelected.delete(sessionId);
+    } else {
+      newSelected.add(sessionId);
+    }
+    setSelectedSessions(newSelected);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold">Scraping Sessions</h2>
-        <Button
-          onClick={onCreateNew}
-          onKeyDown={(e) => e.key === 'Enter' && onCreateNew()}
-          className="flex items-center gap-2"
-        >
-          <Play className="h-4 w-4" />
-          New Session
-        </Button>
+        <div className="flex gap-2">
+          {batchMode && selectedSessions.size > 0 && (
+            <Badge variant="secondary">
+              {selectedSessions.size} selected
+            </Badge>
+          )}
+          <Button
+            variant={batchMode ? 'secondary' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setBatchMode(!batchMode);
+              setSelectedSessions(new Set());
+            }}
+          >
+            {batchMode ? <CheckSquare className="h-4 w-4 mr-2" /> : <Square className="h-4 w-4 mr-2" />}
+            Batch Mode
+          </Button>
+          <Button
+            onClick={onCreateNew}
+            onKeyDown={(e) => e.key === 'Enter' && onCreateNew()}
+            className="flex items-center gap-2"
+          >
+            <Play className="h-4 w-4" />
+            New Session
+          </Button>
+        </div>
       </div>
 
       {sessions.length === 0 ? (
@@ -204,6 +236,16 @@ export const ScrapingSessionsList: React.FC<ScrapingSessionsListProps> = ({
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
+                  {batchMode && (
+                    <div className="mr-3 pt-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedSessions.has(session.id)}
+                        onChange={() => toggleSessionSelection(session.id)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                    </div>
+                  )}
                   <div className="flex-1">
                     <CardTitle className="text-lg flex items-center gap-2">
                       {getStatusIcon(session.status)}

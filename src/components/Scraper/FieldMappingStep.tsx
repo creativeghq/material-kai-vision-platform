@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, BookTemplate, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FieldTemplatesDialog } from './FieldTemplatesDialog';
+import { AISuggestFieldsDialog } from './AISuggestFieldsDialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -21,19 +23,31 @@ export interface FieldMapping {
   type: 'text' | 'number' | 'array' | 'object' | 'boolean';
   description: string;
   required: boolean;
+  validation?: {
+    pattern?: string;
+    min?: number;
+    max?: number;
+    enum?: string[];
+  };
 }
 
 interface FieldMappingStepProps {
   fields: FieldMapping[];
   onChange: (fields: FieldMapping[]) => void;
+  workspaceId?: string;
+  sampleUrl?: string;
 }
 
 export const FieldMappingStep: React.FC<FieldMappingStepProps> = ({
   fields,
   onChange,
+  workspaceId = 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
+  sampleUrl = '',
 }) => {
   const [editingField, setEditingField] = useState<FieldMapping | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [showAISuggest, setShowAISuggest] = useState(false);
 
   const defaultField: Omit<FieldMapping, 'id'> = {
     name: '',
@@ -170,13 +184,52 @@ export const FieldMappingStep: React.FC<FieldMappingStepProps> = ({
             Define what data to extract from the web pages
           </p>
         </div>
-        {!isAdding && (
-          <Button onClick={() => setIsAdding(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Field
+        <div className="flex gap-2">
+          {sampleUrl && (
+            <Button onClick={() => setShowAISuggest(true)} size="sm" variant="outline">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Suggest
+            </Button>
+          )}
+          <Button onClick={() => setShowTemplates(true)} size="sm" variant="outline">
+            <BookTemplate className="h-4 w-4 mr-2" />
+            Templates
           </Button>
-        )}
+          {!isAdding && (
+            <Button onClick={() => setIsAdding(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Field
+            </Button>
+          )}
+        </div>
       </div>
+
+      <FieldTemplatesDialog
+        open={showTemplates}
+        onOpenChange={setShowTemplates}
+        currentFields={fields}
+        onApplyTemplate={(templateFields) => {
+          const mappedFields = templateFields.map((f, idx) => ({
+            ...f,
+            id: f.name || `field_${Date.now()}_${idx}`,
+          }));
+          onChange(mappedFields);
+        }}
+        workspaceId={workspaceId}
+      />
+
+      <AISuggestFieldsDialog
+        open={showAISuggest}
+        onOpenChange={setShowAISuggest}
+        url={sampleUrl}
+        onApplyFields={(suggestedFields) => {
+          const mappedFields = suggestedFields.map((f, idx) => ({
+            ...f,
+            id: f.name || `field_${Date.now()}_${idx}`,
+          }));
+          onChange([...fields, ...mappedFields]);
+        }}
+      />
 
       {/* Add New Field Form */}
       {isAdding &&
