@@ -67,6 +67,7 @@ export const NewScraperPage: React.FC<NewScraperPageProps> = ({ embedded = false
   const [previewUrl, setPreviewUrl] = useState('');
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [pendingSessionData, setPendingSessionData] = useState<any>(null);
+  const [previewSessionId, setPreviewSessionId] = useState<string | null>(null);
 
   // Scraping mode selection
   const [scrapingMode, setScrapingMode] = useState<ScrapingMode>('single-page');
@@ -239,13 +240,26 @@ Return a list of materials found on the page.`);
 
       // Determine preview URL based on mode
       let previewUrlToUse = sourceUrl;
-      if (scrapingMode === 'sitemap') {
-        // For sitemap, parse and use first URL
-        const urls = await parseSitemap(sourceUrl);
-        if (urls.length === 0) {
-          throw new Error('No URLs found in sitemap');
-        }
-        previewUrlToUse = urls[0];
+      let urls: string[] = [];
+
+      switch (scrapingMode) {
+        case 'single-page':
+        case 'crawl':
+        case 'map':
+          urls = [sourceUrl];
+          previewUrlToUse = sourceUrl;
+          break;
+        case 'sitemap':
+          urls = await parseSitemap(sourceUrl);
+          if (urls.length === 0) {
+            throw new Error('No URLs found in sitemap');
+          }
+          previewUrlToUse = urls[0];
+          break;
+        case 'search':
+          urls = [sourceUrl];
+          previewUrlToUse = sourceUrl;
+          break;
       }
 
       // Generate dynamic extraction prompt from field mappings
@@ -256,6 +270,61 @@ Return a list of materials found on the page.`);
 
       // Generate JSON schema from field mappings
       const schema = generateJsonSchema(fieldMappings);
+
+      // Create session in database FIRST (so we have sessionId for preview)
+      const sessionId = crypto.randomUUID();
+      const sessionData = {
+        id: sessionId,
+        user_id: user.id,
+        workspace_id: workspaceId,
+        session_id: sessionId,
+        source_url: sourceUrl,
+        status: 'pending',
+        total_pages: urls.length,
+        completed_pages: 0,
+        failed_pages: 0,
+        materials_processed: 0,
+        progress_percentage: 0,
+        field_mappings: {
+          fields: fieldMappings,
+        },
+        scraping_config: {
+          mode: scrapingMode,
+          extractionPrompt: promptData.prompt,
+          systemPrompt: promptData.systemPrompt,
+          schema: schema,
+          maxPages: scrapingMode === 'sitemap' ? maxPages : 1,
+          timeout,
+          retryCount,
+          concurrentPages,
+          firecrawlOptions,
+        } as Json,
+      };
+
+      const { data: insertedSession, error: sessionError } = await supabase
+        .from('scraping_sessions')
+        .insert([sessionData])
+        .select()
+        .single();
+
+      if (sessionError) {
+        throw new Error(`Failed to create session: ${sessionError.message}`);
+      }
+
+      // Create page entries
+      const pageEntries = urls.map((url, index) => ({
+        session_id: sessionId,
+        url,
+        status: 'pending',
+        page_index: index,
+        materials_found: 0,
+        processing_time_ms: null,
+        error_message: null,
+      }));
+
+      if (pageEntries.length > 0) {
+        await supabase.from('scraping_pages').insert(pageEntries);
+      }
 
       // Call preview Edge Function
       const apiService = BrowserApiIntegrationService.getInstance();
@@ -277,6 +346,7 @@ Return a list of materials found on the page.`);
 
       setPreviewMaterials(result.data.materials || []);
       setPreviewUrl(previewUrlToUse);
+      setPreviewSessionId(sessionId);
       setShowPreview(true);
 
       toast({
@@ -481,32 +551,23 @@ Return a list of materials found on the page.`);
     }
   };
 
-  const renderCreateForm = () => (
-    <div className="min-h-screen bg-background">
-      <GlobalAdminHeader
-        title="Material Scraper"
-        description="Scrape material data from websites and external sources"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: 'Material Scraper' },
-        ]}
-      />
-      <div className="p-6">
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div className="flex items-center gap-4 mb-6">
-            <Button
-              className="border border-input bg-background hover:bg-accent hover:text-accent-foreground"
-              onClick={() => setViewMode('sessions')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  setViewMode('sessions');
-                }
-              }}
-            >
-              ← Back to Sessions
-            </Button>
-            <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
-          </div>
+  const renderCreateForm = () => {
+    const formContent = (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            className="border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+            onClick={() => setViewMode('sessions')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setViewMode('sessions');
+              }
+            }}
+          >
+            ← Back to Sessions
+          </Button>
+          <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
+        </div>
 
           {/* Scraping Mode Selection */}
           <Card>
@@ -776,15 +837,14 @@ Return a list of materials found on the page.`);
             </CardContent>
           </Card>
 
-          {/* Service-specific Configuration */}
-          {selectedService === 'firecrawl' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Firecrawl Options
-                </CardTitle>
-              </CardHeader>
+          {/* Firecrawl Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Firecrawl Options
+              </CardTitle>
+            </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>Output Formats</Label>
@@ -1042,7 +1102,6 @@ Return a list of materials found on the page.`);
                 </div>
               </CardContent>
             </Card>
-          )}
 
           <div className="flex gap-3">
             <Button
@@ -1088,9 +1147,29 @@ Return a list of materials found on the page.`);
             </Button>
           </div>
         </div>
+    );
+
+    // Wrap in layout if not embedded
+    if (embedded) {
+      return formContent;
+    }
+
+    return (
+      <div className="min-h-screen bg-background">
+        <GlobalAdminHeader
+          title="Material Scraper"
+          description="Scrape material data from websites and external sources"
+          breadcrumbs={[
+            { label: 'Admin', path: '/admin' },
+            { label: 'Material Scraper' },
+          ]}
+        />
+        <div className="p-6">
+          {formContent}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Main render logic
   const renderContent = () => {
@@ -1184,16 +1263,26 @@ Return a list of materials found on the page.`);
       {/* Preview Modal */}
       <ScrapingPreviewModal
         isOpen={showPreview}
-        onClose={() => setShowPreview(false)}
+        onClose={() => {
+          setShowPreview(false);
+          setPreviewSessionId(null);
+        }}
         materials={previewMaterials}
         url={previewUrl}
         totalPages={getTotalPagesForPreview()}
+        sessionId={previewSessionId || undefined}
         onConfirm={() => {
           setShowPreview(false);
-          createNewSession();
+          // Navigate to session detail view
+          if (previewSessionId) {
+            setSelectedSessionId(previewSessionId);
+            setViewMode('detail');
+          }
+          setPreviewSessionId(null);
         }}
         onEdit={() => {
           setShowPreview(false);
+          setPreviewSessionId(null);
         }}
       />
     </>

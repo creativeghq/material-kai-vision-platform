@@ -40,7 +40,6 @@ import AgentHub from './pages/AgentHub';
 import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
 import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
 import PackagesPanel from './components/Admin/PackagesPanel';
-// Removed: MaterialScraperPage - now integrated into DataImportHub
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import { UserProfilePage } from './pages/UserProfilePage';
 import HealthPage from './pages/Health';
@@ -472,11 +471,6 @@ const App = () => (
                     </AdminGuard>
                   </AuthGuard>
                 }
-              />
-              {/* Redirect /scraper to /admin/data-import (web scraping tab) */}
-              <Route
-                path="/scraper"
-                element={<Navigate to="/admin/data-import" replace />}
               />
               <Route
                 path="/pdf-knowledge-demo"

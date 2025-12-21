@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import Anthropic from '@anthropic-ai/sdk';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -68,15 +67,20 @@ Deno.serve(async (req) => {
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicKey) throw new Error('Anthropic API key not configured');
 
-    const anthropic = new Anthropic({ apiKey: anthropicKey });
-
-    const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 2000,
-      messages: [
-        {
-          role: 'user',
-          content: `Analyze this webpage content and suggest relevant fields for data extraction.
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 2000,
+        messages: [
+          {
+            role: 'user',
+            content: `Analyze this webpage content and suggest relevant fields for data extraction.
 
 URL: ${url}
 
@@ -102,10 +106,17 @@ Example format:
     "required": true
   }
 ]`,
-        },
-      ],
+          },
+        ],
+      }),
     });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+    }
+
+    const message = await response.json();
     const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
     
     // Extract JSON from response

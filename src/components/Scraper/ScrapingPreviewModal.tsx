@@ -30,7 +30,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Globe,
+  Loader2,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface PreviewMaterial {
   name: string;
@@ -50,6 +53,7 @@ interface ScrapingPreviewModalProps {
   totalPages: number;
   onConfirm: () => void;
   onEdit: () => void;
+  sessionId?: string; // Session ID to start processing
 }
 
 export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
@@ -60,9 +64,12 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
   totalPages,
   onConfirm,
   onEdit,
+  sessionId,
 }) => {
+  const { toast } = useToast();
   const [currentMaterialIndex, setCurrentMaterialIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isStarting, setIsStarting] = useState(false);
 
   // Reset indices when materials change
   React.useEffect(() => {
@@ -97,6 +104,50 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
   const prevImage = () => {
     if (currentImageIndex > 0) {
       setCurrentImageIndex(currentImageIndex - 1);
+    }
+  };
+
+  const handleStartScraping = async () => {
+    if (!sessionId) {
+      // Fallback to old behavior - just call onConfirm
+      onConfirm();
+      return;
+    }
+
+    setIsStarting(true);
+    try {
+      // Call scrape-session-manager to start processing
+      const { data, error } = await supabase.functions.invoke('scrape-session-manager', {
+        body: {
+          action: 'start',
+          sessionId: sessionId,
+        },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to start scraping');
+      }
+
+      toast({
+        title: 'Scraping Started',
+        description: `Processing ${totalPages} page${totalPages !== 1 ? 's' : ''}. You can monitor progress in the session detail view.`,
+      });
+
+      // Call onConfirm to navigate to session detail
+      onConfirm();
+    } catch (error) {
+      console.error('Error starting scraping:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to start scraping',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStarting(false);
     }
   };
 
@@ -344,13 +395,25 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
 
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={onEdit}>
+            <Button variant="outline" onClick={onEdit} disabled={isStarting}>
               <ChevronLeft className="h-4 w-4 mr-2" />
               Back to Settings
             </Button>
-            <Button onClick={onConfirm} disabled={!currentMaterial?.name}>
-              <Play className="h-4 w-4 mr-2" />
-              Import Materials
+            <Button
+              onClick={handleStartScraping}
+              disabled={!currentMaterial?.name || isStarting}
+            >
+              {isStarting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Starting Scraping...
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Scraping
+                </>
+              )}
             </Button>
           </div>
           </div>

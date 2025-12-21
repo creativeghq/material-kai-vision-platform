@@ -10,7 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Upload, Globe, FileText, FileType, ExternalLink, AlertCircle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -26,14 +26,20 @@ import { supabase } from '@/integrations/supabase/client';
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('pdf');
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam || 'pdf');
   const [activeJobs, setActiveJobs] = useState<any[]>([]);
   const [checkingJobs, setCheckingJobs] = useState(true);
 
-  // Check for active PDF processing jobs on mount
+  // Check for active PDF processing jobs on mount and handle tab parameter
   useEffect(() => {
     checkActiveJobs();
-  }, []);
+    // Set active tab from URL parameter if present
+    if (tabParam && ['pdf', 'xml', 'firecrawl', 'history'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   const checkActiveJobs = async () => {
     try {
