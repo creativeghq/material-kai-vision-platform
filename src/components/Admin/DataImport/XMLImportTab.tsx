@@ -101,8 +101,12 @@ const XMLImportTab: React.FC = () => {
         throw new Error('Invalid source configuration');
       }
 
-      // Encode to base64
-      const xmlBase64 = btoa(xmlText);
+      // Encode to base64 (UTF-8 safe)
+      // btoa() only supports Latin1, so we need to use TextEncoder for UTF-8
+      const encoder = new TextEncoder();
+      const uint8Array = encoder.encode(xmlText);
+      const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+      const xmlBase64 = btoa(binaryString);
 
       // Call Edge Function in preview mode
       const { data, error: functionError } = await supabase.functions.invoke(

@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Download, RefreshCw, Search, Filter, X, Trash2, Clock, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 export function LogViewer() {
   const { toast } = useToast();
@@ -166,16 +167,27 @@ export function LogViewer() {
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Application Logs</CardTitle>
-              <CardDescription>
-                Real-time logs from the logger service ({filteredLogs.length} of {logs.length} logs)
-              </CardDescription>
-            </div>
+    <div className="min-h-screen">
+      <GlobalAdminHeader
+        title="Application Logs"
+        description="Real-time logs from the logger service"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'Logs' },
+        ]}
+        badge="Monitoring"
+      />
+
+      <div className="p-6 space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Log Viewer</CardTitle>
+                <CardDescription>
+                  Showing {filteredLogs.length} of {logs.length} logs
+                </CardDescription>
+              </div>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -453,6 +465,7 @@ export function LogViewer() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

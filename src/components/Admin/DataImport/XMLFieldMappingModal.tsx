@@ -167,7 +167,12 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
     try {
       // Read XML file
       const xmlText = await xmlFile.text();
-      const xmlBase64 = btoa(xmlText);
+
+      // Encode to base64 (UTF-8 safe)
+      const encoder = new TextEncoder();
+      const uint8Array = encoder.encode(xmlText);
+      const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
+      const xmlBase64 = btoa(binaryString);
 
       // Save template if requested
       let templateId: string | undefined;

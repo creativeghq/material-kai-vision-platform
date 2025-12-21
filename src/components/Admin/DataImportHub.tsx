@@ -19,6 +19,7 @@ import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { PDFUploadSection } from '@/components/PDF/PDFUploadSection';
+import { NewScraperPage } from '@/components/Scraper/NewScraperPage';
 import { supabase } from '@/integrations/supabase/client';
 
 // PDFProcessingStepsMonitor has been removed - all monitoring now happens in AsyncJobQueueMonitor
@@ -88,10 +89,9 @@ const DataImportHub: React.FC = () => {
                   <FileText className="h-4 w-4 mr-2" />
                   XML Import
                 </TabsTrigger>
-                <TabsTrigger value="firecrawl" disabled>
+                <TabsTrigger value="firecrawl">
                   <Globe className="h-4 w-4 mr-2" />
                   Web Scraping
-                  <span className="ml-2 text-xs text-muted-foreground">(Coming Soon)</span>
                 </TabsTrigger>
                 <TabsTrigger value="history">
                   <Upload className="h-4 w-4 mr-2" />
@@ -192,13 +192,7 @@ const DataImportHub: React.FC = () => {
               </TabsContent>
 
               <TabsContent value="firecrawl" className="mt-6">
-                <div className="text-center py-12 text-muted-foreground">
-                  <Globe className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg">Web scraping integration coming in Phase 4</p>
-                  <p className="text-sm mt-2">
-                    Will support Firecrawl for automated product extraction from websites
-                  </p>
-                </div>
+                <NewScraperPage embedded={true} />
               </TabsContent>
 
               <TabsContent value="history" className="mt-6">

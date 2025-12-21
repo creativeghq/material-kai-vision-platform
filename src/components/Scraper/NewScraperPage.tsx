@@ -38,7 +38,11 @@ import { ScrapingSessionsList } from './ScrapingSessionsList';
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';
 
-export const NewScraperPage: React.FC = () => {
+interface NewScraperPageProps {
+  embedded?: boolean; // If true, don't render GlobalAdminHeader or min-h-screen wrapper
+}
+
+export const NewScraperPage: React.FC<NewScraperPageProps> = ({ embedded = false }) => {
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
@@ -1100,6 +1104,14 @@ Return a list of materials found on the page.`);
       return renderCreateForm();
 
     case 'detail':
+      if (embedded) {
+        return (
+          <SessionDetailView
+            sessionId={selectedSessionId}
+            onBack={() => setViewMode('sessions')}
+          />
+        );
+      }
       return (
         <div className="min-h-screen bg-background">
           <GlobalAdminHeader
@@ -1120,6 +1132,17 @@ Return a list of materials found on the page.`);
       );
 
     default:
+      if (embedded) {
+        return (
+          <ScrapingSessionsList
+            onSelectSession={(sessionId) => {
+              setSelectedSessionId(sessionId);
+              setViewMode('detail');
+            }}
+            onCreateNew={() => setViewMode('create')}
+          />
+        );
+      }
       return (
         <div className="min-h-screen bg-background">
           <GlobalAdminHeader
