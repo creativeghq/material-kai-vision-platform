@@ -16,6 +16,12 @@ interface XMLImportRequest {
   mapping_template_id?: string; // Optional: use existing mapping template
   field_mappings?: Record<string, string>; // Optional: custom field mappings
   preview_only?: boolean; // If true, only return detected fields without creating job
+  generate_preview?: boolean; // If true, return a single sample product with applied mappings
+  manual_values?: { // Manual values for required fields if not auto-detected
+    factory_name?: string;
+    name?: string;
+    material_category?: string;
+  };
 }
 
 interface DetectedField {
@@ -44,6 +50,7 @@ interface XMLImportResponse {
   total_products?: number;
   detected_fields?: DetectedField[]; // For preview mode
   suggested_mappings?: Record<string, string>; // AI-suggested mappings
+  preview_product?: ProductData; // For generate_preview mode
 }
 
 /**
@@ -296,10 +303,12 @@ Deno.serve(async (req) => {
       source_name,
       mapping_template_id,
       field_mappings,
-      preview_only
+      preview_only,
+      generate_preview,
+      manual_values
     }: XMLImportRequest = requestBody;
 
-    console.log(`Processing XML import for workspace: ${workspace_id}, category: ${category}, preview_only: ${preview_only}`);
+    console.log(`Processing XML import for workspace: ${workspace_id}, category: ${category}, preview_only: ${preview_only}, generate_preview: ${generate_preview}`);
 
     // Validate inputs
     if (!workspace_id || !xml_content) {
@@ -412,6 +421,50 @@ Deno.serve(async (req) => {
           detected_fields: detectedFields,
           suggested_mappings: suggestedMappings,
           message: `Detected ${detectedFields.length} fields. Review and confirm mappings to proceed.`
+        } as XMLImportResponse),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // GENERATE PREVIEW MODE: Extract and return a single sample product
+    if (generate_preview) {
+      console.log('Generate preview mode: extracting sample product with applied mappings');
+
+      // Parse XML and extract first product
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(xmlString, 'text/html');
+
+      // Find product elements
+      let productElements = xmlDoc.querySelectorAll('product');
+      if (productElements.length === 0) productElements = xmlDoc.querySelectorAll('item');
+      if (productElements.length === 0) productElements = xmlDoc.querySelectorAll('material');
+
+      if (productElements.length === 0) {
+        throw new Error('No product elements found in XML');
+      }
+
+      console.log(`Found ${productElements.length} products, extracting first one for preview`);
+
+      // Extract first product with field mappings applied
+      const firstElement = productElements[0];
+      let previewProduct = extractProductDataWithMappings(firstElement, field_mappings);
+
+      // Apply manual values if provided
+      if (manual_values) {
+        if (manual_values.factory_name) previewProduct.factory_name = manual_values.factory_name;
+        if (manual_values.name) previewProduct.name = manual_values.name;
+        if (manual_values.material_category) previewProduct.material_category = manual_values.material_category;
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          preview_product: previewProduct,
+          total_products: productElements.length,
+          message: `Preview generated from 1 of ${productElements.length} products`
         } as XMLImportResponse),
         {
           status: 200,
@@ -648,6 +701,94 @@ function extractProductData(element: Element): ProductData | null {
     console.error('Error extracting product data:', error);
     return null;
   }
+}
+
+/**
+ * Extract product data with custom field mappings applied
+ * Used for preview generation
+ */
+function extractProductDataWithMappings(element: Element, mappings?: Record<string, string>): ProductData {
+  // If no mappings provided, use default extraction
+  if (!mappings || Object.keys(mappings).length === 0) {
+    return extractProductData(element) || {
+      name: 'Unknown Product',
+      factory_name: 'Unknown Factory',
+      material_category: 'Unknown Category',
+      images: [],
+      metadata: {}
+    };
+  }
+
+  // Apply custom mappings
+  const product: ProductData = {
+    name: '',
+    factory_name: '',
+    material_category: '',
+    images: [],
+    metadata: {
+      source_type: 'xml',
+      extraction_date: new Date().toISOString(),
+      extraction_method: 'xml_import',
+    }
+  };
+
+  // Extract fields based on mappings
+  for (const [xmlField, targetField] of Object.entries(mappings)) {
+    const value = getElementText(element, xmlField);
+
+    if (!value) continue;
+
+    switch (targetField) {
+      case 'name':
+        product.name = value;
+        break;
+      case 'factory_name':
+        product.factory_name = value;
+        break;
+      case 'material_category':
+        product.material_category = value;
+        break;
+      case 'description':
+        product.description = value;
+        break;
+      case 'factory_group_name':
+        product.factory_group_name = value;
+        break;
+      case 'images':
+        // Handle both single and comma-separated images
+        if (value.includes(',')) {
+          product.images = value.split(',').map(url => url.trim()).filter(url => url);
+        } else {
+          product.images.push(value);
+        }
+        break;
+      default:
+        // Everything else goes to metadata
+        product.metadata![xmlField] = value;
+        break;
+    }
+  }
+
+  // Extract images from standard fields if not mapped
+  if (product.images.length === 0) {
+    const imageLink = getElementText(element, 'image_link') || getElementText(element, 'image');
+    if (imageLink) product.images.push(imageLink);
+
+    const additionalImageLink = getElementText(element, 'additional_image_link');
+    if (additionalImageLink) {
+      const additionalImages = additionalImageLink.split(',').map(url => url.trim()).filter(url => url);
+      product.images.push(...additionalImages);
+    }
+  }
+
+  // Extract product ID for metadata
+  const productId = getElementText(element, 'id') || getElementText(element, 'product_id') || getElementText(element, 'sku');
+  if (productId) {
+    product.metadata!.product_id = productId;
+    product.metadata!.original_id = productId;
+  }
+
+  return product;
 }
 
 /**

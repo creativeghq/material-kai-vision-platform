@@ -34,6 +34,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { XMLProductPreviewModal } from './XMLProductPreviewModal';
 
 interface DetectedField {
   xml_field: string;
@@ -93,6 +94,10 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
     material_category: '',
   });
   const [categories, setCategories] = useState<Array<{ category_key: string; display_name: string; name: string }>>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState<any>(null);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [xmlBase64, setXmlBase64] = useState<string>('');
 
   // Load workspace ID and categories on mount
   React.useEffect(() => {
@@ -185,7 +190,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
     return requiredFields.filter(field => !mappedFields.includes(field));
   };
 
-  const handleImport = async () => {
+  const handleGeneratePreview = async () => {
     if (!validateMappings()) return;
     if (!workspaceId) return;
 
@@ -200,7 +205,50 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
       const encoder = new TextEncoder();
       const uint8Array = encoder.encode(xmlText);
       const binaryString = Array.from(uint8Array, byte => String.fromCharCode(byte)).join('');
-      const xmlBase64 = btoa(binaryString);
+      const base64 = btoa(binaryString);
+      setXmlBase64(base64);
+
+      // Generate preview
+      const { data, error: functionError } = await supabase.functions.invoke(
+        'xml-import-orchestrator',
+        {
+          body: {
+            workspace_id: workspaceId,
+            xml_content: base64,
+            field_mappings: fieldMappings,
+            manual_values: manualValues,
+            generate_preview: true,
+          },
+        }
+      );
+
+      if (functionError) {
+        throw new Error(functionError.message);
+      }
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to generate preview');
+      }
+
+      // Show preview modal
+      setPreviewProduct(data.preview_product);
+      setTotalProducts(data.total_products || 0);
+      setShowPreview(true);
+    } catch (err: any) {
+      console.error('Preview generation error:', err);
+      setError(err.message || 'Failed to generate preview');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!workspaceId) return;
+
+    setIsImporting(true);
+    setError(null);
+
+    try {
 
       // Save template if requested
       let templateId: string | undefined;
@@ -437,23 +485,33 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             Cancel
           </Button>
           <Button
-            onClick={handleImport}
+            onClick={handleGeneratePreview}
             disabled={isImporting}
           >
             {isImporting ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Starting Import...
+                Generating Preview...
               </>
             ) : (
               <>
                 <Upload className="h-4 w-4 mr-2" />
-                Start Import
+                Preview & Import
               </>
             )}
           </Button>
         </div>
       </DialogContent>
+
+      {/* Product Preview Modal */}
+      <XMLProductPreviewModal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        product={previewProduct}
+        onConfirm={handleConfirmImport}
+        onEdit={() => setShowPreview(false)}
+        totalProducts={totalProducts}
+      />
     </Dialog>
   );
 };
