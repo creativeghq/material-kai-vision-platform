@@ -26,6 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
+import { RecommendationsService } from '@/services/recommendationsService';
 
 // Types for search results
 export interface SearchResult {
@@ -113,6 +114,14 @@ export const SearchResultCard: React.FC<SearchResultCardProps> = ({
   };
 
   const handleView = () => {
+    // Track click if this is a product/material
+    if (result.product_id) {
+      RecommendationsService.trackClick(result.product_id, {
+        source: 'search_results',
+        search_type: result.type,
+        relevance_score: result.relevanceScore,
+      });
+    }
     onView?.(result);
   };
 

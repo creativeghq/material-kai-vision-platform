@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { captureException, captureMessage } from '../_shared/sentry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -431,6 +432,20 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in XML import orchestrator:', error);
+
+    // 🚨 SENTRY ALERT: Send XML import error to Sentry
+    await captureException(error, {
+      tags: {
+        function: 'xml-import-orchestrator',
+        error_type: 'xml_import_failed',
+      },
+      extra: {
+        error_message: error.message,
+        timestamp: new Date().toISOString(),
+      },
+      fingerprint: ['xml-import-orchestrator', 'error'],
+    });
+
     return new Response(
       JSON.stringify({
         success: false,
@@ -763,6 +778,36 @@ async function callPythonAPI(
 
       if (isLastAttempt) {
         console.error(`❌ All ${MAX_RETRIES} attempts failed for job ${jobId}`);
+
+        // Get job details for Sentry context
+        const { data: jobData } = await supabase
+          .from('data_import_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+
+        // 🚨 SENTRY ALERT: Send XML import job failure to Sentry
+        await captureException(error, {
+          tags: {
+            function: 'xml-import-orchestrator',
+            error_type: 'xml_import_job_failed',
+            job_id: jobId,
+            source_name: jobData?.source_name || 'unknown',
+          },
+          extra: {
+            job_id: jobId,
+            source_name: jobData?.source_name,
+            import_type: jobData?.import_type,
+            total_products: jobData?.total_products || 0,
+            processed_products: jobData?.processed_products || 0,
+            failed_products: jobData?.failed_products || 0,
+            error_message: error.message,
+            retry_count: MAX_RETRIES,
+            timestamp: new Date().toISOString(),
+          },
+          fingerprint: ['xml-import-job-failed', jobData?.source_name || 'unknown'],
+        });
+
         throw error; // Re-throw on final failure
       } else {
         // Calculate exponential backoff delay

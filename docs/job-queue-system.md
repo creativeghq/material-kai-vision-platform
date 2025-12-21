@@ -1,53 +1,64 @@
 # Job Queue System & Async Processing
 
 **Architecture**: Supabase-Native with Custom Recovery Layer
-**Last Updated**: October 31, 2025
+**Last Updated**: December 21, 2025
 
 ---
 
 ## Overview
 
-The Material Kai Vision Platform uses a **Supabase-native job queue system** with a custom checkpoint-based recovery layer for resilient PDF processing. This hybrid approach combines Supabase's reliability with custom recovery logic for fault tolerance.
+The Material Kai Vision Platform uses a **unified job queue system** across all data import pipelines with custom checkpoint-based recovery for resilient processing. This hybrid approach combines Supabase's reliability with custom recovery logic for fault tolerance.
+
+### Supported Job Types
+
+1. **PDF Processing** - Extract materials from PDF catalogs with 9-stage checkpoint recovery
+2. **Web Scraping** - Discover materials from websites with page-level tracking
+3. **XML Import** - Import materials from XML feeds with webhook retry logic
 
 ### Key Features
 
-- **Supabase-Native Storage**: All jobs persisted in PostgreSQL tables
-- **Checkpoint-Based Recovery**: Resume from last successful stage
-- **Auto-Recovery**: Automatic detection and restart of stuck jobs
-- **Real-Time Progress**: Live progress tracking with SSE/WebSocket
-- **Priority Queuing**: Support for low/normal/high/critical priorities
+- **Unified Job Tracking**: All jobs tracked in `background_jobs` table
+- **Type-Specific Tables**: Specialized tables for each job type (scraping_sessions, data_import_jobs)
+- **Checkpoint-Based Recovery**: Resume PDF jobs from last successful stage
+- **Auto-Recovery**: Automatic detection and restart of stuck jobs (all types)
+- **Real-Time Progress**: Live progress tracking with Supabase subscriptions
+- **Sentry Integration**: All failures automatically reported with full context
 - **Retry Logic**: Automatic retry with exponential backoff
-- **Dead Letter Queue**: Failed jobs moved to DLQ for analysis
-- **Health Monitoring**: Continuous monitoring and auto-recovery
+- **Health Monitoring**: Continuous monitoring across all job types
 
 ---
 
 ## 🏗️ Architecture
 
-### Three-Layer Design
+### Multi-Pipeline Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  Frontend (React)                                       │
-│  - PDF Upload Modal                                     │
-│  - Progress Tracking (SSE/WebSocket)                    │
-│  - Job Status Display                                   │
-└────────────────┬────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  Frontend (React)                                               │
+│  - PDF Upload (/admin/data-import)                              │
+│  - Web Scraping UI (/scraper)                                   │
+│  - XML Import (/admin/data-import)                              │
+│  - Unified Job Monitor (/admin/async-queue-monitor)             │
+└────────────────┬────────────────────────────────────────────────┘
                  │
-┌────────────────▼────────────────────────────────────────┐
-│  MIVAA Backend (FastAPI)                                │
-│  - Job Queue Service (AsyncQueueService)                │
-│  - Checkpoint Recovery (CheckpointRecoveryService)      │
-│  - Job Monitor (JobMonitorService)                      │
-│  - Progress Tracking (JobProgressService)               │
-└────────────────┬────────────────────────────────────────┘
+┌────────────────▼────────────────────────────────────────────────┐
+│  Processing Layer                                               │
+│                                                                 │
+│  MIVAA Backend (FastAPI)          Edge Functions (Deno)        │
+│  - PDF Processing Service         - scrape-session-manager     │
+│  - Web Scraping Service           - xml-import-orchestrator    │
+│  - Checkpoint Recovery            - scrape-single-page         │
+│  - Job Monitor (ALL TYPES)                                     │
+└────────────────┬────────────────────────────────────────────────┘
                  │
-┌────────────────▼────────────────────────────────────────┐
-│  Supabase PostgreSQL                                    │
-│  - background_jobs (job tracking)                       │
-│  - job_progress (real-time progress)                    │
-│  - job_checkpoints (recovery data)                      │
-│  - image_processing_queue (image jobs)                  │
+┌────────────────▼────────────────────────────────────────────────┐
+│  Supabase PostgreSQL                                            │
+│  - background_jobs (unified job tracking)                       │
+│  - scraping_sessions (web scraping jobs)                        │
+│  - scraping_pages (page-level tracking)                         │
+│  - data_import_jobs (XML import jobs)                           │
+│  - webhook_calls (API call tracking)                            │
+│  - job_checkpoints (PDF recovery data)                          │
 │  - ai_analysis_queue (AI analysis jobs)                 │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -540,12 +551,45 @@ job_monitor_service = JobMonitorService(
 - [Database Schema](database-schema-complete.md)
 - [API Endpoints](api-endpoints.md)
 - [Troubleshooting Guide](troubleshooting-guide.md)
+- [Unified Job Tracking](unified-job-tracking.md) ✨ NEW
+- [Monitoring & Alerting](monitoring-and-alerting.md) ✨ NEW
+
+---
+
+## 🚨 Monitoring & Alerting
+
+### Job Monitor Service
+
+The `JobMonitorService` continuously monitors ALL job types:
+
+**PDF Processing Jobs**:
+- Heartbeat timeout detection (15 minutes)
+- Update timeout detection (5 minutes)
+- Auto-restart from checkpoints
+
+**Web Scraping Sessions**:
+- Update timeout detection (30 minutes)
+- Mark as failed + Sentry alert
+
+**XML Import Jobs**:
+- Update timeout detection (20 minutes)
+- Mark as failed + Sentry alert
+
+### Sentry Integration
+
+All job failures are automatically reported to Sentry with:
+- Full job context (ID, type, progress, stage)
+- Error details and stack traces
+- Timestamps and duration
+- Unique fingerprints for grouping
+
+See [monitoring-and-alerting.md](monitoring-and-alerting.md) for complete details.
 
 ---
 
 ## Summary
 
-The Material Kai Vision Platform uses a **production-ready, Supabase-native job queue system** with:
+The Material Kai Vision Platform uses a **production-ready, unified job queue system** with:
 
 - Persistent job storage in PostgreSQL
 - Checkpoint-based recovery for fault tolerance

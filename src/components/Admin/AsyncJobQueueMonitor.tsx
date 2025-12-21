@@ -309,7 +309,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   useEffect(() => {
     fetchQueueData();
 
-    // Set up real-time subscription for background_jobs
+    // Set up real-time subscriptions for all job-related tables
     const jobsSubscription = supabase
       .channel('background_jobs_changes')
       .on(
@@ -320,6 +320,55 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           table: 'background_jobs',
         },
         () => {
+          console.log('background_jobs changed - refreshing data');
+          fetchQueueData();
+        }
+      )
+      .subscribe();
+
+    const scrapingSubscription = supabase
+      .channel('scraping_sessions_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scraping_sessions',
+        },
+        () => {
+          console.log('scraping_sessions changed - refreshing data');
+          fetchQueueData();
+        }
+      )
+      .subscribe();
+
+    const importSubscription = supabase
+      .channel('data_import_jobs_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'data_import_jobs',
+        },
+        () => {
+          console.log('data_import_jobs changed - refreshing data');
+          fetchQueueData();
+        }
+      )
+      .subscribe();
+
+    const webhookSubscription = supabase
+      .channel('webhook_calls_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'webhook_calls',
+        },
+        () => {
+          console.log('webhook_calls changed - refreshing data');
           fetchQueueData();
         }
       )
@@ -333,6 +382,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     return () => {
       jobsSubscription.unsubscribe();
+      scrapingSubscription.unsubscribe();
+      importSubscription.unsubscribe();
+      webhookSubscription.unsubscribe();
       if (interval) clearInterval(interval);
     };
   }, [fetchQueueData, autoRefresh]);

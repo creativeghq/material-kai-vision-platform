@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Package,
   Filter,
@@ -44,6 +44,7 @@ import {
   getAllMaterialInstallationMethods,
   getAllMaterialApplications,
 } from '@/types/materials';
+import { RecommendationsService } from '@/services/recommendationsService';
 
 interface MaterialCatalogListingProps {
   materials: Material[];
@@ -598,9 +599,47 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
   onEdit: _onEdit,
 }) => {
   const categoryDef = (MATERIAL_CATEGORIES as any)[material.category];
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Track view when card becomes visible
+  useEffect(() => {
+    if (!cardRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            RecommendationsService.trackView(material.id, {
+              source: 'material_catalog',
+              view_mode: viewMode,
+            });
+            // Unobserve after tracking view once
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.5 } // Track when 50% visible
+    );
+
+    observer.observe(cardRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [material.id, viewMode]);
+
+  // Track click when user selects material
+  const handleSelect = () => {
+    RecommendationsService.trackClick(material.id, {
+      source: 'material_catalog',
+      view_mode: viewMode,
+    });
+    onSelect?.();
+  };
 
   return (
     <Card
+      ref={cardRef}
       className={`overflow-hidden transition-all hover:shadow-md ${
         viewMode === 'list' ? 'h-auto' : 'h-fit'
       }`}
@@ -654,10 +693,10 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={onSelect}
+                onClick={handleSelect}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    onSelect();
+                    handleSelect();
                   }
                 }}
               >

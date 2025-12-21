@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { captureException, captureMessage } from '../_shared/sentry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -86,6 +87,19 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in session manager:', error);
+
+    // 🚨 SENTRY ALERT: Send error to Sentry
+    await captureException(error, {
+      tags: {
+        function: 'scrape-session-manager',
+        error_type: 'session_manager_error',
+      },
+      extra: {
+        error_message: error.message,
+        timestamp: new Date().toISOString(),
+      },
+      fingerprint: ['scrape-session-manager', 'error'],
+    });
 
     return new Response(JSON.stringify({
       success: false,
@@ -237,6 +251,33 @@ async function processSessionPages(supabase: any, sessionId: string, req: Reques
 
   } catch (error) {
     console.error(`Error in background processing for session ${sessionId}:`, error);
+
+    // Get session details for Sentry context
+    const { data: sessionData } = await supabase
+      .from('scraping_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
+
+    // 🚨 SENTRY ALERT: Send scraping failure to Sentry
+    await captureException(error, {
+      tags: {
+        function: 'scrape-session-manager',
+        error_type: 'scraping_session_failed',
+        session_id: sessionId,
+        source_url: sessionData?.source_url || 'unknown',
+      },
+      extra: {
+        session_id: sessionId,
+        source_url: sessionData?.source_url,
+        total_pages: sessionData?.total_pages || 0,
+        completed_pages: sessionData?.completed_pages || 0,
+        failed_pages: sessionData?.failed_pages || 0,
+        error_message: error.message,
+        timestamp: new Date().toISOString(),
+      },
+      fingerprint: ['scraping-session-failed', sessionData?.source_url || 'unknown'],
+    });
 
     // Mark session as failed
     await supabase

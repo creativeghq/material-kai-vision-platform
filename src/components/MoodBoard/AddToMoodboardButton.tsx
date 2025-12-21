@@ -4,6 +4,7 @@ import { Plus, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { AddToMoodboardModal } from './AddToMoodboardModal';
+import { RecommendationsService } from '@/services/recommendationsService';
 
 interface AddToMoodboardButtonProps {
   productId: string;
@@ -37,6 +38,12 @@ export const AddToMoodboardButton: React.FC<AddToMoodboardButtonProps> = ({
   };
 
   const handleSuccess = (moodboardName: string) => {
+    // Track save interaction
+    RecommendationsService.trackSave(productId, {
+      source: 'moodboard_button',
+      moodboard_name: moodboardName,
+    });
+
     toast({
       title: 'Added to Moodboard',
       description: `${productName || 'Product'} added to "${moodboardName}"`,

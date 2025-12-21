@@ -10,6 +10,8 @@ import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 import { DashboardCard } from '@/components/DesignSystem/DashboardCard';
 import { ProductDetailModal } from '@/components/AI/ProductDetailModal';
 import { Product } from '@/components/AI/ProductCard';
+import { RecommendationsService } from '@/services/recommendationsService';
+import { RecommendationsService } from '@/services/recommendationsService';
 
 export const MoodBoardDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -73,6 +75,12 @@ export const MoodBoardDetailPage: React.FC = () => {
 
   const handleProductClick = (item: MoodBoardItem) => {
     if (item.material) {
+      // Track click interaction
+      RecommendationsService.trackClick(item.material.id, {
+        source: 'moodboard',
+        moodboard_id: id,
+      });
+
       // Convert MoodBoardItem material to Product format
       const product: Product = {
         id: item.material.id,

@@ -5,13 +5,11 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Clock, CheckCircle, XCircle, Loader2, FileText, Play, Calendar } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Loader2, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import ScheduleImportModal from './ScheduleImportModal';
+import { XMLImportJobCard, XMLImportJob } from './XMLImportJobCard';
 
 interface ImportJob {
   id: string;
@@ -69,6 +67,46 @@ const ImportHistoryTab: React.FC = () => {
   useEffect(() => {
     if (workspaceId) {
       loadImportHistory();
+
+      // Set up real-time subscriptions for import jobs
+      const importJobsChannel = supabase
+        .channel(`data_import_jobs_${workspaceId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'data_import_jobs',
+            filter: `workspace_id=eq.${workspaceId}`,
+          },
+          () => {
+            console.log('data_import_jobs changed - refreshing data');
+            loadImportHistory();
+          }
+        )
+        .subscribe();
+
+      const backgroundJobsChannel = supabase
+        .channel(`background_jobs_pdf_${workspaceId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'background_jobs',
+            filter: `job_type=eq.pdf_processing`,
+          },
+          () => {
+            console.log('background_jobs (PDF) changed - refreshing data');
+            loadImportHistory();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(importJobsChannel);
+        supabase.removeChannel(backgroundJobsChannel);
+      };
     }
   }, [workspaceId]);
 
@@ -129,46 +167,9 @@ const ImportHistoryTab: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <Badge className="bg-green-600 text-white">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Completed
-          </Badge>
-        );
-      case 'processing':
-        return (
-          <Badge className="bg-blue-600 text-white">
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-            Processing
-          </Badge>
-        );
-      case 'failed':
-        return (
-          <Badge className="bg-red-600 text-white">
-            <XCircle className="h-3 w-3 mr-1" />
-            Failed
-          </Badge>
-        );
-      case 'pending':
-        return (
-          <Badge className="bg-yellow-600 text-white">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      default:
-        return <Badge>{status}</Badge>;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
-
-  const handleManualRerun = async (job: ImportJob) => {
+  const handleManualRerun = async (jobId: string) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
     if (!workspaceId || !job.original_xml_content) {
       toast({
         title: 'Cannot Re-run',
@@ -239,110 +240,15 @@ const ImportHistoryTab: React.FC = () => {
   return (
     <div className="space-y-4">
       {jobs.map((job) => (
-        <Card key={job.id} className="bg-gray-700/30 border-gray-600">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-white text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-400" />
-                {job.source_name || 'Unnamed Import'}
-              </CardTitle>
-              {getStatusBadge(job.status)}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Type</p>
-                <p className="text-sm text-white font-medium uppercase">{job.import_type}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Total Products</p>
-                <p className="text-sm text-white font-medium">{job.total_products}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Processed</p>
-                <p className="text-sm text-green-400 font-medium">{job.processed_products}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 mb-1">Failed</p>
-                <p className="text-sm text-red-400 font-medium">{job.failed_products}</p>
-              </div>
-            </div>
-
-            {/* Progress Bar */}
-            {job.status === 'processing' && job.total_products > 0 && (
-              <div className="mb-4">
-                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                  <span>Progress</span>
-                  <span>
-                    {Math.round((job.processed_products / job.total_products) * 100)}%
-                  </span>
-                </div>
-                <div className="w-full bg-gray-600 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
-                    style={{
-                      width: `${(job.processed_products / job.total_products) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center justify-between text-xs text-gray-400">
-              <span>Started: {formatDate(job.created_at)}</span>
-              {job.completed_at && <span>Completed: {formatDate(job.completed_at)}</span>}
-            </div>
-
-            {job.error_message && (
-              <div className="mt-3 p-3 bg-red-900/20 border border-red-700 rounded text-sm text-red-300">
-                <strong>Error:</strong> {job.error_message}
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            {job.status === 'completed' && job.import_type === 'xml' && (
-              <div className="mt-4 flex gap-2 pt-3 border-t border-gray-600">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleManualRerun(job)}
-                  disabled={isRerunning === job.id || !job.original_xml_content}
-                  className="bg-blue-600/20 border-blue-600 text-blue-300 hover:bg-blue-600/30"
-                >
-                  {isRerunning === job.id ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Re-running...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4 mr-2" />
-                      Manual Re-run
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setSelectedJobForSchedule(job)}
-                  className="bg-purple-600/20 border-purple-600 text-purple-300 hover:bg-purple-600/30"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  {job.is_scheduled ? 'Update Schedule' : 'Schedule Cron'}
-                </Button>
-
-                {job.is_scheduled && job.next_run_at && (
-                  <div className="ml-auto flex items-center gap-2 text-xs text-gray-400">
-                    <Clock className="h-3 w-3" />
-                    Next run: {formatDate(job.next_run_at)}
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <XMLImportJobCard
+          key={job.id}
+          job={job as XMLImportJob}
+          onRetry={handleManualRerun}
+          onViewDetails={(jobId) => {
+            // TODO: Navigate to job details page
+            console.log('View details for job:', jobId);
+          }}
+        />
       ))}
 
       {/* Schedule Modal */}
