@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
+import { logger } from '@/services/logger.service';
 
 interface DetectedField {
   xml_field: string;
@@ -134,6 +135,17 @@ const XMLImportTab: React.FC = () => {
       setShowMappingModal(true);
     } catch (err: any) {
       console.error('Error detecting fields:', err);
+
+      // Log to internal logger with full context
+      logger.error('XML field detection failed', err, {
+        service: 'XMLImportTab',
+        sourceType,
+        hasFile: !!selectedFile,
+        hasUrl: !!remoteUrl,
+        errorMessage: err?.message,
+        errorStack: err?.stack,
+      });
+
       setError(err.message || 'Failed to detect XML fields');
     } finally {
       setIsDetecting(false);

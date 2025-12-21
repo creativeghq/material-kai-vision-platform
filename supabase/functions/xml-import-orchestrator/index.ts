@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
+import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -277,6 +278,16 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('📥 Parsing request body...');
+    const requestBody = await req.json();
+    console.log('✅ Request body parsed:', {
+      has_workspace_id: !!requestBody.workspace_id,
+      has_xml_content: !!requestBody.xml_content,
+      xml_content_length: requestBody.xml_content?.length || 0,
+      preview_only: requestBody.preview_only,
+      category: requestBody.category,
+    });
+
     const {
       workspace_id,
       category,
@@ -285,7 +296,7 @@ Deno.serve(async (req) => {
       mapping_template_id,
       field_mappings,
       preview_only
-    }: XMLImportRequest = await req.json();
+    }: XMLImportRequest = requestBody;
 
     console.log(`Processing XML import for workspace: ${workspace_id}, category: ${category}, preview_only: ${preview_only}`);
 
@@ -320,15 +331,30 @@ Deno.serve(async (req) => {
     }
 
     // Decode base64 XML content (UTF-8 safe)
-    // The frontend encodes using TextEncoder + btoa, so we need to reverse that process
-    const binaryString = atob(xml_content);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    console.log('🔓 Decoding base64 XML content...');
+    console.log(`Base64 content length: ${xml_content.length} characters`);
+
+    let xmlString: string;
+    try {
+      // The frontend encodes using TextEncoder + btoa, so we need to reverse that process
+      const binaryString = atob(xml_content);
+      console.log(`✅ atob() successful, binary string length: ${binaryString.length}`);
+
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      console.log(`✅ Converted to Uint8Array: ${bytes.length} bytes`);
+
+      const decoder = new TextDecoder('utf-8');
+      xmlString = decoder.decode(bytes);
+      console.log(`✅ Decoded XML content (${xmlString.length} characters)`);
+      console.log(`First 200 chars: ${xmlString.substring(0, 200)}`);
+    } catch (decodeError: any) {
+      console.error('❌ Error decoding base64:', decodeError);
+      console.error('Base64 sample (first 100 chars):', xml_content.substring(0, 100));
+      throw new Error(`Failed to decode base64 XML content: ${decodeError?.message || decodeError}`);
     }
-    const decoder = new TextDecoder('utf-8');
-    const xmlString = decoder.decode(bytes);
-    console.log(`Decoded XML content (${xmlString.length} characters)`);
 
     // PREVIEW MODE: Detect fields and suggest mappings
     if (preview_only) {
@@ -437,17 +463,22 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error) {
-    console.error('Error in XML import orchestrator:', error);
+  } catch (error: any) {
+    console.error('❌ Error in XML import orchestrator:', error);
+    console.error('Error stack:', error?.stack);
+
+    const errorMessage = error?.message || String(error);
+    const errorObj = error instanceof Error ? error : new Error(errorMessage);
 
     // 🚨 SENTRY ALERT: Send XML import error to Sentry
-    await captureException(error, {
+    await captureException(errorObj, {
       tags: {
         function: 'xml-import-orchestrator',
         error_type: 'xml_import_failed',
       },
       extra: {
-        error_message: error.message,
+        error_message: errorMessage,
+        error_stack: error?.stack,
         timestamp: new Date().toISOString(),
       },
       fingerprint: ['xml-import-orchestrator', 'error'],
@@ -456,7 +487,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: errorMessage,
       } as XMLImportResponse),
       {
         status: 500,
@@ -514,9 +545,9 @@ async function parseXML(xmlString: string): Promise<ProductData[]> {
     }
 
     return products;
-  } catch (error) {
+  } catch (error: any) {
     console.error('XML parsing error:', error);
-    throw new Error(`Failed to parse XML: ${error.message}`);
+    throw new Error(`Failed to parse XML: ${error?.message || error}`);
   }
 }
 
