@@ -35,6 +35,8 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { SessionDetailView } from './SessionDetailView';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
 import { ScrapingPreviewModal } from './ScrapingPreviewModal';
+import { FieldMappingStep, type FieldMapping } from './FieldMappingStep';
+import { generateExtractionPrompt, generateJsonSchema } from '@/utils/scrapingPromptGenerator';
 
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';
@@ -88,6 +90,50 @@ Return a list of materials found on the page.`);
   const [timeout, setTimeout] = useState(30000);
   const [retryCount, setRetryCount] = useState(3);
   const [concurrentPages, setConcurrentPages] = useState(5);
+
+  // Field Mappings
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([
+    {
+      id: 'default_1',
+      name: 'material_name',
+      label: 'Material Name',
+      type: 'text',
+      description: 'The name or title of the material product',
+      required: true,
+    },
+    {
+      id: 'default_2',
+      name: 'price',
+      label: 'Price',
+      type: 'text',
+      description: 'Price of the material (include currency if available)',
+      required: false,
+    },
+    {
+      id: 'default_3',
+      name: 'description',
+      label: 'Description',
+      type: 'text',
+      description: 'Detailed description of the material',
+      required: false,
+    },
+    {
+      id: 'default_4',
+      name: 'images',
+      label: 'Images',
+      type: 'array',
+      description: 'Array of image URLs for the material',
+      required: false,
+    },
+    {
+      id: 'default_5',
+      name: 'category',
+      label: 'Category',
+      type: 'text',
+      description: 'Material category (e.g., tiles, stone, wood, metal)',
+      required: false,
+    },
+  ]);
 
   // Firecrawl Options - Enhanced with more API options
   const [firecrawlOptions, setFirecrawlOptions] = useState({
@@ -202,13 +248,25 @@ Return a list of materials found on the page.`);
         previewUrlToUse = urls[0];
       }
 
+      // Generate dynamic extraction prompt from field mappings
+      const promptData = await generateExtractionPrompt(workspaceId, fieldMappings);
+      if (!promptData) {
+        throw new Error('Failed to generate extraction prompt');
+      }
+
+      // Generate JSON schema from field mappings
+      const schema = generateJsonSchema(fieldMappings);
+
       // Call preview Edge Function
       const apiService = BrowserApiIntegrationService.getInstance();
       const result = await apiService.callSupabaseFunction('scrape-preview', {
         url: previewUrlToUse,
         workspaceId: workspaceId,
         options: {
-          prompt: extractionPrompt,
+          prompt: promptData.prompt,
+          systemPrompt: promptData.systemPrompt,
+          schema: schema,
+          fieldMappings: fieldMappings,
           timeout: timeout,
         },
       });
@@ -297,6 +355,12 @@ Return a list of materials found on the page.`);
 
       const workspaceId = workspaceData?.id || null;
 
+      // Generate dynamic extraction prompt from field mappings
+      const promptData = await generateExtractionPrompt(workspaceId || '', fieldMappings);
+      if (!promptData) {
+        throw new Error('Failed to generate extraction prompt');
+      }
+
       // Create session in Supabase database
       const sessionId = crypto.randomUUID();
       const sessionData = {
@@ -311,10 +375,14 @@ Return a list of materials found on the page.`);
         failed_pages: 0,
         materials_processed: 0,
         progress_percentage: 0,
+        field_mappings: {
+          fields: fieldMappings,
+        },
         scraping_config: {
           mode: scrapingMode,
-          service: selectedService,
-          extractionPrompt,
+          extractionPrompt: promptData.prompt,
+          systemPrompt: promptData.systemPrompt,
+          schema: generateJsonSchema(fieldMappings),
           maxPages: scrapingMode === 'sitemap' ? maxPages : 1,
           timeout,
           retryCount,
@@ -646,20 +714,22 @@ Return a list of materials found on the page.`);
                 </div>
               )}
 
-              {/* Extraction Prompt */}
-              <div>
-                <Label htmlFor="extraction-prompt">Extraction Prompt</Label>
-                <Textarea
-                  id="extraction-prompt"
-                  value={extractionPrompt}
-                  onChange={(e) => setExtractionPrompt(e.target.value)}
-                  rows={4}
-                  className="mt-1"
-                />
-                <p className="text-sm text-muted-foreground mt-1">
-                  Describe what information to extract from the pages
-                </p>
-              </div>
+            </CardContent>
+          </Card>
+
+          {/* Field Mappings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Field Mappings
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <FieldMappingStep
+                fields={fieldMappings}
+                onChange={setFieldMappings}
+              />
             </CardContent>
           </Card>
 

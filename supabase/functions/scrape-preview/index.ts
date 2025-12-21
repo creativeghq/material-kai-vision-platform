@@ -11,7 +11,9 @@ interface ScrapePreviewRequest {
   workspaceId: string;
   options?: {
     prompt?: string;
-    service?: 'firecrawl' | 'jina';
+    systemPrompt?: string | null;
+    schema?: Record<string, any>;
+    fieldMappings?: any[];
     timeout?: number;
   };
 }
@@ -87,20 +89,10 @@ Deno.serve(async (req) => {
       throw new Error('Authentication failed');
     }
 
-    // Use the specified service or default to firecrawl
-    const service = options.service || 'firecrawl';
-    let materials: PreviewMaterial[] = [];
-    let markdown = '';
-
-    if (service === 'firecrawl') {
-      const result = await scrapePreviewWithFirecrawl(url, options);
-      materials = result.materials;
-      markdown = result.markdown;
-    } else {
-      const result = await scrapePreviewWithJina(url, options);
-      materials = result.materials;
-      markdown = result.markdown;
-    }
+    // Use Firecrawl v2 with dynamic prompts and schema
+    const result = await scrapePreviewWithFirecrawl(url, options);
+    const materials = result.materials;
+    const markdown = result.markdown;
 
     console.log(`Preview extracted ${materials.length} materials from ${url}`);
 
@@ -109,7 +101,7 @@ Deno.serve(async (req) => {
       url,
       materials,
       markdown,
-      service,
+      service: 'firecrawl',
       timestamp: new Date().toISOString(),
     };
 
@@ -137,6 +129,36 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
     throw new Error('Firecrawl API key not configured');
   }
 
+  // Use dynamic schema from field mappings or fallback to default
+  const extractionSchema = options.schema || {
+    type: 'object',
+    properties: {
+      materials: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Material name or product title' },
+            description: { type: 'string', description: 'Material description' },
+            category: { type: 'string', description: 'Material category' },
+            price: { type: 'string', description: 'Price with currency' },
+            images: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Image URLs'
+            },
+            properties: {
+              type: 'object',
+              description: 'Additional properties'
+            },
+            supplier: { type: 'string', description: 'Supplier name' },
+          },
+          required: ['name'],
+        },
+      },
+    },
+  };
+
   // Build v2 API request with structured extraction
   const requestBody: any = {
     url: url,
@@ -151,30 +173,12 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
         properties: {
           materials: {
             type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string', description: 'Material name or product title' },
-                description: { type: 'string', description: 'Material description' },
-                category: { type: 'string', description: 'Material category' },
-                price: { type: 'string', description: 'Price with currency' },
-                images: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  description: 'Image URLs'
-                },
-                properties: {
-                  type: 'object',
-                  description: 'Additional properties'
-                },
-                supplier: { type: 'string', description: 'Supplier name' },
-              },
-              required: ['name'],
-            },
+            items: extractionSchema,
           },
         },
       },
-      systemPrompt: options.prompt || `Extract material/product information from this page. Return all materials found.`,
+      prompt: options.prompt || `Extract material/product information from this page. Return all materials found.`,
+      systemPrompt: options.systemPrompt || 'You are a precise data extraction assistant. Focus on accuracy and structured output.',
     },
   };
 
@@ -223,48 +227,3 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
 
   return { materials, markdown };
 }
-
-async function scrapePreviewWithJina(url: string, options: any): Promise<{ materials: PreviewMaterial[], markdown: string }> {
-  const apiKey = Deno.env.get('JINA_API_KEY');
-  if (!apiKey) {
-    throw new Error('Jina API key not configured');
-  }
-
-  const readerResponse = await fetch(`https://r.jina.ai/${url}`, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'X-Return-Format': 'markdown',
-    },
-  });
-
-  if (!readerResponse.ok) {
-    throw new Error(`Jina Reader API error: ${readerResponse.status}`);
-  }
-
-  const markdown = await readerResponse.text();
-
-  // Basic extraction for preview
-  const materials: PreviewMaterial[] = [];
-  const materialPatterns = [
-    /(?:tile|stone|wood|metal|fabric|glass|plastic|concrete)[^.]*?(?:\$[\d,]+\.?\d*|\d+[\s]*(?:USD|EUR|GBP))/gi,
-  ];
-
-  for (const pattern of materialPatterns) {
-    const matches = markdown.match(pattern);
-    if (matches) {
-      for (const match of matches.slice(0, 5)) { // Limit to 5 for preview
-        materials.push({
-          name: match.split(/[$.]/)[0].trim(),
-          description: match,
-          category: 'Unknown',
-          price: '',
-          images: [],
-          properties: {},
-        });
-      }
-    }
-  }
-
-  return { materials, markdown };
-}
-

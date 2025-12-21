@@ -12,6 +12,8 @@ interface ScrapePageRequest {
   pageId: string;
   options?: {
     prompt?: string;
+    systemPrompt?: string | null;
+    schema?: Record<string, any>;
     timeout?: number;
   };
 }
@@ -192,7 +194,29 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
     ];
   }
 
-  // Add structured extraction with schema (v2 feature)
+  // Use dynamic schema from field mappings or fallback to default
+  const extractionSchema = options.schema || {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Material name or product title' },
+      description: { type: 'string', description: 'Material description' },
+      category: { type: 'string', description: 'Material category (tiles, stone, wood, etc.)' },
+      price: { type: 'string', description: 'Price with currency' },
+      images: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Array of image URLs'
+      },
+      properties: {
+        type: 'object',
+        description: 'Additional properties like dimensions, color, finish'
+      },
+      supplier: { type: 'string', description: 'Supplier or manufacturer name' },
+    },
+    required: ['name'],
+  };
+
+  // Add structured extraction with dynamic schema (v2 feature)
   if (options.useStructuredExtraction !== false) {
     requestBody.extract = {
       schema: {
@@ -200,30 +224,11 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
         properties: {
           materials: {
             type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string', description: 'Material name or product title' },
-                description: { type: 'string', description: 'Material description' },
-                category: { type: 'string', description: 'Material category (tiles, stone, wood, etc.)' },
-                price: { type: 'string', description: 'Price with currency' },
-                images: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  description: 'Array of image URLs'
-                },
-                properties: {
-                  type: 'object',
-                  description: 'Additional properties like dimensions, color, finish'
-                },
-                supplier: { type: 'string', description: 'Supplier or manufacturer name' },
-              },
-              required: ['name'],
-            },
+            items: extractionSchema,
           },
         },
       },
-      systemPrompt: options.prompt || `Extract material information from this page. Look for:
+      prompt: options.prompt || `Extract material information from this page. Look for:
 - Material name (required)
 - Price (if available)
 - Description
@@ -232,6 +237,7 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
 - Category (tiles, stone, wood, etc.)
 - Supplier or manufacturer
 Return all materials found on the page in the materials array.`,
+      systemPrompt: options.systemPrompt || 'You are a precise data extraction assistant. Focus on accuracy and structured output.',
     };
   }
 

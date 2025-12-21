@@ -213,6 +213,7 @@ export const ExtractionPromptsPage: React.FC = () => {
       entity_creation: 'bg-green-100 text-green-700 border-green-200',
       image_analysis: 'bg-purple-100 text-purple-700 border-purple-200',
       chunking: 'bg-pink-100 text-pink-700 border-pink-200',
+      scraping: 'bg-cyan-100 text-cyan-700 border-cyan-200',
     };
 
     return (
@@ -228,6 +229,7 @@ export const ExtractionPromptsPage: React.FC = () => {
       material_properties: 'bg-teal-100 text-teal-700 border-teal-200',
       certificates: 'bg-yellow-100 text-yellow-700 border-yellow-200',
       logos: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+      materials: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     };
 
     return (
@@ -277,6 +279,7 @@ export const ExtractionPromptsPage: React.FC = () => {
                   <SelectItem value="entity_creation">Entity Creation</SelectItem>
                   <SelectItem value="image_analysis">Image Analysis</SelectItem>
                   <SelectItem value="chunking">Chunking</SelectItem>
+                  <SelectItem value="scraping">Scraping</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -292,6 +295,7 @@ export const ExtractionPromptsPage: React.FC = () => {
                   <SelectItem value="material_properties">Material Properties</SelectItem>
                   <SelectItem value="certificates">Certificates</SelectItem>
                   <SelectItem value="logos">Logos</SelectItem>
+                  <SelectItem value="materials">Materials (Web Scraping)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
