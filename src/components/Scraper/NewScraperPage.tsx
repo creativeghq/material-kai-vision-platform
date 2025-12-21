@@ -34,9 +34,20 @@ import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 import { SessionDetailView } from './SessionDetailView';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
+import { ScrapingPreviewModal } from './ScrapingPreviewModal';
 
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';
+
+interface PreviewMaterial {
+  name: string;
+  description?: string;
+  category?: string;
+  price?: string;
+  images: string[];
+  properties: Record<string, any>;
+  supplier?: string;
+}
 
 interface NewScraperPageProps {
   embedded?: boolean; // If true, don't render GlobalAdminHeader or min-h-screen wrapper
@@ -47,6 +58,13 @@ export const NewScraperPage: React.FC<NewScraperPageProps> = ({ embedded = false
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [creating, setCreating] = useState(false);
+
+  // Preview state
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewMaterials, setPreviewMaterials] = useState<PreviewMaterial[]>([]);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [pendingSessionData, setPendingSessionData] = useState<any>(null);
 
   // Scraping mode selection
   const [scrapingMode, setScrapingMode] = useState<ScrapingMode>('single-page');
@@ -150,6 +168,86 @@ Return a list of materials found on the page.`);
       throw new Error(
         'Failed to parse sitemap. Please check the URL and try again.',
       );
+    }
+  };
+
+  const handlePreviewScraping = async () => {
+    const sourceUrl = getSourceUrl();
+    if (!sourceUrl.trim()) {
+      toast({
+        title: 'Error',
+        description: `Please enter a ${scrapingMode === 'search' ? 'search query' : 'URL'}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoadingPreview(true);
+    try {
+      // Get current user and workspace
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError || !user) {
+        throw new Error('You must be logged in to preview scraping');
+      }
+
+      const { data: workspaceData } = await supabase
+        .from('workspaces')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      const workspaceId = workspaceData?.id;
+      if (!workspaceId) {
+        throw new Error('No workspace found');
+      }
+
+      // Determine preview URL based on mode
+      let previewUrlToUse = sourceUrl;
+      if (scrapingMode === 'sitemap') {
+        // For sitemap, parse and use first URL
+        const urls = await parseSitemap(sourceUrl);
+        if (urls.length === 0) {
+          throw new Error('No URLs found in sitemap');
+        }
+        previewUrlToUse = urls[0];
+      }
+
+      // Call preview Edge Function
+      const apiService = BrowserApiIntegrationService.getInstance();
+      const result = await apiService.callSupabaseFunction('scrape-preview', {
+        url: previewUrlToUse,
+        workspaceId: workspaceId,
+        options: {
+          service: selectedService,
+          prompt: extractionPrompt,
+          timeout: timeout,
+        },
+      });
+
+      if (!result.success || !result.data?.success) {
+        throw new Error(result.data?.error || 'Preview failed');
+      }
+
+      setPreviewMaterials(result.data.materials || []);
+      setPreviewUrl(previewUrlToUse);
+      setShowPreview(true);
+
+      toast({
+        title: 'Preview Ready',
+        description: `Found ${result.data.materials?.length || 0} materials on sample page`,
+      });
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast({
+        title: 'Preview Failed',
+        description: error instanceof Error ? error.message : 'Failed to preview scraping',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingPreview(false);
     }
   };
 
@@ -1070,90 +1168,91 @@ Return a list of materials found on the page.`);
             </Card>
           )}
 
-          <Button
-            onClick={createNewSession}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                createNewSession();
-              }
-            }}
-            disabled={creating || !getSourceUrl().trim()}
-            className="w-full h-11 px-8"
-          >
-            {creating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating Session...
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Session with{' '}
-                {selectedService === 'firecrawl' ? 'Firecrawl' : 'Jina AI'}
-              </>
-            )}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              onClick={handlePreviewScraping}
+              disabled={loadingPreview || creating || !getSourceUrl().trim()}
+              variant="outline"
+              className="flex-1 h-11 px-8"
+            >
+              {loadingPreview ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Loading Preview...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Preview First
+                </>
+              )}
+            </Button>
+
+            <Button
+              onClick={createNewSession}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  createNewSession();
+                }
+              }}
+              disabled={creating || loadingPreview || !getSourceUrl().trim()}
+              className="flex-1 h-11 px-8"
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating Session...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Session
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   );
 
   // Main render logic
-  switch (viewMode) {
-    case 'create':
-      return renderCreateForm();
+  const renderContent = () => {
+    switch (viewMode) {
+      case 'create':
+        return renderCreateForm();
 
-    case 'detail':
-      if (embedded) {
-        return (
-          <SessionDetailView
-            sessionId={selectedSessionId}
-            onBack={() => setViewMode('sessions')}
-          />
-        );
-      }
-      return (
-        <div className="min-h-screen bg-background">
-          <GlobalAdminHeader
-            title="Material Scraper"
-            description="Scrape material data from websites and external sources"
-            breadcrumbs={[
-              { label: 'Admin', path: '/admin' },
-              { label: 'Material Scraper' },
-            ]}
-          />
-          <div className="p-6">
+      case 'detail':
+        if (embedded) {
+          return (
             <SessionDetailView
               sessionId={selectedSessionId}
               onBack={() => setViewMode('sessions')}
             />
-          </div>
-        </div>
-      );
-
-    default:
-      if (embedded) {
+          );
+        }
         return (
-          <ScrapingSessionsList
-            onSelectSession={(sessionId) => {
-              setSelectedSessionId(sessionId);
-              setViewMode('detail');
-            }}
-            onCreateNew={() => setViewMode('create')}
-          />
+          <div className="min-h-screen bg-background">
+            <GlobalAdminHeader
+              title="Material Scraper"
+              description="Scrape material data from websites and external sources"
+              breadcrumbs={[
+                { label: 'Admin', path: '/admin' },
+                { label: 'Material Scraper' },
+              ]}
+            />
+            <div className="p-6">
+              <SessionDetailView
+                sessionId={selectedSessionId}
+                onBack={() => setViewMode('sessions')}
+              />
+            </div>
+          </div>
         );
-      }
-      return (
-        <div className="min-h-screen bg-background">
-          <GlobalAdminHeader
-            title="Material Scraper"
-            description="Scrape material data from websites and external sources"
-            breadcrumbs={[
-              { label: 'Admin', path: '/admin' },
-              { label: 'Material Scraper' },
-            ]}
-          />
-          <div className="p-6">
+
+      default:
+        if (embedded) {
+          return (
             <ScrapingSessionsList
               onSelectSession={(sessionId) => {
                 setSelectedSessionId(sessionId);
@@ -1161,8 +1260,66 @@ Return a list of materials found on the page.`);
               }}
               onCreateNew={() => setViewMode('create')}
             />
+          );
+        }
+        return (
+          <div className="min-h-screen bg-background">
+            <GlobalAdminHeader
+              title="Material Scraper"
+              description="Scrape material data from websites and external sources"
+              breadcrumbs={[
+                { label: 'Admin', path: '/admin' },
+                { label: 'Material Scraper' },
+              ]}
+            />
+            <div className="p-6">
+              <ScrapingSessionsList
+                onSelectSession={(sessionId) => {
+                  setSelectedSessionId(sessionId);
+                  setViewMode('detail');
+                }}
+                onCreateNew={() => setViewMode('create')}
+              />
+            </div>
           </div>
-        </div>
-      );
-  }
+        );
+    }
+  };
+
+  const getTotalPagesForPreview = () => {
+    switch (scrapingMode) {
+      case 'single-page':
+        return 1;
+      case 'sitemap':
+        return maxPages;
+      case 'crawl':
+        return maxPages;
+      case 'map':
+        return maxPages;
+      default:
+        return 1;
+    }
+  };
+
+  return (
+    <>
+      {renderContent()}
+
+      {/* Preview Modal */}
+      <ScrapingPreviewModal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        materials={previewMaterials}
+        url={previewUrl}
+        totalPages={getTotalPagesForPreview()}
+        onConfirm={() => {
+          setShowPreview(false);
+          createNewSession();
+        }}
+        onEdit={() => {
+          setShowPreview(false);
+        }}
+      />
+    </>
+  );
 };

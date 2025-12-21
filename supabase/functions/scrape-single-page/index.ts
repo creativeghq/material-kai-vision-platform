@@ -184,26 +184,74 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
     throw new Error('Firecrawl API key not configured');
   }
 
-  const requestBody = {
+  // Build v2 API request with structured extraction schema
+  const requestBody: any = {
     url: url,
     formats: ['markdown', 'html'],
     timeout: options.timeout || 30000,
-    extractorOptions: {
-      mode: 'llm-extraction',
-      extractionPrompt: options.prompt || `Extract material information from this page. Look for:
-- Material name
+  };
+
+  // Add browser actions if needed (for dynamic content)
+  if (options.actions) {
+    requestBody.actions = options.actions;
+  } else {
+    // Default actions for better scraping
+    requestBody.actions = [
+      { type: 'wait', milliseconds: 2000 }, // Wait for dynamic content to load
+    ];
+  }
+
+  // Add structured extraction with schema (v2 feature)
+  if (options.useStructuredExtraction !== false) {
+    requestBody.extract = {
+      schema: {
+        type: 'object',
+        properties: {
+          materials: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Material name or product title' },
+                description: { type: 'string', description: 'Material description' },
+                category: { type: 'string', description: 'Material category (tiles, stone, wood, etc.)' },
+                price: { type: 'string', description: 'Price with currency' },
+                images: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of image URLs'
+                },
+                properties: {
+                  type: 'object',
+                  description: 'Additional properties like dimensions, color, finish'
+                },
+                supplier: { type: 'string', description: 'Supplier or manufacturer name' },
+              },
+              required: ['name'],
+            },
+          },
+        },
+      },
+      systemPrompt: options.prompt || `Extract material information from this page. Look for:
+- Material name (required)
 - Price (if available)
 - Description
 - Images
 - Properties like dimensions, color, finish
 - Category (tiles, stone, wood, etc.)
-Return a list of materials found on the page.`,
-    },
-  };
+- Supplier or manufacturer
+Return all materials found on the page in the materials array.`,
+    };
+  }
 
-  console.log('Making Firecrawl API request to:', url);
+  console.log('Making Firecrawl v2 API request to:', url);
+  console.log('Request config:', JSON.stringify({
+    formats: requestBody.formats,
+    hasActions: !!requestBody.actions,
+    hasExtract: !!requestBody.extract
+  }));
 
-  const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+  const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -214,31 +262,29 @@ Return a list of materials found on the page.`,
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Firecrawl API error: ${response.status} - ${errorText}`);
+    throw new Error(`Firecrawl v2 API error: ${response.status} - ${errorText}`);
   }
 
   const result = await response.json();
 
   if (!result.success) {
-    throw new Error(result.error || 'Firecrawl extraction failed');
+    throw new Error(result.error || 'Firecrawl v2 extraction failed');
   }
 
-  // Extract markdown content
+  // Extract markdown content (v2 response structure)
   const markdown = result.data?.markdown || null;
 
   // Parse extracted data into our material format
   const materials: MaterialData[] = [];
 
-  if (result.data?.extract) {
-    const extracted = result.data.extract;
+  // v2 structured extraction returns data in extract field
+  if (result.data?.extract?.materials) {
+    const extractedMaterials = result.data.extract.materials;
 
-    // Handle if extracted data is an array or single object
-    const items = Array.isArray(extracted) ? extracted : [extracted];
-
-    for (const item of items) {
-      if (item && typeof item === 'object') {
+    for (const item of extractedMaterials) {
+      if (item && typeof item === 'object' && item.name) {
         materials.push({
-          name: item.name || item.title || 'Unknown Material',
+          name: item.name,
           description: item.description || '',
           category: item.category || '',
           price: item.price || '',
@@ -246,11 +292,13 @@ Return a list of materials found on the page.`,
           properties: item.properties || {},
           sourceUrl: url,
           supplier: item.supplier || '',
-          confidence: 0.8,
+          confidence: 0.9, // Higher confidence with structured extraction
         });
       }
     }
   }
+
+  console.log(`Firecrawl v2 extracted ${materials.length} materials from ${url}`);
 
   return { materials, markdown };
 }
