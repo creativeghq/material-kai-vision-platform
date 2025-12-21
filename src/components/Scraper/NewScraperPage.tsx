@@ -85,9 +85,6 @@ export const NewScraperPage: React.FC<NewScraperPageProps> = ({ embedded = false
 Return a list of materials found on the page.`);
 
   // API Configuration
-  const [selectedService, setSelectedService] = useState<'firecrawl' | 'jina'>(
-    'firecrawl',
-  );
   const [timeout, setTimeout] = useState(30000);
   const [retryCount, setRetryCount] = useState(3);
   const [concurrentPages, setConcurrentPages] = useState(5);
@@ -112,17 +109,7 @@ Return a list of materials found on the page.`);
     proxy: 'basic' as 'basic' | 'premium' | 'none',
   });
 
-  // Jina AI Options
-  const [jinaOptions, setJinaOptions] = useState({
-    returnFormat: 'markdown' as 'markdown' | 'html' | 'text',
-    targetSelector: '',
-    waitForSelector: '',
-    includeImages: true,
-    includeLinks: false,
-    maxLength: 10000,
-    removeAds: true,
-    removeForms: true,
-  });
+
 
   const getSourceUrl = () => {
     switch (scrapingMode) {
@@ -221,7 +208,6 @@ Return a list of materials found on the page.`);
         url: previewUrlToUse,
         workspaceId: workspaceId,
         options: {
-          service: selectedService,
           prompt: extractionPrompt,
           timeout: timeout,
         },
@@ -333,9 +319,7 @@ Return a list of materials found on the page.`);
           timeout,
           retryCount,
           concurrentPages,
-          firecrawlOptions:
-            selectedService === 'firecrawl' ? firecrawlOptions : undefined,
-          jinaOptions: selectedService === 'jina' ? jinaOptions : undefined,
+          firecrawlOptions,
         } as Json,
       };
 
@@ -688,34 +672,6 @@ Return a list of materials found on the page.`);
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label>Scraping Service</Label>
-                <Select
-                  value={selectedService}
-                  onValueChange={(value: 'firecrawl' | 'jina') =>
-                    setSelectedService(value)
-                  }
-                >
-                  <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="firecrawl">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
-                        Firecrawl (Advanced AI Extraction)
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="jina">
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-4 w-4" />
-                        Jina AI (Reader + Processing)
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="timeout">Timeout (ms)</Label>
@@ -1017,157 +973,6 @@ Return a list of materials found on the page.`);
             </Card>
           )}
 
-          {selectedService === 'jina' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="h-5 w-5" />
-                  Jina AI Options
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Return Format</Label>
-                  <Select
-                    value={jinaOptions.returnFormat}
-                    onValueChange={(value: 'markdown' | 'html' | 'text') =>
-                      setJinaOptions((prev) => ({
-                        ...prev,
-                        returnFormat: value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="markdown">Markdown</SelectItem>
-                      <SelectItem value="html">HTML</SelectItem>
-                      <SelectItem value="text">Plain Text</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="targetSelector">
-                    Target CSS Selector (optional)
-                  </Label>
-                  <Input
-                    id="targetSelector"
-                    value={jinaOptions.targetSelector}
-                    onChange={(e) =>
-                      setJinaOptions((prev) => ({
-                        ...prev,
-                        targetSelector: e.target.value,
-                      }))
-                    }
-                    placeholder=".main-content, #product-details"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="waitForSelector">
-                    Wait for Selector (optional)
-                  </Label>
-                  <Input
-                    id="waitForSelector"
-                    value={jinaOptions.waitForSelector}
-                    onChange={(e) =>
-                      setJinaOptions((prev) => ({
-                        ...prev,
-                        waitForSelector: e.target.value,
-                      }))
-                    }
-                    placeholder=".dynamic-content"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="maxLength">Max Content Length</Label>
-                  <Input
-                    id="maxLength"
-                    type="number"
-                    value={jinaOptions.maxLength}
-                    onChange={(e) =>
-                      setJinaOptions((prev) => ({
-                        ...prev,
-                        maxLength: parseInt(e.target.value) || 10000,
-                      }))
-                    }
-                    min="1000"
-                    max="50000"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="includeImages"
-                      checked={jinaOptions.includeImages}
-                      onCheckedChange={(checked: boolean) =>
-                        setJinaOptions((prev) => ({
-                          ...prev,
-                          includeImages: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="includeImages" className="text-sm">
-                      Include Images
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="includeLinksJina"
-                      checked={jinaOptions.includeLinks}
-                      onCheckedChange={(checked: boolean) =>
-                        setJinaOptions((prev) => ({
-                          ...prev,
-                          includeLinks: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="includeLinksJina" className="text-sm">
-                      Include Links
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="removeAds"
-                      checked={jinaOptions.removeAds}
-                      onCheckedChange={(checked: boolean) =>
-                        setJinaOptions((prev) => ({
-                          ...prev,
-                          removeAds: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="removeAds" className="text-sm">
-                      Remove Ads
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="removeForms"
-                      checked={jinaOptions.removeForms}
-                      onCheckedChange={(checked: boolean) =>
-                        setJinaOptions((prev) => ({
-                          ...prev,
-                          removeForms: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="removeForms" className="text-sm">
-                      Remove Forms
-                    </Label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           <div className="flex gap-3">
             <Button
               onClick={handlePreviewScraping}
@@ -1183,7 +988,7 @@ Return a list of materials found on the page.`);
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Preview First
+                  Preview
                 </>
               )}
             </Button>

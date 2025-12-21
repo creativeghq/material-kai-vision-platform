@@ -12,7 +12,6 @@ interface ScrapePageRequest {
   pageId: string;
   options?: {
     prompt?: string;
-    service?: 'firecrawl' | 'jina';
     timeout?: number;
   };
 }
@@ -96,18 +95,10 @@ Deno.serve(async (req) => {
     let errorMessage: string | null = null;
 
     try {
-      // Use the specified service or default to firecrawl
-      const service = options.service || 'firecrawl';
-
-      if (service === 'firecrawl') {
-        const result = await scrapeWithFirecrawl(pageUrl, options);
-        materials = result.materials;
-        markdownContent = result.markdown;
-      } else {
-        const result = await scrapeWithJina(pageUrl, options);
-        materials = result.materials;
-        markdownContent = result.markdown;
-      }
+      // Use Firecrawl v2 API for scraping
+      const result = await scrapeWithFirecrawl(pageUrl, options);
+      materials = result.materials;
+      markdownContent = result.markdown;
 
       console.log(`Extracted ${materials.length} materials from ${pageUrl}`);
       console.log(`Markdown content length: ${markdownContent?.length || 0} characters`);
@@ -299,55 +290,6 @@ Return all materials found on the page in the materials array.`,
   }
 
   console.log(`Firecrawl v2 extracted ${materials.length} materials from ${url}`);
-
-  return { materials, markdown };
-}
-
-async function scrapeWithJina(url: string, options: any): Promise<{ materials: MaterialData[], markdown: string | null }> {
-  const apiKey = Deno.env.get('JINA_API_KEY');
-  if (!apiKey) {
-    throw new Error('Jina API key not configured');
-  }
-
-  // Use Jina Reader API to get clean content
-  const readerResponse = await fetch(`https://r.jina.ai/${url}`, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'X-Return-Format': 'markdown',
-    },
-  });
-
-  if (!readerResponse.ok) {
-    throw new Error(`Jina Reader API error: ${readerResponse.status}`);
-  }
-
-  const markdown = await readerResponse.text();
-
-  // Use simple pattern matching to extract material information
-  const materials: MaterialData[] = [];
-
-  // Basic material extraction patterns (can be enhanced)
-  const materialPatterns = [
-    /(?:tile|stone|wood|metal|fabric|glass|plastic|concrete)[^.]*?(?:\$[\d,]+\.?\d*|\d+[\s]*(?:USD|EUR|GBP))/gi,
-  ];
-
-  for (const pattern of materialPatterns) {
-    const matches = markdown.match(pattern);
-    if (matches) {
-      for (const match of matches) {
-        materials.push({
-          name: match.split(/[$.]/)[0].trim(),
-          description: match,
-          category: 'Unknown',
-          price: '',
-          images: [],
-          properties: {},
-          sourceUrl: url,
-          confidence: 0.6,
-        });
-      }
-    }
-  }
 
   return { materials, markdown };
 }

@@ -55,7 +55,7 @@ interface ScrapingPreviewModalProps {
 export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
   isOpen,
   onClose,
-  materials,
+  materials = [],
   url,
   totalPages,
   onConfirm,
@@ -64,10 +64,14 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
   const [currentMaterialIndex, setCurrentMaterialIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  if (materials.length === 0) return null;
+  // Reset indices when materials change
+  React.useEffect(() => {
+    setCurrentMaterialIndex(0);
+    setCurrentImageIndex(0);
+  }, [materials]);
 
-  const currentMaterial = materials[currentMaterialIndex];
-  const hasImages = currentMaterial.images && currentMaterial.images.length > 0;
+  const currentMaterial = materials[currentMaterialIndex] || null;
+  const hasImages = currentMaterial?.images && currentMaterial.images.length > 0;
   const currentImage = hasImages ? currentMaterial.images[currentImageIndex] : null;
 
   const nextMaterial = () => {
@@ -110,9 +114,33 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Material Navigation */}
-          {materials.length > 1 && (
+        {/* Empty State */}
+        {materials.length === 0 || !currentMaterial ? (
+          <div className="py-12 text-center">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-yellow-600" />
+            <h3 className="text-lg font-semibold mb-2">No Materials Found</h3>
+            <p className="text-muted-foreground mb-6">
+              The preview didn't find any materials on this page. This could mean:
+            </p>
+            <ul className="text-sm text-muted-foreground text-left max-w-md mx-auto space-y-2 mb-6">
+              <li>• The page doesn't contain product/material information</li>
+              <li>• The extraction settings need adjustment</li>
+              <li>• The page requires authentication or has anti-scraping measures</li>
+            </ul>
+            <div className="flex justify-center gap-3">
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button onClick={onEdit}>
+                <Edit className="h-4 w-4 mr-2" />
+                Adjust Settings
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Material Navigation */}
+            {materials.length > 1 && (
             <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
               <Button
                 variant="outline"
@@ -304,11 +332,11 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
             <div className="flex items-start gap-3">
               <Globe className="h-5 w-5 text-blue-600 mt-0.5" />
               <div className="flex-1">
-                <p className="font-semibold text-blue-900">Ready to Scrape</p>
+                <p className="font-semibold text-blue-900">Ready to Import</p>
                 <p className="text-sm text-blue-700 mt-1">
                   This is a preview from <strong>{url}</strong>.
-                  Clicking "Start Scraping" will process <strong>{totalPages}</strong> page{totalPages !== 1 ? 's' : ''}
-                  with the same extraction settings.
+                  Clicking "Import Materials" will process <strong>{totalPages}</strong> page{totalPages !== 1 ? 's' : ''}
+                  and import all discovered materials into your workspace.
                 </p>
               </div>
             </div>
@@ -317,15 +345,16 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="outline" onClick={onEdit}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Settings
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back to Settings
             </Button>
-            <Button onClick={onConfirm} disabled={!currentMaterial.name}>
+            <Button onClick={onConfirm} disabled={!currentMaterial?.name}>
               <Play className="h-4 w-4 mr-2" />
-              Start Scraping
+              Import Materials
             </Button>
           </div>
-        </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
