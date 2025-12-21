@@ -319,8 +319,15 @@ Deno.serve(async (req) => {
       throw new Error('Authentication failed');
     }
 
-    // Decode base64 XML content
-    const xmlString = atob(xml_content);
+    // Decode base64 XML content (UTF-8 safe)
+    // The frontend encodes using TextEncoder + btoa, so we need to reverse that process
+    const binaryString = atob(xml_content);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const decoder = new TextDecoder('utf-8');
+    const xmlString = decoder.decode(bytes);
     console.log(`Decoded XML content (${xmlString.length} characters)`);
 
     // PREVIEW MODE: Detect fields and suggest mappings

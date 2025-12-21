@@ -9,7 +9,6 @@ import {
   Settings,
   Home,
   FileText,
-  Globe,
   Users,
   Package,
   Bot,
@@ -102,20 +101,12 @@ const AdminDashboard: React.FC = () => {
     ],
     'Data Management': [
       {
-        title: 'PDF Processing',
-        description: 'Upload and process PDF catalogs with 14-stage workflow monitoring',
+        title: 'Material Processing',
+        description: 'Upload and process materials from PDFs, XML files, and web scraping',
         icon: DatabaseIcon,
         path: '/admin/data-import',
         status: 'active',
-        count: 'PDF Upload',
-      },
-      {
-        title: 'Material Scraper',
-        description: 'Scrape material data from websites and external sources',
-        icon: Globe,
-        path: '/scraper',
-        status: 'active',
-        count: 'Web scraping',
+        count: 'Multi-source',
       },
       {
         title: 'Metadata Management',
