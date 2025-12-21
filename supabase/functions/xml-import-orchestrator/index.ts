@@ -51,7 +51,8 @@ interface XMLImportResponse {
  */
 function detectXMLFields(xmlContent: string): Map<string, string[]> {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(xmlContent, 'text/xml');
+  // Note: deno_dom only supports 'text/html', but it can parse XML correctly
+  const doc = parser.parseFromString(xmlContent, 'text/html');
 
   const parserError = doc.querySelector('parsererror');
   if (parserError) {
@@ -506,7 +507,8 @@ async function parseXML(xmlString: string): Promise<ProductData[]> {
   try {
     // Use DOMParser to parse XML
     const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(xmlString, 'text/xml');
+    // Note: deno_dom only supports 'text/html', but it can parse XML correctly
+    const xmlDoc = parser.parseFromString(xmlString, 'text/html');
 
     // Check for parsing errors
     const parserError = xmlDoc.querySelector('parsererror');
