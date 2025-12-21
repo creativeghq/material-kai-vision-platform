@@ -87,10 +87,16 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   const [category, setCategory] = useState('materials');
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [manualValues, setManualValues] = useState<Record<string, string>>({
+    factory_name: '',
+    name: '',
+    material_category: '',
+  });
+  const [categories, setCategories] = useState<Array<{ category_key: string; display_name: string; name: string }>>([]);
 
-  // Load workspace ID on mount
+  // Load workspace ID and categories on mount
   React.useEffect(() => {
-    const loadWorkspace = async () => {
+    const loadData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -106,9 +112,24 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
       if (workspaceData) {
         setWorkspaceId(workspaceData.workspace_id);
       }
+
+      // Load material categories from database
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('material_categories')
+        .select('category_key, name, display_name')
+        .eq('is_active', true)
+        .order('sort_order');
+
+      if (!categoriesError && categoriesData) {
+        setCategories(categoriesData);
+        // Set first category as default if available
+        if (categoriesData.length > 0 && !category) {
+          setCategory(categoriesData[0].category_key);
+        }
+      }
     };
 
-    loadWorkspace();
+    loadData();
   }, []);
 
   const handleMappingChange = (xmlField: string, targetField: string) => {
@@ -121,21 +142,21 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   const getConfidenceBadge = (confidence: number) => {
     if (confidence >= 0.9) {
       return (
-        <Badge className="bg-green-600 text-white">
+        <Badge className="bg-green-100 text-green-700 border-green-200">
           <CheckCircle className="h-3 w-3 mr-1" />
           {(confidence * 100).toFixed(0)}%
         </Badge>
       );
     } else if (confidence >= 0.7) {
       return (
-        <Badge className="bg-yellow-600 text-white">
+        <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
           <Sparkles className="h-3 w-3 mr-1" />
           {(confidence * 100).toFixed(0)}%
         </Badge>
       );
     } else {
       return (
-        <Badge className="bg-red-600 text-white">
+        <Badge className="bg-red-100 text-red-700 border-red-200">
           <AlertTriangle className="h-3 w-3 mr-1" />
           {(confidence * 100).toFixed(0)}%
         </Badge>
@@ -148,13 +169,20 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
     const mappedFields = Object.values(fieldMappings);
 
     for (const required of requiredFields) {
-      if (!mappedFields.includes(required)) {
-        setError(`Missing required field: ${required}`);
+      // Check if field is mapped OR has a manual value
+      if (!mappedFields.includes(required) && !manualValues[required]) {
+        setError(`Missing required field: ${required}. Please map it or provide a manual value.`);
         return false;
       }
     }
 
     return true;
+  };
+
+  const getMissingRequiredFields = (): string[] => {
+    const requiredFields = ['name', 'factory_name', 'material_category'];
+    const mappedFields = Object.values(fieldMappings);
+    return requiredFields.filter(field => !mappedFields.includes(field));
   };
 
   const handleImport = async () => {
@@ -202,6 +230,18 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         }
       }
 
+      // Merge manual values into field mappings
+      const finalMappings = { ...fieldMappings };
+      const missingFields = getMissingRequiredFields();
+
+      // Add manual values as special mappings
+      const manualFieldMappings: Record<string, string> = {};
+      for (const field of missingFields) {
+        if (manualValues[field]) {
+          manualFieldMappings[`__manual_${field}`] = field;
+        }
+      }
+
       // Call Edge Function to create import job
       const { data, error: functionError } = await supabase.functions.invoke(
         'xml-import-orchestrator',
@@ -211,7 +251,8 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             category: category,
             xml_content: xmlBase64,
             source_name: xmlFile.name,
-            field_mappings: fieldMappings,
+            field_mappings: { ...finalMappings, ...manualFieldMappings },
+            manual_values: manualValues, // Pass manual values separately
             mapping_template_id: templateId,
           },
         }
@@ -238,13 +279,13 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-800 text-white border-gray-700">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-blue-400" />
+            <Sparkles className="h-6 w-6 text-primary" />
             Review Field Mappings
           </DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogDescription>
             AI has suggested mappings for {detectedFields.length} fields. Review and adjust as needed.
           </DialogDescription>
         </DialogHeader>
@@ -258,41 +299,47 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
         {/* Category Selection */}
         <div className="space-y-2">
-          <Label htmlFor="category" className="text-white">
+          <Label htmlFor="category">
             Material Category
           </Label>
           <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger id="category" className="bg-gray-700 border-gray-600 text-white">
-              <SelectValue />
+            <SelectTrigger id="category">
+              <SelectValue placeholder="Select a category" />
             </SelectTrigger>
-            <SelectContent className="bg-gray-700 border-gray-600">
-              <SelectItem value="materials">Materials</SelectItem>
-              <SelectItem value="tiles">Tiles</SelectItem>
-              <SelectItem value="flooring">Flooring</SelectItem>
-              <SelectItem value="wallpaper">Wallpaper</SelectItem>
-              <SelectItem value="furniture">Furniture</SelectItem>
+            <SelectContent>
+              {categories.length > 0 ? (
+                categories.map((cat) => (
+                  <SelectItem key={cat.category_key} value={cat.category_key}>
+                    {cat.display_name || cat.name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="materials" disabled>
+                  Loading categories...
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
 
         {/* Field Mappings Table */}
-        <div className="border border-gray-700 rounded-lg overflow-hidden">
-          <div className="bg-gray-700/50 px-4 py-3 grid grid-cols-12 gap-4 font-semibold text-sm">
+        <div className="border rounded-lg overflow-hidden">
+          <div className="bg-muted px-4 py-3 grid grid-cols-12 gap-4 font-semibold text-sm">
             <div className="col-span-3">XML Field</div>
             <div className="col-span-3">Sample Values</div>
             <div className="col-span-4">Map To</div>
             <div className="col-span-2">AI Confidence</div>
           </div>
 
-          <div className="divide-y divide-gray-700">
+          <div className="divide-y">
             {detectedFields.map((field) => (
-              <div key={field.xml_field} className="px-4 py-3 grid grid-cols-12 gap-4 items-center">
+              <div key={field.xml_field} className="px-4 py-3 grid grid-cols-12 gap-4 items-center bg-background hover:bg-muted/50 transition-colors">
                 <div className="col-span-3">
-                  <code className="text-sm text-blue-300">{field.xml_field}</code>
+                  <code className="text-sm text-primary font-mono">{field.xml_field}</code>
                 </div>
 
                 <div className="col-span-3">
-                  <div className="text-xs text-gray-400 space-y-1">
+                  <div className="text-xs text-muted-foreground space-y-1">
                     {field.sample_values.slice(0, 2).map((value, idx) => (
                       <div key={idx} className="truncate" title={value}>
                         {value}
@@ -306,14 +353,14 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
                     value={fieldMappings[field.xml_field] || 'metadata'}
                     onValueChange={(value) => handleMappingChange(field.xml_field, value)}
                   >
-                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white text-sm">
+                    <SelectTrigger className="text-sm">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-gray-700 border-gray-600">
+                    <SelectContent>
                       {TARGET_FIELDS.map((target) => (
                         <SelectItem key={target.value} value={target.value}>
                           {target.label}
-                          {target.required && <span className="text-red-400 ml-1">*</span>}
+                          {target.required && <span className="text-destructive ml-1">*</span>}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -326,8 +373,42 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
           </div>
         </div>
 
+        {/* Manual Input for Missing Required Fields */}
+        {getMissingRequiredFields().length > 0 && (
+          <div className="space-y-3 bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-yellow-900 mb-2">
+                  Missing Required Fields
+                </h4>
+                <p className="text-sm text-yellow-700 mb-3">
+                  The following required fields could not be auto-detected. Please provide values manually:
+                </p>
+                <div className="space-y-3">
+                  {getMissingRequiredFields().map((field) => (
+                    <div key={field} className="space-y-1">
+                      <Label htmlFor={`manual-${field}`} className="text-yellow-900">
+                        {TARGET_FIELDS.find(f => f.value === field)?.label || field}
+                        <span className="text-destructive ml-1">*</span>
+                      </Label>
+                      <Input
+                        id={`manual-${field}`}
+                        placeholder={`Enter ${TARGET_FIELDS.find(f => f.value === field)?.label || field}`}
+                        value={manualValues[field] || ''}
+                        onChange={(e) => setManualValues(prev => ({ ...prev, [field]: e.target.value }))}
+                        className="bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Save as Template */}
-        <div className="space-y-3 bg-gray-700/30 p-4 rounded-lg">
+        <div className="space-y-3 bg-muted/50 p-4 rounded-lg border">
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -336,7 +417,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
               onChange={(e) => setSaveAsTemplate(e.target.checked)}
               className="rounded"
             />
-            <Label htmlFor="save-template" className="text-white cursor-pointer">
+            <Label htmlFor="save-template" className="cursor-pointer">
               Save as mapping template for future imports
             </Label>
           </div>
@@ -346,20 +427,18 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
               placeholder="Template name (e.g., 'Supplier ABC Catalog')"
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              className="bg-gray-700 border-gray-600 text-white"
             />
           )}
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-700">
+        <div className="flex justify-end gap-3 pt-4 border-t">
           <Button variant="outline" onClick={onClose} disabled={isImporting}>
             Cancel
           </Button>
           <Button
             onClick={handleImport}
             disabled={isImporting}
-            className="bg-blue-600 hover:bg-blue-700"
           >
             {isImporting ? (
               <>

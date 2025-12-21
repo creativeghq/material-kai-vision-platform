@@ -573,15 +573,36 @@ function extractProductData(element: Element): ProductData | null {
     const description = getElementText(element, 'description') || getElementText(element, 'desc');
     const factory_group_name = getElementText(element, 'factory_group') || getElementText(element, 'group');
 
-    // Extract images
+    // Extract images - handle both single and multiple image fields
     const images: string[] = [];
-    const imageElements = element.querySelectorAll('image, img, picture');
-    for (const imgEl of imageElements) {
-      const url = imgEl.textContent?.trim() || imgEl.getAttribute('url') || imgEl.getAttribute('src');
-      if (url) {
-        images.push(url);
+
+    // Handle image_link (single image)
+    const imageLink = getElementText(element, 'image_link') || getElementText(element, 'image');
+    if (imageLink) {
+      images.push(imageLink);
+    }
+
+    // Handle additional_image_link (comma-separated multiple images)
+    const additionalImageLink = getElementText(element, 'additional_image_link') || getElementText(element, 'additional_images');
+    if (additionalImageLink) {
+      // Split by comma and trim whitespace
+      const additionalImages = additionalImageLink.split(',').map(url => url.trim()).filter(url => url);
+      images.push(...additionalImages);
+    }
+
+    // Fallback: check for generic image elements
+    if (images.length === 0) {
+      const imageElements = element.querySelectorAll('img, picture');
+      for (const imgEl of imageElements) {
+        const url = imgEl.textContent?.trim() || imgEl.getAttribute('url') || imgEl.getAttribute('src');
+        if (url) {
+          images.push(url);
+        }
       }
     }
+
+    // Extract product ID for variant tracking
+    const productId = getElementText(element, 'id') || getElementText(element, 'product_id') || getElementText(element, 'sku');
 
     // Extract metadata
     const metadata: Record<string, any> = {
@@ -590,12 +611,27 @@ function extractProductData(element: Element): ProductData | null {
       extraction_method: 'xml_import',
     };
 
+    // Store product ID in metadata for variant tracking
+    if (productId) {
+      metadata.product_id = productId;
+      metadata.original_id = productId;
+    }
+
     // Extract additional fields as metadata
-    const metadataFields = ['price', 'color', 'colors', 'dimensions', 'size', 'designer', 'collection', 'finish', 'material'];
+    const metadataFields = ['price', 'color', 'colors', 'dimensions', 'size', 'designer', 'collection', 'finish', 'material', 'link', 'url'];
     for (const field of metadataFields) {
       const value = getElementText(element, field);
       if (value) {
         metadata[field] = value;
+      }
+    }
+
+    // Extract categories if present (for variant differentiation)
+    const categoryElements = element.querySelectorAll('categories > category');
+    if (categoryElements.length > 0) {
+      const categories = Array.from(categoryElements).map(cat => cat.textContent?.trim()).filter(Boolean);
+      if (categories.length > 0) {
+        metadata.categories = categories;
       }
     }
 
