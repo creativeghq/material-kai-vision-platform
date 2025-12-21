@@ -119,13 +119,45 @@ export class BrowserApiIntegrationService {
     functionName: string,
     payload: Record<string, unknown>,
   ): Promise<StandardizedApiResponse> {
-    const client = browserApiClientFactory.getClient('supabase');
-    if (!client) {
+    try {
+      // Import supabase client dynamically to avoid circular dependencies
+      const { supabase } = await import('@/integrations/supabase/client');
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: payload,
+      });
+
+      if (error) {
+        return {
+          success: false,
+          error: {
+            message: error.message || 'Supabase function call failed',
+            code: 'SUPABASE_ERROR',
+            retryable: true,
+          },
+          metadata: {
+            apiType: 'supabase',
+            timestamp: new Date().toISOString(),
+            requestId: crypto.randomUUID(),
+          },
+        };
+      }
+
+      return {
+        success: true,
+        data,
+        metadata: {
+          apiType: 'supabase',
+          timestamp: new Date().toISOString(),
+          requestId: crypto.randomUUID(),
+        },
+      };
+    } catch (error) {
       return {
         success: false,
         error: {
-          message: 'Supabase client not available',
-          code: 'CLIENT_NOT_AVAILABLE',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'EXCEPTION',
           retryable: false,
         },
         metadata: {
@@ -135,11 +167,6 @@ export class BrowserApiIntegrationService {
         },
       };
     }
-
-    return client.callFunction({
-      functionName,
-      payload,
-    });
   }
 
 
