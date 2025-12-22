@@ -32,6 +32,7 @@ const XMLImportTab: React.FC = () => {
   const [suggestedMappings, setSuggestedMappings] = useState<Record<string, string>>({});
   const [showMappingModal, setShowMappingModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [xmlContentCache, setXmlContentCache] = useState<string>(''); // Cache XML content for URL sources
 
   // Load workspace ID on mount
   useEffect(() => {
@@ -132,6 +133,7 @@ const XMLImportTab: React.FC = () => {
 
       setDetectedFields(data.detected_fields || []);
       setSuggestedMappings(data.suggested_mappings || {});
+      setXmlContentCache(xmlText); // Cache the XML content for later use
       setShowMappingModal(true);
     } catch (err: any) {
       console.error('Error detecting fields:', err);
@@ -328,7 +330,8 @@ const XMLImportTab: React.FC = () => {
           onClose={() => setShowMappingModal(false)}
           detectedFields={detectedFields}
           suggestedMappings={suggestedMappings}
-          xmlFile={selectedFile!}
+          xmlFile={selectedFile}
+          xmlContent={xmlContentCache}
           onMappingConfirmed={handleMappingConfirmed}
         />
       )}

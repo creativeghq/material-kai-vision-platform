@@ -78,26 +78,33 @@ function detectXMLFields(xmlContent: string): Map<string, string[]> {
     throw new Error('No product elements found in XML');
   }
 
-  // Collect all unique fields and sample values (from first 5 products)
-  const fieldSamples = new Map<string, string[]>();
+  // Collect all unique fields and sample values (from first 10 products for better diversity)
+  const fieldSamples = new Map<string, Set<string>>();
 
-  Array.from(products).slice(0, 5).forEach((product) => {
+  Array.from(products).slice(0, 10).forEach((product) => {
     Array.from(product.children).forEach((child) => {
       const fieldName = child.tagName.toLowerCase();
       const value = child.textContent?.trim() || '';
 
       if (!fieldSamples.has(fieldName)) {
-        fieldSamples.set(fieldName, []);
+        fieldSamples.set(fieldName, new Set<string>());
       }
 
       const samples = fieldSamples.get(fieldName)!;
-      if (samples.length < 3 && value && !samples.includes(value)) {
-        samples.push(value);
+      // Only add unique, non-empty values (Set automatically handles uniqueness)
+      if (value && samples.size < 3) {
+        samples.add(value);
       }
     });
   });
 
-  return fieldSamples;
+  // Convert Sets back to Arrays for the response
+  const fieldSamplesArray = new Map<string, string[]>();
+  for (const [field, samplesSet] of fieldSamples) {
+    fieldSamplesArray.set(field, Array.from(samplesSet));
+  }
+
+  return fieldSamplesArray;
 }
 
 /**

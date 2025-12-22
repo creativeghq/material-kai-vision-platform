@@ -41,7 +41,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   CheckCircle,
   AlertTriangle,
-  Save,
   Upload,
   Loader2,
   Sparkles,
@@ -65,7 +64,8 @@ interface XMLFieldMappingModalProps {
   onClose: () => void;
   detectedFields: DetectedField[];
   suggestedMappings: Record<string, string>;
-  xmlFile: File;
+  xmlFile: File | null;
+  xmlContent?: string; // Optional: for URL-based XML content
   onMappingConfirmed: () => void;
 }
 
@@ -190,6 +190,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
   detectedFields,
   suggestedMappings,
   xmlFile,
+  xmlContent,
   onMappingConfirmed,
 }) => {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
@@ -309,8 +310,15 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
     setError(null);
 
     try {
-      // Read XML file
-      const xmlText = await xmlFile.text();
+      // Read XML content - either from file or from prop
+      let xmlText: string;
+      if (xmlFile) {
+        xmlText = await xmlFile.text();
+      } else if (xmlContent) {
+        xmlText = xmlContent;
+      } else {
+        throw new Error('No XML content available');
+      }
 
       // Encode to base64 (UTF-8 safe)
       const encoder = new TextEncoder();
@@ -409,7 +417,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             workspace_id: workspaceId,
             category: category,
             xml_content: xmlBase64,
-            source_name: xmlFile.name,
+            source_name: xmlFile?.name || 'xml_url_import',
             field_mappings: { ...finalMappings, ...manualFieldMappings },
             manual_values: manualValues, // Pass manual values separately
             mapping_template_id: templateId,
