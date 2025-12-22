@@ -136,20 +136,20 @@ Return a list of materials found on the page.`);
     },
   ]);
 
-  // Firecrawl Options - Enhanced with more API options
+  // Firecrawl Options - Optimized defaults for material extraction
   const [firecrawlOptions, setFirecrawlOptions] = useState({
     formats: ['markdown', 'html'] as string[],
     onlyMainContent: true,
     includeLinks: false,
     includeTags: [] as string[],
     excludeTags: ['nav', 'footer', 'aside'] as string[],
-    waitFor: 0,
+    waitFor: 2000, // Wait for dynamic content to load
     mobile: false,
     skipTlsVerification: false,
     parsePDF: true,
-    removeBase64Images: true,
+    removeBase64Images: false, // Keep images - we need them for material extraction
     blockAds: true,
-    extractorMode: 'llm-extraction' as 'llm-extraction' | 'css-extraction',
+    extractorMode: 'llm-extraction' as 'llm-extraction' | 'css-extraction', // Always use LLM for best results
     schema: '',
     actions: [] as unknown[],
     maxAge: 0,
@@ -537,15 +537,49 @@ Return a list of materials found on the page.`);
   const getModeDescription = (mode: ScrapingMode) => {
     switch (mode) {
       case 'single-page':
-        return 'Scrape a single webpage with full content and metadata';
+        return 'Best for: Scraping a single product page or specific URL with full content extraction';
       case 'sitemap':
-        return 'Parse sitemap XML and scrape multiple pages from the list';
+        return 'Best for: When you have a sitemap.xml with known product URLs to scrape in bulk';
       case 'crawl':
-        return 'Crawl website and discover all accessible subpages automatically';
+        return 'Best for: Discovering and scraping all product pages automatically from a website';
       case 'search':
-        return 'Search the web and get full content from search results';
+        return 'Best for: Finding and scraping pages based on search queries across the web';
       case 'map':
-        return 'Get a complete list of URLs from any website quickly';
+        return 'Best for: Quickly getting a complete list of URLs from a website without scraping content';
+      default:
+        return '';
+    }
+  };
+
+  const getModeUseCase = (mode: ScrapingMode) => {
+    switch (mode) {
+      case 'single-page':
+        return 'Use when you want to extract materials from one specific page';
+      case 'sitemap':
+        return 'Use when the website provides a sitemap with all product URLs';
+      case 'crawl':
+        return 'Use when you want to automatically discover all pages on a website';
+      case 'search':
+        return 'Use when you need to find pages via search engines';
+      case 'map':
+        return 'Use when you only need URLs without extracting content yet';
+      default:
+        return '';
+    }
+  };
+
+  const getModeTips = (mode: ScrapingMode) => {
+    switch (mode) {
+      case 'single-page':
+        return '💡 Perfect for testing extraction on a single product page before scaling up';
+      case 'sitemap':
+        return '💡 Most efficient when you have a sitemap.xml - usually found at /sitemap.xml';
+      case 'crawl':
+        return '💡 The crawler will automatically discover product pages - set a reasonable page limit';
+      case 'search':
+        return '💡 Uses Firecrawl search to find relevant pages across the web';
+      case 'map':
+        return '💡 Fast way to get all URLs first, then scrape them in a separate session';
       default:
         return '';
     }
@@ -569,70 +603,40 @@ Return a list of materials found on the page.`);
           <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
         </div>
 
-          {/* Scraping Mode Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Scraping Mode
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {(
-                  [
-                    'single-page',
-                    'sitemap',
-                    'crawl',
-                    'search',
-                    'map',
-                  ] as ScrapingMode[]
-                ).map((mode) => {
-                  const Icon = getModeIcon(mode);
-                  return (
-                    <div
-                      key={mode}
-                      className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                        scrapingMode === mode
-                          ? 'border-primary bg-primary/5'
-                          : 'border-muted hover:border-muted-foreground/50'
-                      }`}
-                      onClick={() => setScrapingMode(mode)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          setScrapingMode(mode);
-                        }
-                      }}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <Icon className="h-5 w-5" />
-                        <span className="font-medium capitalize">
-                          {mode.replace('-', ' ')}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {getModeDescription(mode)}
-                      </p>
-                    </div>
-                  );
-                })}
+          {/* Workflow Info */}
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex gap-3">
+                <Brain className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-sm">How it works:</h3>
+                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Enter the website URL or search query</li>
+                    <li>Choose your scraping mode based on your needs</li>
+                    <li>Configure field mappings for material data extraction</li>
+                    <li>Preview the extraction on a sample page</li>
+                    <li>Confirm and start the full scraping process</li>
+                  </ol>
+                  <p className="text-xs text-muted-foreground italic mt-2">
+                    💡 The system will automatically extract materials, create embeddings, and chunk the data for AI processing.
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Input Configuration */}
+          {/* Primary Input - URL/Query (Moved to top as primary action) */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                {React.createElement(getModeIcon(scrapingMode), {
-                  className: 'h-5 w-5',
-                })}
-                {scrapingMode === 'single-page' && 'Page URL'}
-                {scrapingMode === 'sitemap' && 'Sitemap Configuration'}
-                {scrapingMode === 'crawl' && 'Website to Crawl'}
-                {scrapingMode === 'search' && 'Search Query'}
-                {scrapingMode === 'map' && 'Website to Map'}
+                <Globe className="h-5 w-5" />
+                {scrapingMode === 'search' ? 'Search Query' : 'Website URL'}
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                {scrapingMode === 'search'
+                  ? 'Enter your search query to find and scrape relevant pages'
+                  : 'Enter the URL of the website or page you want to scrape'}
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Single Page Input */}
@@ -778,6 +782,71 @@ Return a list of materials found on the page.`);
             </CardContent>
           </Card>
 
+          {/* Scraping Mode Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Scraping Mode
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Choose how you want to scrape the website based on your needs
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Show tip for selected mode */}
+              {scrapingMode && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm">
+                  {getModeTips(scrapingMode)}
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {(
+                  [
+                    'single-page',
+                    'sitemap',
+                    'crawl',
+                    'search',
+                    'map',
+                  ] as ScrapingMode[]
+                ).map((mode) => {
+                  const Icon = getModeIcon(mode);
+                  return (
+                    <div
+                      key={mode}
+                      className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                        scrapingMode === mode
+                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+                          : 'border-muted hover:border-muted-foreground/50 hover:bg-accent/5'
+                      }`}
+                      onClick={() => setScrapingMode(mode)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setScrapingMode(mode);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <Icon className="h-5 w-5 text-primary" />
+                        <span className="font-medium capitalize">
+                          {mode.replace('-', ' ')}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {getModeDescription(mode)}
+                      </p>
+                      <p className="text-xs text-primary/70 italic">
+                        {getModeUseCase(mode)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Field Mappings */}
           <Card>
             <CardHeader>
@@ -844,10 +913,16 @@ Return a list of materials found on the page.`);
                 <Sparkles className="h-5 w-5" />
                 Firecrawl Options
               </CardTitle>
+              <p className="text-sm text-muted-foreground mt-2">
+                Configure how Firecrawl extracts content. Defaults are optimized for material extraction.
+              </p>
             </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <Label>Output Formats</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Markdown and HTML are recommended for best extraction results
+                  </p>
                   <div className="flex gap-4 mt-2">
                     {['markdown', 'html', 'links', 'screenshot'].map(
                       (format) => (
@@ -953,6 +1028,9 @@ Return a list of materials found on the page.`);
 
                 <div>
                   <Label>Extractor Mode</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    LLM extraction is recommended for best accuracy with material data
+                  </p>
                   <Select
                     value={firecrawlOptions.extractorMode}
                     onValueChange={(
@@ -969,7 +1047,7 @@ Return a list of materials found on the page.`);
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="llm-extraction">
-                        LLM Extraction (AI-powered)
+                        LLM Extraction (AI-powered) - Recommended
                       </SelectItem>
                       <SelectItem value="css-extraction">
                         CSS Extraction (Rule-based)
@@ -1043,6 +1121,9 @@ Return a list of materials found on the page.`);
                       Remove Base64 Images
                     </Label>
                   </div>
+                  <p className="text-xs text-muted-foreground col-span-2 -mt-2">
+                    ⚠️ Keep this OFF - we need images for material extraction
+                  </p>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="skipTlsVerification"
