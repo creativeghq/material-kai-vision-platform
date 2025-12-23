@@ -1,10 +1,10 @@
 /**
  * Auto-Recovery Cron Job
- * 
+ *
  * Runs every 5 minutes to detect and recover stuck jobs.
- * 
- * Schedule: */5 * * * * (every 5 minutes)
- * 
+ *
+ * Schedule: Every 5 minutes (cron: star-slash-5 star star star star)
+ *
  * Usage:
  * - Automatically triggered by Supabase Cron
  * - Can be manually triggered via POST request

@@ -566,6 +566,91 @@ node scripts/testing/test-xml-import-phase2.js
 
 ---
 
+## 🛡️ Production Hardening
+
+The Data Import System implements **complete production hardening** across all import methods (PDF, XML, Web Scraping):
+
+### Source Tracking ✅
+
+All imported data is tagged with source information for complete traceability:
+
+| Field | Purpose | Example Values |
+|-------|---------|----------------|
+| **source_type** | Import method | `'pdf_processing'`, `'xml_import'`, `'web_scraping'` |
+| **source_job_id** | Originating job | Job UUID from `background_jobs` or `data_import_jobs` |
+
+**Applied to:**
+- ✅ Products table
+- ✅ Chunks table
+- ✅ Images table
+- ✅ Embeddings table
+
+**Benefits:**
+- Filter Materials Data page by specific import job
+- Trace any data back to its source
+- Delete all data from a specific import
+- Audit data quality by source
+
+---
+
+### Heartbeat Monitoring ✅
+
+All import methods update heartbeat timestamps to detect stuck/crashed jobs:
+
+| Method | Heartbeat Field | Update Frequency | Stuck Threshold |
+|--------|----------------|------------------|-----------------|
+| **PDF Processing** | `last_heartbeat` | Every stage | >10 minutes |
+| **XML Import** | `last_heartbeat` | Every batch (10 products) | >30 minutes |
+| **Web Scraping** | `last_heartbeat_at` | Every 30 seconds | >5 minutes |
+
+**Features:**
+- Automatic stuck job detection
+- Auto-recovery mechanisms
+- Real-time job health monitoring
+- Alert on processing delays
+
+---
+
+### Sentry Error Tracking ✅
+
+Comprehensive error tracking and performance monitoring across all import methods:
+
+| Feature | PDF | XML | Web Scraping |
+|---------|-----|-----|--------------|
+| **Transaction Tracking** | ✅ | ✅ | ✅ |
+| **Breadcrumbs** | ✅ | ✅ | ✅ |
+| **Exception Capture** | ✅ | ✅ | ✅ |
+| **Performance Monitoring** | ✅ | ✅ | ✅ |
+| **Error Context** | ✅ | ✅ | ✅ |
+
+**Benefits:**
+- Track performance bottlenecks
+- Debug errors with full context
+- Monitor AI model usage
+- Identify slow operations
+
+---
+
+### Production Hardening Status
+
+| Feature | PDF | XML | Web Scraping | Status |
+|---------|-----|-----|--------------|--------|
+| **Source Tracking** | ✅ | ✅ | ✅ | COMPLETE |
+| **Heartbeat Monitoring** | ✅ | ✅ | ✅ | COMPLETE |
+| **Sentry Tracking** | ✅ | ✅ | ✅ | COMPLETE |
+| **Error Handling** | ✅ | ✅ | ✅ | COMPLETE |
+| **Progress Tracking** | ✅ | ✅ | ✅ | COMPLETE |
+| **Checkpoint Recovery** | ✅ | ✅ | ✅ | COMPLETE |
+| **Auto-Recovery** | ✅ | ✅ | ✅ | COMPLETE |
+
+For detailed implementation, see:
+- [Unified Product Generation Flow](./unified-product-generation-flow.md)
+- [PDF Processing Pipeline](./pdf-processing-pipeline.md)
+- [XML Import Orchestrator](./xml-import-orchestrator.md)
+- [Web Scraping Integration](./web-scraping-integration.md)
+
+---
+
 ## Future Enhancements
 
 ### Frontend Improvements

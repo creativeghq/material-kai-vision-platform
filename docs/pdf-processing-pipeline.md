@@ -830,7 +830,128 @@ Response:
 
 ---
 
-**Last Updated**: November 27, 2025
+## 🛡️ Production Hardening
+
+PDF processing implements **complete production hardening** for reliability and monitoring:
+
+### Source Tracking ✅
+
+Every product, chunk, image, and embedding is tagged with source information:
+
+```python
+# Products
+await supabase.table('products').insert({
+    'name': product_name,
+    'source_type': 'pdf_processing',  # ✅ NEW
+    'source_job_id': job_id,          # ✅ NEW
+    # ... other fields
+})
+
+# Chunks
+await supabase.table('document_chunks').insert({
+    'content': chunk_text,
+    'source_type': 'pdf_processing',  # ✅ NEW
+    'source_job_id': job_id,          # ✅ NEW
+    # ... other fields
+})
+
+# Images
+await supabase.table('document_images').insert({
+    'url': image_url,
+    'source_type': 'pdf_processing',  # ✅ NEW
+    'source_job_id': job_id,          # ✅ NEW
+    # ... other fields
+})
+
+# Embeddings
+await supabase.table('embeddings').insert({
+    'embedding': vector,
+    'source_type': 'pdf_processing',  # ✅ NEW
+    'source_job_id': job_id,          # ✅ NEW
+    # ... other fields
+})
+```
+
+**Benefits:**
+- Filter Materials Data page by specific PDF job
+- Trace any data back to its source PDF
+- Delete all data from a specific PDF import
+- Audit data quality by source
+
+---
+
+### Heartbeat Monitoring ✅
+
+Updates `last_heartbeat` field every stage to detect stuck jobs:
+
+```python
+# Update heartbeat during processing
+await supabase.table('background_jobs').update({
+    'last_heartbeat': datetime.utcnow().isoformat(),
+    'current_stage': stage_name,
+    'progress_percent': progress
+}).eq('id', job_id).execute()
+```
+
+**Stuck Job Detection:**
+- Threshold: >10 minutes without heartbeat
+- Auto-recovery: Automatic retry of stuck jobs
+- Monitoring: Real-time job health dashboard
+
+---
+
+### Sentry Error Tracking ✅
+
+Comprehensive error tracking and performance monitoring:
+
+```python
+# Transaction tracking
+with sentry_sdk.start_transaction(op="pdf_processing", name="process_stage") as transaction:
+    transaction.set_tag("job_id", job_id)
+    transaction.set_tag("stage", stage_name)
+    transaction.set_data("total_pages", total_pages)
+
+    # Breadcrumbs for debugging
+    sentry_sdk.add_breadcrumb(
+        category="pdf_processing",
+        message=f"Processing stage {stage_name}",
+        level="info",
+        data={"progress": progress}
+    )
+
+    try:
+        # ... processing logic ...
+        transaction.set_status("ok")
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        transaction.set_status("internal_error")
+        raise
+```
+
+**Features:**
+- Transaction tracking for performance monitoring
+- Breadcrumbs for debugging context
+- Exception capture with full stack traces
+- AI model usage tracking
+- Performance bottleneck identification
+
+---
+
+### Production Hardening Status
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| **Source Tracking** | ✅ COMPLETE | All tables have `source_type` and `source_job_id` |
+| **Heartbeat Monitoring** | ✅ COMPLETE | Updates every stage, 10-minute stuck threshold |
+| **Sentry Tracking** | ✅ COMPLETE | Transactions, breadcrumbs, exception capture |
+| **Error Handling** | ✅ COMPLETE | Comprehensive try-catch with Sentry integration |
+| **Progress Tracking** | ✅ COMPLETE | Real-time progress updates via `job_progress` table |
+| **Checkpoint Recovery** | ✅ COMPLETE | Resume from last successful stage |
+| **Auto-Recovery** | ✅ COMPLETE | Automatic retry of stuck/failed jobs |
+
+---
+
+**Last Updated**: December 23, 2025
 **Pipeline Version**: 11-Stage (URL-Based Architecture)
 **Status**: Production
 **Major Changes**:
@@ -841,4 +962,5 @@ Response:
 - **10× Faster**: 2-3 minutes vs 30+ minutes timeout
 - **60% Less Memory**: <3GB vs 7.7GB OOM crash
 - **Aggressive Batch Cleanup**: Delete batch data between batches to prevent memory leaks
+- **✅ Production Hardening**: Complete source tracking, heartbeat monitoring, and Sentry integration
 

@@ -269,9 +269,131 @@ After job creation:
 
 See Python API documentation for details on batch processing.
 
+---
+
+## 🛡️ Production Hardening
+
+XML Import implements **complete production hardening** for reliability and monitoring:
+
+### Source Tracking ✅
+
+Every product, chunk, and image is tagged with source information:
+
+```python
+# Products
+await supabase.table('products').insert({
+    'name': product_name,
+    'source_type': 'xml_import',     # ✅ Tracks source
+    'source_job_id': job_id,         # ✅ Links to import job
+    # ... other fields
+})
+
+# Chunks
+await supabase.table('document_chunks').insert({
+    'content': chunk_text,
+    'source_type': 'xml_import',     # ✅ Tracks source
+    'source_job_id': job_id,         # ✅ Links to import job
+    # ... other fields
+})
+
+# Images
+await supabase.table('document_images').insert({
+    'url': image_url,
+    'source_type': 'xml_import',     # ✅ Tracks source
+    'source_job_id': job_id,         # ✅ Links to import job
+    # ... other fields
+})
+```
+
+**Benefits:**
+- Filter Materials Data page by specific XML import job
+- Trace any data back to its source XML file
+- Delete all data from a specific XML import
+- Audit data quality by source
+
+---
+
+### Heartbeat Monitoring ✅
+
+Updates `last_heartbeat` field **every batch (10 products)** to detect stuck jobs:
+
+```python
+# Update heartbeat during batch processing
+await supabase.table('background_jobs').update({
+    'last_heartbeat': datetime.utcnow().isoformat(),
+    'progress_percent': progress,
+    'metadata': {
+        'processed': processed_count,
+        'failed': failed_count,
+        'total': total_products
+    }
+}).eq('id', background_job_id).execute()
+```
+
+**Implementation:**
+- Location: `data_import_service.py` line 584
+- Frequency: Every 10 products processed
+- Stuck Threshold: >30 minutes without heartbeat
+- Auto-Recovery: Automatic retry of stuck jobs
+
+---
+
+### Sentry Error Tracking ✅
+
+Comprehensive error tracking and performance monitoring:
+
+```python
+# Transaction tracking
+with sentry_sdk.start_transaction(op="xml_import", name="process_import_job") as transaction:
+    transaction.set_tag("job_id", job_id)
+    transaction.set_tag("workspace_id", workspace_id)
+    transaction.set_data("total_products", total_products)
+    transaction.set_data("batch_size", batch_size)
+
+    # Breadcrumbs for debugging
+    sentry_sdk.add_breadcrumb(
+        category="xml_import",
+        message=f"Processing batch {batch_index + 1}",
+        level="info",
+        data={"batch_size": len(batch)}
+    )
+
+    try:
+        # ... processing logic ...
+        transaction.set_status("ok")
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        transaction.set_status("internal_error")
+        raise
+```
+
+**Features:**
+- Transaction tracking for performance monitoring
+- Breadcrumbs for batch processing context
+- Exception capture with full stack traces
+- Batch processing metrics
+- Performance bottleneck identification
+
+---
+
+### Production Hardening Status
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| **Source Tracking** | ✅ COMPLETE | All tables have `source_type='xml_import'` and `source_job_id` |
+| **Heartbeat Monitoring** | ✅ COMPLETE | Updates every batch (10 products), 30-minute stuck threshold |
+| **Sentry Tracking** | ✅ COMPLETE | Transactions, breadcrumbs, exception capture |
+| **Error Handling** | ✅ COMPLETE | Comprehensive try-catch with Sentry integration |
+| **Progress Tracking** | ✅ COMPLETE | Real-time progress updates via `background_jobs` table |
+| **Checkpoint Recovery** | ✅ COMPLETE | Resume from last successful batch |
+| **Auto-Recovery** | ✅ COMPLETE | Automatic retry of stuck/failed jobs |
+
+---
+
 ## Related Documentation
 
 - [Data Import Hub Architecture](../../../docs/data-import-hub.md)
 - [Python API Import Endpoints](../../../mivaa-pdf-extractor/docs/import-api.md)
 - [Database Schema](../../../supabase/migrations/20251110_create_data_import_tables.sql)
+- [Unified Product Generation Flow](../../../docs/unified-product-generation-flow.md) - Complete production hardening details
 

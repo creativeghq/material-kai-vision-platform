@@ -15,9 +15,10 @@ Complete documentation for all three product generation methods and their unifie
 1. [Overview](#overview)
 2. [Architecture Diagram](#architecture-diagram)
 3. [Method Comparison](#method-comparison)
-4. [Unified Storage](#unified-storage)
-5. [Unified Search](#unified-search)
-6. [Verification Checklist](#verification-checklist)
+4. [Production Hardening](#production-hardening)
+5. [Unified Storage](#unified-storage)
+6. [Unified Search](#unified-search)
+7. [Verification Checklist](#verification-checklist)
 
 ---
 
@@ -240,6 +241,145 @@ await async_queue.queue_ai_analysis_jobs(
 # 5. Image Embeddings → VECS collections (1152D x5)
 # (Same ImageProcessingService as PDF)
 ```
+
+---
+
+## Production Hardening
+
+All three processing methods implement **complete production hardening** for reliability, monitoring, and debugging.
+
+### Source Tracking
+
+Every product, chunk, image, and embedding is tagged with its source for complete data lineage:
+
+| Field | Purpose | Example Values |
+|-------|---------|----------------|
+| **source_type** | Processing method | `'pdf_processing'`, `'xml_import'`, `'web_scraping'` |
+| **source_job_id** | Originating job | Job UUID from `background_jobs` or `data_import_jobs` |
+
+**Benefits:**
+- ✅ Filter Materials Data page by specific job
+- ✅ Trace any data back to its source
+- ✅ Delete all data from a specific import
+- ✅ Audit data quality by source
+
+**Implementation:**
+```python
+# PDF Processing
+await supabase.table('products').insert({
+    'name': product_name,
+    'source_type': 'pdf_processing',
+    'source_job_id': job_id,
+    # ... other fields
+})
+
+# XML Import
+await supabase.table('products').insert({
+    'name': product_name,
+    'source_type': 'xml_import',
+    'source_job_id': job_id,
+    # ... other fields
+})
+
+# Web Scraping
+await supabase.table('products').insert({
+    'name': product_name,
+    'source_type': 'web_scraping',
+    'source_job_id': session_id,
+    # ... other fields
+})
+```
+
+---
+
+### Heartbeat Monitoring
+
+All processing methods update heartbeat timestamps to detect stuck/crashed jobs:
+
+| Method | Heartbeat Field | Update Frequency | Stuck Threshold |
+|--------|----------------|------------------|-----------------|
+| **PDF Processing** | `last_heartbeat` | Every stage | >10 minutes |
+| **XML Import** | `last_heartbeat` | Every batch (10 products) | >30 minutes |
+| **Web Scraping** | `last_heartbeat_at` | Every 30 seconds | >5 minutes |
+
+**Benefits:**
+- ✅ Detect crashed/stuck jobs automatically
+- ✅ Enable auto-recovery mechanisms
+- ✅ Monitor job health in real-time
+- ✅ Alert on processing delays
+
+**Implementation:**
+```python
+# Update heartbeat during processing
+await supabase.table('background_jobs').update({
+    'last_heartbeat': datetime.utcnow().isoformat()
+}).eq('id', job_id).execute()
+
+# Detect stuck jobs
+stuck_jobs = await supabase.table('background_jobs').select('*').filter(
+    'status', 'eq', 'processing'
+).filter(
+    'last_heartbeat', 'lt', (datetime.utcnow() - timedelta(minutes=10)).isoformat()
+).execute()
+```
+
+---
+
+### Sentry Error Tracking
+
+All processing methods use Sentry for comprehensive error tracking and performance monitoring:
+
+| Feature | PDF | XML | Web Scraping |
+|---------|-----|-----|--------------|
+| **Transaction Tracking** | ✅ | ✅ | ✅ |
+| **Breadcrumbs** | ✅ | ✅ | ✅ |
+| **Exception Capture** | ✅ | ✅ | ✅ |
+| **Performance Monitoring** | ✅ | ✅ | ✅ |
+| **Error Context** | ✅ | ✅ | ✅ |
+
+**Benefits:**
+- ✅ Track performance bottlenecks
+- ✅ Debug errors with full context
+- ✅ Monitor AI model usage
+- ✅ Identify slow operations
+
+**Implementation:**
+```python
+# Start Sentry transaction
+with sentry_sdk.start_transaction(op="pdf_processing", name="process_job") as transaction:
+    transaction.set_tag("job_id", job_id)
+    transaction.set_data("total_products", total_products)
+
+    # Add breadcrumbs for debugging
+    sentry_sdk.add_breadcrumb(
+        category="processing",
+        message=f"Processing batch {batch_index}",
+        level="info",
+        data={"batch_size": len(batch)}
+    )
+
+    try:
+        # ... processing logic ...
+        transaction.set_status("ok")
+    except Exception as e:
+        sentry_sdk.capture_exception(e)
+        transaction.set_status("internal_error")
+        raise
+```
+
+---
+
+### Production Hardening Status
+
+| Feature | PDF | XML | Web Scraping | Status |
+|---------|-----|-----|--------------|--------|
+| **Source Tracking** | ✅ | ✅ | ✅ | COMPLETE |
+| **Heartbeat Monitoring** | ✅ | ✅ | ✅ | COMPLETE |
+| **Sentry Tracking** | ✅ | ✅ | ✅ | COMPLETE |
+| **Error Handling** | ✅ | ✅ | ✅ | COMPLETE |
+| **Progress Tracking** | ✅ | ✅ | ✅ | COMPLETE |
+| **Checkpoint Recovery** | ✅ | ✅ | ✅ | COMPLETE |
+| **Auto-Recovery** | ✅ | ✅ | ✅ | COMPLETE |
 
 ---
 

@@ -351,12 +351,142 @@ curl -X POST "https://v1api.materialshub.gr/api/scraping/session/{session_id}/re
   -H "Authorization: Bearer mk_your_api_key"
 ```
 
+---
+
+## 🛡️ Production Hardening
+
+Web Scraping implements **complete production hardening** for reliability and monitoring:
+
+### Source Tracking ✅
+
+Every product, chunk, and image is tagged with source information:
+
+```python
+# Products
+await supabase.table('products').insert({
+    'name': product_name,
+    'source_type': 'web_scraping',   # ✅ Tracks source
+    'source_job_id': session_id,     # ✅ Links to scraping session
+    # ... other fields
+})
+
+# Chunks
+await supabase.table('document_chunks').insert({
+    'content': chunk_text,
+    'source_type': 'web_scraping',   # ✅ Tracks source
+    'source_job_id': session_id,     # ✅ Links to scraping session
+    # ... other fields
+})
+
+# Images
+await supabase.table('document_images').insert({
+    'url': image_url,
+    'source_type': 'web_scraping',   # ✅ Tracks source
+    'source_job_id': session_id,     # ✅ Links to scraping session
+    # ... other fields
+})
+```
+
+**Benefits:**
+- Filter Materials Data page by specific scraping session
+- Trace any data back to its source website
+- Delete all data from a specific scraping session
+- Audit data quality by source
+
+---
+
+### Heartbeat Monitoring ✅
+
+Updates `last_heartbeat_at` field **every 30 seconds** to detect stuck jobs:
+
+```typescript
+// Update heartbeat during scraping
+await supabase
+  .from('scraping_sessions')
+  .update({
+    last_heartbeat_at: new Date().toISOString(),
+    status: 'processing',
+    metadata: {
+      pages_scraped: pagesScraped,
+      products_found: productsFound
+    }
+  })
+  .eq('id', sessionId);
+```
+
+**Implementation:**
+- Location: `scrape-session-manager` Edge Function
+- Frequency: Every 30 seconds during scraping
+- Stuck Threshold: >5 minutes without heartbeat
+- Auto-Recovery: Automatic retry of stuck sessions
+
+---
+
+### Sentry Error Tracking ✅
+
+Comprehensive error tracking and performance monitoring:
+
+```typescript
+// Transaction tracking
+const transaction = Sentry.startTransaction({
+  op: 'web_scraping',
+  name: 'scrape_session'
+});
+
+transaction.setTag('session_id', sessionId);
+transaction.setTag('workspace_id', workspaceId);
+transaction.setData('url', targetUrl);
+
+// Breadcrumbs for debugging
+Sentry.addBreadcrumb({
+  category: 'web_scraping',
+  message: `Scraping page ${pageIndex}`,
+  level: 'info',
+  data: { url: pageUrl }
+});
+
+try {
+  // ... scraping logic ...
+  transaction.setStatus('ok');
+} catch (error) {
+  Sentry.captureException(error);
+  transaction.setStatus('internal_error');
+  throw error;
+} finally {
+  transaction.finish();
+}
+```
+
+**Features:**
+- Transaction tracking for performance monitoring
+- Breadcrumbs for scraping progress context
+- Exception capture with full stack traces
+- Firecrawl API metrics
+- Performance bottleneck identification
+
+---
+
+### Production Hardening Status
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| **Source Tracking** | ✅ COMPLETE | All tables have `source_type='web_scraping'` and `source_job_id` |
+| **Heartbeat Monitoring** | ✅ COMPLETE | Updates every 30s, 5-minute stuck threshold |
+| **Sentry Tracking** | ✅ COMPLETE | Transactions, breadcrumbs, exception capture |
+| **Error Handling** | ✅ COMPLETE | Comprehensive try-catch with Sentry integration |
+| **Progress Tracking** | ✅ COMPLETE | Real-time progress updates via `scraping_sessions` table |
+| **Checkpoint Recovery** | ✅ COMPLETE | Resume from last scraped page |
+| **Auto-Recovery** | ✅ COMPLETE | Automatic retry of stuck/failed sessions |
+
+---
+
 ## 📚 Related Documentation
 
 - [Product Discovery Architecture](./product-discovery-architecture.md)
 - [Web Scraping Authentication](./web-scraping-authentication.md)
 - [Job Queue System](./job-queue-system.md)
 - [API Documentation](./api-docs.md)
+- [Unified Product Generation Flow](./unified-product-generation-flow.md) - Complete production hardening details
 
 ## 🆘 Support
 
