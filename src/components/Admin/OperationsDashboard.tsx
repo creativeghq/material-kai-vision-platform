@@ -428,8 +428,9 @@ export const OperationsDashboard: React.FC = () => {
         .limit(100);
 
       if (aiLogsError) {
-        console.error('Error fetching AI usage logs:', aiLogsError);
+        console.error('❌ Error fetching AI usage logs:', aiLogsError);
       } else if (aiLogs) {
+        console.log('✅ AI Usage Logs:', aiLogs.length);
         setAIUsageLogs(aiLogs);
 
         // Calculate total credits used
@@ -439,6 +440,60 @@ export const OperationsDashboard: React.FC = () => {
           ...prev,
           totalCreditsUsed,
         }));
+
+        // Calculate AI Model Usage Stats (GPT, Claude, Llama, etc.)
+        const modelStats: Record<string, {
+          call_count: number;
+          total_cost: number;
+          total_tokens: number;
+          total_input_tokens: number;
+          total_output_tokens: number;
+          avg_latency: number;
+          success_count: number;
+        }> = {};
+
+        aiLogs.forEach((log: AIUsageLog) => {
+          const model = log.model_name || 'unknown';
+          if (!modelStats[model]) {
+            modelStats[model] = {
+              call_count: 0,
+              total_cost: 0,
+              total_tokens: 0,
+              total_input_tokens: 0,
+              total_output_tokens: 0,
+              avg_latency: 0,
+              success_count: 0,
+            };
+          }
+
+          modelStats[model].call_count++;
+          modelStats[model].total_cost += Number(log.total_cost_usd || 0);
+          modelStats[model].total_input_tokens += Number(log.input_tokens || 0);
+          modelStats[model].total_output_tokens += Number(log.output_tokens || 0);
+          modelStats[model].total_tokens += Number(log.input_tokens || 0) + Number(log.output_tokens || 0);
+          // Assuming success if no error field or error is null
+          if (!log.error) {
+            modelStats[model].success_count++;
+          }
+        });
+
+        // Convert to array and calculate averages
+        const aiModelUsageArray = Object.entries(modelStats).map(([model, stats]) => ({
+          model_name: model,
+          call_count: stats.call_count,
+          total_cost: stats.total_cost,
+          total_tokens: stats.total_tokens,
+          input_tokens: stats.total_input_tokens,
+          output_tokens: stats.total_output_tokens,
+          success_rate: stats.call_count > 0 ? (stats.success_count / stats.call_count) * 100 : 0,
+          avg_cost: stats.call_count > 0 ? stats.total_cost / stats.call_count : 0,
+        }));
+
+        // Sort by total cost descending
+        aiModelUsageArray.sort((a, b) => b.total_cost - a.total_cost);
+
+        console.log('📊 AI Model Usage Stats:', aiModelUsageArray);
+        setModelUsage(aiModelUsageArray as any);
       }
 
       // Fetch Interior Design Analytics
@@ -963,87 +1018,148 @@ export const OperationsDashboard: React.FC = () => {
 
           {/* AI Performance Tab - Consolidated AI Models, Interior Design, Quality Metrics */}
           <TabsContent value="ai-performance" className="space-y-4">
-            {/* Summary Cards */}
+            {/* AI Models Summary Cards - GPT, Claude, Llama, etc. */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total AI Cost</CardTitle>
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">${interiorDesignStats.total_cost.toFixed(2)}</div>
+                  <div className="text-2xl font-bold">
+                    ${aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0).toFixed(2)}
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    {interiorDesignStats.total_generations} generations
+                    {aiUsageLogs.length} API calls
                   </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Images Generated</CardTitle>
-                  <Image className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{interiorDesignStats.total_images}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Avg Cost/Generation</CardTitle>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Total Tokens</CardTitle>
+                  <Zap className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
+                    {aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0).toLocaleString()}
                   </div>
-                  <p className="text-xs text-muted-foreground">Per generation</p>
+                  <p className="text-xs text-muted-foreground">
+                    Input + Output tokens
+                  </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Unique Users</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-sm font-medium">Credits Used</CardTitle>
+                  <CreditCard className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{interiorDesignStats.unique_users}</div>
-                  <p className="text-xs text-muted-foreground">Active users</p>
+                  <div className="text-2xl font-bold">
+                    {aiUsageLogs.reduce((sum, log) => sum + (Number(log.credits_debited) || 0), 0).toFixed(0)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Platform credits</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Models</CardTitle>
+                  <Bot className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {new Set(aiUsageLogs.map(log => log.model_name)).size}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Unique AI models</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Model Usage Table */}
+            {/* Interior Design Specific Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Model Usage & Costs</CardTitle>
-                <CardDescription>Performance and cost breakdown by model</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Image className="h-5 w-5" />
+                  Interior Design Generation Stats
+                </CardTitle>
+                <CardDescription>3D design generation costs and performance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Total Cost</div>
+                    <div className="text-2xl font-bold">${interiorDesignStats.total_cost.toFixed(2)}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {interiorDesignStats.total_generations} generations
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Images Generated</div>
+                    <div className="text-2xl font-bold">{interiorDesignStats.total_images}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Avg Cost/Generation</div>
+                    <div className="text-2xl font-bold">
+                      ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Per generation</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Unique Users</div>
+                    <div className="text-2xl font-bold">{interiorDesignStats.unique_users}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Active users</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* AI Models Usage Table - GPT, Claude, Llama, etc. */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bot className="h-5 w-5" />
+                  AI Model Usage & Costs
+                </CardTitle>
+                <CardDescription>
+                  All AI models (GPT, Claude, Llama, etc.) - Performance and cost breakdown
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Model</TableHead>
-                      <TableHead className="text-right">Usage Count</TableHead>
+                      <TableHead className="text-right">API Calls</TableHead>
+                      <TableHead className="text-right">Total Tokens</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Avg Cost</TableHead>
                       <TableHead className="text-right">Success Rate</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {modelUsage.map((model) => (
-                      <TableRow key={model.model_id}>
-                        <TableCell className="font-medium">{model.model_name}</TableCell>
-                        <TableCell className="text-right">{model.usage_count}</TableCell>
-                        <TableCell className="text-right">${model.total_cost.toFixed(3)}</TableCell>
+                    {modelUsage.map((model: any) => (
+                      <TableRow key={model.model_name}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-muted-foreground" />
+                            {model.model_name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">{model.call_count || model.usage_count}</TableCell>
                         <TableCell className="text-right">
-                          ${(model.total_cost / Math.max(model.usage_count, 1)).toFixed(3)}
+                          {model.total_tokens ? model.total_tokens.toLocaleString() : 'N/A'}
+                        </TableCell>
+                        <TableCell className="text-right">${model.total_cost.toFixed(4)}</TableCell>
+                        <TableCell className="text-right">
+                          ${model.avg_cost ? model.avg_cost.toFixed(4) : (model.total_cost / Math.max(model.call_count || model.usage_count, 1)).toFixed(4)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge variant={model.success_rate >= 90 ? 'default' : 'secondary'}>
+                          <Badge variant={model.success_rate >= 90 ? 'default' : model.success_rate >= 70 ? 'secondary' : 'destructive'}>
                             {model.success_rate.toFixed(1)}%
                           </Badge>
                         </TableCell>
@@ -1053,7 +1169,9 @@ export const OperationsDashboard: React.FC = () => {
                 </Table>
                 {modelUsage.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    No interior design generations found.
+                    <Bot className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>No AI model usage found.</p>
+                    <p className="text-xs mt-1">AI usage will appear here once models are called.</p>
                   </div>
                 )}
               </CardContent>
@@ -1197,6 +1315,86 @@ export const OperationsDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <PDFProcessingMonitor />
+              </CardContent>
+            </Card>
+
+            {/* XML Import Monitoring */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  XML Import Jobs
+                </CardTitle>
+                <CardDescription>Real-time monitoring of XML data imports</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Total Jobs</div>
+                      <div className="text-2xl font-bold">{dataProcessingStats.xml.total}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Completed</div>
+                      <div className="text-2xl font-bold text-green-600">{dataProcessingStats.xml.completed}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Processing</div>
+                      <div className="text-2xl font-bold text-blue-600">{dataProcessingStats.xml.processing}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Products Imported</div>
+                      <div className="text-2xl font-bold text-purple-600">{dataProcessingStats.xml.totalProducts}</div>
+                    </div>
+                  </div>
+                  {dataProcessingStats.xml.total === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Database className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                      <p>No XML import jobs found.</p>
+                      <p className="text-xs mt-1">Import jobs will appear here once XML imports are initiated.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Web Scraping Monitoring */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Web Scraping Sessions
+                </CardTitle>
+                <CardDescription>Real-time monitoring of web scraping operations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Total Sessions</div>
+                      <div className="text-2xl font-bold">{dataProcessingStats.scraping.total}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Completed</div>
+                      <div className="text-2xl font-bold text-green-600">{dataProcessingStats.scraping.completed}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Active</div>
+                      <div className="text-2xl font-bold text-blue-600">{dataProcessingStats.scraping.processing}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Pages Scraped</div>
+                      <div className="text-2xl font-bold text-purple-600">{dataProcessingStats.scraping.totalPages}</div>
+                    </div>
+                  </div>
+                  {dataProcessingStats.scraping.total === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <Activity className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                      <p>No scraping sessions found.</p>
+                      <p className="text-xs mt-1">Scraping sessions will appear here once web scraping is initiated.</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
