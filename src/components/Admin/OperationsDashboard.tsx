@@ -258,6 +258,7 @@ export const OperationsDashboard: React.FC = () => {
   const fetchAnalyticsData = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('🔄 Fetching analytics data...');
 
       // Fetch search analytics
       const { data: searchData, error: searchError } = await supabase
@@ -266,7 +267,11 @@ export const OperationsDashboard: React.FC = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (searchError) throw searchError;
+      if (searchError) {
+        console.error('❌ Error fetching analytics_events:', searchError);
+        throw searchError;
+      }
+      console.log('✅ Analytics events:', searchData?.length || 0);
 
       // Fetch API usage logs
       const { data: apiData, error: apiError } = await supabase
@@ -437,6 +442,7 @@ export const OperationsDashboard: React.FC = () => {
       }
 
       // Fetch Interior Design Analytics
+      console.log('🔄 Fetching interior design analytics...');
       const { data: generations, error: genError } = await supabase
         .from('generation_3d')
         .select('id, user_id, total_cost, models_results')
@@ -444,8 +450,9 @@ export const OperationsDashboard: React.FC = () => {
         .not('total_cost', 'is', null);
 
       if (genError) {
-        console.error('Error fetching interior design analytics:', genError);
+        console.error('❌ Error fetching interior design analytics:', genError);
       } else if (generations) {
+        console.log('✅ Interior Design Generations:', generations.length);
         const totalCost = generations.reduce((sum, g) => sum + (Number(g.total_cost) || 0), 0);
         const uniqueUsers = new Set(generations.map(g => g.user_id)).size;
 
@@ -499,11 +506,16 @@ export const OperationsDashboard: React.FC = () => {
       }
 
       // Fetch Data Processing Stats (PDF, XML, Scraping)
+      console.log('🔄 Fetching data processing stats...');
       const [pdfJobs, xmlJobs, scrapingSessions] = await Promise.all([
         supabase.from('background_jobs').select('*').eq('job_type', 'pdf_processing'),
         supabase.from('data_import_jobs').select('*'),
         supabase.from('scraping_sessions').select('*'),
       ]);
+
+      console.log('📊 PDF Jobs:', pdfJobs.data?.length || 0, pdfJobs.error);
+      console.log('📊 XML Jobs:', xmlJobs.data?.length || 0, xmlJobs.error);
+      console.log('📊 Scraping Sessions:', scrapingSessions.data?.length || 0, scrapingSessions.error);
 
       // Calculate PDF stats
       const pdfData = pdfJobs.data || [];
@@ -524,7 +536,7 @@ export const OperationsDashboard: React.FC = () => {
       const scrapingData = scrapingSessions.data || [];
       const totalScrapingPages = scrapingData.reduce((sum, s) => sum + (s.total_pages || 0), 0);
 
-      setDataProcessingStats({
+      const processingStats = {
         pdf: {
           total: pdfData.length,
           completed: pdfData.filter(j => j.status === 'completed').length,
@@ -546,7 +558,10 @@ export const OperationsDashboard: React.FC = () => {
           processing: scrapingData.filter(s => s.status === 'processing' || s.status === 'scraping').length,
           totalPages: totalScrapingPages,
         },
-      });
+      };
+
+      console.log('✅ Data Processing Stats:', processingStats);
+      setDataProcessingStats(processingStats);
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -1041,6 +1056,22 @@ export const OperationsDashboard: React.FC = () => {
                     No interior design generations found.
                   </div>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Chunk Quality Dashboard - Consolidated from /admin/chunk-quality */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5" />
+                  Chunk Quality Metrics
+                </CardTitle>
+                <CardDescription>
+                  Monitor chunk quality, deduplication, and flagged content
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChunkQualityDashboard />
               </CardContent>
             </Card>
           </TabsContent>

@@ -72,17 +72,10 @@ interface MetadataItem {
 }
 
 interface MetadataStatistics {
-  total_count: number;
-  by_scope: {
-    product_specific: number;
-    catalog_general_explicit: number;
-    catalog_general_implicit: number;
-    category_specific: number;
-  };
-  avg_confidence: number;
-  override_count: number;
-  documents_count: number;
-  products_count: number;
+  total_products: number;
+  total_metadata_fields: number;
+  unique_fields: number;
+  most_common_fields: Array<{ field: string; count: number }>;
 }
 
 export const MetadataManagement: React.FC = () => {
@@ -116,31 +109,75 @@ export const MetadataManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
+      // Get products with metadata from Supabase directly
+      let query = supabase
+        .from('products')
+        .select('id, name, metadata, source_document_id, created_at');
+
+      // Apply document filter
+      if (documentFilter !== 'all') {
+        query = query.eq('source_document_id', documentFilter);
       }
 
-      const params = new URLSearchParams();
-      if (scopeFilter !== 'all') params.append('scope', scopeFilter);
-      if (confidenceFilter !== '0.0') params.append('min_confidence', confidenceFilter);
-      if (documentFilter !== 'all') params.append('document_id', documentFilter);
-      params.append('limit', '1000');
+      query = query.limit(1000);
 
-      const response = await fetch(`${MIVAA_API_URL}/api/rag/metadata/list?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
+      const { data: products, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      if (!products) {
+        setMetadata([]);
+        setLoading(false);
+        return;
+      }
+
+      // Transform products into metadata items
+      const items: MetadataItem[] = [];
+      const fieldCounts: Record<string, number> = {};
+
+      products.forEach(product => {
+        const metadata = product.metadata || {};
+
+        // Extract each metadata field as a separate item
+        Object.entries(metadata).forEach(([key, value]) => {
+          // Skip internal fields
+          if (key.startsWith('_')) return;
+
+          // Count field occurrences
+          fieldCounts[key] = (fieldCounts[key] || 0) + 1;
+
+          items.push({
+            id: `${product.id}-${key}`,
+            field_name: key,
+            field_value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+            scope: 'product_specific', // Default scope
+            confidence: 1.0,
+            reasoning: 'Extracted from product metadata',
+            applies_to: [product.name],
+            document_id: product.source_document_id || '',
+            document_name: product.source_document_id || 'Unknown',
+            is_override: false,
+            created_at: product.created_at || new Date().toISOString(),
+          });
+        });
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to load metadata');
-      }
+      setMetadata(items);
 
-      const data = await response.json();
-      setMetadata(data.metadata || []);
+      // Calculate statistics
+      const stats = {
+        total_products: products.length,
+        total_metadata_fields: items.length,
+        unique_fields: Object.keys(fieldCounts).length,
+        most_common_fields: Object.entries(fieldCounts)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 10)
+          .map(([field, count]) => ({ field, count })),
+      };
+
+      setStatistics(stats);
     } catch (error) {
       console.error('Error loading metadata:', error);
       toast({
@@ -154,27 +191,8 @@ export const MetadataManagement: React.FC = () => {
   };
 
   const loadStatistics = async () => {
-    try {
-      // Get auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await fetch(`${MIVAA_API_URL}/api/rag/metadata/statistics`, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to load statistics');
-      }
-
-      const data = await response.json();
-      setStatistics(data);
-    } catch (error) {
-      console.error('Error loading statistics:', error);
-    }
+    // Statistics are now loaded inline with metadata
+    // This function is kept for compatibility but does nothing
   };
 
   // Filter metadata by search query
@@ -275,14 +293,14 @@ export const MetadataManagement: React.FC = () => {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  Total Metadata
+                  <Package className="h-4 w-4" />
+                  Total Products
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{statistics.total_count}</div>
+                <div className="text-2xl font-bold text-gray-900">{statistics.total_products}</div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Across {statistics.documents_count} documents
+                  With metadata
                 </p>
               </CardContent>
             </Card>
@@ -290,16 +308,16 @@ export const MetadataManagement: React.FC = () => {
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Product-Specific
+                  <Database className="h-4 w-4" />
+                  Metadata Fields
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-blue-600">
-                  {statistics.by_scope.product_specific}
+                  {statistics.total_metadata_fields}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {((statistics.by_scope.product_specific / statistics.total_count) * 100).toFixed(1)}% of total
+                  Total field instances
                 </p>
               </CardContent>
             </Card>
@@ -308,15 +326,15 @@ export const MetadataManagement: React.FC = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Catalog-General
+                  Unique Fields
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  {statistics.by_scope.catalog_general_explicit + statistics.by_scope.catalog_general_implicit}
+                  {statistics.unique_fields}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {statistics.by_scope.catalog_general_implicit} implicit
+                  Different field types
                 </p>
               </CardContent>
             </Card>
@@ -325,15 +343,15 @@ export const MetadataManagement: React.FC = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
                   <BarChart3 className="h-4 w-4" />
-                  Avg Confidence
+                  Most Common
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-purple-600">
-                  {(statistics.avg_confidence * 100).toFixed(1)}%
+                  {statistics.most_common_fields[0]?.field || 'N/A'}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  {statistics.override_count} overrides
+                  {statistics.most_common_fields[0]?.count || 0} occurrences
                 </p>
               </CardContent>
             </Card>
