@@ -612,13 +612,13 @@ Return a list of materials found on the page.`);
                   <h3 className="font-semibold text-sm">How it works:</h3>
                   <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
                     <li>Enter the website URL or search query</li>
-                    <li>Choose your scraping mode based on your needs</li>
-                    <li>Configure field mappings for material data extraction</li>
-                    <li>Preview the extraction on a sample page</li>
-                    <li>Confirm and start the full scraping process</li>
+                    <li>Choose your scraping mode and configure options</li>
+                    <li><strong>Preview (Dry Run)</strong> - Scrape one sample page first</li>
+                    <li><strong>Map Fields</strong> - Map the extracted data to material fields</li>
+                    <li>Execute the full scraping process with your mappings</li>
                   </ol>
                   <p className="text-xs text-muted-foreground italic mt-2">
-                    💡 The system will automatically extract materials, create embeddings, and chunk the data for AI processing.
+                    💡 Always preview first! This lets you see what data is extracted and map it correctly before running the full scrape.
                   </p>
                 </div>
               </div>
@@ -847,23 +847,6 @@ Return a list of materials found on the page.`);
             </CardContent>
           </Card>
 
-          {/* Field Mappings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Field Mappings
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <FieldMappingStep
-                fields={fieldMappings}
-                onChange={setFieldMappings}
-                sampleUrl={url}
-              />
-            </CardContent>
-          </Card>
-
           {/* API Configuration */}
           <Card>
             <CardHeader>
@@ -921,69 +904,40 @@ Return a list of materials found on the page.`);
                 <div>
                   <Label>Output Formats</Label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    Markdown and HTML are recommended for best extraction results
+                    ✅ Pre-configured for optimal material extraction (Markdown + HTML)
                   </p>
-                  <div className="flex gap-4 mt-2">
-                    {['markdown', 'html', 'links', 'screenshot'].map(
-                      (format) => (
-                        <div
-                          key={format}
-                          className="flex items-center space-x-2"
-                        >
-                          <Checkbox
-                            id={format}
-                            checked={firecrawlOptions.formats.includes(format)}
-                            onCheckedChange={(checked: boolean) => {
-                              setFirecrawlOptions((prev) => ({
-                                ...prev,
-                                formats: checked
-                                  ? [...prev.formats, format]
-                                  : prev.formats.filter((f) => f !== format),
-                              }));
-                            }}
-                          />
-                          <Label
-                            htmlFor={format}
-                            className="text-sm capitalize"
-                          >
-                            {format}
-                          </Label>
-                        </div>
-                      ),
-                    )}
+                  <div className="flex gap-2 mt-2 text-sm text-muted-foreground">
+                    <span className="bg-primary/10 px-2 py-1 rounded">✓ Markdown</span>
+                    <span className="bg-primary/10 px-2 py-1 rounded">✓ HTML</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="onlyMainContent"
-                      checked={firecrawlOptions.onlyMainContent}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          onlyMainContent: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="onlyMainContent" className="text-sm">
-                      Main Content Only
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="onlyMainContent"
+                        checked={firecrawlOptions.onlyMainContent}
+                        disabled
+                      />
+                      <Label htmlFor="onlyMainContent" className="text-sm">
+                        Main Content Only
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">✅ Enabled - focuses on product content</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="includeLinks"
-                      checked={firecrawlOptions.includeLinks}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          includeLinks: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="includeLinks" className="text-sm">
-                      Include Links
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="includeLinks"
+                        checked={false}
+                        disabled
+                      />
+                      <Label htmlFor="includeLinks" className="text-sm">
+                        Include Links
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">❌ Disabled - focus on material data only</p>
                   </div>
                 </div>
 
@@ -1029,115 +983,87 @@ Return a list of materials found on the page.`);
                 <div>
                   <Label>Extractor Mode</Label>
                   <p className="text-xs text-muted-foreground mb-2">
-                    LLM extraction is recommended for best accuracy with material data
+                    ✅ Pre-configured to use LLM extraction for best accuracy
                   </p>
-                  <Select
-                    value={firecrawlOptions.extractorMode}
-                    onValueChange={(
-                      value: 'llm-extraction' | 'css-extraction',
-                    ) =>
-                      setFirecrawlOptions((prev) => ({
-                        ...prev,
-                        extractorMode: value,
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="llm-extraction">
-                        LLM Extraction (AI-powered) - Recommended
-                      </SelectItem>
-                      <SelectItem value="css-extraction">
-                        CSS Extraction (Rule-based)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2 mt-2 text-sm">
+                    <span className="bg-primary/10 px-3 py-2 rounded border border-primary/20">
+                      ✓ LLM Extraction (AI-powered)
+                    </span>
+                  </div>
                 </div>
 
                 {/* Advanced Firecrawl Options */}
                 <Separator className="my-4" />
                 <h4 className="font-medium text-sm mb-3">Advanced Options</h4>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Pre-configured for optimal material extraction
+                </p>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="mobile"
-                      checked={firecrawlOptions.mobile}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          mobile: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="mobile" className="text-sm">
-                      Mobile Viewport
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="mobile"
+                        checked={false}
+                        disabled
+                      />
+                      <Label htmlFor="mobile" className="text-sm">
+                        Mobile Viewport
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">Desktop view for better data</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="parsePDF"
-                      checked={firecrawlOptions.parsePDF}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          parsePDF: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="parsePDF" className="text-sm">
-                      Parse PDFs
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="parsePDF"
+                        checked={firecrawlOptions.parsePDF}
+                        disabled
+                      />
+                      <Label htmlFor="parsePDF" className="text-sm">
+                        Parse PDFs
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">Enabled for spec sheets</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="blockAds"
-                      checked={firecrawlOptions.blockAds}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          blockAds: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="blockAds" className="text-sm">
-                      Block Ads
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="blockAds"
+                        checked={firecrawlOptions.blockAds}
+                        disabled
+                      />
+                      <Label htmlFor="blockAds" className="text-sm">
+                        Block Ads
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">✅ Cleaner extraction</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="removeBase64Images"
-                      checked={firecrawlOptions.removeBase64Images}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          removeBase64Images: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="removeBase64Images" className="text-sm">
-                      Remove Base64 Images
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="removeBase64Images"
+                        checked={!firecrawlOptions.removeBase64Images}
+                        disabled
+                      />
+                      <Label htmlFor="removeBase64Images" className="text-sm">
+                        Keep Images
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">✅ Images needed for materials</p>
                   </div>
-                  <p className="text-xs text-muted-foreground col-span-2 -mt-2">
-                    ⚠️ Keep this OFF - we need images for material extraction
-                  </p>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="skipTlsVerification"
-                      checked={firecrawlOptions.skipTlsVerification}
-                      onCheckedChange={(checked: boolean) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          skipTlsVerification: !!checked,
-                        }))
-                      }
-                    />
-                    <Label htmlFor="skipTlsVerification" className="text-sm">
-                      Skip TLS Verification
-                    </Label>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="skipTlsVerification"
+                        checked={false}
+                        disabled
+                      />
+                      <Label htmlFor="skipTlsVerification" className="text-sm">
+                        Skip TLS Verification
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground ml-6">Security enabled</p>
                   </div>
                 </div>
 

@@ -86,7 +86,11 @@ export const PromptTemplatesPage: React.FC = () => {
         }
       );
 
-      if (!response.ok) throw new Error('Failed to load templates');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`Failed to load templates: ${response.status} - ${errorText}`);
+      }
 
       const data = await response.json();
       setTemplates(data);
@@ -94,7 +98,7 @@ export const PromptTemplatesPage: React.FC = () => {
       console.error('Error loading templates:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load prompt templates',
+        description: error instanceof Error ? error.message : 'Failed to load prompt templates',
         variant: 'destructive',
       });
     } finally {
