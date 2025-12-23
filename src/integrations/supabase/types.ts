@@ -495,6 +495,7 @@ export type Database = {
           session_id: string;
           user_id: string | null;
           workspace_id: string | null;
+          background_job_id: string | null;
           source_url: string;
           status: string;
           scraping_config: Json | null;
@@ -511,6 +512,7 @@ export type Database = {
           session_id: string;
           user_id?: string | null;
           workspace_id?: string | null;
+          background_job_id?: string | null;
           source_url: string;
           status?: string;
           scraping_config?: Json | null;
@@ -527,6 +529,7 @@ export type Database = {
           session_id?: string;
           user_id?: string | null;
           workspace_id?: string | null;
+          background_job_id?: string | null;
           source_url?: string;
           status?: string;
           scraping_config?: Json | null;
@@ -544,6 +547,13 @@ export type Database = {
             columns: ['workspace_id'];
             isOneToOne: false;
             referencedRelation: 'workspaces';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'scraping_sessions_background_job_id_fkey';
+            columns: ['background_job_id'];
+            isOneToOne: false;
+            referencedRelation: 'background_jobs';
             referencedColumns: ['id'];
           },
         ];

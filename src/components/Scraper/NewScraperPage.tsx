@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Globe,
   Loader2,
@@ -37,6 +38,7 @@ import { ScrapingSessionsList } from './ScrapingSessionsList';
 import { ScrapingPreviewModal } from './ScrapingPreviewModal';
 import { FieldMappingStep, type FieldMapping } from './FieldMappingStep';
 import { generateExtractionPrompt, generateJsonSchema } from '@/utils/scrapingPromptGenerator';
+import { MultiStepScraperWizard } from './MultiStepScraperWizard';
 
 type ViewMode = 'sessions' | 'detail' | 'create';
 type ScrapingMode = 'single-page' | 'sitemap' | 'crawl' | 'search' | 'map';
@@ -57,6 +59,7 @@ interface NewScraperPageProps {
 
 export const NewScraperPage: React.FC<NewScraperPageProps> = ({ embedded = false }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('sessions');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
   const [creating, setCreating] = useState(false);
@@ -587,573 +590,44 @@ Return a list of materials found on the page.`);
 
   const renderCreateForm = () => {
     const formContent = (
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center gap-4 mb-6">
           <Button
-            className="border border-input bg-background hover:bg-accent hover:text-accent-foreground"
+            variant="outline"
             onClick={() => setViewMode('sessions')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                setViewMode('sessions');
-              }
-            }}
           >
             ← Back to Sessions
           </Button>
           <h1 className="text-2xl font-bold">Create New Scraping Session</h1>
         </div>
 
-          {/* Workflow Info */}
-          <Card className="bg-primary/5 border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex gap-3">
-                <Brain className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-sm">How it works:</h3>
-                  <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Enter the website URL or search query</li>
-                    <li>Choose your scraping mode and configure options</li>
-                    <li><strong>Preview (Dry Run)</strong> - Scrape one sample page first</li>
-                    <li><strong>Map Fields</strong> - Map the extracted data to material fields</li>
-                    <li>Execute the full scraping process with your mappings</li>
-                  </ol>
-                  <p className="text-xs text-muted-foreground italic mt-2">
-                    💡 Always preview first! This lets you see what data is extracted and map it correctly before running the full scrape.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <MultiStepScraperWizard
+          onComplete={async (sessionId) => {
+            // Get the background_job_id from the session
+            const { data: session } = await supabase
+              .from('scraping_sessions')
+              .select('background_job_id')
+              .eq('id', sessionId)
+              .single();
 
-          {/* Primary Input - URL/Query (Moved to top as primary action) */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5" />
-                {scrapingMode === 'search' ? 'Search Query' : 'Website URL'}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                {scrapingMode === 'search'
-                  ? 'Enter your search query to find and scrape relevant pages'
-                  : 'Enter the URL of the website or page you want to scrape'}
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Single Page Input */}
-              {scrapingMode === 'single-page' && (
-                <div>
-                  <Label htmlFor="page-url">Page URL</Label>
-                  <Input
-                    id="page-url"
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://example.com/product-page"
-                    className="mt-1"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Enter the URL of the page you want to scrape
-                  </p>
-                </div>
-              )}
-
-              {/* Sitemap Input */}
-              {scrapingMode === 'sitemap' && (
-                <>
-                  <div>
-                    <Label htmlFor="sitemap-url">Sitemap URL</Label>
-                    <Input
-                      id="sitemap-url"
-                      type="url"
-                      value={sitemapUrl}
-                      onChange={(e) => setSitemapUrl(e.target.value)}
-                      placeholder="https://example.com/sitemap.xml"
-                      className="mt-1"
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Enter the XML sitemap URL to scrape pages from
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="max-pages">Maximum Pages</Label>
-                      <Input
-                        id="max-pages"
-                        type="number"
-                        value={maxPages}
-                        onChange={(e) =>
-                          setMaxPages(parseInt(e.target.value) || 100)
-                        }
-                        min="1"
-                        max="1000"
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="concurrent-pages">Concurrent Pages</Label>
-                      <Input
-                        id="concurrent-pages"
-                        type="number"
-                        value={concurrentPages}
-                        onChange={(e) =>
-                          setConcurrentPages(parseInt(e.target.value) || 5)
-                        }
-                        min="1"
-                        max="20"
-                        className="mt-1"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Crawl Input */}
-              {scrapingMode === 'crawl' && (
-                <>
-                  <div>
-                    <Label htmlFor="crawl-url">Website URL</Label>
-                    <Input
-                      id="crawl-url"
-                      type="url"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://example.com"
-                      className="mt-1"
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Enter the website URL to crawl all accessible subpages
-                    </p>
-                  </div>
-                  <div>
-                    <Label htmlFor="crawl-limit">Page Limit</Label>
-                    <Input
-                      id="crawl-limit"
-                      type="number"
-                      value={maxPages}
-                      onChange={(e) =>
-                        setMaxPages(parseInt(e.target.value) || 100)
-                      }
-                      min="1"
-                      max="1000"
-                      className="mt-1"
-                    />
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Maximum number of pages to crawl
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {/* Search Input */}
-              {scrapingMode === 'search' && (
-                <div>
-                  <Label htmlFor="search-query">Search Query</Label>
-                  <Input
-                    id="search-query"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="material suppliers ceramic tiles"
-                    className="mt-1"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Enter search terms to find and scrape relevant web pages
-                  </p>
-                </div>
-              )}
-
-              {/* Map Input */}
-              {scrapingMode === 'map' && (
-                <div>
-                  <Label htmlFor="map-url">Website URL</Label>
-                  <Input
-                    id="map-url"
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://example.com"
-                    className="mt-1"
-                  />
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Get a complete list of URLs from this website
-                  </p>
-                </div>
-              )}
-
-            </CardContent>
-          </Card>
-
-          {/* Scraping Mode Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Scraping Mode
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Choose how you want to scrape the website based on your needs
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Show tip for selected mode */}
-              {scrapingMode && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm">
-                  {getModeTips(scrapingMode)}
-                </div>
-              )}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(
-                  [
-                    'single-page',
-                    'sitemap',
-                    'crawl',
-                    'search',
-                    'map',
-                  ] as ScrapingMode[]
-                ).map((mode) => {
-                  const Icon = getModeIcon(mode);
-                  return (
-                    <div
-                      key={mode}
-                      className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                        scrapingMode === mode
-                          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                          : 'border-muted hover:border-muted-foreground/50 hover:bg-accent/5'
-                      }`}
-                      onClick={() => setScrapingMode(mode)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          setScrapingMode(mode);
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      <div className="flex items-center gap-3 mb-2">
-                        <Icon className="h-5 w-5 text-primary" />
-                        <span className="font-medium capitalize">
-                          {mode.replace('-', ' ')}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mb-2">
-                        {getModeDescription(mode)}
-                      </p>
-                      <p className="text-xs text-primary/70 italic">
-                        {getModeUseCase(mode)}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* API Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                API Configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="timeout">Timeout (ms)</Label>
-                  <Input
-                    id="timeout"
-                    type="number"
-                    value={timeout}
-                    onChange={(e) =>
-                      setTimeout(parseInt(e.target.value) || 30000)
-                    }
-                    min="5000"
-                    max="120000"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="retry-count">Retry Count</Label>
-                  <Input
-                    id="retry-count"
-                    type="number"
-                    value={retryCount}
-                    onChange={(e) =>
-                      setRetryCount(parseInt(e.target.value) || 3)
-                    }
-                    min="0"
-                    max="10"
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Firecrawl Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5" />
-                Firecrawl Options
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-2">
-                Configure how Firecrawl extracts content. Defaults are optimized for material extraction.
-              </p>
-            </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label>Output Formats</Label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    ✅ Pre-configured for optimal material extraction (Markdown + HTML)
-                  </p>
-                  <div className="flex gap-2 mt-2 text-sm text-muted-foreground">
-                    <span className="bg-primary/10 px-2 py-1 rounded">✓ Markdown</span>
-                    <span className="bg-primary/10 px-2 py-1 rounded">✓ HTML</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="onlyMainContent"
-                        checked={firecrawlOptions.onlyMainContent}
-                        disabled
-                      />
-                      <Label htmlFor="onlyMainContent" className="text-sm">
-                        Main Content Only
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">✅ Enabled - focuses on product content</p>
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="includeLinks"
-                        checked={false}
-                        disabled
-                      />
-                      <Label htmlFor="includeLinks" className="text-sm">
-                        Include Links
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">❌ Disabled - focus on material data only</p>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="excludeTags">
-                    Exclude HTML Tags (comma separated)
-                  </Label>
-                  <Input
-                    id="excludeTags"
-                    value={firecrawlOptions.excludeTags.join(', ')}
-                    onChange={(e) =>
-                      setFirecrawlOptions((prev) => ({
-                        ...prev,
-                        excludeTags: e.target.value
-                          .split(',')
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      }))
-                    }
-                    placeholder="nav, footer, aside"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="waitFor">Wait For (ms)</Label>
-                  <Input
-                    id="waitFor"
-                    type="number"
-                    value={firecrawlOptions.waitFor}
-                    onChange={(e) =>
-                      setFirecrawlOptions((prev) => ({
-                        ...prev,
-                        waitFor: parseInt(e.target.value) || 0,
-                      }))
-                    }
-                    min="0"
-                    max="10000"
-                    className="mt-1"
-                  />
-                </div>
-
-                <div>
-                  <Label>Extractor Mode</Label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    ✅ Pre-configured to use LLM extraction for best accuracy
-                  </p>
-                  <div className="flex gap-2 mt-2 text-sm">
-                    <span className="bg-primary/10 px-3 py-2 rounded border border-primary/20">
-                      ✓ LLM Extraction (AI-powered)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Advanced Firecrawl Options */}
-                <Separator className="my-4" />
-                <h4 className="font-medium text-sm mb-3">Advanced Options</h4>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Pre-configured for optimal material extraction
-                </p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="mobile"
-                        checked={false}
-                        disabled
-                      />
-                      <Label htmlFor="mobile" className="text-sm">
-                        Mobile Viewport
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">Desktop view for better data</p>
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="parsePDF"
-                        checked={firecrawlOptions.parsePDF}
-                        disabled
-                      />
-                      <Label htmlFor="parsePDF" className="text-sm">
-                        Parse PDFs
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">Enabled for spec sheets</p>
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="blockAds"
-                        checked={firecrawlOptions.blockAds}
-                        disabled
-                      />
-                      <Label htmlFor="blockAds" className="text-sm">
-                        Block Ads
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">✅ Cleaner extraction</p>
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="removeBase64Images"
-                        checked={!firecrawlOptions.removeBase64Images}
-                        disabled
-                      />
-                      <Label htmlFor="removeBase64Images" className="text-sm">
-                        Keep Images
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">✅ Images needed for materials</p>
-                  </div>
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="skipTlsVerification"
-                        checked={false}
-                        disabled
-                      />
-                      <Label htmlFor="skipTlsVerification" className="text-sm">
-                        Skip TLS Verification
-                      </Label>
-                    </div>
-                    <p className="text-xs text-muted-foreground ml-6">Security enabled</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="maxAge">Cache Max Age (seconds)</Label>
-                    <Input
-                      id="maxAge"
-                      type="number"
-                      value={firecrawlOptions.maxAge}
-                      onChange={(e) =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          maxAge: parseInt(e.target.value) || 0,
-                        }))
-                      }
-                      min="0"
-                      max="86400"
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label>Proxy Level</Label>
-                    <Select
-                      value={firecrawlOptions.proxy}
-                      onValueChange={(value: 'basic' | 'premium' | 'none') =>
-                        setFirecrawlOptions((prev) => ({
-                          ...prev,
-                          proxy: value,
-                        }))
-                      }
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No Proxy</SelectItem>
-                        <SelectItem value="basic">Basic Proxy</SelectItem>
-                        <SelectItem value="premium">Premium Proxy</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-          <div className="flex gap-3">
-            <Button
-              onClick={handlePreviewScraping}
-              disabled={loadingPreview || creating || !getSourceUrl().trim()}
-              variant="outline"
-              className="flex-1 h-11 px-8"
-            >
-              {loadingPreview ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Loading Preview...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Preview
-                </>
-              )}
-            </Button>
-
-            <Button
-              onClick={createNewSession}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  createNewSession();
-                }
-              }}
-              disabled={creating || loadingPreview || !getSourceUrl().trim()}
-              className="flex-1 h-11 px-8"
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating Session...
-                </>
-              ) : (
-                <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Session
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
+            if (session?.background_job_id) {
+              // Redirect to async queue monitor (same as PDF processing)
+              if (embedded) {
+                // If embedded in DataImportHub, use navigate
+                navigate(`/admin/async-queue-monitor?jobId=${session.background_job_id}`);
+              } else {
+                // If standalone page, also navigate
+                navigate(`/admin/async-queue-monitor?jobId=${session.background_job_id}`);
+              }
+            } else {
+              // Fallback to detail view if no job ID
+              setSelectedSessionId(sessionId);
+              setViewMode('detail');
+            }
+          }}
+          onCancel={() => setViewMode('sessions')}
+        />
+      </div>
     );
 
     // Wrap in layout if not embedded

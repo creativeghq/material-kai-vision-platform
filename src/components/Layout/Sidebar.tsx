@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Palette, Settings, MessageSquare, User, ChevronRight, ChevronLeft, FileText } from 'lucide-react';
+import { Home, Palette, Settings, MessageSquare, User, ChevronRight, ChevronLeft, FileText, CheckSquare } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ const navigationItems = [
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
   { id: 'quotes', label: 'Quotes Cart', path: '/quotes', icon: FileText },
+  { id: 'tasks', label: 'Task Manager', path: '/tasks', icon: CheckSquare },
   { id: 'admin', label: 'Admin Panel', path: '/admin', icon: Settings },
 ];
 

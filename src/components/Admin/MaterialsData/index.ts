@@ -1,4 +1,4 @@
-export { PDFProcessingDataPage } from './PDFProcessingDataPage';
+export { MaterialsDataPage } from './MaterialsDataPage';
 export { ProductsTab } from './ProductsTab';
 export { ChunksTab } from './ChunksTab';
 export { ImagesTab } from './ImagesTab';

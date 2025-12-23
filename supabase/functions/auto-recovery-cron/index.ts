@@ -1,0 +1,289 @@
+/**
+ * Auto-Recovery Cron Job
+ * 
+ * Runs every 5 minutes to detect and recover stuck jobs.
+ * 
+ * Schedule: */5 * * * * (every 5 minutes)
+ * 
+ * Usage:
+ * - Automatically triggered by Supabase Cron
+ * - Can be manually triggered via POST request
+ */
+
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface StuckJob {
+  id: string;
+  type: 'pdf_processing' | 'xml_import' | 'web_scraping';
+  status: string;
+  lastHeartbeat: string | null;
+  stuckDuration: number;
+  recoveryAttempts: number;
+  canRecover: boolean;
+  metadata?: any;
+}
+
+serve(async (req) => {
+  // Handle CORS
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    console.log('[AutoRecoveryCron] Starting stuck job detection...');
+
+    // Detect stuck jobs
+    const stuckJobs = await detectAllStuckJobs(supabase);
+    console.log(`[AutoRecoveryCron] Found ${stuckJobs.length} stuck jobs`);
+
+    if (stuckJobs.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'No stuck jobs found',
+          timestamp: new Date().toISOString(),
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Attempt recovery for each stuck job
+    const results = await Promise.all(
+      stuckJobs.map(job => recoverJob(supabase, job))
+    );
+
+    const summary = {
+      timestamp: new Date().toISOString(),
+      totalStuck: stuckJobs.length,
+      recovered: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results,
+    };
+
+    console.log('[AutoRecoveryCron] Recovery complete:', summary);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        ...summary,
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } catch (error: any) {
+    console.error('[AutoRecoveryCron] Error:', error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});
+
+async function detectAllStuckJobs(supabase: any): Promise<StuckJob[]> {
+  const [pdfJobs, scrapingJobs, xmlJobs] = await Promise.all([
+    detectStuckPdfJobs(supabase),
+    detectStuckScrapingJobs(supabase),
+    detectStuckXmlJobs(supabase),
+  ]);
+
+  return [...pdfJobs, ...scrapingJobs, ...xmlJobs];
+}
+
+async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
+  const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('background_jobs')
+    .select('*')
+    .eq('status', 'processing')
+    .eq('job_type', 'product_discovery_upload')
+    .lt('last_heartbeat', tenMinutesAgo);
+
+  if (error) {
+    console.error('[AutoRecoveryCron] Error detecting stuck PDF jobs:', error);
+    return [];
+  }
+
+  return (data || []).map((job: any) => ({
+    id: job.id,
+    type: 'pdf_processing' as const,
+    status: job.status,
+    lastHeartbeat: job.last_heartbeat,
+    stuckDuration: calculateStuckDuration(job.last_heartbeat),
+    recoveryAttempts: job.recovery_attempts || 0,
+    canRecover: (job.recovery_attempts || 0) < 3,
+    metadata: { filename: job.filename, document_id: job.document_id },
+  }));
+}
+
+async function detectStuckScrapingJobs(supabase: any): Promise<StuckJob[]> {
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('scraping_sessions')
+    .select('*')
+    .eq('status', 'processing')
+    .lt('last_heartbeat_at', fiveMinutesAgo);
+
+  if (error) {
+    console.error('[AutoRecoveryCron] Error detecting stuck scraping jobs:', error);
+    return [];
+  }
+
+  return (data || []).map((job: any) => ({
+    id: job.id,
+    type: 'web_scraping' as const,
+    status: job.status,
+    lastHeartbeat: job.last_heartbeat_at,
+    stuckDuration: calculateStuckDuration(job.last_heartbeat_at),
+    recoveryAttempts: job.recovery_attempts || 0,
+    canRecover: (job.recovery_attempts || 0) < 3,
+    metadata: { url: job.url, background_job_id: job.background_job_id, last_recovery_at: job.last_recovery_at },
+  }));
+}
+
+async function detectStuckXmlJobs(supabase: any): Promise<StuckJob[]> {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('background_jobs')
+    .select('*')
+    .eq('status', 'processing')
+    .eq('job_type', 'xml_import')
+    .lt('created_at', thirtyMinutesAgo);
+
+  if (error) {
+    console.error('[AutoRecoveryCron] Error detecting stuck XML jobs:', error);
+    return [];
+  }
+
+  return (data || []).map((job: any) => ({
+    id: job.id,
+    type: 'xml_import' as const,
+    status: job.status,
+    lastHeartbeat: job.last_heartbeat || job.updated_at,
+    stuckDuration: calculateStuckDuration(job.last_heartbeat || job.updated_at),
+    recoveryAttempts: job.recovery_attempts || 0,
+    canRecover: (job.recovery_attempts || 0) < 3,
+    metadata: { filename: job.filename, last_recovery_at: job.last_recovery_at },
+  }));
+}
+
+function calculateStuckDuration(lastHeartbeat: string | null): number {
+  if (!lastHeartbeat) return 0;
+  const diff = Date.now() - new Date(lastHeartbeat).getTime();
+  return Math.floor(diff / (60 * 1000)); // minutes
+}
+
+async function recoverJob(supabase: any, job: StuckJob): Promise<any> {
+  console.log(`[AutoRecoveryCron] Attempting recovery for ${job.type} job ${job.id}`);
+
+  if (!job.canRecover) {
+    console.log(`[AutoRecoveryCron] Job ${job.id} exceeded max recovery attempts (3)`);
+    await markAsFailed(supabase, job);
+    return { jobId: job.id, type: job.type, success: false, error: 'Max recovery attempts exceeded' };
+  }
+
+  if (!shouldAttemptRecovery(job)) {
+    console.log(`[AutoRecoveryCron] Skipping job ${job.id} - backoff period not elapsed`);
+    return { jobId: job.id, type: job.type, success: false, error: 'Backoff period not elapsed' };
+  }
+
+  try {
+    let success = false;
+    switch (job.type) {
+      case 'pdf_processing':
+        success = await recoverPdfJob(supabase, job);
+        break;
+      case 'web_scraping':
+        success = await recoverScrapingJob(supabase, job);
+        break;
+      case 'xml_import':
+        success = await recoverXmlJob(supabase, job);
+        break;
+    }
+
+    if (success) {
+      console.log(`[AutoRecoveryCron] ✅ Successfully recovered ${job.type} job ${job.id}`);
+      await incrementRecoveryAttempts(supabase, job);
+      return { jobId: job.id, type: job.type, success: true };
+    } else {
+      throw new Error('Recovery failed');
+    }
+  } catch (error: any) {
+    console.error(`[AutoRecoveryCron] ❌ Failed to recover ${job.type} job ${job.id}:`, error);
+    await incrementRecoveryAttempts(supabase, job);
+    return { jobId: job.id, type: job.type, success: false, error: error.message };
+  }
+}
+
+function shouldAttemptRecovery(job: StuckJob): boolean {
+  if (job.recoveryAttempts === 0) return true;
+  if (!job.metadata?.last_recovery_at) return true;
+
+  const lastRecovery = new Date(job.metadata.last_recovery_at).getTime();
+  const minutesSinceLastRecovery = (Date.now() - lastRecovery) / (60 * 1000);
+  const backoffMinutes = [5, 15, 30][job.recoveryAttempts - 1] || 30;
+
+  return minutesSinceLastRecovery >= backoffMinutes;
+}
+
+async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {
+  const { error } = await supabase
+    .from('background_jobs')
+    .update({ status: 'pending', last_heartbeat: new Date().toISOString() })
+    .eq('id', job.id);
+  return !error;
+}
+
+async function recoverScrapingJob(supabase: any, job: StuckJob): Promise<boolean> {
+  const { error } = await supabase
+    .from('scraping_sessions')
+    .update({ status: 'pending', last_heartbeat_at: new Date().toISOString() })
+    .eq('id', job.id);
+  return !error;
+}
+
+async function recoverXmlJob(supabase: any, job: StuckJob): Promise<boolean> {
+  const { error } = await supabase
+    .from('background_jobs')
+    .update({ status: 'pending', progress: 0, last_heartbeat: new Date().toISOString() })
+    .eq('id', job.id);
+  return !error;
+}
+
+async function incrementRecoveryAttempts(supabase: any, job: StuckJob): Promise<void> {
+  const table = job.type === 'web_scraping' ? 'scraping_sessions' : 'background_jobs';
+  await supabase
+    .from(table)
+    .update({ recovery_attempts: job.recoveryAttempts + 1, last_recovery_at: new Date().toISOString() })
+    .eq('id', job.id);
+}
+
+async function markAsFailed(supabase: any, job: StuckJob): Promise<void> {
+  const table = job.type === 'web_scraping' ? 'scraping_sessions' : 'background_jobs';
+  await supabase
+    .from(table)
+    .update({
+      status: 'failed',
+      error: `Job stuck for ${job.stuckDuration} minutes. Max recovery attempts (3) exceeded.`,
+    })
+    .eq('id', job.id);
+}
+

@@ -1,10 +1,11 @@
 /**
  * XML Import Tab
- * 
+ *
  * Handles XML file upload, field detection, AI-assisted mapping, and import job creation
  */
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Link } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -23,6 +24,7 @@ interface DetectedField {
 }
 
 const XMLImportTab: React.FC = () => {
+  const navigate = useNavigate();
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string>('');
@@ -154,9 +156,14 @@ const XMLImportTab: React.FC = () => {
     }
   };
 
-  const handleMappingConfirmed = () => {
+  const handleMappingConfirmed = (jobId?: string) => {
     setShowMappingModal(false);
-    // The modal will handle the actual import
+
+    // Redirect to async queue monitor if job ID is provided
+    if (jobId) {
+      console.log('🎯 XMLImportTab: Import started, redirecting to queue monitor', { jobId });
+      navigate(`/admin/async-queue-monitor?jobId=${jobId}`);
+    }
   };
 
   return (

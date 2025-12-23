@@ -180,7 +180,7 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
   // Build v2 API request with structured extraction schema
   const requestBody: any = {
     url: url,
-    formats: ['markdown', 'html'],
+    formats: ['markdown'], // Only markdown to avoid duplicate chunks
     timeout: options.timeout || 30000,
   };
 

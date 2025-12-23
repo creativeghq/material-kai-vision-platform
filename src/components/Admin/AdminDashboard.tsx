@@ -90,13 +90,13 @@ const AdminDashboard: React.FC = () => {
         count: 'User Docs',
       },
       {
-        title: 'PDF Processing Data',
+        title: 'Materials Data',
         description:
-          'View all products, chunks, images, and embeddings generated from PDF processing',
+          'View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources',
         icon: DatabaseIcon,
-        path: '/admin/pdf-data',
+        path: '/admin/materials-data',
         status: 'active',
-        count: 'Extraction Data',
+        count: 'All Sources',
       },
     ],
     'Data Management': [

@@ -66,7 +66,7 @@ interface XMLFieldMappingModalProps {
   suggestedMappings: Record<string, string>;
   xmlFile: File | null;
   xmlContent?: string; // Optional: for URL-based XML content
-  onMappingConfirmed: () => void;
+  onMappingConfirmed: (jobId?: string) => void;
 }
 
 // Target schema fields
@@ -433,8 +433,11 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
         throw new Error(data.error || 'Import failed');
       }
 
-      // Success!
-      onMappingConfirmed();
+      // Success! Pass job ID to parent for redirect
+      const jobId = data.job_id || data.data_import_job_id;
+      console.log('✅ XML Import started successfully', { jobId, data });
+
+      onMappingConfirmed(jobId);
       onClose();
     } catch (err: any) {
       console.error('Import error:', err);

@@ -59,8 +59,33 @@ interface BackgroundJob {
     processing_time_ms?: number;
     ai_model?: string;
     retry_count?: number;
+    // XML import specific
+    source_name?: string;
+    import_type?: string;
+    total_products?: number;
+    processed_products?: number;
+    failed_products?: number;
     [key: string]: any;
   } | null;
+}
+
+// XML Import Job from data_import_jobs table
+interface XMLImportJob {
+  id: string;
+  workspace_id: string;
+  import_type: string;
+  source_name: string | null;
+  source_url: string | null;
+  status: string;
+  total_products: number;
+  processed_products: number;
+  failed_products: number;
+  category: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+  metadata: any;
 }
 
 interface JobCheckpoint {
@@ -191,21 +216,74 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
+  // 🆕 Normalize XML import job to BackgroundJob format
+  const normalizeXMLJob = (xmlJob: XMLImportJob): BackgroundJob => {
+    // Calculate progress percentage
+    const progress = xmlJob.total_products > 0
+      ? Math.round((xmlJob.processed_products / xmlJob.total_products) * 100)
+      : 0;
+
+    return {
+      id: xmlJob.id,
+      workspace_id: xmlJob.workspace_id,
+      document_id: null,
+      job_type: 'xml_import',
+      status: xmlJob.status as any, // Map status
+      progress: progress,
+      created_at: xmlJob.created_at,
+      started_at: xmlJob.started_at,
+      completed_at: xmlJob.completed_at,
+      failed_at: null,
+      interrupted_at: null,
+      error: xmlJob.error_message,
+      metadata: {
+        source_name: xmlJob.source_name || 'XML Import',
+        import_type: xmlJob.import_type,
+        total_products: xmlJob.total_products,
+        processed_products: xmlJob.processed_products,
+        failed_products: xmlJob.failed_products,
+        category: xmlJob.category,
+        source_url: xmlJob.source_url,
+        ...xmlJob.metadata,
+      },
+    };
+  };
+
   const fetchQueueData = useCallback(async () => {
     try {
       setError(null);
 
-      // 🆕 Fetch ALL job types from background_jobs
-      const { data: jobsData, error: jobsError } = await supabase
+      // Fetch background jobs (PDF and Web Scraping)
+      const { data: bgJobsData, error: bgJobsError } = await supabase
         .from('background_jobs')
         .select('*')
-        .in('job_type', ['pdf_processing', 'web_scraping', 'xml_import'])
+        .in('job_type', ['pdf_processing', 'web_scraping'])
         .order('created_at', { ascending: false })
-        .limit(200); // Increased limit to accommodate all job types
+        .limit(100);
 
-      if (jobsError) throw jobsError;
+      if (bgJobsError) throw bgJobsError;
 
-      setJobs(jobsData || []);
+      // 🆕 Fetch XML import jobs from data_import_jobs table
+      const { data: xmlJobsData, error: xmlJobsError } = await supabase
+        .from('data_import_jobs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (xmlJobsError) {
+        console.warn('⚠️ Failed to fetch XML import jobs:', xmlJobsError);
+      }
+
+      // 🆕 Normalize XML jobs and combine with background jobs
+      const normalizedXMLJobs = (xmlJobsData || []).map(normalizeXMLJob);
+      const allJobs = [...(bgJobsData || []), ...normalizedXMLJobs];
+
+      // Sort by created_at descending
+      allJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      console.log(`✅ Fetched ${bgJobsData?.length || 0} background jobs + ${normalizedXMLJobs.length} XML jobs = ${allJobs.length} total`);
+
+      setJobs(allJobs);
 
       // 🆕 Helper function to calculate metrics for a specific job type
       const calculateJobTypeMetrics = (jobs: BackgroundJob[], jobType?: string): JobTypeMetrics => {
@@ -251,10 +329,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         };
       };
 
-      // Calculate metrics from background_jobs
+      // 🆕 Calculate metrics from combined jobs (background_jobs + data_import_jobs)
       const calculateMetrics = (): QueueMetrics => {
-        const allJobs = jobsData || [];
-
         // Calculate metrics for each job type
         const pdfMetrics = calculateJobTypeMetrics(allJobs, 'pdf_processing');
         const scrapingMetrics = calculateJobTypeMetrics(allJobs, 'web_scraping');
@@ -263,7 +339,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
         // Calculate totals from metadata
         const totalProducts = allJobs.reduce((sum, job) => {
-          return sum + (job.metadata?.products_discovered || job.metadata?.products_created || job.metadata?.processed || 0);
+          return sum + (
+            job.metadata?.products_discovered ||
+            job.metadata?.products_created ||
+            job.metadata?.processed_products || // XML jobs
+            job.metadata?.processed ||
+            0
+          );
         }, 0);
 
         const totalChunks = allJobs.reduce((sum, job) => {
@@ -1688,19 +1770,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Pipeline Stages - 14-Stage Workflow WITH DETAILED ACCORDIONS */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    14-Stage Processing Pipeline
-                  </CardTitle>
-                  <CardDescription>
-                    Click on completed stages (green) to see detailed metrics, or skipped stages (amber) to understand why they were not applicable
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
+              {/* Pipeline Stages - 14-Stage Workflow (PDF only) */}
+              {selectedJob?.job_type === 'pdf_processing' && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Activity className="h-4 w-4" />
+                      14-Stage Processing Pipeline
+                    </CardTitle>
+                    <CardDescription>
+                      Click on completed stages (green) to see detailed metrics, or skipped stages (amber) to understand why they were not applicable
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
                     {PROCESSING_STAGES.map((stage) => {
                       // Find if this stage has a checkpoint
                       const checkpoint = jobCheckpoints.find(
@@ -1907,6 +1990,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* REMOVED DUPLICATE METRICS SECTION - Metrics are now displayed at the top, before the 14-stage workflow */}
             </div>

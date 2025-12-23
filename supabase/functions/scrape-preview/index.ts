@@ -162,7 +162,7 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
   // Build v2 API request with structured extraction
   const requestBody: any = {
     url: url,
-    formats: ['markdown', 'html'],
+    formats: ['markdown'], // Only markdown to avoid duplicate chunks
     timeout: options.timeout || 30000,
     actions: [
       { type: 'wait', milliseconds: 2000 },

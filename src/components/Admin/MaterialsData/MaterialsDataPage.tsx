@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Grid3X3, Image as ImageIcon, Database } from 'lucide-react';
+import { Package, Grid3X3, Image as ImageIcon, Database, Filter } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
@@ -8,8 +11,10 @@ import { ImagesTab } from './ImagesTab';
 import { EmbeddingsTab } from './EmbeddingsTab';
 import { supabase } from '@/integrations/supabase/client';
 
-export const PDFProcessingDataPage: React.FC = () => {
+export const MaterialsDataPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [jobIdFilter, setJobIdFilter] = useState<string>(searchParams.get('jobId') || '');
   const [stats, setStats] = useState({
     products: 0,
     chunks: 0,
@@ -115,12 +120,35 @@ export const PDFProcessingDataPage: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
-        title="PDF Processing Data"
-        description="View all products, chunks, images, and embeddings generated from PDF processing"
-        badge="Extraction Data"
+        title="Materials Data"
+        description="View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources"
+        badge="All Sources"
       />
 
       <div className="p-6">
+        {/* Job ID Filter */}
+        <div className="mb-4 flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Filter by Job ID (optional)"
+            value={jobIdFilter}
+            onChange={(e) => setJobIdFilter(e.target.value)}
+            className="max-w-md"
+          />
+          {jobIdFilter && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setJobIdFilter('');
+                setSearchParams({});
+              }}
+            >
+              Clear Filter
+            </Button>
+          )}
+        </div>
+
         <Tabs defaultValue="products" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="products" className="flex items-center gap-2">
@@ -142,19 +170,19 @@ export const PDFProcessingDataPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value="products">
-            <ProductsTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
+            <ProductsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
           <TabsContent value="chunks">
-            <ChunksTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
+            <ChunksTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
           <TabsContent value="images">
-            <ImagesTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
+            <ImagesTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
           <TabsContent value="embeddings">
-            <EmbeddingsTab workspaceId={workspaceId} onStatsUpdate={loadStats} />
+            <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
         </Tabs>
       </div>

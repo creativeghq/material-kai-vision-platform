@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Loader2 } from 'lucide-react';
+import { Eye, Loader2, FileText, Code, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -29,13 +29,15 @@ import {
 
 interface EmbeddingsTabProps {
   workspaceId: string;
+  jobIdFilter?: string;
   onStatsUpdate: () => void;
 }
 
-export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onStatsUpdate }) => {
+export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
   const [embeddings, setEmbeddings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [selectedEmbedding, setSelectedEmbedding] = useState<any | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
@@ -48,7 +50,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
       setCurrentPage(1);
       loadEmbeddings(1);
     }
-  }, [workspaceId, typeFilter]);
+  }, [workspaceId, typeFilter, sourceFilter, jobIdFilter]);
 
   useEffect(() => {
     if (workspaceId) {
@@ -66,15 +68,24 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
       let query = supabase
         .from('embeddings')
         .select('*', { count: 'exact' })
-        .eq('workspace_id', workspaceId)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+        .eq('workspace_id', workspaceId);
 
       if (typeFilter !== 'all') {
         query = query.eq('model_name', typeFilter);
       }
 
-      const { data, error, count } = await query;
+      if (sourceFilter !== 'all') {
+        query = query.eq('source_type', sourceFilter);
+      }
+
+      // Apply job ID filter
+      if (jobIdFilter && jobIdFilter.trim()) {
+        query = query.eq('source_job_id', jobIdFilter.trim());
+      }
+
+      const { data, error, count } = await query
+        .order('created_at', { ascending: false })
+        .range(from, to);
 
       if (error) throw error;
       setEmbeddings(data || []);
@@ -91,23 +102,57 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
     }
   };
 
+  const getSourceBadge = (sourceType: string | null | undefined) => {
+    if (!sourceType) return <Badge variant="outline">Unknown</Badge>;
+
+    const badges = {
+      pdf_processing: { label: 'PDF', icon: FileText, color: 'bg-blue-100 text-blue-700' },
+      xml_import: { label: 'XML', icon: Code, color: 'bg-green-100 text-green-700' },
+      web_scraping: { label: 'Web', icon: Globe, color: 'bg-purple-100 text-purple-700' },
+    };
+
+    const badge = badges[sourceType as keyof typeof badges];
+    if (!badge) return <Badge variant="outline">{sourceType}</Badge>;
+
+    const Icon = badge.icon;
+    return (
+      <Badge className={`${badge.color} flex items-center gap-1`}>
+        <Icon className="h-3 w-3" />
+        {badge.label}
+      </Badge>
+    );
+  };
+
   return (
     <>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>All Embeddings</CardTitle>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[250px]">
-                <SelectValue placeholder="Filter by model" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Models</SelectItem>
-                <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
-                <SelectItem value="text-embedding-ada-002">text-embedding-ada-002</SelectItem>
-                <SelectItem value="voyage-3">voyage-3</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="pdf_processing">PDF Processing</SelectItem>
+                  <SelectItem value="xml_import">XML Import</SelectItem>
+                  <SelectItem value="web_scraping">Web Scraping</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Filter by model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Models</SelectItem>
+                  <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
+                  <SelectItem value="text-embedding-ada-002">text-embedding-ada-002</SelectItem>
+                  <SelectItem value="voyage-3">voyage-3</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -137,7 +182,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, onSta
                       <Badge>{emb.model_name || 'text'}</Badge>
                     </TableCell>
                     <TableCell>
-                      {emb.chunk_id ? 'Chunk' : 'Unknown'}
+                      {getSourceBadge(emb.source_type)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{emb.dimensions || emb.embedding?.length || 0}</Badge>

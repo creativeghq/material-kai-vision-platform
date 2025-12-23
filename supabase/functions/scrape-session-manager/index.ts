@@ -126,10 +126,13 @@ async function startProcessing(supabase: any, sessionId: string, req: Request) {
     throw new Error('Session not found');
   }
 
-  // Update session status
+  // Update session status and set initial heartbeat
   await supabase
     .from('scraping_sessions')
-    .update({ status: 'processing' })
+    .update({
+      status: 'processing',
+      last_heartbeat_at: new Date().toISOString()
+    })
     .eq('id', sessionId);
 
   // Update background_jobs status to 'processing' if it exists
@@ -192,11 +195,12 @@ async function processSessionPages(supabase: any, sessionId: string, req: Reques
     const delayBetweenBatches = 2000; // 2 second delay between batches
 
     while (true) {
-      // Check if session is still processing
+      // ✅ Send heartbeat and check if session is still processing
       const { data: currentSession } = await supabase
         .from('scraping_sessions')
-        .select('status')
+        .update({ last_heartbeat_at: new Date().toISOString() })
         .eq('id', sessionId)
+        .select('status')
         .single();
 
       if (!currentSession || currentSession.status !== 'processing') {

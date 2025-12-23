@@ -18,7 +18,7 @@ import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
-import { PDFProcessingDataPage } from './components/Admin/PDFProcessingData';
+import { MaterialsDataPage } from './components/Admin/MaterialsData';
 import { LogViewer } from './components/Admin/LogViewer';
 
 import { AgentConfigsPage } from './components/Admin/AgentConfigs';
@@ -70,6 +70,7 @@ import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
 import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
 import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
+import TaskManagerPage from './pages/TaskManagerPage';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -200,12 +201,12 @@ const App = () => (
                 }
               />
               <Route
-                path="/admin/pdf-data"
+                path="/admin/materials-data"
                 element={
                   <AuthGuard>
                     <AdminGuard>
                       <Layout>
-                        <PDFProcessingDataPage />
+                        <MaterialsDataPage />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>
@@ -549,6 +550,14 @@ const App = () => (
                     <Layout>
                       <QuoteDetailCustomerPage />
                     </Layout>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/tasks"
+                element={
+                  <AuthGuard>
+                    <TaskManagerPage />
                   </AuthGuard>
                 }
               />
