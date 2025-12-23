@@ -28,7 +28,7 @@ import { AdminPanel } from './components/Admin/AdminPanel';
 import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
 import { AITestingPanel } from './components/Admin/AITestingPanel';
 import { AIMonitoringDashboard } from './components/Admin/AIMonitoringDashboard';
-import { AnalyticsDashboard } from './components/Admin/AnalyticsDashboard';
+import { OperationsDashboard } from './components/Admin/OperationsDashboard';
 import { SystemPerformance } from './components/Admin/SystemPerformance';
 import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
 import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
@@ -48,7 +48,7 @@ import {
   PageErrorBoundary,
 } from './components/ErrorBoundary/ErrorBoundary';
 // Removed: MivaaDocsViewer - now external links in admin header
-// Removed: QualityStabilityMetricsPanel and Phase3MetricsPanel - now consolidated in AnalyticsDashboard
+// Removed: QualityStabilityMetricsPanel and Phase3MetricsPanel - now consolidated in OperationsDashboard
 import { MetadataManagement } from './components/Admin/MetadataManagement';
 import { RelevancyManagement } from './components/Admin/RelevancyManagement';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
@@ -56,7 +56,7 @@ import { CRMManagement } from './components/Admin/CRMManagement';
 import { ContactDetailPage } from './pages/ContactDetailPage';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
-// Removed: ChunkQualityDashboard - now consolidated in AnalyticsDashboard
+// Removed: ChunkQualityDashboard - now consolidated in OperationsDashboard
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
 import DataImportHub from './components/Admin/DataImportHub';
 import { SubscriptionPlansPage } from './components/Billing/SubscriptionPlansPage';
@@ -158,7 +158,7 @@ const App = () => (
                 element={
                   <AuthGuard>
                     <Layout>
-                      <AnalyticsDashboard />
+                      <OperationsDashboard />
                     </Layout>
                   </AuthGuard>
                 }
@@ -176,16 +176,21 @@ const App = () => (
                 }
               />
               <Route
-                path="/admin/analytics"
+                path="/admin/operations"
                 element={
                   <AuthGuard>
                     <AdminGuard>
                       <Layout>
-                        <AnalyticsDashboard />
+                        <OperationsDashboard />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>
                 }
+              />
+              {/* Legacy route redirect */}
+              <Route
+                path="/admin/analytics"
+                element={<Navigate to="/admin/operations" replace />}
               />
 
               <Route
@@ -411,8 +416,8 @@ const App = () => (
                 }
               />
               {/* Removed: /admin/mivaa-docs - now external links in admin header */}
-              {/* Removed: /admin/quality-stability-metrics and /admin/phase3-metrics - now consolidated in /admin/analytics */}
-              {/* Removed: /admin/chunk-quality - now consolidated in /admin/analytics */}
+              {/* Removed: /admin/quality-stability-metrics and /admin/phase3-metrics - now consolidated in /admin/operations */}
+              {/* Removed: /admin/chunk-quality - now consolidated in /admin/operations */}
               <Route
                 path="/admin/metadata"
                 element={

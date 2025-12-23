@@ -168,6 +168,30 @@ interface UserProfile {
   created_at: string;
 }
 
+interface DataProcessingStats {
+  pdf: {
+    total: number;
+    completed: number;
+    failed: number;
+    processing: number;
+    avgProcessingTime: number;
+  };
+  xml: {
+    total: number;
+    completed: number;
+    failed: number;
+    processing: number;
+    totalProducts: number;
+  };
+  scraping: {
+    total: number;
+    completed: number;
+    failed: number;
+    processing: number;
+    totalPages: number;
+  };
+}
+
 interface AIUsageLog {
   id: string;
   user_id: string;
@@ -195,7 +219,7 @@ interface ModelUsage {
   success_rate: number;
 }
 
-export const AnalyticsDashboard: React.FC = () => {
+export const OperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [analytics, setAnalytics] = useState<UsageAnalytics>({
@@ -223,6 +247,11 @@ export const AnalyticsDashboard: React.FC = () => {
     unique_users: 0,
   });
   const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]);
+  const [dataProcessingStats, setDataProcessingStats] = useState<DataProcessingStats>({
+    pdf: { total: 0, completed: 0, failed: 0, processing: 0, avgProcessingTime: 0 },
+    xml: { total: 0, completed: 0, failed: 0, processing: 0, totalProducts: 0 },
+    scraping: { total: 0, completed: 0, failed: 0, processing: 0, totalPages: 0 },
+  });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -468,6 +497,56 @@ export const AnalyticsDashboard: React.FC = () => {
         modelUsageArray.sort((a, b) => b.total_cost - a.total_cost);
         setModelUsage(modelUsageArray);
       }
+
+      // Fetch Data Processing Stats (PDF, XML, Scraping)
+      const [pdfJobs, xmlJobs, scrapingSessions] = await Promise.all([
+        supabase.from('background_jobs').select('*').eq('job_type', 'pdf_processing'),
+        supabase.from('data_import_jobs').select('*'),
+        supabase.from('scraping_sessions').select('*'),
+      ]);
+
+      // Calculate PDF stats
+      const pdfData = pdfJobs.data || [];
+      const pdfCompleted = pdfData.filter(j => j.status === 'completed');
+      const pdfProcessingTimes = pdfCompleted
+        .map(j => j.completed_at && j.started_at ?
+          new Date(j.completed_at).getTime() - new Date(j.started_at).getTime() : 0)
+        .filter(t => t > 0);
+      const avgPdfTime = pdfProcessingTimes.length > 0
+        ? pdfProcessingTimes.reduce((a, b) => a + b, 0) / pdfProcessingTimes.length / 1000
+        : 0;
+
+      // Calculate XML stats
+      const xmlData = xmlJobs.data || [];
+      const totalXmlProducts = xmlData.reduce((sum, j) => sum + (j.total_products || 0), 0);
+
+      // Calculate Scraping stats
+      const scrapingData = scrapingSessions.data || [];
+      const totalScrapingPages = scrapingData.reduce((sum, s) => sum + (s.total_pages || 0), 0);
+
+      setDataProcessingStats({
+        pdf: {
+          total: pdfData.length,
+          completed: pdfData.filter(j => j.status === 'completed').length,
+          failed: pdfData.filter(j => j.status === 'failed').length,
+          processing: pdfData.filter(j => j.status === 'processing').length,
+          avgProcessingTime: Math.round(avgPdfTime),
+        },
+        xml: {
+          total: xmlData.length,
+          completed: xmlData.filter(j => j.status === 'completed').length,
+          failed: xmlData.filter(j => j.status === 'failed').length,
+          processing: xmlData.filter(j => j.status === 'processing').length,
+          totalProducts: totalXmlProducts,
+        },
+        scraping: {
+          total: scrapingData.length,
+          completed: scrapingData.filter(s => s.status === 'completed').length,
+          failed: scrapingData.filter(s => s.status === 'failed').length,
+          processing: scrapingData.filter(s => s.status === 'processing' || s.status === 'scraping').length,
+          totalPages: totalScrapingPages,
+        },
+      });
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -550,9 +629,9 @@ export const AnalyticsDashboard: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
-        title="Analytics Dashboard"
-        description="Comprehensive analytics: search, API usage, PDF processing, chunk quality, and validation metrics"
-        badge="Analytics"
+        title="Operations Management"
+        description="Monitor and manage platform operations: data processing, AI performance, system health, and quality metrics"
+        badge="Operations"
       />
 
       {/* Main Content */}
@@ -589,39 +668,31 @@ export const AnalyticsDashboard: React.FC = () => {
           />
         </div>
 
-        <Tabs defaultValue="agent-chat" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-8">
+        <Tabs defaultValue="system-health" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="system-health">
               <Activity className="h-4 w-4 mr-2" />
               System Health
             </TabsTrigger>
-            <TabsTrigger value="agent-chat">
+            <TabsTrigger value="data-processing">
+              <Database className="h-4 w-4 mr-2" />
+              Data Processing
+            </TabsTrigger>
+            <TabsTrigger value="ai-performance">
               <Bot className="h-4 w-4 mr-2" />
+              AI Performance
+            </TabsTrigger>
+            <TabsTrigger value="agent-chat">
+              <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
             <TabsTrigger value="subscriptions">
               <CreditCard className="h-4 w-4 mr-2" />
               Subscriptions
             </TabsTrigger>
-            <TabsTrigger value="interior-design">
-              <Image className="h-4 w-4 mr-2" />
-              Interior Design
-            </TabsTrigger>
-            <TabsTrigger value="ai-models">
-              <Settings className="h-4 w-4 mr-2" />
-              AI Models
-            </TabsTrigger>
-            <TabsTrigger value="pdf-processing">
-              <FileText className="h-4 w-4 mr-2" />
-              PDF Processing
-            </TabsTrigger>
             <TabsTrigger value="api-usage">
               <Zap className="h-4 w-4 mr-2" />
               API Usage
-            </TabsTrigger>
-            <TabsTrigger value="quality-metrics">
-              <Gauge className="h-4 w-4 mr-2" />
-              Quality Metrics
             </TabsTrigger>
           </TabsList>
 
@@ -875,8 +946,8 @@ export const AnalyticsDashboard: React.FC = () => {
             </Card>
           </TabsContent>
 
-          {/* Interior Design Analytics Tab */}
-          <TabsContent value="interior-design" className="space-y-4">
+          {/* AI Performance Tab - Consolidated AI Models, Interior Design, Quality Metrics */}
+          <TabsContent value="ai-performance" className="space-y-4">
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <Card>
@@ -1028,39 +1099,169 @@ export const AnalyticsDashboard: React.FC = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="pdf-processing" className="space-y-4">
-            <PDFProcessingMonitor />
-          </TabsContent>
-
-          {/* AI Models Tab - Model Settings & Costs */}
-          <TabsContent value="ai-models" className="space-y-4">
-            {/* Provider Cost Summary */}
+          {/* Data Processing Tab - PDF, XML, Scraping */}
+          <TabsContent value="data-processing" className="space-y-4">
+            {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">🧠</span>
+                    <div className="p-2 rounded-lg bg-blue-200">
+                      <FileText className="h-5 w-5 text-blue-700" />
+                    </div>
                     <div>
-                      <div className="text-sm text-orange-600 font-medium">Anthropic</div>
-                      <div className="text-2xl font-bold text-orange-800">
-                        ${MODEL_CONFIGS.filter(m => m.provider === 'anthropic').reduce((sum, m) =>
-                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
-                        ).toFixed(4)}
+                      <div className="text-sm text-blue-600">PDF Processing</div>
+                      <div className="text-2xl font-bold text-blue-900">{dataProcessingStats.pdf.total}</div>
+                      <div className="text-xs text-blue-500 mt-1">
+                        {dataProcessingStats.pdf.completed} completed • {dataProcessingStats.pdf.processing} processing
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
               <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">🤖</span>
+                    <div className="p-2 rounded-lg bg-green-200">
+                      <Database className="h-5 w-5 text-green-700" />
+                    </div>
                     <div>
-                      <div className="text-sm text-green-600 font-medium">OpenAI</div>
-                      <div className="text-2xl font-bold text-green-800">
-                        ${MODEL_CONFIGS.filter(m => m.provider === 'openai').reduce((sum, m) =>
-                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
-                        ).toFixed(4)}
+                      <div className="text-sm text-green-600">XML Imports</div>
+                      <div className="text-2xl font-bold text-green-900">{dataProcessingStats.xml.total}</div>
+                      <div className="text-xs text-green-500 mt-1">
+                        {dataProcessingStats.xml.totalProducts} products imported
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-200">
+                      <Activity className="h-5 w-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-purple-600">Web Scraping</div>
+                      <div className="text-2xl font-bold text-purple-900">{dataProcessingStats.scraping.total}</div>
+                      <div className="text-xs text-purple-500 mt-1">
+                        {dataProcessingStats.scraping.totalPages} pages scraped
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Detailed PDF Processing Monitor */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  PDF Processing Jobs
+                </CardTitle>
+                <CardDescription>Real-time monitoring of PDF processing pipeline</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PDFProcessingMonitor />
+              </CardContent>
+            </Card>
+
+            {/* Processing Stats Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Success Rates</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>PDF Processing</span>
+                      <span className="font-semibold">
+                        {dataProcessingStats.pdf.total > 0
+                          ? Math.round((dataProcessingStats.pdf.completed / dataProcessingStats.pdf.total) * 100)
+                          : 0}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={dataProcessingStats.pdf.total > 0
+                        ? (dataProcessingStats.pdf.completed / dataProcessingStats.pdf.total) * 100
+                        : 0}
+                      className="h-2"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>XML Imports</span>
+                      <span className="font-semibold">
+                        {dataProcessingStats.xml.total > 0
+                          ? Math.round((dataProcessingStats.xml.completed / dataProcessingStats.xml.total) * 100)
+                          : 0}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={dataProcessingStats.xml.total > 0
+                        ? (dataProcessingStats.xml.completed / dataProcessingStats.xml.total) * 100
+                        : 0}
+                      className="h-2"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Web Scraping</span>
+                      <span className="font-semibold">
+                        {dataProcessingStats.scraping.total > 0
+                          ? Math.round((dataProcessingStats.scraping.completed / dataProcessingStats.scraping.total) * 100)
+                          : 0}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={dataProcessingStats.scraping.total > 0
+                        ? (dataProcessingStats.scraping.completed / dataProcessingStats.scraping.total) * 100
+                        : 0}
+                      className="h-2"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Processing Metrics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Avg PDF Time</span>
+                    <span className="font-semibold">{dataProcessingStats.pdf.avgProcessingTime}s</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Products (XML)</span>
+                    <span className="font-semibold">{dataProcessingStats.xml.totalProducts.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">Total Pages (Scraping)</span>
+                    <span className="font-semibold">{dataProcessingStats.scraping.totalPages.toLocaleString()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+            {/* AI Performance Summary */}
+            <div className="grid grid-cols-4 gap-4">
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-orange-200">
+                      <DollarSign className="h-5 w-5 text-orange-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-orange-600">Interior Design Cost</div>
+                      <div className="text-2xl font-bold text-orange-900">${interiorDesignStats.total_cost.toFixed(2)}</div>
+                      <div className="text-xs text-orange-500 mt-1">
+                        {interiorDesignStats.total_generations} generations
                       </div>
                     </div>
                   </div>
@@ -1069,13 +1270,46 @@ export const AnalyticsDashboard: React.FC = () => {
               <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">🦙</span>
+                    <div className="p-2 rounded-lg bg-blue-200">
+                      <Image className="h-5 w-5 text-blue-700" />
+                    </div>
                     <div>
-                      <div className="text-sm text-blue-600 font-medium">Meta / Other</div>
-                      <div className="text-2xl font-bold text-blue-800">
-                        ${MODEL_CONFIGS.filter(m => m.provider === 'meta' || m.provider === 'google').reduce((sum, m) =>
-                          sum + ((m.totalInputTokens / 1_000_000) * m.inputCostPer1M) + ((m.totalOutputTokens / 1_000_000) * m.outputCostPer1M), 0
-                        ).toFixed(4)}
+                      <div className="text-sm text-blue-600">Images Generated</div>
+                      <div className="text-2xl font-bold text-blue-900">{interiorDesignStats.total_images}</div>
+                      <div className="text-xs text-blue-500 mt-1">
+                        Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-200">
+                      <CheckCircle className="h-5 w-5 text-green-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-green-600">Chunk Quality</div>
+                      <div className="text-2xl font-bold text-green-900">92%</div>
+                      <div className="text-xs text-green-500 mt-1">
+                        Above threshold
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-purple-200">
+                      <TrendingUp className="h-5 w-5 text-purple-700" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-purple-600">Search Precision</div>
+                      <div className="text-2xl font-bold text-purple-900">87%</div>
+                      <div className="text-xs text-purple-500 mt-1">
+                        Avg accuracy
                       </div>
                     </div>
                   </div>
@@ -1083,203 +1317,83 @@ export const AnalyticsDashboard: React.FC = () => {
               </Card>
             </div>
 
-            {/* Model Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {MODEL_CONFIGS.map((model) => {
-                const style = getProviderStyle(model.provider);
-                const inputCost = (model.totalInputTokens / 1_000_000) * model.inputCostPer1M;
-                const outputCost = (model.totalOutputTokens / 1_000_000) * model.outputCostPer1M;
-                const totalCost = inputCost + outputCost;
-
-                return (
-                  <Card key={model.id} className={`${style.bg} ${style.border} border-2 hover:shadow-lg transition-shadow`}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl">{style.icon}</span>
-                          <div>
-                            <CardTitle className={`text-lg ${style.text}`}>{model.name}</CardTitle>
-                            <CardDescription className="text-xs font-mono">{model.model}</CardDescription>
-                          </div>
-                        </div>
-                        <Badge className={`${model.speed === 'fast' ? 'bg-green-500' : model.speed === 'medium' ? 'bg-yellow-500' : 'bg-red-500'} text-white`}>
-                          <Zap className="h-3 w-3 mr-1" />
-                          {model.speed}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="bg-white/50 rounded p-2">
-                          <div className="text-xs text-gray-500">Input Cost</div>
-                          <div className="font-semibold">${model.inputCostPer1M}/1M</div>
-                        </div>
-                        <div className="bg-white/50 rounded p-2">
-                          <div className="text-xs text-gray-500">Output Cost</div>
-                          <div className="font-semibold">${model.outputCostPer1M}/1M</div>
-                        </div>
-                      </div>
-                      <div className="bg-white/50 rounded p-2">
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>Token Usage</span>
-                          <span className="font-semibold text-gray-700">${totalCost.toFixed(4)}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="flex items-center gap-1">
-                            <MessageSquare className="h-3 w-3" />
-                            <span>In: {model.totalInputTokens.toLocaleString()}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Eye className="h-3 w-3" />
-                            <span>Out: {model.totalOutputTokens.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {model.usedFor.map((use) => (
-                          <Badge key={use} variant="outline" className="text-xs bg-white/50">
-                            {use}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
-
-          {/* Quality Metrics Tab - Consolidated */}
-          <TabsContent value="quality-metrics" className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-100 border border-blue-200">
-                      <CheckCircle className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600">Chunk Quality</div>
-                      <div className="text-2xl font-bold text-slate-900">92%</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-100 border border-green-200">
-                      <TrendingUp className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600">Search Precision</div>
-                      <div className="text-2xl font-bold text-slate-900">87%</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-100 border border-purple-200">
-                      <Database className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600">Data Stability</div>
-                      <div className="text-2xl font-bold text-slate-900">99.2%</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white/80 backdrop-blur-sm border-slate-200 shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-orange-100 border border-orange-200">
-                      <Users className="h-5 w-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600">User Satisfaction</div>
-                      <div className="text-2xl font-bold text-slate-900">4.2/5</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Chunk Quality Dashboard */}
+            {/* AI Model Performance */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5" />
-                  Chunk Quality Analysis
+                  <Bot className="h-5 w-5" />
+                  AI Model Usage & Costs
                 </CardTitle>
+                <CardDescription>Performance and cost breakdown by model</CardDescription>
               </CardHeader>
               <CardContent>
-                <ChunkQualityDashboard />
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Model</TableHead>
+                      <TableHead>Usage Count</TableHead>
+                      <TableHead>Total Cost</TableHead>
+                      <TableHead>Success Rate</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {modelUsage.map((model) => (
+                      <TableRow key={model.model_id}>
+                        <TableCell className="font-medium">{model.model_name}</TableCell>
+                        <TableCell>{model.usage_count}</TableCell>
+                        <TableCell>${model.total_cost.toFixed(4)}</TableCell>
+                        <TableCell>
+                          <Badge variant={model.success_rate > 90 ? 'default' : 'secondary'}>
+                            {model.success_rate.toFixed(1)}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
-            {/* User Behavior Stats */}
+            {/* Quality Metrics & Interior Design */}
             <div className="grid md:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5" />
-                    Search Patterns
+                    <CheckCircle className="h-5 w-5" />
+                    Chunk Quality Analysis
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Material searches</span>
-                        <span className="font-semibold">45%</span>
-                      </div>
-                      <Progress value={45} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Property searches</span>
-                        <span className="font-semibold">32%</span>
-                      </div>
-                      <Progress value={32} className="h-2" />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Style searches</span>
-                        <span className="font-semibold">23%</span>
-                      </div>
-                      <Progress value={23} className="h-2" />
-                    </div>
-                  </div>
+                  <ChunkQualityDashboard />
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    User Engagement
+                    <Image className="h-5 w-5" />
+                    Interior Design Performance
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="text-sm">Average session time</span>
-                      <span className="font-mono text-sm font-semibold">12.5 min</span>
+                    <div className="flex justify-between items-center p-2 bg-gradient-to-r from-orange-50 to-orange-100 rounded">
+                      <span className="text-sm">Total Generations</span>
+                      <span className="font-mono text-sm font-semibold">{interiorDesignStats.total_generations}</span>
                     </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="text-sm">Pages per session</span>
-                      <span className="font-mono text-sm font-semibold">8.2</span>
+                    <div className="flex justify-between items-center p-2 bg-gradient-to-r from-blue-50 to-blue-100 rounded">
+                      <span className="text-sm">Images Created</span>
+                      <span className="font-mono text-sm font-semibold">{interiorDesignStats.total_images}</span>
                     </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="text-sm">Bounce rate</span>
-                      <span className="font-mono text-sm font-semibold">24%</span>
+                    <div className="flex justify-between items-center p-2 bg-gradient-to-r from-green-50 to-green-100 rounded">
+                      <span className="text-sm">Unique Users</span>
+                      <span className="font-mono text-sm font-semibold">{interiorDesignStats.unique_users}</span>
                     </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <span className="text-sm">Return rate</span>
-                      <span className="font-mono text-sm font-semibold">67%</span>
+                    <div className="flex justify-between items-center p-2 bg-gradient-to-r from-purple-50 to-purple-100 rounded">
+                      <span className="text-sm">Avg Cost/Generation</span>
+                      <span className="font-mono text-sm font-semibold">
+                        ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
+                      </span>
                     </div>
                   </div>
                 </CardContent>

@@ -162,10 +162,10 @@ const AdminDashboard: React.FC = () => {
         count: 'Real-time',
       },
       {
-        title: 'Analytics Dashboard',
-        description: 'System performance metrics and usage analytics',
+        title: 'Operations Management',
+        description: 'Monitor data processing, AI performance, and system health',
         icon: BarChart3,
-        path: '/admin/analytics',
+        path: '/admin/operations',
         status: 'active',
         count: 'Real-time',
       },
