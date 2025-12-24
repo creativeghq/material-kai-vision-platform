@@ -21,7 +21,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div className="border-b bg-card px-6 py-4">
+    <div className="px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
