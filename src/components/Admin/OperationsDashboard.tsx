@@ -1050,195 +1050,143 @@ export const OperationsDashboard: React.FC = () => {
           </TabsContent>
 
           {/* AI Performance Tab - Consolidated AI Models, Interior Design, Quality Metrics */}
-          <TabsContent value="ai-performance" className="space-y-4">
-            {/* Info Banner */}
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <Bot className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-blue-900 mb-1">AI Performance Tracking</h3>
-                    <p className="text-sm text-blue-700">
-                      Monitoring all AI models including <strong>Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Llama 4 Scout 17B</strong>, and vision/embedding models (SigLIP, CLIP).
-                      Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* AI Models Summary Cards - GPT, Claude, Llama, etc. */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <DollarSign className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Total AI Cost</div>
-                      <div className="text-2xl font-bold text-slate-900">
-                        ${(
-                          aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0) +
-                          interiorDesignStats.total_cost
-                        ).toFixed(2)}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {aiUsageLogs.length + interiorDesignStats.total_generations} total operations
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <Zap className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Total Tokens</div>
-                      <div className="text-2xl font-bold text-slate-900">
-                        {aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0).toLocaleString()}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        Input + Output tokens
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <CreditCard className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Credits Used</div>
-                      <div className="text-2xl font-bold text-slate-900">
-                        {aiUsageLogs.reduce((sum, log) => sum + (Number(log.credits_debited) || 0), 0).toFixed(0)}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">Platform credits</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <Bot className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Active Models</div>
-                      <div className="text-2xl font-bold text-slate-900">
-                        {new Set(aiUsageLogs.map(log => log.model_name)).size}
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">Unique AI models</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          <TabsContent value="ai-performance" className="space-y-6">
+            {/* Page Header */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
+              <p className="text-muted-foreground">
+                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Llama 4 Scout 17B, and vision/embedding models (SigLIP, CLIP). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+              </p>
             </div>
 
-            {/* Interior Design Specific Stats */}
-            <Card className="bg-slate-50 border-slate-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Image className="h-5 w-5 text-slate-700" />
-                  Interior Design Generation Stats
-                </CardTitle>
-                <CardDescription className="text-slate-600">
-                  3D design generation costs and performance
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-sm text-slate-600 font-medium">Total Cost</div>
-                    <div className="text-2xl font-bold text-slate-900">${interiorDesignStats.total_cost.toFixed(2)}</div>
-                    <div className="text-xs text-slate-500 mt-1">
-                      {interiorDesignStats.total_generations} generations
+            {/* AI Models Summary Cards - GPT, Claude, Llama, Interior Design, etc. */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Total AI Cost</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      ${(
+                        aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0) +
+                        interiorDesignStats.total_cost
+                      ).toFixed(2)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {aiUsageLogs.length + interiorDesignStats.total_generations} total operations
                     </div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-sm text-slate-600 font-medium">Images Generated</div>
-                    <div className="text-2xl font-bold text-slate-900">{interiorDesignStats.total_images}</div>
-                    <div className="text-xs text-slate-500 mt-1">
+                </div>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Zap className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Total Tokens</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0).toLocaleString()}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Input + Output tokens
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Credits Used</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {aiUsageLogs.reduce((sum, log) => sum + (Number(log.credits_debited) || 0), 0).toFixed(0)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Platform credits</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Bot className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Active Models</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {new Set(aiUsageLogs.map(log => log.model_name)).size}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Unique AI models</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interior Design Stats - Merged into main cards */}
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Image className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Images Generated</div>
+                    <div className="text-2xl font-bold text-foreground">{interiorDesignStats.total_images}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
                       Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
                     </div>
                   </div>
-                  <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-sm text-slate-600 font-medium">Avg Cost/Generation</div>
-                    <div className="text-2xl font-bold text-slate-900">
+                </div>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Avg Cost/Generation</div>
+                    <div className="text-2xl font-bold text-foreground">
                       ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1">Per generation</div>
-                  </div>
-                  <div className="bg-white p-4 rounded-lg border border-slate-200">
-                    <div className="text-sm text-slate-600 font-medium">Unique Users</div>
-                    <div className="text-2xl font-bold text-slate-900">{interiorDesignStats.unique_users}</div>
-                    <div className="text-xs text-slate-500 mt-1">Active users</div>
+                    <div className="text-xs text-muted-foreground mt-1">Per generation</div>
                   </div>
                 </div>
+              </div>
 
-                {/* Interior Design Models Breakdown */}
-                <div className="mt-6">
-                  <div className="text-sm font-medium text-slate-700 mb-3">Model Breakdown</div>
-                  {interiorDesignModels.length > 0 ? (
-                    <div className="space-y-2">
-                      {interiorDesignModels.map((model) => (
-                        <div key={model.model_id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200">
-                          <div className="flex items-center gap-2">
-                            <Image className="h-4 w-4 text-slate-600" />
-                            <span className="font-medium text-sm">{model.model_name}</span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm">
-                            <span className="text-muted-foreground">{model.usage_count} uses</span>
-                            <span className="font-semibold">${model.total_cost.toFixed(3)}</span>
-                            <Badge variant={model.success_rate >= 90 ? 'default' : 'secondary'}>
-                              {model.success_rate.toFixed(0)}%
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 opacity-50">
-                        <div className="flex items-center gap-2">
-                          <Image className="h-4 w-4 text-slate-600" />
-                          <span className="font-medium text-sm">Stable Diffusion XL</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">0 uses</span>
-                          <span className="font-semibold">$0.000</span>
-                          <Badge variant="secondary">0%</Badge>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 opacity-50">
-                        <div className="flex items-center gap-2">
-                          <Image className="h-4 w-4 text-slate-600" />
-                          <span className="font-medium text-sm">Flux Pro</span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-muted-foreground">0 uses</span>
-                          <span className="font-semibold">$0.000</span>
-                          <Badge variant="secondary">0%</Badge>
-                        </div>
-                      </div>
-                      <div className="text-center py-2">
-                        <p className="text-xs text-slate-500">No generations yet. Models will show data once 3D designs are generated.</p>
-                      </div>
-                    </div>
-                  )}
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Users className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Unique Users</div>
+                    <div className="text-2xl font-bold text-foreground">{interiorDesignStats.unique_users}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Active users</div>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Image className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Total Generations</div>
+                    <div className="text-2xl font-bold text-foreground">{interiorDesignStats.total_generations}</div>
+                    <div className="text-xs text-muted-foreground mt-1">3D designs created</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
 
             {/* AI Models Usage Table - GPT, Claude, Llama, etc. */}
             <Card>
@@ -1532,118 +1480,107 @@ export const OperationsDashboard: React.FC = () => {
           </TabsContent>
 
           {/* Data Processing Tab - PDF, XML, Scraping */}
-          <TabsContent value="data-processing" className="space-y-4">
-            {/* Info Banner */}
-            <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <Database className="h-5 w-5 text-green-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-green-900 mb-1">Data Processing Pipeline</h3>
-                    <p className="text-sm text-green-700">
-                      Real-time monitoring of <strong>PDF processing, XML imports, and web scraping</strong> operations.
-                      Track job status, success rates, processing times, and data volumes across all import sources.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="data-processing" className="space-y-6">
+            {/* Page Header */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-2">Data Processing Pipeline</h2>
+              <p className="text-muted-foreground">
+                Real-time monitoring of PDF processing, XML imports, and web scraping operations. Track job status, success rates, processing times, and data volumes across all import sources.
+              </p>
+            </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <FileText className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">PDF Processing</div>
-                      <div className="text-2xl font-bold text-slate-900">{dataProcessingStats.pdf.total}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {dataProcessingStats.pdf.completed} completed • {dataProcessingStats.pdf.processing} processing
-                      </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">PDF Processing</div>
+                    <div className="text-2xl font-bold text-foreground">{dataProcessingStats.pdf.total}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {dataProcessingStats.pdf.completed} completed • {dataProcessingStats.pdf.processing} processing
                     </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Database className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">XML Imports</div>
+                    <div className="text-2xl font-bold text-foreground">{dataProcessingStats.xml.total}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {dataProcessingStats.xml.totalProducts} products imported
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Activity className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Web Scraping</div>
+                    <div className="text-2xl font-bold text-foreground">{dataProcessingStats.scraping.total}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {dataProcessingStats.scraping.totalPages} pages scraped
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Processing Tables */}
+            <div className="grid grid-cols-1 gap-6">
+              {/* PDF Processing Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    PDF Processing Jobs
+                  </CardTitle>
+                  <CardDescription>Real-time monitoring of PDF processing pipeline</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PDFProcessingMonitor />
                 </CardContent>
               </Card>
 
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <Database className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">XML Imports</div>
-                      <div className="text-2xl font-bold text-slate-900">{dataProcessingStats.xml.total}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {dataProcessingStats.xml.totalProducts} products imported
-                      </div>
-                    </div>
-                  </div>
+              {/* XML Import Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5" />
+                    XML Import Jobs
+                  </CardTitle>
+                  <CardDescription>Real-time monitoring of XML data imports</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <XMLProcessingMonitor />
                 </CardContent>
               </Card>
 
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <Activity className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Web Scraping</div>
-                      <div className="text-2xl font-bold text-slate-900">{dataProcessingStats.scraping.total}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {dataProcessingStats.scraping.totalPages} pages scraped
-                      </div>
-                    </div>
-                  </div>
+              {/* Web Scraping Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Web Scraping Sessions
+                  </CardTitle>
+                  <CardDescription>Real-time monitoring of web scraping operations</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <WebScrapingMonitor />
                 </CardContent>
               </Card>
             </div>
-
-            {/* Detailed PDF Processing Monitor */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  PDF Processing Jobs
-                </CardTitle>
-                <CardDescription>Real-time monitoring of PDF processing pipeline</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PDFProcessingMonitor />
-              </CardContent>
-            </Card>
-
-            {/* XML Import Monitoring */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-5 w-5" />
-                  XML Import Jobs
-                </CardTitle>
-                <CardDescription>Real-time monitoring of XML data imports</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <XMLProcessingMonitor />
-              </CardContent>
-            </Card>
-
-            {/* Web Scraping Monitoring */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Web Scraping Sessions
-                </CardTitle>
-                <CardDescription>Real-time monitoring of web scraping operations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <WebScrapingMonitor />
-              </CardContent>
-            </Card>
 
             {/* Old XML Stats - Keep for reference */}
             <Card className="hidden">

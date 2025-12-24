@@ -536,6 +536,44 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {renderMetadataSection('Compliance & Certifications', compliance, <Shield className="h-5 w-5" />)}
               {renderMetadataSection('Design', design, <Sparkles className="h-5 w-5" />)}
               {renderMetadataSection('Manufacturing', manufacturing, <Building2 className="h-5 w-5" />)}
+
+              {/* Source Information - Job ID */}
+              {(product.source_job_id || product.source_type) && (
+                <Card className="bg-gray-50 border-gray-300">
+                  <CardHeader className="bg-gray-100 border-b border-gray-300">
+                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Package className="h-5 w-5 text-gray-700" />
+                      Source Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="space-y-3">
+                      {product.source_type && (
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Import Source
+                          </p>
+                          <p className="text-sm font-bold text-gray-900">
+                            {product.source_type === 'pdf_processing' && 'PDF Processing'}
+                            {product.source_type === 'xml_import' && 'XML Import'}
+                            {product.source_type === 'web_scraping' && 'Web Scraping'}
+                          </p>
+                        </div>
+                      )}
+                      {product.source_job_id && (
+                        <div className="bg-white border border-gray-200 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Job ID
+                          </p>
+                          <p className="text-sm font-mono font-bold text-gray-900 break-all">
+                            {product.source_job_id}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         )}
