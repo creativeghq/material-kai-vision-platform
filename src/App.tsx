@@ -558,13 +558,10 @@ const App = () => (
                   </AuthGuard>
                 }
               />
+              {/* Redirect /tasks to Operations Dashboard */}
               <Route
                 path="/tasks"
-                element={
-                  <AuthGuard>
-                    <TaskManagerPage />
-                  </AuthGuard>
-                }
+                element={<Navigate to="/admin/operations" replace />}
               />
               <Route
                 path="/admin/quote-requests"

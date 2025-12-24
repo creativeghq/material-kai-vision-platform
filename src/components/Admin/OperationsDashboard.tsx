@@ -22,6 +22,7 @@ import {
   DollarSign,
   Crown,
   Image,
+  ListTodo,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -44,6 +45,10 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './PDFProcessingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
+import { KanbanBoard } from '@/components/Tasks/KanbanBoard';
+import { TaskDetailModal } from '@/components/Tasks/TaskDetailModal';
+import { CreateTaskModal } from '@/components/Tasks/CreateTaskModal';
+import type { TaskWithDetails } from '@/services/tasks';
 
 // Model pricing per 1M tokens (in USD)
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
@@ -255,6 +260,29 @@ export const OperationsDashboard: React.FC = () => {
   });
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Task management state
+  const [selectedTask, setSelectedTask] = useState<TaskWithDetails | null>(null);
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
+
+  const handleTaskClick = (task: TaskWithDetails) => {
+    setSelectedTask(task);
+    setIsTaskDetailModalOpen(true);
+  };
+
+  const handleCreateTask = () => {
+    setIsCreateTaskModalOpen(true);
+  };
+
+  const handleCloseTaskDetailModal = () => {
+    setIsTaskDetailModalOpen(false);
+    setSelectedTask(null);
+  };
+
+  const handleCloseCreateTaskModal = () => {
+    setIsCreateTaskModalOpen(false);
+  };
 
   const fetchAnalyticsData = useCallback(async () => {
     try {
@@ -739,7 +767,7 @@ export const OperationsDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="system-health" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="system-health">
               <Activity className="h-4 w-4 mr-2" />
               System Health
@@ -763,6 +791,10 @@ export const OperationsDashboard: React.FC = () => {
             <TabsTrigger value="api-usage">
               <Zap className="h-4 w-4 mr-2" />
               API Usage
+            </TabsTrigger>
+            <TabsTrigger value="tasks">
+              <ListTodo className="h-4 w-4 mr-2" />
+              Tasks
             </TabsTrigger>
           </TabsList>
 
@@ -1026,7 +1058,7 @@ export const OperationsDashboard: React.FC = () => {
                   <div>
                     <h3 className="font-semibold text-blue-900 mb-1">AI Performance Tracking</h3>
                     <p className="text-sm text-blue-700">
-                      Monitoring all AI models including <strong>GPT-4o, Claude Sonnet 4.5, Llama 3.1</strong>, and image generation models.
+                      Monitoring all AI models including <strong>GPT-4o, Claude Sonnet 4.5, Llama 4 Scout</strong>, and image generation models.
                       Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
                     </p>
                   </div>
@@ -1045,10 +1077,13 @@ export const OperationsDashboard: React.FC = () => {
                     <div>
                       <div className="text-sm text-emerald-600 font-medium">Total AI Cost</div>
                       <div className="text-2xl font-bold text-emerald-900">
-                        ${aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0).toFixed(2)}
+                        ${(
+                          aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0) +
+                          interiorDesignStats.total_cost
+                        ).toFixed(2)}
                       </div>
                       <div className="text-xs text-emerald-500 mt-1">
-                        {aiUsageLogs.length} API calls
+                        {aiUsageLogs.length + interiorDesignStats.total_generations} total operations
                       </div>
                     </div>
                   </div>
@@ -1644,8 +1679,47 @@ export const OperationsDashboard: React.FC = () => {
               </Card>
             </div>
           </TabsContent>
+
+          {/* Tasks Tab */}
+          <TabsContent value="tasks" className="space-y-4">
+            <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-3">
+                  <ListTodo className="h-5 w-5 text-purple-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-purple-900 mb-1">Task Management</h3>
+                    <p className="text-sm text-purple-700">
+                      Organize and track operational tasks with a <strong>Kanban board</strong>.
+                      Create, assign, and monitor tasks across different stages of completion.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="h-[calc(100vh-20rem)]">
+              <KanbanBoard
+                onTaskClick={handleTaskClick}
+                onCreateTask={handleCreateTask}
+              />
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Task Modals */}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          isOpen={isTaskDetailModalOpen}
+          onClose={handleCloseTaskDetailModal}
+        />
+      )}
+
+      <CreateTaskModal
+        isOpen={isCreateTaskModalOpen}
+        onClose={handleCloseCreateTaskModal}
+      />
     </div>
   );
 };

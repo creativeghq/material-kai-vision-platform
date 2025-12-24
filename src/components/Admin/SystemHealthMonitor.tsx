@@ -77,7 +77,15 @@ export const SystemHealthMonitor: React.FC = () => {
       );
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch health status: ${response.statusText}`);
+        // Try to get error details from response
+        let errorDetail = response.statusText;
+        try {
+          const errorData = await response.json();
+          errorDetail = errorData.detail || errorDetail;
+        } catch {
+          // If JSON parsing fails, use statusText
+        }
+        throw new Error(`Health check failed (${response.status}): ${errorDetail}`);
       }
 
       const data = await response.json();
@@ -85,6 +93,7 @@ export const SystemHealthMonitor: React.FC = () => {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch health status';
       setError(errorMsg);
+      console.error('Health check error:', err);
       toast({
         title: 'Health Check Failed',
         description: errorMsg,
