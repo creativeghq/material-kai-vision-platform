@@ -4,9 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Notion light theme - clean white background */
+/* Modern beige/cream theme - warm neutral background */
 body {
-  background: hsl(0, 0%, 100%);  /* #FFFFFF - Pure white */
+  background: hsl(40, 25%, 96%);  /* #F5F3EE - Warm beige/cream */
   min-height: 100vh;
   color: hsl(0, 0%, 15%);  /* Dark text */
   font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -116,135 +116,135 @@ All colors MUST be HSL.
     --font-medium: 500;    /* Medium */
     --font-semibold: 600;  /* Semi-bold */
 
-    /* ===== NOTION LIGHT THEME COLOR SYSTEM ===== */
-    /* Main Background - Clean white/off-white (Notion light) */
-    --background: 0 0% 100%;  /* #FFFFFF - Pure white */
+    /* ===== MODERN BEIGE/LIME THEME COLOR SYSTEM ===== */
+    /* Main Background - Warm beige/cream */
+    --background: 40 25% 96%;  /* #F5F3EE - Warm beige/cream */
     --foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
-    /* Page container - Subtle off-white for depth */
-    --page-background: 0 0% 98%;  /* #FAFAFA - Very light gray */
+    /* Page container - Slightly darker beige for depth */
+    --page-background: 40 25% 94%;  /* #F0EDE6 - Slightly darker beige */
 
-    /* Content sections/cards - White with transparency (glass effect) */
+    /* Content sections/cards - White with subtle warmth */
     --card: 0 0% 100%;  /* #FFFFFF - White cards */
     --card-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
     --popover: 0 0% 100%;  /* #FFFFFF - White popover */
     --popover-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
-    /* Primary - Soft sage green #c6d0bc */
-    --primary: 95 20% 77%;  /* #c6d0bc - Soft sage green */
-    --primary-foreground: 0 0% 20%;  /* Dark text on sage */
+    /* Primary - Bright lime/neon yellow-green #D4FF00 */
+    --primary: 73 100% 50%;  /* #D4FF00 - Bright lime green */
+    --primary-foreground: 0 0% 10%;  /* Very dark text on lime */
 
-    /* Secondary - Light gray (Notion-like) */
-    --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    /* Secondary - Light warm gray */
+    --secondary: 40 15% 93%;  /* #EFEAE0 - Warm light gray */
     --secondary-foreground: 0 0% 20%;  /* Dark text */
 
-    /* Muted - Subtle light backgrounds (Notion-like) */
-    --muted: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    /* Muted - Subtle warm backgrounds */
+    --muted: 40 15% 93%;  /* #EFEAE0 - Warm light gray */
     --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray text */
 
-    /* Accent - Subtle hover state (Notion-like) */
-    --accent: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    /* Accent - Lime green hover state */
+    --accent: 73 100% 95%;  /* Very light lime for hover */
     --accent-foreground: 0 0% 20%;  /* Dark text */
 
-    /* Destructive - Muted red (Notion-like) */
-    --destructive: 0 70% 50%;  /* #D9534F - Muted red */
+    /* Destructive - Soft red/pink */
+    --destructive: 0 70% 60%;  /* #E57373 - Soft red */
     --destructive-foreground: 0 0% 100%;  /* White text */
 
-    /* Borders - Very subtle light gray (Notion-like, soft) */
-    --border: 0 0% 90%;  /* #E5E5E5 - Very light border */
-    --input: 0 0% 90%;  /* #E5E5E5 - Input border */
-    --ring: 95 20% 77%;  /* #c6d0bc - Focus ring (sage green) */
+    /* Borders - Subtle warm gray */
+    --border: 40 15% 88%;  /* #E0D9CC - Warm light border */
+    --input: 40 15% 88%;  /* #E0D9CC - Input border */
+    --ring: 73 100% 50%;  /* #D4FF00 - Focus ring (lime green) */
 
-    --radius: 0.5rem;  /* 8px - Slightly rounded corners (Notion-like) */
+    --radius: 0.75rem;  /* 12px - Moderately rounded corners */
 
-    /* Sidebar - Clean white (Notion light) */
-    --sidebar-background: 0 0% 98%;  /* #FAFAFA - Very light gray */
-    --sidebar-foreground: 0 0% 40%;  /* #666666 - Medium gray text */
-    --sidebar-accent: 95 20% 77%;  /* #c6d0bc - Sage green for active items */
-    --sidebar-accent-foreground: 0 0% 20%;  /* Dark text on sage */
-    --sidebar-border: 0 0% 93%;  /* #EDEDED - Very subtle border */
+    /* Sidebar - White with warm undertone */
+    --sidebar-background: 0 0% 100%;  /* #FFFFFF - White sidebar */
+    --sidebar-foreground: 0 0% 30%;  /* #4D4D4D - Medium dark gray text */
+    --sidebar-accent: 73 100% 50%;  /* #D4FF00 - Lime green for active items */
+    --sidebar-accent-foreground: 0 0% 10%;  /* Very dark text on lime */
+    --sidebar-border: 40 15% 90%;  /* #E8E2D5 - Subtle warm border */
 
-    /* Hero section background - Clean white */
+    /* Hero section background - White */
     --hero-background: 0 0% 100%;  /* #FFFFFF - Pure white */
 
-    /* ===== STAT BUBBLE COLORS (Notion-Style) ===== */
-    /* Muted, professional colors */
-    --bubble-sage: 95 20% 77%;       /* Soft sage green (primary) */
-    --bubble-green: 142 71% 45%;     /* Muted green */
-    --bubble-purple: 271 76% 53%;    /* Muted purple */
-    --bubble-orange: 27 98% 54%;     /* Muted orange */
+    /* ===== STAT BUBBLE COLORS (Modern Style) ===== */
+    /* Vibrant, modern colors */
+    --bubble-lime: 73 100% 50%;      /* Bright lime green (primary) */
+    --bubble-green: 142 71% 50%;     /* Vibrant green */
+    --bubble-purple: 271 76% 60%;    /* Vibrant purple */
+    --bubble-orange: 27 98% 60%;     /* Vibrant orange */
     --bubble-text: 0 0% 100%;        /* White text on bubbles */
     --bubble-text-muted: 0 0% 80%;   /* Muted white for secondary text */
 
-    /* Card gradients - Minimal (Notion-like) */
-    --card-gradient-start: 0 0% 15%;  /* Slightly lighter gray */
-    --card-gradient-end: 0 0% 13%;    /* Slightly darker gray */
+    /* Card gradients - Subtle */
+    --card-gradient-start: 0 0% 100%;  /* White */
+    --card-gradient-end: 40 25% 98%;   /* Very light beige */
 
-    /* Gradients - Subtle (Notion-like) */
-    --gradient-sage: linear-gradient(180deg, rgba(198, 208, 188, 0.1) 0%, rgba(198, 208, 188, 0.02) 100%);
-    --gradient-gray: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+    /* Gradients - Subtle warm tones */
+    --gradient-lime: linear-gradient(180deg, rgba(212, 255, 0, 0.1) 0%, rgba(212, 255, 0, 0.02) 100%);
+    --gradient-warm: linear-gradient(180deg, rgba(245, 243, 238, 0.5) 0%, rgba(255, 255, 255, 0.1) 100%);
 
-    /* Shadows - Very subtle (Notion light theme) */
-    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
-    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.05);
-    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
-    --shadow-md: 0 3px 6px 0 rgb(0 0 0 / 0.08);
-    --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.1);
-    --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.04);
+    /* Shadows - Soft and subtle */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06);
+    --shadow: 0 2px 4px 0 rgb(0 0 0 / 0.08);
+    --shadow-md: 0 4px 6px 0 rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 6px 10px 0 rgb(0 0 0 / 0.12);
+    --shadow-card: 0 2px 4px 0 rgb(0 0 0 / 0.06);
 
-    /* Animation - Smooth (Notion-like) */
+    /* Animation - Smooth */
     --transition-smooth: all 0.15s ease;
     --transition-bounce: all 0.2s ease;
 
-    /* Status colors - Light theme with good contrast */
-    --success: 142 71% 35%;  /* Darker green for readability */
+    /* Status colors - Modern vibrant theme */
+    --success: 142 71% 45%;  /* Vibrant green */
     --success-foreground: 0 0% 100%;  /* White text */
     --success-bg: 142 71% 95%;  /* Very light green background */
 
-    --warning: 27 98% 40%;  /* Darker orange for readability */
+    --warning: 27 98% 55%;  /* Vibrant orange */
     --warning-foreground: 0 0% 100%;  /* White text */
     --warning-bg: 27 98% 95%;  /* Very light orange background */
 
-    --error: 0 70% 45%;  /* Darker red for readability */
+    --error: 0 70% 60%;  /* Soft red/pink */
     --error-foreground: 0 0% 100%;  /* White text */
     --error-bg: 0 70% 95%;  /* Very light red background */
 
-    --info: 210 100% 45%;  /* Darker blue for readability */
+    --info: 210 100% 55%;  /* Vibrant blue */
     --info-foreground: 0 0% 100%;  /* White text */
     --info-bg: 210 100% 95%;  /* Very light blue background */
 
-    /* Chart colors - Muted palette (Notion-like) */
-    --chart-1: 95 20% 77%;    /* Soft sage green (primary) */
-    --chart-2: 142 71% 45%;   /* Muted green */
-    --chart-3: 271 76% 53%;   /* Muted purple */
-    --chart-4: 27 98% 54%;    /* Muted orange */
-    --chart-5: 349 86% 61%;   /* Muted red */
+    /* Chart colors - Vibrant modern palette */
+    --chart-1: 73 100% 50%;   /* Bright lime green (primary) */
+    --chart-2: 142 71% 50%;   /* Vibrant green */
+    --chart-3: 271 76% 60%;   /* Vibrant purple */
+    --chart-4: 27 98% 60%;    /* Vibrant orange */
+    --chart-5: 0 70% 60%;     /* Soft red/pink */
 
-    /* Badge color system - Light theme with excellent accessibility */
-    --badge-pending-bg: 45 93% 95%;      /* Very light yellow */
-    --badge-pending-text: 45 93% 35%;    /* Dark yellow */
-    --badge-pending-border: 45 93% 70%;  /* Medium yellow */
+    /* Badge color system - Modern vibrant theme */
+    --badge-pending-bg: 45 93% 92%;      /* Light yellow */
+    --badge-pending-text: 45 93% 30%;    /* Dark yellow */
+    --badge-pending-border: 45 93% 60%;  /* Medium yellow */
 
-    --badge-updated-bg: 210 100% 95%;    /* Very light blue */
-    --badge-updated-text: 210 100% 35%;  /* Dark blue */
-    --badge-updated-border: 210 100% 70%; /* Medium blue */
+    --badge-updated-bg: 210 100% 92%;    /* Light blue */
+    --badge-updated-text: 210 100% 30%;  /* Dark blue */
+    --badge-updated-border: 210 100% 60%; /* Medium blue */
 
-    --badge-approved-bg: 142 71% 95%;    /* Very light green */
-    --badge-approved-text: 142 71% 30%;  /* Dark green */
-    --badge-approved-border: 142 71% 65%; /* Medium green */
+    --badge-approved-bg: 142 71% 92%;    /* Light green */
+    --badge-approved-text: 142 71% 25%;  /* Dark green */
+    --badge-approved-border: 142 71% 55%; /* Medium green */
 
-    --badge-rejected-bg: 0 70% 95%;      /* Very light red */
-    --badge-rejected-text: 0 70% 40%;    /* Dark red */
-    --badge-rejected-border: 0 70% 70%;  /* Medium red */
+    --badge-rejected-bg: 0 70% 92%;      /* Light red */
+    --badge-rejected-text: 0 70% 35%;    /* Dark red */
+    --badge-rejected-border: 0 70% 60%;  /* Medium red */
 
-    --badge-sent-bg: 271 76% 95%;        /* Very light purple */
-    --badge-sent-text: 271 76% 35%;      /* Dark purple */
-    --badge-sent-border: 271 76% 70%;    /* Medium purple */
+    --badge-sent-bg: 271 76% 92%;        /* Light purple */
+    --badge-sent-text: 271 76% 30%;      /* Dark purple */
+    --badge-sent-border: 271 76% 60%;    /* Medium purple */
 
-    --badge-draft-bg: 0 0% 95%;          /* Very light gray */
-    --badge-draft-text: 0 0% 35%;        /* Dark gray */
-    --badge-draft-border: 0 0% 70%;      /* Medium gray */
+    --badge-draft-bg: 40 15% 90%;        /* Light warm gray */
+    --badge-draft-text: 0 0% 30%;        /* Dark gray */
+    --badge-draft-border: 40 15% 70%;    /* Medium warm gray */
   }
 
 .dark {
