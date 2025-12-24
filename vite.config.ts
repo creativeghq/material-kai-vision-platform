@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
       // MIVAA environment variables
       'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
       'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
+      'import.meta.env.VITE_MIVAA_API_URL': JSON.stringify(env.VITE_MIVAA_API_URL || env.MIVAA_GATEWAY_URL),
       // AI API Keys
       'process.env.VITE_OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
       'process.env.OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),

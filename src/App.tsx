@@ -70,7 +70,6 @@ import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
 import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
 import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
-import TaskManagerPage from './pages/TaskManagerPage';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -557,11 +556,6 @@ const App = () => (
                     </Layout>
                   </AuthGuard>
                 }
-              />
-              {/* Redirect /tasks to Operations Dashboard */}
-              <Route
-                path="/tasks"
-                element={<Navigate to="/admin/operations" replace />}
               />
               <Route
                 path="/admin/quote-requests"
