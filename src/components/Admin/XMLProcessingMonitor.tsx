@@ -5,9 +5,12 @@ interface XMLMetrics {
   totalXMLDocuments: number;
   totalXMLProducts: number;
   totalXMLImages: number;
+  totalXMLChunks: number;
+  totalXMLEmbeddings: number;
   xmlProcessingSuccessRate: number;
   averageProductsPerXML: number;
   averageImagesPerXML: number;
+  averageChunksPerProduct: number;
   recentXMLProcessingErrors: number;
 }
 
@@ -23,44 +26,69 @@ export const XMLProcessingMonitor: React.FC = () => {
         setError(null);
 
         // Fetch XML-specific data from Supabase
-        // Assuming we have a way to identify XML documents (e.g., by file_type or source)
+        // Step 1: Fetch products first to get their IDs
+        const { data: xmlProducts, count: totalXMLProducts } = await supabase
+          .from('products')
+          .select('*', { count: 'exact' })
+          .eq('source_type', 'xml');
+
+        // Step 2: Fetch chunks using product IDs
+        const productIds = xmlProducts?.map((p: any) => p.id) || [];
+        const { data: xmlChunks, count: totalXMLChunks } = productIds.length > 0
+          ? await supabase
+              .from('document_chunks')
+              .select('*', { count: 'exact' })
+              .in('product_id', productIds)
+          : { data: null, count: 0 };
+
+        // Step 3: Fetch embeddings using chunk IDs
+        const chunkIds = xmlChunks?.map((c: any) => c.id) || [];
+        const { count: totalXMLEmbeddings } = chunkIds.length > 0
+          ? await supabase
+              .from('embeddings')
+              .select('*', { count: 'exact', head: true })
+              .in('chunk_id', chunkIds)
+          : { count: 0 };
+
+        // Step 4: Fetch remaining data in parallel
         const [
-          { data: xmlDocs, count: totalXMLDocuments },
-          { data: xmlProducts, count: totalXMLProducts },
-          { data: xmlImages, count: totalXMLImages },
+          { count: totalXMLDocuments },
+          { count: totalXMLImages },
         ] = await Promise.all([
           supabase
             .from('documents')
-            .select('*', { count: 'exact' })
+            .select('*', { count: 'exact', head: true })
             .eq('file_type', 'xml'),
           supabase
-            .from('products')
-            .select('*', { count: 'exact' })
-            .eq('source_type', 'xml'),
-          supabase
             .from('images')
-            .select('*', { count: 'exact' })
+            .select('*', { count: 'exact', head: true })
             .eq('source_type', 'xml'),
         ]);
 
         // Calculate metrics
-        const xmlProcessingSuccessRate = totalXMLDocuments > 0 
-          ? ((totalXMLDocuments - 0) / totalXMLDocuments) * 100 
+        const xmlProcessingSuccessRate = totalXMLDocuments > 0
+          ? ((totalXMLDocuments - 0) / totalXMLDocuments) * 100
           : 0;
-        const averageProductsPerXML = totalXMLDocuments > 0 
-          ? (totalXMLProducts || 0) / totalXMLDocuments 
+        const averageProductsPerXML = totalXMLDocuments > 0
+          ? (totalXMLProducts || 0) / totalXMLDocuments
           : 0;
-        const averageImagesPerXML = totalXMLDocuments > 0 
-          ? (totalXMLImages || 0) / totalXMLDocuments 
+        const averageImagesPerXML = totalXMLDocuments > 0
+          ? (totalXMLImages || 0) / totalXMLDocuments
+          : 0;
+        const averageChunksPerProduct = totalXMLProducts > 0
+          ? (totalXMLChunks || 0) / totalXMLProducts
           : 0;
 
         setMetrics({
           totalXMLDocuments: totalXMLDocuments || 0,
           totalXMLProducts: totalXMLProducts || 0,
           totalXMLImages: totalXMLImages || 0,
+          totalXMLChunks: totalXMLChunks || 0,
+          totalXMLEmbeddings: totalXMLEmbeddings || 0,
           xmlProcessingSuccessRate,
           averageProductsPerXML,
           averageImagesPerXML,
+          averageChunksPerProduct,
           recentXMLProcessingErrors: 0, // TODO: Implement error tracking
         });
       } catch (err) {
@@ -130,49 +158,67 @@ export const XMLProcessingMonitor: React.FC = () => {
       )}
 
       {/* Overview Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MetricCard
           label="XML Documents"
           value={metrics.totalXMLDocuments}
-          gradient="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📋"
         />
         <MetricCard
           label="Products from XML"
           value={metrics.totalXMLProducts}
-          gradient="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📦"
         />
-        <MetricCard 
-          label="Images from XML" 
-          value={metrics.totalXMLImages} 
-          gradient="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+        <MetricCard
+          label="Images from XML"
+          value={metrics.totalXMLImages}
+          gradient="bg-slate-50 border-slate-200"
           icon="🖼️"
+        />
+        <MetricCard
+          label="Chunks Generated"
+          value={metrics.totalXMLChunks}
+          gradient="bg-slate-50 border-slate-200"
+          icon="📝"
+        />
+        <MetricCard
+          label="Embeddings Created"
+          value={metrics.totalXMLEmbeddings}
+          gradient="bg-slate-50 border-slate-200"
+          icon="🧠"
         />
       </div>
 
       {/* Success Rates & Averages */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <MetricCard
           label="Processing Success Rate"
           value={metrics.xmlProcessingSuccessRate}
           unit="%"
           gradient={metrics.xmlProcessingSuccessRate > 90
-            ? "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300"
-            : "bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300"}
+            ? "bg-green-50 border-green-200"
+            : "bg-amber-50 border-amber-200"}
           icon={metrics.xmlProcessingSuccessRate > 90 ? "✅" : "⚠️"}
         />
         <MetricCard
           label="Avg Products/XML"
           value={metrics.averageProductsPerXML}
-          gradient="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🏷️"
         />
         <MetricCard
           label="Avg Images/XML"
           value={metrics.averageImagesPerXML}
-          gradient="bg-gradient-to-br from-rose-50 to-rose-100 border-rose-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🎨"
+        />
+        <MetricCard
+          label="Avg Chunks/Product"
+          value={metrics.averageChunksPerProduct}
+          gradient="bg-slate-50 border-slate-200"
+          icon="📊"
         />
       </div>
 

@@ -5,9 +5,12 @@ interface WebScrapingMetrics {
   totalScrapedPages: number;
   totalScrapedProducts: number;
   totalScrapedImages: number;
+  totalScrapedChunks: number;
+  totalScrapedEmbeddings: number;
   scrapingSuccessRate: number;
   averageProductsPerPage: number;
   averageImagesPerPage: number;
+  averageChunksPerProduct: number;
   recentScrapingErrors: number;
   activeSources: number;
 }
@@ -24,24 +27,43 @@ export const WebScrapingMonitor: React.FC = () => {
         setError(null);
 
         // Fetch web scraping data from Supabase
-        // Assuming we have a way to identify scraped content (e.g., by source_type)
+        // Step 1: Fetch products first to get their IDs
+        const { data: scrapedProducts, count: totalScrapedProducts } = await supabase
+          .from('products')
+          .select('*', { count: 'exact' })
+          .eq('source_type', 'web_scraping');
+
+        // Step 2: Fetch chunks using product IDs
+        const productIds = scrapedProducts?.map((p: any) => p.id) || [];
+        const { data: scrapedChunks, count: totalScrapedChunks } = productIds.length > 0
+          ? await supabase
+              .from('document_chunks')
+              .select('*', { count: 'exact' })
+              .in('product_id', productIds)
+          : { data: null, count: 0 };
+
+        // Step 3: Fetch embeddings using chunk IDs
+        const chunkIds = scrapedChunks?.map((c: any) => c.id) || [];
+        const { count: totalScrapedEmbeddings } = chunkIds.length > 0
+          ? await supabase
+              .from('embeddings')
+              .select('*', { count: 'exact', head: true })
+              .in('chunk_id', chunkIds)
+          : { count: 0 };
+
+        // Step 4: Fetch remaining data in parallel
         const [
-          { data: scrapedPages, count: totalScrapedPages },
-          { data: scrapedProducts, count: totalScrapedProducts },
-          { data: scrapedImages, count: totalScrapedImages },
+          { count: totalScrapedPages },
+          { count: totalScrapedImages },
           { data: sources },
         ] = await Promise.all([
           supabase
             .from('documents')
-            .select('*', { count: 'exact' })
-            .eq('source_type', 'web_scraping'),
-          supabase
-            .from('products')
-            .select('*', { count: 'exact' })
+            .select('*', { count: 'exact', head: true })
             .eq('source_type', 'web_scraping'),
           supabase
             .from('images')
-            .select('*', { count: 'exact' })
+            .select('*', { count: 'exact', head: true })
             .eq('source_type', 'web_scraping'),
           supabase
             .from('scraping_sources')
@@ -50,23 +72,29 @@ export const WebScrapingMonitor: React.FC = () => {
         ]);
 
         // Calculate metrics
-        const scrapingSuccessRate = totalScrapedPages > 0 
-          ? ((totalScrapedPages - 0) / totalScrapedPages) * 100 
+        const scrapingSuccessRate = totalScrapedPages > 0
+          ? ((totalScrapedPages - 0) / totalScrapedPages) * 100
           : 0;
-        const averageProductsPerPage = totalScrapedPages > 0 
-          ? (totalScrapedProducts || 0) / totalScrapedPages 
+        const averageProductsPerPage = totalScrapedPages > 0
+          ? (totalScrapedProducts || 0) / totalScrapedPages
           : 0;
-        const averageImagesPerPage = totalScrapedPages > 0 
-          ? (totalScrapedImages || 0) / totalScrapedPages 
+        const averageImagesPerPage = totalScrapedPages > 0
+          ? (totalScrapedImages || 0) / totalScrapedPages
+          : 0;
+        const averageChunksPerProduct = totalScrapedProducts > 0
+          ? (totalScrapedChunks || 0) / totalScrapedProducts
           : 0;
 
         setMetrics({
           totalScrapedPages: totalScrapedPages || 0,
           totalScrapedProducts: totalScrapedProducts || 0,
           totalScrapedImages: totalScrapedImages || 0,
+          totalScrapedChunks: totalScrapedChunks || 0,
+          totalScrapedEmbeddings: totalScrapedEmbeddings || 0,
           scrapingSuccessRate,
           averageProductsPerPage,
           averageImagesPerPage,
+          averageChunksPerProduct,
           recentScrapingErrors: 0, // TODO: Implement error tracking
           activeSources: sources?.length || 0,
         });
@@ -137,55 +165,73 @@ export const WebScrapingMonitor: React.FC = () => {
       )}
 
       {/* Overview Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <MetricCard
           label="Scraped Pages"
           value={metrics.totalScrapedPages}
-          gradient="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🌐"
         />
         <MetricCard
           label="Products Extracted"
           value={metrics.totalScrapedProducts}
-          gradient="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📦"
         />
         <MetricCard
           label="Images Scraped"
           value={metrics.totalScrapedImages}
-          gradient="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🖼️"
+        />
+        <MetricCard
+          label="Chunks Generated"
+          value={metrics.totalScrapedChunks}
+          gradient="bg-slate-50 border-slate-200"
+          icon="📝"
+        />
+        <MetricCard
+          label="Embeddings Created"
+          value={metrics.totalScrapedEmbeddings}
+          gradient="bg-slate-50 border-slate-200"
+          icon="🧠"
         />
         <MetricCard
           label="Active Sources"
           value={metrics.activeSources}
-          gradient="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🔗"
         />
       </div>
 
       {/* Success Rates & Averages */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <MetricCard
           label="Scraping Success Rate"
           value={metrics.scrapingSuccessRate}
           unit="%"
           gradient={metrics.scrapingSuccessRate > 90
-            ? "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300"
-            : "bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300"}
+            ? "bg-green-50 border-green-200"
+            : "bg-amber-50 border-amber-200"}
           icon={metrics.scrapingSuccessRate > 90 ? "✅" : "⚠️"}
         />
         <MetricCard
           label="Avg Products/Page"
           value={metrics.averageProductsPerPage}
-          gradient="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🏷️"
         />
         <MetricCard
           label="Avg Images/Page"
           value={metrics.averageImagesPerPage}
-          gradient="bg-gradient-to-br from-rose-50 to-rose-100 border-rose-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🎨"
+        />
+        <MetricCard
+          label="Avg Chunks/Product"
+          value={metrics.averageChunksPerProduct}
+          gradient="bg-slate-50 border-slate-200"
+          icon="📊"
         />
       </div>
 

@@ -1069,21 +1069,21 @@ export const OperationsDashboard: React.FC = () => {
 
             {/* AI Models Summary Cards - GPT, Claude, Llama, etc. */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-emerald-200">
-                      <DollarSign className="h-5 w-5 text-emerald-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <DollarSign className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-emerald-600 font-medium">Total AI Cost</div>
-                      <div className="text-2xl font-bold text-emerald-900">
+                      <div className="text-sm text-slate-600 font-medium">Total AI Cost</div>
+                      <div className="text-2xl font-bold text-slate-900">
                         ${(
                           aiUsageLogs.reduce((sum, log) => sum + (Number(log.total_cost_usd) || 0), 0) +
                           interiorDesignStats.total_cost
                         ).toFixed(2)}
                       </div>
-                      <div className="text-xs text-emerald-500 mt-1">
+                      <div className="text-xs text-slate-500 mt-1">
                         {aiUsageLogs.length + interiorDesignStats.total_generations} total operations
                       </div>
                     </div>
@@ -1091,18 +1091,18 @@ export const OperationsDashboard: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-amber-200">
-                      <Zap className="h-5 w-5 text-amber-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <Zap className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-amber-600 font-medium">Total Tokens</div>
-                      <div className="text-2xl font-bold text-amber-900">
+                      <div className="text-sm text-slate-600 font-medium">Total Tokens</div>
+                      <div className="text-2xl font-bold text-slate-900">
                         {aiUsageLogs.reduce((sum, log) => sum + (Number(log.input_tokens) || 0) + (Number(log.output_tokens) || 0), 0).toLocaleString()}
                       </div>
-                      <div className="text-xs text-amber-500 mt-1">
+                      <div className="text-xs text-slate-500 mt-1">
                         Input + Output tokens
                       </div>
                     </div>
@@ -1110,35 +1110,35 @@ export const OperationsDashboard: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-cyan-200">
-                      <CreditCard className="h-5 w-5 text-cyan-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <CreditCard className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-cyan-600 font-medium">Credits Used</div>
-                      <div className="text-2xl font-bold text-cyan-900">
+                      <div className="text-sm text-slate-600 font-medium">Credits Used</div>
+                      <div className="text-2xl font-bold text-slate-900">
                         {aiUsageLogs.reduce((sum, log) => sum + (Number(log.credits_debited) || 0), 0).toFixed(0)}
                       </div>
-                      <div className="text-xs text-cyan-500 mt-1">Platform credits</div>
+                      <div className="text-xs text-slate-500 mt-1">Platform credits</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-indigo-200">
-                      <Bot className="h-5 w-5 text-indigo-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <Bot className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-indigo-600 font-medium">Active Models</div>
-                      <div className="text-2xl font-bold text-indigo-900">
+                      <div className="text-sm text-slate-600 font-medium">Active Models</div>
+                      <div className="text-2xl font-bold text-slate-900">
                         {new Set(aiUsageLogs.map(log => log.model_name)).size}
                       </div>
-                      <div className="text-xs text-indigo-500 mt-1">Unique AI models</div>
+                      <div className="text-xs text-slate-500 mt-1">Unique AI models</div>
                     </div>
                   </div>
                 </CardContent>
@@ -1146,55 +1146,55 @@ export const OperationsDashboard: React.FC = () => {
             </div>
 
             {/* Interior Design Specific Stats */}
-            <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200">
+            <Card className="bg-slate-50 border-slate-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Image className="h-5 w-5 text-indigo-700" />
+                  <Image className="h-5 w-5 text-slate-700" />
                   Interior Design Generation Stats
                 </CardTitle>
-                <CardDescription className="text-indigo-600">
+                <CardDescription className="text-slate-600">
                   3D design generation costs and performance
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-4">
-                  <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-indigo-600 font-medium">Total Cost</div>
-                    <div className="text-2xl font-bold text-indigo-900">${interiorDesignStats.total_cost.toFixed(2)}</div>
-                    <div className="text-xs text-indigo-500 mt-1">
+                  <div className="bg-white p-4 rounded-lg border border-slate-200">
+                    <div className="text-sm text-slate-600 font-medium">Total Cost</div>
+                    <div className="text-2xl font-bold text-slate-900">${interiorDesignStats.total_cost.toFixed(2)}</div>
+                    <div className="text-xs text-slate-500 mt-1">
                       {interiorDesignStats.total_generations} generations
                     </div>
                   </div>
-                  <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-indigo-600 font-medium">Images Generated</div>
-                    <div className="text-2xl font-bold text-indigo-900">{interiorDesignStats.total_images}</div>
-                    <div className="text-xs text-indigo-500 mt-1">
+                  <div className="bg-white p-4 rounded-lg border border-slate-200">
+                    <div className="text-sm text-slate-600 font-medium">Images Generated</div>
+                    <div className="text-2xl font-bold text-slate-900">{interiorDesignStats.total_images}</div>
+                    <div className="text-xs text-slate-500 mt-1">
                       Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
                     </div>
                   </div>
-                  <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-indigo-600 font-medium">Avg Cost/Generation</div>
-                    <div className="text-2xl font-bold text-indigo-900">
+                  <div className="bg-white p-4 rounded-lg border border-slate-200">
+                    <div className="text-sm text-slate-600 font-medium">Avg Cost/Generation</div>
+                    <div className="text-2xl font-bold text-slate-900">
                       ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
                     </div>
-                    <div className="text-xs text-indigo-500 mt-1">Per generation</div>
+                    <div className="text-xs text-slate-500 mt-1">Per generation</div>
                   </div>
-                  <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-indigo-600 font-medium">Unique Users</div>
-                    <div className="text-2xl font-bold text-indigo-900">{interiorDesignStats.unique_users}</div>
-                    <div className="text-xs text-indigo-500 mt-1">Active users</div>
+                  <div className="bg-white p-4 rounded-lg border border-slate-200">
+                    <div className="text-sm text-slate-600 font-medium">Unique Users</div>
+                    <div className="text-2xl font-bold text-slate-900">{interiorDesignStats.unique_users}</div>
+                    <div className="text-xs text-slate-500 mt-1">Active users</div>
                   </div>
                 </div>
 
                 {/* Interior Design Models Breakdown */}
                 <div className="mt-6">
-                  <div className="text-sm font-medium text-indigo-700 mb-3">Model Breakdown</div>
+                  <div className="text-sm font-medium text-slate-700 mb-3">Model Breakdown</div>
                   {interiorDesignModels.length > 0 ? (
                     <div className="space-y-2">
                       {interiorDesignModels.map((model) => (
-                        <div key={model.model_id} className="flex items-center justify-between bg-white/70 p-3 rounded-lg">
+                        <div key={model.model_id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200">
                           <div className="flex items-center gap-2">
-                            <Image className="h-4 w-4 text-indigo-600" />
+                            <Image className="h-4 w-4 text-slate-600" />
                             <span className="font-medium text-sm">{model.model_name}</span>
                           </div>
                           <div className="flex items-center gap-4 text-sm">
@@ -1209,9 +1209,9 @@ export const OperationsDashboard: React.FC = () => {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between bg-white/70 p-3 rounded-lg opacity-50">
+                      <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 opacity-50">
                         <div className="flex items-center gap-2">
-                          <Image className="h-4 w-4 text-indigo-600" />
+                          <Image className="h-4 w-4 text-slate-600" />
                           <span className="font-medium text-sm">Stable Diffusion XL</span>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
@@ -1220,9 +1220,9 @@ export const OperationsDashboard: React.FC = () => {
                           <Badge variant="secondary">0%</Badge>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between bg-white/70 p-3 rounded-lg opacity-50">
+                      <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 opacity-50">
                         <div className="flex items-center gap-2">
-                          <Image className="h-4 w-4 text-indigo-600" />
+                          <Image className="h-4 w-4 text-slate-600" />
                           <span className="font-medium text-sm">Flux Pro</span>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
@@ -1232,7 +1232,7 @@ export const OperationsDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-center py-2">
-                        <p className="text-xs text-indigo-500">No generations yet. Models will show data once 3D designs are generated.</p>
+                        <p className="text-xs text-slate-500">No generations yet. Models will show data once 3D designs are generated.</p>
                       </div>
                     </div>
                   )}
@@ -1301,11 +1301,44 @@ export const OperationsDashboard: React.FC = () => {
                       ))}
                       {modelUsage.length === 0 && (
                         <>
+                          {/* Chat/Completion Models */}
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">GPT-5</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
                           <TableRow className="hover:bg-gray-50">
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
                                 <span className="text-gray-600">GPT-4o</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">GPT-4o-mini</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
@@ -1337,7 +1370,72 @@ export const OperationsDashboard: React.FC = () => {
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">Llama 4 Scout 17B</span>
+                                <span className="text-gray-600">Claude Haiku 4.5</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">Llama 4 Scout 17B Vision</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          {/* Embedding Models */}
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">text-embedding-3-small</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">SigLIP ViT-SO400M</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">CLIP ViT-Base</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
@@ -1351,7 +1449,7 @@ export const OperationsDashboard: React.FC = () => {
                           </TableRow>
                           <TableRow>
                             <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
-                              No AI usage data yet. Models will show actual data once API calls are made.
+                              No AI usage data yet. All models (GPT-5, GPT-4o, GPT-4o-mini, Claude Sonnet 4.5, Claude Haiku 4.5, Llama 4 Scout 17B Vision, text-embedding-3-small, SigLIP, CLIP) will show actual data once API calls are made.
                             </TableCell>
                           </TableRow>
                         </>
@@ -1453,16 +1551,16 @@ export const OperationsDashboard: React.FC = () => {
 
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-200">
-                      <FileText className="h-5 w-5 text-blue-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <FileText className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-blue-600 font-medium">PDF Processing</div>
-                      <div className="text-2xl font-bold text-blue-900">{dataProcessingStats.pdf.total}</div>
-                      <div className="text-xs text-blue-500 mt-1">
+                      <div className="text-sm text-slate-600 font-medium">PDF Processing</div>
+                      <div className="text-2xl font-bold text-slate-900">{dataProcessingStats.pdf.total}</div>
+                      <div className="text-xs text-slate-500 mt-1">
                         {dataProcessingStats.pdf.completed} completed • {dataProcessingStats.pdf.processing} processing
                       </div>
                     </div>
@@ -1470,16 +1568,16 @@ export const OperationsDashboard: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-200">
-                      <Database className="h-5 w-5 text-green-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <Database className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-green-600 font-medium">XML Imports</div>
-                      <div className="text-2xl font-bold text-green-900">{dataProcessingStats.xml.total}</div>
-                      <div className="text-xs text-green-500 mt-1">
+                      <div className="text-sm text-slate-600 font-medium">XML Imports</div>
+                      <div className="text-2xl font-bold text-slate-900">{dataProcessingStats.xml.total}</div>
+                      <div className="text-xs text-slate-500 mt-1">
                         {dataProcessingStats.xml.totalProducts} products imported
                       </div>
                     </div>
@@ -1487,16 +1585,16 @@ export const OperationsDashboard: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-200">
-                      <Activity className="h-5 w-5 text-green-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <Activity className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-green-600 font-medium">Web Scraping</div>
-                      <div className="text-2xl font-bold text-green-900">{dataProcessingStats.scraping.total}</div>
-                      <div className="text-xs text-green-500 mt-1">
+                      <div className="text-sm text-slate-600 font-medium">Web Scraping</div>
+                      <div className="text-2xl font-bold text-slate-900">{dataProcessingStats.scraping.total}</div>
+                      <div className="text-xs text-slate-500 mt-1">
                         {dataProcessingStats.scraping.totalPages} pages scraped
                       </div>
                     </div>
