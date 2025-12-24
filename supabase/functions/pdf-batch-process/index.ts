@@ -166,16 +166,13 @@ async function handleBatchCreate(req: Request, supabase: any, startTime: number)
 
     // Log API usage
     await Logger.logApiUsage(supabase, {
-      endpoint_id: undefined,
-      user_id: authResult.userId!,
+      api_key_id: authResult.userId!,
+      endpoint: '/pdf-batch-process',
+      method: 'POST',
+      status_code: 202,
+      response_time_ms: responseTime,
       ip_address: Utils.getClientIP(req),
       user_agent: req.headers.get('user-agent') || undefined,
-      request_method: 'POST',
-      request_path: '/pdf-batch-process',
-      response_status: 202,
-      response_time_ms: responseTime,
-      is_internal_request: false,
-      rate_limit_exceeded: false,
     });
 
     const response: BatchProcessResponse = {

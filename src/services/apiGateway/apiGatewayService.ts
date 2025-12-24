@@ -60,17 +60,17 @@ export interface RateLimitRule {
 
 export interface ApiUsageLog {
   id: string;
-  endpoint_id?: string;
-  user_id?: string;
-  ip_address: string;
-  user_agent?: string;
-  request_method: string;
-  request_path: string;
-  response_status?: number;
-  response_time_ms?: number;
-  is_internal_request: boolean;
-  rate_limit_exceeded: boolean;
-  created_at: string;
+  api_key_id: string;
+  endpoint: string;
+  method: string;
+  status_code: number;
+  response_time_ms: number | null;
+  request_size_bytes: number | null;
+  response_size_bytes: number | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  error_message: string | null;
+  created_at: string | null;
 }
 
 class ApiGatewayService {
@@ -314,8 +314,8 @@ class ApiGatewayService {
   async getApiUsageLogs(options?: {
     startDate?: string;
     endDate?: string;
-    endpointId?: string;
-    userId?: string;
+    endpoint?: string;
+    apiKeyId?: string;
     limit?: number;
   }): Promise<ApiUsageLog[]> {
     let query = supabase
@@ -329,11 +329,11 @@ class ApiGatewayService {
     if (options?.endDate) {
       query = query.lte('created_at', options.endDate);
     }
-    if (options?.endpointId) {
-      query = query.eq('endpoint_id', options.endpointId);
+    if (options?.endpoint) {
+      query = query.eq('endpoint', options.endpoint);
     }
-    if (options?.userId) {
-      query = query.eq('user_id', options.userId);
+    if (options?.apiKeyId) {
+      query = query.eq('api_key_id', options.apiKeyId);
     }
     if (options?.limit) {
       query = query.limit(options.limit);
@@ -342,10 +342,7 @@ class ApiGatewayService {
     const { data, error } = await query;
 
     if (error) throw error;
-    return (data || []).map((log: unknown) => ({
-      ...(log as any),
-      ip_address: String((log as any).ip_address || ''),
-    })) as ApiUsageLog[];
+    return (data || []) as ApiUsageLog[];
   }
 
   async getUsageStats(options?: {

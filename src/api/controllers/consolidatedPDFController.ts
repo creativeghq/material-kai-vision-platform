@@ -317,10 +317,10 @@ export class RateLimitHelper {
       const { data: recentRequests, error } = await supabase
         .from('api_usage_logs')
         .select('id')
-        .eq('request_path', endpoint)
+        .eq('endpoint', endpoint)
         .gte('created_at', oneMinuteAgo.toISOString())
         .or(
-          `ip_address.eq.${clientIP}${userId ? `,user_id.eq.${userId}` : ''}`,
+          `ip_address.eq.${clientIP}${userId ? `,api_key_id.eq.${userId}` : ''}`,
         );
 
       if (error) {
@@ -367,14 +367,14 @@ export class RateLimitHelper {
   ): Promise<void> {
     try {
       await supabase.from('api_usage_logs').insert({
-        user_id: userId ?? null,
-        ip_address: clientIP,
-        request_method: method,
-        request_path: endpoint,
-        response_status: responseStatus ?? null,
+        api_key_id: userId ?? 'anonymous',
+        endpoint: endpoint,
+        method: method,
+        status_code: responseStatus ?? 0,
         response_time_ms: responseTime ?? null,
-        is_internal_request: await apiGatewayService.isInternalIP(clientIP),
-        rate_limit_exceeded: rateLimitExceeded ?? false,
+        ip_address: clientIP,
+        user_agent: null,
+        error_message: rateLimitExceeded ? 'Rate limit exceeded' : null,
       });
     } catch (_error) {
       // Failed to log API usage - continue without logging

@@ -435,22 +435,27 @@ export class AuthUtils {
 // Logging utilities
 export class Logger {
   static async logApiUsage(supabase: any, logData: {
-    endpoint_id?: string;
-    user_id?: string;
-    ip_address: string;
+    api_key_id?: string;
+    endpoint: string;
+    method: string;
+    status_code: number;
+    response_time_ms?: number;
+    ip_address?: string;
     user_agent?: string;
-    request_method: string;
-    request_path: string;
-    response_status: number;
-    response_time_ms: number;
-    is_internal_request?: boolean;
-    rate_limit_exceeded?: boolean;
+    error_message?: string;
   }): Promise<void> {
     try {
       const { error } = await supabase
         .from('api_usage_logs')
         .insert({
-          ...logData,
+          api_key_id: logData.api_key_id ?? 'anonymous',
+          endpoint: logData.endpoint,
+          method: logData.method,
+          status_code: logData.status_code,
+          response_time_ms: logData.response_time_ms ?? null,
+          ip_address: logData.ip_address ?? null,
+          user_agent: logData.user_agent ?? null,
+          error_message: logData.error_message ?? null,
           created_at: new Date().toISOString(),
         });
 

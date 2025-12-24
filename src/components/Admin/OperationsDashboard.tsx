@@ -44,6 +44,8 @@ import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import { PDFProcessingMonitor } from './PDFProcessingMonitor';
+import { XMLProcessingMonitor } from './XMLProcessingMonitor';
+import { WebScrapingMonitor } from './WebScrapingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
 import { KanbanBoard } from '@/components/Tasks/KanbanBoard';
 import { TaskDetailModal } from '@/components/Tasks/TaskDetailModal';
@@ -399,15 +401,7 @@ export const OperationsDashboard: React.FC = () => {
             (item as any).created_at &&
             (item as any).id &&
             (item as any).status_code !== null,
-        )
-        .map((item: unknown) => ({
-          ...(item as any),
-          response_status: (item as any).status_code || 0,
-          response_time_ms: (item as any).response_time_ms || 0,
-          user_id: (item as any).api_key_id || 'anonymous',
-          endpoint_id: (item as any).endpoint || 'unknown',
-          user_agent: (item as any).user_agent || 'unknown',
-        }));
+        ) as ApiUsageLog[];
 
       setSearchAnalytics(filteredSearchData);
       setApiUsage(filteredApiData);
@@ -1535,6 +1529,34 @@ export const OperationsDashboard: React.FC = () => {
                 <CardDescription>Real-time monitoring of XML data imports</CardDescription>
               </CardHeader>
               <CardContent>
+                <XMLProcessingMonitor />
+              </CardContent>
+            </Card>
+
+            {/* Web Scraping Monitoring */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Web Scraping Sessions
+                </CardTitle>
+                <CardDescription>Real-time monitoring of web scraping operations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WebScrapingMonitor />
+              </CardContent>
+            </Card>
+
+            {/* Old XML Stats - Keep for reference */}
+            <Card className="hidden">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5" />
+                  XML Import Jobs (Old Stats)
+                </CardTitle>
+                <CardDescription>Legacy XML import statistics</CardDescription>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-5 gap-4">
                     <div>
@@ -1578,14 +1600,14 @@ export const OperationsDashboard: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Web Scraping Monitoring */}
-            <Card>
+            {/* Old Web Scraping Stats - Keep for reference */}
+            <Card className="hidden">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5" />
-                  Web Scraping Sessions
+                  Web Scraping Sessions (Old Stats)
                 </CardTitle>
-                <CardDescription>Real-time monitoring of web scraping operations</CardDescription>
+                <CardDescription>Legacy web scraping statistics</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
