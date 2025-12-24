@@ -200,7 +200,7 @@ export class ApiConfigManager {
   }
 
   /**
-   * Get configuration summary for debugging
+   * Get configuration summary for debugging (sanitized - no API keys exposed)
    */
   static getConfigSummary(): Record<string, unknown> {
     const apis = apiRegistry.getAllApis();
@@ -209,8 +209,9 @@ export class ApiConfigManager {
     apis.forEach((config, name) => {
       summary[name] = {
         environment: config.environment,
-        hasApiKey: !!config.apiKey,
+        hasApiKey: !!config.apiKey, // Only boolean, not the actual key
         baseUrl: config.baseUrl,
+        // SECURITY: Never log actual API keys or sensitive configuration
       };
     });
 

@@ -89,11 +89,22 @@ interface ModelConfig {
 }
 
 const MODEL_CONFIGS: ModelConfig[] = [
-  { id: 'claude-haiku', name: 'Claude Haiku 3.5', provider: 'anthropic', model: 'claude-3-5-haiku-20241022', inputCostPer1M: 0.80, outputCostPer1M: 4.00, speed: 'fast', usedFor: ['Search Agent', 'Quick Queries'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'claude-sonnet', name: 'Claude Sonnet 4.5', provider: 'anthropic', model: 'claude-sonnet-4-5-20250929', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['PDF Processing', 'Complex Tasks', 'Admin Agent'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Vision Tasks'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'llama-vision', name: 'Llama 4 Scout 17B Vision', provider: 'meta', model: 'meta-llama/Llama-4-Scout-17B-16E-Instruct', inputCostPer1M: 0.20, outputCostPer1M: 0.20, speed: 'fast', usedFor: ['Image Embeddings', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'vit-embeddings', name: 'ViT Base Patch16', provider: 'google', model: 'google/vit-base-patch16-224', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['CLIP Embeddings', 'Image Classification'], totalInputTokens: 0, totalOutputTokens: 0 },
+  // Claude Models
+  { id: 'claude-haiku-4', name: 'Claude Haiku 4.5', provider: 'anthropic', model: 'claude-haiku-4-20250514', inputCostPer1M: 0.80, outputCostPer1M: 4.00, speed: 'fast', usedFor: ['Search Agent', 'Quick Queries', 'Validation'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-sonnet-4', name: 'Claude Sonnet 4.5', provider: 'anthropic', model: 'claude-sonnet-4-20250514', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Admin Agent'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-sonnet-3.5', name: 'Claude Sonnet 3.5', provider: 'anthropic', model: 'claude-3-5-sonnet-20241022', inputCostPer1M: 3.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['Legacy Tasks'], totalInputTokens: 0, totalOutputTokens: 0 },
+
+  // OpenAI Models
+  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', model: 'gpt-5', inputCostPer1M: 5.00, outputCostPer1M: 15.00, speed: 'medium', usedFor: ['High Accuracy Tasks', 'Discovery'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Chunking'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
+
+  // Meta Llama Models
+  { id: 'llama-4-scout', name: 'Llama 4 Scout 17B Vision', provider: 'meta', model: 'meta-llama/Llama-4-Scout-17B-16E-Instruct', inputCostPer1M: 0.20, outputCostPer1M: 0.20, speed: 'fast', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
+
+  // Vision/Embedding Models
+  { id: 'siglip', name: 'SigLIP SO400M', provider: 'google', model: 'google/siglip-so400m-patch14-384', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'clip', name: 'CLIP ViT Base', provider: 'openai', model: 'openai/clip-vit-base-patch32', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Fallback)'], totalInputTokens: 0, totalOutputTokens: 0 },
 ];
 
 const getProviderStyle = (provider: string) => {
@@ -281,6 +292,12 @@ export const OperationsDashboard: React.FC = () => {
   };
 
   const handleCloseCreateTaskModal = () => {
+    setIsCreateTaskModalOpen(false);
+  };
+
+  const handleTaskCreated = () => {
+    // Refresh the kanban board by triggering a re-render
+    // The KanbanBoard component will reload its data
     setIsCreateTaskModalOpen(false);
   };
 
@@ -682,22 +699,12 @@ export const OperationsDashboard: React.FC = () => {
     trend?: number;
   }) => (
     <div className="dashboard-card">
-      <div className="flex items-center gap-2 mb-3">
-        <div
-          className="flex items-center justify-center"
-          style={{
-            width: '2rem',
-            height: '2rem',
-            borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'hsl(var(--primary) / 0.1)',
-          }}
-        >
-          <Icon className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-        </div>
-        <p className="text-sm text-muted-foreground">{title}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+        <p className="text-xs text-muted-foreground">{title}</p>
       </div>
-      <div className="text-3xl font-bold">{value}</div>
-      <div className="flex items-center justify-between mt-2">
+      <div className="text-2xl font-bold">{value}</div>
+      <div className="flex items-center justify-between mt-1">
         <p className="text-xs text-muted-foreground">{description}</p>
         {trend !== undefined && (
           <Badge
@@ -734,8 +741,8 @@ export const OperationsDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        {/* Overview Stats */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Overview Stats - Compact Design */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <StatCard
             title="Total Searches"
             value={analytics.total_searches}
@@ -972,16 +979,16 @@ export const OperationsDashboard: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-200">
-                      <Zap className="h-5 w-5 text-purple-700" />
+                    <div className="p-2 rounded-lg bg-blue-200">
+                      <Zap className="h-5 w-5 text-blue-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-purple-600">Credits Used</div>
-                      <div className="text-2xl font-bold text-purple-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
-                      <div className="text-xs text-purple-500 mt-1">
+                      <div className="text-sm text-blue-600">Credits Used</div>
+                      <div className="text-2xl font-bold text-blue-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
+                      <div className="text-xs text-blue-500 mt-1">
                         Across all users
                       </div>
                     </div>
@@ -1058,7 +1065,7 @@ export const OperationsDashboard: React.FC = () => {
                   <div>
                     <h3 className="font-semibold text-blue-900 mb-1">AI Performance Tracking</h3>
                     <p className="text-sm text-blue-700">
-                      Monitoring all AI models including <strong>GPT-4o, Claude Sonnet 4.5, Llama 4 Scout</strong>, and image generation models.
+                      Monitoring all AI models including <strong>Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Llama 4 Scout 17B</strong>, and vision/embedding models (SigLIP, CLIP).
                       Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
                     </p>
                   </div>
@@ -1145,55 +1152,55 @@ export const OperationsDashboard: React.FC = () => {
             </div>
 
             {/* Interior Design Specific Stats */}
-            <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+            <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Image className="h-5 w-5 text-purple-700" />
+                  <Image className="h-5 w-5 text-indigo-700" />
                   Interior Design Generation Stats
                 </CardTitle>
-                <CardDescription className="text-purple-600">
+                <CardDescription className="text-indigo-600">
                   3D design generation costs and performance
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-4">
                   <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-purple-600 font-medium">Total Cost</div>
-                    <div className="text-2xl font-bold text-purple-900">${interiorDesignStats.total_cost.toFixed(2)}</div>
-                    <div className="text-xs text-purple-500 mt-1">
+                    <div className="text-sm text-indigo-600 font-medium">Total Cost</div>
+                    <div className="text-2xl font-bold text-indigo-900">${interiorDesignStats.total_cost.toFixed(2)}</div>
+                    <div className="text-xs text-indigo-500 mt-1">
                       {interiorDesignStats.total_generations} generations
                     </div>
                   </div>
                   <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-purple-600 font-medium">Images Generated</div>
-                    <div className="text-2xl font-bold text-purple-900">{interiorDesignStats.total_images}</div>
-                    <div className="text-xs text-purple-500 mt-1">
+                    <div className="text-sm text-indigo-600 font-medium">Images Generated</div>
+                    <div className="text-2xl font-bold text-indigo-900">{interiorDesignStats.total_images}</div>
+                    <div className="text-xs text-indigo-500 mt-1">
                       Avg {(interiorDesignStats.total_images / Math.max(interiorDesignStats.total_generations, 1)).toFixed(1)} per job
                     </div>
                   </div>
                   <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-purple-600 font-medium">Avg Cost/Generation</div>
-                    <div className="text-2xl font-bold text-purple-900">
+                    <div className="text-sm text-indigo-600 font-medium">Avg Cost/Generation</div>
+                    <div className="text-2xl font-bold text-indigo-900">
                       ${(interiorDesignStats.total_cost / Math.max(interiorDesignStats.total_generations, 1)).toFixed(3)}
                     </div>
-                    <div className="text-xs text-purple-500 mt-1">Per generation</div>
+                    <div className="text-xs text-indigo-500 mt-1">Per generation</div>
                   </div>
                   <div className="bg-white/50 p-4 rounded-lg">
-                    <div className="text-sm text-purple-600 font-medium">Unique Users</div>
-                    <div className="text-2xl font-bold text-purple-900">{interiorDesignStats.unique_users}</div>
-                    <div className="text-xs text-purple-500 mt-1">Active users</div>
+                    <div className="text-sm text-indigo-600 font-medium">Unique Users</div>
+                    <div className="text-2xl font-bold text-indigo-900">{interiorDesignStats.unique_users}</div>
+                    <div className="text-xs text-indigo-500 mt-1">Active users</div>
                   </div>
                 </div>
 
                 {/* Interior Design Models Breakdown */}
                 <div className="mt-6">
-                  <div className="text-sm font-medium text-purple-700 mb-3">Model Breakdown</div>
+                  <div className="text-sm font-medium text-indigo-700 mb-3">Model Breakdown</div>
                   {interiorDesignModels.length > 0 ? (
                     <div className="space-y-2">
                       {interiorDesignModels.map((model) => (
                         <div key={model.model_id} className="flex items-center justify-between bg-white/70 p-3 rounded-lg">
                           <div className="flex items-center gap-2">
-                            <Image className="h-4 w-4 text-purple-600" />
+                            <Image className="h-4 w-4 text-indigo-600" />
                             <span className="font-medium text-sm">{model.model_name}</span>
                           </div>
                           <div className="flex items-center gap-4 text-sm">
@@ -1210,7 +1217,7 @@ export const OperationsDashboard: React.FC = () => {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between bg-white/70 p-3 rounded-lg opacity-50">
                         <div className="flex items-center gap-2">
-                          <Image className="h-4 w-4 text-purple-600" />
+                          <Image className="h-4 w-4 text-indigo-600" />
                           <span className="font-medium text-sm">Stable Diffusion XL</span>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
@@ -1221,7 +1228,7 @@ export const OperationsDashboard: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-between bg-white/70 p-3 rounded-lg opacity-50">
                         <div className="flex items-center gap-2">
-                          <Image className="h-4 w-4 text-purple-600" />
+                          <Image className="h-4 w-4 text-indigo-600" />
                           <span className="font-medium text-sm">Flux Pro</span>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
@@ -1231,7 +1238,7 @@ export const OperationsDashboard: React.FC = () => {
                         </div>
                       </div>
                       <div className="text-center py-2">
-                        <p className="text-xs text-purple-500">No generations yet. Models will show data once 3D designs are generated.</p>
+                        <p className="text-xs text-indigo-500">No generations yet. Models will show data once 3D designs are generated.</p>
                       </div>
                     </div>
                   )}
@@ -1251,97 +1258,113 @@ export const OperationsDashboard: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Model</TableHead>
-                      <TableHead className="text-right">API Calls</TableHead>
-                      <TableHead className="text-right">Total Tokens</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                      <TableHead className="text-right">Avg Cost</TableHead>
-                      <TableHead className="text-right">Success Rate</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {modelUsage.map((model: any) => (
-                      <TableRow key={model.model_name}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-muted-foreground" />
-                            {model.model_name}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">{model.call_count || model.usage_count}</TableCell>
-                        <TableCell className="text-right">
-                          {model.total_tokens ? model.total_tokens.toLocaleString() : 'N/A'}
-                        </TableCell>
-                        <TableCell className="text-right">${model.total_cost.toFixed(4)}</TableCell>
-                        <TableCell className="text-right">
-                          ${model.avg_cost ? model.avg_cost.toFixed(4) : (model.total_cost / Math.max(model.call_count || model.usage_count, 1)).toFixed(4)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge variant={model.success_rate >= 90 ? 'default' : model.success_rate >= 70 ? 'secondary' : 'destructive'}>
-                            {model.success_rate.toFixed(1)}%
-                          </Badge>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="font-semibold">Model</TableHead>
+                        <TableHead className="text-right font-semibold">API Calls</TableHead>
+                        <TableHead className="text-right font-semibold">Input Tokens</TableHead>
+                        <TableHead className="text-right font-semibold">Output Tokens</TableHead>
+                        <TableHead className="text-right font-semibold">Total Cost</TableHead>
+                        <TableHead className="text-right font-semibold">Avg Cost/Call</TableHead>
+                        <TableHead className="text-right font-semibold">Success Rate</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {modelUsage.length === 0 && (
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-4 w-4 text-muted-foreground" />
-                          GPT-4o
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">0</TableCell>
-                      <TableCell className="text-right">0</TableCell>
-                      <TableCell className="text-right">$0.0000</TableCell>
-                      <TableCell className="text-right">$0.0000</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="secondary">0.0%</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-4 w-4 text-muted-foreground" />
-                          Claude Sonnet 4.5
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">0</TableCell>
-                      <TableCell className="text-right">0</TableCell>
-                      <TableCell className="text-right">$0.0000</TableCell>
-                      <TableCell className="text-right">$0.0000</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="secondary">0.0%</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-4 w-4 text-muted-foreground" />
-                          Llama 3.1
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">0</TableCell>
-                      <TableCell className="text-right">0</TableCell>
-                      <TableCell className="text-right">$0.0000</TableCell>
-                      <TableCell className="text-right">$0.0000</TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant="secondary">0.0%</Badge>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4 text-sm text-muted-foreground">
-                        No AI usage data yet. Models will show actual data once API calls are made.
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                )}
+                    </TableHeader>
+                    <TableBody>
+                      {modelUsage.map((model: any) => (
+                        <TableRow key={model.model_name} className="hover:bg-gray-50">
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Bot className="h-4 w-4 text-blue-600" />
+                              <span className="text-gray-900">{model.model_name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {(model.call_count || model.usage_count).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-blue-600">
+                            {model.input_tokens ? model.input_tokens.toLocaleString() : '0'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-green-600">
+                            {model.output_tokens ? model.output_tokens.toLocaleString() : '0'}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm font-semibold">
+                            ${model.total_cost.toFixed(4)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-gray-600">
+                            ${model.avg_cost ? model.avg_cost.toFixed(4) : (model.total_cost / Math.max(model.call_count || model.usage_count, 1)).toFixed(4)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant={model.success_rate >= 90 ? 'default' : model.success_rate >= 70 ? 'secondary' : 'destructive'}
+                              className="font-semibold"
+                            >
+                              {model.success_rate.toFixed(1)}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {modelUsage.length === 0 && (
+                        <>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">GPT-4o</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">Claude Sonnet 4.5</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Bot className="h-4 w-4 text-gray-400" />
+                                <span className="text-gray-600">Llama 4 Scout 17B</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-400">$0.0000</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">0.0%</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
+                              No AI usage data yet. Models will show actual data once API calls are made.
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -1470,16 +1493,16 @@ export const OperationsDashboard: React.FC = () => {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-purple-200">
-                      <Activity className="h-5 w-5 text-purple-700" />
+                    <div className="p-2 rounded-lg bg-green-200">
+                      <Activity className="h-5 w-5 text-green-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-purple-600 font-medium">Web Scraping</div>
-                      <div className="text-2xl font-bold text-purple-900">{dataProcessingStats.scraping.total}</div>
-                      <div className="text-xs text-purple-500 mt-1">
+                      <div className="text-sm text-green-600 font-medium">Web Scraping</div>
+                      <div className="text-2xl font-bold text-green-900">{dataProcessingStats.scraping.total}</div>
+                      <div className="text-xs text-green-500 mt-1">
                         {dataProcessingStats.scraping.totalPages} pages scraped
                       </div>
                     </div>
@@ -1513,7 +1536,7 @@ export const OperationsDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     <div>
                       <div className="text-sm text-muted-foreground">Total Jobs</div>
                       <div className="text-2xl font-bold">{dataProcessingStats.xml.total}</div>
@@ -1523,12 +1546,16 @@ export const OperationsDashboard: React.FC = () => {
                       <div className="text-2xl font-bold text-green-600">{dataProcessingStats.xml.completed}</div>
                     </div>
                     <div>
+                      <div className="text-sm text-muted-foreground">Failed</div>
+                      <div className="text-2xl font-bold text-red-600">{dataProcessingStats.xml.failed}</div>
+                    </div>
+                    <div>
                       <div className="text-sm text-muted-foreground">Processing</div>
                       <div className="text-2xl font-bold text-blue-600">{dataProcessingStats.xml.processing}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Products Imported</div>
-                      <div className="text-2xl font-bold text-purple-600">{dataProcessingStats.xml.totalProducts}</div>
+                      <div className="text-2xl font-bold text-green-600">{dataProcessingStats.xml.totalProducts}</div>
                     </div>
                   </div>
                   <div className="mt-4">
@@ -1562,7 +1589,7 @@ export const OperationsDashboard: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-5 gap-4">
                     <div>
                       <div className="text-sm text-muted-foreground">Total Sessions</div>
                       <div className="text-2xl font-bold">{dataProcessingStats.scraping.total}</div>
@@ -1572,12 +1599,16 @@ export const OperationsDashboard: React.FC = () => {
                       <div className="text-2xl font-bold text-green-600">{dataProcessingStats.scraping.completed}</div>
                     </div>
                     <div>
+                      <div className="text-sm text-muted-foreground">Failed</div>
+                      <div className="text-2xl font-bold text-red-600">{dataProcessingStats.scraping.failed}</div>
+                    </div>
+                    <div>
                       <div className="text-sm text-muted-foreground">Active</div>
                       <div className="text-2xl font-bold text-blue-600">{dataProcessingStats.scraping.processing}</div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Pages Scraped</div>
-                      <div className="text-2xl font-bold text-purple-600">{dataProcessingStats.scraping.totalPages}</div>
+                      <div className="text-2xl font-bold text-green-600">{dataProcessingStats.scraping.totalPages}</div>
                     </div>
                   </div>
                   <div className="mt-4">
@@ -1682,13 +1713,13 @@ export const OperationsDashboard: React.FC = () => {
 
           {/* Tasks Tab */}
           <TabsContent value="tasks" className="space-y-4">
-            <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <ListTodo className="h-5 w-5 text-purple-600 mt-0.5" />
+                  <ListTodo className="h-5 w-5 text-blue-600 mt-0.5" />
                   <div>
-                    <h3 className="font-semibold text-purple-900 mb-1">Task Management</h3>
-                    <p className="text-sm text-purple-700">
+                    <h3 className="font-semibold text-blue-900 mb-1">Task Management</h3>
+                    <p className="text-sm text-blue-700">
                       Organize and track operational tasks with a <strong>Kanban board</strong>.
                       Create, assign, and monitor tasks across different stages of completion.
                     </p>
@@ -1719,6 +1750,7 @@ export const OperationsDashboard: React.FC = () => {
       <CreateTaskModal
         isOpen={isCreateTaskModalOpen}
         onClose={handleCloseCreateTaskModal}
+        onTaskCreated={handleTaskCreated}
       />
     </div>
   );

@@ -60,14 +60,19 @@ export const ChunkQualityDashboard: React.FC = () => {
   const fetchMetrics = async () => {
     try {
       setLoading(true);
+      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/metrics?days=30`,
+        `${apiUrl}/admin/chunk-quality/metrics?days=30`,
       );
-      if (!response.ok) throw new Error('Failed to fetch metrics');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch metrics (${response.status}): ${errorText.substring(0, 100)}`);
+      }
       const data = await response.json();
       setMetrics(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load metrics');
+      console.error('Chunk quality metrics error:', err);
     } finally {
       setLoading(false);
     }
@@ -75,8 +80,9 @@ export const ChunkQualityDashboard: React.FC = () => {
 
   const fetchFlaggedChunks = async (reviewed: boolean) => {
     try {
+      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/flagged?reviewed=${reviewed}&limit=50`,
+        `${apiUrl}/admin/chunk-quality/flagged?reviewed=${reviewed}&limit=50`,
       );
       if (!response.ok) throw new Error('Failed to fetch flagged chunks');
       const data = await response.json();
@@ -90,8 +96,9 @@ export const ChunkQualityDashboard: React.FC = () => {
 
   const reviewChunk = async (flagId: string, action: string) => {
     try {
+      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
       const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL}/admin/chunk-quality/flagged/${flagId}/review`,
+        `${apiUrl}/admin/chunk-quality/flagged/${flagId}/review`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

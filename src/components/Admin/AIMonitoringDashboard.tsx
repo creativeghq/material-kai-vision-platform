@@ -240,70 +240,60 @@ export const AIMonitoringDashboard: React.FC = () => {
           </Button>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+        {/* Summary Cards - Compact Design */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Total Cost</p>
+            </div>
             <div className="text-2xl font-bold">
               {formatCost(metrics.summary.total_cost)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               {formatNumber(metrics.summary.total_calls)} AI calls
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Avg Confidence
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Avg Confidence</p>
+            </div>
             <div className="text-2xl font-bold">
               {formatPercentage(metrics.summary.average_confidence)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Quality score across all calls
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Latency</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Avg Latency</p>
+            </div>
             <div className="text-2xl font-bold">
               {Math.round(metrics.summary.average_latency_ms)}ms
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               Average response time
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Fallback Rate</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Fallback Rate</p>
+            </div>
             <div className="text-2xl font-bold">
               {formatPercentage(metrics.summary.fallback_rate)}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-1">
               AI failures requiring fallback
             </p>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
 
       {/* Tabs */}
       <Tabs defaultValue="models" className="space-y-4">

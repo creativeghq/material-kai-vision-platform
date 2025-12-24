@@ -218,71 +218,55 @@ export const QualityMetricsDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Stats Overview */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Avg Precision</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${getQualityColor(stats.avgPrecision)}`}
-            >
-              {(stats.avgPrecision * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Retrieval accuracy
-            </p>
-          </CardContent>
-        </Card>
+      {/* Stats Overview - Compact Design */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="dashboard-card">
+          <p className="text-xs text-muted-foreground mb-2">Avg Precision</p>
+          <div
+            className={`text-2xl font-bold ${getQualityColor(stats.avgPrecision)}`}
+          >
+            {(stats.avgPrecision * 100).toFixed(1)}%
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Retrieval accuracy
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Avg Recall</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${getQualityColor(stats.avgRecall)}`}
-            >
-              {(stats.avgRecall * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Retrieval completeness
-            </p>
-          </CardContent>
-        </Card>
+        <div className="dashboard-card">
+          <p className="text-xs text-muted-foreground mb-2">Avg Recall</p>
+          <div
+            className={`text-2xl font-bold ${getQualityColor(stats.avgRecall)}`}
+          >
+            {(stats.avgRecall * 100).toFixed(1)}%
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Retrieval completeness
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">
-              Avg Response Quality
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={`text-2xl font-bold ${getQualityColor(stats.avgResponseQuality)}`}
-            >
-              {(stats.avgResponseQuality * 100).toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              LLM response quality
-            </p>
-          </CardContent>
-        </Card>
+        <div className="dashboard-card">
+          <p className="text-xs text-muted-foreground mb-2">
+            Avg Response Quality
+          </p>
+          <div
+            className={`text-2xl font-bold ${getQualityColor(stats.avgResponseQuality)}`}
+          >
+            {(stats.avgResponseQuality * 100).toFixed(1)}%
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            LLM response quality
+          </p>
+        </div>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Avg Latency</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats.avgLatency.toFixed(0)}ms
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Search response time
-            </p>
-          </CardContent>
-        </Card>
+        <div className="dashboard-card">
+          <p className="text-xs text-muted-foreground mb-2">Avg Latency</p>
+          <div className="text-2xl font-bold">
+            {stats.avgLatency.toFixed(0)}ms
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Search response time
+          </p>
+        </div>
       </div>
 
       {/* Tabs for detailed metrics */}

@@ -370,8 +370,8 @@ export const CRMManagement: React.FC = () => {
       />
 
       <div className="p-6 space-y-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Stats Cards - Compact Design */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <AdminStatCard
             title="Total Users"
             value={userStats.total}

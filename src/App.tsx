@@ -240,8 +240,9 @@ const App = () => (
                   </AuthGuard>
                 }
               />
-              {/* Redirect old route to new route */}
+              {/* Redirect old routes to new routes */}
               <Route path="/admin/agent-configs" element={<Navigate to="/admin/ai-configs" replace />} />
+              <Route path="/tasks" element={<Navigate to="/admin/operations" replace />} />
               <Route
                 path="/admin/prompt-templates"
                 element={

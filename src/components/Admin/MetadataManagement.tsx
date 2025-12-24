@@ -287,74 +287,58 @@ export const MetadataManagement: React.FC = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* Statistics Cards */}
+        {/* Statistics Cards - Compact Design */}
         {statistics && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Total Products
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-gray-900">{statistics.total_products}</div>
-                <p className="text-xs text-gray-500 mt-1">
-                  With metadata
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Total Products</p>
+              </div>
+              <div className="text-2xl font-bold">{statistics.total_products}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                With metadata
+              </p>
+            </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  Metadata Fields
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {statistics.total_metadata_fields}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Total field instances
-                </p>
-              </CardContent>
-            </Card>
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <Database className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Metadata Fields</p>
+              </div>
+              <div className="text-2xl font-bold text-blue-600">
+                {statistics.total_metadata_fields}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Total field instances
+              </p>
+            </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Unique Fields
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {statistics.unique_fields}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Different field types
-                </p>
-              </CardContent>
-            </Card>
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Unique Fields</p>
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                {statistics.unique_fields}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Different field types
+              </p>
+            </div>
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Most Common
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600">
-                  {statistics.most_common_fields[0]?.field || 'N/A'}
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  {statistics.most_common_fields[0]?.count || 0} occurrences
-                </p>
-              </CardContent>
-            </Card>
+            <div className="dashboard-card">
+              <div className="flex items-center gap-2 mb-2">
+                <BarChart3 className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+                <p className="text-xs text-muted-foreground">Most Common</p>
+              </div>
+              <div className="text-2xl font-bold text-purple-600">
+                {statistics.most_common_fields[0]?.field || 'N/A'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {statistics.most_common_fields[0]?.count || 0} occurrences
+              </p>
+            </div>
           </div>
         )}
 

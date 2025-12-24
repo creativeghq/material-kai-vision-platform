@@ -27,11 +27,9 @@ export default defineConfig(({ mode }) => {
       'process.env.MIVAA_GATEWAY_URL': JSON.stringify(env.MIVAA_GATEWAY_URL),
       'process.env.MIVAA_API_KEY': JSON.stringify(env.MIVAA_API_KEY),
       'import.meta.env.VITE_MIVAA_API_URL': JSON.stringify(env.VITE_MIVAA_API_URL || env.MIVAA_GATEWAY_URL),
-      // AI API Keys
-      'process.env.VITE_OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
-      'process.env.OPENAI_API_KEY': JSON.stringify(env.VITE_OPENAI_API_KEY),
-      'process.env.HUGGINGFACE_API_TOKEN': JSON.stringify(env.HUGGINGFACE_API_TOKEN),
-      'process.env.REPLICATE_API_TOKEN': JSON.stringify(env.REPLICATE_API_TOKEN),
+      // SECURITY: AI API Keys are NOT exposed to client-side code
+      // They should only be used server-side (Supabase Edge Functions, MIVAA API)
+      // Client code should call backend APIs which then use these keys securely
     },
     build: {
       rollupOptions: {

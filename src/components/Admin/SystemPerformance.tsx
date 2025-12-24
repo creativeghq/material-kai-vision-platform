@@ -385,36 +385,35 @@ export const SystemPerformance: React.FC = () => {
     trend?: number;
     status?: 'good' | 'warning' | 'error';
   }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+    <div className="dashboard-card">
+      <div className="flex items-center gap-2 mb-2">
         <Icon
-          className={`h-4 w-4 ${
-            status === 'good'
-              ? 'text-green-600'
+          className="h-4 w-4"
+          style={{
+            color: status === 'good'
+              ? 'hsl(142 71% 45%)'
               : status === 'warning'
-                ? 'text-yellow-600'
+                ? 'hsl(38 92% 50%)'
                 : status === 'error'
-                  ? 'text-red-600'
-                  : 'text-muted-foreground'
-          }`}
+                  ? 'hsl(0 84% 60%)'
+                  : 'hsl(var(--primary))'
+          }}
         />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">{description}</p>
-          {trend !== undefined && (
-            <Badge
-              className={`text-xs ${trend > 0 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-            >
-              {trend > 0 ? '+' : ''}
-              {trend}%
-            </Badge>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        <p className="text-xs text-muted-foreground">{title}</p>
+      </div>
+      <div className="text-2xl font-bold">{value}</div>
+      <div className="flex items-center justify-between mt-1">
+        <p className="text-xs text-muted-foreground">{description}</p>
+        {trend !== undefined && (
+          <Badge
+            className={`text-xs ${trend > 0 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+          >
+            {trend > 0 ? '+' : ''}
+            {trend}%
+          </Badge>
+        )}
+      </div>
+    </div>
   );
 
   if (loading) {
@@ -490,8 +489,8 @@ export const SystemPerformance: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        {/* System Health Overview */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* System Health Overview - Compact Design */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <MetricCard
             title="Processing Jobs"
             value={metrics.total_processing_jobs}
@@ -553,9 +552,9 @@ export const SystemPerformance: React.FC = () => {
 
           {/* Enhanced Monitoring Tab */}
           <TabsContent value="enhanced-monitoring" className="space-y-6">
-            {/* Document Analysis Metrics */}
+            {/* Document Analysis Metrics - Compact Design */}
             {documentMetrics && (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <MetricCard
                   title="Documents Today"
                   value={documentMetrics.documents_processed_today}

@@ -255,120 +255,48 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Compact Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-lg font-semibold">{quoteRequests.length}</p>
-              </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Total</p>
             </div>
+            <div className="text-2xl font-bold">{quoteRequests.length}</div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Pending</p>
-                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'submitted').length}</p>
-              </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Pending</p>
             </div>
+            <div className="text-2xl font-bold">{quoteRequests.filter(q => q.status === 'submitted').length}</div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Quoted</p>
-                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'quoted').length}</p>
-              </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Quoted</p>
             </div>
+            <div className="text-2xl font-bold">{quoteRequests.filter(q => q.status === 'quoted').length}</div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Accepted</p>
-                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'accepted').length}</p>
-              </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Accepted</p>
             </div>
+            <div className="text-2xl font-bold">{quoteRequests.filter(q => q.status === 'accepted').length}</div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <XCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Rejected</p>
-                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'rejected').length}</p>
-              </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <XCircle className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Rejected</p>
             </div>
+            <div className="text-2xl font-bold">{quoteRequests.filter(q => q.status === 'rejected').length}</div>
           </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Draft</p>
-                <p className="text-lg font-semibold">{quoteRequests.filter(q => q.status === 'draft').length}</p>
-              </div>
+          <div className="dashboard-card">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              <p className="text-xs text-muted-foreground">Draft</p>
             </div>
+            <div className="text-2xl font-bold">{quoteRequests.filter(q => q.status === 'draft').length}</div>
           </div>
         </div>
 

@@ -171,16 +171,14 @@ export const AdminPanel: React.FC = () => {
     icon: React.ComponentType<{ className?: string }>;
     description: string;
   }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
+    <div className="dashboard-card">
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+        <p className="text-xs text-muted-foreground">{title}</p>
+      </div>
+      <div className="text-2xl font-bold">{value}</div>
+      <p className="text-xs text-muted-foreground mt-1">{description}</p>
+    </div>
   );
 
   if (loading) {
@@ -239,8 +237,8 @@ export const AdminPanel: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        {/* Stats Overview */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        {/* Stats Overview - Compact Design */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <StatCard
             title="Total Analyses"
             value={stats.totalAnalyses}

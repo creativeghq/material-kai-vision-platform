@@ -3,12 +3,18 @@ export async function debugCORSIssue() {
   console.log('🔍 CORS Debug - Environment Check');
 
   // Check environment variables
-  const supabaseUrl =
-    (import.meta as any).env?.VITE_SUPABASE_URL ||
-    'https://bgbavxtjlbvgplozizxu.supabase.co';
-  const supabaseKey =
-    (import.meta as any).env?.VITE_SUPABASE_ANON_KEY ||
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJnYmF2eHRqbGJ2Z3Bsb3ppenh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE5MDYwMzEsImV4cCI6MjA2NzQ4MjAzMX0.xswCBesG3eoYjKY5VNkUNhxc0tG6Ju2IzGI0Yd-DWMg';
+  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
+  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('❌ Missing Supabase environment variables');
+    console.error('  VITE_SUPABASE_URL:', supabaseUrl ? 'Set' : 'Missing');
+    console.error('  VITE_SUPABASE_ANON_KEY:', supabaseKey ? 'Set' : 'Missing');
+    return {
+      success: false,
+      error: 'Missing Supabase environment variables. Please check your .env file.'
+    };
+  }
 
   console.log('Environment Variables:');
   console.log('  VITE_SUPABASE_URL:', supabaseUrl);

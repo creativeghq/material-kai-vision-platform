@@ -26,6 +26,13 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface AIServiceHealth {
+  status: 'healthy' | 'unhealthy';
+  message?: string;
+  response_time_ms?: number;
+  error?: string;
+}
+
 interface HealthStatus {
   overall_status: 'healthy' | 'degraded' | 'unhealthy';
   database: {
@@ -58,6 +65,11 @@ interface HealthStatus {
     state: 'closed' | 'open' | 'half_open';
     failure_count: number;
   };
+  ai_services?: {
+    together_ai?: AIServiceHealth;
+    embeddings?: AIServiceHealth;
+    ai_services?: AIServiceHealth;
+  };
   timestamp: string;
 }
 
@@ -72,9 +84,10 @@ export const SystemHealthMonitor: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/health/detailed`
-      );
+      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+
+      // Fetch main health status
+      const response = await fetch(`${apiUrl}/health/detailed`);
 
       if (!response.ok) {
         // Try to get error details from response
@@ -89,6 +102,23 @@ export const SystemHealthMonitor: React.FC = () => {
       }
 
       const data = await response.json();
+
+      // Fetch AI services health in parallel
+      const aiServicesPromises = [
+        fetch(`${apiUrl}/api/health`).then(r => r.ok ? r.json() : null).catch(() => null), // TogetherAI
+        fetch(`${apiUrl}/api/embeddings/health`).then(r => r.ok ? r.json() : null).catch(() => null), // Embeddings
+        fetch(`${apiUrl}/api/v1/ai-services/health`).then(r => r.ok ? r.json() : null).catch(() => null), // AI Services
+      ];
+
+      const [togetherAI, embeddings, aiServices] = await Promise.all(aiServicesPromises);
+
+      // Add AI services to health data
+      data.ai_services = {
+        together_ai: togetherAI ? { status: 'healthy', message: togetherAI.message } : { status: 'unhealthy', error: 'Service unavailable' },
+        embeddings: embeddings ? { status: 'healthy', message: embeddings.message } : { status: 'unhealthy', error: 'Service unavailable' },
+        ai_services: aiServices ? { status: 'healthy' } : { status: 'unhealthy', error: 'Service unavailable' },
+      };
+
       setHealth(data);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch health status';
@@ -336,6 +366,64 @@ export const SystemHealthMonitor: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* AI Services Health */}
+      {health.ai_services && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              AI Services Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm font-medium">TogetherAI</span>
+                {health.ai_services.together_ai?.status === 'healthy' ? (
+                  <Badge className="bg-green-500">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Healthy
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Unavailable
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm font-medium">Embeddings</span>
+                {health.ai_services.embeddings?.status === 'healthy' ? (
+                  <Badge className="bg-green-500">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Healthy
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Unavailable
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                <span className="text-sm font-medium">AI Services</span>
+                {health.ai_services.ai_services?.status === 'healthy' ? (
+                  <Badge className="bg-green-500">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Healthy
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Unavailable
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Database Performance Details */}
       <Card>

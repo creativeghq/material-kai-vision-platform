@@ -348,13 +348,14 @@ class ConfigurationFactory implements ConfigFactory {
   }
 
   /**
-   * Get configuration summary for logging/debugging
+   * Get configuration summary for logging/debugging (sanitized - no secrets)
    */
   public getConfigSummary(): Record<string, unknown> {
     if (!this.currentConfig) {
       return { status: 'No configuration loaded' };
     }
 
+    // SECURITY: Only return non-sensitive configuration metadata
     return {
       environment: this.currentConfig.environment,
       version: this.currentConfig.version,
@@ -365,6 +366,7 @@ class ConfigurationFactory implements ConfigFactory {
       cachingEnabled: this.currentConfig.performance.caching.enabled,
       rateLimitEnabled: this.currentConfig.performance.rateLimit.enabled,
       monitoringEnabled: this.currentConfig.performance.monitoring.enabled,
+      // Note: API keys and secrets are never included in summaries
     };
   }
 
