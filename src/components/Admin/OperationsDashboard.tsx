@@ -308,6 +308,23 @@ export const OperationsDashboard: React.FC = () => {
       setLoading(true);
       console.log('🔄 Fetching analytics data...');
 
+      // Check if user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session) {
+        console.error('❌ Authentication error:', sessionError);
+        toast({
+          title: 'Authentication Required',
+          description: 'Your session has expired. Please log in again.',
+          variant: 'destructive',
+        });
+        // Optionally redirect to login
+        // navigate('/auth');
+        return;
+      }
+
+      console.log('✅ User authenticated:', session.user.email);
+
       // Fetch search analytics
       const { data: searchData, error: searchError } = await supabase
         .from('analytics_events')
@@ -317,6 +334,15 @@ export const OperationsDashboard: React.FC = () => {
 
       if (searchError) {
         console.error('❌ Error fetching analytics_events:', searchError);
+        // Check if it's an auth error
+        if (searchError.message?.includes('JWT') || searchError.message?.includes('401')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please refresh the page and log in again.',
+            variant: 'destructive',
+          });
+          return;
+        }
         throw searchError;
       }
       console.log('✅ Analytics events:', searchData?.length || 0);
@@ -328,7 +354,18 @@ export const OperationsDashboard: React.FC = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      if (apiError) throw apiError;
+      if (apiError) {
+        console.error('❌ Error fetching api_usage_logs:', apiError);
+        if (apiError.message?.includes('JWT') || apiError.message?.includes('401')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please refresh the page and log in again.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw apiError;
+      }
 
       // Fetch agent chat messages (assistant responses with metadata)
       const { data: agentChatData, error: agentChatError } = await supabase
@@ -349,7 +386,15 @@ export const OperationsDashboard: React.FC = () => {
         .limit(100);
 
       if (agentChatError) {
-        console.error('Error fetching agent chats:', agentChatError);
+        console.error('❌ Error fetching agent chats:', agentChatError);
+        if (agentChatError.message?.includes('JWT') || agentChatError.message?.includes('401')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please refresh the page and log in again.',
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
       // Map agent chat data with user info
@@ -441,7 +486,15 @@ export const OperationsDashboard: React.FC = () => {
         .order('created_at', { ascending: false });
 
       if (profilesError) {
-        console.error('Error fetching user profiles:', profilesError);
+        console.error('❌ Error fetching user profiles:', profilesError);
+        if (profilesError.message?.includes('JWT') || profilesError.message?.includes('401')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please refresh the page and log in again.',
+            variant: 'destructive',
+          });
+          return;
+        }
       } else if (profiles) {
         setUserProfiles(profiles);
 
@@ -469,6 +522,14 @@ export const OperationsDashboard: React.FC = () => {
 
       if (aiLogsError) {
         console.error('❌ Error fetching AI usage logs:', aiLogsError);
+        if (aiLogsError.message?.includes('JWT') || aiLogsError.message?.includes('401')) {
+          toast({
+            title: 'Session Expired',
+            description: 'Your session has expired. Please refresh the page and log in again.',
+            variant: 'destructive',
+          });
+          return;
+        }
       } else if (aiLogs) {
         console.log('✅ AI Usage Logs:', aiLogs.length);
         setAIUsageLogs(aiLogs);
@@ -607,6 +668,35 @@ export const OperationsDashboard: React.FC = () => {
         supabase.from('scraping_sessions').select('*'),
       ]);
 
+      // Check for auth errors in data processing queries
+      if (pdfJobs.error && (pdfJobs.error.message?.includes('JWT') || pdfJobs.error.message?.includes('401'))) {
+        console.error('❌ Auth error fetching PDF jobs:', pdfJobs.error);
+        toast({
+          title: 'Session Expired',
+          description: 'Your session has expired. Please refresh the page and log in again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (xmlJobs.error && (xmlJobs.error.message?.includes('JWT') || xmlJobs.error.message?.includes('401'))) {
+        console.error('❌ Auth error fetching XML jobs:', xmlJobs.error);
+        toast({
+          title: 'Session Expired',
+          description: 'Your session has expired. Please refresh the page and log in again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (scrapingSessions.error && (scrapingSessions.error.message?.includes('JWT') || scrapingSessions.error.message?.includes('401'))) {
+        console.error('❌ Auth error fetching scraping sessions:', scrapingSessions.error);
+        toast({
+          title: 'Session Expired',
+          description: 'Your session has expired. Please refresh the page and log in again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       console.log('📊 PDF Jobs:', pdfJobs.data?.length || 0, pdfJobs.error);
       console.log('📊 XML Jobs:', xmlJobs.data?.length || 0, xmlJobs.error);
       console.log('📊 Scraping Sessions:', scrapingSessions.data?.length || 0, scrapingSessions.error);
@@ -735,38 +825,6 @@ export const OperationsDashboard: React.FC = () => {
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
-        {/* Overview Stats - Compact Design */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard
-            title="Total Searches"
-            value={analytics.total_searches}
-            icon={Search}
-            description="Search queries processed"
-            trend={12}
-          />
-          <StatCard
-            title="API Calls"
-            value={analytics.total_api_calls}
-            icon={BarChart3}
-            description="Total API requests"
-            trend={8}
-          />
-          <StatCard
-            title="Active Users"
-            value={analytics.active_users}
-            icon={Users}
-            description="Unique users today"
-            trend={15}
-          />
-          <StatCard
-            title="Avg Response Time"
-            value={`${analytics.avg_response_time}ms`}
-            icon={Clock}
-            description="Average API response time"
-            trend={-5}
-          />
-        </div>
-
         <Tabs defaultValue="system-health" className="space-y-4">
           <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="system-health">
@@ -806,6 +864,38 @@ export const OperationsDashboard: React.FC = () => {
 
           {/* Agent Chat Analytics Tab */}
           <TabsContent value="agent-chat" className="space-y-4">
+            {/* Platform Overview Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <StatCard
+                title="Total Searches"
+                value={analytics.total_searches}
+                icon={Search}
+                description="Search queries processed"
+                trend={12}
+              />
+              <StatCard
+                title="API Calls"
+                value={analytics.total_api_calls}
+                icon={BarChart3}
+                description="Total API requests"
+                trend={8}
+              />
+              <StatCard
+                title="Active Users"
+                value={analytics.active_users}
+                icon={Users}
+                description="Unique users today"
+                trend={15}
+              />
+              <StatCard
+                title="Avg Response Time"
+                value={`${analytics.avg_response_time}ms`}
+                icon={Clock}
+                description="Average API response time"
+                trend={-5}
+              />
+            </div>
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

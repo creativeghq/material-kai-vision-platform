@@ -30,6 +30,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AITestingPanel } from './AITestingPanel';
 import { QualityMetricsDashboard } from './QualityMetricsDashboard';
 import { HumanReviewPanel } from './HumanReviewPanel';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface AnalyticsEvent {
   id: string;
@@ -194,36 +195,16 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => navigate('/')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Activity className="h-4 w-4" />
-                Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
-                onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Back to Admin
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
-              <p className="text-sm text-muted-foreground">
-                AI Performance Analytics & System Overview
-              </p>
-            </div>
-          </div>
+      <GlobalAdminHeader
+        title="Admin Panel"
+        description="AI Performance Analytics & System Overview"
+        badge="Analytics"
+      />
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
+        {/* Refresh Button */}
+        <div className="flex justify-end">
           <Button
             onClick={fetchAnalyticsData}
             onKeyDown={(e) => e.key === 'Enter' && fetchAnalyticsData()}
@@ -233,10 +214,6 @@ export const AdminPanel: React.FC = () => {
             Refresh Data
           </Button>
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="p-6 space-y-6">
         {/* Stats Overview - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <StatCard

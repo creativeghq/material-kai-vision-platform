@@ -7,8 +7,6 @@ import {
   CheckCircle,
   Clock,
   Brain,
-  Home,
-  ArrowLeft,
   Gauge,
   FileText,
   Layers,
@@ -34,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface SystemMetrics {
   total_processing_jobs: number;
@@ -431,47 +430,16 @@ export const SystemPerformance: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => navigate('/')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate('/');
-                  }
-                }}
-                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
-              >
-                <Home className="h-4 w-4" />
-                Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate('/admin');
-                  }
-                }}
-                className="border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground h-8 px-3 text-sm flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Admin
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                System Performance
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Technical performance metrics, processing times, and system
-                health
-              </p>
-            </div>
-          </div>
+      <GlobalAdminHeader
+        title="System Performance"
+        description="Technical performance metrics, processing times, and system health"
+        badge="Performance"
+      />
+
+      {/* Main Content */}
+      <div className="p-6 space-y-6">
+        {/* Refresh Button */}
+        <div className="flex justify-end">
           <Button
             onClick={fetchPerformanceData}
             onKeyDown={(e) => {
@@ -485,10 +453,7 @@ export const SystemPerformance: React.FC = () => {
             Refresh Data
           </Button>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="p-6 space-y-6">
         {/* System Health Overview - Compact Design */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <MetricCard

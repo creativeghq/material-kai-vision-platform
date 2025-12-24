@@ -11,8 +11,6 @@ import {
   Image,
   FileText,
   Layers,
-  ArrowLeft,
-  Home,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';
+import { GlobalAdminHeader } from './GlobalAdminHeader';
 // import { HybridAIService } from '@/services/hybridAIService'; // REMOVED: Service deleted during cleanup
 
 // ✅ Standardized AI Test Response Interface
@@ -559,49 +558,11 @@ export const AITestingPanel: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Header with Navigation */}
-      <div className="border-b bg-card px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => navigate('/')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate('/');
-                  }
-                }}
-                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <Home className="h-4 w-4" />
-                Back to Main
-              </Button>
-              <Button
-                onClick={() => navigate('/admin')}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate('/admin');
-                  }
-                }}
-                className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Admin
-              </Button>
-            </div>
-            <div className="h-6 w-px bg-border" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                AI Testing Panel
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Test the hybrid AI system to generate analytics data and
-                validate scoring
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <GlobalAdminHeader
+        title="AI Testing Panel"
+        description="Test the hybrid AI system to generate analytics data and validate scoring"
+        badge="Testing"
+      />
 
       {/* Main Content */}
       <div className="p-6 space-y-6">
