@@ -234,43 +234,6 @@ export const WebScrapingMonitor: React.FC = () => {
           icon="📊"
         />
       </div>
-
-      {/* Recommendations */}
-      {(metrics.totalScrapedPages > 0 && metrics.totalScrapedProducts === 0) ||
-       metrics.activeSources === 0 ? (
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-lg shadow-sm">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">💡</span>
-            <div>
-              <h3 className="font-bold text-blue-900 mb-2">Recommendations</h3>
-              <ul className="text-sm text-blue-800 space-y-1.5">
-                {metrics.totalScrapedPages > 0 && metrics.totalScrapedProducts === 0 && (
-                  <>
-                    <li className="flex items-start gap-2">
-                      <span>•</span>
-                      <span>Verify CSS selectors for product extraction are up to date</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span>•</span>
-                      <span>Check if target websites have changed their HTML structure</span>
-                    </li>
-                  </>
-                )}
-                {metrics.activeSources === 0 && (
-                  <li className="flex items-start gap-2">
-                    <span>•</span>
-                    <span>No active scraping sources configured - add sources to begin scraping</span>
-                  </li>
-                )}
-                <li className="flex items-start gap-2">
-                  <span>•</span>
-                  <span>Monitor scraping frequency to avoid rate limiting</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 };

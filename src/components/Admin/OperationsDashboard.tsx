@@ -48,7 +48,7 @@ import { XMLProcessingMonitor } from './XMLProcessingMonitor';
 import { WebScrapingMonitor } from './WebScrapingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
 import { KanbanBoard } from '@/components/Tasks/KanbanBoard';
-import { TaskDetailModal } from '@/components/Tasks/TaskDetailModal';
+import { TaskDetailPanel } from '@/components/Tasks/TaskDetailPanel';
 import { CreateTaskModal } from '@/components/Tasks/CreateTaskModal';
 import type { TaskWithDetails } from '@/services/tasks';
 
@@ -940,49 +940,49 @@ export const OperationsDashboard: React.FC = () => {
           {/* Subscriptions & Credits Tab */}
           <TabsContent value="subscriptions" className="space-y-4">
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-200">
-                      <Crown className="h-5 w-5 text-blue-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <Crown className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-blue-600">Pro Subscribers</div>
-                      <div className="text-2xl font-bold text-blue-900">{subscriptionStats.proUsers}</div>
-                      <div className="text-xs text-blue-500 mt-1">
+                      <div className="text-sm text-slate-600 font-medium">Pro Subscribers</div>
+                      <div className="text-2xl font-bold text-slate-900">{subscriptionStats.proUsers}</div>
+                      <div className="text-xs text-slate-500 mt-1">
                         {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-green-200">
-                      <DollarSign className="h-5 w-5 text-green-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <DollarSign className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-green-600">Monthly Revenue</div>
-                      <div className="text-2xl font-bold text-green-900">${subscriptionStats.totalRevenue}</div>
-                      <div className="text-xs text-green-500 mt-1">
+                      <div className="text-sm text-slate-600 font-medium">Monthly Revenue</div>
+                      <div className="text-2xl font-bold text-slate-900">${subscriptionStats.totalRevenue}</div>
+                      <div className="text-xs text-slate-500 mt-1">
                         From Pro subscriptions
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200">
+              <Card className="bg-slate-50 border-slate-200">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-blue-200">
-                      <Zap className="h-5 w-5 text-blue-700" />
+                    <div className="p-2 rounded-lg bg-slate-200">
+                      <Zap className="h-5 w-5 text-slate-700" />
                     </div>
                     <div>
-                      <div className="text-sm text-blue-600">Credits Used</div>
-                      <div className="text-2xl font-bold text-blue-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
-                      <div className="text-xs text-blue-500 mt-1">
+                      <div className="text-sm text-slate-600 font-medium">Credits Used</div>
+                      <div className="text-2xl font-bold text-slate-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
+                      <div className="text-xs text-slate-500 mt-1">
                         Across all users
                       </div>
                     </div>
@@ -1247,7 +1247,7 @@ export const OperationsDashboard: React.FC = () => {
                   <Bot className="h-5 w-5" />
                   AI Model Usage & Costs
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-muted-foreground">
                   All AI models (GPT, Claude, Llama, etc.) - Performance and cost breakdown
                 </CardDescription>
               </CardHeader>
@@ -1833,13 +1833,13 @@ export const OperationsDashboard: React.FC = () => {
 
           {/* Tasks Tab */}
           <TabsContent value="tasks" className="space-y-4">
-            <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <Card className="bg-slate-50 border-slate-200">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
-                  <ListTodo className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <ListTodo className="h-5 w-5 text-slate-600 mt-0.5" />
                   <div>
-                    <h3 className="font-semibold text-blue-900 mb-1">Task Management</h3>
-                    <p className="text-sm text-blue-700">
+                    <h3 className="font-semibold text-slate-900 mb-1">Task Management</h3>
+                    <p className="text-sm text-slate-600">
                       Organize and track operational tasks with a <strong>Kanban board</strong>.
                       Create, assign, and monitor tasks across different stages of completion.
                     </p>
@@ -1858,15 +1858,14 @@ export const OperationsDashboard: React.FC = () => {
         </Tabs>
       </div>
 
-      {/* Task Modals */}
-      {selectedTask && (
-        <TaskDetailModal
-          task={selectedTask}
-          isOpen={isTaskDetailModalOpen}
-          onClose={handleCloseTaskDetailModal}
-        />
-      )}
+      {/* Task Detail Panel (Sliding from right) */}
+      <TaskDetailPanel
+        task={selectedTask}
+        isOpen={isTaskDetailModalOpen}
+        onClose={handleCloseTaskDetailModal}
+      />
 
+      {/* Create Task Modal */}
       <CreateTaskModal
         isOpen={isCreateTaskModalOpen}
         onClose={handleCloseCreateTaskModal}

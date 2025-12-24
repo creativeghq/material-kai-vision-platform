@@ -20,11 +20,18 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   onTaskClick,
   children,
 }) => {
+  // Check if this is the first column (Open column)
+  const isFirstColumn = column.position === 0;
+
   return (
     <div
       className={cn(
         'relative transition-all duration-300 ease-in-out flex-shrink-0',
-        isExpanded ? 'w-80' : 'w-16'
+        isExpanded
+          ? isFirstColumn
+            ? 'flex-1 min-w-[600px]'  // Full width for Open column
+            : 'w-80'                    // Fixed width for other columns
+          : 'w-16'
       )}
     >
       {/* Column Container */}

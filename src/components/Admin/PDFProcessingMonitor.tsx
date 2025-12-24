@@ -113,7 +113,7 @@ export const PDFProcessingMonitor: React.FC = () => {
     <div className="space-y-4">
       {/* Critical Issues */}
       {hasIssues && (
-        <div className="p-4 bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-red-500 rounded-lg shadow-sm">
+        <div className="p-4 bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm">
           <div className="flex items-start gap-3">
             <span className="text-2xl">⚠️</span>
             <div>
@@ -144,31 +144,31 @@ export const PDFProcessingMonitor: React.FC = () => {
         <MetricCard
           label="Documents"
           value={metrics.totalDocuments}
-          gradient="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📄"
         />
         <MetricCard
           label="Total Products"
           value={metrics.totalProducts}
-          gradient="bg-gradient-to-br from-green-50 to-green-100 border-green-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📦"
         />
         <MetricCard
           label="Chunks"
           value={metrics.totalChunks}
-          gradient="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🧩"
         />
         <MetricCard
           label="Embeddings"
           value={metrics.totalEmbeddings}
-          gradient="bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🔮"
         />
         <MetricCard
           label="Images"
           value={metrics.totalImages}
-          gradient="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🖼️"
         />
       </div>
@@ -180,8 +180,8 @@ export const PDFProcessingMonitor: React.FC = () => {
           value={metrics.embeddingSuccessRate}
           unit="%"
           gradient={metrics.embeddingSuccessRate > 80
-            ? "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300"
-            : "bg-gradient-to-br from-red-50 to-red-100 border-red-300"}
+            ? "bg-green-50 border-green-200"
+            : "bg-red-50 border-red-200"}
           icon={metrics.embeddingSuccessRate > 80 ? "✅" : "⚠️"}
         />
         <MetricCard
@@ -189,15 +189,15 @@ export const PDFProcessingMonitor: React.FC = () => {
           value={metrics.imageExtractionRate}
           unit="%"
           gradient={metrics.imageExtractionRate > 50
-            ? "bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300"
-            : "bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300"}
+            ? "bg-green-50 border-green-200"
+            : "bg-red-50 border-red-200"}
           icon={metrics.imageExtractionRate > 50 ? "✅" : "⚠️"}
         />
         <MetricCard
           label="Product Generation Rate"
           value={metrics.productGenerationRate}
           unit="%"
-          gradient="bg-gradient-to-br from-cyan-50 to-cyan-100 border-cyan-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📊"
         />
       </div>
@@ -207,25 +207,25 @@ export const PDFProcessingMonitor: React.FC = () => {
         <MetricCard
           label="Avg Chunks/Doc"
           value={metrics.averageChunksPerDocument}
-          gradient="bg-gradient-to-br from-sky-50 to-sky-100 border-sky-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="📝"
         />
         <MetricCard
           label="Avg Embeddings/Doc"
           value={metrics.averageEmbeddingsPerDocument}
-          gradient="bg-gradient-to-br from-violet-50 to-violet-100 border-violet-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🎯"
         />
         <MetricCard
           label="Avg Images/Doc"
           value={metrics.averageImagesPerDocument}
-          gradient="bg-gradient-to-br from-rose-50 to-rose-100 border-rose-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🎨"
         />
         <MetricCard
           label="Avg Products/Doc"
           value={metrics.averageProductsPerDocument}
-          gradient="bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200"
+          gradient="bg-slate-50 border-slate-200"
           icon="🏷️"
         />
       </div>
@@ -234,7 +234,7 @@ export const PDFProcessingMonitor: React.FC = () => {
       {(metrics.totalEmbeddings === 0 && metrics.totalChunks > 0) ||
        (metrics.totalImages === 0 && metrics.totalDocuments > 0) ||
        metrics.averageProductsPerDocument < 5 ? (
-        <div className="p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border-l-4 border-blue-500 rounded-lg shadow-sm">
+        <div className="p-4 bg-blue-50 border-l-4 border-blue-500 rounded-lg shadow-sm">
           <div className="flex items-start gap-3">
             <span className="text-2xl">💡</span>
             <div>
