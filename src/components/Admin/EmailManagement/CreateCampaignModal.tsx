@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { X, Users, Calendar } from 'lucide-react';
+import { X, Users, Calendar, Search, UserPlus, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -23,6 +24,13 @@ interface EmailTemplate {
   id: string;
   name: string;
   slug: string;
+}
+
+interface Recipient {
+  id: string;
+  email: string;
+  name?: string;
+  type: 'user' | 'contact';
 }
 
 export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
@@ -42,12 +50,19 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
     from_name: '',
     from_email: '',
     reply_to: '',
-    audience_type: 'all_users', // 'all_users', 'all_contacts', 'both', 'specific', 'filtered'
+    audience_type: 'all_users', // 'all_users', 'all_contacts', 'both', 'specific', 'selected', 'filtered'
     specific_emails: '',
     audience_filter: {},
     schedule_type: 'now', // 'now', 'later'
     scheduled_at: '',
   });
+
+  // Recipient selection state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [availableRecipients, setAvailableRecipients] = useState<Recipient[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<Recipient[]>([]);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -56,7 +71,57 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
   useEffect(() => {
     estimateAudience();
-  }, [formData.audience_type, formData.specific_emails, formData.audience_filter]);
+  }, [formData.audience_type, formData.specific_emails, formData.audience_filter, selectedRecipients]);
+
+  useEffect(() => {
+    if (formData.audience_type === 'selected') {
+      loadRecipients();
+    }
+  }, [formData.audience_type, searchQuery]);
+
+  const loadRecipients = async () => {
+    try {
+      setLoadingRecipients(true);
+
+      // Load users
+      const { data: users, error: usersError } = await supabase
+        .from('user_profiles')
+        .select('user_id, email, full_name')
+        .ilike('email', `%${searchQuery}%`)
+        .limit(50);
+
+      if (usersError) throw usersError;
+
+      // Load contacts
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id, email, name')
+        .ilike('email', `%${searchQuery}%`)
+        .limit(50);
+
+      if (contactsError) throw contactsError;
+
+      const userRecipients: Recipient[] = (users || []).map(u => ({
+        id: u.user_id,
+        email: u.email,
+        name: u.full_name,
+        type: 'user' as const,
+      }));
+
+      const contactRecipients: Recipient[] = (contacts || []).map(c => ({
+        id: c.id,
+        email: c.email,
+        name: c.name,
+        type: 'contact' as const,
+      }));
+
+      setAvailableRecipients([...userRecipients, ...contactRecipients]);
+    } catch (error) {
+      console.error('Error loading recipients:', error);
+    } finally {
+      setLoadingRecipients(false);
+    }
+  };
 
   const estimateAudience = async () => {
     try {
@@ -92,6 +157,8 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           .map(e => e.trim())
           .filter(e => e.length > 0);
         count = emails.length;
+      } else if (formData.audience_type === 'selected') {
+        count = selectedRecipients.length;
       }
 
       setEstimatedRecipients(count);
@@ -162,6 +229,12 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
           .split('\n')
           .map(e => e.trim())
           .filter(e => e.length > 0);
+      } else if (formData.audience_type === 'selected') {
+        audienceFilter.recipients = selectedRecipients.map(r => ({
+          id: r.id,
+          email: r.email,
+          type: r.type,
+        }));
       }
 
       // Determine status based on schedule
@@ -257,6 +330,13 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
         })) || [];
 
         recipients = [...userRecipients, ...contactRecipients];
+      } else if (formData.audience_type === 'selected') {
+        // Use selected recipients
+        recipients = selectedRecipients.map(r => ({
+          email: r.email,
+          user_id: r.type === 'user' ? r.id : undefined,
+          contact_id: r.type === 'contact' ? r.id : undefined,
+        }));
       } else if (formData.audience_type === 'specific') {
         // Parse specific emails
         const emails = formData.specific_emails
@@ -478,6 +558,20 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                   <input
                     type="radio"
                     name="audience_type"
+                    value="selected"
+                    checked={formData.audience_type === 'selected'}
+                    onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
+                  />
+                  <div>
+                    <p className="font-medium">Select Recipients</p>
+                    <p className="text-xs text-muted-foreground">Search and select specific users/contacts</p>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2 p-3 border rounded-lg cursor-pointer hover:bg-muted/50">
+                  <input
+                    type="radio"
+                    name="audience_type"
                     value="specific"
                     checked={formData.audience_type === 'specific'}
                     onChange={(e) => setFormData({ ...formData, audience_type: e.target.value })}
@@ -502,6 +596,90 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                 </label>
               </div>
             </div>
+
+            {/* Recipient Selector */}
+            {formData.audience_type === 'selected' && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Search Recipients</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+
+                {/* Selected Recipients */}
+                {selectedRecipients.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Selected ({selectedRecipients.length})</Label>
+                    <div className="flex flex-wrap gap-2 p-3 border rounded-lg max-h-32 overflow-y-auto">
+                      {selectedRecipients.map((recipient) => (
+                        <Badge
+                          key={recipient.id}
+                          variant="secondary"
+                          className="flex items-center gap-1"
+                        >
+                          {recipient.type === 'user' ? <Users className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
+                          {recipient.email}
+                          <X
+                            className="h-3 w-3 cursor-pointer hover:text-destructive"
+                            onClick={() => setSelectedRecipients(selectedRecipients.filter(r => r.id !== recipient.id))}
+                          />
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Recipients */}
+                <div className="space-y-2">
+                  <Label>Available Recipients</Label>
+                  <div className="border rounded-lg max-h-64 overflow-y-auto">
+                    {loadingRecipients ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        Loading...
+                      </div>
+                    ) : availableRecipients.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground">
+                        No recipients found. Try a different search.
+                      </div>
+                    ) : (
+                      <div className="divide-y">
+                        {availableRecipients
+                          .filter(r => !selectedRecipients.find(sr => sr.id === r.id))
+                          .map((recipient) => (
+                            <div
+                              key={recipient.id}
+                              className="p-3 hover:bg-muted/50 cursor-pointer flex items-center justify-between"
+                              onClick={() => setSelectedRecipients([...selectedRecipients, recipient])}
+                            >
+                              <div className="flex items-center gap-2">
+                                {recipient.type === 'user' ? (
+                                  <Users className="h-4 w-4 text-muted-foreground" />
+                                ) : (
+                                  <Mail className="h-4 w-4 text-muted-foreground" />
+                                )}
+                                <div>
+                                  <p className="text-sm font-medium">{recipient.email}</p>
+                                  {recipient.name && (
+                                    <p className="text-xs text-muted-foreground">{recipient.name}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <UserPlus className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Specific Emails Input */}
             {formData.audience_type === 'specific' && (

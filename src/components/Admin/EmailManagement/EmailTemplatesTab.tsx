@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import CreateTemplateModal from './CreateTemplateModal';
 
 interface EmailTemplate {
   id: string;
@@ -25,6 +26,7 @@ interface EmailTemplate {
 export const EmailTemplatesTab: React.FC = () => {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -71,7 +73,7 @@ export const EmailTemplatesTab: React.FC = () => {
             Manage reusable email templates built with React Email
           </p>
         </div>
-        <Button>
+        <Button onClick={() => setShowCreateModal(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Create Template
         </Button>
@@ -164,6 +166,17 @@ export const EmailTemplatesTab: React.FC = () => {
           </p>
         </div>
       </div>
+
+      {/* Create Template Modal */}
+      {showCreateModal && (
+        <CreateTemplateModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            loadTemplates();
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -5,7 +5,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SESClient, SendEmailCommand, VerifyDomainIdentityCommand, GetIdentityVerificationAttributesCommand } from 'npm:@aws-sdk/client-ses@3';
+import { SESClient, SendEmailCommand, VerifyDomainIdentityCommand, GetIdentityVerificationAttributesCommand, ListIdentitiesCommand } from 'npm:@aws-sdk/client-ses@3';
 import { SESv2Client, GetAccountCommand } from 'npm:@aws-sdk/client-sesv2@3';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
 
@@ -326,6 +326,42 @@ serve(async (req) => {
 
         return new Response(
           JSON.stringify({ success: true, domains: data }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'list-ses-domains': {
+        if (req.method !== 'GET') {
+          throw new Error('Method not allowed');
+        }
+
+        // Check if user is admin
+        const isAdmin = user.user_metadata?.role === 'admin';
+        if (!isAdmin) {
+          throw new Error('Unauthorized: Admin access required');
+        }
+
+        // List all identities from SES
+        const listCommand = new ListIdentitiesCommand({
+          IdentityType: 'Domain',
+        });
+        const listResponse = await sesClient.send(listCommand);
+        const domains = listResponse.Identities || [];
+
+        // Get verification status for all domains
+        const verifyCommand = new GetIdentityVerificationAttributesCommand({
+          Identities: domains,
+        });
+        const verifyResponse = await sesClient.send(verifyCommand);
+
+        const sesDomains = domains.map(domain => ({
+          domain,
+          verificationStatus: verifyResponse.VerificationAttributes?.[domain]?.VerificationStatus || 'Pending',
+          verificationToken: verifyResponse.VerificationAttributes?.[domain]?.VerificationToken,
+        }));
+
+        return new Response(
+          JSON.stringify({ success: true, domains: sesDomains }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

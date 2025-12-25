@@ -91,10 +91,11 @@ export class EmailService {
   }
 
   /**
-   * Get all verified email domains
+   * Get all verified email domains (from database and SES)
    */
   async getDomains(): Promise<EmailDomain[]> {
-    const { data, error } = await supabase
+    // Fetch from database
+    const { data: dbDomains, error } = await supabase
       .from('email_domains')
       .select('*')
       .order('is_default', { ascending: false })
@@ -105,7 +106,46 @@ export class EmailService {
       throw new Error('Failed to fetch email domains');
     }
 
-    return data || [];
+    // Fetch from SES
+    try {
+      const { data: sesData, error: sesError } = await supabase.functions.invoke('email-api', {
+        body: { action: 'list-ses-domains' },
+      });
+
+      if (sesError) {
+        console.error('Error fetching SES domains:', sesError);
+        // Return database domains if SES fetch fails
+        return dbDomains || [];
+      }
+
+      const sesDomains = sesData?.domains || [];
+
+      // Merge SES domains with database domains
+      // Add SES domains that are not in the database
+      const dbDomainNames = new Set((dbDomains || []).map(d => d.domain));
+      const newSesDomains = sesDomains
+        .filter((sd: any) => !dbDomainNames.has(sd.domain))
+        .map((sd: any) => ({
+          id: `ses-${sd.domain}`,
+          domain: sd.domain,
+          verification_status: sd.verificationStatus === 'Success' ? 'verified' :
+                              sd.verificationStatus === 'Failed' ? 'failed' : 'pending',
+          verification_token: sd.verificationToken,
+          is_default: false,
+          bounce_rate: 0,
+          complaint_rate: 0,
+          daily_quota: 0,
+          reputation_status: 'healthy',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }));
+
+      return [...(dbDomains || []), ...newSesDomains];
+    } catch (error) {
+      console.error('Error fetching SES domains:', error);
+      // Return database domains if SES fetch fails
+      return dbDomains || [];
+    }
   }
 
   /**
