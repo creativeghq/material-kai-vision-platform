@@ -3,6 +3,8 @@
 Complete documentation for the Amazon SES email system with domain verification, template management, and delivery analytics.
 
 > **📚 Related Documentation:**
+> - [Campaign System](./campaign-system.md) - Email campaign management ✨ NEW
+> - [SES Webhook Setup](./ses-webhook-setup.md) - Bounce and complaint handling
 > - [Deployment Guide](./deployment-guide.md) - Supabase Secrets configuration
 > - [API Endpoints](./api-endpoints.md) - Complete API reference
 > - [System Architecture](./system-architecture.md) - Platform overview

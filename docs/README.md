@@ -156,6 +156,32 @@
 - 9 checkpoint stages with full metrics
 - Real-time updates via Supabase subscriptions
 
+**[email-system.md](email-system.md)** - Email system with Amazon SES
+- Domain verification and management
+- React Email template system
+- Delivery tracking and analytics
+- Bounce and complaint handling
+- SNS webhook integration
+- Admin dashboard at /admin/emails
+- Complete API reference
+
+**[campaign-system.md](campaign-system.md)** - Email campaign management ✨ NEW
+- Bulk email campaigns with targeting
+- Recipient tracking and analytics
+- Campaign scheduling and automation
+- Template personalization
+- Real-time delivery monitoring
+- Admin interface for campaign management
+- Complete workflow documentation
+
+**[quotes-system-architecture.md](quotes-system-architecture.md)** - Quotes management system
+- Multiple independent quotes per user
+- Custom requests and product quotes
+- Status tags and timeline tracking
+- Upsells/extras management
+- Quote acceptance workflow
+- Admin management interface
+
 **[features-guide.md](features-guide.md)** - Platform features
 - Intelligent PDF processing
 - Multi-modal search
@@ -335,15 +361,19 @@ For questions or issues:
 
 ---
 
-**Last Updated**: January 9, 2025
-**Version**: 2.1.0
+**Last Updated**: December 25, 2024
+**Version**: 2.2.0
 **Status**: Production
-**Total Documentation**: 39 comprehensive guides
-**Total Lines**: 12,000+
+**Total Documentation**: 40 comprehensive guides
+**Total Lines**: 13,000+
 **Coverage**: 100% of platform features
 **Planning Documents**: 10 files in /planning directory
 
 **Recent Additions**:
+- ✨ **NEW**: campaign-system.md - Complete email campaign management documentation
+- ✨ Added campaign creation, scheduling, and sending workflows
+- ✨ Documented recipient tracking and analytics
+- ✨ Added campaign admin dashboard documentation
 - ✨ monitoring-analytics-system.md - Complete monitoring and analytics documentation
 - ✨ Stage 0 and Stage 1 monitoring integration
 - ✨ Stage 3.5 (Embedding-to-Text) and Stage 4 (Metadata Consolidation) documentation

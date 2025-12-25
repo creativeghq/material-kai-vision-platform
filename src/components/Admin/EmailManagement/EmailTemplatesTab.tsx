@@ -151,12 +151,12 @@ export const EmailTemplatesTab: React.FC = () => {
       {/* Template Builder Info */}
       <div className="dashboard-card">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold">About React Email Templates</h3>
+          <h3 className="text-lg font-semibold">About Email Templates</h3>
         </div>
         <div className="space-y-2 text-sm">
           <p>
-            Email templates are built using <a href="https://react.email" target="_blank" rel="noopener noreferrer" className="text-primary underline">React Email</a>,
-            a modern way to build emails with React components.
+            Email templates are stored in the database and can be edited by administrators.
+            All templates use HTML with inline CSS for maximum email client compatibility.
           </p>
           <p className="text-muted-foreground">
             Templates support dynamic variables using the <code className="rounded bg-muted px-1">{`{{variable}}`}</code> syntax.

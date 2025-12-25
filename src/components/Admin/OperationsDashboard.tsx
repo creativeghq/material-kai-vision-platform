@@ -43,9 +43,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
-import { PDFProcessingMonitor } from './PDFProcessingMonitor';
-import { XMLProcessingMonitor } from './XMLProcessingMonitor';
-import { WebScrapingMonitor } from './WebScrapingMonitor';
+import { UnifiedProcessingMonitor } from './UnifiedProcessingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
 import { KanbanBoard } from '@/components/Tasks/KanbanBoard';
 import { TaskDetailPanel } from '@/components/Tasks/TaskDetailPanel';
@@ -1623,45 +1621,17 @@ export const OperationsDashboard: React.FC = () => {
 
             {/* Detailed Processing Tables */}
             <div className="grid grid-cols-1 gap-6">
-              {/* PDF Processing Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    PDF Processing Jobs
-                  </CardTitle>
-                  <CardDescription>Real-time monitoring of PDF processing pipeline</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <PDFProcessingMonitor />
-                </CardContent>
-              </Card>
-
-              {/* XML Import Table */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5" />
-                    XML Import Jobs
-                  </CardTitle>
-                  <CardDescription>Real-time monitoring of XML data imports</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <XMLProcessingMonitor />
-                </CardContent>
-              </Card>
-
-              {/* Web Scraping Table */}
+              {/* Unified Processing Monitor Table */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Activity className="h-5 w-5" />
-                    Web Scraping Sessions
+                    Processing Jobs Monitor
                   </CardTitle>
-                  <CardDescription>Real-time monitoring of web scraping operations</CardDescription>
+                  <CardDescription>Real-time monitoring of all processing pipelines (PDF, XML, Web Scraping)</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <WebScrapingMonitor />
+                  <UnifiedProcessingMonitor />
                 </CardContent>
               </Card>
             </div>

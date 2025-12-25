@@ -7,6 +7,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SESClient, SendEmailCommand, VerifyDomainIdentityCommand, GetIdentityVerificationAttributesCommand } from 'npm:@aws-sdk/client-ses@3';
 import { SESv2Client, GetAccountCommand } from 'npm:@aws-sdk/client-sesv2@3';
+import { captureException, captureMessage } from '../_shared/sentry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,14 +81,18 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname.split('/').pop();
 
+    // Parse request body to check for action parameter
+    const requestBody = req.method === 'POST' ? await req.json() : {};
+    const action = requestBody.action || path;
+
     // Route handling
-    switch (path) {
+    switch (action) {
       case 'send': {
         if (req.method !== 'POST') {
           throw new Error('Method not allowed');
         }
 
-        const body: SendEmailRequest = await req.json();
+        const body: SendEmailRequest = requestBody;
         
         // Get template if specified
         let htmlBody = body.html;
@@ -203,6 +208,11 @@ serve(async (req) => {
             },
           },
           ReplyToAddresses: body.replyTo ? [body.replyTo] : undefined,
+          ConfigurationSetName: 'ses-mh-notifications', // For bounce/complaint tracking via SNS
+          Tags: [
+            { Name: 'environment', Value: Deno.env.get('ENVIRONMENT') || 'production' },
+            { Name: 'type', Value: body.emailType || 'transactional' },
+          ],
         });
 
         const response = await sesClient.send(command);
@@ -235,7 +245,7 @@ serve(async (req) => {
           throw new Error('Unauthorized: Admin access required');
         }
 
-        const body: VerifyDomainRequest = await req.json();
+        const body: VerifyDomainRequest = requestBody;
 
         // Verify domain with SES
         const verifyCommand = new VerifyDomainIdentityCommand({ Domain: body.domain });
@@ -269,7 +279,7 @@ serve(async (req) => {
           throw new Error('Method not allowed');
         }
 
-        const body: { domain: string } = await req.json();
+        const body: { domain: string } = requestBody;
 
         // Check verification status with SES
         const command = new GetIdentityVerificationAttributesCommand({
@@ -355,12 +365,22 @@ serve(async (req) => {
       }
 
       case 'analytics': {
-        if (req.method !== 'GET') {
-          throw new Error('Method not allowed');
-        }
+        // Accept both GET and POST requests
+        // GET: query params (fromDate, toDate)
+        // POST: body params (dateRange: { start, end })
+        let fromDate: string | null = null;
+        let toDate: string | null = null;
 
-        const fromDate = url.searchParams.get('fromDate');
-        const toDate = url.searchParams.get('toDate');
+        if (req.method === 'GET') {
+          fromDate = url.searchParams.get('fromDate');
+          toDate = url.searchParams.get('toDate');
+        } else if (req.method === 'POST') {
+          const dateRange = requestBody.dateRange;
+          if (dateRange) {
+            fromDate = dateRange.start || null;
+            toDate = dateRange.end || null;
+          }
+        }
 
         let query = supabaseClient.from('email_analytics').select('*');
 
@@ -396,17 +416,21 @@ serve(async (req) => {
         const openRate = totals.totalDelivered > 0 ? (totals.totalOpened / totals.totalDelivered) * 100 : 0;
         const clickRate = totals.totalOpened > 0 ? (totals.totalClicked / totals.totalOpened) * 100 : 0;
 
+        // Return data directly (not nested in 'analytics' property) to match frontend expectations
         return new Response(
           JSON.stringify({
             success: true,
-            analytics: {
-              ...totals,
-              deliveryRate: parseFloat(deliveryRate.toFixed(2)),
-              bounceRate: parseFloat(bounceRate.toFixed(2)),
-              complaintRate: parseFloat(complaintRate.toFixed(2)),
-              openRate: parseFloat(openRate.toFixed(2)),
-              clickRate: parseFloat(clickRate.toFixed(2)),
-            },
+            totalSent: totals.totalSent,
+            totalDelivered: totals.totalDelivered,
+            totalBounced: totals.totalBounced,
+            totalComplained: totals.totalComplained,
+            totalOpened: totals.totalOpened,
+            totalClicked: totals.totalClicked,
+            deliveryRate: parseFloat(deliveryRate.toFixed(2)),
+            bounceRate: parseFloat(bounceRate.toFixed(2)),
+            complaintRate: parseFloat(complaintRate.toFixed(2)),
+            openRate: parseFloat(openRate.toFixed(2)),
+            clickRate: parseFloat(clickRate.toFixed(2)),
             dailyData: data,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -439,8 +463,20 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error:', error);
+
+    // Send error to Sentry
+    await captureException(error instanceof Error ? error : new Error(String(error)), {
+      tags: {
+        function: 'email-api',
+        endpoint: 'email-api',
+      },
+      extra: {
+        error_message: error instanceof Error ? error.message : String(error),
+      },
+    });
+
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

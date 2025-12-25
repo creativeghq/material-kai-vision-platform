@@ -32,8 +32,11 @@ export const EmailAnalyticsTab: React.FC = () => {
       setLoading(true);
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - 30);
-      
-      const data = await emailService.getAnalytics(fromDate);
+
+      const data = await emailService.getAnalytics({
+        start: fromDate.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        end: new Date().toISOString().split('T')[0],
+      });
       setAnalytics(data);
     } catch (error) {
       console.error('Error loading analytics:', error);

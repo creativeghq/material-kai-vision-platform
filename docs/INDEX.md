@@ -94,6 +94,18 @@ Complete documentation for Material Kai Vision Platform.
 - Database schema (2 tables with indexes and RLS)
 - Cosine similarity and matrix factorization algorithms
 
+**[campaign-system.md](campaign-system.md)** - Email campaign management system ✨ NEW
+- Campaign creation and management
+- Audience targeting and segmentation
+- Recipient tracking (sent, delivered, opened, clicked, bounced)
+- Template integration with personalization
+- Campaign scheduling and sending
+- Real-time analytics and reporting
+- Admin dashboard at /admin/emails → Campaigns tab
+- SES webhook integration for bounce/complaint handling
+- Complete API reference and usage examples
+- Best practices and troubleshooting
+
 **[search-strategies.md](search-strategies.md)** - Complete search system guide
 - 6 search strategies (100% implemented)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image
@@ -256,6 +268,35 @@ Complete documentation for Material Kai Vision Platform.
 
 ---
 
+### 💼 Business Features
+
+**[email-system.md](email-system.md)** - Email system with Amazon SES
+- Domain verification and management
+- React Email template system
+- Delivery tracking and analytics
+- Bounce and complaint handling
+- SNS webhook integration
+- Admin dashboard at /admin/emails
+- Complete API reference
+
+**[campaign-system.md](campaign-system.md)** - Email campaign management ✨ NEW
+- Bulk email campaigns with targeting
+- Recipient tracking and analytics
+- Campaign scheduling and automation
+- Template personalization
+- Real-time delivery monitoring
+- Admin interface for campaign management
+
+**[quotes-system-architecture.md](quotes-system-architecture.md)** - Quotes management system
+- Multiple independent quotes per user
+- Custom requests and product quotes
+- Status tags and timeline tracking
+- Upsells/extras management
+- Quote acceptance workflow
+- Admin management interface
+
+---
+
 ### 🔌 API Reference
 
 **[api-endpoints.md](api-endpoints.md)** - Complete API reference
@@ -406,12 +447,18 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: January 9, 2025
-**Version**: 2.1.0
+**Last Updated**: December 25, 2024
+**Version**: 2.2.0
 **Status**: Production
 **Maintainer**: Development Team
 
 **Recent Changes:**
+- ✨ **NEW**: Added campaign-system.md - Complete email campaign management documentation
+- ✨ Added campaign system to INDEX.md under Business Features section
+- ✨ Documented campaign creation, scheduling, and sending workflows
+- ✨ Documented recipient tracking and analytics
+- ✨ Added campaign admin dashboard documentation
+- ✨ Added campaign API reference and usage examples
 - ✨ **MAJOR UPDATE**: True 6-embedding multi-vector search with async parallel execution
 - ✨ Updated image-relevancy-and-search.md with complete technical implementation
 - ✨ Added multi-vector search architecture section (6 embeddings with weights)
@@ -442,17 +489,17 @@ For questions or issues:
 
 ---
 
-**Total Documentation**: 39 comprehensive guides
-**Total Lines**: 12,000+
+**Total Documentation**: 40 comprehensive guides
+**Total Lines**: 13,000+
 **Coverage**: 100% of platform features
 **Planning Documents**: 10 files in /planning directory
 
 **Documentation Categories**:
-- 🎯 Getting Started: 7 guides
+- 🎯 Getting Started: 8 guides
 - 🏗️ Architecture & Design: 8 guides
 - 🤖 AI & Processing: 9 guides
 - 🔌 API Reference: 3 guides
 - 🚀 Deployment & Operations: 3 guides
-- 📊 Monitoring & Analytics: 3 guides ✨ NEW
-- 💼 Business Features: 6 guides
+- 📊 Monitoring & Analytics: 3 guides
+- 💼 Business Features: 6 guides (Email System, Campaign System, Quotes System)
 

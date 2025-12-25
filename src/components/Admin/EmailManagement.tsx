@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Mail, Send, Database, BarChart3, Settings, TestTube } from 'lucide-react';
+import { Mail, Send, Database, BarChart3, Settings, TestTube, Zap, Megaphone } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,8 @@ import { EmailDomainsTab } from './EmailManagement/EmailDomainsTab';
 import { EmailLogsTab } from './EmailManagement/EmailLogsTab';
 import { EmailAnalyticsTab } from './EmailManagement/EmailAnalyticsTab';
 import { EmailTemplatesTab } from './EmailManagement/EmailTemplatesTab';
+import { EmailActionsTab } from './EmailManagement/EmailActionsTab';
+import { CampaignsTab } from './EmailManagement/CampaignsTab';
 import { TestEmailDialog } from './EmailManagement/TestEmailDialog';
 import { EmailSettingsModal } from './EmailManagement/EmailSettingsModal';
 
@@ -212,6 +214,14 @@ export const EmailManagement: React.FC = () => {
               <Settings className="mr-2 h-4 w-4" />
               Templates
             </TabsTrigger>
+            <TabsTrigger value="actions">
+              <Zap className="mr-2 h-4 w-4" />
+              Actions
+            </TabsTrigger>
+            <TabsTrigger value="campaigns">
+              <Megaphone className="mr-2 h-4 w-4" />
+              Campaigns
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="analytics" className="space-y-4">
@@ -228,6 +238,14 @@ export const EmailManagement: React.FC = () => {
 
           <TabsContent value="templates" className="space-y-4">
             <EmailTemplatesTab />
+          </TabsContent>
+
+          <TabsContent value="actions" className="space-y-4">
+            <EmailActionsTab />
+          </TabsContent>
+
+          <TabsContent value="campaigns" className="space-y-4">
+            <CampaignsTab />
           </TabsContent>
         </Tabs>
 
