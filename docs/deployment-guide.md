@@ -57,6 +57,9 @@
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `TOGETHER_AI_API_KEY` | **Secret** | Server ENV | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
+| `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
+| `GOOGLE_SHOPPING_API_KEY` | **Secret** | Server ENV | Google Shopping API key (optional) | `AIzaSyxxxxxxxxxxxxxxxx` |
+| `GOOGLE_SHOPPING_CX` | **Secret** | Server ENV | Google Custom Search Engine ID (optional) | `xxxxxxxxxxxxxxxx` |
 | `SENTRY_DSN` | **Secret** | Server ENV | Sentry error tracking DSN | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
 | `CORS_ORIGINS` | Public | Server ENV | Allowed CORS origins | `https://your-domain.com,https://preview.vercel.app` |
 | `ENVIRONMENT` | Public | Server ENV | Environment name | `production`, `staging`, `development` |
@@ -72,6 +75,14 @@
 | **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
 
+### **Price Monitoring API Keys**
+
+| Service | Secret Name | Where Used | How to Get | Required? |
+|---------|------------|------------|------------|-----------|
+| **Firecrawl** | `FIRECRAWL_API_KEY` | Backend, Edge Functions | https://firecrawl.dev → Dashboard → API Keys | ✅ **Required** |
+| **Google Shopping** | `GOOGLE_SHOPPING_API_KEY` | Backend | https://console.cloud.google.com → Enable Custom Search API | ⭕ Optional |
+| **Google Shopping** | `GOOGLE_SHOPPING_CX` | Backend | https://programmablesearchengine.google.com → Create Search Engine | ⭕ Optional |
+
 ### **Supabase Edge Functions Secrets**
 
 **Required for PDF Processing Agent and other Edge Functions**
@@ -79,6 +90,7 @@
 | Secret Name | Type | Where Set | Description | Example/Format |
 |------------|------|-----------|-------------|----------------|
 | `ANTHROPIC_API_KEY` | **Secret** | Supabase Dashboard | Claude API key for agent chat | `sk-ant-xxxxxxxxxxxxxxxx` |
+| `FIRECRAWL_API_KEY` | **Secret** | Supabase Dashboard | Firecrawl API for price monitoring cron | `fc-xxxxxxxxxxxxxxxx` |
 | `MIVAA_SERVICE_URL` | Public | Supabase Dashboard | MIVAA API endpoint | `https://v1api.materialshub.gr` |
 | `MIVAA_API_KEY` | **Secret** | Supabase Dashboard | MIVAA API authentication (optional) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `SSH_HOST` | Public | Supabase Dashboard | Server hostname for health checks | `v1api.materialshub.gr` |
@@ -721,6 +733,11 @@ HUGGINGFACE_API_KEY=your_huggingface_key
 MATERIAL_KAI_API_URL=https://v1api.materialshub.gr
 MATERIAL_KAI_API_KEY=your_api_key
 SENTRY_DSN=your_sentry_dsn
+
+# Price Monitoring (Required for price tracking features)
+FIRECRAWL_API_KEY=fc-your-firecrawl-key
+GOOGLE_SHOPPING_API_KEY=your-google-api-key  # Optional
+GOOGLE_SHOPPING_CX=your-search-engine-id     # Optional
 ```
 
 #### **Deployment Process**
@@ -939,6 +956,9 @@ jobs:
      - OPENAI_API_KEY
      - ANTHROPIC_API_KEY
      - TOGETHER_AI_API_KEY
+     - FIRECRAWL_API_KEY (for price monitoring)
+     - GOOGLE_SHOPPING_API_KEY (optional)
+     - GOOGLE_SHOPPING_CX (optional)
 
 2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments

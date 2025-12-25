@@ -25,7 +25,7 @@
 ### Phase 4: Backend Services ✅ COMPLETE
 - `PriceMonitoringService` - Core monitoring logic
 - `CompetitorScraperService` - Firecrawl-based scraping
-- `GoogleProductsIntegration` - Google Shopping API integration
+- `DataForSEOIntegration` - DataForSEO API integration for product search and pricing
 - `PriceAnalyticsService` - Trend analysis and statistics
 - FastAPI endpoints for all operations
 
@@ -414,10 +414,131 @@ FastAPI endpoints are in: `mivaa-pdf-extractor/app/api/`
 - Backend uses Python/FastAPI
 - Database is Supabase (PostgreSQL)
 - Price scraping uses Firecrawl API with credit tracking
-- Google Shopping API integration is optional (requires API key)
+- Product search and pricing data uses DataForSEO API (replaces Google Merchant API)
+
+---
+
+---
+
+## 🔐 Required Environment Variables & Secrets
+
+**IMPORTANT:** This project does NOT use `.env` files for the backend. All secrets are managed through GitHub Secrets and passed to the systemd service during deployment.
+
+---
+
+### 1. Firecrawl API (Required for Price Scraping)
+
+**Where to Add:**
+- ✅ **GitHub Secrets** (REQUIRED - for backend deployment)
+- ✅ **Supabase Edge Functions** (REQUIRED - for cron jobs)
+
+**Variables:**
+```bash
+FIRECRAWL_API_KEY=fc-your-api-key-here
+```
+
+**How to Get:**
+1. Sign up at https://firecrawl.dev
+2. Go to Dashboard → API Keys
+3. Copy your API key (starts with `fc-`)
+
+---
+
+### 2. DataForSEO API (Required - for product search and pricing data)
+
+**Where to Add:**
+- ✅ **GitHub Secrets** (REQUIRED - for product discovery and pricing)
+- ✅ **Supabase Edge Functions** (REQUIRED - for scheduled jobs)
+
+**Variables:**
+```bash
+DATAFORSEO_LOGIN=your-dataforseo-login
+DATAFORSEO_PASSWORD=your-dataforseo-password
+```
+
+**How to Get:**
+1. Sign up at https://dataforseo.com
+2. Go to Dashboard → API Access
+3. Copy your login credentials (username and password)
+4. Note: DataForSEO uses Basic Authentication with login/password
+
+**Note:** DataForSEO is used instead of Google Merchant API for product search and competitive pricing data.
+
+---
+
+### 3. GitHub Repository Secrets (Main Configuration)
+
+**Repository:** `creativeghq/material-kai-vision-platform`
+
+**Path:** Settings → Secrets and variables → Actions → Repository secrets
+
+**How to Add:**
+1. Go to https://github.com/creativeghq/material-kai-vision-platform/settings/secrets/actions
+2. Click "New repository secret"
+3. Add each secret below
+
+**Required Secrets to Add:**
+
+| Secret Name | Value | Required? |
+|-------------|-------|-----------|
+| `FIRECRAWL_API_KEY` | `fc-your-api-key-here` | ✅ YES |
+| `DATAFORSEO_LOGIN` | `your-dataforseo-login` | ✅ YES |
+| `DATAFORSEO_PASSWORD` | `your-dataforseo-password` | ✅ YES |
+
+**Existing Secrets (Should Already Exist):**
+- ✅ `SUPABASE_URL`
+- ✅ `SUPABASE_SERVICE_ROLE_KEY`
+- ✅ `SUPABASE_ANON_KEY`
+- ✅ `SUPABASE_PROJECT_ID`
+
+---
+
+### 4. Supabase Edge Function Secrets
+
+**Where to Add:**
+Supabase Dashboard → Edge Functions → Manage secrets
+
+**Command Line:**
+```bash
+# Set Firecrawl API key
+supabase secrets set FIRECRAWL_API_KEY=fc-your-api-key-here
+
+# Set DataForSEO credentials
+supabase secrets set DATAFORSEO_LOGIN=your-dataforseo-login
+supabase secrets set DATAFORSEO_PASSWORD=your-dataforseo-password
+
+# Verify secrets
+supabase secrets list
+```
+
+**Required Secrets:**
+```bash
+FIRECRAWL_API_KEY=fc-your-api-key-here
+DATAFORSEO_LOGIN=your-dataforseo-login
+DATAFORSEO_PASSWORD=your-dataforseo-password
+```
+
+---
+
+## 📋 Setup Checklist
+
+### ✅ Required (System Won't Work Without These)
+- [ ] `FIRECRAWL_API_KEY` - Added to GitHub Secrets
+- [ ] `FIRECRAWL_API_KEY` - Added to Supabase Edge Functions
+- [ ] `DATAFORSEO_LOGIN` - Added to GitHub Secrets
+- [ ] `DATAFORSEO_PASSWORD` - Added to GitHub Secrets
+- [ ] `DATAFORSEO_LOGIN` - Added to Supabase Edge Functions
+- [ ] `DATAFORSEO_PASSWORD` - Added to Supabase Edge Functions
+- [ ] Verify existing Supabase secrets in GitHub
+
+### 🚀 Deployment Verification
+- [ ] All secrets added to GitHub repository
+- [ ] Supabase Edge Function secrets configured
+- [ ] Secrets verified with `supabase secrets list`
+- [ ] Backend deployment successful (systemd service updated)
 
 ---
 
 **Document Created:** December 25, 2024
-**Last Updated:** December 25, 2024
+**Last Updated:** December 25, 2024 (Updated to use DataForSEO API instead of Google Merchant API)
 

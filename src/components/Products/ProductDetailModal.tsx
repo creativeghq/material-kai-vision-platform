@@ -437,23 +437,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </CardContent>
         </Card>
 
-            {/* Similar Materials Section */}
-            <div className="mt-6">
-              <SimilarMaterials materialId={product.id} limit={10} />
-            </div>
-          </div>
-          </TabsContent>
+        {/* Similar Materials Section */}
+        <div className="mt-6">
+          <SimilarMaterials materialId={product.id} limit={10} />
+        </div>
+      </TabsContent>
 
-          {/* Monitor Tab */}
-          <TabsContent value="monitor" className="mt-6">
-            <ProductMonitorTab
-              productId={product.id}
-              productName={product.name}
-              currentPrice={product.pricing?.retail}
-              currency={product.pricing?.currency}
-            />
-          </TabsContent>
-        </Tabs>
+      {/* Monitor Tab */}
+      <TabsContent value="monitor" className="mt-6">
+        <ProductMonitorTab
+          productId={product.id}
+          productName={product.name}
+          currentPrice={product.pricing?.retail}
+          currency={product.pricing?.currency}
+        />
+      </TabsContent>
+    </Tabs>
       </DialogContent>
     </Dialog>
   );
