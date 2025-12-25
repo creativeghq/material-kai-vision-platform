@@ -832,14 +832,12 @@ export class ConsolidatedPDFController {
         };
       }
 
-      // Perform vector search using MIVAA API
-      const searchResponse = await mivaaApi.searchSemantic({
+      // Perform multi-vector search using MIVAA API (the only supported search method)
+      const searchResponse = await mivaaApi.searchMultiVector({
         query: request.query,
+        workspace_id: request.workspaceId,
         limit: request.options?.limit || 10,
-        filters: {
-          workspace_id: request.workspaceId,
-          threshold: request.options?.threshold || 0.7,
-        },
+        similarity_threshold: request.options?.threshold || 0.7,
       });
 
       if (!searchResponse.success || !searchResponse.data) {

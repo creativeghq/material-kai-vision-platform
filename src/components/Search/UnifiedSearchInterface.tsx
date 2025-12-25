@@ -340,64 +340,16 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
 
       let searchResponse;
 
-      // ✅ UPDATED: Handle all search types including specialized embeddings
-      if (searchType === 'text') {
-        // Text search using semantic strategy
-        searchResponse = await UnifiedSearchService.search({
-          query: query.trim(),
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'semantic',
-          top_k: 15,
-        });
-      } else if (searchType === 'image') {
-        // Image-based search using visual strategy
-        searchResponse = await UnifiedSearchService.search({
-          query: selectedImage?.name || 'uploaded_image',
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'visual',
-          top_k: 12,
-        });
-      } else if (searchType === 'color') {
-        // ✅ NEW: Color palette search
-        searchResponse = await UnifiedSearchService.search({
-          query: selectedImage?.name || 'color_search',
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'color',
-          top_k: 12,
-        });
-      } else if (searchType === 'texture') {
-        // ✅ NEW: Texture pattern search
-        searchResponse = await UnifiedSearchService.search({
-          query: selectedImage?.name || 'texture_search',
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'texture',
-          top_k: 12,
-        });
-      } else if (searchType === 'style') {
-        // ✅ NEW: Design style search
-        searchResponse = await UnifiedSearchService.search({
-          query: selectedImage?.name || 'style_search',
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'style',
-          top_k: 12,
-        });
-      } else if (searchType === 'material') {
-        // ✅ NEW: Material type search
-        searchResponse = await UnifiedSearchService.search({
-          query: selectedImage?.name || 'material_search',
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'material_type',
-          top_k: 12,
-        });
-      } else {
-        // Hybrid search (text + semantic)
-        searchResponse = await UnifiedSearchService.search({
-          query: query.trim(),
-          workspace_id: workspaceData.workspace_id,
-          strategy: 'hybrid',
-          top_k: 20,
-        });
-      }
+      // ✅ All search types now use multi_vector strategy (the only supported strategy)
+      // multi_vector automatically handles text, image, color, texture, style, and material searches
+      searchResponse = await UnifiedSearchService.searchMultiVector({
+        query: searchType === 'text' ? query.trim() : (selectedImage?.name || `${searchType}_search`),
+        workspace_id: workspaceData.workspace_id,
+        limit: 15,
+        image_url: selectedImage?.url,
+        image_base64: selectedImage?.base64,
+        enableQueryUnderstanding: true,
+      });
 
       if (!searchResponse.success) {
         throw new Error(searchResponse.error || 'Search failed');

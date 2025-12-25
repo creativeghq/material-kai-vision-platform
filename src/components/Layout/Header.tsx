@@ -64,8 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
             <Input
               placeholder="Search materials, projects, or settings..."
-              className="pl-12 h-12 border-white/20"
-              style={{ background: 'rgba(255, 255, 255, 0.1)' }}
+              className="pl-12 h-12 border-white/20 bg-sidebar"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />

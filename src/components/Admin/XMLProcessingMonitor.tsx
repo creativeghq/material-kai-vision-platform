@@ -119,15 +119,15 @@ export const XMLProcessingMonitor: React.FC = () => {
     return <div className="p-4 text-gray-600">No XML metrics available</div>;
   }
 
-  const MetricCard = ({ label, value, unit = '', gradient, icon }: any) => (
-    <div className={`${gradient} border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow`}>
+  const MetricCard = ({ label, value, unit = '', icon }: any) => (
+    <div className="dashboard-card">
       <div className="flex items-center gap-2 mb-2">
         {icon && <span className="text-xl">{icon}</span>}
-        <div className="text-sm font-medium text-gray-700">{label}</div>
+        <div className="text-sm font-medium text-muted-foreground">{label}</div>
       </div>
-      <div className="text-2xl font-bold text-gray-900">
+      <div className="text-2xl font-bold text-foreground">
         {typeof value === 'number' ? value.toFixed(1) : value}
-        {unit && <span className="text-sm ml-1 font-normal text-gray-600">{unit}</span>}
+        {unit && <span className="text-sm ml-1 font-normal text-muted-foreground">{unit}</span>}
       </div>
     </div>
   );
@@ -162,31 +162,26 @@ export const XMLProcessingMonitor: React.FC = () => {
         <MetricCard
           label="XML Documents"
           value={metrics.totalXMLDocuments}
-          gradient="bg-slate-50 border-slate-200"
           icon="📋"
         />
         <MetricCard
           label="Products from XML"
           value={metrics.totalXMLProducts}
-          gradient="bg-slate-50 border-slate-200"
           icon="📦"
         />
         <MetricCard
           label="Images from XML"
           value={metrics.totalXMLImages}
-          gradient="bg-slate-50 border-slate-200"
           icon="🖼️"
         />
         <MetricCard
           label="Chunks Generated"
           value={metrics.totalXMLChunks}
-          gradient="bg-slate-50 border-slate-200"
           icon="📝"
         />
         <MetricCard
           label="Embeddings Created"
           value={metrics.totalXMLEmbeddings}
-          gradient="bg-slate-50 border-slate-200"
           icon="🧠"
         />
       </div>
@@ -197,27 +192,21 @@ export const XMLProcessingMonitor: React.FC = () => {
           label="Processing Success Rate"
           value={metrics.xmlProcessingSuccessRate}
           unit="%"
-          gradient={metrics.xmlProcessingSuccessRate > 90
-            ? "bg-green-50 border-green-200"
-            : "bg-amber-50 border-amber-200"}
           icon={metrics.xmlProcessingSuccessRate > 90 ? "✅" : "⚠️"}
         />
         <MetricCard
           label="Avg Products/XML"
           value={metrics.averageProductsPerXML}
-          gradient="bg-slate-50 border-slate-200"
           icon="🏷️"
         />
         <MetricCard
           label="Avg Images/XML"
           value={metrics.averageImagesPerXML}
-          gradient="bg-slate-50 border-slate-200"
           icon="🎨"
         />
         <MetricCard
           label="Avg Chunks/Product"
           value={metrics.averageChunksPerProduct}
-          gradient="bg-slate-50 border-slate-200"
           icon="📊"
         />
       </div>

@@ -11,7 +11,7 @@
 .heroSection {
   position: relative;
   overflow: hidden;
-  background: hsl(var(--accent));
+  background: hsl(var(--sidebar-background));
   margin: 0 var(--hero-margin-x) var(--hero-margin-bottom) var(--hero-margin-x);
   border-radius: var(--radius-xl);
   box-shadow: none;

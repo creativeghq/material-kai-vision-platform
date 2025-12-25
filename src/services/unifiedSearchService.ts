@@ -13,23 +13,14 @@ import { ErrorHandler } from '../utils/errorHandler';
 // ==================== TYPE DEFINITIONS ====================
 
 /**
- * Search strategies available in Python backend
- * From: mivaa-pdf-extractor/app/services/unified_search_service.py
+ * Search strategy for the platform
  *
- * RECOMMENDED: Use 'multi_vector' for best accuracy and performance
+ * ONLY 'multi_vector' is supported and used throughout the platform.
+ * This is the default and only search method, combining 6 specialized CLIP embeddings
+ * (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%)
+ * + JSONB metadata filtering + query understanding support.
  */
-export type SearchStrategy =
-  | 'semantic'      // Semantic search using text embeddings only
-  | 'visual'        // Visual search using CLIP embeddings only
-  | 'multi_vector'  // ⭐ RECOMMENDED DEFAULT: Enhanced multi-vector combining 6 specialized CLIP embeddings (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%) + JSONB metadata filtering + query understanding support
-  | 'hybrid'        // Hybrid search combining semantic and keyword
-  | 'material'      // Material property-based search
-  | 'keyword'       // Keyword/exact match search
-  | 'color'         // Color palette matching using specialized CLIP embeddings
-  | 'texture'       // Texture pattern matching using specialized CLIP embeddings
-  | 'style'         // Design style matching using specialized CLIP embeddings
-  | 'material_type' // Material type matching using specialized CLIP embeddings
-  | 'all';          // ⚠️ DEPRECATED: Use 'multi_vector' instead (10x slower, 10x higher cost, lower accuracy)
+export type SearchStrategy = 'multi_vector';
 
 /**
  * Unified search request matching Python backend SearchRequest schema
@@ -210,67 +201,14 @@ export class UnifiedSearchService {
     }
   }
 
-  // ==================== CONVENIENCE METHODS ====================
+  // ==================== SEARCH METHOD ====================
 
   /**
-   * Semantic search - Natural language understanding
-   */
-  static async searchSemantic(params: {
-    query: string;
-    workspace_id: string;
-    limit?: number;
-    filters?: Record<string, any>;
-  }): Promise<UnifiedSearchResponse> {
-    return this.search({
-      query: params.query,
-      workspace_id: params.workspace_id,
-      strategy: 'semantic',
-      top_k: params.limit,
-      material_filters: params.filters,
-    });
-  }
-
-  /**
-   * Visual search - Image-based similarity
-   */
-  static async searchVisual(params: {
-    workspace_id: string;
-    image_url?: string;
-    image_base64?: string;
-    query?: string;
-    limit?: number;
-  }): Promise<UnifiedSearchResponse> {
-    return this.search({
-      query: params.query || '',
-      workspace_id: params.workspace_id,
-      strategy: 'visual',
-      image_url: params.image_url,
-      image_base64: params.image_base64,
-      top_k: params.limit,
-    });
-  }
-
-  /**
-   * Material search - Property-based filtering
-   */
-  static async searchMaterials(params: {
-    query: string;
-    workspace_id: string;
-    filters?: Record<string, any>;
-    limit?: number;
-  }): Promise<UnifiedSearchResponse> {
-    return this.search({
-      query: params.query,
-      workspace_id: params.workspace_id,
-      strategy: 'material',
-      material_filters: params.filters,
-      top_k: params.limit,
-    });
-  }
-
-  /**
-   * 🎯 Multi-Vector Search - RECOMMENDED DEFAULT
+   * 🎯 Multi-Vector Search - The ONLY search method used in the platform
    * Combines 6 specialized CLIP embeddings + metadata filtering + query understanding (enabled by default)
+   *
+   * This method replaces all previous search methods (semantic, visual, hybrid, material, etc.)
+   * All search functionality now uses multi_vector strategy exclusively.
    */
   static async searchMultiVector(params: {
     query: string;
@@ -278,6 +216,8 @@ export class UnifiedSearchService {
     limit?: number;
     filters?: Record<string, any>;
     enableQueryUnderstanding?: boolean;  // Auto-extract filters from natural language (default: true, set to false to disable)
+    image_url?: string;  // Optional image URL for visual search component
+    image_base64?: string;  // Optional base64 image for visual search component
   }): Promise<UnifiedSearchResponse> {
     return this.search({
       query: params.query,
@@ -286,44 +226,6 @@ export class UnifiedSearchService {
       material_filters: params.filters,
       top_k: params.limit,
       enable_query_understanding: params.enableQueryUnderstanding,
-    });
-  }
-
-  /**
-   * Hybrid search - Semantic + keyword combined
-   */
-  static async searchHybrid(params: {
-    query: string;
-    workspace_id: string;
-    limit?: number;
-  }): Promise<UnifiedSearchResponse> {
-    return this.search({
-      query: params.query,
-      workspace_id: params.workspace_id,
-      strategy: 'hybrid',
-      top_k: params.limit,
-    });
-  }
-
-  // REMOVED: Duplicate searchMultiVector method (already defined at line 275)
-
-  /**
-   * ALL strategies - Parallel execution (3-4x faster!)
-   */
-  static async searchAll(params: {
-    query: string;
-    workspace_id: string;
-    limit?: number;
-    material_filters?: Record<string, any>;
-    image_url?: string;
-    image_base64?: string;
-  }): Promise<UnifiedSearchResponse> {
-    return this.search({
-      query: params.query,
-      workspace_id: params.workspace_id,
-      strategy: 'multi_vector',
-      top_k: params.limit,
-      material_filters: params.material_filters,
       image_url: params.image_url,
       image_base64: params.image_base64,
     });

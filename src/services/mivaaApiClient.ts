@@ -226,150 +226,20 @@ export class MivaaApiClient {
   // All search methods now use the consolidated /api/rag/search endpoint with strategy parameter
 
   /**
-   * Semantic search
-   * Uses consolidated /api/rag/search endpoint with strategy="semantic"
-   * Replaces: semantic-search, enhanced-rag-search, rag-knowledge-search Edge Functions
-   */
-  async searchSemantic(payload: {
-    query: string;
-    limit?: number;
-    filters?: any;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=semantic', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Vector similarity search
-   * Uses consolidated /api/rag/search endpoint with strategy="vector"
-   * Replaces: vector-similarity-search, document-vector-search Edge Functions
-   */
-  async searchVector(payload: {
-    query_vector?: number[];
-    query_text?: string;
-    limit?: number;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=vector', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Unified material search
-   * Uses consolidated /api/rag/search endpoint with strategy="material"
-   * Replaces: unified-material-search, unified-materials-api Edge Functions
-   */
-  async searchMaterials(payload: {
-    query: string;
-    search_type?: 'text' | 'semantic' | 'hybrid';
-    limit?: number;
-    filters?: any;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=material', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Visual search (image-based)
-   * Uses consolidated /api/rag/search endpoint with strategy="image"
-   * Replaces: visual-search-analyze Edge Function
-   */
-  async searchVisual(payload: {
-    image_url?: string;
-    image_data?: string;
-    limit?: number;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=image', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Material images search
-   * Uses consolidated /api/rag/search endpoint with strategy="image"
-   * Replaces: material-images-api Edge Function
-   */
-  async searchImages(payload: {
-    query?: string;
-    material_id?: string;
-    limit?: number;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=image', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
-   * Multi-vector search (combines 3 embedding types)
+   * Multi-vector search - THE ONLY search method used in the platform
    * Uses consolidated /api/rag/search endpoint with strategy="multi_vector"
-   * Combines text_embedding_1536 (40%), visual_clip_embedding_512 (30%), multimodal_fusion_embedding_2688 (30%)
+   *
+   * Combines 6 specialized CLIP embeddings with intelligent weighting:
+   * - text_embedding_1536 (20%) - Semantic understanding
+   * - visual_clip_embedding_512 (20%) - Visual similarity
+   * - color_clip_embedding_512 (15%) - Color palette matching
+   * - texture_clip_embedding_512 (15%) - Texture pattern matching
+   * - style_clip_embedding_512 (15%) - Design style matching
+   * - material_clip_embedding_512 (15%) - Material type matching
+   *
+   * This replaces ALL previous search methods (semantic, visual, hybrid, material, etc.)
    */
   async searchMultiVector(payload: {
-    query: string;
-    workspace_id: string;
-    limit?: number;
-    similarity_threshold?: number;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=multi_vector', {
-      method: 'POST',
-      body: JSON.stringify({
-        query: payload.query,
-        workspace_id: payload.workspace_id,
-        top_k: payload.limit || 10,
-        similarity_threshold: payload.similarity_threshold || 0.7,
-      }),
-    });
-  }
-
-  /**
-   * Hybrid search (semantic + keyword)
-   * Uses consolidated /api/rag/search endpoint with strategy="hybrid"
-   * Combines semantic search (70%) + PostgreSQL full-text search (30%)
-   */
-  async searchHybrid(payload: {
-    query: string;
-    workspace_id: string;
-    limit?: number;
-    similarity_threshold?: number;
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/rag/search?strategy=hybrid', {
-      method: 'POST',
-      body: JSON.stringify({
-        query: payload.query,
-        workspace_id: payload.workspace_id,
-        top_k: payload.limit || 10,
-        similarity_threshold: payload.similarity_threshold || 0.7,
-      }),
-    });
-  }
-
-  /**
-   * MULTI-VECTOR SEARCH - Intelligent weighted search with 6 CLIP embeddings! ⚡
-   * Uses consolidated /api/rag/search endpoint with strategy="multi_vector"
-   *
-   * Combines 6 specialized embeddings with intelligent weighting:
-   * 1. text_embedding_1536 (20%) - Semantic understanding
-   * 2. visual_clip_embedding_512 (20%) - Visual similarity
-   * 3. color_clip_embedding_512 (15%) - Color palette matching
-   * 4. texture_clip_embedding_512 (15%) - Texture pattern matching
-   * 5. style_clip_embedding_512 (15%) - Design style matching
-   * 6. material_clip_embedding_512 (15%) - Material type matching
-   *
-   * Performance:
-   * - Multi-Vector: ~200ms (single intelligent query)
-   * - Old "all" strategy: ~800ms (10 separate queries)
-   * - Improvement: 4x faster + better accuracy! ⚡
-   *
-   * Returns weighted results with JSONB metadata filtering.
-   */
-  async searchAllStrategies(payload: {
     query: string;
     workspace_id: string;
     limit?: number;
@@ -391,6 +261,7 @@ export class MivaaApiClient {
       }),
     });
   }
+
 
   // ==================== RAG & KNOWLEDGE ====================
 

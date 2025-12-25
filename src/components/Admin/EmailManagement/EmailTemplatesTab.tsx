@@ -1,0 +1,172 @@
+/**
+ * Email Templates Tab
+ * Manage email templates
+ */
+
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit, Eye, Trash2 } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+
+interface EmailTemplate {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  category: string;
+  is_active: boolean;
+  variables: string[];
+  created_at: string;
+}
+
+export const EmailTemplatesTab: React.FC = () => {
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('email_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTemplates(data || []);
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load email templates',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getCategoryBadge = (category: string) => {
+    const colors: Record<string, 'default' | 'secondary' | 'outline'> = {
+      transactional: 'default',
+      marketing: 'secondary',
+      notification: 'outline',
+    };
+    return <Badge variant={colors[category] || 'outline'}>{category}</Badge>;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium">Email Templates</h3>
+          <p className="text-sm text-muted-foreground">
+            Manage reusable email templates built with React Email
+          </p>
+        </div>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Template
+        </Button>
+      </div>
+
+      <div className="grid gap-4">
+        {loading ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              Loading templates...
+            </CardContent>
+          </Card>
+        ) : templates.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              No templates found. Create your first template to get started.
+            </CardContent>
+          </Card>
+        ) : (
+          templates.map((template) => (
+            <Card key={template.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{template.name}</CardTitle>
+                      {!template.is_active && <Badge variant="secondary">Inactive</Badge>}
+                    </div>
+                    <CardDescription>{template.description || 'No description'}</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {getCategoryBadge(template.category)}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Slug:</span>
+                    <code className="rounded bg-muted px-2 py-1">{template.slug}</code>
+                  </div>
+
+                  {template.variables && template.variables.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-sm text-muted-foreground">Variables:</span>
+                      <div className="flex flex-wrap gap-2">
+                        {template.variables.map((variable) => (
+                          <Badge key={variable} variant="outline">
+                            {`{{${variable}}}`}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline">
+                      <Eye className="mr-2 h-4 w-4" />
+                      Preview
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button size="sm" variant="outline">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Template Builder Info */}
+      <Card>
+        <CardHeader>
+          <CardTitle>About React Email Templates</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>
+            Email templates are built using <a href="https://react.email" target="_blank" rel="noopener noreferrer" className="text-primary underline">React Email</a>,
+            a modern way to build emails with React components.
+          </p>
+          <p className="text-muted-foreground">
+            Templates support dynamic variables using the <code className="rounded bg-muted px-1">{`{{variable}}`}</code> syntax.
+            Variables are replaced with actual values when sending emails.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default EmailTemplatesTab;
+

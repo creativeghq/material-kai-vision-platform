@@ -1,24 +1,16 @@
 import React, { useState } from 'react';
-import { Search, Sparkles, FileText, Clock } from 'lucide-react';
+import { Search, Clock } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 export const SearchInterface: React.FC = () => {
   const [query, setQuery] = useState('');
-  const [searchType, setSearchType] = useState<'semantic' | 'full_text' | 'hybrid'>('semantic');
   const [results, setResults] = useState<KBDocument[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchTime, setSearchTime] = useState<number>(0);
@@ -56,7 +48,7 @@ export const SearchInterface: React.FC = () => {
       setIsSearching(true);
       const startTime = Date.now();
 
-      // Call MIVAA API for semantic search (generates query embedding and does vector similarity)
+      // Call MIVAA API for multi-vector search (enhanced search with 6 specialized CLIP embeddings)
       const response = await fetch('https://v1api.materialshub.gr/api/kb/search', {
         method: 'POST',
         headers: {
@@ -65,7 +57,7 @@ export const SearchInterface: React.FC = () => {
         body: JSON.stringify({
           workspace_id: workspaceId,
           query: query.trim(),
-          search_type: searchType,
+          search_type: 'multi_vector',
           limit: 20,
         }),
       });
@@ -98,14 +90,7 @@ export const SearchInterface: React.FC = () => {
     }
   };
 
-  const getSearchTypeBadge = (type: string) => {
-    const labels = {
-      semantic: 'Semantic (AI)',
-      full_text: 'Full-Text',
-      hybrid: 'Hybrid',
-    };
-    return labels[type as keyof typeof labels] || type;
-  };
+
 
   return (
     <div className="space-y-4">
@@ -120,33 +105,8 @@ export const SearchInterface: React.FC = () => {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Search for documents..."
-              className="flex-1"
+              className="flex-1 bg-sidebar"
             />
-            <Select value={searchType} onValueChange={(value: any) => setSearchType(value)}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="semantic">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4" />
-                    Semantic (AI)
-                  </div>
-                </SelectItem>
-                <SelectItem value="full_text">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Full-Text
-                  </div>
-                </SelectItem>
-                <SelectItem value="hybrid">
-                  <div className="flex items-center gap-2">
-                    <Search className="h-4 w-4" />
-                    Hybrid
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
             <Button onClick={handleSearch} disabled={isSearching}>
               {isSearching ? (
                 <>Searching...</>

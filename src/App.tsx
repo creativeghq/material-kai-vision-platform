@@ -70,6 +70,7 @@ import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
 import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
 import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
+import { EmailManagement } from './components/Admin/EmailManagement';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -613,6 +614,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <TimelineStepsManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/emails"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <EmailManagement />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

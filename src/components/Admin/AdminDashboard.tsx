@@ -16,6 +16,7 @@ import {
   Book,
   AlertTriangle,
   ScrollText,
+  Mail,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -149,6 +150,16 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/quote-requests',
         status: 'active',
         count: 'Quote System',
+      },
+    ],
+    'Communications': [
+      {
+        title: 'Email Management',
+        description: 'Manage email domains, templates, and monitor delivery analytics with Amazon SES',
+        icon: Mail,
+        path: '/admin/emails',
+        status: 'active',
+        count: 'SES Integration',
       },
     ],
     'System Monitoring': [

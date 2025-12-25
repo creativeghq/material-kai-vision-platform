@@ -89,6 +89,11 @@
 | `STRIPE_WEBHOOK_SECRET` | **Secret** | Supabase Dashboard | Stripe webhook signing secret | `whsec_...` |
 | `STRIPE_PRO_PRICE_ID` | Public | Supabase Dashboard | Stripe price ID for Pro subscription | `price_...` |
 | `STRIPE_ENTERPRISE_PRICE_ID` | Public | Supabase Dashboard | Stripe price ID for Enterprise subscription | `price_...` |
+| `AWS_REGION` | Public | Supabase Dashboard | AWS region for SES | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | **Secret** | Supabase Dashboard | AWS IAM access key for SES | `AKIAXXXXXXXXXXXXXXXX` |
+| `AWS_SECRET_ACCESS_KEY` | **Secret** | Supabase Dashboard | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `DEFAULT_FROM_EMAIL` | Public | Supabase Dashboard | Default sender email address | `noreply@yourdomain.com` |
+| `DEFAULT_FROM_NAME` | Public | Supabase Dashboard | Default sender name | `Material Kai` |
 
 **How to Set Supabase Edge Function Secrets:**
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)

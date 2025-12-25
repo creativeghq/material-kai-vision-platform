@@ -1031,54 +1031,48 @@ export const OperationsDashboard: React.FC = () => {
           <TabsContent value="subscriptions" className="space-y-4">
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4">
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <Crown className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Pro Subscribers</div>
-                      <div className="text-2xl font-bold text-slate-900">{subscriptionStats.proUsers}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
-                      </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Crown className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Pro Subscribers</div>
+                    <div className="text-2xl font-bold text-foreground">{subscriptionStats.proUsers}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <DollarSign className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Monthly Revenue</div>
-                      <div className="text-2xl font-bold text-slate-900">${subscriptionStats.totalRevenue}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        From Pro subscriptions
-                      </div>
+                </div>
+              </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <DollarSign className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Monthly Revenue</div>
+                    <div className="text-2xl font-bold text-foreground">${subscriptionStats.totalRevenue}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      From Pro subscriptions
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-slate-50 border-slate-200">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-slate-200">
-                      <Zap className="h-5 w-5 text-slate-700" />
-                    </div>
-                    <div>
-                      <div className="text-sm text-slate-600 font-medium">Credits Used</div>
-                      <div className="text-2xl font-bold text-slate-900">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        Across all users
-                      </div>
+                </div>
+              </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <Zap className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Credits Used</div>
+                    <div className="text-2xl font-bold text-foreground">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Across all users
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </div>
 
             {/* User Profiles Table */}
@@ -1860,21 +1854,6 @@ export const OperationsDashboard: React.FC = () => {
 
           {/* Tasks Tab */}
           <TabsContent value="tasks" className="space-y-4">
-            <Card className="bg-slate-50 border-slate-200">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <ListTodo className="h-5 w-5 text-slate-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-semibold text-slate-900 mb-1">Task Management</h3>
-                    <p className="text-sm text-slate-600">
-                      Organize and track operational tasks with a <strong>Kanban board</strong>.
-                      Create, assign, and monitor tasks across different stages of completion.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
             <div className="h-[calc(100vh-20rem)]">
               <KanbanBoard
                 onTaskClick={handleTaskClick}
