@@ -334,7 +334,8 @@ serve(async (req) => {
       }
 
       case 'domains': {
-        if (req.method !== 'GET') {
+        // Accept both GET and POST (Supabase functions.invoke uses POST)
+        if (req.method !== 'GET' && req.method !== 'POST') {
           throw new Error('Method not allowed');
         }
 
@@ -355,6 +356,7 @@ serve(async (req) => {
       }
 
       case 'list-ses-domains': {
+        // Accept both GET and POST (Supabase functions.invoke uses POST)
         if (req.method !== 'POST' && req.method !== 'GET') {
           throw new Error('Method not allowed');
         }
@@ -391,7 +393,8 @@ serve(async (req) => {
       }
 
       case 'logs': {
-        if (req.method !== 'GET') {
+        // Accept both GET and POST (Supabase functions.invoke uses POST)
+        if (req.method !== 'GET' && req.method !== 'POST') {
           throw new Error('Method not allowed');
         }
 
@@ -498,7 +501,8 @@ serve(async (req) => {
       }
 
       case 'sending-stats': {
-        if (req.method !== 'GET') {
+        // Accept both GET and POST (Supabase functions.invoke uses POST)
+        if (req.method !== 'GET' && req.method !== 'POST') {
           throw new Error('Method not allowed');
         }
 

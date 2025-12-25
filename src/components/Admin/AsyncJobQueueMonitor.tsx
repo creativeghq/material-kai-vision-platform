@@ -253,11 +253,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     try {
       setError(null);
 
-      // Fetch background jobs (PDF and Web Scraping)
+      // Fetch background jobs (PDF, Web Scraping, and Product Discovery)
       const { data: bgJobsData, error: bgJobsError } = await supabase
         .from('background_jobs')
         .select('*')
-        .in('job_type', ['pdf_processing', 'web_scraping'])
+        .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload'])
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -287,7 +287,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       // 🆕 Helper function to calculate metrics for a specific job type
       const calculateJobTypeMetrics = (jobs: BackgroundJob[], jobType?: string): JobTypeMetrics => {
-        const filteredJobs = jobType ? jobs.filter(j => j.job_type === jobType) : jobs;
+        let filteredJobs: BackgroundJob[];
+
+        if (!jobType) {
+          filteredJobs = jobs;
+        } else if (jobType === 'pdf_processing') {
+          // Group product_discovery_upload with pdf_processing
+          filteredJobs = jobs.filter(j =>
+            j.job_type === 'pdf_processing' ||
+            j.job_type === 'product_discovery_upload'
+          );
+        } else {
+          filteredJobs = jobs.filter(j => j.job_type === jobType);
+        }
 
         const pending = filteredJobs.filter((j) => j.status === 'pending').length;
         const processing = filteredJobs.filter((j) => j.status === 'processing').length;
@@ -385,6 +397,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     if (selectedTab === 'all') {
       return jobs;
     }
+
+    // Group product_discovery_upload with pdf_processing
+    if (selectedTab === 'pdf_processing') {
+      return jobs.filter(job =>
+        job.job_type === 'pdf_processing' ||
+        job.job_type === 'product_discovery_upload'
+      );
+    }
+
     return jobs.filter(job => job.job_type === selectedTab);
   };
 
@@ -865,54 +886,94 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             <CardContent className="space-y-4">
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <div className="text-2xl font-bold text-yellow-700">
-                    {metrics.all_jobs.pending}
-                  </div>
-                  <div className="text-sm text-yellow-600">Pending</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {metrics.all_jobs.processing}
-                  </div>
-                  <div className="text-sm text-blue-600">Processing</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="text-2xl font-bold text-green-700">
-                    {metrics.all_jobs.completed}
-                  </div>
-                  <div className="text-sm text-green-600">Completed</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="text-2xl font-bold text-red-700">
-                    {metrics.all_jobs.failed}
-                  </div>
-                  <div className="text-sm text-red-600">Failed</div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                  <div className="text-2xl font-bold text-orange-700">
-                    {metrics.all_jobs.interrupted}
-                  </div>
-                  <div className="text-sm text-orange-600">Interrupted</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="text-2xl font-bold text-gray-700">
-                    {metrics.all_jobs.cancelled}
-                  </div>
-                  <div className="text-sm text-gray-600">Cancelled</div>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-700">
-                    {metrics.all_jobs.retrying}
-                  </div>
-                  <div className="text-sm text-purple-600">Retrying</div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-2xl font-bold text-slate-700">
-                    {metrics.all_jobs.total}
-                  </div>
-                  <div className="text-sm text-slate-600">Total</div>
-                </div>
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                      <p className="text-xs font-medium text-yellow-700">Pending</p>
+                    </div>
+                    <div className="text-2xl font-bold text-yellow-800">
+                      {metrics.all_jobs.pending}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                      <p className="text-xs font-medium text-blue-700">Processing</p>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-800">
+                      {metrics.all_jobs.processing}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-medium text-green-700">Completed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-green-800">
+                      {metrics.all_jobs.completed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <p className="text-xs font-medium text-red-700">Failed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-red-800">
+                      {metrics.all_jobs.failed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <p className="text-xs font-medium text-orange-700">Interrupted</p>
+                    </div>
+                    <div className="text-2xl font-bold text-orange-800">
+                      {metrics.all_jobs.interrupted}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-gray-600" />
+                      <p className="text-xs font-medium text-gray-700">Cancelled</p>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {metrics.all_jobs.cancelled}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-purple-600" />
+                      <p className="text-xs font-medium text-purple-700">Retrying</p>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-800">
+                      {metrics.all_jobs.retrying}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-4 w-4 text-slate-600" />
+                      <p className="text-xs font-medium text-slate-700">Total</p>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-800">
+                      {metrics.all_jobs.total}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Recent Jobs List */}
@@ -1067,54 +1128,94 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             <CardContent className="space-y-4">
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <div className="text-2xl font-bold text-yellow-700">
-                    {metrics.pdf_processing.pending}
-                  </div>
-                  <div className="text-sm text-yellow-600">Pending</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {metrics.pdf_processing.processing}
-                  </div>
-                  <div className="text-sm text-blue-600">Processing</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="text-2xl font-bold text-green-700">
-                    {metrics.pdf_processing.completed}
-                  </div>
-                  <div className="text-sm text-green-600">Completed</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="text-2xl font-bold text-red-700">
-                    {metrics.pdf_processing.failed}
-                  </div>
-                  <div className="text-sm text-red-600">Failed</div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                  <div className="text-2xl font-bold text-orange-700">
-                    {metrics.pdf_processing.interrupted}
-                  </div>
-                  <div className="text-sm text-orange-600">Interrupted</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="text-2xl font-bold text-gray-700">
-                    {metrics.pdf_processing.cancelled}
-                  </div>
-                  <div className="text-sm text-gray-600">Cancelled</div>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-700">
-                    {metrics.pdf_processing.retrying}
-                  </div>
-                  <div className="text-sm text-purple-600">Retrying</div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-2xl font-bold text-slate-700">
-                    {metrics.pdf_processing.total}
-                  </div>
-                  <div className="text-sm text-slate-600">Total</div>
-                </div>
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                      <p className="text-xs font-medium text-yellow-700">Pending</p>
+                    </div>
+                    <div className="text-2xl font-bold text-yellow-800">
+                      {metrics.pdf_processing.pending}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                      <p className="text-xs font-medium text-blue-700">Processing</p>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-800">
+                      {metrics.pdf_processing.processing}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-medium text-green-700">Completed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-green-800">
+                      {metrics.pdf_processing.completed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <p className="text-xs font-medium text-red-700">Failed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-red-800">
+                      {metrics.pdf_processing.failed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <p className="text-xs font-medium text-orange-700">Interrupted</p>
+                    </div>
+                    <div className="text-2xl font-bold text-orange-800">
+                      {metrics.pdf_processing.interrupted}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-gray-600" />
+                      <p className="text-xs font-medium text-gray-700">Cancelled</p>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {metrics.pdf_processing.cancelled}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-purple-600" />
+                      <p className="text-xs font-medium text-purple-700">Retrying</p>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-800">
+                      {metrics.pdf_processing.retrying}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-4 w-4 text-slate-600" />
+                      <p className="text-xs font-medium text-slate-700">Total</p>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-800">
+                      {metrics.pdf_processing.total}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Recent Jobs List */}
@@ -1230,54 +1331,94 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             <CardContent className="space-y-4">
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <div className="text-2xl font-bold text-yellow-700">
-                    {metrics.web_scraping.pending}
-                  </div>
-                  <div className="text-sm text-yellow-600">Pending</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {metrics.web_scraping.processing}
-                  </div>
-                  <div className="text-sm text-blue-600">Processing</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="text-2xl font-bold text-green-700">
-                    {metrics.web_scraping.completed}
-                  </div>
-                  <div className="text-sm text-green-600">Completed</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="text-2xl font-bold text-red-700">
-                    {metrics.web_scraping.failed}
-                  </div>
-                  <div className="text-sm text-red-600">Failed</div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                  <div className="text-2xl font-bold text-orange-700">
-                    {metrics.web_scraping.interrupted}
-                  </div>
-                  <div className="text-sm text-orange-600">Interrupted</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="text-2xl font-bold text-gray-700">
-                    {metrics.web_scraping.cancelled}
-                  </div>
-                  <div className="text-sm text-gray-600">Cancelled</div>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-700">
-                    {metrics.web_scraping.retrying}
-                  </div>
-                  <div className="text-sm text-purple-600">Retrying</div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-2xl font-bold text-slate-700">
-                    {metrics.web_scraping.total}
-                  </div>
-                  <div className="text-sm text-slate-600">Total</div>
-                </div>
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                      <p className="text-xs font-medium text-yellow-700">Pending</p>
+                    </div>
+                    <div className="text-2xl font-bold text-yellow-800">
+                      {metrics.web_scraping.pending}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                      <p className="text-xs font-medium text-blue-700">Processing</p>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-800">
+                      {metrics.web_scraping.processing}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-medium text-green-700">Completed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-green-800">
+                      {metrics.web_scraping.completed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <p className="text-xs font-medium text-red-700">Failed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-red-800">
+                      {metrics.web_scraping.failed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <p className="text-xs font-medium text-orange-700">Interrupted</p>
+                    </div>
+                    <div className="text-2xl font-bold text-orange-800">
+                      {metrics.web_scraping.interrupted}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-gray-600" />
+                      <p className="text-xs font-medium text-gray-700">Cancelled</p>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {metrics.web_scraping.cancelled}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-purple-600" />
+                      <p className="text-xs font-medium text-purple-700">Retrying</p>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-800">
+                      {metrics.web_scraping.retrying}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-4 w-4 text-slate-600" />
+                      <p className="text-xs font-medium text-slate-700">Total</p>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-800">
+                      {metrics.web_scraping.total}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Recent Jobs List */}
@@ -1393,54 +1534,94 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             <CardContent className="space-y-4">
               {/* Status Breakdown */}
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <div className="text-2xl font-bold text-yellow-700">
-                    {metrics.xml_import.pending}
-                  </div>
-                  <div className="text-sm text-yellow-600">Pending</div>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-700">
-                    {metrics.xml_import.processing}
-                  </div>
-                  <div className="text-sm text-blue-600">Processing</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <div className="text-2xl font-bold text-green-700">
-                    {metrics.xml_import.completed}
-                  </div>
-                  <div className="text-sm text-green-600">Completed</div>
-                </div>
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="text-2xl font-bold text-red-700">
-                    {metrics.xml_import.failed}
-                  </div>
-                  <div className="text-sm text-red-600">Failed</div>
-                </div>
-                <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-                  <div className="text-2xl font-bold text-orange-700">
-                    {metrics.xml_import.interrupted}
-                  </div>
-                  <div className="text-sm text-orange-600">Interrupted</div>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="text-2xl font-bold text-gray-700">
-                    {metrics.xml_import.cancelled}
-                  </div>
-                  <div className="text-sm text-gray-600">Cancelled</div>
-                </div>
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-700">
-                    {metrics.xml_import.retrying}
-                  </div>
-                  <div className="text-sm text-purple-600">Retrying</div>
-                </div>
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-2xl font-bold text-slate-700">
-                    {metrics.xml_import.total}
-                  </div>
-                  <div className="text-sm text-slate-600">Total</div>
-                </div>
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-600" />
+                      <p className="text-xs font-medium text-yellow-700">Pending</p>
+                    </div>
+                    <div className="text-2xl font-bold text-yellow-800">
+                      {metrics.xml_import.pending}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                      <p className="text-xs font-medium text-blue-700">Processing</p>
+                    </div>
+                    <div className="text-2xl font-bold text-blue-800">
+                      {metrics.xml_import.processing}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-medium text-green-700">Completed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-green-800">
+                      {metrics.xml_import.completed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <p className="text-xs font-medium text-red-700">Failed</p>
+                    </div>
+                    <div className="text-2xl font-bold text-red-800">
+                      {metrics.xml_import.failed}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <p className="text-xs font-medium text-orange-700">Interrupted</p>
+                    </div>
+                    <div className="text-2xl font-bold text-orange-800">
+                      {metrics.xml_import.interrupted}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-gray-600" />
+                      <p className="text-xs font-medium text-gray-700">Cancelled</p>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-800">
+                      {metrics.xml_import.cancelled}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-purple-600" />
+                      <p className="text-xs font-medium text-purple-700">Retrying</p>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-800">
+                      {metrics.xml_import.retrying}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="h-4 w-4 text-slate-600" />
+                      <p className="text-xs font-medium text-slate-700">Total</p>
+                    </div>
+                    <div className="text-2xl font-bold text-slate-800">
+                      {metrics.xml_import.total}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Recent Jobs List */}

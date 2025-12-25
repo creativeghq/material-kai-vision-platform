@@ -63,9 +63,9 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
           slug: formData.slug,
           description: formData.description || null,
           category: formData.category,
-          subject: '',
-          html_content: '',
-          text_content: '',
+          subject_template: '',
+          html_template: '',
+          text_template: '',
           variables: [],
           is_active: false, // Set to inactive until template is built
           created_by: user?.id,
