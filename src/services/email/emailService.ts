@@ -109,6 +109,7 @@ export class EmailService {
     // Fetch from SES
     try {
       const { data: sesData, error: sesError } = await supabase.functions.invoke('email-api', {
+        method: 'POST',
         body: { action: 'list-ses-domains' },
       });
 

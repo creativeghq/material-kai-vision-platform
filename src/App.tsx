@@ -71,6 +71,7 @@ import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
 import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
 import { EmailManagement } from './components/Admin/EmailManagement';
+import { EmailTemplateBuilder } from './pages/Admin/EmailTemplateBuilder';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -626,6 +627,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <EmailManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/email-templates/:id/edit"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <EmailTemplateBuilder />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

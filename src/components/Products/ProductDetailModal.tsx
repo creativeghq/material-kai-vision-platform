@@ -15,11 +15,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, Factory } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity } from 'lucide-react';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
 import { SimilarMaterials } from '@/components/recommendations';
+import { ProductMonitorTab } from '@/components/PriceMonitoring/ProductMonitorTab';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -239,7 +241,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mt-6">
+        {/* Tabs for Details and Monitor */}
+        <Tabs defaultValue="details" className="mt-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details" className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Product Details
+            </TabsTrigger>
+            <TabsTrigger value="monitor" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Price Monitor
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Details Tab */}
+          <TabsContent value="details" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left Column: Image Slider (3/5 width) */}
           <div className="lg:col-span-3 space-y-4">
             <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
@@ -420,10 +437,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </CardContent>
         </Card>
 
-        {/* Similar Materials Section */}
-        <div className="mt-6">
-          <SimilarMaterials materialId={product.id} limit={10} />
-        </div>
+            {/* Similar Materials Section */}
+            <div className="mt-6">
+              <SimilarMaterials materialId={product.id} limit={10} />
+            </div>
+          </div>
+          </TabsContent>
+
+          {/* Monitor Tab */}
+          <TabsContent value="monitor" className="mt-6">
+            <ProductMonitorTab
+              productId={product.id}
+              productName={product.name}
+              currentPrice={product.pricing?.retail}
+              currency={product.pricing?.currency}
+            />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

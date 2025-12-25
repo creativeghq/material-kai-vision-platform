@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SESClient, SendEmailCommand, VerifyDomainIdentityCommand, GetIdentityVerificationAttributesCommand, ListIdentitiesCommand } from 'npm:@aws-sdk/client-ses@3';
 import { SESv2Client, GetAccountCommand } from 'npm:@aws-sdk/client-sesv2@3';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
+import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -115,11 +116,34 @@ serve(async (req) => {
           templateId = template.id;
           const variables = body.variables || {};
 
-          // Simple template rendering
-          subject = template.subject_template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] || '');
-          htmlBody = template.html_template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] || '');
-          if (template.text_template) {
-            textBody = template.text_template.replace(/\{\{(\w+)\}\}/g, (_, key) => variables[key] || '');
+          // Render subject with variables
+          subject = renderTemplateWithVariables(template.subject || body.subject, variables);
+
+          // Try to render React Email template first, fall back to HTML template
+          if (template.react_code) {
+            try {
+              htmlBody = await renderReactEmailTemplate(template.react_code, variables);
+              // Generate plain text from rendered HTML if not provided
+              if (!textBody) {
+                textBody = generatePlainTextFromReactEmail(htmlBody);
+              }
+            } catch (error) {
+              console.error('Error rendering React Email template, falling back to HTML:', error);
+              // Fall back to HTML template if React rendering fails
+              if (template.html_content) {
+                htmlBody = renderTemplateWithVariables(template.html_content, variables);
+              } else {
+                throw new Error('Failed to render email template');
+              }
+            }
+          } else if (template.html_content) {
+            // Legacy HTML template rendering
+            htmlBody = renderTemplateWithVariables(template.html_content, variables);
+            if (template.text_content) {
+              textBody = renderTemplateWithVariables(template.text_content, variables);
+            }
+          } else {
+            throw new Error('Template has no content');
           }
         }
 
@@ -331,7 +355,7 @@ serve(async (req) => {
       }
 
       case 'list-ses-domains': {
-        if (req.method !== 'GET') {
+        if (req.method !== 'POST' && req.method !== 'GET') {
           throw new Error('Method not allowed');
         }
 

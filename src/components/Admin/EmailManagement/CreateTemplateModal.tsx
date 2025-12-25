@@ -27,10 +27,6 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
     slug: '',
     description: '',
     category: 'transactional',
-    subject: '',
-    html_content: '',
-    text_content: '',
-    variables: '',
   });
   const { toast } = useToast();
 
@@ -60,33 +56,32 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
 
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Parse variables
-      const variables = formData.variables
-        .split(',')
-        .map(v => v.trim())
-        .filter(v => v.length > 0);
-
-      const { error } = await supabase
+      const { data: template, error } = await supabase
         .from('email_templates')
         .insert({
           name: formData.name,
           slug: formData.slug,
           description: formData.description || null,
           category: formData.category,
-          subject: formData.subject || null,
-          html_content: formData.html_content || null,
-          text_content: formData.text_content || null,
-          variables: variables,
-          is_active: true,
+          subject: '',
+          html_content: '',
+          text_content: '',
+          variables: [],
+          is_active: false, // Set to inactive until template is built
           created_by: user?.id,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
       toast({
         title: 'Success',
-        description: 'Template created successfully',
+        description: 'Template created. Redirecting to builder...',
       });
+
+      // Redirect to template builder
+      window.location.href = `/admin/email-templates/${template.id}/edit`;
 
       onSuccess();
     } catch (error: any) {
@@ -163,56 +158,9 @@ export const CreateTemplateModal: React.FC<CreateTemplateModalProps> = ({
             </select>
           </div>
 
-          {/* Subject */}
-          <div className="space-y-2">
-            <Label htmlFor="subject">Default Subject Line</Label>
-            <Input
-              id="subject"
-              value={formData.subject}
-              onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-              placeholder="Welcome to {{company_name}}!"
-            />
-          </div>
-
-          {/* HTML Content */}
-          <div className="space-y-2">
-            <Label htmlFor="html_content">HTML Content</Label>
-            <Textarea
-              id="html_content"
-              value={formData.html_content}
-              onChange={(e) => setFormData({ ...formData, html_content: e.target.value })}
-              placeholder="<html>...</html>"
-              rows={8}
-              className="font-mono text-xs"
-            />
-            <p className="text-xs text-muted-foreground">
-              Use &#123;&#123;variable_name&#125;&#125; for dynamic content
-            </p>
-          </div>
-
-          {/* Text Content */}
-          <div className="space-y-2">
-            <Label htmlFor="text_content">Plain Text Content</Label>
-            <Textarea
-              id="text_content"
-              value={formData.text_content}
-              onChange={(e) => setFormData({ ...formData, text_content: e.target.value })}
-              placeholder="Plain text version of the email"
-              rows={6}
-            />
-          </div>
-
-          {/* Variables */}
-          <div className="space-y-2">
-            <Label htmlFor="variables">Template Variables</Label>
-            <Input
-              id="variables"
-              value={formData.variables}
-              onChange={(e) => setFormData({ ...formData, variables: e.target.value })}
-              placeholder="user_name, company_name, action_url"
-            />
-            <p className="text-xs text-muted-foreground">
-              Comma-separated list of variables used in this template
+          <div className="p-4 rounded-lg border bg-muted/50">
+            <p className="text-sm text-muted-foreground">
+              After creating the template, you'll be redirected to the email builder where you can design your email using React Email components.
             </p>
           </div>
 
