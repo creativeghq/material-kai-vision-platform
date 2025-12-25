@@ -122,9 +122,31 @@ serve(async (req) => {
           throw new Error('Either html or text body must be provided');
         }
 
-        // Get default domain
-        const fromEmail = body.from || Deno.env.get('DEFAULT_FROM_EMAIL') || 'noreply@example.com';
-        const fromName = body.fromName || Deno.env.get('DEFAULT_FROM_NAME') || 'Material Kai';
+        // Get default sender settings from database
+        let defaultFromEmail = 'noreply@example.com';
+        let defaultFromName = 'Material Kai';
+
+        try {
+          const { data: emailSettings } = await supabaseClient
+            .from('email_settings')
+            .select('setting_key, setting_value')
+            .in('setting_key', ['default_from_email', 'default_from_name']);
+
+          if (emailSettings) {
+            emailSettings.forEach((setting) => {
+              if (setting.setting_key === 'default_from_email') {
+                defaultFromEmail = setting.setting_value;
+              } else if (setting.setting_key === 'default_from_name') {
+                defaultFromName = setting.setting_value;
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error loading email settings, using defaults:', error);
+        }
+
+        const fromEmail = body.from || defaultFromEmail;
+        const fromName = body.fromName || defaultFromName;
         const fromAddress = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
         const toAddresses = Array.isArray(body.to) ? body.to : [body.to];

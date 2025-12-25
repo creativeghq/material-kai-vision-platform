@@ -66,7 +66,7 @@ export const EmailTemplatesTab: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium">Email Templates</h3>
+          <h3 className="text-lg font-semibold">Email Templates</h3>
           <p className="text-sm text-muted-foreground">
             Manage reusable email templates built with React Email
           </p>
@@ -79,35 +79,35 @@ export const EmailTemplatesTab: React.FC = () => {
 
       <div className="grid gap-4">
         {loading ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <div className="dashboard-card">
+            <div className="py-8 text-center text-muted-foreground">
               Loading templates...
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : templates.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <div className="dashboard-card">
+            <div className="py-8 text-center text-muted-foreground">
               No templates found. Create your first template to get started.
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : (
           templates.map((template) => (
-            <Card key={template.id}>
-              <CardHeader>
+            <div key={template.id} className="dashboard-card">
+              <div className="mb-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
+                      <h4 className="text-lg font-semibold">{template.name}</h4>
                       {!template.is_active && <Badge variant="secondary">Inactive</Badge>}
                     </div>
-                    <CardDescription>{template.description || 'No description'}</CardDescription>
+                    <p className="text-sm text-muted-foreground">{template.description || 'No description'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {getCategoryBadge(template.category)}
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent>
+              </div>
+              <div>
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground">Slug:</span>
@@ -142,18 +142,18 @@ export const EmailTemplatesTab: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))
         )}
       </div>
 
       {/* Template Builder Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle>About React Email Templates</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm">
+      <div className="dashboard-card">
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold">About React Email Templates</h3>
+        </div>
+        <div className="space-y-2 text-sm">
           <p>
             Email templates are built using <a href="https://react.email" target="_blank" rel="noopener noreferrer" className="text-primary underline">React Email</a>,
             a modern way to build emails with React components.
@@ -162,8 +162,8 @@ export const EmailTemplatesTab: React.FC = () => {
             Templates support dynamic variables using the <code className="rounded bg-muted px-1">{`{{variable}}`}</code> syntax.
             Variables are replaced with actual values when sending emails.
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };

@@ -132,7 +132,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium">Email Domains</h3>
+          <h3 className="text-lg font-semibold">Email Domains</h3>
           <p className="text-sm text-muted-foreground">
             Manage verified domains for sending emails via Amazon SES
           </p>
@@ -176,31 +176,31 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
 
       <div className="grid gap-4">
         {loading ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <div className="dashboard-card">
+            <div className="py-8 text-center text-muted-foreground">
               Loading domains...
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : domains.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground">
+          <div className="dashboard-card">
+            <div className="py-8 text-center text-muted-foreground">
               No domains configured. Add your first domain to start sending emails.
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ) : (
           domains.map((domain) => (
-            <Card key={domain.id}>
-              <CardHeader>
+            <div key={domain.id} className="dashboard-card">
+              <div className="mb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {getStatusIcon(domain.verification_status)}
-                    <CardTitle className="text-lg">{domain.domain}</CardTitle>
+                    <h4 className="text-lg font-semibold">{domain.domain}</h4>
                     {domain.is_default && <Badge variant="outline">Default</Badge>}
                   </div>
                   {getStatusBadge(domain.verification_status)}
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </div>
+              <div className="space-y-4">
                 {domain.verification_token && (
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Verification Token (TXT Record)</Label>
@@ -250,8 +250,8 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
                     Check Verification Status
                   </Button>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))
         )}
       </div>

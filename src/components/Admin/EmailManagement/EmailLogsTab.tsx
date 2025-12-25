@@ -95,7 +95,7 @@ export const EmailLogsTab: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium">Email Logs</h3>
+          <h3 className="text-lg font-semibold">Email Logs</h3>
           <p className="text-sm text-muted-foreground">
             View all sent emails and their delivery status
           </p>
@@ -135,17 +135,16 @@ export const EmailLogsTab: React.FC = () => {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="py-8 text-center text-muted-foreground">
-              Loading email logs...
-            </div>
-          ) : logs.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-              No email logs found
-            </div>
-          ) : (
+      <div className="dashboard-card p-0">
+        {loading ? (
+          <div className="py-8 text-center text-muted-foreground">
+            Loading email logs...
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground">
+            No email logs found
+          </div>
+        ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -179,8 +178,7 @@ export const EmailLogsTab: React.FC = () => {
               </TableBody>
             </Table>
           )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 };
