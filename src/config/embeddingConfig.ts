@@ -7,12 +7,13 @@
 
 export interface EmbeddingModelConfig {
   name: string;
-  provider: 'openai' | 'huggingface' | 'mivaa';
+  provider: 'voyage' | 'openai' | 'huggingface' | 'mivaa';
   dimensions: number;
   maxTokens: number;
   costPerToken: number;
   normalization: 'l2' | 'none';
   batchSize: number;
+  inputType?: 'document' | 'query'; // Voyage AI specific
 }
 
 export interface UnifiedEmbeddingConfig {
@@ -43,18 +44,30 @@ export interface UnifiedEmbeddingConfig {
 
 /**
  * Default embedding configuration for the platform
+ * Updated to use Voyage AI as primary provider with OpenAI fallback
  */
 export const DEFAULT_EMBEDDING_CONFIG: UnifiedEmbeddingConfig = {
   primary: {
-    name: 'text-embedding-ada-002',
-    provider: 'openai',
-    dimensions: 1536,
-    maxTokens: 8191,
-    costPerToken: 0.0001,
+    name: 'voyage-3.5',
+    provider: 'voyage',
+    dimensions: 1024,
+    maxTokens: 8000,
+    costPerToken: 0.00005, // Voyage AI pricing
     normalization: 'l2',
     batchSize: 100,
+    inputType: 'document', // Default for indexing
   },
-  fallback: [],
+  fallback: [
+    {
+      name: 'text-embedding-3-small',
+      provider: 'openai',
+      dimensions: 1536,
+      maxTokens: 8191,
+      costPerToken: 0.0001,
+      normalization: 'l2',
+      batchSize: 100,
+    },
+  ],
   textPreprocessing: {
     maxLength: 8000, // Leave room for tokenization overhead
     truncateStrategy: 'tail',

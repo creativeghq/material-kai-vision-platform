@@ -137,7 +137,7 @@ export class QualityControlService {
           id, name, description, long_description, specifications, metadata,
           quality_score, confidence_score, completeness_score, quality_metrics,
           quality_assessment,
-          text_embedding_1536, visual_clip_embedding_512, multimodal_fusion_embedding_2688,
+          text_embedding_1024, visual_clip_embedding_512, multimodal_fusion_embedding_2048,
           color_embedding_256, texture_embedding_256, application_embedding_512,
           embedding_metadata
         `,
@@ -234,7 +234,7 @@ export class QualityControlService {
           `
           chunk_id, content, metadata, page_number,
           coherence_score, quality_score, boundary_quality, semantic_completeness,
-          text_embedding_1536, visual_clip_embedding_512, embedding_metadata
+          text_embedding_1024, visual_clip_embedding_512, embedding_metadata
         `,
         )
         .eq('chunk_id', chunkId)
@@ -250,7 +250,7 @@ export class QualityControlService {
         quality_score: chunk.quality_score || 0,
         boundary_quality: chunk.boundary_quality || 0,
         semantic_completeness: chunk.semantic_completeness || 0,
-        embedding_coverage: chunk.text_embedding_1536 ? 1 : 0, // Basic coverage for chunks
+        embedding_coverage: chunk.text_embedding_1024 ? 1 : 0, // Basic coverage for chunks
       };
 
       // Calculate overall score
@@ -516,9 +516,9 @@ export class QualityControlService {
    */
   private static calculateEmbeddingCoverage(product: any): number {
     const embeddingTypes = [
-      'text_embedding_1536',
+      'text_embedding_1024',
       'visual_clip_embedding_512',
-      'multimodal_fusion_embedding_2688',
+      'multimodal_fusion_embedding_2048',
       'color_embedding_256',
       'texture_embedding_256',
       'application_embedding_512',

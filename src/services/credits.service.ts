@@ -163,11 +163,32 @@ export const creditsAPI = {
   ): { inputCost: number; outputCost: number; totalCost: number; credits: number } {
     // Model pricing per 1M tokens (in USD)
     const pricing: Record<string, { input: number; output: number }> = {
+      // Claude Models
       'claude-sonnet-4.5': { input: 3.00, output: 15.00 },
       'claude-haiku-4.5': { input: 0.80, output: 4.00 },
+      'claude-opus-4.5': { input: 15.00, output: 75.00 },
+      'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
+      'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+
+      // OpenAI Models
       'gpt-5': { input: 5.00, output: 15.00 },
       'gpt-4o': { input: 2.50, output: 10.00 },
       'gpt-4o-mini': { input: 0.15, output: 0.60 },
+      'text-embedding-3-small': { input: 0.02, output: 0.00 },
+      'text-embedding-3-large': { input: 0.13, output: 0.00 },
+
+      // Voyage AI Embeddings
+      'voyage-3': { input: 0.06, output: 0.00 },
+      'voyage-3-lite': { input: 0.02, output: 0.00 },
+      'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
+
+      // Qwen Vision Models
+      'qwen3-vl-32b': { input: 0.50, output: 1.50 },
+      'qwen3-vl-8b': { input: 0.08, output: 0.50 },
+
+      // Llama Models
+      'llama-4-scout-17b': { input: 0.20, output: 0.20 },
+      'llama-4-maverick-17b': { input: 0.20, output: 0.20 },
     };
 
     const modelPricing = pricing[modelName] || pricing['gpt-4o-mini'];

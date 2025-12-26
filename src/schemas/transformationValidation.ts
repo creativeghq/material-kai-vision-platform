@@ -32,18 +32,26 @@ const ChunkSizeConfigSchema = z
 
 /**
  * Validation schema for embedding configuration
+ * Updated to support Voyage AI models
  */
 const EmbeddingConfigSchema = z.object({
   model: z.enum([
-    'text-embedding-ada-002',
+    'voyage-3.5',
+    'voyage-3',
+    'voyage-2',
     'text-embedding-3-small',
     'text-embedding-3-large',
+    'text-embedding-ada-002',
   ]),
   dimensions: z
     .number()
     .int()
     .min(256, 'Dimensions must be at least 256')
     .max(3072, 'Dimensions cannot exceed 3072')
+    .optional(),
+  inputType: z
+    .enum(['document', 'query'])
+    .default('document')
     .optional(),
   batchSize: z
     .number()

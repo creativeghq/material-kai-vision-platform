@@ -19,17 +19,19 @@ const AI_PRICING = {
     'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
     'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
     'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-    'claude-opus-4': { input: 15.00, output: 75.00 },
+    'claude-opus-4-5': { input: 15.00, output: 75.00 },
   },
   // OpenAI GPT Models
   gpt: {
     'gpt-5': { input: 5.00, output: 15.00 },
     'gpt-4o': { input: 2.50, output: 10.00 },
+    'gpt-4o-mini': { input: 0.15, output: 0.60 },
     'gpt-4-turbo': { input: 10.00, output: 30.00 },
   },
   // Llama Models (TogetherAI)
   llama: {
     'llama-4-scout-17b': { input: 0.20, output: 0.20 },
+    'llama-4-maverick-17b': { input: 0.20, output: 0.20 },
     'meta-llama/Llama-4-Scout-17B-16E-Instruct': { input: 0.20, output: 0.20 },
   },
   // OpenAI Embeddings
@@ -37,6 +39,19 @@ const AI_PRICING = {
     'text-embedding-3-small': { input: 0.02, output: 0.00 },
     'text-embedding-3-large': { input: 0.13, output: 0.00 },
     'text-embedding-ada-002': { input: 0.10, output: 0.00 },
+  },
+  // Voyage AI Embeddings
+  voyage: {
+    'voyage-3': { input: 0.06, output: 0.00 },
+    'voyage-3-lite': { input: 0.02, output: 0.00 },
+    'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
+  },
+  // Qwen Vision Models (TogetherAI)
+  qwen: {
+    'qwen3-vl-32b': { input: 0.50, output: 1.50 },
+    'qwen3-vl-8b': { input: 0.08, output: 0.50 },
+    'Qwen/Qwen3-VL-32B-Instruct': { input: 0.50, output: 1.50 },
+    'Qwen/Qwen3-VL-8B-Instruct': { input: 0.08, output: 0.50 },
   },
   // Vision Models
   vision: {
@@ -98,11 +113,19 @@ export class AICallLogger {
         modelLower.includes(key.toLowerCase())
       )?.[1];
     } else if (provider === 'together' || modelLower.includes('llama')) {
-      pricing = Object.entries(AI_PRICING.llama).find(([key]) => 
+      pricing = Object.entries(AI_PRICING.llama).find(([key]) =>
+        modelLower.includes(key.toLowerCase())
+      )?.[1];
+    } else if (modelLower.includes('qwen')) {
+      pricing = Object.entries(AI_PRICING.qwen).find(([key]) =>
+        modelLower.includes(key.toLowerCase())
+      )?.[1];
+    } else if (modelLower.includes('voyage')) {
+      pricing = Object.entries(AI_PRICING.voyage).find(([key]) =>
         modelLower.includes(key.toLowerCase())
       )?.[1];
     } else if (modelLower.includes('embedding')) {
-      pricing = Object.entries(AI_PRICING.embeddings).find(([key]) => 
+      pricing = Object.entries(AI_PRICING.embeddings).find(([key]) =>
         modelLower.includes(key.toLowerCase())
       )?.[1];
     } else if (modelLower.includes('clip')) {

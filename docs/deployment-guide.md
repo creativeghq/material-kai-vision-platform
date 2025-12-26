@@ -56,6 +56,7 @@
 | `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `TOGETHER_AI_API_KEY` | **Secret** | Server ENV | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for embeddings | `pa-xxxxxxxxxxxxxxxx` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
 | `GOOGLE_SHOPPING_API_KEY` | **Secret** | Server ENV | Google Shopping API key (optional) | `AIzaSyxxxxxxxxxxxxxxxx` |
@@ -73,6 +74,7 @@
 | **OpenAI** | `OPENAI_API_KEY` | Frontend, Backend | https://platform.openai.com/api-keys | Pay-per-use |
 | **Anthropic** | `ANTHROPIC_API_KEY` | Backend | https://console.anthropic.com/ | Pay-per-use |
 | **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use |
+| **Voyage AI** | `VOYAGE_API_KEY` | Backend | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
 
 ### **Price Monitoring API Keys**
@@ -90,6 +92,7 @@
 | Secret Name | Type | Where Set | Description | Example/Format |
 |------------|------|-----------|-------------|----------------|
 | `ANTHROPIC_API_KEY` | **Secret** | Supabase Dashboard | Claude API key for agent chat | `sk-ant-xxxxxxxxxxxxxxxx` |
+| `VOYAGE_API_KEY` | **Secret** | Supabase Dashboard | Voyage AI API key for embeddings | `pa-xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Supabase Dashboard | Firecrawl API for price monitoring cron | `fc-xxxxxxxxxxxxxxxx` |
 | `MIVAA_SERVICE_URL` | Public | Supabase Dashboard | MIVAA API endpoint | `https://v1api.materialshub.gr` |
 | `MIVAA_API_KEY` | **Secret** | Supabase Dashboard | MIVAA API authentication (optional) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
@@ -490,6 +493,7 @@ Environment=SUPABASE_SERVICE_KEY=<your-service-key>
 Environment=TOGETHER_AI_API_KEY=<your-together-ai-key>
 Environment=ANTHROPIC_API_KEY=<your-anthropic-key>
 Environment=OPENAI_API_KEY=<your-openai-key>
+Environment=VOYAGE_API_KEY=<your-voyage-ai-key>
 ExecStart=/var/www/mivaa-pdf-extractor/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=3
@@ -729,6 +733,9 @@ SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 JWT_SECRET_KEY=your_jwt_secret
 OPENAI_API_KEY=your_openai_key
+ANTHROPIC_API_KEY=your_anthropic_key
+TOGETHER_AI_API_KEY=your_together_ai_key
+VOYAGE_API_KEY=your_voyage_ai_key
 HUGGINGFACE_API_KEY=your_huggingface_key
 MATERIAL_KAI_API_URL=https://v1api.materialshub.gr
 MATERIAL_KAI_API_KEY=your_api_key
@@ -956,6 +963,7 @@ jobs:
      - OPENAI_API_KEY
      - ANTHROPIC_API_KEY
      - TOGETHER_AI_API_KEY
+     - VOYAGE_API_KEY (for text embeddings)
      - FIRECRAWL_API_KEY (for price monitoring)
      - GOOGLE_SHOPPING_API_KEY (optional)
      - GOOGLE_SHOPPING_CX (optional)

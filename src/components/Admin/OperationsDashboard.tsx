@@ -52,11 +52,32 @@ import type { TaskWithDetails } from '@/services/tasks';
 
 // Model pricing per 1M tokens (in USD)
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  // Claude Models
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
   'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
+  'claude-haiku-4-5': { input: 0.80, output: 4.00 },
+  'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
+  'claude-opus-4-5': { input: 15.00, output: 75.00 },
+
+  // OpenAI Models
   'gpt-4o': { input: 2.50, output: 10.00 },
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
+  'text-embedding-3-small': { input: 0.02, output: 0.00 },
+  'text-embedding-3-large': { input: 0.13, output: 0.00 },
+
+  // Voyage AI Embeddings
+  'voyage-3': { input: 0.06, output: 0.00 },
+  'voyage-3-lite': { input: 0.02, output: 0.00 },
+  'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
+
+  // Qwen Vision Models
+  'qwen3-vl-32b': { input: 0.50, output: 1.50 },
+  'qwen3-vl-8b': { input: 0.08, output: 0.50 },
+
+  // Llama Models
+  'llama-4-scout-17b': { input: 0.20, output: 0.20 },
+  'llama-4-maverick-17b': { input: 0.20, output: 0.20 },
 };
 
 // Estimate tokens from content length (rough approximation: 4 chars = 1 token)
@@ -1137,7 +1158,7 @@ export const OperationsDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground">
-                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Llama 4 Scout 17B, and vision/embedding models (SigLIP, CLIP). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Llama 4 Scout 17B, Voyage AI (embeddings), and vision/embedding models (SigLIP, CLIP). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 

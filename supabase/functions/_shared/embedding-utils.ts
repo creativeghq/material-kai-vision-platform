@@ -65,10 +65,12 @@ export const MIVAA_CONFIG = {
 } as const;
 
 // Unified embedding configuration for consistency across platform
+// Updated to use Voyage AI as primary provider
 export const EMBEDDING_CONFIG = {
-  model: 'text-embedding-ada-002',
-  dimensions: 1536,
-  maxTokens: 8191,
+  model: 'voyage-3.5',
+  dimensions: 1024,
+  maxTokens: 8000,
+  inputType: 'document', // 'document' for indexing, 'query' for search
   maxRetries: 3,
   retryDelay: 1000,
   requestTimeout: 30000,
@@ -97,10 +99,14 @@ function validateConfig(): void {
  * Generate standard embedding using MIVAA gateway
  *
  * @param text - The text to generate embeddings for
+ * @param inputType - Type of input: 'document' for indexing, 'query' for search (Voyage AI)
  * @returns Promise<number[]> - The embedding vector
  * @throws Error if embedding generation fails
  */
-export async function generateStandardEmbedding(text: string): Promise<number[]> {
+export async function generateStandardEmbedding(
+  text: string,
+  inputType: 'document' | 'query' = 'document'
+): Promise<number[]> {
   if (!MIVAA_CONFIG.apiKey) {
     throw new Error('MIVAA_API_KEY environment variable is required');
   }
@@ -113,7 +119,7 @@ export async function generateStandardEmbedding(text: string): Promise<number[]>
   // Retry logic
   for (let attempt = 1; attempt <= EMBEDDING_CONFIG.maxRetries; attempt++) {
     try {
-      console.log(`🔄 Generating embedding via MIVAA (attempt ${attempt}/${EMBEDDING_CONFIG.maxRetries})`);
+      console.log(`🔄 Generating embedding via MIVAA (attempt ${attempt}/${EMBEDDING_CONFIG.maxRetries}, inputType: ${inputType})`);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), MIVAA_CONFIG.timeout);
@@ -131,6 +137,7 @@ export async function generateStandardEmbedding(text: string): Promise<number[]>
             text: truncatedText,
             model: EMBEDDING_CONFIG.model,
             dimensions: EMBEDDING_CONFIG.dimensions,
+            input_type: inputType, // Add input_type for Voyage AI
           },
         }),
         signal: controller.signal,

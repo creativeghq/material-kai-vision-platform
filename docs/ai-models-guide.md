@@ -1,25 +1,35 @@
 # AI Models Integration Guide
 
-Complete reference of 12 AI models used across the platform.
+**Last Updated:** 2025-12-26
+
+Complete reference of all AI models used across the Material KAI Vision Platform.
 
 ---
 
 ## AI Models Overview
 
-| Model | Provider | Purpose | Capability | Cost |
-|-------|----------|---------|-----------|------|
-| Claude Sonnet 4.5 | Anthropic | Product discovery, enrichment | 95%+ accuracy | $3/1M input |
-| Claude Haiku 4.5 | Anthropic | Fast validation | Real-time | $0.80/1M input |
-| GPT-4o | OpenAI | Alternative discovery | 94%+ accuracy | $5/1M input |
-| text-embedding-3-small | OpenAI | Text embeddings | 1536D vectors | $0.02/1M tokens |
-| Llama 4 Scout 17B Vision | Together AI | Image analysis, OCR | 69.4% MMMU | $0.40/1M tokens |
-| CLIP (Visual) | OpenAI | Visual embeddings | 512D vectors | $0.02/1M tokens |
-| CLIP (Large) | OpenAI | Large visual embeddings | 1536D vectors | $0.02/1M tokens |
-| CLIP (Color) | OpenAI | Color analysis | 256D vectors | $0.02/1M tokens |
-| CLIP (Texture) | OpenAI | Texture analysis | 256D vectors | $0.02/1M tokens |
-| CLIP (Application) | OpenAI | Application classification | 512D vectors | $0.02/1M tokens |
-| Anthropic Semantic Chunking | Anthropic | Text segmentation | Semantic boundaries | Included |
-| LlamaIndex | LlamaIndex | RAG system | Document indexing | Open source |
+| Model | Provider | Purpose | Capability | Cost (per 1M tokens) |
+|-------|----------|---------|-----------|---------------------|
+| **Text Generation** |
+| Claude Sonnet 4.5 | Anthropic | Product discovery, enrichment | 95%+ accuracy | $3 input / $15 output |
+| Claude Haiku 4.5 | Anthropic | Fast validation | Real-time | $0.80 input / $4 output |
+| Claude Opus 4.5 | Anthropic | Complex reasoning | Highest accuracy | $15 input / $75 output |
+| GPT-4o | OpenAI | Alternative discovery | 94%+ accuracy | $2.50 input / $10 output |
+| GPT-4o Mini | OpenAI | Lightweight tasks | Fast & cheap | $0.15 input / $0.60 output |
+| Llama 4 Scout 17B | Together AI | Open-source alternative | Good performance | $0.20 input / $0.20 output |
+| **Text Embeddings** |
+| Voyage-3 | Voyage AI | **PRIMARY** Text embeddings | 1024D vectors | $0.06 input |
+| Voyage-3 Lite | Voyage AI | Lightweight embeddings | 512D vectors | $0.02 input |
+| text-embedding-3-small | OpenAI | Legacy text embeddings | 1536D vectors | $0.02 input |
+| text-embedding-3-large | OpenAI | Large text embeddings | 3072D vectors | $0.13 input |
+| **Vision Models** |
+| Qwen3-VL-32B | Together AI | **PRIMARY** Vision analysis | State-of-the-art | $0.50 input / $1.50 output |
+| Qwen3-VL-8B | Together AI | Lightweight vision | Fast vision | $0.08 input / $0.50 output |
+| CLIP (Visual) | OpenAI | Visual embeddings | 512D vectors | Free |
+| CLIP (Color) | OpenAI | Color analysis | 512D vectors | Free |
+| CLIP (Texture) | OpenAI | Texture analysis | 512D vectors | Free |
+| CLIP (Style) | OpenAI | Style analysis | 512D vectors | Free |
+| CLIP (Material) | OpenAI | Material classification | 512D vectors | Free |
 
 ---
 
@@ -396,7 +406,160 @@ MODELS = {
 
 ---
 
-**Last Updated**: October 31, 2025  
-**Version**: 1.0.0  
+## New Models (2025-12-26)
+
+### Voyage-3 (Voyage AI) - PRIMARY TEXT EMBEDDINGS
+
+**Purpose**: High-quality text embeddings for semantic search and retrieval
+
+**Capabilities**:
+- Generate 1024-dimensional text embeddings
+- Superior semantic understanding vs OpenAI
+- Optimized for retrieval tasks
+- Better performance on domain-specific content
+
+**Usage**:
+```python
+import voyageai
+
+vo = voyageai.Client(api_key=VOYAGE_API_KEY)
+result = vo.embed(
+    texts=["Product description text..."],
+    model="voyage-3",
+    input_type="document"
+)
+embeddings = result.embeddings
+```
+
+**Performance**:
+- Dimensions: 1024D
+- Latency: 100-300ms
+- Cost: $0.06 per 1M tokens
+- Quality: Superior to text-embedding-3-small
+
+**When to Use**:
+- **PRIMARY** choice for all text embeddings
+- Product descriptions
+- Material specifications
+- Document chunks
+- Semantic search
+
+**Migration**: Replaced text-embedding-3-small (1536D → 1024D)
+
+---
+
+### Qwen3-VL-32B (Together AI) - PRIMARY VISION MODEL
+
+**Purpose**: State-of-the-art vision-language model for image analysis
+
+**Capabilities**:
+- Advanced image understanding
+- OCR and text extraction
+- Material identification
+- Color and texture analysis
+- Multi-image reasoning
+
+**Usage**:
+```python
+from together import Together
+
+client = Together(api_key=TOGETHER_API_KEY)
+response = client.chat.completions.create(
+    model="Qwen/Qwen3-VL-32B-Instruct",
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "image_url", "image_url": {"url": image_url}},
+            {"type": "text", "text": "Analyze this material image..."}
+        ]
+    }]
+)
+```
+
+**Performance**:
+- Accuracy: State-of-the-art vision understanding
+- Latency: 2-5 seconds
+- Cost: $0.50 input / $1.50 output per 1M tokens
+- Quality: Superior to GPT-4V and Llama Vision
+
+**When to Use**:
+- **PRIMARY** choice for vision tasks
+- Material image analysis
+- PDF image extraction
+- Product photo analysis
+- Quality assessment
+
+**Migration**: Replaced Llama 3.2 90B Vision and GPT-4V
+
+---
+
+### Qwen3-VL-8B (Together AI) - LIGHTWEIGHT VISION
+
+**Purpose**: Fast, cost-effective vision model for simple tasks
+
+**Capabilities**:
+- Basic image understanding
+- Fast OCR
+- Simple material identification
+- Quick validation
+
+**Performance**:
+- Accuracy: Good for simple tasks
+- Latency: 500ms-2s
+- Cost: $0.08 input / $0.50 output per 1M tokens
+- Quality: 6x cheaper than Qwen3-VL-32B
+
+**When to Use**:
+- Simple image validation
+- Fast OCR tasks
+- Cost-sensitive operations
+- Batch processing
+
+---
+
+### Voyage-3-Lite (Voyage AI) - LIGHTWEIGHT EMBEDDINGS
+
+**Purpose**: Fast, cost-effective embeddings for simple tasks
+
+**Capabilities**:
+- Generate 512-dimensional embeddings
+- Faster than Voyage-3
+- Lower cost
+
+**Performance**:
+- Dimensions: 512D
+- Latency: 50-150ms
+- Cost: $0.02 per 1M tokens
+- Quality: Good for simple tasks
+
+**When to Use**:
+- Simple semantic search
+- Fast lookups
+- Cost-sensitive operations
+- Non-critical embeddings
+
+---
+
+## Model Selection Guide
+
+### Text Embeddings
+1. **Voyage-3** (PRIMARY) - All production text embeddings
+2. **Voyage-3-Lite** - Simple/fast tasks only
+3. **text-embedding-3-small** - Legacy (being phased out)
+
+### Vision Analysis
+1. **Qwen3-VL-32B** (PRIMARY) - All production vision tasks
+2. **Qwen3-VL-8B** - Simple/fast vision tasks
+3. **CLIP models** - Visual embeddings only (not analysis)
+
+### Text Generation
+1. **Claude Sonnet 4.5** (PRIMARY) - Complex reasoning
+2. **Claude Haiku 4.5** - Fast validation
+3. **GPT-4o** - Alternative/fallback
+
+---
+
+**Last Updated**: December 26, 2025
+**Version**: 2.0.0
 **Status**: Production
 
