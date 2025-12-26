@@ -556,59 +556,174 @@ export const ChunkQualityDashboard: React.FC = () => {
 
         {/* Statistics Tab */}
         <TabsContent value="stats" className="space-y-4">
+          {/* Detailed Chunk Statistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Chunk Statistics Overview</CardTitle>
+              <CardDescription>
+                Comprehensive statistics about your document chunks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Total Chunks</p>
+                  <p className="text-3xl font-bold">{metrics?.total_chunks || 0}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Total Documents</p>
+                  <p className="text-3xl font-bold">{metrics?.total_documents || 0}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Avg Chunks/Doc</p>
+                  <p className="text-3xl font-bold">
+                    {metrics && metrics.total_documents > 0
+                      ? (metrics.total_chunks / metrics.total_documents).toFixed(1)
+                      : 0}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Avg Quality</p>
+                  <p className="text-3xl font-bold">
+                    {((metrics?.average_quality_score || 0) * 100).toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Quality Distribution Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Validation Statistics</CardTitle>
+                <CardTitle>Quality Distribution</CardTitle>
+                <CardDescription>Breakdown by quality tier</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Low Quality Rejected:</span>
-                  <span className="font-bold">
-                    {metrics?.low_quality_rejected || 0}
-                  </span>
+              <CardContent className="space-y-3">
+                {metrics && Object.entries(metrics.quality_distribution).map(([range, count]) => {
+                  const total = metrics.total_chunks;
+                  const percentage = total > 0 ? (count / total) * 100 : 0;
+                  const label = range === 'excellent' ? '🌟 Excellent (≥90%)' :
+                               range === 'good' ? '✅ Good (70-89%)' :
+                               range === 'fair' ? '⚠️ Fair (50-69%)' :
+                               '❌ Poor (<50%)';
+
+                  return (
+                    <div key={range} className="flex justify-between items-center">
+                      <span className="text-sm">{label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold">{count}</span>
+                        <Badge variant={range === 'excellent' || range === 'good' ? 'default' : 'destructive'}>
+                          {percentage.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+
+            {/* Size Distribution Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Size Distribution</CardTitle>
+                <CardDescription>Chunk size breakdown</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Very Small (&lt;100 chars)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">{metrics?.very_small_chunks || 0}</span>
+                    <Badge variant="destructive">
+                      {metrics && metrics.total_chunks > 0
+                        ? ((metrics.very_small_chunks / metrics.total_chunks) * 100).toFixed(1)
+                        : 0}%
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Exact Duplicates Prevented:</span>
-                  <span className="font-bold">
-                    {metrics?.exact_duplicates_prevented || 0}
-                  </span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Optimal (500-2000 chars)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">
+                      {metrics ? metrics.total_chunks - (metrics.very_small_chunks + metrics.very_large_chunks) : 0}
+                    </span>
+                    <Badge variant="default">
+                      {metrics && metrics.total_chunks > 0
+                        ? (((metrics.total_chunks - (metrics.very_small_chunks + metrics.very_large_chunks)) / metrics.total_chunks) * 100).toFixed(1)
+                        : 0}%
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span>Semantic Duplicates Prevented:</span>
-                  <span className="font-bold">
-                    {metrics?.semantic_duplicates_prevented || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Borderline Quality Flagged:</span>
-                  <span className="font-bold">
-                    {metrics?.borderline_quality_flagged || 0}
-                  </span>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Very Large (&gt;2500 chars)</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold">{metrics?.very_large_chunks || 0}</span>
+                    <Badge variant="secondary">
+                      {metrics && metrics.total_chunks > 0
+                        ? ((metrics.very_large_chunks / metrics.total_chunks) * 100).toFixed(1)
+                        : 0}%
+                    </Badge>
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Configuration Stats */}
             <Card>
               <CardHeader>
-                <CardTitle>Quality Thresholds</CardTitle>
+                <CardTitle>Current Configuration</CardTitle>
+                <CardDescription>Active chunking settings</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span>Minimum Quality Score:</span>
-                  <Badge>0.7 (70%)</Badge>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Chunk Size</span>
+                  <Badge variant="outline">
+                    {metrics?.chunk_overlap_stats?.avg_configured_size?.toFixed(0) || 1000} chars
+                  </Badge>
                 </div>
-                <div className="flex justify-between">
-                  <span>Minimum Length:</span>
-                  <Badge>50 characters</Badge>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Chunk Overlap</span>
+                  <Badge variant="outline">
+                    {metrics?.chunk_overlap_stats?.avg_overlap?.toFixed(0) || 200} chars
+                  </Badge>
                 </div>
-                <div className="flex justify-between">
-                  <span>Maximum Length:</span>
-                  <Badge>5000 characters</Badge>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Overlap Ratio</span>
+                  <Badge variant="outline">
+                    {metrics?.chunk_overlap_stats?.overlap_ratio?.toFixed(1) || 20}%
+                  </Badge>
                 </div>
-                <div className="flex justify-between">
-                  <span>Semantic Similarity Threshold:</span>
-                  <Badge>0.85 (85%)</Badge>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Strategy</span>
+                  <Badge variant="outline">Hierarchical</Badge>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Flagged Chunks Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Review Queue</CardTitle>
+                <CardDescription>Chunks requiring attention</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Pending Review</span>
+                  <Badge variant="destructive">
+                    {metrics?.flagged_chunks_pending_review || 0}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Already Reviewed</span>
+                  <Badge variant="secondary">
+                    {metrics?.flagged_chunks_reviewed || 0}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Borderline Quality</span>
+                  <Badge variant="secondary">
+                    {metrics?.borderline_quality_flagged || 0}
+                  </Badge>
                 </div>
               </CardContent>
             </Card>
