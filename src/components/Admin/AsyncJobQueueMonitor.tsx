@@ -191,8 +191,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       }
 
       // Update selected job with fresh data
+      // Only update if data actually changed to prevent modal blinking
       if (jobData) {
-        setSelectedJob(jobData as BackgroundJob);
+        setSelectedJob(prev => {
+          // Deep comparison of relevant fields to prevent unnecessary re-renders
+          if (prev &&
+              prev.status === jobData.status &&
+              prev.progress === jobData.progress &&
+              JSON.stringify(prev.metadata) === JSON.stringify(jobData.metadata)) {
+            return prev; // No change, keep same reference
+          }
+          return jobData as BackgroundJob;
+        });
       }
 
       // Fetch all checkpoints for this job
@@ -1849,7 +1859,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   })()}
 
                   {/* Additional Metrics Row */}
-                  {(selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || selectedJob?.metadata?.database_records_created) && (
+                  {(selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || selectedJob?.metadata?.database_records_created) ? (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t">
                       {selectedJob?.metadata?.result?.pages_processed && (
                         <div>
@@ -1883,7 +1893,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </CardContent>
               </Card>
 

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { isDemoProduct, getDemoPriceHistory } from '@/data/demo/price-monitoring-demo';
 
 interface PriceHistoryChartProps {
   productId?: string;
@@ -50,6 +51,43 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
 
     try {
       setIsLoading(true);
+
+      // Check if this is a demo product
+      if (isDemoProduct(productId)) {
+        const days = timeRange === '7d' ? 7 : timeRange === '30d' ? 30 : timeRange === '90d' ? 90 : 30;
+        const demoHistory = getDemoPriceHistory(productId, 45.99, days);
+
+        // Transform demo data to match expected format
+        const transformedData = demoHistory.map(item => ({
+          date: item.date,
+          price: item.price,
+          source: item.source,
+          availability: item.availability,
+        }));
+
+        setPriceData(transformedData);
+
+        // Calculate stats from demo data
+        const prices = transformedData.map(d => d.price);
+        const currentPrice = prices[prices.length - 1];
+        const lowestPrice = Math.min(...prices);
+        const highestPrice = Math.max(...prices);
+        const averagePrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+        const priceChange = currentPrice - prices[0];
+        const priceChangePercent = (priceChange / prices[0]) * 100;
+
+        setStats({
+          currentPrice,
+          lowestPrice,
+          highestPrice,
+          averagePrice,
+          priceChange,
+          priceChangePercent,
+        });
+
+        setIsLoading(false);
+        return;
+      }
 
       // Calculate date range
       const now = new Date();

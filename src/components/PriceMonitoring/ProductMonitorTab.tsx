@@ -22,6 +22,14 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CompetitorSourceManager } from './CompetitorSourceManager';
+import { PriceHistoryChart } from './PriceHistoryChart';
+import {
+  isDemoProduct,
+  getDemoCompetitorSources,
+  getDemoCompetitorPrices,
+  getDemoMonitoringConfig,
+  getDemoPriceHistory,
+} from '@/data/demo/price-monitoring-demo';
 
 interface ProductMonitorTabProps {
   productId: string;
@@ -71,6 +79,14 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
 
   const loadMonitoringConfig = async () => {
     try {
+      // Check if this is a demo product
+      if (isDemoProduct(productId)) {
+        const demoConfig = getDemoMonitoringConfig();
+        setMonitoringEnabled(demoConfig.monitoring_enabled);
+        setMonitoringFrequency(demoConfig.monitoring_frequency);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('price_monitoring_products')
         .select('monitoring_enabled, monitoring_frequency')
@@ -94,6 +110,18 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   const loadCompetitorData = async () => {
     try {
       setIsLoading(true);
+
+      // Check if this is a demo product
+      if (isDemoProduct(productId)) {
+        // Use demo data for Demo Agent products
+        const demoSources = getDemoCompetitorSources(productId);
+        const demoPrices = getDemoCompetitorPrices(productId, currentPrice || 45.99, currency);
+
+        setCompetitorSources(demoSources as any);
+        setCompetitorPrices(demoPrices as any);
+        setIsLoading(false);
+        return;
+      }
 
       // Load competitor sources
       const { data: sources, error: sourcesError } = await supabase
@@ -268,8 +296,20 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
     );
   }
 
+  const isDemo = isDemoProduct(productId);
+
   return (
     <div className="space-y-6">
+      {/* Demo Badge */}
+      {isDemo && (
+        <Alert className="border-yellow-300 bg-yellow-50">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-900">
+            <strong>Demo Mode:</strong> This is sample price monitoring data for demonstration purposes.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Header with Check Now Button */}
       <div className="flex items-center justify-between">
         <div>
@@ -279,22 +319,31 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setShowAddSource(true)}
-            variant="outline"
-            size="sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Source
-          </Button>
-          <Button
-            onClick={handleCheckNow}
-            disabled={isChecking || competitorSources.length === 0}
-            size="sm"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
-            Check Now
-          </Button>
+          {!isDemo && (
+            <>
+              <Button
+                onClick={() => setShowAddSource(true)}
+                variant="outline"
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Source
+              </Button>
+              <Button
+                onClick={handleCheckNow}
+                disabled={isChecking || competitorSources.length === 0}
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
+                Check Now
+              </Button>
+            </>
+          )}
+          {isDemo && (
+            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+              Demo Data
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -473,6 +522,15 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Price History Chart - Only show for demo products */}
+      {isDemo && (
+        <PriceHistoryChart
+          productId={productId}
+          productName={productName}
+          timeRange="30d"
+        />
       )}
 
       {/* Empty State */}
