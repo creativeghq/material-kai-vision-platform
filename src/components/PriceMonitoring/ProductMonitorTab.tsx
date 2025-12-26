@@ -157,6 +157,16 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   };
 
   const handleCheckNow = async () => {
+    // Prevent database operations for demo products
+    if (isDemoProduct(productId)) {
+      toast({
+        title: 'Demo Mode',
+        description: 'Price checking is disabled for demo products',
+        variant: 'default',
+      });
+      return;
+    }
+
     try {
       setIsChecking(true);
 
@@ -213,6 +223,16 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
   };
 
   const handleUpdateTracking = async () => {
+    // Prevent database operations for demo products
+    if (isDemoProduct(productId)) {
+      toast({
+        title: 'Demo Mode',
+        description: 'Price tracking configuration is disabled for demo products',
+        variant: 'default',
+      });
+      return;
+    }
+
     try {
       setIsUpdatingTracking(true);
 
@@ -347,62 +367,64 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
         </div>
       </div>
 
-      {/* Price Tracking Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Automated Price Tracking</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-900">
-                  Enable Automated Tracking
+      {/* Price Tracking Configuration - Hide for demo products */}
+      {!isDemo && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Automated Price Tracking</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-900">
+                    Enable Automated Tracking
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Automatically check competitor prices on a schedule
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={monitoringEnabled}
+                    onChange={(e) => setMonitoringEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                 </label>
-                <p className="text-xs text-gray-500">
-                  Automatically check competitor prices on a schedule
-                </p>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={monitoringEnabled}
-                  onChange={(e) => setMonitoringEnabled(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-              </label>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-900">
-                Monitoring Frequency
-              </label>
-              <select
-                value={monitoringFrequency}
-                onChange={(e) => setMonitoringFrequency(e.target.value as any)}
-                disabled={!monitoringEnabled}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900">
+                  Monitoring Frequency
+                </label>
+                <select
+                  value={monitoringFrequency}
+                  onChange={(e) => setMonitoringFrequency(e.target.value as any)}
+                  disabled={!monitoringEnabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                >
+                  <option value="hourly">Hourly</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="on_demand">On-Demand Only</option>
+                </select>
+              </div>
+
+              <Button
+                onClick={handleUpdateTracking}
+                disabled={isUpdatingTracking}
+                className="w-full"
+                size="sm"
               >
-                <option value="hourly">Hourly</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="on_demand">On-Demand Only</option>
-              </select>
-            </div>
-
-            <Button
-              onClick={handleUpdateTracking}
-              disabled={isUpdatingTracking}
-              className="w-full"
-              size="sm"
-            >
-              <Clock className={`h-4 w-4 mr-2 ${isUpdatingTracking ? 'animate-spin' : ''}`} />
+                <Clock className={`h-4 w-4 mr-2 ${isUpdatingTracking ? 'animate-spin' : ''}`} />
               {isUpdatingTracking ? 'Updating...' : 'Update Price Tracking'}
             </Button>
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* No Sources Alert */}
       {competitorSources.length === 0 && (
