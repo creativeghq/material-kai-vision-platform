@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Card,
@@ -1724,11 +1724,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <div className="text-xs text-muted-foreground">Status</div>
-                    <div className="mt-1">{selectedJob && getStatusBadge(selectedJob.status)}</div>
+                    <div className="mt-1 transition-all duration-300">{selectedJob && getStatusBadge(selectedJob.status)}</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Progress</div>
-                    <div className="mt-1 font-semibold">{selectedJob?.progress}%</div>
+                    <div className="mt-1 font-semibold transition-all duration-300 animate-in fade-in">{selectedJob?.progress}%</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Created</div>
@@ -1736,7 +1736,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Duration</div>
-                    <div className="mt-1 text-sm">
+                    <div className="mt-1 text-sm transition-all duration-300">
                       {selectedJob?.started_at && selectedJob?.completed_at
                         ? formatTime(
                             (new Date(selectedJob.completed_at).getTime() -
@@ -1763,7 +1763,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <Package className="h-4 w-4 text-primary" />
                       <div>
                         <div className="text-xs text-muted-foreground">Products</div>
-                        <div className="font-semibold text-lg">
+                        <div className="font-semibold text-lg transition-all duration-300 animate-in fade-in">
                           {selectedJob?.metadata?.result?.products_created ||
                            selectedJob?.metadata?.products_created ||
                            selectedJob?.metadata?.products_discovered || 0}
@@ -1774,7 +1774,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <FileText className="h-4 w-4 text-primary" />
                       <div>
                         <div className="text-xs text-muted-foreground">Chunks</div>
-                        <div className="font-semibold text-lg">
+                        <div className="font-semibold text-lg transition-all duration-300 animate-in fade-in">
                           {selectedJob?.metadata?.result?.chunks_created ||
                            selectedJob?.metadata?.chunks_created || 0}
                         </div>
@@ -1784,7 +1784,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <ImageIcon className="h-4 w-4 text-primary" />
                       <div>
                         <div className="text-xs text-muted-foreground">Images</div>
-                        <div className="font-semibold text-lg">
+                        <div className="font-semibold text-lg transition-all duration-300 animate-in fade-in">
                           {selectedJob?.metadata?.result?.images_processed ||
                            selectedJob?.metadata?.images_saved ||
                            (jobCheckpoints.find(cp => cp.stage === 'images_extracted')?.checkpoint_data as any)?.images_saved || 0}
@@ -1800,7 +1800,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <Zap className="h-4 w-4 text-primary" />
                       <div>
                         <div className="text-xs text-muted-foreground">Embeddings</div>
-                        <div className="font-semibold text-lg">
+                        <div className="font-semibold text-lg transition-all duration-300 animate-in fade-in">
                           {(() => {
                             const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
                             const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
@@ -2038,11 +2038,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 {Object.keys(checkpointData).length > 0 && (
                                   <div>
                                     <h5 className="text-xs font-semibold text-muted-foreground mb-2">Stage Output Data</h5>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs bg-white/50 p-2 rounded">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs p-2 rounded">
                                       {Object.entries(checkpointData).map(([key, value]) => (
                                         <div key={key}>
                                           <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                          <span className="ml-1 font-medium">
+                                          <span className="ml-1 font-medium transition-all duration-300">
                                             {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value)}
                                           </span>
                                         </div>
@@ -2055,11 +2055,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 {Object.keys(metadata).length > 0 && (
                                   <div>
                                     <h5 className="text-xs font-semibold text-muted-foreground mb-2">Processing Metadata</h5>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs bg-white/50 p-2 rounded">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs p-2 rounded">
                                       {Object.entries(metadata).map(([key, value]) => (
                                         <div key={key}>
                                           <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                          <span className="ml-1 font-medium">
+                                          <span className="ml-1 font-medium transition-all duration-300">
                                             {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value)}
                                           </span>
                                         </div>
