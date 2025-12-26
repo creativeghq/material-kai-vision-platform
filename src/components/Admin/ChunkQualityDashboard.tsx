@@ -33,6 +33,22 @@ interface ChunkQualityMetrics {
   quality_distribution: Record<string, number>;
   flagged_chunks_pending_review: number;
   flagged_chunks_reviewed: number;
+  // Enhanced metrics
+  chunk_size_stats: {
+    min: number;
+    max: number;
+    avg: number;
+    stddev: number;
+    median: number;
+  };
+  chunk_overlap_stats: {
+    avg_overlap: number;
+    avg_configured_size: number;
+    overlap_ratio: number;
+  };
+  very_small_chunks: number;
+  very_large_chunks: number;
+  recommendations: string[];
 }
 
 interface FlaggedChunk {
@@ -243,12 +259,165 @@ export const ChunkQualityDashboard: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="distribution" className="space-y-4">
+      <Tabs defaultValue="recommendations" className="space-y-4">
         <TabsList>
+          <TabsTrigger value="recommendations">Recommendations</TabsTrigger>
           <TabsTrigger value="distribution">Quality Distribution</TabsTrigger>
           <TabsTrigger value="flagged">Flagged Chunks</TabsTrigger>
           <TabsTrigger value="stats">Statistics</TabsTrigger>
         </TabsList>
+
+        {/* Recommendations Tab - NEW */}
+        <TabsContent value="recommendations" className="space-y-4">
+          {/* AI-Powered Recommendations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+                AI-Powered Chunk Quality Recommendations
+              </CardTitle>
+              <CardDescription>
+                Actionable insights to improve your chunking configuration and retrieval quality
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {metrics?.recommendations && metrics.recommendations.length > 0 ? (
+                <div className="space-y-3">
+                  {metrics.recommendations.map((rec, idx) => {
+                    const isHigh = rec.includes('⚠️ HIGH');
+                    const isMedium = rec.includes('⚡ MEDIUM');
+                    const isExcellent = rec.includes('✅ EXCELLENT');
+                    const isInfo = rec.includes('💡');
+
+                    return (
+                      <Alert
+                        key={idx}
+                        variant={isHigh ? 'destructive' : 'default'}
+                        className={
+                          isExcellent ? 'border-green-500 bg-green-50' :
+                          isMedium ? 'border-yellow-500 bg-yellow-50' :
+                          isInfo ? 'border-blue-500 bg-blue-50' :
+                          ''
+                        }
+                      >
+                        <AlertDescription className="text-sm">
+                          {rec}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  No recommendations available. Process more documents to get insights.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Chunk Size Statistics */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Chunk Size Analysis</CardTitle>
+              <CardDescription>
+                Statistical analysis of chunk sizes across your documents
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Minimum</p>
+                  <p className="text-2xl font-bold">{metrics?.chunk_size_stats?.min || 0}</p>
+                  <p className="text-xs text-muted-foreground">characters</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Average</p>
+                  <p className="text-2xl font-bold">{metrics?.chunk_size_stats?.avg?.toFixed(0) || 0}</p>
+                  <p className="text-xs text-muted-foreground">characters</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Median</p>
+                  <p className="text-2xl font-bold">{metrics?.chunk_size_stats?.median?.toFixed(0) || 0}</p>
+                  <p className="text-xs text-muted-foreground">characters</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Maximum</p>
+                  <p className="text-2xl font-bold">{metrics?.chunk_size_stats?.max || 0}</p>
+                  <p className="text-xs text-muted-foreground">characters</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Std Dev</p>
+                  <p className="text-2xl font-bold">{metrics?.chunk_size_stats?.stddev?.toFixed(0) || 0}</p>
+                  <p className="text-xs text-muted-foreground">variance</p>
+                </div>
+              </div>
+
+              {/* Size Distribution Warnings */}
+              <div className="mt-4 space-y-2">
+                {metrics && metrics.very_small_chunks > 0 && (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      {metrics.very_small_chunks} chunks are very small (&lt; 100 chars) -
+                      {((metrics.very_small_chunks / metrics.total_chunks) * 100).toFixed(1)}% of total
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {metrics && metrics.very_large_chunks > 0 && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      {metrics.very_large_chunks} chunks are very large (&gt; 2500 chars) -
+                      {((metrics.very_large_chunks / metrics.total_chunks) * 100).toFixed(1)}% of total
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Overlap Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Chunk Overlap Configuration</CardTitle>
+              <CardDescription>
+                Current overlap settings and efficiency metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Configured Size</p>
+                  <p className="text-2xl font-bold">
+                    {metrics?.chunk_overlap_stats?.avg_configured_size?.toFixed(0) || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">characters</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Average Overlap</p>
+                  <p className="text-2xl font-bold">
+                    {metrics?.chunk_overlap_stats?.avg_overlap?.toFixed(0) || 0}
+                  </p>
+                  <p className="text-xs text-muted-foreground">characters</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Overlap Ratio</p>
+                  <p className="text-2xl font-bold">
+                    {metrics?.chunk_overlap_stats?.overlap_ratio?.toFixed(1) || 0}%
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {metrics && metrics.chunk_overlap_stats?.overlap_ratio > 20 ?
+                      'Consider reducing' :
+                      metrics && metrics.chunk_overlap_stats?.overlap_ratio < 10 ?
+                      'Consider increasing' :
+                      'Optimal range'
+                    }
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* Quality Distribution Tab */}
         <TabsContent value="distribution" className="space-y-4">
