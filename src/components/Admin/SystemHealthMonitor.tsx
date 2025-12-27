@@ -48,6 +48,16 @@ interface HealthStatus {
       slow_query_count: number;
       slow_query_threshold_ms: number;
     };
+    connection_pool?: {
+      status: string;
+      max_connections: number;
+      max_keepalive: number;
+      keepalive_expiry_seconds?: number;
+      pool_timeout_seconds?: number;
+      http2_enabled?: boolean;
+      pool_utilization_percent?: number;
+      note?: string;
+    };
   };
   job_monitor: {
     monitor_running: boolean;
@@ -292,6 +302,37 @@ export const SystemHealthMonitor: React.FC = () => {
                 <span className="text-sm">Errors</span>
                 <span className="text-sm font-medium">{health.database.error_count}</span>
               </div>
+            )}
+
+            {/* Connection Pool Stats */}
+            {health.database.connection_pool && (
+              <>
+                <div className="pt-2 border-t">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Connection Pool</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Max Connections</span>
+                  <span className="text-xs font-medium">{health.database.connection_pool.max_connections}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Max Keep-Alive</span>
+                  <span className="text-xs font-medium">{health.database.connection_pool.max_keepalive}</span>
+                </div>
+                {health.database.connection_pool.http2_enabled !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">HTTP/2</span>
+                    <Badge variant={health.database.connection_pool.http2_enabled ? "default" : "secondary"} className="text-xs">
+                      {health.database.connection_pool.http2_enabled ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                  </div>
+                )}
+                {health.database.connection_pool.pool_timeout_seconds !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Pool Timeout</span>
+                    <span className="text-xs font-medium">{health.database.connection_pool.pool_timeout_seconds}s</span>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

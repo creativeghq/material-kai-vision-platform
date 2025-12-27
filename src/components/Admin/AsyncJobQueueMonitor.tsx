@@ -502,6 +502,56 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     };
   }, [fetchQueueData, autoRefresh]);
 
+  // 🔧 FIX: Separate useEffect to refresh selected job data WITHOUT closing modal
+  useEffect(() => {
+    if (!selectedJob || !autoRefresh) return;
+
+    const refreshSelectedJob = async () => {
+      try {
+        // Fetch fresh job data
+        const { data: jobData, error: jobError } = await supabase
+          .from('background_jobs')
+          .select('*')
+          .eq('id', selectedJob.id)
+          .single();
+
+        if (jobError || !jobData) return;
+
+        // Update selected job ONLY if data actually changed
+        setSelectedJob(prev => {
+          if (!prev) return prev;
+
+          // Deep comparison to prevent unnecessary re-renders
+          if (prev.status === jobData.status &&
+              prev.progress === jobData.progress &&
+              JSON.stringify(prev.metadata) === JSON.stringify(jobData.metadata)) {
+            return prev; // No change, keep same reference to prevent modal blink
+          }
+
+          return jobData as BackgroundJob;
+        });
+
+        // Refresh checkpoints
+        const { data: checkpoints } = await supabase
+          .from('job_checkpoints')
+          .select('*')
+          .eq('job_id', selectedJob.id)
+          .order('created_at', { ascending: true });
+
+        if (checkpoints) {
+          setJobCheckpoints(checkpoints);
+        }
+      } catch (error) {
+        console.error('Error refreshing selected job:', error);
+      }
+    };
+
+    // Refresh selected job every 5 seconds (faster than main refresh)
+    const interval = setInterval(refreshSelectedJob, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedJob, autoRefresh]);
+
   // Auto-refresh selected job details when modal is open and job is processing
   useEffect(() => {
     if (!selectedJob || (selectedJob.status !== 'processing' && selectedJob.status !== 'pending')) {

@@ -3,9 +3,11 @@
  *
  * This file defines standardized interfaces, payload structures, and error handling
  * for all MIVAA service integrations across the platform.
+ *
  */
 
 import { z } from 'zod';
+import type { UnifiedApiResponse } from '@/types/unified-api-response';
 
 // =============================================================================
 // STANDARDIZED INTERFACES
@@ -53,23 +55,12 @@ export interface StandardMivaaPayload {
 
 /**
  * Standard MIVAA response structure
+ *
+ * @deprecated Use UnifiedApiResponse from '@/types/unified-api-response' instead.
+ * This interface is kept for backward compatibility during migration.
  */
-export interface StandardMivaaResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: {
-    code: string;
-    message: string;
-    details?: Record<string, unknown>;
-    retryable?: boolean;
-  };
-  metadata: {
-    requestId?: string;
-    processingTime: number;
-    timestamp: string;
-    version?: string;
-    endpoint?: string;
-  };
+export interface StandardMivaaResponse<T = any> extends UnifiedApiResponse<T> {
+  // Extends UnifiedApiResponse for backward compatibility
 }
 
 // =============================================================================
