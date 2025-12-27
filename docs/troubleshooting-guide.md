@@ -287,7 +287,7 @@ echo {token} | jq -R 'split(".") | .[1] | @base64d | fromjson'
 
 **Symptoms**:
 - "Image analysis failed"
-- Llama API errors
+- TogetherAI (Qwen) API errors
 - Quality score 0
 
 **Diagnosis**:
@@ -298,7 +298,7 @@ file /path/to/image.png
 # Check image size
 ls -lh /path/to/image.png
 
-# Check Llama API
+# Check TogetherAI (Qwen) API
 curl https://api.together.xyz/health
 ```
 

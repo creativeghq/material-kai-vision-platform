@@ -309,7 +309,7 @@ Custom ML model training and management for material classification and recommen
 **Database Tables:**
 - `chunk_boundaries` - ✅ IMPLEMENTED (ChunkAnalysisService.ts)
 - `chunk_classifications` - ✅ IMPLEMENTED (ChunkAnalysisService.ts)
-- `chunk_quality_flags` - ✅ IMPLEMENTED (llamaindex_service.py + ChunkQualityDashboard.tsx)
+- `chunk_quality_flags` - ✅ IMPLEMENTED (ChunkQualityDashboard.tsx)
 - `chunk_validation_scores` - ✅ IMPLEMENTED (ChunkAnalysisService.ts)
 
 **Description:**

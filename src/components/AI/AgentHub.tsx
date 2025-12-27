@@ -138,10 +138,22 @@ const AGENTS: AgentDefinition[] = [
 
 // AI Models available (format: provider/model-name for Mastra)
 const AI_MODELS = [
-  { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-  { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic' },
-  { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai' },
-  { id: 'together/meta-llama/Llama-4-Scout-17B-16E-Instruct', name: 'Llama 4 Scout 17B', provider: 'together' },
+  // Language Models
+  { id: 'anthropic/claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', provider: 'anthropic', type: 'language' },
+  { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', type: 'language' },
+  { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai', type: 'language' },
+
+  // Vision Models
+  { id: 'together/Qwen/Qwen3-VL-32B-Instruct', name: 'Qwen3-VL-32B', provider: 'together', type: 'vision' },
+  { id: 'together/Qwen/Qwen3-VL-8B-Instruct', name: 'Qwen3-VL-8B', provider: 'together', type: 'vision' },
+
+  // Visual Embedding Models
+  { id: 'google/siglip-so400m-patch14-384', name: 'SigLIP-SO400M', provider: 'google', type: 'visual-embedding' },
+  { id: 'openai/clip-vit-base-patch32', name: 'CLIP-ViT-Base', provider: 'openai', type: 'visual-embedding' },
+
+  // Text Embedding Models
+  { id: 'voyage/voyage-3.5', name: 'Voyage AI 3.5', provider: 'voyage', type: 'text-embedding' },
+  { id: 'openai/text-embedding-3-small', name: 'OpenAI Embedding 3 Small', provider: 'openai', type: 'text-embedding' },
 ];
 
 interface Message {

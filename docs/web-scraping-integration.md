@@ -12,7 +12,7 @@ The Material Kai Vision Platform now supports **automatic product discovery from
 ### Async Processing
 
 Web scraping uses **fully async processing** with the same concurrency limits as PDF processing:
-- ✅ 5 concurrent Llama Vision requests (image classification)
+- ✅ 5 concurrent Qwen Vision requests (image classification)
 - ✅ 2 concurrent Claude requests (validation)
 - ✅ 10 concurrent image uploads
 - ✅ 20 images per CLIP batch

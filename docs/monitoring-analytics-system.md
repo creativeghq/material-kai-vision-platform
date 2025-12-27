@@ -107,7 +107,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 **Purpose**: Track AI model usage, costs, and performance
 
 **Metrics**:
-- **Cost Tracking**: Real-time cost per model (Claude, GPT, Llama)
+- **Cost Tracking**: Real-time cost per model (Claude, GPT, Qwen)
 - **Model Usage**: API calls by model and endpoint
 - **Confidence Scores**: Distribution of AI confidence scores
 - **Latency Metrics**: Response times per model
@@ -120,7 +120,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 - Claude Haiku 4.5
 - GPT-4o
 - GPT-5
-- Llama 4 Scout 17B Vision
+- Qwen3-VL 17B Vision
 - OpenAI text-embedding-3-small
 
 ---
@@ -289,7 +289,7 @@ All stages save comprehensive metrics to checkpoints for recovery:
   },
   "metadata": {
     "processing_time_ms": 120000,
-    "ai_model": "llama-4-scout-17b",
+    "ai_model": "qwen3-vl-8b",
     "success_rate": 0.98
   }
 }
@@ -353,7 +353,7 @@ except Exception as e:
 - Claude Sonnet 4.5: $3.00 / 1M input tokens, $15.00 / 1M output tokens
 - Claude Haiku 4.5: $0.80 / 1M input tokens, $4.00 / 1M output tokens
 - GPT-4o: $2.50 / 1M input tokens, $10.00 / 1M output tokens
-- Llama 4 Scout 17B: $0.30 / 1M tokens
+- Qwen3-VL 17B: $0.30 / 1M tokens
 - text-embedding-3-small: $0.02 / 1M tokens
 
 **Cost Calculation**:

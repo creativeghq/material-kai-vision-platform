@@ -160,15 +160,15 @@ export class MivaaApiClient {
   }
 
   /**
-   * Analyze image using Llama Vision
-   * Replaces: llama-vision-analysis Edge Function
+   * Analyze image using Qwen Vision
+   * Replaces: vision-analysis Edge Function
    */
-  async analyzeLlamaVision(payload: {
+  async analyzeVision(payload: {
     image_url?: string;
     image_data?: string;
     prompt?: string;
   }): Promise<MivaaApiResponse> {
-    return this.request('/api/vision/llama-analyze', {
+    return this.request('/api/vision/analyze', {
       method: 'POST',
       body: JSON.stringify(payload),
     });

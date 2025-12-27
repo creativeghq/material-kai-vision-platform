@@ -122,7 +122,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
     if (!searchQuery) return true; // Show all if no search query
 
     const filename = image.metadata?.filename || image.caption || '';
-    const description = image.llama_analysis?.description || image.claude_validation?.description || '';
+    const description = image.vision_analysis?.description || image.claude_validation?.description || '';
     const pageNum = image.page_number?.toString() || '';
 
     return filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -210,9 +210,9 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                       <p className="text-xs text-muted-foreground">
                         Page {image.page_number}
                       </p>
-                      {image.llama_analysis?.description && (
+                      {image.vision_analysis?.description && (
                         <p className="text-xs text-muted-foreground line-clamp-2">
-                          {image.llama_analysis.description}
+                          {image.vision_analysis.description}
                         </p>
                       )}
                       <Button
@@ -287,10 +287,10 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 <p className="text-sm">{selectedImage.page_number}</p>
               </div>
 
-              {selectedImage.llama_analysis?.description && (
+              {selectedImage.vision_analysis?.description && (
                 <div>
-                  <h4 className="font-semibold mb-2">AI Description (Llama)</h4>
-                  <p className="text-sm">{selectedImage.llama_analysis.description}</p>
+                  <h4 className="font-semibold mb-2">AI Description (Vision)</h4>
+                  <p className="text-sm">{selectedImage.vision_analysis.description}</p>
                 </div>
               )}
 

@@ -81,8 +81,8 @@ const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) => {
               (log) =>
                 log.task.includes('embedding') || log.model.includes('clip'),
             );
-            const llamaCalls = data.filter((log) =>
-              log.model.includes('llama'),
+            const visionCalls = data.filter((log) =>
+              log.model.includes('qwen') || log.model.includes('vision'),
             );
             const claudeCalls = data.filter((log) =>
               log.model.includes('claude'),
@@ -94,7 +94,7 @@ const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) => {
                 (sum, log) => sum + (parseFloat(log.cost) || 0),
                 0,
               ),
-              llama: llamaCalls.reduce(
+              vision: visionCalls.reduce(
                 (sum, log) => sum + (parseFloat(log.cost) || 0),
                 0,
               ),
@@ -143,13 +143,13 @@ const ImageAICostDisplay: React.FC<{ imageId: string }> = ({ imageId }) => {
             </span>
           </div>
         )}
-        {aiCost.llama > 0 && (
+        {aiCost.vision > 0 && (
           <div className="flex justify-between">
             <span className="text-green-700 dark:text-green-300">
-              Llama Analysis:
+              Vision Analysis:
             </span>
             <span className="font-medium text-green-900 dark:text-green-100">
-              ${aiCost.llama.toFixed(4)}
+              ${aiCost.vision.toFixed(4)}
             </span>
           </div>
         )}

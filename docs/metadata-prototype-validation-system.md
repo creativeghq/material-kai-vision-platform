@@ -24,7 +24,7 @@ The Metadata Prototype Validation System is a semantic validation system that st
 
 ## 🎯 Overview
 
-The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic metadata extraction by adding **semantic validation** using CLIP text embeddings. This ensures that Llama Vision's free-text metadata extractions are standardized to consistent, validated property values.
+The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic metadata extraction by adding **semantic validation** using CLIP text embeddings. This ensures that Qwen Vision's free-text metadata extractions are standardized to consistent, validated property values.
 
 ---
 
@@ -523,7 +523,7 @@ async def multi_vector_search(...):
 **Implementation**:
 
 ```python
-# In llamaindex_service.py, line 5348
+# In rag_service.py (Direct Vector DB)
 async def multi_vector_search(...):
     # ... execute vector search ...
 
@@ -867,7 +867,7 @@ Day 32: New extractions get validated:
 ### Current Search Scoring (Before Prototype Validation)
 
 ```python
-# Multi-vector search scoring (llamaindex_service.py, line 5209)
+# Multi-vector search scoring (rag_service.py)
 final_score = (
     0.4 * text_similarity +      # Text embedding match
     0.3 * visual_similarity +    # Image embedding match
@@ -980,7 +980,7 @@ final_score = (
 
 ### Integration Points
 
-**1. Multi-Vector Search** (`llamaindex_service.py`, line 5209):
+**1. Multi-Vector Search** (`rag_service.py`):
 ```python
 # Add metadata_prototype_match to scoring
 results = await self._score_with_metadata_validation(
@@ -1000,7 +1000,7 @@ validated_category = await validate_metadata_value(
 products = await self._filter_by_category(validated_category)
 ```
 
-**3. Semantic Search** (`llamaindex_service.py`, line 4800):
+**3. Semantic Search** (`rag_service.py`):
 ```python
 # Boost results with validated metadata
 for result in results:
@@ -1057,7 +1057,7 @@ WITH (lists = 100);
 
 ### Step-by-Step Process
 
-**1. Llama Extracts Free Text**
+**1. Qwen Extracts Free Text**
 ```python
 llama_result = {
     "materials_identified": ["ceramic tile with glossy finish"],
@@ -1441,7 +1441,7 @@ for result in results:
 ## Benefits
 
 ### For Metadata Extraction
-- **Standardization**: Llama's free text → validated property values
+- **Standardization**: Qwen's free text → validated property values
 - **Consistency**: Same material gets same label across PDFs
 - **Validation**: Prevents hallucinations and invalid values
 - **Confidence**: Semantic similarity scores for each validation

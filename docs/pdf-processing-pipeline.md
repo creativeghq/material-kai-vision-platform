@@ -89,14 +89,14 @@
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 6: AI Classification (70-75%) - URL-BASED PROCESSING      │
-│ Model: Llama 4 Scout 17B Vision                                │
+│ Model: Qwen3-VL 17B Vision                                │
 │ Process: Download from Supabase URLs → Classify → Delete       │
 │ Output: Material vs non-material classification                │
 │                                                                 │
 │ 🚀 URL-BASED ARCHITECTURE:                                     │
 │   1. Download image from Supabase URL to RAM                  │
 │   2. Convert to base64 on-the-fly                             │
-│   3. Classify with Llama Vision (material/non-material)       │
+│   3. Classify with Qwen Vision (material/non-material)       │
 │   4. Delete from RAM immediately                               │
 │   5. Delete non-material images from Supabase                 │
 │                                                                 │
@@ -124,15 +124,15 @@
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 8: Llama Vision Analysis (85-90%) - URL-BASED PROCESSING  │
-│ Model: Llama 4 Scout 17B Vision                                │
+│ STAGE 8: Qwen Vision Analysis (85-90%) - URL-BASED PROCESSING  │
+│ Model: Qwen3-VL 17B Vision                                │
 │ Process: Download from Supabase URLs → Analyze → Delete       │
 │ Output: Quality scores, material properties, confidence        │
 │                                                                 │
 │ 🚀 ON-DEMAND DOWNLOAD ARCHITECTURE:                           │
 │   1. Download image from Supabase URL to RAM                  │
 │   2. Convert to base64 on-the-fly                             │
-│   3. Analyze with Llama Vision (quality, properties)          │
+│   3. Analyze with Qwen Vision (quality, properties)          │
 │   4. Delete from RAM immediately                               │
 │   5. Batch cleanup after every 10 images                       │
 │                                                                 │
@@ -438,12 +438,12 @@
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Llama 4 Scout 17B Vision
+**Model**: Qwen3-VL 17B Vision
 
 **Process (Per Image)**:
 1. **Download image from Supabase URL to RAM**
 2. Convert to base64 on-the-fly (no disk I/O)
-3. Classify with Llama Vision (material vs non-material)
+3. Classify with Qwen Vision (material vs non-material)
 4. **Delete from RAM immediately**
 5. Delete non-material images from Supabase Storage
 
@@ -546,21 +546,21 @@
 
 ---
 
-### Stage 8: Llama Vision Analysis (85-90%) - URL-Based Processing
+### Stage 8: Qwen Vision Analysis (85-90%) - URL-Based Processing
 
 **🚀 ON-DEMAND DOWNLOAD ARCHITECTURE**
 
-**Model**: Llama 4 Scout 17B Vision
+**Model**: Qwen3-VL 17B Vision
 
 **Process (Per Image)**:
 1. **Download image from Supabase URL to RAM**
 2. Convert to base64 on-the-fly
-3. Analyze with Llama Vision (quality, properties)
+3. Analyze with Qwen Vision (quality, properties)
 4. **Delete from RAM immediately**
 5. **Batch cleanup after every 10 images**
 
 **Why On-Demand Download?**
-- **Llama Requires Base64**: No URL support (yet)
+- **Qwen Requires Base64**: No URL support (yet)
 - **Temporary RAM Usage**: Download → Process → Delete
 - **Batch Cleanup**: Aggressive memory management
 - **Zero Disk Usage**: Everything in RAM
@@ -587,7 +587,7 @@
 
 ### Stage 6: Image Analysis (80-85%) - ASYNC JOB
 
-**Model**: Llama 4 Scout 17B Vision
+**Model**: Qwen3-VL 17B Vision
 
 **Process**:
 1. Runs as background job (non-blocking)
@@ -707,7 +707,7 @@
 3. **CHUNKS_CREATED** - Text chunking complete
 4. **TEXT_EMBEDDINGS_GENERATED** - Text embeddings complete
 5. **IMAGES_EXTRACTED** - Images uploaded to Supabase Storage ✅ UPDATED
-6. **IMAGE_EMBEDDINGS_GENERATED** - CLIP embeddings + Llama Vision complete ✅ UPDATED
+6. **IMAGE_EMBEDDINGS_GENERATED** - CLIP embeddings + Qwen Vision complete ✅ UPDATED
 7. **PRODUCTS_DETECTED** - Products identified
 8. **PRODUCTS_CREATED** - Product creation complete
 9. **COMPLETED** - All processing complete
@@ -722,7 +722,7 @@ else:
 
 **Note**:
 - Stage 5 (IMAGES_EXTRACTED): All images uploaded to Supabase Storage, 0 local files
-- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All CLIP embeddings + Llama Vision analysis complete
+- Stage 6 (IMAGE_EMBEDDINGS_GENERATED): All CLIP embeddings + Qwen Vision analysis complete
 - Recovery uses Supabase URLs for all subsequent processing (no local files needed)
 
 ---
@@ -766,7 +766,7 @@ The pipeline has been refactored from a monolithic 2900+ line function into modu
 ### Service Layer
 
 **ImageProcessingService** (`app/services/image_processing_service.py`)
-- `classify_images()` - Llama Vision + Claude validation
+- `classify_images()` - Qwen Vision + Claude validation
 - `upload_images_to_storage()` - Upload to Supabase Storage
 - `save_images_and_generate_clips()` - DB save + CLIP embeddings
 

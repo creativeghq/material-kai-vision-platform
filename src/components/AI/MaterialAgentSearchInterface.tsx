@@ -186,7 +186,7 @@ interface VisualSearchResults {
     name: string;
     description?: string;
     similarity_score: number;
-    llama_analysis?: Record<string, unknown>;
+    vision_analysis?: Record<string, unknown>;
     visual_features?: Record<string, unknown>;
     thumbnail_url?: string;
   }>;
@@ -541,7 +541,7 @@ export const MaterialAgentSearchInterface: React.FC<
                         (result as any).material_data?.description ||
                         'No description available',
                       similarity_score: (result as any).similarity_score || 0.8,
-                      llama_analysis: (result as any).llama_analysis || {},
+                      vision_analysis: (result as any).vision_analysis || {},
                       visual_features: (result as any).visual_features || {},
                       thumbnail_url:
                         (result as any).thumbnail_url ||

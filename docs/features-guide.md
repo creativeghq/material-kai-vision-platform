@@ -401,9 +401,9 @@ POST /api/images/upload-and-analyze
 **External Services**:
 - OpenAI (GPT, embeddings, CLIP)
 - Anthropic (Claude)
-- Together AI (Llama)
+- Together AI (Qwen)
 - Supabase (Database, auth, storage)
-- LlamaIndex (RAG)
+- Direct Vector DB RAG (Claude 4.5)
 
 **Capabilities**:
 - ✅ API integration

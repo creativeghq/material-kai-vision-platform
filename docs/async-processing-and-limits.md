@@ -105,19 +105,19 @@ await self._update_background_job_status(
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
-| **Llama Vision Concurrent** | 5 | Fast material classification |
+| **Qwen Vision Concurrent** | 5 | Fast material classification |
 | **Claude Validation Concurrent** | 2 | Validation for uncertain cases |
 | **Batch Size** | 15 images | Memory optimization |
 
 ```python
 # mivaa-pdf-extractor/app/services/image_processing_service.py
-llama_semaphore = Semaphore(5)   # 5 concurrent Llama requests
+together_semaphore = Semaphore(5)   # 5 concurrent TogetherAI (Qwen) requests
 claude_semaphore = Semaphore(2)  # 2 concurrent Claude requests
 batch_size = 15  # Process 15 images per batch
 ```
 
 **Why these limits?**
-- **Llama (5)**: Fast, cheap model → higher concurrency
+- **TogetherAI/Qwen (5)**: Fast, cheap model → higher concurrency
 - **Claude (2)**: Expensive, rate-limited → lower concurrency
 - **Batch (15)**: Prevents OOM on large PDFs with 500+ images
 
@@ -321,7 +321,7 @@ async with httpx.AsyncClient(timeout=30) as client:
 
 | Operation | Timeout | Purpose |
 |-----------|---------|---------|
-| **Llama Vision Request** | 120s | Image classification |
+| **Qwen Vision Request** | 120s | Image classification |
 | **Claude Request** | 120s | Validation |
 
 ```python
@@ -335,7 +335,7 @@ class TogetherAIConfig:
 
 ## Rate Limiting
 
-### 1. TogetherAI (Llama Vision)
+### 1. TogetherAI (Qwen Vision)
 
 **Applies to**: PDF, Web Scraping, XML Import
 **Service**: `TogetherAIService`
@@ -402,7 +402,7 @@ All three methods use the **SAME** services with **SAME** limits:
 
 ```python
 # Shared limits across all methods
-llama_semaphore = Semaphore(5)   # 5 concurrent Llama
+together_semaphore = Semaphore(5)   # 5 concurrent TogetherAI (Qwen)
 claude_semaphore = Semaphore(2)  # 2 concurrent Claude
 upload_semaphore = Semaphore(10) # 10 concurrent uploads
 batch_size = 15  # Classification batch
@@ -491,7 +491,7 @@ class UnifiedChunkingService:
 
 | API | Limit | Strategy |
 |-----|-------|----------|
-| **TogetherAI (Llama)** | 10 req/min | Semaphore (5 concurrent) |
+| **TogetherAI (Qwen)** | 10 req/min | Semaphore (5 concurrent) |
 | **Claude** | Circuit breaker | Semaphore (2 concurrent) |
 | **OpenAI** | No limit | Batch processing |
 
@@ -516,7 +516,7 @@ class UnifiedChunkingService:
 
 | Limit | PDF | Web | XML |
 |-------|-----|-----|-----|
-| **Llama Vision** | 5 concurrent | 5 concurrent | 5 concurrent |
+| **Qwen Vision** | 5 concurrent | 5 concurrent | 5 concurrent |
 | **Claude Validation** | 2 concurrent | 2 concurrent | 2 concurrent |
 | **Image Classification Batch** | 15 images | 15 images | 15 images |
 | **Image Uploads** | 10 concurrent | 10 concurrent | 10 concurrent |
@@ -584,7 +584,7 @@ await self._update_background_job_status(
 ## Summary
 
 ✅ **All methods fully async**: PDF, Web Scraping, XML Import
-✅ **Same concurrency limits**: 5 Llama, 2 Claude, 10 uploads, 20 CLIP
+✅ **Same concurrency limits**: 5 TogetherAI (Qwen), 2 Claude, 10 uploads, 20 CLIP
 ✅ **Same timeout guards**: 300s discovery, 120s AI, 30s downloads
 ✅ **Same rate limiting**: 10 req/min TogetherAI, circuit breaker Claude
 ✅ **Same shared services**: ImageProcessingService, RealEmbeddingsService, AsyncQueueService

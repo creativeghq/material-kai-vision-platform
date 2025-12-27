@@ -670,15 +670,15 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         icon: React.ReactNode;
                       }[] = [];
 
-                      // Check for LLAMA usage
+                      // Check for RAG processing (Claude 4.5 + Vector DB)
                       const mivaaStep = job.steps.find(
                         (s) => s.id === 'mivaa-processing',
                       );
                       if (mivaaStep?.status === 'completed') {
                         aiModels.push({
-                          name: 'LLAMA (LlamaIndex RAG)',
+                          name: 'Claude 4.5 Sonnet (RAG)',
                           purpose:
-                            'Document parsing, chunking, and semantic analysis',
+                            'Document synthesis, semantic analysis, and intelligent Q&A',
                           status: '✓ Used',
                           icon: <Brain className="h-3 w-3 text-blue-600" />,
                         });

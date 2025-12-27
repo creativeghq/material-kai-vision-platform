@@ -203,12 +203,6 @@ const MIVAA_PACKAGES = [
     critical: true,
   },
   {
-    name: 'llama-index',
-    description: 'RAG framework for LLM applications',
-    category: 'AI/ML',
-    critical: false,
-  },
-  {
     name: 'transformers',
     description: 'State-of-the-art ML models',
     category: 'AI/ML',

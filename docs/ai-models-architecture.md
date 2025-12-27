@@ -9,7 +9,7 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 | **Google** | SigLIP ViT-SO400M | Visual embeddings (512D) |
 | **OpenAI** | text-embedding-3-small, GPT-4o, GPT-5 | Text embeddings, chat, product discovery |
 | **Anthropic** | Claude Sonnet 4.5, Claude Haiku 4.5 | Vision analysis, validation, agents |
-| **TogetherAI** | Llama 4 Scout 17B Vision | Image analysis, OCR, material detection |
+| **TogetherAI** | Qwen3-VL 17B Vision | Image analysis, OCR, material detection |
 
 ---
 
@@ -38,7 +38,7 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 3: Image Analysis (Primary)                                      │
-│ Model: Llama 4 Scout 17B Vision (TogetherAI)                          │
+│ Model: Qwen3-VL 17B Vision (TogetherAI)                          │
 │ Purpose: Detailed material analysis, color detection, texture          │
 │ Input: Product images                                                  │
 │ Output: Material properties, colors, textures, quality scores          │
@@ -48,7 +48,7 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 4: Image Analysis (Validation - Optional)                        │
 │ Model: Claude 4.5 Sonnet Vision                                       │
-│ Purpose: Validate low-quality Llama results, enrich metadata          │
+│ Purpose: Validate low-quality Qwen results, enrich metadata           │
 │ Input: Images with quality_score < 0.7                                │
 │ Output: Enhanced analysis, validation                                  │
 │ Why: Higher accuracy, better reasoning, used only when needed         │
@@ -89,13 +89,13 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ SEARCH: Multimodal RAG (LlamaIndex)                                    │
+│ SEARCH: Direct Vector DB RAG (Claude 4.5 + Multi-Vector)              │
 │ Models:                                                                │
-│   - Text Embeddings: OpenAI text-embedding-3-small (1536D)            │
-│   - Visual Embeddings: CLIP ViT-B/32 (512D) - LlamaIndex native      │
-│   - LLM: GPT-4o OR Claude Sonnet 4.5                                 │
-│ Purpose: Retrieve relevant chunks/images, generate answers            │
-│ Why: LlamaIndex handles multimodal RAG, CLIP for compatibility        │
+│   - Text Embeddings: Voyage AI 3.5 (1024D)                           │
+│   - Visual Embeddings: 6x CLIP specialized (SigLIP, color, texture)  │
+│   - LLM: Claude Sonnet 4.5 (200K context)                            │
+│ Purpose: Multi-vector search + intelligent synthesis                  │
+│ Why: Direct vector DB queries, no intermediate indexing layer         │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -104,7 +104,7 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 │   - Claude Sonnet 4.5 (default for agents)                           │
 │   - Claude Haiku 4.5 (fast responses)                                │
 │   - GPT-5 (advanced reasoning)                                        │
-│   - Llama 4 Scout 17B (cost-effective)                               │
+│   - Qwen3-VL 17B (cost-effective)                               │
 │ Purpose: Conversational AI, material search, recommendations          │
 │ Why: Mastra provides agent orchestration, tool calling                │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -185,7 +185,7 @@ embedding = response.json()["data"][0]["embedding"]  # 1536D
 **Impact on Flow**:
 - ✅ **PDF Processing**: Embeds all text chunks (Stage 5, 60-70%)
 - ✅ **Search**: Primary text search mechanism
-- ✅ **RAG**: LlamaIndex uses for retrieval
+- ✅ **RAG**: Voyage AI 3.5 for semantic retrieval
 
 **Cost**: $0.00002 per 1K tokens
 **Speed**: 100-300ms
@@ -193,7 +193,7 @@ embedding = response.json()["data"][0]["embedding"]  # 1536D
 
 ---
 
-### 3. **Llama 4 Scout 17B Vision** 🦙
+### 3. **Qwen3-VL 17B Vision** 🦙
 
 **File**: `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
@@ -202,7 +202,7 @@ embedding = response.json()["data"][0]["embedding"]  # 1536D
 response = await client.post(
     "https://api.together.xyz/v1/chat/completions",
     json={
-        "model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+        "model": "Qwen/Qwen3-VL-8B-Instruct",
         "messages": [{"role": "user", "content": [
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
             {"type": "text", "text": analysis_prompt}
@@ -224,7 +224,7 @@ response = await client.post(
 - ✅ **OCR**: Extracts text from technical diagrams
 - ⚠️ **Validation**: Low scores (<0.7) trigger Claude validation
 
-**Why Llama**:
+**Why Qwen**:
 - 69.4% MMMU score (multimodal understanding)
 - #1 OCR performance among open models
 - Cost-effective ($0.18 per 1M tokens vs Claude $3.00)
@@ -257,7 +257,7 @@ response = client.messages.create(
 ```
 
 **Purpose**:
-- **Validation** of low-quality Llama results
+- **Validation** of low-quality Qwen results
 - **Enrichment** of metadata
 - **Product Discovery** (alternative to GPT-5)
 - **Agent responses** (Mastra framework)
@@ -266,7 +266,7 @@ response = client.messages.create(
 - ✅ **PDF Processing**: Validates images with quality_score < 0.7 (async job)
 - ✅ **Product Discovery**: Identifies products BEFORE extraction (Stage 1)
 - ✅ **Agents**: Powers conversational AI in Agent Hub
-- ✅ **RAG**: Optional LLM for LlamaIndex queries
+- ❌ **RAG**: Claude 4.5 is now the primary RAG LLM
 
 **Why Claude**:
 - Superior reasoning and accuracy
@@ -284,7 +284,7 @@ response = client.messages.create(
 
 **Files**:
 - `mivaa-pdf-extractor/app/services/product_discovery_service.py`
-- `mivaa-pdf-extractor/app/services/llamaindex_service.py`
+- `mivaa-pdf-extractor/app/services/rag_service.py` (Direct Vector DB)
 
 **Usage**:
 ```python
@@ -294,14 +294,14 @@ response = await client.post(
     json={"model": "gpt-5", "messages": [...]}
 )
 
-# LlamaIndex RAG
-from llama_index.llms.openai import OpenAI
+# Direct Vector DB RAG (Claude 4.5)
+from anthropic import Anthropic
 llm = OpenAI(model="gpt-4o", temperature=0.1)
 ```
 
 **Purpose**:
 - **Product Discovery**: Alternative to Claude for identifying products
-- **RAG**: Default LLM for LlamaIndex multimodal queries
+- ❌ **RAG**: Claude 4.5 is now the primary RAG LLM
 - **Agent**: Available in Agent Hub for advanced reasoning
 
 **Impact on Flow**:
@@ -344,33 +344,35 @@ const response = await supabase.functions.invoke('agent-chat', {
 
 ---
 
-### 7. **CLIP ViT-B/32** (LlamaIndex Only) 🔗
+### 7. **Multi-Vector CLIP Embeddings** (Direct Vector DB) 🔗
 
-**File**: `mivaa-pdf-extractor/app/services/llamaindex_service.py`
+**File**: `mivaa-pdf-extractor/app/services/rag_service.py`
 
 **Usage**:
 ```python
-from llama_index.embeddings.clip import ClipEmbedding
-image_embeddings = ClipEmbedding(model_name="ViT-B/32")
+# 6 specialized CLIP embeddings for multi-vector search
+embeddings = {
+    'visual': 'SigLIP-SO400M (1152D)',
+    'color': 'CLIP specialized',
+    'texture': 'CLIP specialized',
+    'style': 'CLIP specialized',
+    'material': 'CLIP specialized',
+    'text': 'Voyage AI 3.5 (1024D)'
+}
 ```
 
 **Purpose**:
-- **LlamaIndex multimodal RAG** (internal use only)
-- **NOT used for PDF processing** (replaced by SigLIP)
-- Kept for LlamaIndex compatibility
+- **Multi-vector semantic search** across 6 specialized dimensions
+- **Direct vector DB queries** (no intermediate indexing)
+- **Parallel search** for maximum accuracy
 
 **Impact on Flow**:
-- ✅ **Search**: LlamaIndex uses for image-text retrieval
-- ❌ **PDF Processing**: NOT used (SigLIP replaced it)
+- ✅ **Search**: 6-way parallel vector search with intelligent fusion
+- ✅ **PDF Processing**: SigLIP for visual embeddings
 
-**Why Keep It**:
-- LlamaIndex has native CLIP integration
-- Changing would break LlamaIndex's multimodal capabilities
-- Only used during search, not processing
-
-**Cost**: Free
-**Speed**: 100-300ms
-**Output**: 512D embeddings
+**Cost**: ~$0.001 per query (Voyage AI)
+**Speed**: 300-500ms (parallel execution)
+**Output**: 6 different embedding types
 
 ---
 
@@ -404,7 +406,7 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
    └─ SigLIP ViT-SO400M (only model)
 
 3. Image Analysis (Stage 6)
-   ├─ Primary: Llama 4 Scout 17B Vision (ALL images)
+   ├─ Primary: Qwen3-VL 17B Vision (ALL images)
    └─ Validation: Claude 4.5 Sonnet (quality_score < 0.7)
 
 4. Visual Embeddings (Stage 7-10)
@@ -417,16 +419,16 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
 ### Search & Agents
 
 ```
-1. LlamaIndex RAG
-   ├─ Text Embeddings: OpenAI text-embedding-3-small
-   ├─ Visual Embeddings: CLIP ViT-B/32 (LlamaIndex native)
-   └─ LLM: GPT-4o (default) OR Claude Sonnet 4.5
+1. Direct Vector DB RAG (Claude 4.5)
+   ├─ Text Embeddings: Voyage AI 3.5 (1024D)
+   ├─ Visual Embeddings: 6x CLIP specialized (multi-vector)
+   └─ LLM: Claude Sonnet 4.5 (200K context)
 
 2. Agent Hub (Mastra)
    ├─ Default: Claude Sonnet 4.5
    ├─ Fast: Claude Haiku 4.5
    ├─ Advanced: GPT-5
-   └─ Cost-effective: Llama 4 Scout 17B
+   └─ Cost-effective: Qwen3-VL 17B
 ```
 
 ---
@@ -439,7 +441,7 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
 |-------|-------|------|
 | **Claude Sonnet 4.5** | Product discovery (1 call) | ~$0.05 |
 | **SigLIP** | OCR filtering (50 images) | $0.00 (free) |
-| **Llama 4 Scout** | Image analysis (50 images) | ~$0.02 |
+| **Qwen3-VL** | Image analysis (50 images) | ~$0.02 |
 | **Claude Sonnet 4.5** | Validation (10 low-quality) | ~$0.15 |
 | **SigLIP** | Visual embeddings (250 total) | $0.00 (free) |
 | **OpenAI Embeddings** | Text chunks (500 chunks) | ~$0.01 |
@@ -449,9 +451,9 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
 
 | Model | Usage | Cost |
 |-------|-------|------|
-| **OpenAI Embeddings** | Query embedding | <$0.001 |
-| **CLIP** | Image query (LlamaIndex) | $0.00 |
-| **GPT-4o / Claude** | Answer generation | ~$0.01 |
+| **Voyage AI 3.5** | Query embedding | ~$0.001 |
+| **Multi-Vector CLIP** | 6-way parallel search | $0.00 |
+| **Claude 4.5** | Answer synthesis | ~$0.02 |
 | **TOTAL** | Per query | **~$0.01** |
 
 ---
@@ -459,22 +461,22 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
 ## 🎯 Why This Architecture?
 
 ### 1. **Cost Optimization**
-- Llama 4 Scout for bulk image analysis (cheap)
+- Qwen3-VL for bulk image analysis (cheap)
 - Claude only for validation (selective)
 - SigLIP for embeddings (free)
 
 ### 2. **Quality Optimization**
 - SigLIP: +19-29% accuracy over CLIP
 - Claude: Best-in-class vision for validation
-- Llama: 69.4% MMMU, excellent OCR
+- Qwen: 69.4% MMMU, excellent OCR
 
 ### 3. **Speed Optimization**
-- Llama: Fast inference (2-5s)
+- Qwen: Fast inference (2-5s)
 - SigLIP: Fast embeddings (150-400ms)
 - Parallel processing where possible
 
 ### 4. **Compatibility**
-- LlamaIndex: Keep CLIP for native integration
+- Direct Vector DB: Multi-vector CLIP for specialized search
 - Mastra: Support multiple agent models
 - OpenAI: Industry standard embeddings
 
@@ -494,7 +496,7 @@ image_embeddings = ClipEmbedding(model_name="ViT-B/32")
 ## 🔮 Future Considerations
 
 1. **Regenerate Existing Embeddings**: Batch job to upgrade CLIP → SigLIP
-2. **Monitor Llama Quality**: Track validation rate (should be <20%)
+2. **Monitor Qwen Quality**: Track validation rate (should be <20%)
 3. **A/B Test Models**: Compare Claude vs GPT-5 for product discovery
 4. **Add More Agents**: Expand Mastra agent capabilities
 

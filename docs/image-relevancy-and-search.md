@@ -45,7 +45,7 @@ This ensures that when you search or browse, you see all relevant images for eac
 
 The platform uses two advanced AI systems working together:
 
-**Primary Analysis** - Fast, accurate material detection using Llama 4 Scout Vision AI
+**Primary Analysis** - Fast, accurate material detection using Qwen3-VL Vision AI
 - Identifies material types, colors, and textures
 - Provides quality scores for each analysis
 - Processes images quickly and efficiently

@@ -237,7 +237,7 @@ jobs:
 
           - **39** Comprehensive Documentation Files
           - **120+** API Endpoints across **15** categories
-          - **14** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Llama 4 Scout 17B Vision, CLIP, etc.)
+          - **14** AI Models (Claude Sonnet 4.5, Haiku 4.5, GPT-5, Qwen3-VL-8B/32B, CLIP, etc.)
           - **6** Embedding Types (text, visual, color, texture, application, multimodal)
           - **14-Stage** PDF Processing Pipeline with checkpoint recovery and real-time monitoring
           - **Complete Quote System** with status tags, upsells/extras, and project timeline tracking
@@ -288,7 +288,7 @@ jobs:
           - **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)
           - **Duplicate Detection**: Smart material deduplication with factory/manufacturer matching
           - **Search Suggestions**: AI-powered auto-complete, trending searches, and typo correction
-          - **Material Recognition**: Llama 4 Scout 17B Vision (69.4% MMMU, #1 OCR performance)
+          - **Material Recognition**: Qwen3-VL-8B (69.4% MMMU, #1 OCR performance)
           - **Relevancy System**: Multi-source linking between chunks, images, and products
 
           ### 💼 Quote & CRM System

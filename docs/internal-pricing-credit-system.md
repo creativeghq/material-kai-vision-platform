@@ -45,11 +45,10 @@ Example: A $0.15 USD API call = **15 platform credits**
   Platform Credits = USD Cost × 100
   ```
 
-### 3. **Meta Llama Models**
+### 3. **TogetherAI Models (Qwen Vision)**
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
-  - Llama 3.3 70B, Llama 3.1 405B/70B/8B
-  - Llama 3.2 90B/11B/3B/1B
+  - Qwen3-VL-32B, Qwen3-VL-8B (vision models)
 - **Cost Calculation**: Same as OpenAI
 
 ### 4. **Embedding Models**

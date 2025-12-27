@@ -541,7 +541,7 @@ Return Unified Results (PDF + Web + XML)
 | Requirement | Status | Evidence |
 |-------------|--------|----------|
 | **Fully Async** | ✅ | All methods use `async/await` |
-| **Same Limits** | ✅ | 5 Llama, 2 Claude, 10 uploads, 20 CLIP |
+| **Same Limits** | ✅ | 5 TogetherAI (Qwen), 2 Claude, 10 uploads, 20 CLIP |
 | **Same Timeouts** | ✅ | 300s discovery, 120s AI, 30s downloads |
 | **Same Services** | ✅ | ImageProcessingService, RealEmbeddingsService, AsyncQueueService |
 

@@ -26,7 +26,7 @@
 - All components properly connected to backend APIs
 
 ### ✅ **4. User Feedback Sentiment Analysis** (COMPLETE)
-- Backend: SentimentAnalysisService using Llama 4 Scout
+- Backend: SentimentAnalysisService using Qwen3-VL
 - API endpoints: submit, get feedback, trends, mark helpful
 - Database: user_feedback & sentiment_trends tables
 - Frontend: MaterialFeedbackPanel component with star ratings

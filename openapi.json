@@ -2774,7 +2774,7 @@
           "RAG"
         ],
         "summary": "Rag Health Check",
-        "description": "Health check for RAG services.\n\nThis endpoint checks the health of all RAG-related services\nincluding LlamaIndex, embedding service, and vector store.",
+        "description": "Health check for RAG services.\n\nThis endpoint checks the health of all RAG-related services\nincluding embedding service and vector store.",
         "operationId": "rag_health_check_api_rag_health_get",
         "responses": {
           "200": {

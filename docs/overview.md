@@ -47,7 +47,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **AI Services**:
 - OpenAI (GPT-4o, text-embedding-3-small)
 - Anthropic (Claude Sonnet 4.5, Claude Haiku 4.5)
-- Together AI (Llama 4 Scout 17B Vision)
+- Together AI (Qwen3-VL 17B Vision)
 - CLIP (Visual embeddings)
 - Replicate (Image generation)
 
@@ -68,7 +68,7 @@ MIVAA API (FastAPI) → Creates background job
   3. Semantic Chunking (Anthropic)
   4. Text Embeddings (OpenAI 1536D)
   5. Image Extraction
-  6. Image Analysis (Llama Vision)
+  6. Image Analysis (Qwen Vision)
   7-10. Multi-Vector CLIP Embeddings (512D)
   11. Product Creation & Entity Linking
   12. Entity Relationship Mapping
@@ -115,7 +115,7 @@ Real-time updates → Frontend displays results
 - **Cost**: $0.02 per 1M tokens
 - **Pipeline Stages**: Text Embedding Generation (Stage 5)
 
-#### 3. Together AI - Llama 4 Scout 17B Vision
+#### 3. Together AI - Qwen3-VL 17B Vision
 
 - **Parameters**: 17 billion
 - **Modality**: Vision + Text
@@ -207,7 +207,7 @@ The platform generates **6 types of embeddings** for comprehensive search:
 - **Checkpoint**: IMAGES_EXTRACTED
 
 **Stage 9: Image Analysis (AI)**
-- Llama 4 Scout 17B Vision: Analyze each image (1-3 seconds)
+- Qwen3-VL 17B Vision: Analyze each image (1-3 seconds)
 - Extract material properties
 - Quality scoring (0-100)
 - Classify image type (product, detail, mood, diagram)
@@ -397,7 +397,7 @@ The platform uses **6 embedding types** for comprehensive search:
 8. AI Services (10 endpoints - AI model integration)
 9. Background Jobs (7 endpoints - async job tracking)
 10. Anthropic APIs (3 endpoints - Claude integration)
-11. Together AI APIs (3 endpoints - Llama integration)
+11. Together AI APIs (3 endpoints - Qwen integration)
 12. Monitoring Routes (3 endpoints - health checks, metrics)
 13. AI Metrics Routes (2 endpoints - AI performance tracking)
 

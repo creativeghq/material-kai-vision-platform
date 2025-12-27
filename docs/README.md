@@ -57,7 +57,7 @@
 - Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
 - OpenAI: GPT-4o, GPT-5, text-embedding-3-small
 - Google: SigLIP ViT-SO400M (primary CLIP)
-- TogetherAI: Llama 4 Scout 17B Vision
+- TogetherAI: Qwen3-VL 17B Vision
 - OpenAI CLIP ViT-B/32 (fallback)
 - Model usage by stage
 - Cost optimization
@@ -305,7 +305,7 @@
 - **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
 - **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 - **Database**: PostgreSQL 15, pgvector, Supabase
-- **AI**: Claude, GPT-4o, Llama, CLIP, LlamaIndex
+- **AI**: Claude 4.5, GPT-4o, Qwen3-VL, SigLIP, Voyage AI, Multi-Vector CLIP
 
 ### API Categories
 1. PDF Processing (12 endpoints)

@@ -115,16 +115,10 @@ export const MIVAA_ACTION_MAP: Record<
   { path: string; method: string }
 > = {
   // PDF Processing - Use valid mivaa-gateway actions
-  // REMOVED: pdf_process_document - Use rag_upload instead
-  // REMOVED: pdf_extract_markdown - Use rag_upload instead
-  // REMOVED: pdf_extract_tables - Use rag_upload instead
-  // REMOVED: pdf_extract_images - Use rag_upload instead
   rag_upload: { path: '/api/rag/documents/upload', method: 'POST' },
   admin_bulk_process: { path: '/api/admin/bulk/process', method: 'POST' },
 
   // Material Recognition - Use valid mivaa-gateway actions
-  // REMOVED: material_recognition - Use together_analyze_image instead
-  // REMOVED: llama_vision_analysis - Use together_analyze_image instead
   together_analyze_image: { path: '/api/together-ai/analyze-image', method: 'POST' },
 
   // Embeddings
@@ -141,10 +135,6 @@ export const MIVAA_ACTION_MAP: Record<
   hybrid_search: { path: '/api/search/hybrid', method: 'POST' },
 
   // Chat & AI - Use valid mivaa-gateway actions
-  // REMOVED: chat_completion - Use rag_chat instead
-  // REMOVED: contextual_response - Use rag_query instead
-  // REMOVED: semantic_analysis - Use together_analyze_image or rag_query instead
-  // REMOVED: multimodal_analysis - Use rag_query instead
   rag_chat: { path: '/api/rag/chat', method: 'POST' },
   rag_query: { path: '/api/rag/query', method: 'POST' },
 

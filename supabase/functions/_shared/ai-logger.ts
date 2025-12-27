@@ -28,12 +28,6 @@ const AI_PRICING = {
     'gpt-4o-mini': { input: 0.15, output: 0.60 },
     'gpt-4-turbo': { input: 10.00, output: 30.00 },
   },
-  // Llama Models (TogetherAI)
-  llama: {
-    'llama-4-scout-17b': { input: 0.20, output: 0.20 },
-    'llama-4-maverick-17b': { input: 0.20, output: 0.20 },
-    'meta-llama/Llama-4-Scout-17B-16E-Instruct': { input: 0.20, output: 0.20 },
-  },
   // OpenAI Embeddings
   embeddings: {
     'text-embedding-3-small': { input: 0.02, output: 0.00 },
@@ -112,11 +106,7 @@ export class AICallLogger {
       pricing = Object.entries(AI_PRICING.gpt).find(([key]) => 
         modelLower.includes(key.toLowerCase())
       )?.[1];
-    } else if (provider === 'together' || modelLower.includes('llama')) {
-      pricing = Object.entries(AI_PRICING.llama).find(([key]) =>
-        modelLower.includes(key.toLowerCase())
-      )?.[1];
-    } else if (modelLower.includes('qwen')) {
+    } else if (provider === 'together' || modelLower.includes('qwen')) {
       pricing = Object.entries(AI_PRICING.qwen).find(([key]) =>
         modelLower.includes(key.toLowerCase())
       )?.[1];
@@ -267,9 +257,9 @@ export class AICallLogger {
   }
 
   /**
-   * Log Llama API call (TogetherAI)
+   * Log TogetherAI (Qwen) API call
    */
-  async logLlamaCall(
+  async logTogetherCall(
     task: string,
     model: string,
     response: any,

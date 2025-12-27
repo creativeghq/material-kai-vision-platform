@@ -18,7 +18,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - 🔍 **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)
 - 💬 **AI Agents**: Intelligent material recommendations and search assistance
 - 📊 **Knowledge Base**: Semantic chunking, quality scoring, and relationship mapping
-- 🎨 **Visual Recognition**: CLIP + Llama 4 Scout Vision for image analysis
+- 🎨 **Visual Recognition**: CLIP + Qwen3-VL Vision for image analysis
 - 🏷️ **Auto-Metadata**: AI-powered metadata extraction and population
 
 ### **Production Stats**
@@ -58,7 +58,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 #### **AI Models** (12 models across 7 stages)
 1. **OpenAI**: text-embedding-3-small (1536D embeddings)
 2. **Anthropic**: Claude Haiku 4.5 (fast classification), Claude Sonnet 4.5 (deep enrichment)
-3. **Together AI**: Llama 4 Scout 17B Vision (69.4% MMMU, #1 OCR)
+3. **Together AI**: Qwen3-VL 17B Vision (69.4% MMMU, #1 OCR)
 4. **CLIP**: Visual embeddings (512D)
 5. **Custom Models**: Color, texture, application embeddings
 
@@ -83,7 +83,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
                     │                     │                     │
            ┌────────▼────────┐   ┌───────▼────────┐   ┌───────▼────────┐
            │  OpenAI         │   │  Anthropic     │   │  Together AI   │
-           │  Embeddings     │   │  Claude 4.5    │   │  Llama 4 Scout │
+           │  Embeddings     │   │  Claude 4.5    │   │  Qwen3-VL │
            └─────────────────┘   └────────────────┘   └────────────────┘
 ```
 
@@ -251,7 +251,7 @@ curl https://v1api.materialshub.gr/docs
 8. Borderline Quality Flagging (score 0.6-0.7)
 9. Chunk Classification
 10. Embedding Generation (6 types)
-11. Image Analysis (Claude Haiku 4.5 + Llama 4 Scout Vision)
+11. Image Analysis (Claude Haiku 4.5 + Qwen3-VL Vision)
 12. Product Detection (Four-layer validation)
 13. Product Enrichment (Claude Sonnet 4.5)
 14. Multi-Vector Embedding Generation
@@ -413,7 +413,7 @@ This project is proprietary software owned by Creative GHQ.
 
 - **OpenAI**: GPT models and embeddings
 - **Anthropic**: Claude 4.5 models
-- **Together AI**: Llama 4 Scout Vision
+- **Together AI**: Qwen3-VL Vision
 - **Supabase**: Database and backend infrastructure
 - **Vercel**: Frontend hosting and deployment
 

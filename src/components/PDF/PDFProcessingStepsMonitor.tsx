@@ -91,7 +91,7 @@ const PROCESSING_STEPS: Array<{ id: number; name: string; description: string }>
   {
     id: 8,
     name: 'Image Analysis',
-    description: 'Llama Vision analysis for image understanding'
+    description: 'Vision model analysis for image understanding'
   },
   {
     id: 9,

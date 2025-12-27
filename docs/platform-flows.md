@@ -36,7 +36,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Stage 3: Semantic Chunking
    - Stage 4: Text Embeddings (OpenAI 1536D)
    - Stage 5: Image Extraction
-   - Stage 6: Image Analysis (Llama Vision)
+   - Stage 6: Image Analysis (Qwen Vision)
    - Stages 7-10: Multi-Vector CLIP Embeddings
    - Stage 11: Product Creation & Entity Linking
    - Stage 12: Entity Relationship Mapping
@@ -288,7 +288,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 | Flow | Entry Point | AI Models | Processing Time | Output |
 |------|-------------|-----------|-----------------|--------|
-| PDF Processing | Upload PDF | Claude, GPT-4o, Llama | 2-10 min | Products, Images, Metadata |
+| PDF Processing | Upload PDF | Claude, GPT-4o, Qwen | 2-10 min | Products, Images, Metadata |
 | Search | Search query | OpenAI, Claude | <1 sec | Ranked results |
 | **Spaceformer** ✨ | **Room image** | **Claude Vision** | **2-5 sec** | **Layout, Materials, Accessibility** |
 | Data Import | Upload XML | Claude | 1-5 min | Products, Images |

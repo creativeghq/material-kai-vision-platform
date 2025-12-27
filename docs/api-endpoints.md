@@ -104,9 +104,9 @@ GET /health
     "ai_models": {
       "claude": {"status": "healthy", "response_time_ms": 150},
       "gpt": {"status": "healthy", "response_time_ms": 120},
-      "llama": {"status": "healthy", "response_time_ms": 200}
+      "QWEN": {"status": "healthy", "response_time_ms": 200}
     },
-    "llamaindex": {"status": "healthy", "response_time_ms": 8}
+    "rag": {"status": "healthy", "service_type": "Direct Vector DB", "response_time_ms": 8}
   },
   "version": "1.0.0"
 }
@@ -649,8 +649,8 @@ Parameters (Form Data):
 **Processing Stages:**
 1. Stage 0 (0-15%): Product Discovery - Claude/GPT analyzes entire PDF
 2. Stage 1 (15-30%): Focused Extraction - Extract only product pages
-3. Stage 2 (30-50%): Chunking - Create chunks with LlamaIndex
-4. Stage 3 (50-70%): Image Processing - Llama Vision + CLIP embeddings
+3. Stage 2 (30-50%): Chunking - Create chunks for vector DB
+4. Stage 3 (50-70%): Image Processing - Qwen3-VL + CLIP embeddings
 5. Stage 4 (70-90%): Product Creation - Create product records
 6. Stage 5 (90-100%): Quality Enhancement - Claude validation (async)
 
@@ -859,7 +859,7 @@ GET /api/rag/images?document_id={uuid}&limit=100&offset=0
       "document_id": "uuid",
       "image_url": "https://storage.supabase.co/...",
       "page_number": 5,
-      "llama_analysis": {
+      "QWEN_analysis": {
         "materials": ["fabric", "leather"],
         "colors": ["beige", "brown"],
         "ocr_text": "NOVA Sofa"
@@ -1301,7 +1301,7 @@ GET /api/rag/health
 {
   "status": "healthy",
   "services": {
-    "llamaindex": "healthy",
+    "rag": "healthy",
     "embeddings": "healthy",
     "vector_store": "healthy",
     "database": "healthy"
@@ -1360,7 +1360,7 @@ GET /api/rag/job/{job_id}/ai-tracking
 {
   "job_id": "uuid",
   "models_used": {
-    "LLAMA": {
+    "QWEN": {
       "calls": 28,
       "tokens": 45000,
       "cost": 0.45,
@@ -1395,7 +1395,7 @@ GET /api/rag/job/{job_id}/ai-tracking
 
 **Request:**
 ```http
-GET /api/rag/job/{job_id}/ai-tracking/model/LLAMA
+GET /api/rag/job/{job_id}/ai-tracking/model/QWEN
 ```
 
 **Database Operations:** SELECT FROM background_jobs
@@ -3756,7 +3756,7 @@ All endpoints return JSON:
 
 **Key Features:**
 - ✅ Consolidated endpoints (no duplicates)
-- ✅ Comprehensive AI integration (Claude, GPT, Llama)
+- ✅ Comprehensive AI integration (Claude, GPT, QWEN)
 - ✅ Complete Knowledge Base system
 - ✅ Advanced duplicate detection
 - ✅ Data import with AI field mapping

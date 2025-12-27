@@ -74,10 +74,8 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   // Qwen Vision Models
   'qwen3-vl-32b': { input: 0.50, output: 1.50 },
   'qwen3-vl-8b': { input: 0.08, output: 0.50 },
-
-  // Llama Models
-  'llama-4-scout-17b': { input: 0.20, output: 0.20 },
-  'llama-4-maverick-17b': { input: 0.20, output: 0.20 },
+  'Qwen/Qwen3-VL-32B-Instruct': { input: 0.50, output: 1.50 },
+  'Qwen/Qwen3-VL-8B-Instruct': { input: 0.08, output: 0.50 },
 };
 
 // Estimate tokens from content length (rough approximation: 4 chars = 1 token)
@@ -120,8 +118,8 @@ const MODEL_CONFIGS: ModelConfig[] = [
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Chunking'], totalInputTokens: 0, totalOutputTokens: 0 },
   { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
 
-  // Meta Llama Models
-  { id: 'llama-4-scout', name: 'Llama 4 Scout 17B Vision', provider: 'meta', model: 'meta-llama/Llama-4-Scout-17B-16E-Instruct', inputCostPer1M: 0.20, outputCostPer1M: 0.20, speed: 'fast', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
+  // Qwen Vision Models
+  { id: 'qwen3-vl-8b', name: 'Qwen3-VL-8B-Instruct', provider: 'meta', model: 'Qwen/Qwen3-VL-8B-Instruct', inputCostPer1M: 0.08, outputCostPer1M: 0.50, speed: 'fast', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
 
   // Vision/Embedding Models
   { id: 'siglip', name: 'SigLIP SO400M', provider: 'google', model: 'google/siglip-so400m-patch14-384', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
@@ -283,7 +281,7 @@ export const OperationsDashboard: React.FC = () => {
     total_images: 0,
     unique_users: 0,
   });
-  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]); // AI models (GPT, Claude, Llama)
+  const [modelUsage, setModelUsage] = useState<ModelUsage[]>([]); // AI models (Claude, GPT, Qwen, SigLIP)
   const [interiorDesignModels, setInteriorDesignModels] = useState<ModelUsage[]>([]); // Interior Design specific models
   const [dataProcessingStats, setDataProcessingStats] = useState<DataProcessingStats>({
     pdf: { total: 0, completed: 0, failed: 0, processing: 0, avgProcessingTime: 0 },
@@ -561,7 +559,7 @@ export const OperationsDashboard: React.FC = () => {
           totalCreditsUsed,
         }));
 
-        // Calculate AI Model Usage Stats (GPT, Claude, Llama, etc.)
+        // Calculate AI Model Usage Stats (Claude, GPT, Qwen, SigLIP, etc.)
         const modelStats: Record<string, {
           call_count: number;
           total_cost: number;
@@ -1158,11 +1156,11 @@ export const OperationsDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-2">AI Performance</h2>
               <p className="text-muted-foreground">
-                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Llama 4 Scout 17B, Voyage AI (embeddings), and vision/embedding models (SigLIP, CLIP). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
+                Monitoring all AI models including Claude Sonnet 4.5, Claude Haiku 4.5, GPT-5, GPT-4o, Qwen3-VL-32B (vision & chunking), and embedding models (SigLIP-SO400M, Voyage AI 3.5). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure.
               </p>
             </div>
 
-            {/* AI Models Summary Cards - GPT, Claude, Llama, Interior Design, etc. */}
+            {/* AI Models Summary Cards - GPT, Claude, Qwen, Interior Design, etc. */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="dashboard-card">
                 <div className="flex items-center gap-3">
@@ -1291,7 +1289,7 @@ export const OperationsDashboard: React.FC = () => {
 
 
 
-            {/* AI Models Usage Table - GPT, Claude, Llama, etc. */}
+            {/* AI Models Usage Table - GPT, Claude, Qwen, etc. */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1299,7 +1297,7 @@ export const OperationsDashboard: React.FC = () => {
                   AI Model Usage & Costs
                 </CardTitle>
                 <CardDescription className="text-muted-foreground">
-                  All AI models (GPT, Claude, Llama, etc.) - Performance and cost breakdown
+                  All AI models (GPT, Claude, Qwen, etc.) - Performance and cost breakdown
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1437,7 +1435,7 @@ export const OperationsDashboard: React.FC = () => {
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <Bot className="h-4 w-4 text-gray-400" />
-                                <span className="text-gray-600">Llama 4 Scout 17B Vision</span>
+                                <span className="text-gray-600">Qwen3-VL-8B-Instruct</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm text-gray-400">0</TableCell>
@@ -1500,7 +1498,7 @@ export const OperationsDashboard: React.FC = () => {
                           </TableRow>
                           <TableRow>
                             <TableCell colSpan={7} className="text-center py-4 text-sm text-muted-foreground">
-                              No AI usage data yet. All models (GPT-5, GPT-4o, GPT-4o-mini, Claude Sonnet 4.5, Claude Haiku 4.5, Llama 4 Scout 17B Vision, text-embedding-3-small, SigLIP, CLIP) will show actual data once API calls are made.
+                              No AI usage data yet. All models (GPT-5, GPT-4o, GPT-4o-mini, Claude Sonnet 4.5, Claude Haiku 4.5, Qwen3-VL-8B, text-embedding-3-small, SigLIP, CLIP) will show actual data once API calls are made.
                             </TableCell>
                           </TableRow>
                         </>

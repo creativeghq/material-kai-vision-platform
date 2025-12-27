@@ -10,7 +10,7 @@ from app.services.ai_usage_logger import AIUsageLogger
 
 ### 2. Log an AI API Call
 
-#### For OpenAI/Anthropic/Llama (Token-based)
+#### For OpenAI/Anthropic/TogetherAI (Token-based)
 ```python
 # After making an API call
 response = openai_client.chat.completions.create(...)

@@ -54,7 +54,7 @@ Use 3 complementary extraction methods to catch everything:
 
 ### 1. Quality Scoring Enhancement ✅
 
-**File:** `mivaa-pdf-extractor/app/services/llamaindex_service.py` (lines 3448-3534)
+**File:** `mivaa-pdf-extractor/app/services/rag_service.py` (Direct Vector DB)
 
 **Features:**
 - `_is_meta_rich_chunk()` method detects chunks with 2+ meta categories

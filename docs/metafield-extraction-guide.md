@@ -64,7 +64,7 @@ PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 3: Image Processing & Visual Metafield Extraction (50-70%)│
-│ AI: Llama Vision 4 Scout 17B + CLIP                            │
+│ AI: Qwen Vision 4 Scout 17B + CLIP                            │
 │ Purpose: Extract images, analyze for visual metafields         │
 │ Output: Images with detected colors, texture, finish           │
 └─────────────────────────────────────────────────────────────────┘
@@ -227,7 +227,7 @@ The AI creates semantic chunks while preserving metafield information:
 ## 🖼️ Stage 3: Image Processing & Visual Metafield Extraction
 
 ### AI Models & Process
-- **Llama Vision 4 Scout 17B**: Advanced image analysis
+- **Qwen Vision 4 Scout 17B**: Advanced image analysis
 - **CLIP**: Image embeddings (512D) for visual similarity
 
 The AI extracts images and analyzes them for visual metafields:
@@ -945,7 +945,7 @@ Response: {
 |-------|----------|-------|---------|--------|----------|
 | **0** | Claude Sonnet 4.5 / GPT-4o | Full PDF | Identify products & metafield types | Product catalog with metafield types | 88%+ |
 | **2** | Anthropic Claude | Product pages | Create chunks, preserve metafields | Chunks with metafield metadata | 88%+ |
-| **3** | Llama Vision + CLIP | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
+| **3** | Qwen Vision + CLIP | Images | Analyze for visual metafields | Images with colors, texture, finish | 85-94% |
 | **4** | Claude Haiku 4.5 → Sonnet 4.5 | Chunks + Images | Consolidate metafields | Product records with consolidated metafields | 95%+ |
 | **12** | Extract & Link | Product metadata | Create database records, link to products/chunks/images | metafield_values linked | 100% |
 
@@ -1002,7 +1002,7 @@ Response: {
 **Material Identification**:
 1. **Stage 0**: Claude identifies material types from PDF (e.g., "White Body Tile", "Ceramic")
 2. **Stage 2**: Chunks preserve material information in metadata
-3. **Stage 3**: Llama Vision analyzes material appearance (texture, finish, gloss)
+3. **Stage 3**: Qwen Vision analyzes material appearance (texture, finish, gloss)
 4. **Stage 4**: Claude consolidates material data from all sources
 5. **Stage 12**: Material metafield linked to product, chunks, and images
 

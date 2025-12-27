@@ -36,7 +36,7 @@ If you don't provide `ai_config`, the system uses these defaults:
 
 **Defaults Used**:
 - Visual Embeddings: SigLIP (primary) → CLIP (fallback)
-- Classification: Llama Vision (primary) → Claude Sonnet (validation)
+- Classification: Qwen Vision (primary) → Claude Sonnet (validation)
 - Discovery: Claude Sonnet 4.5
 - Metadata: Claude
 - Text Embeddings: OpenAI text-embedding-3-small
@@ -70,7 +70,7 @@ Best overall accuracy and reliability.
     "visual_embedding_primary": "google/siglip-so400m-patch14-384",
     "visual_embedding_fallback": "openai/clip-vit-base-patch32",
     "text_embedding_model": "text-embedding-3-small",
-    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.7,
     "discovery_model": "claude-sonnet-4-20250514",
@@ -185,7 +185,7 @@ POST /api/internal/classify-images/abc123
     }
   ],
   "ai_config": {
-    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.75,
     "classification_temperature": 0.1,
@@ -337,7 +337,7 @@ For processing large batches of PDFs, optimize for speed and cost:
 ```json
 {
   "ai_config": {
-    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
     "classification_validation_model": "claude-haiku-4-20250514",
     "classification_confidence_threshold": 0.65,
     "discovery_model": "gpt-4o",
@@ -365,7 +365,7 @@ For high-value catalogs requiring maximum accuracy:
 ```json
 {
   "ai_config": {
-    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.85,
     "discovery_model": "gpt-5",
@@ -394,7 +394,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **DEFAULT_AI_CONFIG**:
 - Discovery (Claude Sonnet): ~$0.50
-- Classification (Llama + Claude): ~$0.30
+- Classification (Qwen + Claude): ~$0.30
 - Metadata (Claude): ~$0.40
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20
@@ -402,7 +402,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **COST_OPTIMIZED_CONFIG**:
 - Discovery (GPT-4o): ~$0.25
-- Classification (Llama + Haiku): ~$0.10
+- Classification (Qwen + Haiku): ~$0.10
 - Metadata (GPT): ~$0.20
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20
@@ -410,7 +410,7 @@ For high-value catalogs requiring maximum accuracy:
 
 **HIGH_ACCURACY_CONFIG**:
 - Discovery (GPT-5): ~$1.00
-- Classification (Llama + Sonnet): ~$0.40
+- Classification (Qwen + Sonnet): ~$0.40
 - Metadata (Claude): ~$0.60
 - Visual Embeddings (SigLIP/CLIP): ~$0.10
 - Text Embeddings (OpenAI): ~$0.20

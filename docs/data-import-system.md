@@ -51,7 +51,7 @@ XML Import uses **fully async processing** with unified concurrency limits:
 | **Product Batch Size** | 10 products | Memory optimization |
 | **Image Downloads** | 5 concurrent | Network optimization |
 | **Image Upload** | 10 concurrent | Supabase Storage limit |
-| **Llama Vision** | 5 concurrent | AI classification |
+| **Qwen Vision** | 5 concurrent | AI classification |
 | **Claude Validation** | 2 concurrent | Validation |
 | **CLIP Batch** | 20 images | Embedding generation |
 | **Download Timeout** | 30 seconds | Per-image timeout |

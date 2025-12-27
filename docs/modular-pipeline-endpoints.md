@@ -50,7 +50,7 @@ interface AIModelConfig {
   text_embedding_model?: string;              // Default: "text-embedding-3-small"
 
   // Image Classification Models
-  classification_primary_model?: string;      // Default: "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+  classification_primary_model?: string;      // Default: "Qwen/Qwen3-VL-8B-Instruct"
   classification_validation_model?: string;   // Default: "claude-sonnet-4-20250514"
   classification_confidence_threshold?: number; // Default: 0.7
 
@@ -81,7 +81,7 @@ interface AIModelConfig {
 - Best overall accuracy and reliability
 - Uses Claude Sonnet 4.5 for discovery and metadata
 - Uses SigLIP for visual embeddings with CLIP fallback
-- Uses Llama Vision for fast classification with Claude validation
+- Uses Qwen Vision for fast classification with Claude validation
 
 **FAST_CONFIG** (Speed Optimized):
 - Uses GPT-4o instead of Claude for faster processing
@@ -105,7 +105,7 @@ interface AIModelConfig {
   "job_id": "abc123",
   "extracted_images": [...],
   "ai_config": {
-    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.8,
     "visual_embedding_primary": "google/siglip-so400m-patch14-384"
@@ -145,8 +145,8 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Uses AI to determine if each image is material-related or not
 
 **AI Processing**:
-- **Stage 1 - Llama Vision (Fast & Cheap)**:
-  - Model: `meta-llama/Llama-4-Scout-17B-16E-Instruct` (TogetherAI)
+- **Stage 1 - Qwen Vision (Fast & Cheap)**:
+  - Model: `Qwen/Qwen3-VL-8B-Instruct` (TogetherAI)
   - Classifies images into 3 categories:
     - `material_closeup`: Close-up of material texture/surface/pattern
     - `material_in_situ`: Material shown in application/context
@@ -168,7 +168,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
   "visual_embedding_primary": "google/siglip-so400m-patch14-384",
   "visual_embedding_fallback": "openai/clip-vit-base-patch32",
   "text_embedding_model": "text-embedding-3-small",
-  "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+  "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
   "classification_validation_model": "claude-sonnet-4-20250514",
   "classification_confidence_threshold": 0.7,
   "discovery_model": "claude-sonnet-4-20250514",
@@ -191,7 +191,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
     }
   ],
   "ai_config": {
-    "classification_primary_model": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.7
   }
@@ -585,7 +585,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 
 ### AI Models Used
 1. **Product Discovery**: Claude Sonnet 4.5 or GPT-5 (configurable)
-2. **Image Classification**: Llama 4 Scout 17B Vision → Claude Sonnet 4.5 (validation)
+2. **Image Classification**: Qwen3-VL 17B Vision → Claude Sonnet 4.5 (validation)
 3. **Visual Embeddings**: Google SigLIP ViT-SO400M (primary) / OpenAI CLIP ViT-B/32 (fallback) - 5 types per image, 512D each
 4. **Text Embeddings**: OpenAI text-embedding-3-small (1536D)
 
@@ -605,7 +605,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 ## 📊 Progress Tracking
 
 ### Pipeline Stages (50-100%)
-- **50-60%**: Image Classification (Llama + Claude)
+- **50-60%**: Image Classification (Qwen + Claude)
 - **60-65%**: Image Upload (Supabase Storage)
 - **65-75%**: Save Images & CLIP Embeddings (5 per image)
 - **75-85%**: Chunking & Text Embeddings
@@ -624,7 +624,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 
 ### What Each Endpoint Does
 
-1. **classify-images**: AI classification (Llama → Claude) to filter material vs non-material images
+1. **classify-images**: AI classification (Qwen → Claude) to filter material vs non-material images
 2. **upload-images**: Upload material images to Supabase Storage (receives pre-filtered list)
 3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SigLIP primary / CLIP fallback)
 4. **create-chunks**: Semantic chunking + text embeddings (OpenAI text-embedding-3-small)
@@ -633,7 +633,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 ### Default Processing Flow
 
 1. Extract ALL images from PDF
-2. Classify ALL images with AI (Llama + Claude) → **material_images** + non_material_images
+2. Classify ALL images with AI (Qwen + Claude) → **material_images** + non_material_images
 3. Upload ONLY **material_images** to storage → **uploaded_images**
 4. Save ONLY **uploaded_images** to database
 5. Generate 5 visual embeddings per saved image (SigLIP primary / CLIP fallback)
@@ -644,7 +644,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 ### Key Features
 
 - ✅ **Focused extraction by default** (only material images)
-- ✅ **Two-stage AI classification** (Llama fast, Claude validation)
+- ✅ **Two-stage AI classification** (Qwen fast, Claude validation)
 - ✅ **5 visual embeddings per image** (SigLIP ViT-SO400M primary / CLIP ViT-B/32 fallback: visual, color, texture, style, material)
 - ✅ **Semantic chunking** with product boundary respect
 - ✅ **Comprehensive progress tracking** (5% increments)

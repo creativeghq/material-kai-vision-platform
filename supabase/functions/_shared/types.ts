@@ -64,7 +64,7 @@ export interface MaterialRecognitionResult {
     /** Type of analysis performed */
     analysisType: 'basic' | 'detailed' | 'comprehensive';
     /** Processing method used */
-    processingMethod: 'llama_vision' | 'openai_vision' | 'catalog_fallback';
+    processingMethod: 'vision_model' | 'openai_vision' | 'catalog_fallback';
     /** Image dimensions if available */
     imageDimensions?: {
       width: number;

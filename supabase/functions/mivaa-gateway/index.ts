@@ -144,8 +144,8 @@ const MIVAA_ENDPOINTS = {
   'anthropic_enrich_product': { path: '/api/anthropic/products/enrich', method: 'POST' },  // Enrich product with Claude
   'anthropic_test': { path: '/api/anthropic/test/claude-integration', method: 'POST' },  // Test Claude integration
 
-  // ==================== TOGETHER AI (LLAMA) ====================
-  'together_analyze_image': { path: '/api/together-ai/analyze-image', method: 'POST' },  // Analyze image with Llama Vision
+  // ==================== TOGETHER AI (QWEN) ====================
+  'together_analyze_image': { path: '/api/together-ai/analyze-image', method: 'POST' },  // Analyze image with Qwen Vision
   'together_health': { path: '/api/together-ai/health', method: 'GET' },  // Together AI health
   'together_models': { path: '/api/together-ai/models', method: 'GET' },  // List available models
 

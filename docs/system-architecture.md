@@ -27,9 +27,9 @@ Complete technical architecture of Material Kai Vision Platform.
 │ - 9-stage PDF processing pipeline (optimized)              │
 │ - Memory-safe image processing (10-15MB constant)          │
 │ - Real-time CLIP embedding generation                      │
-│ - RAG system (LlamaIndex)                                   │
-│ - Search APIs (Semantic, Vector, Hybrid)                   │
-│ - AI Services (Claude, GPT, Llama, SigLIP)                 │
+│ - RAG system (Claude 4.5 + Direct Vector DB)               │
+│ - Search APIs (Multi-Vector, Semantic, Hybrid)             │
+│ - AI Services (Claude 4.5, GPT, Qwen3-VL, SigLIP)          │
 │ - Product Management + Metadata Management                 │
 │ - Duplicate Detection & Merging (factory-based)            │
 │ - Admin & Monitoring                                        │
@@ -64,7 +64,7 @@ Frontend (Vercel)
             ├─→ Supabase (Data)
             ├─→ OpenAI (Embeddings)
             ├─→ Anthropic (Claude)
-            ├─→ Together AI (Llama)
+            ├─→ Together AI (Qwen)
             └─→ Supabase Storage (Images)
 ```
 
@@ -228,7 +228,7 @@ USING (workspace_id = auth.uid());
    - Vision analysis
 
 10. **Together AI APIs** (3 endpoints)
-    - Llama integration
+    - Qwen integration
     - Vision analysis
 
 11. **Monitoring Routes** (3 endpoints)
@@ -262,10 +262,10 @@ USING (workspace_id = auth.uid());
 - CLIP (5 embedding types)
 
 **Together AI**:
-- Llama 4 Scout 17B Vision (Image analysis, OCR)
+- Qwen3-VL 17B Vision (Image analysis, OCR)
 
-**LlamaIndex**:
-- RAG system (Document indexing, retrieval)
+**Direct Vector DB RAG**:
+- Claude 4.5 + Multi-Vector Search (Document retrieval, synthesis)
 
 ---
 
@@ -378,9 +378,9 @@ USING (workspace_id = auth.uid());
 
 **AI Services**:
 - OpenAI API
-- Anthropic API
-- Together AI API
-- LlamaIndex
+- Anthropic API (Claude 4.5)
+- Together AI API (Qwen3-VL)
+- Voyage AI (Embeddings)
 
 **Infrastructure**:
 - Vercel (Frontend)

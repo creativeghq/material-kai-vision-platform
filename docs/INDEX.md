@@ -63,7 +63,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[async-processing-and-limits.md](async-processing-and-limits.md)** - Async processing & concurrency limits ✨ NEW
 - Fully async architecture across all methods (PDF, Web, XML)
-- Unified concurrency limits (5 Llama, 2 Claude, 10 uploads, 20 CLIP)
+- Unified concurrency limits (5 TogetherAI (Qwen), 2 Claude, 10 uploads, 20 CLIP)
 - Timeout configuration (300s discovery, 120s AI, 30s downloads)
 - Rate limiting (10 req/min TogetherAI, circuit breaker Claude)
 - Shared services (ImageProcessingService, RealEmbeddingsService, AsyncQueueService)
@@ -212,7 +212,7 @@ Complete documentation for Material Kai Vision Platform.
 - Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
 - OpenAI: GPT-4o, GPT-5, text-embedding-3-small
 - Google: SigLIP ViT-SO400M (primary CLIP)
-- TogetherAI: Llama 4 Scout 17B Vision
+- TogetherAI: Qwen3-VL 17B Vision
 - OpenAI CLIP ViT-B/32 (fallback)
 - 6 embedding types (text, visual, color, texture, style, material)
 - Model usage by pipeline stage
@@ -397,7 +397,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel  
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted  
 **Database**: PostgreSQL 15, pgvector, Supabase  
-**AI**: Claude, GPT-4o, Llama, CLIP, LlamaIndex  
+**AI**: Claude 4.5, GPT-4o, Qwen3-VL, SigLIP, Voyage AI, Multi-Vector CLIP
 
 ### API Categories
 
