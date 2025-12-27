@@ -27,9 +27,9 @@ export interface ErrorDetail {
  */
 export interface ResponseMetadata {
   /** Unique request identifier for tracing */
-  requestId?: string;
+  request_id?: string;
   /** Request processing time in milliseconds */
-  processingTime: number;
+  processing_time: number;
   /** Response timestamp in ISO 8601 format */
   timestamp: string;
   /** API version */
@@ -50,7 +50,7 @@ export interface ResponseMetadata {
  *   success: true,
  *   data: { results: [...], total: 10 },
  *   metadata: {
- *     processingTime: 123.4,
+ *     processing_time: 123.4,
  *     timestamp: '2024-01-15T10:30:00.000Z',
  *     endpoint: '/api/search'
  *   }
@@ -65,7 +65,7 @@ export interface ResponseMetadata {
  *     retryable: false
  *   },
  *   metadata: {
- *     processingTime: 45.2,
+ *     processing_time: 45.2,
  *     timestamp: '2024-01-15T10:30:00.000Z',
  *     endpoint: '/api/resource/123'
  *   }
