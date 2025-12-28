@@ -145,12 +145,7 @@ class MoodBoardAPI {
           name,
           category_id,
           properties,
-          metadata,
-          product_images(
-            image_url,
-            image_type,
-            display_order
-          )
+          metadata
         )
       `,
       )
@@ -159,13 +154,37 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
-    // Transform data to include thumbnail_url from product_images
+    // Get product IDs to fetch images
+    const productIds = (data || [])
+      .map(item => item.material?.id)
+      .filter((id): id is string => !!id);
+
+    // Fetch images for all products using product_image_relationships
+    const productImageMap: Record<string, string> = {};
+    if (productIds.length > 0) {
+      const { data: imageRelations } = await supabase
+        .from('product_image_relationships')
+        .select('product_id, image:document_images(image_url)')
+        .in('product_id', productIds)
+        .order('relevance_score', { ascending: false });
+
+      if (imageRelations) {
+        for (const rel of imageRelations) {
+          const imgData = rel.image as any;
+          if (!productImageMap[rel.product_id] && imgData?.image_url) {
+            productImageMap[rel.product_id] = imgData.image_url;
+          }
+        }
+      }
+    }
+
+    // Transform data to include thumbnail_url from product_image_relationships
     return (data || []).map(item => ({
       ...item,
       material: item.material ? {
         ...item.material,
         category: item.material.metadata?.category || item.material.category_id || 'Uncategorized',
-        thumbnail_url: item.material.product_images?.[0]?.image_url || null,
+        thumbnail_url: productImageMap[item.material.id] || null,
       } : null,
     }));
   }
@@ -199,12 +218,7 @@ class MoodBoardAPI {
           name,
           category_id,
           properties,
-          metadata,
-          product_images(
-            image_url,
-            image_type,
-            display_order
-          )
+          metadata
         )
       `,
       )
@@ -212,13 +226,29 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
+    // Fetch image for the product using product_image_relationships
+    let thumbnail_url: string | null = null;
+    if (result.material?.id) {
+      const { data: imageRelations } = await supabase
+        .from('product_image_relationships')
+        .select('image:document_images(image_url)')
+        .eq('product_id', result.material.id)
+        .order('relevance_score', { ascending: false })
+        .limit(1);
+
+      if (imageRelations && imageRelations.length > 0) {
+        const imgData = imageRelations[0].image as any;
+        thumbnail_url = imgData?.image_url || null;
+      }
+    }
+
     // Transform to include thumbnail_url
     return {
       ...result,
       material: result.material ? {
         ...result.material,
         category: result.material.metadata?.category || result.material.category_id || 'Uncategorized',
-        thumbnail_url: result.material.product_images?.[0]?.image_url || null,
+        thumbnail_url,
       } : null,
     };
   }
@@ -240,12 +270,7 @@ class MoodBoardAPI {
           name,
           category_id,
           properties,
-          metadata,
-          product_images(
-            image_url,
-            image_type,
-            display_order
-          )
+          metadata
         )
       `,
       )
@@ -253,13 +278,29 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
+    // Fetch image for the product using product_image_relationships
+    let thumbnail_url: string | null = null;
+    if (result.material?.id) {
+      const { data: imageRelations } = await supabase
+        .from('product_image_relationships')
+        .select('image:document_images(image_url)')
+        .eq('product_id', result.material.id)
+        .order('relevance_score', { ascending: false })
+        .limit(1);
+
+      if (imageRelations && imageRelations.length > 0) {
+        const imgData = imageRelations[0].image as any;
+        thumbnail_url = imgData?.image_url || null;
+      }
+    }
+
     // Transform to include thumbnail_url
     return {
       ...result,
       material: result.material ? {
         ...result.material,
         category: result.material.metadata?.category || result.material.category_id || 'Uncategorized',
-        thumbnail_url: result.material.product_images?.[0]?.image_url || null,
+        thumbnail_url,
       } : null,
     };
   }

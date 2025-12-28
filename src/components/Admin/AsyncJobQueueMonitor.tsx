@@ -568,16 +568,45 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   // Handle jobId query parameter - auto-open modal for specific job
   useEffect(() => {
     const jobId = searchParams.get('jobId');
-    if (jobId && jobs.length > 0 && !selectedJob) {
-      const job = jobs.find(j => j.id === jobId);
-      if (job) {
-        console.log('🎯 Auto-opening modal for job from URL:', jobId);
-        fetchJobDetails(job);
-        // Remove jobId from URL after opening
-        setSearchParams({});
-      }
+    if (!jobId || selectedJob) return;
+
+    // Try to find job in loaded jobs first
+    const job = jobs.find(j => j.id === jobId);
+    if (job) {
+      console.log('🎯 Auto-opening modal for job from URL (found in jobs list):', jobId);
+      fetchJobDetails(job);
+      // Remove jobId from URL after opening
+      setSearchParams({});
+      return;
     }
-  }, [searchParams, jobs, selectedJob, setSearchParams]);
+
+    // If jobs are still loading, wait for them
+    if (loading) {
+      console.log('⏳ Jobs still loading, waiting...');
+      return;
+    }
+
+    // If jobs loaded but job not found, fetch it directly from database
+    if (jobs.length > 0) {
+      console.log('🔍 Job not in list, fetching directly from database:', jobId);
+      supabase
+        .from('background_jobs')
+        .select('*')
+        .eq('id', jobId)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('❌ Failed to fetch job:', error);
+            return;
+          }
+          if (data) {
+            console.log('✅ Found job in database, opening modal:', data);
+            fetchJobDetails(data as BackgroundJob);
+            setSearchParams({});
+          }
+        });
+    }
+  }, [searchParams, jobs, selectedJob, loading, setSearchParams]);
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { color: string; icon: string }> = {
