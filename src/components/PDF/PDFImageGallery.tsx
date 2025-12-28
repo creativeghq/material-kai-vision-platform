@@ -62,6 +62,7 @@ export interface PDFImage {
   page_number: number;
   proximity_score?: number;
   confidence: number;
+  category?: string; // 'product' | 'general'
   metadata?: {
     filename?: string;
     width?: number;
@@ -72,6 +73,13 @@ export interface PDFImage {
     associated_chunks?: string[];
     nearest_heading?: string;
     layout_context?: unknown;
+    ai_classification?: {
+      is_material?: boolean;
+      confidence?: number;
+      reason?: string;
+      model?: string;
+      classification?: string;
+    };
   };
   created_at: string;
   workspace_id?: string;
@@ -110,6 +118,7 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(initialViewMode);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all'); // NEW: Category filter
   const [sortBy, setSortBy] = useState<'page' | 'confidence' | 'created'>(
     'page',
   );
@@ -186,6 +195,11 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
       filtered = filtered.filter((image) => image.image_type === filterType);
     }
 
+    // Apply category filter (NEW!)
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter((image) => image.category === categoryFilter);
+    }
+
     // Apply sorting
     filtered.sort((a, b) => {
       let aValue: any, bValue: any;
@@ -215,7 +229,7 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
     });
 
     return filtered;
-  }, [images, searchTerm, filterType, sortBy, sortOrder]);
+  }, [images, searchTerm, filterType, categoryFilter, sortBy, sortOrder]);
 
   // Get unique image types for filter
   const imageTypes = React.useMemo(() => {
@@ -304,6 +318,20 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
           >
             {Math.round(image.confidence * 100)}%
           </Badge>
+
+          {/* Classification badge (NEW!) */}
+          {image.category && (
+            <Badge
+              className={cn(
+                'absolute bottom-2 right-2 border-0',
+                image.category === 'product'
+                  ? 'bg-blue-500/90 text-white'
+                  : 'bg-gray-500/90 text-white'
+              )}
+            >
+              {image.category === 'product' ? 'Product' : 'General'}
+            </Badge>
+          )}
         </div>
 
         {/* Content */}
@@ -501,6 +529,19 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                   ))}
                 </SelectContent>
               </Select>
+
+              {/* Category Filter (NEW!) */}
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="product">Products</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Select
                 value={sortBy}
                 onValueChange={(value: any) => setSortBy(value)}
