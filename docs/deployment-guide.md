@@ -714,7 +714,8 @@ All deployment results are displayed on the main GitHub Action page with:
 - **Process Management**: systemd service (mivaa-pdf-extractor.service)
 - **Web Framework**: FastAPI with Uvicorn ASGI server
 - **Database**: Supabase PostgreSQL with vector extensions
-- **AI Integration**: OpenAI, HuggingFace, TogetherAI APIs
+- **AI Integration**: OpenAI, Anthropic, TogetherAI, Voyage AI, HuggingFace APIs
+- **Visual Embeddings**: SigLIP (local CPU or remote GPU via HuggingFace)
 - **Monitoring**: Sentry error tracking and structured logging
 - **Security**: JWT authentication and environment-based secrets
 
@@ -743,8 +744,14 @@ SENTRY_DSN=your_sentry_dsn
 
 # Price Monitoring (Required for price tracking features)
 FIRECRAWL_API_KEY=fc-your-firecrawl-key
-GOOGLE_SHOPPING_API_KEY=your-google-api-key  # Optional
-GOOGLE_SHOPPING_CX=your-search-engine-id     # Optional
+
+# Visual Embeddings (Optional - for GPU-accelerated remote embeddings)
+VISUAL_EMBEDDING_MODE=remote  # 'local' (default) or 'remote'
+VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384  # Optional: upgrade to v2
+HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384
+HUGGINGFACE_BATCH_SIZE=10
+HUGGINGFACE_TIMEOUT=60
+HUGGINGFACE_MAX_RETRIES=3
 ```
 
 #### **Deployment Process**
@@ -967,6 +974,8 @@ jobs:
      - FIRECRAWL_API_KEY (for price monitoring)
      - GOOGLE_SHOPPING_API_KEY (optional)
      - GOOGLE_SHOPPING_CX (optional)
+     - VISUAL_EMBEDDING_MODE (optional - for remote embeddings)
+     - VISUAL_EMBEDDING_PRIMARY_MODEL (optional - for SigLIP v2 upgrade)
 
 2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments
@@ -983,6 +992,57 @@ jobs:
 5. **SSL Certificate Issues**:
    - **Problem**: HTTPS not working
    - **Solution**: Use Let's Encrypt or proper SSL certificates
+
+### Visual Embeddings Configuration
+
+#### **Remote GPU-Accelerated Embeddings (Optional)**
+
+Enable Hugging Face Inference API for 15x faster visual embeddings:
+
+**Add to systemd service** (`/etc/systemd/system/mivaa-pdf-extractor.service`):
+
+```bash
+# Visual Embedding Mode
+Environment="VISUAL_EMBEDDING_MODE=remote"
+
+# Hugging Face API
+Environment="HUGGINGFACE_API_KEY=hf_YOUR_API_KEY"
+Environment="HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384"
+Environment="HUGGINGFACE_BATCH_SIZE=10"
+Environment="HUGGINGFACE_TIMEOUT=60"
+
+# Optional: Upgrade local model to SigLIP v2
+Environment="VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384"
+```
+
+**Benefits:**
+- ✅ GPU-accelerated: ~15x faster (12-17s → <1s per image)
+- ✅ Batch processing: Up to 10 images per request
+- ✅ Automatic fallback to local if API fails
+- ✅ Cost-effective: ~$0.0001 per image (~$2/month for typical usage)
+
+**Get API Key:**
+1. Go to https://huggingface.co/settings/tokens
+2. Create new token (Read access)
+3. Copy token (starts with `hf_...`)
+
+**Deployment:**
+```bash
+# Edit service file
+sudo nano /etc/systemd/system/mivaa-pdf-extractor.service
+
+# Add environment variables above
+
+# Reload and restart
+sudo systemctl daemon-reload
+sudo systemctl restart mivaa-pdf-extractor
+
+# Verify
+journalctl -u mivaa-pdf-extractor -n 50 | grep "Visual embedding mode"
+# Expected: "🤗 Visual embedding mode: REMOTE (Hugging Face API)"
+```
+
+**See:** `mivaa-pdf-extractor/HUGGINGFACE_DEPLOYMENT.md` for detailed guide
 
 ### Rollback Strategy
 

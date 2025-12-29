@@ -2,9 +2,10 @@
  * Product Detail Modal
  * Global component for displaying full product/material details
  * Supports category-based templates for different material types
+ * Fetches images from product_image_relationships table
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,12 +17,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2 } from 'lucide-react';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
 import { SimilarMaterials } from '@/components/recommendations';
 import { ProductMonitorTab } from '@/components/PriceMonitoring/ProductMonitorTab';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -63,6 +65,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   categoryColor,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [images, setImages] = useState<any[]>([]);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
 
   if (!product) return null;
 
@@ -70,19 +74,86 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const theme = getCategoryTheme(materialCategory);
   const effectiveColor = categoryColor || theme.primary;
 
+  // Load images from product_image_relationships when modal opens
+  useEffect(() => {
+    const loadImages = async () => {
+      if (!product?.id) return;
+
+      try {
+        setIsLoadingImages(true);
+        console.log('[ProductDetailModal] Loading images for product:', product.id, product.name);
+
+        // Fetch images from product_image_relationships table
+        const { data: imageRelations, error } = await supabase
+          .from('product_image_relationships')
+          .select(`
+            image_id,
+            relevance_score,
+            relationship_type,
+            created_at,
+            document_images (
+              id,
+              image_url,
+              page_number,
+              caption,
+              metadata
+            )
+          `)
+          .eq('product_id', product.id)
+          .order('relevance_score', { ascending: false });
+
+        if (error) {
+          console.error('[ProductDetailModal] Error loading images:', error);
+          setImages([]);
+          return;
+        }
+
+        if (imageRelations && imageRelations.length > 0) {
+          // Extract images with relationship metadata
+          const loadedImages = imageRelations
+            .filter(rel => rel.document_images)
+            .map(rel => ({
+              id: rel.document_images.id,
+              url: rel.document_images.image_url,
+              page_number: rel.document_images.page_number,
+              caption: rel.document_images.caption,
+              metadata: rel.document_images.metadata,
+              relationship_score: rel.relevance_score,
+              relationship_type: rel.relationship_type,
+            }));
+
+          console.log('[ProductDetailModal] Loaded images:', loadedImages.length);
+          setImages(loadedImages);
+        } else {
+          console.log('[ProductDetailModal] No images found for product');
+          setImages([]);
+        }
+      } catch (error) {
+        console.error('[ProductDetailModal] Failed to load images:', error);
+        setImages([]);
+      } finally {
+        setIsLoadingImages(false);
+      }
+    };
+
+    if (isOpen) {
+      loadImages();
+    }
+  }, [product?.id, isOpen]);
+
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) =>
-      prev === 0 ? product.images.length - 1 : prev - 1
+      prev === 0 ? images.length - 1 : prev - 1
     );
   };
 
   const handleNextImage = () => {
     setCurrentImageIndex((prev) =>
-      prev === product.images.length - 1 ? 0 : prev + 1
+      prev === images.length - 1 ? 0 : prev + 1
     );
   };
 
-  const currentImage = product.images[currentImageIndex];
+  const currentImage = images[currentImageIndex];
 
   // Extract key metadata from all possible sources
   const allData = {
@@ -259,59 +330,70 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left Column: Image Slider (3/5 width) */}
           <div className="lg:col-span-3 space-y-4">
-            <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
-              {currentImage && (
-                <img
-                  src={currentImage.url}
-                  alt={currentImage.alt}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-              )}
-              {product.images.length > 1 && (
-                <>
-                  <Button
-                    onClick={handlePrevImage}
-                    variant="secondary"
-                    size="icon"
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow-lg"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    onClick={handleNextImage}
-                    variant="secondary"
-                    size="icon"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow-lg"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </Button>
-                </>
-              )}
-              <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
-                {currentImageIndex + 1} / {product.images.length}
+            {isLoadingImages ? (
+              <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
               </div>
-            </div>
+            ) : images.length > 0 ? (
+              <>
+                <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden border border-gray-200">
+                  <img
+                    src={currentImage?.url}
+                    alt={product.name}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                  {images.length > 1 && (
+                    <>
+                      <Button
+                        onClick={handlePrevImage}
+                        variant="secondary"
+                        size="icon"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow-lg"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </Button>
+                      <Button
+                        onClick={handleNextImage}
+                        variant="secondary"
+                        size="icon"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white shadow-lg"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </Button>
+                    </>
+                  )}
+                  <div className="absolute bottom-3 right-3 bg-black/70 text-white px-3 py-1.5 rounded-lg text-sm font-medium">
+                    {currentImageIndex + 1} / {images.length}
+                    {currentImage?.page_number && ` • Page ${currentImage.page_number}`}
+                  </div>
+                </div>
 
-            {/* Thumbnail Strip */}
-            {product.images.length > 1 && (
-              <div className="flex gap-2 overflow-x-auto pb-2">
-                {product.images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentImageIndex(index)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden transition-all ${
-                      index === currentImageIndex
-                        ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2'
-                        : 'border-gray-200 hover:border-gray-400'
-                    }`}
-                  >
-                    <img src={image.url} alt={image.alt} className="w-full h-full object-cover" />
-                  </button>
-                ))}
+                {/* Thumbnail Strip */}
+                {images.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {images.map((image, index) => (
+                      <button
+                        key={image.id}
+                        onClick={() => setCurrentImageIndex(index)}
+                        className={`flex-shrink-0 w-20 h-20 rounded-lg border-2 overflow-hidden transition-all ${
+                          index === currentImageIndex
+                            ? 'border-gray-900 ring-2 ring-gray-900 ring-offset-2'
+                            : 'border-gray-200 hover:border-gray-400'
+                        }`}
+                      >
+                        <img src={image.url} alt={`Thumbnail ${index + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
+                <p className="text-gray-500">No images available</p>
               </div>
             )}
           </div>
