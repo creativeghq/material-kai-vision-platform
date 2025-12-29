@@ -67,7 +67,7 @@ Best overall accuracy and reliability.
 ```json
 {
   "ai_config": {
-    "visual_embedding_primary": "google/siglip-so400m-patch14-384",
+    "visual_embedding_primary": "google/siglip2-so400m-patch14-384",
     "visual_embedding_fallback": "openai/clip-vit-base-patch32",
     "text_embedding_model": "text-embedding-3-small",
     "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
@@ -370,7 +370,7 @@ For high-value catalogs requiring maximum accuracy:
     "classification_confidence_threshold": 0.85,
     "discovery_model": "gpt-5",
     "metadata_extraction_model": "claude",
-    "visual_embedding_primary": "google/siglip-so400m-patch14-384",
+    "visual_embedding_primary": "google/siglip2-so400m-patch14-384",
     "discovery_temperature": 0.05,
     "metadata_temperature": 0.05,
     "discovery_max_tokens": 8192,

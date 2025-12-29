@@ -42,8 +42,8 @@ All endpoints support **dynamic AI model configuration** via the optional `ai_co
 
 ```typescript
 interface AIModelConfig {
-  // Visual Embedding Models (SigLIP primary, CLIP fallback)
-  visual_embedding_primary?: string;          // Default: "google/siglip-so400m-patch14-384"
+  // Visual Embedding Models (SigLIP2 primary, CLIP fallback)
+  visual_embedding_primary?: string;          // Default: "google/siglip2-so400m-patch14-384"
   visual_embedding_fallback?: string;         // Default: "openai/clip-vit-base-patch32"
 
   // Text Embedding Model
@@ -312,18 +312,18 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - The orchestrator passes only the `uploaded_images` output from upload-images endpoint
 - These are already filtered twice: (1) AI classification, (2) successful upload
 
-**AI Processing - Visual Embeddings (SigLIP Exclusive)**:
-- **Model**: Google SigLIP ViT-SO400M (`google/siglip-so400m-patch14-384`)
+**AI Processing - Visual Embeddings (SigLIP2 Exclusive)**:
+- **Model**: Google SigLIP2 ViT-SO400M (`google/siglip2-so400m-patch14-384`)
   - +19-29% accuracy improvement over CLIP
   - Better visual understanding for material search
   - Exclusive model - no CLIP fallback for dimensional consistency
 - **Embedding Dimension**: 1152D per embedding
 - **5 Embedding Types Per Image**:
-  1. **Visual** (1152D): General visual features from SigLIP image encoder
-  2. **Color** (1152D): Text-guided SigLIP embedding optimized for color matching
-  3. **Texture** (1152D): Text-guided SigLIP embedding optimized for texture matching
-  4. **Style** (512D): Same base embedding, optimized for style matching
-  5. **Material** (512D): Same base embedding, optimized for material type matching
+  1. **Visual** (1152D): General visual features from SigLIP2 image encoder
+  2. **Color** (1152D): Text-guided SigLIP2 embedding optimized for color matching
+  3. **Texture** (1152D): Text-guided SigLIP2 embedding optimized for texture matching
+  4. **Style** (1152D): Text-guided SigLIP2 embedding optimized for style matching
+  5. **Material** (1152D): Text-guided SigLIP2 embedding optimized for material type matching
 
 **Technical Details**:
 - Uses SigLIP exclusively for all visual embeddings
@@ -334,9 +334,12 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - All embeddings use siglip-so400m-patch14-384 model
 
 **Storage**:
-- Saves to `document_images` table (PostgreSQL)
-- Saves to `embeddings` table (PostgreSQL) - **CRITICAL**: Saves here FIRST
-- Upserts to VECS collections (vector search) - After database save
+- Saves to `document_images` table (PostgreSQL) with embedding columns:
+  - visual_clip_512 (CLIP base embedding)
+  - color_siglip_1152 (SigLIP color embedding)
+  - texture_siglip_1152 (SigLIP texture embedding)
+  - style_siglip_1152 (SigLIP style embedding)
+  - material_siglip_1152 (SigLIP material embedding)
 
 **Request**:
 ```json

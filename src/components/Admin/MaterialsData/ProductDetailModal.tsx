@@ -34,7 +34,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     specifications: {},
     images: [], // Will be loaded by the unified modal
     tags: [],
-    pricing: {},
+    pricing: {
+      retail: 0,
+      wholesale: 0,
+      currency: 'EUR'
+    },
   };
 
   return (

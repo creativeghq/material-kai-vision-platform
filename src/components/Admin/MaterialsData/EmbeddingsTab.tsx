@@ -65,31 +65,38 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      let query = supabase
-        .from('embeddings')
-        .select('*', { count: 'exact' })
-        .eq('workspace_id', workspaceId);
+      // Query text embeddings from document_chunks
+      let textQuery = supabase
+        .from('document_chunks')
+        .select('id, chunk_text, text_embedding, created_at, document_id, documents!inner(workspace_id, job_id)', { count: 'exact' })
+        .eq('documents.workspace_id', workspaceId)
+        .not('text_embedding', 'is', null);
 
-      if (typeFilter !== 'all') {
-        query = query.eq('model_name', typeFilter);
-      }
-
-      if (sourceFilter !== 'all') {
-        query = query.eq('source_type', sourceFilter);
-      }
-
-      // Apply job ID filter
       if (jobIdFilter && jobIdFilter.trim()) {
-        query = query.eq('source_job_id', jobIdFilter.trim());
+        textQuery = textQuery.eq('documents.job_id', jobIdFilter.trim());
       }
 
-      const { data, error, count } = await query
+      const { data: textData, error: textError, count: textCount } = await textQuery
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      if (error) throw error;
-      setEmbeddings(data || []);
-      setTotalCount(count || 0);
+      if (textError) throw textError;
+
+      // Transform to unified format
+      const transformedData = (textData || []).map(chunk => ({
+        id: chunk.id,
+        source_type: 'text',
+        model_name: 'voyage-3.5',
+        embedding_dimension: 1024,
+        created_at: chunk.created_at,
+        source_id: chunk.id,
+        source_text: chunk.chunk_text?.substring(0, 200) + '...',
+        workspace_id: workspaceId,
+        source_job_id: chunk.documents?.job_id
+      }));
+
+      setEmbeddings(transformedData);
+      setTotalCount(textCount || 0);
     } catch (error) {
       console.error('Failed to load embeddings:', error);
       toast({
@@ -147,9 +154,9 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Models</SelectItem>
-                  <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
-                  <SelectItem value="text-embedding-ada-002">text-embedding-ada-002</SelectItem>
-                  <SelectItem value="voyage-3">voyage-3</SelectItem>
+                  <SelectItem value="voyage-3.5">voyage-3.5 (Text)</SelectItem>
+                  <SelectItem value="clip">CLIP (Images)</SelectItem>
+                  <SelectItem value="siglip">SigLIP (Images)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -185,7 +192,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                       {getSourceBadge(emb.source_type)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{emb.dimensions || emb.embedding?.length || 0}</Badge>
+                      <Badge variant="outline">{emb.embedding_dimension || 0}</Badge>
                     </TableCell>
                     <TableCell>
                       {new Date(emb.created_at).toLocaleDateString()}

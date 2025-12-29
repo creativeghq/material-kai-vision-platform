@@ -435,15 +435,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-xs text-gray-600 mb-1">Retail Price</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {product.pricing.currency === 'EUR' ? '€' : '$'}
-                      {product.pricing.retail.toFixed(2)}
+                      {product.pricing?.currency === 'EUR' ? '€' : '$'}
+                      {(product.pricing?.retail || 0).toFixed(2)}
                     </p>
                   </div>
                   <div className="bg-gray-50 p-3 rounded-lg">
                     <p className="text-xs text-gray-600 mb-1">Wholesale</p>
                     <p className="text-xl font-bold text-gray-900">
-                      {product.pricing.currency === 'EUR' ? '€' : '$'}
-                      {product.pricing.wholesale.toFixed(2)}
+                      {product.pricing?.currency === 'EUR' ? '€' : '$'}
+                      {(product.pricing?.wholesale || 0).toFixed(2)}
                     </p>
                   </div>
                 </div>

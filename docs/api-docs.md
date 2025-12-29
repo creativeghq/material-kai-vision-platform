@@ -22,15 +22,15 @@ The multi-vector search has been **significantly enhanced** to be the single com
 
 ### What's New
 
-✅ **6 Specialized Embeddings** (SigLIP-based)
-- text_embedding_1536 (20%) - Semantic understanding (OpenAI)
-- visual_1152 (20%) - Visual similarity (SigLIP, VECS: image_siglip_embeddings)
-- color_siglip_1152 (15%) - Color palette matching (SigLIP text-guided, VECS: image_color_embeddings)
-- texture_siglip_1152 (15%) - Texture pattern matching (SigLIP text-guided, VECS: image_texture_embeddings)
-- style_siglip_1152 (15%) - Design style matching (SigLIP text-guided, VECS: image_style_embeddings)
-- material_siglip_1152 (15%) - Material type matching (SigLIP text-guided, VECS: image_material_embeddings)
+✅ **6 Specialized Embeddings** (SigLIP2-based)
+- text_embedding_1024 (20%) - Semantic understanding (Voyage AI, stored in document_chunks.text_embedding)
+- visual_clip_512 (20%) - Visual similarity (CLIP, stored in document_images.visual_clip_512)
+- color_siglip_1152 (15%) - Color palette matching (SigLIP2 text-guided, stored in document_images.color_siglip_1152)
+- texture_siglip_1152 (15%) - Texture pattern matching (SigLIP2 text-guided, stored in document_images.texture_siglip_1152)
+- style_siglip_1152 (15%) - Design style matching (SigLIP2 text-guided, stored in document_images.style_siglip_1152)
+- material_siglip_1152 (15%) - Material type matching (SigLIP2 text-guided, stored in document_images.material_siglip_1152)
 
-**Note**: Embeddings stored in `embeddings` table + VECS collections (not document_images columns)
+**Note**: Embeddings stored directly in table columns (document_chunks.text_embedding, document_images.visual_clip_512, etc.)
 
 ✅ **JSONB Metadata Filtering**
 - Filter by material properties (finish, dimensions, etc.)
