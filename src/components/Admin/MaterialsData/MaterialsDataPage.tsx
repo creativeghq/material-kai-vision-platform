@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, Grid3X3, Image as ImageIcon, Database, Filter } from 'lucide-react';
+import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
@@ -9,6 +9,7 @@ import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
 import { ImagesTab } from './ImagesTab';
 import { EmbeddingsTab } from './EmbeddingsTab';
+import { RelationsTab } from './RelationsTab';
 import { supabase } from '@/integrations/supabase/client';
 
 export const MaterialsDataPage: React.FC = () => {
@@ -150,7 +151,7 @@ export const MaterialsDataPage: React.FC = () => {
         </div>
 
         <Tabs defaultValue="products" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="h-4 w-4" />
               Products ({stats.products})
@@ -166,6 +167,10 @@ export const MaterialsDataPage: React.FC = () => {
             <TabsTrigger value="embeddings" className="flex items-center gap-2">
               <Database className="h-4 w-4" />
               Embeddings ({stats.embeddings})
+            </TabsTrigger>
+            <TabsTrigger value="relations" className="flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              Relations
             </TabsTrigger>
           </TabsList>
 
@@ -183,6 +188,10 @@ export const MaterialsDataPage: React.FC = () => {
 
           <TabsContent value="embeddings">
             <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
+          </TabsContent>
+
+          <TabsContent value="relations">
+            <RelationsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
         </Tabs>
       </div>

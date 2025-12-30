@@ -75,7 +75,7 @@ export function LogViewer() {
         params.append('search', searchTerm);
       }
 
-      const response = await fetch(`/api/admin/logs?${params.toString()}`);
+      const response = await fetch(`/admin/logs?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch logs');
@@ -100,7 +100,7 @@ export function LogViewer() {
   // Clear all logs
   const clearAllLogs = async () => {
     try {
-      const response = await fetch('/api/admin/logs', {
+      const response = await fetch('/admin/logs', {
         method: 'DELETE'
       });
       

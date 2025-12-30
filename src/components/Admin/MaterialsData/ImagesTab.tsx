@@ -115,7 +115,32 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
   };
 
   const handleViewImage = async (image: any) => {
-    setSelectedImage(image);
+    // Load full image data with relations
+    const { data: fullImageData, error } = await supabase
+      .from('document_images')
+      .select(`
+        *,
+        document_chunks!inner(
+          id,
+          chunk_text,
+          page_number,
+          products(
+            id,
+            name,
+            source_type
+          )
+        )
+      `)
+      .eq('id', image.id)
+      .single();
+
+    if (error) {
+      console.error('[ImagesTab] Error loading full image data:', error);
+      setSelectedImage(image);
+    } else {
+      setSelectedImage(fullImageData);
+    }
+
     await loadImageEmbeddings(image.id);
   };
 
@@ -431,6 +456,51 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">Resolution:</span>
                           <span className="text-xs font-medium">{selectedImage.metadata.resolution_dpi} DPI</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Relations Section */}
+                {selectedImage.document_chunks && selectedImage.document_chunks.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Related Data</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Related Chunks */}
+                      <div>
+                        <h5 className="text-xs font-semibold text-muted-foreground mb-2">
+                          Chunks ({selectedImage.document_chunks.length})
+                        </h5>
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {selectedImage.document_chunks.slice(0, 3).map((chunk: any) => (
+                            <div key={chunk.id} className="text-xs p-2 bg-muted rounded">
+                              {chunk.chunk_text?.substring(0, 100)}...
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Related Products */}
+                      {selectedImage.document_chunks.some((chunk: any) => chunk.products && chunk.products.length > 0) && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-muted-foreground mb-2">
+                            Products
+                          </h5>
+                          <div className="space-y-1">
+                            {selectedImage.document_chunks.map((chunk: any) =>
+                              chunk.products?.map((product: any) => (
+                                <div key={product.id} className="flex items-center justify-between text-xs p-2 bg-muted rounded">
+                                  <span>{product.name}</span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {product.source_type}
+                                  </Badge>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
                       )}
                     </CardContent>
