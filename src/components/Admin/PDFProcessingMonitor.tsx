@@ -31,16 +31,17 @@ export const PDFProcessingMonitor: React.FC = () => {
         const [
           { count: totalDocuments },
           { count: totalChunks },
-          { count: totalEmbeddings },
           { count: totalImages },
           { count: totalProducts },
         ] = await Promise.all([
           supabase.from('documents').select('*', { count: 'exact', head: true }),
           supabase.from('document_chunks').select('*', { count: 'exact', head: true }),
-          supabase.from('embeddings').select('*', { count: 'exact', head: true }),
           supabase.from('images').select('*', { count: 'exact', head: true }),
           supabase.from('products').select('*', { count: 'exact', head: true }),
         ]);
+
+        // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
+        const totalEmbeddings = totalChunks;
 
         // Calculate rates and averages
         const embeddingSuccessRate = totalChunks > 0 ? (totalEmbeddings / totalChunks) * 100 : 0;

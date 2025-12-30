@@ -37,16 +37,17 @@ export const UnifiedProcessingMonitor: React.FC = () => {
         const [
           { count: pdfDocuments },
           { count: pdfChunks },
-          { count: pdfEmbeddings },
           { count: pdfImages },
           { count: pdfProducts },
         ] = await Promise.all([
           supabase.from('documents').select('*', { count: 'exact', head: true }),
           supabase.from('document_chunks').select('*', { count: 'exact', head: true }),
-          supabase.from('embeddings').select('*', { count: 'exact', head: true }),
           supabase.from('images').select('*', { count: 'exact', head: true }),
           supabase.from('products').select('*', { count: 'exact', head: true }),
         ]);
+
+        // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
+        const pdfEmbeddings = pdfChunks;
 
         // Fetch XML metrics
         const { data: xmlProducts, count: totalXMLProducts } = await supabase
@@ -64,9 +65,8 @@ export const UnifiedProcessingMonitor: React.FC = () => {
           : { data: [] };
 
         const xmlChunkIds = xmlChunks?.map((c: any) => c.id) || [];
-        const { count: totalXMLEmbeddings } = xmlChunkIds.length > 0
-          ? await supabase.from('embeddings').select('*', { count: 'exact', head: true }).in('chunk_id', xmlChunkIds)
-          : { count: 0 };
+        // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
+        const totalXMLEmbeddings = totalXMLChunks;
 
         const [
           { count: totalXMLDocuments },
@@ -92,9 +92,8 @@ export const UnifiedProcessingMonitor: React.FC = () => {
           : { data: [] };
 
         const scrapedChunkIds = scrapedChunks?.map((c: any) => c.id) || [];
-        const { count: totalScrapedEmbeddings } = scrapedChunkIds.length > 0
-          ? await supabase.from('embeddings').select('*', { count: 'exact', head: true }).in('chunk_id', scrapedChunkIds)
-          : { count: 0 };
+        // Embeddings are 1:1 with chunks (stored in VECS, not Supabase table)
+        const totalScrapedEmbeddings = totalScrapedChunks;
 
         const [
           { count: totalScrapedPages },

@@ -240,7 +240,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               No images found
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {filteredImages.map((image) => (
                 <Card key={image.id} className="overflow-hidden flex flex-col">
                   <CardContent className="p-0 flex flex-col h-full">

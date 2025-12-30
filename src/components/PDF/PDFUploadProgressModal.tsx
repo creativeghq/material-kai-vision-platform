@@ -717,28 +717,28 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         });
                       }
 
-                      // Check for CLIP usage
+                      // Check for SigLIP visual embeddings
                       const clipStep = job.steps.find(
                         (s) => s.id === 'enhanced-clip-integration',
                       );
                       if (clipStep?.status === 'completed') {
                         aiModels.push({
-                          name: 'OpenAI CLIP',
+                          name: 'Google SigLIP ViT-SO400M',
                           purpose:
-                            'Visual embeddings and image-product similarity matching',
+                            '1152D visual embeddings for image-product similarity matching',
                           status: '✓ Used',
                           icon: <Eye className="h-3 w-3 text-green-600" />,
                         });
                       }
 
-                      // Check for OpenAI Embeddings
+                      // Check for Voyage AI Text Embeddings
                       const embeddingStep = job.steps.find(
                         (s) => s.id === 'embedding-generation',
                       );
                       if (embeddingStep?.status === 'completed') {
                         aiModels.push({
-                          name: 'OpenAI text-embedding-3-small',
-                          purpose: '1536D text embeddings for semantic search',
+                          name: 'Voyage AI voyage-3.5',
+                          purpose: '1024D text embeddings for semantic search',
                           status: '✓ Used',
                           icon: <Zap className="h-3 w-3 text-yellow-600" />,
                         });
