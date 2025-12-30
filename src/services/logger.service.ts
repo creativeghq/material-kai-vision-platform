@@ -325,7 +325,7 @@ class LoggerService {
       };
 
       // Send to backend (non-blocking)
-      fetch('/admin/logs/frontend', {
+      fetch('/api/admin/logs/frontend', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
