@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
 import {
   Card,
   CardContent,
@@ -12,9 +13,11 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { TempFileCleanupModal } from './TempFileCleanupModal';
 import {
   RefreshCw,
   AlertTriangle,
+  AlertCircle,
   CheckCircle,
   Clock,
   Zap,
@@ -154,6 +157,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
   const [expandedStages, setExpandedStages] = useState<Set<number>>(new Set());
   const [selectedTab, setSelectedTab] = useState<'all' | 'pdf_processing' | 'web_scraping' | 'xml_import'>('all');
+  const [showDeleteJobModal, setShowDeleteJobModal] = useState(false);
+  const [deleteJobId, setDeleteJobId] = useState('');
+  const [showTempCleanupModal, setShowTempCleanupModal] = useState(false);
 
   // Debug log
   console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
@@ -175,8 +181,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     console.log('fetchJobDetails called with job:', job);
     try {
       setLoadingCheckpoints(true);
-      setSelectedJob(job);
-      console.log('Selected job set:', job);
 
       // Fetch fresh job data
       const { data: jobData, error: jobError } = await supabase
@@ -190,17 +194,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         throw jobError;
       }
 
-      // Update selected job with fresh data
-      // Only update if data actually changed to prevent modal blinking
+      // Update selected job with fresh data using deep comparison to prevent modal blinking
       if (jobData) {
         setSelectedJob(prev => {
+          // If no previous job, set the new one
+          if (!prev) return jobData as BackgroundJob;
+
           // Deep comparison of relevant fields to prevent unnecessary re-renders
-          if (prev &&
-              prev.status === jobData.status &&
+          if (prev.status === jobData.status &&
               prev.progress === jobData.progress &&
               JSON.stringify(prev.metadata) === JSON.stringify(jobData.metadata)) {
-            return prev; // No change, keep same reference
+            return prev; // No change, keep same reference to prevent modal blink
           }
+
+          console.log('Selected job updated with new data');
           return jobData as BackgroundJob;
         });
       }
@@ -218,7 +225,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       }
 
       console.log('Checkpoints fetched:', checkpoints);
-      setJobCheckpoints(checkpoints || []);
+
+      // Update checkpoints with deep comparison to prevent unnecessary re-renders
+      setJobCheckpoints(prev => {
+        const newCheckpoints = checkpoints || [];
+        // Only update if checkpoints actually changed
+        if (JSON.stringify(prev) === JSON.stringify(newCheckpoints)) {
+          return prev; // No change, keep same reference
+        }
+        return newCheckpoints;
+      });
     } catch (error) {
       console.error('Error fetching job details:', error);
     } finally {
@@ -531,7 +547,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           return jobData as BackgroundJob;
         });
 
-        // Refresh checkpoints
+        // Refresh checkpoints with deep comparison to prevent unnecessary re-renders
         const { data: checkpoints } = await supabase
           .from('job_checkpoints')
           .select('*')
@@ -539,7 +555,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           .order('created_at', { ascending: true });
 
         if (checkpoints) {
-          setJobCheckpoints(checkpoints);
+          setJobCheckpoints(prev => {
+            // Only update if checkpoints actually changed
+            if (JSON.stringify(prev) === JSON.stringify(checkpoints)) {
+              return prev; // No change, keep same reference
+            }
+            return checkpoints;
+          });
         }
       } catch (error) {
         console.error('Error refreshing selected job:', error);
@@ -552,18 +574,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     return () => clearInterval(interval);
   }, [selectedJob, autoRefresh]);
 
-  // Auto-refresh selected job details when modal is open and job is processing
-  useEffect(() => {
-    if (!selectedJob || (selectedJob.status !== 'processing' && selectedJob.status !== 'pending')) {
-      return;
-    }
-
-    const interval = setInterval(() => {
-      fetchJobDetails(selectedJob);
-    }, 3000); // Refresh every 3 seconds for active jobs
-
-    return () => clearInterval(interval);
-  }, [selectedJob]);
+  // ✅ REMOVED: Duplicate polling interval that was causing modal blink
+  // The refreshSelectedJob interval (lines 505-553) already handles this with proper deep comparison
 
   // Handle jobId query parameter - auto-open modal for specific job
   useEffect(() => {
@@ -636,14 +648,85 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  // Helper function to calculate elapsed time for a job
+  const getElapsedTime = (job: BackgroundJob): string => {
+    // For completed jobs, show total duration
+    if (job.status === 'completed' && job.started_at && job.completed_at) {
+      const start = new Date(job.started_at).getTime();
+      const end = new Date(job.completed_at).getTime();
+      const seconds = Math.floor((end - start) / 1000);
+      return formatTime(seconds);
+    }
+
+    // For failed jobs, show time until failure
+    if (job.status === 'failed' && job.started_at && job.failed_at) {
+      const start = new Date(job.started_at).getTime();
+      const end = new Date(job.failed_at).getTime();
+      const seconds = Math.floor((end - start) / 1000);
+      return formatTime(seconds);
+    }
+
+    // For interrupted jobs, show time until interruption
+    if (job.status === 'interrupted' && job.started_at && job.interrupted_at) {
+      const start = new Date(job.started_at).getTime();
+      const end = new Date(job.interrupted_at).getTime();
+      const seconds = Math.floor((end - start) / 1000);
+      return formatTime(seconds);
+    }
+
+    // For running jobs, show elapsed time since start
+    if ((job.status === 'processing' || job.status === 'retrying') && job.started_at) {
+      const start = new Date(job.started_at).getTime();
+      const now = Date.now();
+      const seconds = Math.floor((now - start) / 1000);
+      return formatTime(seconds);
+    }
+
+    // For pending jobs, show time since creation
+    if (job.status === 'pending') {
+      return formatDistanceToNow(new Date(job.created_at), { addSuffix: true });
+    }
+
+    return 'N/A';
+  };
+
+  // Helper function to format values for display (handles arrays and objects)
+  const formatValue = (value: any): string => {
+    if (value === null || value === undefined) {
+      return 'N/A';
+    }
+
+    // Handle arrays - convert to comma-separated string
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '[]';
+      // For arrays of primitives, join with commas
+      if (value.every(item => typeof item !== 'object')) {
+        return value.join(', ');
+      }
+      // For arrays of objects, show count
+      return `[${value.length} items]`;
+    }
+
+    // Handle objects - show key count or stringify if small
+    if (typeof value === 'object') {
+      const str = JSON.stringify(value);
+      if (str.length <= 50) return str;
+      return `{${Object.keys(value).length} fields}`;
+    }
+
+    // Handle primitives
+    return String(value);
+  };
+
   const handleCancelJob = async (jobId: string) => {
-    if (!confirm('Are you sure you want to cancel this job? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to cancel this job? All partial data (chunks, embeddings, images, products, files) will be deleted. This action cannot be undone.')) {
       return;
     }
 
     setCancellingJob(jobId);
     try {
-      const response = await fetch(`https://v1api.materialshub.gr/api/rag/documents/jobs/${jobId}`, {
+      // Use admin endpoint with cleanup=true to delete all partial data
+      const response = await fetch(`https://v1api.materialshub.gr/api/admin/jobs/${jobId}?cleanup=true`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -652,6 +735,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       if (!response.ok) {
         throw new Error(`Failed to cancel job: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Show cleanup stats if available
+      if (result.cleanup_stats) {
+        console.log('Cleanup stats:', result.cleanup_stats);
       }
 
       // Refresh the job list
@@ -672,18 +762,32 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   const handleClearQueue = async () => {
-    const pendingAndFailedJobs = jobs.filter(
-      (job) => job.status === 'pending' || job.status === 'failed'
+    // Include interrupted jobs in the clear queue operation
+    const jobsToClear = jobs.filter(
+      (job) => job.status === 'pending' || job.status === 'failed' || job.status === 'interrupted'
     );
 
-    if (pendingAndFailedJobs.length === 0) {
-      alert('No pending or failed jobs to clear');
+    if (jobsToClear.length === 0) {
+      alert('No pending, failed, or interrupted jobs to clear');
       return;
     }
 
+    // Count jobs by status for confirmation message
+    const statusCounts = {
+      pending: jobsToClear.filter(j => j.status === 'pending').length,
+      failed: jobsToClear.filter(j => j.status === 'failed').length,
+      interrupted: jobsToClear.filter(j => j.status === 'interrupted').length,
+    };
+
+    const statusMessage = [
+      statusCounts.pending > 0 && `${statusCounts.pending} pending`,
+      statusCounts.failed > 0 && `${statusCounts.failed} failed`,
+      statusCounts.interrupted > 0 && `${statusCounts.interrupted} interrupted`,
+    ].filter(Boolean).join(', ');
+
     if (
       !confirm(
-        `Are you sure you want to clear ${pendingAndFailedJobs.length} pending/failed jobs? This action cannot be undone.`
+        `Are you sure you want to clear ${jobsToClear.length} jobs (${statusMessage})? This action cannot be undone.`
       )
     ) {
       return;
@@ -694,7 +798,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     let failCount = 0;
 
     try {
-      for (const job of pendingAndFailedJobs) {
+      for (const job of jobsToClear) {
         try {
           const response = await fetch(
             `https://v1api.materialshub.gr/api/rag/documents/jobs/${job.id}`,
@@ -731,6 +835,54 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
+  const handleDeleteJobById = async () => {
+    if (!deleteJobId.trim()) {
+      alert('Please enter a job ID');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete job ${deleteJobId} and ALL its associated data? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://v1api.materialshub.gr/api/rag/documents/jobs/${deleteJobId.trim()}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Failed to delete job: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      // Show success message with stats
+      const stats = result.stats || {};
+      const statsMessage = [
+        stats.chunks_deleted > 0 && `${stats.chunks_deleted} chunks`,
+        stats.embeddings_deleted > 0 && `${stats.embeddings_deleted} embeddings`,
+        stats.images_deleted > 0 && `${stats.images_deleted} images`,
+        stats.products_deleted > 0 && `${stats.products_deleted} products`,
+        stats.storage_files_deleted > 0 && `${stats.storage_files_deleted} storage files`,
+      ].filter(Boolean).join(', ');
+
+      alert(`Job deleted successfully!\n\nDeleted: ${statsMessage || 'Job record'}`);
+
+      // Close modal and refresh
+      setShowDeleteJobModal(false);
+      setDeleteJobId('');
+      await fetchQueueData();
+
+    } catch (error) {
+      console.error('Error deleting job:', error);
+      alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm('Are you sure you want to permanently delete this job? This action cannot be undone.')) {
       return;
@@ -763,6 +915,54 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     } finally {
       setDeletingJob(null);
     }
+  };
+
+  // Helper function to calculate stage duration
+  const getStageDuration = (currentCheckpoint: any, previousCheckpoint: any | null): string => {
+    if (!currentCheckpoint) return 'N/A';
+
+    try {
+      const currentTime = new Date(currentCheckpoint.created_at).getTime();
+
+      // If there's a previous checkpoint, calculate duration from it
+      if (previousCheckpoint) {
+        const previousTime = new Date(previousCheckpoint.created_at).getTime();
+        const durationSeconds = Math.floor((currentTime - previousTime) / 1000);
+        return formatTime(durationSeconds);
+      }
+
+      // If this is the first checkpoint, calculate from job start
+      if (selectedJob?.started_at) {
+        const startTime = new Date(selectedJob.started_at).getTime();
+        const durationSeconds = Math.floor((currentTime - startTime) / 1000);
+        return formatTime(durationSeconds);
+      }
+
+      return 'N/A';
+    } catch (error) {
+      return 'N/A';
+    }
+  };
+
+  // Live timer component for running jobs
+  const LiveTimer: React.FC<{ job: BackgroundJob }> = ({ job }) => {
+    const [, setTick] = useState(0);
+
+    useEffect(() => {
+      // Only update for running jobs
+      if (job.status !== 'processing' && job.status !== 'retrying') {
+        return;
+      }
+
+      // Update every second
+      const interval = setInterval(() => {
+        setTick(prev => prev + 1);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }, [job.status]);
+
+    return <span>{getElapsedTime(job)}</span>;
   };
 
   if (loading) {
@@ -943,6 +1143,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     )}
                   </button>
                   <button
+                    onClick={() => setShowDeleteJobModal(true)}
+                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm"
+                    title="Delete a specific job by ID"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 inline mr-1.5" />
+                    Delete Job by ID
+                  </button>
+                  <button
+                    onClick={() => setShowTempCleanupModal(true)}
+                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm"
+                    title="Clean up temporary files to free disk space"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 inline mr-1.5" />
+                    Cleanup Temp Files
+                  </button>
+                  <button
                     onClick={() => setAutoRefresh(!autoRefresh)}
                     className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
                       autoRefresh
@@ -1068,8 +1284,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="text-sm font-medium text-slate-900 group-hover:text-primary transition">
                             {job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                           </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            {formatDate(job.created_at)} | Progress: {job.progress}%
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                            <span>{formatDate(job.created_at)}</span>
+                            <span>•</span>
+                            <span>Progress: {job.progress}%</span>
+                            <span>•</span>
+                            <span className="font-medium">
+                              <LiveTimer job={job} />
+                            </span>
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
@@ -1294,8 +1516,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="text-sm font-medium text-slate-900 group-hover:text-primary transition">
                             {job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                           </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            {formatDate(job.created_at)} | Progress: {job.progress}%
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                            <span>{formatDate(job.created_at)}</span>
+                            <span>•</span>
+                            <span>Progress: {job.progress}%</span>
+                            <span>•</span>
+                            <span className="font-medium">
+                              <LiveTimer job={job} />
+                            </span>
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
@@ -1481,8 +1709,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="text-sm font-medium text-slate-900 group-hover:text-primary transition">
                             {job.metadata?.source_url || job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                           </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            {formatDate(job.created_at)} | Progress: {job.progress}%
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                            <span>{formatDate(job.created_at)}</span>
+                            <span>•</span>
+                            <span>Progress: {job.progress}%</span>
+                            <span>•</span>
+                            <span className="font-medium">
+                              <LiveTimer job={job} />
+                            </span>
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
@@ -1668,8 +1902,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <div className="text-sm font-medium text-slate-900 group-hover:text-primary transition">
                             {job.metadata?.source_name || job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                           </div>
-                          <div className="text-xs text-slate-500 mt-1">
-                            {formatDate(job.created_at)} | Progress: {job.progress}%
+                          <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                            <span>{formatDate(job.created_at)}</span>
+                            <span>•</span>
+                            <span>Progress: {job.progress}%</span>
+                            <span>•</span>
+                            <span className="font-medium">
+                              <LiveTimer job={job} />
+                            </span>
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
@@ -1750,10 +1990,34 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-primary" />
-              Job Details: {selectedJob?.metadata?.filename || selectedJob?.document_id?.slice(0, 8) || 'Unknown'}
+              Processing Document
             </DialogTitle>
-            <DialogDescription>
-              Complete pipeline workflow with all stages, metrics, and AI models used
+            <DialogDescription className="space-y-1">
+              <div className="flex flex-col gap-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-foreground">Job ID:</span>
+                  <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono">
+                    {selectedJob?.id?.slice(0, 8)}...
+                  </code>
+                </div>
+                {selectedJob?.document_id && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground">Document ID:</span>
+                    <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono">
+                      {selectedJob.document_id.slice(0, 8)}...
+                    </code>
+                  </div>
+                )}
+                {selectedJob?.metadata?.filename && (
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground">Filename:</span>
+                    <span className="text-xs">{selectedJob.metadata.filename}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-muted-foreground mt-2">
+                Complete pipeline workflow with all stages, metrics, and AI models used
+              </p>
             </DialogDescription>
           </DialogHeader>
 
@@ -1837,6 +2101,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Interruption Reason Alert */}
+              {selectedJob?.status === 'interrupted' && selectedJob?.error && (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2 text-orange-800">
+                      <AlertCircle className="h-5 w-5" />
+                      Job Interrupted
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="text-sm text-orange-900">
+                        <span className="font-semibold">Reason:</span> {selectedJob.error}
+                      </div>
+                      {selectedJob.interrupted_at && (
+                        <div className="text-xs text-orange-700">
+                          Interrupted at: {formatDate(selectedJob.interrupted_at)}
+                        </div>
+                      )}
+                      <div className="text-xs text-orange-600 mt-2 p-2 bg-orange-100 rounded">
+                        💡 <strong>Tip:</strong> This job was stopped before completion. You can delete it or mark it as cancelled.
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Processing Metrics */}
               <Card>
@@ -1990,12 +2281,21 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                    {PROCESSING_STAGES.map((stage) => {
+                    {PROCESSING_STAGES.map((stage, stageIndex) => {
                       // Find if this stage has a checkpoint
                       const checkpoint = jobCheckpoints.find(
                         (cp) => cp.stage.toLowerCase() === stage.checkpoint.toLowerCase()
                       );
                       const isCompleted = !!checkpoint;
+
+                      // Find previous checkpoint for duration calculation
+                      const previousCheckpoint = stageIndex > 0
+                        ? jobCheckpoints.find(cp =>
+                            cp.stage.toLowerCase() === PROCESSING_STAGES[stageIndex - 1].checkpoint.toLowerCase()
+                          )
+                        : null;
+
+                      const stageDuration = isCompleted ? getStageDuration(checkpoint, previousCheckpoint) : null;
 
                       // Check if this stage was skipped (job completed but this checkpoint doesn't exist)
                       const isSkipped = selectedJob?.status === 'completed' && !isCompleted &&
@@ -2065,6 +2365,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  {checkpoint && stageDuration && (
+                                    <div className="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                                      ⏱️ {stageDuration}
+                                    </div>
+                                  )}
                                   {checkpoint && (
                                     <div className="text-xs text-muted-foreground">
                                       {formatDate(checkpoint.created_at)}
@@ -2091,7 +2396,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   {checkpointData.products_detected && (
                                     <span>📦 {checkpointData.products_detected} products</span>
                                   )}
-                                  {checkpointData.chunks_created && (
+                                  {/* Chunking step (step 4) - show chunks and embedding model */}
+                                  {stage.id === 4 && checkpointData.chunks_created && (
+                                    <>
+                                      <span>📄 {checkpointData.chunks_created} chunks</span>
+                                      <span>🔢 text-embedding-3-small (1536D)</span>
+                                    </>
+                                  )}
+                                  {/* Text Embeddings step (step 5) - show embedding details */}
+                                  {stage.id === 5 && (checkpointData.text_embeddings || checkpointData.text_embeddings_generated) && (
+                                    <>
+                                      <span>🔢 {checkpointData.text_embeddings || checkpointData.text_embeddings_generated} embeddings</span>
+                                      <span>📐 1536 dimensions</span>
+                                    </>
+                                  )}
+                                  {/* Other steps - show chunks if not step 4 */}
+                                  {stage.id !== 4 && checkpointData.chunks_created && (
                                     <span>📄 {checkpointData.chunks_created} chunks</span>
                                   )}
                                   {checkpointData.images_saved && (
@@ -2127,12 +2447,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 {Object.keys(checkpointData).length > 0 && (
                                   <div>
                                     <h5 className="text-xs font-semibold text-muted-foreground mb-2">Stage Output Data</h5>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs p-2 rounded">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs p-2 rounded">
                                       {Object.entries(checkpointData).map(([key, value]) => (
-                                        <div key={key}>
+                                        <div key={key} className="break-words">
                                           <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                          <span className="ml-1 font-medium transition-all duration-300">
-                                            {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value)}
+                                          <span className="ml-1 font-medium transition-all duration-300 break-words">
+                                            {formatValue(value)}
                                           </span>
                                         </div>
                                       ))}
@@ -2144,12 +2464,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 {Object.keys(metadata).length > 0 && (
                                   <div>
                                     <h5 className="text-xs font-semibold text-muted-foreground mb-2">Processing Metadata</h5>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs p-2 rounded">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs p-2 rounded">
                                       {Object.entries(metadata).map(([key, value]) => (
-                                        <div key={key}>
+                                        <div key={key} className="break-words">
                                           <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                          <span className="ml-1 font-medium transition-all duration-300">
-                                            {typeof value === 'object' ? JSON.stringify(value).slice(0, 50) : String(value)}
+                                          <span className="ml-1 font-medium transition-all duration-300 break-words">
+                                            {formatValue(value)}
                                           </span>
                                         </div>
                                       ))}
@@ -2203,6 +2523,84 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Job by ID Modal */}
+      <Dialog open={showDeleteJobModal} onOpenChange={setShowDeleteJobModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-orange-600" />
+              Delete Job by ID
+            </DialogTitle>
+            <DialogDescription>
+              Enter the job ID to delete. This will remove the job and ALL associated data including chunks, embeddings, images, products, and storage files.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="deleteJobId" className="block text-sm font-medium mb-2">
+                Job ID
+              </label>
+              <input
+                id="deleteJobId"
+                type="text"
+                value={deleteJobId}
+                onChange={(e) => setDeleteJobId(e.target.value)}
+                placeholder="Enter job ID (e.g., 123e4567-e89b-12d3-a456-426614174000)"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleDeleteJobById();
+                  }
+                }}
+              />
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-orange-800">
+                  <p className="font-semibold mb-1">⚠️ Warning: This action cannot be undone!</p>
+                  <p className="text-xs">This will permanently delete:</p>
+                  <ul className="text-xs mt-1 ml-4 list-disc space-y-0.5">
+                    <li>Job record</li>
+                    <li>Document record</li>
+                    <li>All chunks and embeddings</li>
+                    <li>All images</li>
+                    <li>All products</li>
+                    <li>Storage files</li>
+                    <li>Checkpoints</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowDeleteJobModal(false);
+                  setDeleteJobId('');
+                }}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md text-sm font-medium transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteJobById}
+                disabled={!deleteJobId.trim()}
+                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4 inline mr-1.5" />
+                Delete Job
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Temp File Cleanup Modal */}
+      <TempFileCleanupModal
+        open={showTempCleanupModal}
+        onOpenChange={setShowTempCleanupModal}
+      />
       </div>
     </div>
   );

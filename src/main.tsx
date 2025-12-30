@@ -4,6 +4,10 @@ import * as Sentry from '@sentry/react';
 
 import App from './App';
 import './index.css';
+import { initializeGlobalErrorHandlers } from './utils/globalErrorHandler';
+
+// Initialize global error handlers (sends errors to backend database)
+initializeGlobalErrorHandlers();
 
 // Initialize Sentry for error tracking and monitoring
 Sentry.init({

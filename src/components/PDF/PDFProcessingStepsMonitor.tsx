@@ -18,6 +18,12 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import {
   usePDFProcessingMonitor,
@@ -395,12 +401,52 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
                 {isExpanded && hasDetails && (
                   <div className="ml-6 pl-6 py-2 border-l-2 border-muted">
                     <div className="space-y-1 text-xs">
-                      {Object.entries(step.metrics!).map(([key, value]) => (
-                        <div key={key} className="flex justify-between">
-                          <span className="text-muted-foreground">{key}:</span>
-                          <span className="font-mono text-foreground">{value}</span>
-                        </div>
-                      ))}
+                      {Object.entries(step.metrics!).map(([key, value]) => {
+                        // Special handling for product_names array
+                        if (key === 'product_names' && Array.isArray(value)) {
+                          const productNames = value as string[];
+                          const displayNames = productNames.slice(0, 2);
+                          const hasMore = productNames.length > 2;
+
+                          return (
+                            <div key={key} className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Products:</span>
+                              <div className="font-mono text-foreground flex items-center gap-1">
+                                <span>{displayNames.join(', ')}</span>
+                                {hasMore && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="text-blue-600 cursor-help underline decoration-dotted">
+                                          +{productNames.length - 2} more
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="max-w-xs">
+                                        <div className="space-y-1">
+                                          <p className="font-semibold text-xs mb-2">All Products ({productNames.length}):</p>
+                                          <ul className="list-disc list-inside space-y-0.5 text-xs">
+                                            {productNames.map((name, idx) => (
+                                              <li key={idx}>{name}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Default rendering for other metrics
+                        return (
+                          <div key={key} className="flex justify-between">
+                            <span className="text-muted-foreground">{key}:</span>
+                            <span className="font-mono text-foreground">{value}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

@@ -193,16 +193,16 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {filteredImages.map((image) => (
-                <Card key={image.id} className="overflow-hidden">
-                  <CardContent className="p-0">
+                <Card key={image.id} className="overflow-hidden flex flex-col">
+                  <CardContent className="p-0 flex flex-col h-full">
                     <img
                       src={image.image_url}
                       alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-48 object-cover flex-shrink-0"
                     />
-                    <div className="p-4 space-y-2">
+                    <div className="p-4 space-y-2 flex-1 flex flex-col">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium truncate flex-1">
+                        <p className="text-sm font-medium truncate flex-1" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
                           {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                         </p>
                         {getSourceBadge(image.source_type)}
@@ -211,14 +211,14 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                         Page {image.page_number}
                       </p>
                       {image.vision_analysis?.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
+                        <p className="text-xs text-muted-foreground line-clamp-2" title={image.vision_analysis.description}>
                           {image.vision_analysis.description}
                         </p>
                       )}
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full"
+                        className="w-full mt-auto"
                         onClick={() => handleViewImage(image)}
                       >
                         <Eye className="h-4 w-4 mr-2" />
@@ -271,7 +271,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
         <Dialog open={true} onOpenChange={() => setSelectedImage(null)}>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
+              <DialogTitle className="break-words">
                 {selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
               </DialogTitle>
             </DialogHeader>
@@ -279,7 +279,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               <img
                 src={selectedImage.image_url}
                 alt={selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
-                className="w-full rounded-lg"
+                className="w-full rounded-lg max-w-full"
               />
 
               <div>
@@ -290,14 +290,14 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               {selectedImage.vision_analysis?.description && (
                 <div>
                   <h4 className="font-semibold mb-2">AI Description (Vision)</h4>
-                  <p className="text-sm">{selectedImage.vision_analysis.description}</p>
+                  <p className="text-sm break-words">{selectedImage.vision_analysis.description}</p>
                 </div>
               )}
 
               {selectedImage.claude_validation?.description && (
                 <div>
                   <h4 className="font-semibold mb-2">AI Validation (Claude)</h4>
-                  <p className="text-sm">{selectedImage.claude_validation.description}</p>
+                  <p className="text-sm break-words">{selectedImage.claude_validation.description}</p>
                 </div>
               )}
 

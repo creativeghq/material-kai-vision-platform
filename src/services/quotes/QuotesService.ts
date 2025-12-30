@@ -305,14 +305,13 @@ export class QuotesService {
   }
 
   /**
-   * Delete a quote (only draft quotes can be deleted)
+   * Delete a quote (users can delete their own quotes, admins can delete any quote)
    */
   async deleteQuote(quoteId: string): Promise<void> {
     const { error } = await supabase
       .from('quotes')
       .delete()
-      .eq('id', quoteId)
-      .eq('status', 'draft');
+      .eq('id', quoteId);
 
     if (error) throw error;
   }
@@ -498,26 +497,38 @@ export class QuotesService {
    * Delete a quote request (and its associated quote)
    * Note: quote_requests may not exist for draft quotes that haven't been submitted
    * Cascade deletes: quote_items, quote_upsells, quote_timeline
+   * Admins can delete any quote, users can only delete their own quotes
    */
   async deleteQuoteRequest(quoteId: string): Promise<void> {
     // Get current user for RLS verification
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    // Verify quote ownership before deletion
-    const { data: quote, error: fetchError } = await supabase
-      .from('quotes')
-      .select('id, user_id')
-      .eq('id', quoteId)
+    // Check if user is admin
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('role_id, roles(name)')
+      .eq('user_id', user.id)
       .single();
 
-    if (fetchError) {
-      console.error('Error fetching quote for deletion:', fetchError);
-      throw new Error('Quote not found');
-    }
+    const isAdmin = userProfile?.roles?.name === 'admin';
 
-    if (quote.user_id !== user.id) {
-      throw new Error('You do not have permission to delete this quote');
+    // If not admin, verify quote ownership
+    if (!isAdmin) {
+      const { data: quote, error: fetchError } = await supabase
+        .from('quotes')
+        .select('id, user_id')
+        .eq('id', quoteId)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching quote for deletion:', fetchError);
+        throw new Error('Quote not found');
+      }
+
+      if (quote.user_id !== user.id) {
+        throw new Error('You do not have permission to delete this quote');
+      }
     }
 
     // First try to delete the quote_request entry (may not exist for draft quotes)
@@ -532,11 +543,11 @@ export class QuotesService {
     }
 
     // Then delete the quote (this will cascade delete quote_items, quote_upsells, quote_timeline)
+    // RLS policies will handle permission checks (admin can delete any, users can delete their own)
     const { error: quoteError } = await supabase
       .from('quotes')
       .delete()
-      .eq('id', quoteId)
-      .eq('user_id', user.id); // Add user_id check for RLS
+      .eq('id', quoteId);
 
     if (quoteError) {
       console.error('Error deleting quote:', quoteError);

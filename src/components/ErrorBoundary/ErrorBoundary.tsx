@@ -12,6 +12,7 @@ import * as Sentry from '@sentry/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { logger } from '@/services/logger.service';
 
 interface Props {
   children: ReactNode;
@@ -77,6 +78,7 @@ export class ErrorBoundary extends Component<Props, State> {
         component: this.props.name || 'Unknown Component',
         errorBoundary: 'true',
         errorBoundaryLevel: this.props.level || 'component',
+        source: 'frontend',
       },
       extra: {
         componentStack: errorInfo.componentStack,
@@ -90,6 +92,17 @@ export class ErrorBoundary extends Component<Props, State> {
       message: `Error boundary caught error: ${error.message}`,
       category: 'error_boundary',
       level: 'error',
+    });
+
+    // Also log to backend database using existing logger
+    logger.error(error.message, error, {
+      component: this.props.name || 'Unknown Component',
+      errorBoundary: true,
+      errorBoundaryLevel: this.props.level || 'component',
+      componentStack: errorInfo.componentStack,
+      errorId: this.state.errorId,
+      retryCount: this.retryCount,
+      service: 'ErrorBoundary',
     });
   };
 

@@ -1,11 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
-import {
-  ValidationError,
-  APIError,
-  ErrorLogger,
-  errorLogger,
-} from '@/core/errors';
+import { ValidationError, APIError } from '@/core/errors';
+import { logger } from '@/config';
 import {
   MaterialData,
   SpatialAnalysisData,
@@ -142,7 +138,7 @@ export class MaterialAgentOrchestratorAPI {
             timestamp: new Date().toISOString(),
           },
         );
-        errorLogger.logError(authError, {
+        logger.error(authError.message, authError, {
           service: 'MaterialAgentOrchestratorAPI',
           method: 'executeTask',
         });
@@ -222,7 +218,7 @@ export class MaterialAgentOrchestratorAPI {
           timestamp: new Date().toISOString(),
         },
       );
-      errorLogger.logError(apiError, {
+      logger.error(apiError.message, apiError, {
         service: 'MaterialAgentOrchestratorAPI',
         method: 'executeTask',
       });

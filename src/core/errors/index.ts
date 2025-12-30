@@ -18,8 +18,5 @@ export {
   type ErrorDetails,
 } from './AppError';
 
-// Error logging system
-export { ErrorLogger, errorLogger, type LogEntry } from './ErrorLogger';
-
 // Utility functions for common error handling patterns
 export * from './utils';

@@ -254,28 +254,125 @@ class LoggerService {
 
   /**
    * Send logs to monitoring service in production
-   * This is a placeholder - integrate with your monitoring service (Sentry, LogRocket, etc.)
+   * Sends to both Sentry and backend database
    */
   private logToMonitoringService(entry: LogEntry): void {
     // Only log errors and warnings in production to reduce noise
     if (entry.level === LogLevel.ERROR || entry.level === LogLevel.WARN) {
-      // TODO: Integrate with monitoring service
-      // Example with Sentry:
-      // import * as Sentry from '@sentry/react';
-      // if (entry.error) {
-      //   Sentry.captureException(entry.error, {
-      //     level: entry.level,
-      //     extra: entry.metadata,
-      //   });
-      // } else {
-      //   Sentry.captureMessage(entry.message, {
-      //     level: entry.level,
-      //     extra: entry.metadata,
-      //   });
-      // }
+      // Send to Sentry
+      this.sendToSentry(entry);
 
-      // For now, still log to console in production for critical issues
-      console.error(`[PRODUCTION ${this.getLevelName(entry.level)}]`, entry.message, entry.metadata);
+      // Send to backend database
+      this.sendToBackend(entry);
+    }
+  }
+
+  /**
+   * Send log entry to Sentry
+   */
+  private sendToSentry(entry: LogEntry): void {
+    try {
+      // Dynamically import Sentry to avoid bundling if not used
+      import('@sentry/react').then((Sentry) => {
+        if (entry.error) {
+          Sentry.captureException(entry.error, {
+            level: this.mapLogLevelToSentry(entry.level),
+            tags: {
+              source: 'frontend',
+              service: entry.service || 'unknown',
+            },
+            extra: entry.metadata,
+          });
+        } else {
+          Sentry.captureMessage(entry.message, {
+            level: this.mapLogLevelToSentry(entry.level),
+            tags: {
+              source: 'frontend',
+              service: entry.service || 'unknown',
+            },
+            extra: entry.metadata,
+          });
+        }
+      }).catch(() => {
+        // Sentry not available, silently fail
+      });
+    } catch (error) {
+      // Don't let logging errors break the app
+    }
+  }
+
+  /**
+   * Send log entry to backend database
+   */
+  private sendToBackend(entry: LogEntry): void {
+    try {
+      const logData = {
+        level: this.mapLogLevelToBackend(entry.level),
+        message: entry.message,
+        logger_name: entry.service || 'frontend',
+        context: {
+          ...entry.metadata,
+          timestamp: entry.timestamp,
+          environment: import.meta.env.MODE,
+          error: entry.error ? {
+            name: entry.error.name,
+            message: entry.error.message,
+            stack: entry.error.stack,
+          } : undefined,
+        },
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      };
+
+      // Send to backend (non-blocking)
+      fetch('/api/admin/logs/frontend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(logData),
+        keepalive: true,
+      }).catch(() => {
+        // Silently fail - don't want logging to break the app
+      });
+    } catch (error) {
+      // Don't let logging errors break the app
+    }
+  }
+
+  /**
+   * Map LogLevel enum to Sentry severity level
+   */
+  private mapLogLevelToSentry(level: LogLevel): 'error' | 'warning' | 'info' | 'debug' {
+    switch (level) {
+      case LogLevel.ERROR:
+        return 'error';
+      case LogLevel.WARN:
+        return 'warning';
+      case LogLevel.INFO:
+        return 'info';
+      case LogLevel.DEBUG:
+        return 'debug';
+      default:
+        return 'info';
+    }
+  }
+
+  /**
+   * Map LogLevel enum to backend log level string
+   */
+  private mapLogLevelToBackend(level: LogLevel): string {
+    switch (level) {
+      case LogLevel.ERROR:
+        return 'ERROR';
+      case LogLevel.WARN:
+        return 'WARNING';
+      case LogLevel.INFO:
+        return 'INFO';
+      case LogLevel.DEBUG:
+        return 'DEBUG';
+      default:
+        return 'INFO';
     }
   }
 

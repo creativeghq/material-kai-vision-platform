@@ -155,7 +155,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -165,50 +165,54 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
               No chunks found
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Content Preview</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Page</TableHead>
-                  <TableHead>Has Embedding</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredChunks.map((chunk) => (
-                  <TableRow key={chunk.id}>
-                    <TableCell className="max-w-md truncate">
-                      {chunk.content?.substring(0, 100)}...
-                    </TableCell>
-                    <TableCell>{getSourceBadge(chunk.source_type)}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{chunk.page_number || 'N/A'}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {chunk.embedding ? (
-                        <Badge>Yes</Badge>
-                      ) : (
-                        <Badge variant="secondary">No</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(chunk.created_at).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedChunk(chunk)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[300px] max-w-[400px]">Content Preview</TableHead>
+                    <TableHead className="min-w-[120px]">Source</TableHead>
+                    <TableHead className="min-w-[80px]">Page</TableHead>
+                    <TableHead className="min-w-[120px]">Has Embedding</TableHead>
+                    <TableHead className="min-w-[100px]">Created</TableHead>
+                    <TableHead className="text-right min-w-[80px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredChunks.map((chunk) => (
+                    <TableRow key={chunk.id}>
+                      <TableCell className="max-w-[400px]">
+                        <div className="truncate" title={chunk.content?.substring(0, 200)}>
+                          {chunk.content?.substring(0, 100)}...
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{getSourceBadge(chunk.source_type)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <Badge variant="outline">{chunk.page_number || 'N/A'}</Badge>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {chunk.embedding ? (
+                          <Badge>Yes</Badge>
+                        ) : (
+                          <Badge variant="secondary">No</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {new Date(chunk.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedChunk(chunk)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
 
           {/* Pagination */}

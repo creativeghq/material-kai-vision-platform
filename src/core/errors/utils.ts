@@ -14,7 +14,7 @@ import {
   DatabaseError,
   ExternalServiceError,
 } from './AppError';
-import { errorLogger } from './ErrorLogger';
+import { logger } from '@/config';
 
 /**
  * Create error context for a service operation
@@ -40,7 +40,7 @@ export async function withErrorHandling<T>(
   context: ErrorContext,
 ): Promise<T> {
   try {
-    errorLogger.logDebug(`Starting operation: ${context.operation}`, {
+    logger.debug(`Starting operation: ${context.operation}`, {
       service: context.service,
       operation: context.operation,
       ...(context.metadata && { metadata: context.metadata }),
@@ -48,7 +48,7 @@ export async function withErrorHandling<T>(
 
     const result = await operation();
 
-    errorLogger.logDebug(`Completed operation: ${context.operation}`, {
+    logger.debug(`Completed operation: ${context.operation}`, {
       service: context.service,
       operation: context.operation,
       metadata: { ...context.metadata, success: true },
@@ -69,7 +69,10 @@ export async function withErrorHandling<T>(
               error instanceof Error ? error : new Error(String(error)),
           });
 
-    errorLogger.logError(appError);
+    logger.error(appError.message, appError, {
+      service: context.service,
+      operation: context.operation,
+    });
     throw appError;
   }
 }
@@ -161,7 +164,10 @@ export function handleAPIError(
     );
   }
 
-  errorLogger.logError(apiError);
+  logger.error(apiError.message, apiError, {
+    service: context.service,
+    operation: context.operation,
+  });
   throw apiError;
 }
 
@@ -194,7 +200,10 @@ export function handleNetworkError(
     error instanceof Error ? error : new Error(String(error)),
   );
 
-  errorLogger.logError(networkError);
+  logger.error(networkError.message, networkError, {
+    service: context.service,
+    operation: context.operation,
+  });
   throw networkError;
 }
 
@@ -217,7 +226,10 @@ export function handleValidationError(
     },
   });
 
-  errorLogger.logError(validationError);
+  logger.error(validationError.message, validationError, {
+    service: context.service,
+    operation: context.operation,
+  });
   throw validationError;
 }
 
@@ -252,7 +264,10 @@ export function handleDatabaseError(
     error instanceof Error ? error : new Error(String(error)),
   );
 
-  errorLogger.logError(dbError);
+  logger.error(dbError.message, dbError, {
+    service: context.service,
+    operation: context.operation,
+  });
   throw dbError;
 }
 
@@ -288,7 +303,10 @@ export function handleExternalServiceError(
     error instanceof Error ? error : new Error(String(error)),
   );
 
-  errorLogger.logError(serviceError);
+  logger.error(serviceError.message, serviceError, {
+    service: context.service,
+    operation: context.operation,
+  });
   throw serviceError;
 }
 

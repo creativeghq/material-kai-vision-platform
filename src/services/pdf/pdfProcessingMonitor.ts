@@ -409,6 +409,10 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.database_records_created !== undefined) {
         metrics['DB Records'] = jobMetadata.database_records_created;
       }
+      // Add product_names as a special field (will be handled by component)
+      if (jobMetadata.product_names && Array.isArray(jobMetadata.product_names)) {
+        metrics['product_names'] = jobMetadata.product_names;
+      }
       break;
 
     case 11: // Relationship Mapping (Stage 5)

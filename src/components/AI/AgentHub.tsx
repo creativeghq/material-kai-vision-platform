@@ -584,6 +584,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                 setMessages((prev) => [...prev, generationMessage]);
 
+                // Save generation message to database immediately
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: generationMessage.content,
+                    metadata: {
+                      agentId: selectedAgent,
+                      model: selectedModel,
+                      generation_job: generationMessage.generation_job,
+                    },
+                  });
+                }
+
                 finalResult = {
                   type: 'final_result',
                   text: `Started generating ${chunk.model_count} interior design variations.`,
@@ -796,6 +810,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             demoData, // Save demo data for DemoAgent
             materialData, // Save material data for Search Agent
             designData, // Save design data for Interior Designer Agent (includes spatial analysis)
+            generation_job: data.generation_job, // Save generation job info for async 3D generation
           },
         });
       }
@@ -862,6 +877,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           demoData: msg.metadata?.demoData as any | undefined,
           materialData: msg.metadata?.materialData as any | undefined,
           designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
+          generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
         }))
       );
     },

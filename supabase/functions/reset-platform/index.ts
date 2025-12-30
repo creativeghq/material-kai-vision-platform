@@ -22,6 +22,7 @@ const TABLES_TO_CLEAR = [
   'quote_timeline',                // Quote timeline progress (child of quotes)
   'quote_upsells',                 // Quote upsells junction (child of quotes)
   'quote_items',                   // Quote items (child of quotes)
+  'quote_requests',                // Quote requests (child of quotes)
   'quotes',                        // Quotes
   'status_tags',                   // Custom status tags
   // NOTE: 'upsells' and 'timeline_steps' are PRESERVED (global data)
