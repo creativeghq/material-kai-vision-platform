@@ -37,6 +37,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 
 interface BackgroundJob {
@@ -691,7 +697,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   // Helper function to format values for display (handles arrays and objects)
-  const formatValue = (value: any): string => {
+  const formatValue = (value: any, key?: string): string | JSX.Element => {
     if (value === null || value === undefined) {
       return 'N/A';
     }
@@ -699,9 +705,24 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     // Handle arrays - convert to comma-separated string
     if (Array.isArray(value)) {
       if (value.length === 0) return '[]';
-      // For arrays of primitives, join with commas
+
+      // Special handling for chunk_ids - show total count instead of IDs
+      if (key === 'chunk_ids') {
+        return `${value.length} chunks`;
+      }
+
+      // Special handling for product_names - show count with tooltip
+      if (key === 'product_names') {
+        return 'PRODUCT_NAMES_TOOLTIP'; // Marker for special rendering
+      }
+
+      // For arrays of primitives, join with commas (but limit length)
       if (value.every(item => typeof item !== 'object')) {
-        return value.join(', ');
+        const joined = value.join(', ');
+        if (joined.length > 100) {
+          return `${value.length} items`;
+        }
+        return joined;
       }
       // For arrays of objects, show count
       return `[${value.length} items]`;
@@ -2183,6 +2204,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         <div className="font-semibold text-lg transition-all duration-300 animate-in fade-in">
                           {(() => {
                             const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
+
+                            // Debug: Log the checkpoint structure
+                            if (imgCheckpoint) {
+                              console.log('Images checkpoint data:', imgCheckpoint.checkpoint_data);
+                              console.log('Images checkpoint metadata:', imgCheckpoint.metadata);
+                            }
+
+                            // Try metadata.clip_embeddings.total first (most accurate)
+                            const metadataTotal = (imgCheckpoint?.metadata as any)?.clip_embeddings?.total;
+                            if (metadataTotal) return metadataTotal;
+
+                            // Fall back to data fields
                             const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
                             const specializedEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.specialized_embeddings || 0;
                             const totalEmbeddings = clipEmbeddings + specializedEmbeddings;
@@ -2448,14 +2481,41 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   <div>
                                     <h5 className="text-xs font-semibold text-muted-foreground mb-2">Stage Output Data</h5>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs p-2 rounded">
-                                      {Object.entries(checkpointData).map(([key, value]) => (
-                                        <div key={key} className="break-words">
-                                          <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                          <span className="ml-1 font-medium transition-all duration-300 break-words">
-                                            {formatValue(value)}
-                                          </span>
-                                        </div>
-                                      ))}
+                                      {Object.entries(checkpointData).map(([key, value]) => {
+                                        // Special rendering for product_names with tooltip
+                                        if (key === 'product_names' && Array.isArray(value) && value.length > 0) {
+                                          return (
+                                            <div key={key} className="break-words">
+                                              <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <span className="ml-1 font-medium transition-all duration-300 break-words cursor-help underline decoration-dotted">
+                                                      Review ({value.length})
+                                                    </span>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent className="max-w-md max-h-60 overflow-y-auto">
+                                                    <div className="space-y-1">
+                                                      {value.map((name: string, idx: number) => (
+                                                        <div key={idx} className="text-xs">• {name}</div>
+                                                      ))}
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div key={key} className="break-words">
+                                            <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+                                            <span className="ml-1 font-medium transition-all duration-300 break-words">
+                                              {formatValue(value, key)}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}
@@ -2465,14 +2525,41 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   <div>
                                     <h5 className="text-xs font-semibold text-muted-foreground mb-2">Processing Metadata</h5>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs p-2 rounded">
-                                      {Object.entries(metadata).map(([key, value]) => (
-                                        <div key={key} className="break-words">
-                                          <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                          <span className="ml-1 font-medium transition-all duration-300 break-words">
-                                            {formatValue(value)}
-                                          </span>
-                                        </div>
-                                      ))}
+                                      {Object.entries(metadata).map(([key, value]) => {
+                                        // Special rendering for product_names with tooltip
+                                        if (key === 'product_names' && Array.isArray(value) && value.length > 0) {
+                                          return (
+                                            <div key={key} className="break-words">
+                                              <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+                                              <TooltipProvider>
+                                                <Tooltip>
+                                                  <TooltipTrigger asChild>
+                                                    <span className="ml-1 font-medium transition-all duration-300 break-words cursor-help underline decoration-dotted">
+                                                      Review ({value.length})
+                                                    </span>
+                                                  </TooltipTrigger>
+                                                  <TooltipContent className="max-w-md max-h-60 overflow-y-auto">
+                                                    <div className="space-y-1">
+                                                      {value.map((name: string, idx: number) => (
+                                                        <div key={idx} className="text-xs">• {name}</div>
+                                                      ))}
+                                                    </div>
+                                                  </TooltipContent>
+                                                </Tooltip>
+                                              </TooltipProvider>
+                                            </div>
+                                          );
+                                        }
+
+                                        return (
+                                          <div key={key} className="break-words">
+                                            <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
+                                            <span className="ml-1 font-medium transition-all duration-300 break-words">
+                                              {formatValue(value, key)}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}

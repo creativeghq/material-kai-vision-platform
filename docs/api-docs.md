@@ -1,7 +1,7 @@
 # MIVAA API Documentation
 
-**Version:** 2.3.0  
-**Last Updated:** 2025-11-17  
+**Version:** 2.5.0
+**Last Updated:** 2025-12-30
 **Base URL:** `https://v1api.materialshub.gr`
 
 ---
@@ -14,7 +14,14 @@
 
 ---
 
-## 🎯 Latest Enhancement: Multi-Vector Search (v2.3.0)
+## 🎯 Latest Enhancement: Image Re-classification (v2.5.0)
+
+**New in v2.5.0:**
+- **Image Re-classification Endpoint**: `/api/images/reclassify/{image_id}` - Re-run AI classification on specific images
+- **Force Validation**: Optional secondary model validation for improved accuracy
+- **Updated Classification Results**: Real-time updates to database with new classification data
+
+**Previous Enhancement: Multi-Vector Search (v2.3.0)**
 
 ### Overview
 

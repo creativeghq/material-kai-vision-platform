@@ -300,14 +300,14 @@ Complete documentation for Material Kai Vision Platform.
 ### 🔌 API Reference
 
 **[api-endpoints.md](api-endpoints.md)** - Complete API reference
-- 113 endpoints across 14 categories
+- 114 endpoints across 14 categories
 - RAG Routes (25 endpoints)
 - Admin Routes (18 endpoints)
 - Search Routes (18 endpoints)
 - Documents Routes (11 endpoints)
 - AI Services Routes (10 endpoints)
-- Images Routes (5 endpoints)
-- Document Entities Routes (5 endpoints) ✨ NEW
+- Images Routes (6 endpoints)
+- Document Entities Routes (5 endpoints)
 - PDF Routes (4 endpoints)
 - Products Routes (3 endpoints)
 - Embeddings Routes (3 endpoints)
@@ -385,7 +385,7 @@ Complete documentation for Material Kai Vision Platform.
 - **99.5%+** uptime SLA
 - **8** AI models across 4 providers
 - **14** processing pipeline stages
-- **108** API endpoints (14 categories)
+- **114** API endpoints (14 categories)
 - **6** embedding types
 - **200+** metafield types
 - **95%+** product detection accuracy
@@ -404,7 +404,7 @@ Complete documentation for Material Kai Vision Platform.
 1. PDF Processing (12 endpoints)
 2. Document Management (13 endpoints)
 3. Search APIs (8 endpoints)
-4. Image Analysis (5 endpoints)
+4. Image Analysis (6 endpoints) - ✨ NEW: Re-classification
 5. RAG System (7 endpoints)
 6. Embeddings (3 endpoints)
 7. Products (6 endpoints)
@@ -447,8 +447,8 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: December 25, 2024
-**Version**: 2.2.0
+**Last Updated**: December 30, 2025
+**Version**: 2.5.0
 **Status**: Production
 **Maintainer**: Development Team
 

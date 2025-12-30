@@ -1,13 +1,20 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-12-03
-**API Version:** v2.4.0
-**Total Endpoints:** 128+ (127 + Spaceformer Spatial Analysis)
+**Last Updated:** 2025-12-30
+**API Version:** v2.5.0
+**Total Endpoints:** 113
 
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (v2.4.0 - December 3, 2025):**
+**Recent Updates (v2.5.0 - December 30, 2025):**
+- **IMAGE RE-CLASSIFICATION:** 1 new endpoint for AI-powered image re-classification
+  - `POST /api/images/reclassify/{image_id}` - Re-run material vs non-material classification
+  - Force validation with secondary model (Qwen-32B or Claude)
+  - Real-time database updates with new classification results
+  - Confidence scoring and reasoning
+
+**Previous Updates (v2.4.0 - December 3, 2025):**
 - **SPACEFORMER SPATIAL ANALYSIS:** 1 new endpoint for AI-powered room analysis (NEW)
   - `POST /api/spaceformer/analyze` - Comprehensive spatial analysis using Claude Vision
   - Room layout optimization with furniture placement suggestions
@@ -2569,7 +2576,7 @@ Response: { top_queries, search_volume, avg_response_time }
 
 ---
 
-### 4. Image Analysis (5 endpoints)
+### 4. Image Analysis (6 endpoints)
 
 **Analyze Image**
 ```http
@@ -2612,6 +2619,32 @@ POST /api/images/upload-and-analyze
 Content-Type: multipart/form-data
 
 Response: { image_id, url, analysis }
+```
+
+**Re-classify Image** ✨ NEW
+```http
+POST /api/images/reclassify/{image_id}
+
+Parameters:
+- image_id: UUID of the image to re-classify
+- force_validation: boolean (optional) - Force validation with secondary model
+
+Response: {
+  success: true,
+  image_id: "uuid",
+  classification: {
+    is_material: true,
+    confidence: 0.85,
+    reason: "Shows ceramic tiles in close-up",
+    model: "qwen3-vl-8b"
+  },
+  updated_data: {
+    category: "product",
+    confidence: 0.85,
+    metadata: { ai_classification: {...} }
+  },
+  message: "Image re-classified as product"
+}
 ```
 
 ---

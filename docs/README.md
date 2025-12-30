@@ -361,8 +361,8 @@ For questions or issues:
 
 ---
 
-**Last Updated**: December 25, 2024
-**Version**: 2.2.0
+**Last Updated**: December 30, 2025
+**Version**: 2.5.0
 **Status**: Production
 **Total Documentation**: 40 comprehensive guides
 **Total Lines**: 13,000+

@@ -392,7 +392,7 @@ The platform uses **6 embedding types** for comprehensive search:
 3. Admin Routes (18 endpoints - job management, system monitoring, metadata management)
 4. Document Entities (5 endpoints - certificates, logos, specifications)
 5. Products API (3 endpoints - product management)
-6. Images API (5 endpoints - image analysis and processing)
+6. Images API (6 endpoints - image analysis, processing, and re-classification)
 7. Embeddings APIs (3 endpoints - embedding generation)
 8. AI Services (10 endpoints - AI model integration)
 9. Background Jobs (7 endpoints - async job tracking)

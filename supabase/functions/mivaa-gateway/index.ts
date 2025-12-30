@@ -116,6 +116,7 @@ const MIVAA_ENDPOINTS = {
   'images_analyze_batch': { path: '/api/images/analyze/batch', method: 'POST' },  // Analyze batch of images
   'images_search': { path: '/api/images/search', method: 'POST' },  // Image search
   'images_upload_analyze': { path: '/api/images/upload-and-analyze', method: 'POST' },  // Upload and analyze
+  'images_reclassify': { path: '/api/images/reclassify/{image_id}', method: 'POST' },  // Re-classify image
   'images_health': { path: '/api/images/health', method: 'GET' },  // Images service health
 
   // ==================== EMBEDDINGS ====================

@@ -35,6 +35,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
   const [imageEmbeddings, setImageEmbeddings] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [isReclassifying, setIsReclassifying] = useState(false);
   const { toast } = useToast();
 
   const ITEMS_PER_PAGE = 20;
@@ -116,6 +117,54 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
   const handleViewImage = async (image: any) => {
     setSelectedImage(image);
     await loadImageEmbeddings(image.id);
+  };
+
+  const handleReclassify = async (imageId: string) => {
+    setIsReclassifying(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_MIVAA_API_URL}/api/images/reclassify/${imageId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Re-classification failed');
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: 'Re-classification Complete',
+        description: `Image re-classified as ${result.updated_data.category}`,
+      });
+
+      // Reload the image data
+      await loadImages(currentPage);
+
+      // Update the selected image if it's still open
+      if (selectedImage?.id === imageId) {
+        const { data, error } = await supabase
+          .from('document_images')
+          .select('*')
+          .eq('id', imageId)
+          .single();
+
+        if (!error && data) {
+          setSelectedImage(data);
+        }
+      }
+    } catch (error) {
+      console.error('Re-classification failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to re-classify image',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsReclassifying(false);
+    }
   };
 
   const filteredImages = images.filter((image) => {
@@ -269,61 +318,175 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
       {selectedImage && (
         <Dialog open={true} onOpenChange={() => setSelectedImage(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
               <DialogTitle className="break-words">
                 {selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <img
-                src={selectedImage.image_url}
-                alt={selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
-                className="w-full rounded-lg max-w-full"
-              />
-
-              <div>
-                <h4 className="font-semibold mb-2">Page Number</h4>
-                <p className="text-sm">{selectedImage.page_number}</p>
+            <div className="flex gap-6 overflow-hidden flex-1">
+              {/* Left Side - Image */}
+              <div className="flex-1 flex items-center justify-center bg-muted rounded-lg overflow-hidden">
+                <img
+                  src={selectedImage.image_url}
+                  alt={selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
+                  className="max-w-full max-h-full object-contain"
+                />
               </div>
 
-              {selectedImage.vision_analysis?.description && (
-                <div>
-                  <h4 className="font-semibold mb-2">AI Description (Vision)</h4>
-                  <p className="text-sm break-words">{selectedImage.vision_analysis.description}</p>
-                </div>
-              )}
+              {/* Right Side - Classification & Metadata */}
+              <div className="w-96 overflow-y-auto space-y-4 pr-2">
+                {/* Classification Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Classification</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Type:</span>
+                      <Badge variant={selectedImage.classification === 'material' ? 'default' : 'secondary'}>
+                        {selectedImage.classification || 'Unknown'}
+                      </Badge>
+                    </div>
+                    {selectedImage.confidence && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Confidence:</span>
+                        <span className="text-xs font-medium">{(selectedImage.confidence * 100).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Page:</span>
+                      <span className="text-xs font-medium">{selectedImage.page_number}</span>
+                    </div>
+                  </CardContent>
+                </Card>
 
-              {selectedImage.claude_validation?.description && (
-                <div>
-                  <h4 className="font-semibold mb-2">AI Validation (Claude)</h4>
-                  <p className="text-sm break-words">{selectedImage.claude_validation.description}</p>
-                </div>
-              )}
+                {/* Material Properties Section */}
+                {selectedImage.material_properties && Object.keys(selectedImage.material_properties).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Material Properties</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(selectedImage.material_properties).map(([key, value]: [string, any]) => (
+                        <div key={key} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                            <span className="text-xs font-medium">{value?.primary || value}</span>
+                          </div>
+                          {value?.confidence && (
+                            <div className="text-xs text-muted-foreground ml-auto">
+                              {(value.confidence * 100).toFixed(0)}% confidence
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
 
-              <div>
-                <h4 className="font-semibold mb-2">Embeddings ({imageEmbeddings.length})</h4>
-                {imageEmbeddings.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No embeddings found</p>
-                ) : (
-                  <div className="space-y-2">
-                    {imageEmbeddings.map((emb, idx) => (
-                      <Card key={idx}>
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge>{emb.embedding_type || 'text'}</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              Dimension: {emb.embedding?.length || 0}
+                {/* AI Analysis Section */}
+                {(selectedImage.vision_analysis?.description || selectedImage.claude_validation?.description) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">AI Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {selectedImage.vision_analysis?.description && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-muted-foreground mb-1">Vision Model</h5>
+                          <p className="text-xs break-words">{selectedImage.vision_analysis.description}</p>
+                        </div>
+                      )}
+                      {selectedImage.claude_validation?.description && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-muted-foreground mb-1">Claude Validation</h5>
+                          <p className="text-xs break-words">{selectedImage.claude_validation.description}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Quality Metrics Section */}
+                {(selectedImage.quality_score || selectedImage.metadata?.quality_score) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Quality Metrics</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {selectedImage.quality_score && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Overall Quality:</span>
+                          <span className="text-xs font-medium">{(selectedImage.quality_score * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
+                      {selectedImage.metadata?.sharpness_score && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Sharpness:</span>
+                          <span className="text-xs font-medium">{(selectedImage.metadata.sharpness_score * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
+                      {selectedImage.metadata?.resolution_dpi && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Resolution:</span>
+                          <span className="text-xs font-medium">{selectedImage.metadata.resolution_dpi} DPI</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Embeddings Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Embeddings ({imageEmbeddings.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {imageEmbeddings.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No embeddings found</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {imageEmbeddings.map((emb, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <Badge variant="outline" className="text-xs">{emb.embedding_type || 'text'}</Badge>
+                            <span className="text-muted-foreground">
+                              {emb.embedding?.length || 0}D
                             </span>
                           </div>
-                          <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">
-                            {JSON.stringify(emb.embedding?.slice(0, 5), null, 2)}... (truncated)
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleReclassify(selectedImage.id)}
+                    disabled={isReclassifying}
+                  >
+                    <Code className="h-4 w-4 mr-2" />
+                    {isReclassifying ? 'Re-classifying...' : 'Request Re-classification'}
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full" disabled>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Edit Manually
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => {
+                    console.log('Full image data:', selectedImage);
+                    toast({
+                      title: 'Full Metadata',
+                      description: 'Check browser console for complete image data',
+                    });
+                  }}>
+                    <Globe className="h-4 w-4 mr-2" />
+                    View Full Metadata
+                  </Button>
+                </div>
               </div>
             </div>
           </DialogContent>

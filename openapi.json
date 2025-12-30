@@ -3,7 +3,7 @@
   "info": {
     "title": "MIVAA - Material Intelligence Vision and Analysis Agent",
     "description": "\n**Production API v2.2.0** - AI-powered material recognition and knowledge management platform serving 5,000+ users.\n\n## 🎯 Overview\n\nMIVAA is the core backend service powering the Material Kai Vision Platform, providing comprehensive PDF processing, AI analysis, and multi-vector search capabilities.\n\n## ✨ API Organization (v2.2.0)\n\n**Comprehensive API with 106 endpoints organized into 15 categories**\n\n**Key Features:**\n- ✅ **Consolidated Upload**: `/api/rag/documents/upload` with processing modes (quick/standard/deep) and categories\n- ✅ **Unified Search**: `/api/rag/search?strategy={strategy}` with 6 strategies (semantic, vector, multi_vector, hybrid, material, image)\n- ✅ **Comprehensive Health**: `/health` for all services (database, storage, AI models)\n- ✅ **Well-Organized**: 15 endpoint categories covering RAG, documents, search, AI services, admin, and more\n- ✅ **Preserved**: Prompt enhancement system, category extraction, all processing modes\n\n### Key Capabilities\n- **PDF Processing**: 14-stage pipeline with PyMuPDF4LLM extraction\n- **Products + Metadata**: Inseparable extraction (Stage 0A) - all metadata stored in product.metadata JSONB\n- **Document Entities**: Certificates, logos, specifications as separate knowledge base (Stage 0B)\n- **AI Analysis**: 12 AI models across 7 pipeline stages\n- **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)\n- **Knowledge Base**: Semantic chunking, quality scoring, deduplication\n- **Image Analysis**: CLIP + Llama 4 Scout Vision (69.4% MMMU, #1 OCR)\n- **Agentic Queries**: Factory/group filtering for certificates, logos, specifications\n\n### AI Models\n1. **OpenAI**: text-embedding-3-small (1536D embeddings)\n2. **Anthropic**: Claude Haiku 4.5 (fast classification), Claude Sonnet 4.5 (deep enrichment)\n3. **Together AI**: Llama 4 Scout 17B Vision\n4. **CLIP**: Visual embeddings (512D)\n5. **Custom**: Color, texture, application embeddings\n\n### API Endpoints\n- **Total**: 106 endpoints across 15 categories (18 legacy endpoints removed)\n- **RAG System**: 23 endpoints for document upload, search, query, chat, embeddings\n- **AI Services**: 10 endpoints for classification, validation, boundary detection\n- **Admin**: 10 endpoints for chunk quality, extraction config, prompts\n- **Search**: 8 endpoints for semantic, image, material, multimodal search\n- **Jobs**: 7 endpoints for progress tracking, statistics, status\n- **Document Entities**: 5 endpoints for certificates, logos, specifications\n\n### Performance\n- **Search Accuracy**: 85%+\n- **Processing Success**: 95%+\n- **Response Time**: 200-800ms (search), 1-4s (analysis)\n- **Uptime**: 99.5%+\n\n## 🔐 Authentication\n\nAll API endpoints require JWT authentication:\n```\nAuthorization: Bearer your-jwt-token\n```\n\nGet your token from the frontend application or Supabase authentication.\n\n## 📊 Latest Enhancements (October 2025)\n\n✅ **Product Detection Pipeline** - 60-70% false positive reduction with 4-layer validation\n✅ **Chunk Quality System** - Hash-based + semantic deduplication, quality scoring\n✅ **Two-Stage Classification** - 60% faster, 40% cost reduction\n✅ **Multi-Vector Embeddings** - 6 embedding types for 85%+ accuracy improvement\n✅ **Admin Dashboard** - Chunk quality monitoring and review workflow\n✅ **Metadata Synchronization** - 100% accuracy in job status reporting\n\n## 🚀 API Categories (106 Endpoints)\n\n### 📄 PDF Processing (`/api/pdf/*`)\n- Extract markdown, tables, images from PDFs\n- PyMuPDF4LLM integration\n- Batch processing support\n\n### 🧠 RAG System (`/api/rag/*`)\n- Document upload and processing\n- Query and chat interfaces\n- Semantic search\n- Job monitoring with real-time progress\n\n### 🤖 AI Analysis (`/api/semantic-analysis`)\n- Llama 4 Scout Vision material analysis\n- Multi-modal text + image processing\n- Entity extraction and classification\n\n### 🔍 Search APIs (`/api/search/*`)\n- Semantic search (text embeddings)\n- Vector search (multi-vector)\n- Hybrid search (combined)\n- Recommendations\n\n### 🔗 Embedding APIs (`/api/embeddings/*`)\n- Generate text embeddings (1536D)\n- Generate CLIP embeddings (512D)\n- Batch processing\n- Multi-vector generation (6 types)\n\n### 💬 Chat APIs (`/api/chat/*`)\n- Chat completions\n- Contextual responses\n- Conversation history\n\n### 📦 Products API (`/api/products/*`)\n- Two-stage product classification\n- Product enrichment\n- Product management\n- Health monitoring\n\n### 👨‍💼 Admin APIs (`/api/admin/*`)\n- Chunk quality dashboard\n- Quality statistics\n- Flagged chunks review\n- Metadata management\n\n### 🏥 Health & Monitoring\n- `/health` - Service health check\n- `/metrics` - Performance metrics\n- `/performance/summary` - Comprehensive stats\n\n## 📖 Documentation\n\n- **Interactive API Docs**: [/docs](/docs) (Swagger UI)\n- **Alternative Docs**: [/redoc](/redoc) (ReDoc)\n- **OpenAPI Schema**: [/openapi.json](/openapi.json)\n- **Complete Documentation**: https://basilakis.github.io\n\n## 🔗 Related Services\n\n- **Frontend**: https://materialshub.gr\n- **Documentation Site**: https://basilakis.github.io\n- **GitHub**: https://github.com/creativeghq/material-kai-vision-platform\n\n        ",
-    "version": "2.4.0",
+    "version": "2.5.0",
     "x-api-features": {
       "api_consolidation": "Consolidated and organized endpoints with clear categorization",
       "consolidated_upload": "/api/rag/documents/upload with modes (quick/standard/deep) + categories",
@@ -33,7 +33,7 @@
       "search_routes": "/api/search/* (8 endpoints) - Semantic, image, material, multimodal search",
       "jobs_routes": "/api/jobs/* (7 endpoints) - Job progress, statistics, status tracking",
       "document_entities_routes": "/api/document-entities/* (5 endpoints) - Certificates, logos, specifications",
-      "images_routes": "/api/images/* (5 endpoints) - Image analysis, search, upload",
+      "images_routes": "/api/images/* (6 endpoints) - Image analysis, search, upload, re-classification",
       "monitoring_routes": "/, /health, /metrics, /performance/summary (4 endpoints)",
       "embeddings_routes": "/api/embeddings/* (4 endpoints) - CLIP text/image, material embeddings",
       "ai_analysis_routes": "/api/semantic-analysis, /api/analyze/* (4 endpoints) - TogetherAI, multimodal analysis",
@@ -45,7 +45,7 @@
       "relationship_routes": "/api/rag/product-image-relationships, /api/rag/chunk-product-relationships (2 endpoints) - Relationship queries for validation"
     },
     "x-platform-stats": {
-      "total_endpoints": 112,
+      "total_endpoints": 113,
       "endpoint_categories": 17,
       "ai_models": 13,
       "processing_stages": 14,
@@ -54,8 +54,8 @@
       "specialized_clip_embeddings": 6,
       "users": "5,000+",
       "uptime": "99.5%+",
-      "version": "2.4.0",
-      "last_updated": "2025-12-20",
+      "version": "2.5.0",
+      "last_updated": "2025-12-30",
       "latest_enhancement": "Web Scraping Integration - Firecrawl to Products with AI Discovery",
       "legacy_removed": "Removed 18 duplicate /api/documents/* endpoints (13 from documents.py + 5 from search.py)"
     }
@@ -1044,6 +1044,91 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/images/reclassify/{image_id}": {
+      "post": {
+        "tags": [
+          "Image Analysis"
+        ],
+        "summary": "Reclassify Image",
+        "description": "**🔄 Re-classify Image - Trigger AI Re-classification**\n\nRe-run the material vs non-material classification on a specific image.\n\nThis endpoint:\n1. Fetches the image from document_images table\n2. Downloads the image from Supabase Storage\n3. Re-runs Qwen Vision classification\n4. Optionally validates with secondary model (Qwen-32B or Claude)\n5. Updates the database with new classification results",
+        "operationId": "reclassify_image_api_images_reclassify__image_id__post",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Image Id"
+            },
+            "description": "UUID of the image to re-classify"
+          },
+          {
+            "name": "force_validation",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Force Validation"
+            },
+            "description": "Force validation with secondary model regardless of confidence"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "image_id": {
+                      "type": "string"
+                    },
+                    "classification": {
+                      "type": "object",
+                      "properties": {
+                        "is_material": {
+                          "type": "boolean"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "updated_data": {
+                      "type": "object"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "400": {
+            "description": "Bad request - Image has no storage URL"
+          },
+          "500": {
+            "description": "Internal server error"
           }
         }
       }
