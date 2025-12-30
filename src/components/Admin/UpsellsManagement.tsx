@@ -420,9 +420,9 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
         badge="Admin"
       />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="p-6 space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Upsell Items</h2>
             <p className="text-gray-600 mt-1">Create and manage upsell items to offer customers additional products or services</p>

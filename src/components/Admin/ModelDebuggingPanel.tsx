@@ -282,8 +282,7 @@ const ModelDebuggingPanel: React.FC = () => {
           { label: '3D Model Debugging' },
         ]}
       />
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="p-6 space-y-6">
           <div className="flex gap-2">
             <Button
               onClick={testAllModels}
@@ -634,7 +633,6 @@ const ModelDebuggingPanel: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 };

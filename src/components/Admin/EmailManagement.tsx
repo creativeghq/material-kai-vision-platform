@@ -74,7 +74,7 @@ export const EmailManagement: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header Actions */}
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setShowSettingsDialog(true)}>

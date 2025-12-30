@@ -496,8 +496,7 @@ const PackagesPanel: React.FC = () => {
           { label: 'Packages' },
         ]}
       />
-      <div className="p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <div className="p-6 space-y-6">
           <div className="flex items-center justify-end">
             <Button
               onClick={checkPackageStatus}
@@ -591,7 +590,6 @@ const PackagesPanel: React.FC = () => {
             </TabsContent>
           </Tabs>
         </div>
-      </div>
     </div>
   );
 };

@@ -117,8 +117,7 @@ export const SystemSettingsPage: React.FC = () => {
       />
 
       {/* Settings Content */}
-      <div className="p-6">
-        <div className="max-w-4xl mx-auto">
+      <div className="p-6 space-y-6">
           <div className="dashboard-card space-y-6">
             {/* Quote Expiration Setting */}
             <div className="space-y-4">
@@ -171,7 +170,6 @@ export const SystemSettingsPage: React.FC = () => {
               </Button>
             </div>
           </div>
-        </div>
       </div>
     </div>
   );

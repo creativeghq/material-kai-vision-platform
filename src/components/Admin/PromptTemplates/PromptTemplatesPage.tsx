@@ -145,9 +145,9 @@ export const PromptTemplatesPage: React.FC = () => {
         badge="AI Templates"
       />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="p-6 space-y-6">
         {/* Header Actions */}
-        <div className="flex justify-end gap-2 mb-6">
+        <div className="flex justify-end gap-2">
           <Button
             onClick={() => loadTemplates()}
             variant="outline"
@@ -166,7 +166,7 @@ export const PromptTemplatesPage: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
+        <Card>
           <CardContent className="pt-6">
             <div className="flex gap-4">
               <div className="flex-1">
