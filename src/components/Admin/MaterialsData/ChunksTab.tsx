@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, Loader2, FileText, Code, Globe } from 'lucide-react';
+import { Search, Eye, Loader2, FileText, Code, Globe, Grid3X3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -130,7 +130,15 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>All Chunks</CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Grid3X3 className="h-5 w-5" />
+                All Chunks
+              </CardTitle>
+              <CardDescription>
+                View and manage text chunks extracted from documents
+              </CardDescription>
+            </div>
             <div className="flex items-center gap-2">
               <Select value={sourceFilter} onValueChange={setSourceFilter}>
                 <SelectTrigger className="w-[180px]">
@@ -179,10 +187,8 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                 <TableBody>
                   {filteredChunks.map((chunk) => (
                     <TableRow key={chunk.id}>
-                      <TableCell>
-                        <div className="truncate" title={chunk.content?.substring(0, 200)}>
-                          {chunk.content?.substring(0, 100)}...
-                        </div>
+                      <TableCell className="font-medium">
+                        {chunk.content?.substring(0, 100)}...
                       </TableCell>
                       <TableCell>{getSourceBadge(chunk.source_type)}</TableCell>
                       <TableCell>

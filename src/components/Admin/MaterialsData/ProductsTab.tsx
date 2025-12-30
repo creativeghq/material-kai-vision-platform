@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, Loader2, Trash2, FileText, Code, Globe } from 'lucide-react';
+import { Search, Eye, Loader2, Trash2, FileText, Code, Globe, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
@@ -162,7 +162,15 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>All Products</CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                All Products
+              </CardTitle>
+              <CardDescription>
+                View and manage all products from PDF, XML, and Web Scraping sources
+              </CardDescription>
+            </div>
             <div className="flex items-center gap-2">
               <Select value={sourceFilter} onValueChange={setSourceFilter}>
                 <SelectTrigger className="w-[180px]">

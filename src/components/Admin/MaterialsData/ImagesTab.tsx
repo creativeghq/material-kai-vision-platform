@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Eye, Loader2, FileText, Code, Globe } from 'lucide-react';
+import { Search, Eye, Loader2, FileText, Code, Globe, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -249,7 +249,15 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>All Images</CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                All Images
+              </CardTitle>
+              <CardDescription>
+                View and manage images extracted from documents
+              </CardDescription>
+            </div>
             <div className="flex items-center gap-2">
               <Select value={sourceFilter} onValueChange={setSourceFilter}>
                 <SelectTrigger className="w-[180px]">
@@ -288,34 +296,30 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               {filteredImages.map((image) => (
                 <Card key={image.id} className="overflow-hidden">
                   <CardContent className="p-0">
-                    <div className="aspect-square overflow-hidden bg-muted">
-                      <img
-                        src={image.image_url}
-                        alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="p-3 space-y-2 flex-1 flex flex-col">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-xs font-medium line-clamp-1 flex-1 overflow-hidden text-ellipsis" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
+                    <img
+                      src={image.image_url}
+                      alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
+                      className="w-full h-48 object-cover"
+                    />
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium truncate flex-1">
                           {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                         </p>
-                        <div className="flex-shrink-0">
-                          {getSourceBadge(image.source_type)}
-                        </div>
+                        {getSourceBadge(image.source_type)}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Page {image.page_number}
                       </p>
                       {image.vision_analysis?.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 overflow-hidden" title={image.vision_analysis.description}>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
                           {image.vision_analysis.description}
                         </p>
                       )}
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full mt-auto"
+                        className="w-full"
                         onClick={() => handleViewImage(image)}
                       >
                         <Eye className="h-4 w-4 mr-2" />
