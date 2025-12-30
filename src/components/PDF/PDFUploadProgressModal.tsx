@@ -431,6 +431,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 const totalImagesExtracted = metadata.total_images_extracted || 0;
                 const productsCreated = metadata.products_created || 0;
                 const embeddingsGenerated = metadata.embeddings_generated || 0;
+                const clipEmbeddings = metadata.clip_embeddings || 0;
                 const ocrPagesProcessed = metadata.ocr_pages_processed || 0;
 
                 // Get AI usage stats
@@ -484,6 +485,16 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         Pages Processed
                       </div>
                     </div>
+                    {clipEmbeddings > 0 && (
+                      <div className="text-center p-3 bg-card rounded-lg border">
+                        <div className="text-2xl font-bold text-primary">
+                          {clipEmbeddings}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          CLIP Embeddings
+                        </div>
+                      </div>
+                    )}
                     {ocrPagesProcessed > 0 && (
                       <div className="text-center p-3 bg-card rounded-lg border">
                         <div className="text-2xl font-bold text-primary">
