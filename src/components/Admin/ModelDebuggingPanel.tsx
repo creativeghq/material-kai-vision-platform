@@ -659,6 +659,7 @@ const ModelDebuggingPanel: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
     </div>
   );
 };
