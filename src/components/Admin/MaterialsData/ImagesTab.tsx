@@ -265,7 +265,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               No images found
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
               {filteredImages.map((image) => (
                 <Card key={image.id} className="overflow-hidden flex flex-col">
                   <CardContent className="p-0 flex flex-col h-full">
@@ -433,34 +433,71 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   </Card>
                 )}
 
-                {/* Quality Metrics Section */}
-                {(selectedImage.quality_score || selectedImage.metadata?.quality_score) && (
+                {/* Metadata Section */}
+                {selectedImage.metadata && Object.keys(selectedImage.metadata).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Quality Metrics</CardTitle>
+                      <CardTitle className="text-sm">Metadata</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {selectedImage.quality_score && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Overall Quality:</span>
-                          <span className="text-xs font-medium">{(selectedImage.quality_score * 100).toFixed(0)}%</span>
+                      {selectedImage.metadata.filename && (
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs text-muted-foreground">Filename:</span>
+                          <span className="text-xs font-medium text-right break-all">{selectedImage.metadata.filename}</span>
                         </div>
                       )}
-                      {selectedImage.metadata?.sharpness_score && (
+                      {selectedImage.metadata.width && selectedImage.metadata.height && (
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Sharpness:</span>
-                          <span className="text-xs font-medium">{(selectedImage.metadata.sharpness_score * 100).toFixed(0)}%</span>
+                          <span className="text-xs text-muted-foreground">Dimensions:</span>
+                          <span className="text-xs font-medium">{selectedImage.metadata.width} × {selectedImage.metadata.height}</span>
                         </div>
                       )}
-                      {selectedImage.metadata?.resolution_dpi && (
+                      {selectedImage.metadata.format && (
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Resolution:</span>
-                          <span className="text-xs font-medium">{selectedImage.metadata.resolution_dpi} DPI</span>
+                          <span className="text-xs text-muted-foreground">Format:</span>
+                          <span className="text-xs font-medium uppercase">{selectedImage.metadata.format}</span>
+                        </div>
+                      )}
+                      {selectedImage.metadata.size && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">File Size:</span>
+                          <span className="text-xs font-medium">{(selectedImage.metadata.size / 1024).toFixed(1)} KB</span>
                         </div>
                       )}
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Quality Metrics Section */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Quality Metrics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {selectedImage.quality_score ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Overall Quality:</span>
+                          <span className="text-xs font-medium">{(selectedImage.quality_score * 100).toFixed(0)}%</span>
+                        </div>
+                        {selectedImage.metadata?.sharpness_score && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Sharpness:</span>
+                            <span className="text-xs font-medium">{(selectedImage.metadata.sharpness_score * 100).toFixed(0)}%</span>
+                          </div>
+                        )}
+                        {selectedImage.metadata?.resolution_dpi && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground">Resolution:</span>
+                            <span className="text-xs font-medium">{selectedImage.metadata.resolution_dpi} DPI</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No quality metrics available</p>
+                    )}
+                  </CardContent>
+                </Card>
 
                 {/* Relations Section */}
                 {selectedImage.document_chunks && selectedImage.document_chunks.length > 0 && (

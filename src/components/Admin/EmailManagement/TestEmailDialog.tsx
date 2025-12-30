@@ -71,11 +71,27 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
         subject: 'Test Email from Material Kai',
         message: 'This is a test email to verify your email configuration is working correctly.',
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending test email:', error);
+
+      // Extract detailed error message
+      let errorMessage = 'Failed to send test email';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      // Check for common edge function errors
+      if (errorMessage.includes('FunctionsRelayError') || errorMessage.includes('FunctionsHttpError')) {
+        errorMessage = 'Email service is not configured. Please check AWS SES credentials in Supabase Edge Function settings.';
+      }
+
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to send test email',
+        title: 'Error Sending Test Email',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {

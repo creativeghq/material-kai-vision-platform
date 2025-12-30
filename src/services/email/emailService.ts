@@ -82,10 +82,28 @@ export class EmailService {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Edge function error:', error);
+        // Provide more helpful error message
+        const errorMessage = error.message || 'Failed to send email';
+        throw new Error(errorMessage);
+      }
+
+      if (!data || !data.messageId) {
+        throw new Error('Invalid response from email service');
+      }
+
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending email:', error);
+
+      // Re-throw with more context
+      if (error.message?.includes('FunctionsRelayError')) {
+        throw new Error('Email service unavailable. Please check edge function deployment.');
+      } else if (error.message?.includes('FunctionsHttpError')) {
+        throw new Error('Email service error. Please check AWS SES configuration.');
+      }
+
       throw error;
     }
   }
