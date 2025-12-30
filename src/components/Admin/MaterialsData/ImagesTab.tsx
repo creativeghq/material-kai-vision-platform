@@ -265,27 +265,31 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               No images found
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full">
               {filteredImages.map((image) => (
-                <Card key={image.id} className="overflow-hidden flex flex-col">
-                  <CardContent className="p-0 flex flex-col h-full">
-                    <img
-                      src={image.image_url}
-                      alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
-                      className="w-full h-48 object-cover flex-shrink-0"
-                    />
-                    <div className="p-3 space-y-2 flex-1 flex flex-col">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-xs font-medium line-clamp-2 flex-1" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
+                <Card key={image.id} className="overflow-hidden flex flex-col min-w-0">
+                  <CardContent className="p-0 flex flex-col h-full min-w-0">
+                    <div className="w-full h-48 flex-shrink-0 overflow-hidden">
+                      <img
+                        src={image.image_url}
+                        alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="p-3 space-y-2 flex-1 flex flex-col min-w-0">
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <p className="text-xs font-medium line-clamp-2 flex-1 min-w-0 break-words" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
                           {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                         </p>
-                        {getSourceBadge(image.source_type)}
+                        <div className="flex-shrink-0">
+                          {getSourceBadge(image.source_type)}
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Page {image.page_number}
                       </p>
                       {image.vision_analysis?.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2" title={image.vision_analysis.description}>
+                        <p className="text-xs text-muted-foreground line-clamp-2 break-words" title={image.vision_analysis.description}>
                           {image.vision_analysis.description}
                         </p>
                       )}

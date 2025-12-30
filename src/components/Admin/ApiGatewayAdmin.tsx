@@ -329,20 +329,20 @@ export const ApiGatewayAdmin: React.FC = () => {
       {/* Main Content */}
       <div className="p-6 space-y-6">
         <Tabs defaultValue="endpoints" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="endpoints" className="flex items-center gap-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="endpoints" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Settings className="h-4 w-4" />
               Endpoints & Rate Limits
             </TabsTrigger>
-            <TabsTrigger value="networks" className="flex items-center gap-2">
+            <TabsTrigger value="networks" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Network className="h-4 w-4" />
               Networks
             </TabsTrigger>
-            <TabsTrigger value="api-keys" className="flex items-center gap-2">
+            <TabsTrigger value="api-keys" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Key className="h-4 w-4" />
               API Keys
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <TabsTrigger value="analytics" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4" />
               Analytics
             </TabsTrigger>

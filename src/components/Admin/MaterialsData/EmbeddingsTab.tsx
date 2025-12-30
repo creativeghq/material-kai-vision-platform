@@ -68,19 +68,21 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
       // Query text embeddings from document_chunks
       let textQuery = supabase
         .from('document_chunks')
-        .select('id, chunk_text, text_embedding, created_at, document_id, documents!inner(workspace_id, job_id)', { count: 'exact' })
+        .select('id, chunk_text, text_embedding, created_at, document_id, documents!inner(workspace_id)', { count: 'exact' })
         .eq('documents.workspace_id', workspaceId)
         .not('text_embedding', 'is', null);
 
-      if (jobIdFilter && jobIdFilter.trim()) {
-        textQuery = textQuery.eq('documents.job_id', jobIdFilter.trim());
-      }
+      // Note: job_id filtering removed as documents table doesn't have job_id column
+      // If needed, this should be added to the documents table schema
 
       const { data: textData, error: textError, count: textCount } = await textQuery
         .order('created_at', { ascending: false })
         .range(from, to);
 
-      if (textError) throw textError;
+      if (textError) {
+        console.error('Error loading embeddings:', textError);
+        throw textError;
+      }
 
       // Transform to unified format
       const transformedData = (textData || []).map(chunk => ({
@@ -92,7 +94,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
         source_id: chunk.id,
         source_text: chunk.chunk_text?.substring(0, 200) + '...',
         workspace_id: workspaceId,
-        source_job_id: chunk.documents?.job_id
+        source_job_id: null // documents table doesn't have job_id
       }));
 
       setEmbeddings(transformedData);

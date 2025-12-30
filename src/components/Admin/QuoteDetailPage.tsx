@@ -618,20 +618,20 @@ export const QuoteDetailPage: React.FC = () => {
 
         {/* Tabs - Reduced to 4 tabs (removed Overview) */}
         <Tabs defaultValue="items" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="items" className="flex items-center gap-2">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Boxes className="h-4 w-4" />
               Items ({itemCount})
             </TabsTrigger>
-            <TabsTrigger value="extras" className="flex items-center gap-2">
+            <TabsTrigger value="extras" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Gift className="h-4 w-4" />
               Extras ({quoteUpsells.length})
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="flex items-center gap-2">
+            <TabsTrigger value="timeline" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Milestone className="h-4 w-4" />
               Timeline ({quoteTimeline.length})
             </TabsTrigger>
-            <TabsTrigger value="activity" className="flex items-center gap-2">
+            <TabsTrigger value="activity" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4" />
               Activity
             </TabsTrigger>

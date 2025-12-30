@@ -28,6 +28,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
       console.log('[RelationsTab] Loading relations for workspace:', workspaceId);
 
       // Load images with their related chunks and products
+      // Note: Simplified query to avoid complex joins that may not exist in schema
       let query = supabase
         .from('document_images')
         .select(`
@@ -37,16 +38,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
           caption,
           source_type,
           created_at,
-          document_chunks!inner(
-            id,
-            chunk_text,
-            page_number,
-            products(
-              id,
-              name,
-              source_type
-            )
-          )
+          workspace_id
         `)
         .eq('workspace_id', workspaceId);
 
@@ -62,7 +54,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
         console.error('[RelationsTab] Error loading relations:', error);
         toast({
           title: 'Error',
-          description: 'Failed to load relations',
+          description: `Failed to load relations: ${error.message}`,
           variant: 'destructive',
         });
         return;
@@ -117,9 +109,9 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
             {relations.map((relation) => (
               <Card key={relation.id} className="border-l-4 border-l-blue-500">
                 <CardContent className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex items-start gap-4">
                     {/* Image */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-shrink-0">
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <ImageIcon className="h-4 w-4 text-blue-600" />
                         Image
@@ -128,7 +120,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
                         <img
                           src={relation.image_url}
                           alt={relation.caption || `Page ${relation.page_number}`}
-                          className="w-full h-32 object-cover rounded"
+                          className="w-48 h-32 object-cover rounded"
                         />
                       )}
                       <div className="text-xs text-muted-foreground">
@@ -137,36 +129,38 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
                       {getSourceBadge(relation.source_type)}
                     </div>
 
-                    {/* Chunks */}
-                    <div className="space-y-2">
+                    {/* Metadata */}
+                    <div className="space-y-2 flex-1">
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <FileText className="h-4 w-4 text-green-600" />
-                        Related Chunks ({relation.document_chunks?.length || 0})
+                        Image Details
                       </div>
-                      <div className="space-y-1 max-h-32 overflow-y-auto">
-                        {relation.document_chunks?.slice(0, 3).map((chunk: any) => (
-                          <div key={chunk.id} className="text-xs p-2 bg-muted rounded">
-                            {chunk.chunk_text?.substring(0, 100)}...
+                      <div className="space-y-1">
+                        {relation.caption && (
+                          <div className="text-xs">
+                            <span className="font-medium">Caption:</span> {relation.caption}
                           </div>
-                        ))}
+                        )}
+                        <div className="text-xs">
+                          <span className="font-medium">Created:</span> {new Date(relation.created_at).toLocaleString()}
+                        </div>
+                        <div className="text-xs">
+                          <span className="font-medium">ID:</span> {relation.id}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Products */}
-                    <div className="space-y-2">
+                    {/* Status */}
+                    <div className="space-y-2 flex-shrink-0 w-64">
                       <div className="flex items-center gap-2 text-sm font-medium">
-                        <Package className="h-4 w-4 text-purple-600" />
-                        Related Products
+                        <Link2 className="h-4 w-4 text-purple-600" />
+                        Status
                       </div>
-                      <div className="space-y-1">
-                        {relation.document_chunks?.map((chunk: any) =>
-                          chunk.products?.map((product: any) => (
-                            <div key={product.id} className="text-xs p-2 bg-muted rounded">
-                              {product.name}
-                              {getSourceBadge(product.source_type)}
-                            </div>
-                          ))
-                        )}
+                      <div className="text-xs p-2 bg-muted rounded">
+                        <p className="text-muted-foreground">
+                          Relations feature requires additional database schema setup.
+                          Currently showing basic image data.
+                        </p>
                       </div>
                     </div>
                   </div>

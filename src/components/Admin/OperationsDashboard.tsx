@@ -843,32 +843,32 @@ export const OperationsDashboard: React.FC = () => {
       {/* Main Content */}
       <div className="p-6 space-y-6">
         <Tabs defaultValue="system-health" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="system-health">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="system-health" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4 mr-2" />
               System Health
             </TabsTrigger>
-            <TabsTrigger value="data-processing">
+            <TabsTrigger value="data-processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Database className="h-4 w-4 mr-2" />
               Data Processing
             </TabsTrigger>
-            <TabsTrigger value="ai-performance">
+            <TabsTrigger value="ai-performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Bot className="h-4 w-4 mr-2" />
               AI Performance
             </TabsTrigger>
-            <TabsTrigger value="agent-chat">
+            <TabsTrigger value="agent-chat" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
-            <TabsTrigger value="subscriptions">
+            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <CreditCard className="h-4 w-4 mr-2" />
               Subscriptions
             </TabsTrigger>
-            <TabsTrigger value="api-usage">
+            <TabsTrigger value="api-usage" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Zap className="h-4 w-4 mr-2" />
               API Usage
             </TabsTrigger>
-            <TabsTrigger value="tasks">
+            <TabsTrigger value="tasks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <ListTodo className="h-4 w-4 mr-2" />
               Tasks
             </TabsTrigger>

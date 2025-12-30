@@ -249,14 +249,14 @@ export const AdminPanel: React.FC = () => {
         </div>
 
         <Tabs defaultValue="recent" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="recent">Recent Activity</TabsTrigger>
-            <TabsTrigger value="scores">Score Analysis</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-            <TabsTrigger value="rag">RAG System</TabsTrigger>
-            <TabsTrigger value="quality">Quality Metrics</TabsTrigger>
-            <TabsTrigger value="review">Human Review</TabsTrigger>
-            <TabsTrigger value="testing">AI Testing</TabsTrigger>
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="recent" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Recent Activity</TabsTrigger>
+            <TabsTrigger value="scores" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Score Analysis</TabsTrigger>
+            <TabsTrigger value="performance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Performance</TabsTrigger>
+            <TabsTrigger value="rag" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">RAG System</TabsTrigger>
+            <TabsTrigger value="quality" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Quality Metrics</TabsTrigger>
+            <TabsTrigger value="review" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Human Review</TabsTrigger>
+            <TabsTrigger value="testing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">AI Testing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="recent" className="space-y-4">

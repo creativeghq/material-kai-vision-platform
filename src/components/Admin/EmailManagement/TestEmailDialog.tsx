@@ -87,6 +87,10 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
       // Check for common edge function errors
       if (errorMessage.includes('FunctionsRelayError') || errorMessage.includes('FunctionsHttpError')) {
         errorMessage = 'Email service is not configured. Please check AWS SES credentials in Supabase Edge Function settings.';
+      } else if (errorMessage.includes('Email address is not verified') || errorMessage.includes('MessageRejected')) {
+        errorMessage = 'AWS SES is in Sandbox Mode. You must verify both sender and recipient email addresses in AWS SES Console, or request production access.';
+      } else if (errorMessage.includes('AccessDenied') || errorMessage.includes('InvalidClientTokenId')) {
+        errorMessage = 'AWS credentials are invalid or expired. Please check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in Supabase secrets.';
       }
 
       toast({

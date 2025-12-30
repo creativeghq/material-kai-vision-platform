@@ -217,6 +217,7 @@ serve(async (req) => {
         }
 
         // Send via SES
+        const configSetName = Deno.env.get('SES_CONFIGURATION_SET_NAME');
         const command = new SendEmailCommand({
           Source: fromAddress,
           Destination: {
@@ -232,7 +233,8 @@ serve(async (req) => {
             },
           },
           ReplyToAddresses: body.replyTo ? [body.replyTo] : undefined,
-          ConfigurationSetName: 'ses-mh-notifications', // For bounce/complaint tracking via SNS
+          // Only include ConfigurationSetName if it's configured
+          ...(configSetName ? { ConfigurationSetName: configSetName } : {}),
           Tags: [
             { Name: 'environment', Value: Deno.env.get('ENVIRONMENT') || 'production' },
             { Name: 'type', Value: body.emailType || 'transactional' },
