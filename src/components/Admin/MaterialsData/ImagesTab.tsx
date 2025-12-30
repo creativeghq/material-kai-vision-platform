@@ -265,7 +265,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               No images found
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {filteredImages.map((image) => (
                 <Card key={image.id} className="overflow-hidden flex flex-col">
                   <CardContent className="p-0 flex flex-col h-full">
@@ -274,9 +274,9 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                       alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                       className="w-full h-48 object-cover flex-shrink-0"
                     />
-                    <div className="p-4 space-y-2 flex-1 flex flex-col">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium truncate flex-1" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
+                    <div className="p-3 space-y-2 flex-1 flex flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium line-clamp-2 flex-1" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
                           {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                         </p>
                         {getSourceBadge(image.source_type)}

@@ -151,26 +151,26 @@ export const MaterialsDataPage: React.FC = () => {
         </div>
 
         <Tabs defaultValue="products" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="products" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Products ({stats.products})
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2">
+            <TabsTrigger value="products" className="flex items-center gap-1.5 text-xs md:text-sm">
+              <Package className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Products</span> ({stats.products})
             </TabsTrigger>
-            <TabsTrigger value="chunks" className="flex items-center gap-2">
-              <Grid3X3 className="h-4 w-4" />
-              Chunks ({stats.chunks})
+            <TabsTrigger value="chunks" className="flex items-center gap-1.5 text-xs md:text-sm">
+              <Grid3X3 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Chunks</span> ({stats.chunks})
             </TabsTrigger>
-            <TabsTrigger value="images" className="flex items-center gap-2">
-              <ImageIcon className="h-4 w-4" />
-              Images ({stats.images})
+            <TabsTrigger value="images" className="flex items-center gap-1.5 text-xs md:text-sm">
+              <ImageIcon className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Images</span> ({stats.images})
             </TabsTrigger>
-            <TabsTrigger value="embeddings" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Embeddings ({stats.embeddings})
+            <TabsTrigger value="embeddings" className="flex items-center gap-1.5 text-xs md:text-sm">
+              <Database className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Embeddings</span> ({stats.embeddings})
             </TabsTrigger>
-            <TabsTrigger value="relations" className="flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              Relations
+            <TabsTrigger value="relations" className="flex items-center gap-1.5 text-xs md:text-sm">
+              <Link2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+              <span className="hidden sm:inline">Relations</span>
             </TabsTrigger>
           </TabsList>
 

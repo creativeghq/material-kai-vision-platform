@@ -15,6 +15,7 @@ import { Download, RefreshCw, Search, X, Trash2, Clock, AlertCircle, Database } 
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { supabase } from '@/integrations/supabase/client';
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
@@ -52,44 +53,61 @@ export function LogViewer() {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      
-      const params = new URLSearchParams({
-        page: '1',
-        page_size: '500',
-        hours: hours.toString()
-      });
-      
+
+      // Calculate cutoff time
+      const cutoffTime = new Date();
+      cutoffTime.setHours(cutoffTime.getHours() - hours);
+
+      // Build query
+      let query = supabase
+        .from('system_logs')
+        .select('*', { count: 'exact' })
+        .gte('timestamp', cutoffTime.toISOString())
+        .order('timestamp', { ascending: false })
+        .limit(500);
+
+      // Apply filters
       if (selectedLevel !== 'all') {
-        params.append('level', selectedLevel);
+        query = query.eq('level', selectedLevel.toUpperCase());
       }
-      
+
       if (selectedLogger !== 'all') {
-        params.append('logger_name', selectedLogger);
+        query = query.eq('logger_name', selectedLogger);
       }
 
       if (selectedSource !== 'all') {
-        params.append('source', selectedSource);
+        query = query.contains('context', { source: selectedSource });
       }
 
       if (searchTerm) {
-        params.append('search', searchTerm);
+        query = query.ilike('message', `%${searchTerm}%`);
       }
 
-      const response = await fetch(`/api/admin/logs?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch logs');
+      const { data, error, count } = await query;
+
+      if (error) {
+        // Check if table doesn't exist
+        if (error.message.includes('relation') && error.message.includes('does not exist')) {
+          toast({
+            title: 'Database Setup Required',
+            description: 'The system_logs table needs to be created. Please run the database migrations.',
+            variant: 'destructive',
+          });
+          setLogs([]);
+          setTotal(0);
+          return;
+        }
+        throw error;
       }
-      
-      const data = await response.json();
-      setLogs(data.logs || []);
-      setTotal(data.total || 0);
-      
+
+      setLogs(data || []);
+      setTotal(count || 0);
+
     } catch (error) {
       console.error('Failed to load logs:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load logs from database',
+        description: error instanceof Error ? error.message : 'Failed to load logs from database',
         variant: 'destructive'
       });
     } finally {
@@ -100,26 +118,33 @@ export function LogViewer() {
   // Clear all logs
   const clearAllLogs = async () => {
     try {
-      const response = await fetch('/api/admin/logs', {
-        method: 'DELETE'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to clear logs');
-      }
-      
+      // Calculate cutoff time based on hours filter
+      const cutoffTime = new Date();
+      cutoffTime.setHours(cutoffTime.getHours() - hours);
+
+      // Delete logs older than cutoff time
+      const { error } = await supabase
+        .from('system_logs')
+        .delete()
+        .lt('timestamp', cutoffTime.toISOString());
+
+      if (error) throw error;
+
       setLogs([]);
       setTotal(0);
-      
+
       toast({
         title: 'Logs cleared',
-        description: 'All system logs have been cleared from the database.',
+        description: `System logs older than ${hours} hours have been cleared.`,
       });
+
+      // Reload to show remaining logs
+      await loadLogs();
     } catch (error) {
       console.error('Failed to clear logs:', error);
       toast({
         title: 'Error',
-        description: 'Failed to clear logs',
+        description: error instanceof Error ? error.message : 'Failed to clear logs',
         variant: 'destructive'
       });
     }

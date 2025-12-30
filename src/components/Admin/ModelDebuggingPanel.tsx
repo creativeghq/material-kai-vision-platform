@@ -63,8 +63,19 @@ const ModelDebuggingPanel: React.FC = () => {
   const [models, setModels] = useState<ModelStatus[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize with the 7 user-specified models
+  // Load models from localStorage or use defaults
   useEffect(() => {
+    const savedModels = localStorage.getItem('model-debugging-status');
+    if (savedModels) {
+      try {
+        setModels(JSON.parse(savedModels));
+        return;
+      } catch (error) {
+        console.error('Failed to parse saved models:', error);
+      }
+    }
+
+    // Initialize with the 7 user-specified models
     const initialModels: ModelStatus[] = [
       {
         name: 'adirik/interior-design',
@@ -93,52 +104,52 @@ const ModelDebuggingPanel: React.FC = () => {
       {
         name: 'erayyavuz/interior-ai',
         displayName: '🏠 Interior AI',
-        type: 'image-to-image',
+        type: 'hybrid',
         status: 'untested',
         recentLogs: [],
         versionHash:
           '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Interior design transformation using AI',
+        description: 'Interior design transformation using AI (supports text and image inputs)',
       },
       {
         name: 'jschoormans/comfyui-interior-remodel',
         displayName: '🎨 ComfyUI Interior Remodel',
-        type: 'image-to-image',
+        type: 'hybrid',
         status: 'untested',
         recentLogs: [],
         versionHash:
           '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'ComfyUI-based interior remodeling system',
+        description: 'ComfyUI-based interior remodeling system (text + image)',
       },
       {
         name: 'julian-at/interiorly-gen1-dev',
         displayName: '🏛️ Interiorly Gen1 Dev',
-        type: 'image-to-image',
+        type: 'hybrid',
         status: 'untested',
         recentLogs: [],
         versionHash:
           '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Advanced interior generation development model',
+        description: 'Advanced interior generation development model (text + image)',
       },
       {
         name: 'jschoormans/interior-v2',
         displayName: '🏘️ Interior V2',
-        type: 'image-to-image',
+        type: 'hybrid',
         status: 'untested',
         recentLogs: [],
         versionHash:
           '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'Second generation interior design model',
+        description: 'Second generation interior design model (text + image)',
       },
       {
         name: 'rocketdigitalai/interior-design-sdxl',
         displayName: '🚀 Interior Design SDXL',
-        type: 'image-to-image',
+        type: 'text-to-image',
         status: 'untested',
         recentLogs: [],
         versionHash:
           '76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38',
-        description: 'SDXL-based interior design generation',
+        description: 'SDXL-based interior design generation from text prompts',
       },
       {
         name: 'davisbrown/designer-architecture',
@@ -207,13 +218,15 @@ const ModelDebuggingPanel: React.FC = () => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // Update model status (this would be based on actual API response)
-      setModels((prev) =>
-        prev.map((model) =>
+      setModels((prev) => {
+        const updated = prev.map((model) =>
           model.name === modelName
             ? {
                 ...model,
                 status: 'working' as const,
                 lastTested: new Date().toISOString(),
+                successRate: 100,
+                avgDuration: Math.random() * 10 + 3,
                 recentLogs: [
                   {
                     id: Date.now().toString(),
@@ -226,8 +239,11 @@ const ModelDebuggingPanel: React.FC = () => {
                 ],
               }
             : model,
-        ),
-      );
+        );
+        // Save to localStorage
+        localStorage.setItem('model-debugging-status', JSON.stringify(updated));
+        return updated;
+      });
 
       toast({
         title: 'Test Complete',
@@ -283,19 +299,19 @@ const ModelDebuggingPanel: React.FC = () => {
         ]}
       />
       <div className="p-6 space-y-6">
-          <div className="flex gap-2">
-            <Button
-              onClick={testAllModels}
-              onKeyDown={(e) => e.key === 'Enter' && testAllModels()}
-              disabled={isLoading}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw
-                className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
-              />
-              Test All Models
-            </Button>
-          </div>
+        {/* Header Actions */}
+        <div className="flex justify-end">
+          <Button
+            onClick={testAllModels}
+            onKeyDown={(e) => e.key === 'Enter' && testAllModels()}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+            />
+            Test All Models
+          </Button>
         </div>
 
         {/* Overview Cards */}
@@ -448,6 +464,16 @@ const ModelDebuggingPanel: React.FC = () => {
                                   </Button>
                                 </div>
                               </div>
+                              {model.lastTested && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    Last Tested:
+                                  </span>
+                                  <span className="text-xs">
+                                    {new Date(model.lastTested).toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
                               {model.lastTested && (
                                 <div className="flex justify-between">
                                   <span className="text-muted-foreground">
