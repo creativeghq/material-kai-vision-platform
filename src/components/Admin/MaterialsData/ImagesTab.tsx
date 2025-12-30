@@ -295,36 +295,52 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredImages.map((image) => (
                 <Card key={image.id} className="overflow-hidden">
-                  <CardContent className="p-0">
+                  <div className="aspect-video bg-muted flex items-center justify-center overflow-hidden">
                     <img
                       src={image.image_url}
                       alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
-                      className="w-full h-48 object-cover"
+                      className="w-full h-full object-cover"
                     />
-                    <div className="p-4 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium truncate flex-1">
-                          {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
-                        </p>
+                  </div>
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline">
+                          {image.image_type || 'Unknown'}
+                        </Badge>
                         {getSourceBadge(image.source_type)}
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Page {image.page_number}
-                      </p>
+
+                      <h4 className="font-medium truncate">
+                        {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
+                      </h4>
+
                       {image.vision_analysis?.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
+                        <p className="text-sm text-muted-foreground line-clamp-2">
                           {image.vision_analysis.description}
                         </p>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => handleViewImage(image)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </Button>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="font-medium">Page:</span> {image.page_number || 'N/A'}
+                        </div>
+                        <div>
+                          <span className="font-medium">Status:</span> {image.processing_status || 'N/A'}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleViewImage(image)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Details
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
