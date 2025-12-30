@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Link2, Image as ImageIcon, FileText, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SmartPagination } from '@/components/ui/smart-pagination';
 import {
   Table,
   TableBody,
@@ -22,21 +23,44 @@ interface RelationsTabProps {
 export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFilter, onStatsUpdate }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [relations, setRelations] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const { toast } = useToast();
+
+  const ITEMS_PER_PAGE = 25;
 
   useEffect(() => {
     if (workspaceId) {
-      loadRelations();
+      setCurrentPage(1);
+      loadRelations(1);
     }
   }, [workspaceId, jobIdFilter]);
 
-  const loadRelations = async () => {
+  useEffect(() => {
+    if (workspaceId) {
+      loadRelations(currentPage);
+    }
+  }, [currentPage]);
+
+  const loadRelations = async (page: number) => {
     try {
       setIsLoading(true);
-      console.log('[RelationsTab] Loading relations for workspace:', workspaceId);
+      console.log('[RelationsTab] Loading relations for workspace:', workspaceId, 'page:', page);
+
+      // Get total count
+      let countQuery = supabase
+        .from('document_images')
+        .select('*', { count: 'exact', head: true })
+        .eq('workspace_id', workspaceId);
+
+      if (jobIdFilter && jobIdFilter.trim()) {
+        countQuery = countQuery.eq('source_job_id', jobIdFilter.trim());
+      }
+
+      const { count } = await countQuery;
+      setTotalCount(count || 0);
 
       // Load images with their related chunks and products
-      // Note: Simplified query to avoid complex joins that may not exist in schema
       let query = supabase
         .from('document_images')
         .select(`
@@ -56,7 +80,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
 
       const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(50);
+        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1);
 
       if (error) {
         console.error('[RelationsTab] Error loading relations:', error);
@@ -157,6 +181,17 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
                 ))}
               </TableBody>
             </Table>
+        )}
+
+        {/* Pagination */}
+        {totalCount > ITEMS_PER_PAGE && (
+          <div className="mt-6">
+            <SmartPagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
+              onPageChange={setCurrentPage}
+            />
+          </div>
         )}
       </CardContent>
     </Card>

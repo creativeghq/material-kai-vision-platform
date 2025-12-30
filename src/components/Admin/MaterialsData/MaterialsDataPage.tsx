@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
 import { ImagesTab } from './ImagesTab';
@@ -133,78 +134,27 @@ export const MaterialsDataPage: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <Package className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-            </div>
-            <div className="text-2xl font-semibold mb-1">{stats.products}</div>
-            <div className="text-sm text-muted-foreground">Products</div>
-          </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <Grid3X3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-            </div>
-            <div className="text-2xl font-semibold mb-1">{stats.chunks}</div>
-            <div className="text-sm text-muted-foreground">Chunks</div>
-          </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <ImageIcon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-            </div>
-            <div className="text-2xl font-semibold mb-1">{stats.images}</div>
-            <div className="text-sm text-muted-foreground">Images</div>
-          </div>
-
-          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: '2.5rem',
-                  height: '2.5rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
-                }}
-              >
-                <Database className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-            </div>
-            <div className="text-2xl font-semibold mb-1">{stats.embeddings}</div>
-            <div className="text-sm text-muted-foreground">Embeddings</div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <AdminStatCard
+            title="Products"
+            value={stats.products}
+            icon={Package}
+          />
+          <AdminStatCard
+            title="Chunks"
+            value={stats.chunks}
+            icon={Grid3X3}
+          />
+          <AdminStatCard
+            title="Images"
+            value={stats.images}
+            icon={ImageIcon}
+          />
+          <AdminStatCard
+            title="Embeddings"
+            value={stats.embeddings}
+            icon={Database}
+          />
         </div>
 
         {/* Job ID Filter */}

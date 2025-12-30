@@ -63,7 +63,7 @@ This document defines the consistent design patterns used across the entire plat
 
 ## 3. Tables
 
-### Pattern for Table Tabs
+### EXACT Pattern (Copy from ProductsTab.tsx)
 ```tsx
 <Card>
   <CardHeader>
@@ -81,70 +81,186 @@ This document defines the consistent design patterns used across the entire plat
     </div>
   </CardHeader>
   <CardContent className="p-0">
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Column 1</TableHead>
-          <TableHead>Column 2</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        <TableRow>
-          <TableCell className="font-medium">Content</TableCell>
-          <TableCell>Content</TableCell>
-          <TableCell className="text-right">
-            <Button variant="ghost" size="sm">
-              <Eye className="h-4 w-4" />
-            </Button>
-          </TableCell>
-        </TableRow>
-      </TableBody>
-    </Table>
+    {isLoading ? (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    ) : filteredItems.length === 0 ? (
+      <div className="text-center py-8 text-muted-foreground">
+        No items found
+      </div>
+    ) : (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Column 1</TableHead>
+            <TableHead>Column 2</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.map((item) => (
+            <TableRow key={item.id}>
+              <TableCell className="font-medium">Content</TableCell>
+              <TableCell>Content</TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="sm">
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    )}
+
+    {/* Pagination */}
+    {totalCount > ITEMS_PER_PAGE && (
+      <div className="mt-6">
+        <SmartPagination
+          currentPage={currentPage}
+          totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+    )}
   </CardContent>
 </Card>
 ```
 
-**Rules:**
-- ✅ CardContent must have `className="p-0"` for tables
-- ✅ NO wrapper divs around Table (no `<div className="rounded-md border">`)
-- ✅ NO fixed column widths on TableHead (let table auto-size)
-- ✅ NO wrapper divs inside TableCell (direct content only)
-- ✅ First column typically has `className="font-medium"`
+**CRITICAL RULES - DO NOT DEVIATE:**
+- ✅ CardContent MUST have `className="p-0"`
+- ✅ Table is DIRECT child of ternary (NO wrapper divs!)
+- ✅ Pagination is INSIDE CardContent with `mt-6` for spacing
+- ✅ Loading/empty states have `py-8` for vertical padding
+- ✅ NO `<div className="rounded-md border">` wrapper
+- ✅ NO fixed column widths on TableHead
+- ✅ First column has `className="font-medium"`
 - ✅ Actions column has `className="text-right"`
-- ✅ Table component has built-in overflow handling
+
+**Reference File:** `src/components/Admin/MaterialsData/ProductsTab.tsx`
 
 ---
 
-## 4. Image Grids
+## 4. Image Grids (Dashboard Card Style)
 
-### Pattern
+### EXACT Pattern (Copy from ImagesTab.tsx)
 ```tsx
 <CardContent>
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-    {items.map((item) => (
-      <Card key={item.id} className="overflow-hidden">
-        <CardContent className="p-0">
-          <img src={item.url} alt={item.alt} className="w-full h-48 object-cover" />
-          <div className="p-4 space-y-2">
-            <p className="text-sm font-medium truncate">{item.title}</p>
-            <Button variant="outline" size="sm" className="w-full">
-              View Details
-            </Button>
+  {isLoading ? (
+    <div className="flex items-center justify-center py-8">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  ) : filteredImages.length === 0 ? (
+    <div className="text-center py-8 text-muted-foreground">
+      No images found
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: 'var(--grid-gap)' }}>
+      {images.map((image) => (
+        <div
+          key={image.id}
+          className="dashboard-card transition-all duration-200 hover:shadow-md cursor-pointer"
+          style={{ padding: 'var(--card-padding)' }}
+          onClick={() => handleViewImage(image)}
+        >
+          {/* Image */}
+          <div className="aspect-video bg-muted rounded-lg overflow-hidden" style={{ marginBottom: 'var(--space-sm)' }}>
+            <img
+              src={image.image_url}
+              alt={image.caption}
+              className="w-full h-full object-cover"
+            />
           </div>
-        </CardContent>
-      </Card>
-    ))}
-  </div>
+
+          {/* Badges */}
+          <div className="flex items-center justify-between" style={{ marginBottom: 'var(--space-xs)' }}>
+            <Badge variant="outline" className="text-xs">{image.image_type}</Badge>
+            {getSourceBadge(image.source_type)}
+          </div>
+
+          {/* Title */}
+          <h4 className="font-medium truncate" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-xs)' }}>
+            {image.filename}
+          </h4>
+
+          {/* Description */}
+          {image.description && (
+            <p className="text-muted-foreground line-clamp-2" style={{ fontSize: 'var(--text-xs)', marginBottom: 'var(--space-xs)' }}>
+              {image.description}
+            </p>
+          )}
+
+          {/* Metadata */}
+          <div className="grid grid-cols-2 gap-2" style={{ fontSize: 'var(--text-xs)', color: 'hsl(var(--muted-foreground))' }}>
+            <div><span className="font-medium">Page:</span> {image.page}</div>
+            <div><span className="font-medium">Status:</span> {image.status}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Pagination if needed */}
+  {totalCount > ITEMS_PER_PAGE && (
+    <div className="mt-6">
+      <SmartPagination
+        currentPage={currentPage}
+        totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
+        onPageChange={setCurrentPage}
+      />
+    </div>
+  )}
 </CardContent>
 ```
 
+**CRITICAL RULES - DO NOT DEVIATE:**
+- ✅ Use `dashboard-card` class (NOT Card component)
+- ✅ Grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-4` with `gap: var(--grid-gap)`
+- ✅ Card: `className="dashboard-card transition-all duration-200 hover:shadow-md cursor-pointer"`
+- ✅ Card padding: `style={{ padding: 'var(--card-padding)' }}`
+- ✅ Image container: `aspect-video bg-muted rounded-lg overflow-hidden`
+- ✅ Image: `w-full h-full object-cover`
+- ✅ Use CSS variables for ALL spacing: `var(--space-sm)`, `var(--space-xs)`, `var(--text-sm)`, etc.
+- ✅ Whole card is clickable with `onClick`
+- ✅ NO separate button - entire card is the click target
+- ✅ Pagination INSIDE CardContent with `mt-6`
+
+**Reference File:** `src/components/Admin/MaterialsData/ImagesTab.tsx`
+
+---
+
+## 7. Smart Pagination
+
+### Pattern
+```tsx
+import { SmartPagination } from '@/components/ui/smart-pagination';
+
+{totalCount > ITEMS_PER_PAGE && (
+  <div className="mt-6">
+    <SmartPagination
+      currentPage={currentPage}
+      totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
+      onPageChange={setCurrentPage}
+    />
+  </div>
+)}
+```
+
+**Behavior:**
+- Shows: `Previous 1 2 3 4 ... 10 Next`
+- When on page 4: `Previous 1 ... 3 4 5 ... 10 Next`
+- When on page 10: `Previous 1 ... 8 9 10 Next`
+- Always shows first page, last page, current page ± 1
+- Ellipsis (...) for gaps
+
 **Rules:**
-- ✅ Responsive grid: `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`
-- ✅ Fixed image height: `h-48` (not aspect-square for consistency)
-- ✅ Simple structure: img → div.p-4 → content
-- ✅ Use `truncate` for text overflow, not complex flex layouts
-- ✅ CardContent keeps default padding (NOT p-0 like tables)
+- ✅ Always use SmartPagination component
+- ✅ Wrapper div with `className="mt-6"`
+- ✅ Calculate totalPages with `Math.ceil(totalCount / ITEMS_PER_PAGE)`
+- ❌ Never create custom pagination with all page numbers
+
+**Reference File:** `src/components/ui/smart-pagination.tsx`
 
 ---
 
@@ -168,6 +284,34 @@ const getSourceBadge = (sourceType: string) => {
 - ✅ PDF = default (primary color)
 - ✅ XML = secondary
 - ✅ Web = outline
+
+---
+
+## 6. Stat Cards
+
+### Pattern (AdminStatCard)
+```tsx
+import { AdminStatCard } from '../AdminStatCard';
+
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+  <AdminStatCard
+    title="Products"
+    value={stats.products}
+    icon={Package}
+  />
+  <AdminStatCard
+    title="Chunks"
+    value={stats.chunks}
+    icon={Grid3X3}
+  />
+</div>
+```
+
+**Rules:**
+- ✅ Always use AdminStatCard component for stats
+- ✅ Grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`
+- ✅ Compact design with icon + title on same line
+- ❌ Never create custom stat cards with big icons and spacing
 
 ---
 

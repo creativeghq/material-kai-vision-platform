@@ -21,6 +21,7 @@ import {
 import { Search, Eye, Loader2, FileText, Code, Globe, Grid3X3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SmartPagination } from '@/components/ui/smart-pagination';
 import {
   Dialog,
   DialogContent,
@@ -163,7 +164,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -173,15 +174,12 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
               No chunks found
             </div>
           ) : (
-            <div className="rounded-md border">
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Content Preview</TableHead>
                     <TableHead>Source</TableHead>
-                    <TableHead>Page</TableHead>
                     <TableHead>Has Embedding</TableHead>
-                    <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -193,17 +191,11 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                       </TableCell>
                       <TableCell>{getSourceBadge(chunk.source_type)}</TableCell>
                       <TableCell>
-                        <Badge variant="outline">{chunk.page_number || 'N/A'}</Badge>
-                      </TableCell>
-                      <TableCell>
                         {chunk.embedding ? (
-                          <Badge>Yes</Badge>
+                          <Badge className="bg-green-100 text-green-700">Yes</Badge>
                         ) : (
                           <Badge variant="secondary">No</Badge>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        {new Date(chunk.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -218,40 +210,16 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
 
           {/* Pagination */}
           {totalCount > ITEMS_PER_PAGE && (
-            <div className="flex items-center justify-center gap-2 mt-6">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-
-              {Array.from({ length: Math.ceil(totalCount / ITEMS_PER_PAGE) }, (_, i) => i + 1).map(page => (
-                <Button
-                  key={page}
-                  variant={currentPage === page ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(page)}
-                >
-                  {page}
-                </Button>
-              ))}
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(p => Math.min(Math.ceil(totalCount / ITEMS_PER_PAGE), p + 1))}
-                disabled={currentPage === Math.ceil(totalCount / ITEMS_PER_PAGE)}
-              >
-                Next
-              </Button>
+            <div className="mt-6">
+              <SmartPagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
+                onPageChange={setCurrentPage}
+              />
             </div>
           )}
         </CardContent>
