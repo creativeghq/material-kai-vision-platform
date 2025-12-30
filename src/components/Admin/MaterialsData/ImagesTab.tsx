@@ -103,53 +103,80 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
   const loadImageEmbeddings = async (imageId: string) => {
     try {
-      // Check if image has multimodal fusion embedding
+      // Load all embeddings from document_images table
       const { data: imageData, error: imageError } = await supabase
         .from('document_images')
-        .select('multimodal_fusion_embedding_2688')
+        .select('multimodal_fusion_embedding_2688, visual_clip_embedding_512, color_embedding_256, texture_embedding_256, application_embedding_512')
         .eq('id', imageId)
         .single();
 
       if (imageError) {
-        console.error('Failed to check image embedding:', imageError);
+        console.error('[ImagesTab] Failed to load embeddings:', imageError);
         setImageEmbeddings([]);
         return;
       }
 
-      // For now, just indicate if the fusion embedding exists
-      // VECS embeddings are stored separately and not easily queryable from frontend
       const embeddings = [];
+
+      // Add multimodal fusion embedding (2688D)
       if (imageData?.multimodal_fusion_embedding_2688) {
         embeddings.push({
-          embedding_type: 'multimodal_fusion',
+          embedding_type: 'Multimodal Fusion',
           model_name: 'SigLIP-SO400M-14-384',
           vector_dimensions: 2688,
         });
       }
 
+      // Add CLIP visual embedding (512D)
+      if (imageData?.visual_clip_embedding_512) {
+        embeddings.push({
+          embedding_type: 'Visual CLIP',
+          model_name: 'clip-vit-base-patch32',
+          vector_dimensions: 512,
+        });
+      }
+
+      // Add color embedding (256D)
+      if (imageData?.color_embedding_256) {
+        embeddings.push({
+          embedding_type: 'Color',
+          model_name: 'clip-vit-base-patch32',
+          vector_dimensions: 256,
+        });
+      }
+
+      // Add texture embedding (256D)
+      if (imageData?.texture_embedding_256) {
+        embeddings.push({
+          embedding_type: 'Texture',
+          model_name: 'clip-vit-base-patch32',
+          vector_dimensions: 256,
+        });
+      }
+
+      // Add application embedding (512D)
+      if (imageData?.application_embedding_512) {
+        embeddings.push({
+          embedding_type: 'Application',
+          model_name: 'clip-vit-base-patch32',
+          vector_dimensions: 512,
+        });
+      }
+
       setImageEmbeddings(embeddings);
     } catch (error) {
-      console.error('Failed to load embeddings:', error);
+      console.error('[ImagesTab] Failed to load embeddings:', error);
       setImageEmbeddings([]);
     }
   };
 
   const handleViewImage = async (image: any) => {
-    // Load full image data with relations
+    // Load full image data with ALL relations
     const { data: fullImageData, error } = await supabase
       .from('document_images')
       .select(`
         *,
-        document_chunks!inner(
-          id,
-          chunk_text,
-          page_number,
-          products(
-            id,
-            name,
-            source_type
-          )
-        )
+        documents(id, filename, title)
       `)
       .eq('id', image.id)
       .single();
@@ -158,7 +185,39 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
       console.error('[ImagesTab] Error loading full image data:', error);
       setSelectedImage(image);
     } else {
-      setSelectedImage(fullImageData);
+      // Load chunk relationships
+      const { data: chunkRels } = await supabase
+        .from('chunk_image_relationships')
+        .select(`
+          relationship_type,
+          relevance_score,
+          document_chunks!inner(
+            id,
+            chunk_text,
+            page_number
+          )
+        `)
+        .eq('image_id', image.id);
+
+      // Load product relationships
+      const { data: productRels } = await supabase
+        .from('product_image_relationships')
+        .select(`
+          relationship_type,
+          relevance_score,
+          product_enrichments!inner(
+            id,
+            product_name,
+            product_category
+          )
+        `)
+        .eq('image_id', image.id);
+
+      setSelectedImage({
+        ...fullImageData,
+        chunk_relationships: chunkRels || [],
+        product_relationships: productRels || []
+      });
     }
 
     await loadImageEmbeddings(image.id);
@@ -389,10 +448,18 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                         <Badge variant="default">{selectedImage.category}</Badge>
                       </div>
                     )}
-                    {selectedImage.image_type && (
+                    {(selectedImage.vision_analysis?.material_type || selectedImage.image_type) && (
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Type:</span>
-                        <Badge variant="secondary">{selectedImage.image_type}</Badge>
+                        <Badge variant="secondary">
+                          {(() => {
+                            const materialType = selectedImage.vision_analysis?.material_type;
+                            if (typeof materialType === 'string') {
+                              return materialType.replace(/_/g, ' ');
+                            }
+                            return selectedImage.image_type || 'Unknown';
+                          })()}
+                        </Badge>
                       </div>
                     )}
                     {selectedImage.confidence && (
@@ -403,8 +470,14 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     )}
                     {selectedImage.confidence_score && (
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">Confidence Score:</span>
+                        <span className="text-xs text-muted-foreground">AI Confidence:</span>
                         <span className="text-xs font-medium">{(selectedImage.confidence_score * 100).toFixed(1)}%</span>
+                      </div>
+                    )}
+                    {selectedImage.quality_score && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Quality Score:</span>
+                        <span className="text-xs font-medium">{(selectedImage.quality_score * 100).toFixed(1)}%</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between">
@@ -422,26 +495,168 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   </CardContent>
                 </Card>
 
+                {/* Vision Analysis - Rich Details */}
+                {selectedImage.vision_analysis && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Vision Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Material Type */}
+                      {selectedImage.vision_analysis.material_type && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Material Type:</span>
+                          <Badge variant="outline" className="text-xs">
+                            {typeof selectedImage.vision_analysis.material_type === 'string'
+                              ? selectedImage.vision_analysis.material_type.replace(/_/g, ' ')
+                              : String(selectedImage.vision_analysis.material_type)}
+                          </Badge>
+                        </div>
+                      )}
+
+                      {/* Patterns */}
+                      {selectedImage.vision_analysis.patterns && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Patterns:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedImage.vision_analysis.patterns.primary && (
+                              <Badge variant="default" className="text-xs">
+                                {typeof selectedImage.vision_analysis.patterns.primary === 'string'
+                                  ? selectedImage.vision_analysis.patterns.primary.replace(/_/g, ' ')
+                                  : String(selectedImage.vision_analysis.patterns.primary)}
+                                {selectedImage.vision_analysis.patterns.confidence &&
+                                  ` (${(selectedImage.vision_analysis.patterns.confidence * 100).toFixed(0)}%)`}
+                              </Badge>
+                            )}
+                            {Array.isArray(selectedImage.vision_analysis.patterns.secondary) &&
+                              selectedImage.vision_analysis.patterns.secondary.map((pattern: any, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {typeof pattern === 'string' ? pattern.replace(/_/g, ' ') : String(pattern)}
+                                </Badge>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Colors */}
+                      {selectedImage.vision_analysis.colors && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Colors:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedImage.vision_analysis.colors.primary && (
+                              <Badge variant="default" className="text-xs">
+                                {String(selectedImage.vision_analysis.colors.primary)}
+                                {selectedImage.vision_analysis.colors.confidence &&
+                                  ` (${(selectedImage.vision_analysis.colors.confidence * 100).toFixed(0)}%)`}
+                              </Badge>
+                            )}
+                            {Array.isArray(selectedImage.vision_analysis.colors.secondary) &&
+                              selectedImage.vision_analysis.colors.secondary.map((color: any, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {String(color)}
+                                </Badge>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Finish */}
+                      {selectedImage.vision_analysis.finish && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Finish:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedImage.vision_analysis.finish.primary && (
+                              <Badge variant="default" className="text-xs">
+                                {String(selectedImage.vision_analysis.finish.primary)}
+                                {selectedImage.vision_analysis.finish.confidence &&
+                                  ` (${(selectedImage.vision_analysis.finish.confidence * 100).toFixed(0)}%)`}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Style */}
+                      {selectedImage.vision_analysis.style && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Style:</span>
+                          <div className="flex flex-wrap gap-1">
+                            {selectedImage.vision_analysis.style.primary && (
+                              <Badge variant="default" className="text-xs">
+                                {typeof selectedImage.vision_analysis.style.primary === 'string'
+                                  ? selectedImage.vision_analysis.style.primary.replace(/_/g, ' ')
+                                  : String(selectedImage.vision_analysis.style.primary)}
+                                {selectedImage.vision_analysis.style.confidence &&
+                                  ` (${(selectedImage.vision_analysis.style.confidence * 100).toFixed(0)}%)`}
+                              </Badge>
+                            )}
+                            {Array.isArray(selectedImage.vision_analysis.style.secondary) &&
+                              selectedImage.vision_analysis.style.secondary.map((style: any, idx: number) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {typeof style === 'string' ? style.replace(/_/g, ' ') : String(style)}
+                                </Badge>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Technical Specs */}
+                      {selectedImage.vision_analysis.technical_specs && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Technical Specs:</span>
+                          <div className="bg-muted p-2 rounded space-y-1">
+                            {selectedImage.vision_analysis.technical_specs.measurements && (
+                              <div className="text-xs">
+                                <span className="font-medium">Dimensions:</span> {selectedImage.vision_analysis.technical_specs.measurements}
+                              </div>
+                            )}
+                            {selectedImage.vision_analysis.technical_specs.dimensions_visible !== undefined && (
+                              <div className="text-xs">
+                                <span className="font-medium">Dimensions Visible:</span> {selectedImage.vision_analysis.technical_specs.dimensions_visible ? 'Yes' : 'No'}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Description */}
+                      {selectedImage.vision_analysis.description && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Description:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{selectedImage.vision_analysis.description}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Material Properties Section */}
                 {selectedImage.material_properties && Object.keys(selectedImage.material_properties).length > 0 && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Material Properties</CardTitle>
+                      <CardTitle className="text-sm">Material Properties (Extracted)</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {Object.entries(selectedImage.material_properties).map(([key, value]: [string, any]) => (
-                        <div key={key} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
-                            <span className="text-xs font-medium">{value?.primary || value}</span>
-                          </div>
-                          {value?.confidence && (
-                            <div className="text-xs text-muted-foreground ml-auto">
-                              {(value.confidence * 100).toFixed(0)}% confidence
+                      {Object.entries(selectedImage.material_properties).map(([key, value]: [string, any]) => {
+                        // Handle different value types safely
+                        const displayValue = typeof value === 'object' && value !== null
+                          ? (value.primary || JSON.stringify(value))
+                          : String(value || '');
+
+                        return (
+                          <div key={key} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                              <span className="text-xs font-medium">{displayValue}</span>
                             </div>
-                          )}
-                        </div>
-                      ))}
+                            {typeof value === 'object' && value?.confidence && (
+                              <div className="text-xs text-muted-foreground ml-auto">
+                                {(value.confidence * 100).toFixed(0)}% confidence
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </CardContent>
                   </Card>
                 )}
@@ -685,45 +900,79 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                 )}
 
                 {/* Relations Section */}
-                {selectedImage.document_chunks && selectedImage.document_chunks.length > 0 && (
+                {((selectedImage.chunk_relationships && selectedImage.chunk_relationships.length > 0) ||
+                  (selectedImage.product_relationships && selectedImage.product_relationships.length > 0)) && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-sm">Related Data</CardTitle>
+                      <CardTitle className="text-sm">Relationships</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {/* Related Chunks */}
-                      <div>
-                        <h5 className="text-xs font-semibold text-muted-foreground mb-2">
-                          Chunks ({selectedImage.document_chunks.length})
-                        </h5>
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {selectedImage.document_chunks.slice(0, 3).map((chunk: any) => (
-                            <div key={chunk.id} className="text-xs p-2 bg-muted rounded">
-                              {chunk.chunk_text?.substring(0, 100)}...
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Related Products */}
-                      {selectedImage.document_chunks.some((chunk: any) => chunk.products && chunk.products.length > 0) && (
+                      {selectedImage.chunk_relationships && selectedImage.chunk_relationships.length > 0 && (
                         <div>
                           <h5 className="text-xs font-semibold text-muted-foreground mb-2">
-                            Products
+                            Related Chunks ({selectedImage.chunk_relationships.length})
                           </h5>
-                          <div className="space-y-1">
-                            {selectedImage.document_chunks.map((chunk: any) =>
-                              chunk.products?.map((product: any) => (
-                                <div key={product.id} className="flex items-center justify-between text-xs p-2 bg-muted rounded">
-                                  <span>{product.name}</span>
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {selectedImage.chunk_relationships.map((rel: any, idx: number) => (
+                              <div key={idx} className="p-2 bg-muted rounded space-y-1">
+                                <div className="flex items-center justify-between">
                                   <Badge variant="outline" className="text-xs">
-                                    {product.source_type}
+                                    {rel.relationship_type || 'related'}
                                   </Badge>
+                                  {rel.relevance_score && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {(rel.relevance_score * 100).toFixed(0)}% relevance
+                                    </span>
+                                  )}
                                 </div>
-                              ))
-                            )}
+                                <p className="text-xs break-words">
+                                  {rel.document_chunks?.chunk_text?.substring(0, 150)}...
+                                </p>
+                                <span className="text-xs text-muted-foreground">
+                                  Page {rel.document_chunks?.page_number}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
+                      )}
+
+                      {/* Related Products */}
+                      {selectedImage.product_relationships && selectedImage.product_relationships.length > 0 && (
+                        <div>
+                          <h5 className="text-xs font-semibold text-muted-foreground mb-2">
+                            Related Products ({selectedImage.product_relationships.length})
+                          </h5>
+                          <div className="space-y-2">
+                            {selectedImage.product_relationships.map((rel: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-xs p-2 bg-muted rounded">
+                                <div className="flex-1">
+                                  <div className="font-medium">{rel.product_enrichments?.product_name}</div>
+                                  <div className="text-muted-foreground text-xs">
+                                    {rel.product_enrichments?.product_category}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs">
+                                    {rel.relationship_type || 'related'}
+                                  </Badge>
+                                  {rel.relevance_score && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {(rel.relevance_score * 100).toFixed(0)}%
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No Relationships */}
+                      {(!selectedImage.chunk_relationships || selectedImage.chunk_relationships.length === 0) &&
+                       (!selectedImage.product_relationships || selectedImage.product_relationships.length === 0) && (
+                        <p className="text-xs text-muted-foreground">No relationships found</p>
                       )}
                     </CardContent>
                   </Card>
@@ -749,34 +998,32 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     <CardTitle className="text-sm">Embeddings</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    {/* Multimodal Fusion Embedding */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-muted-foreground">Multimodal Fusion (2688D):</span>
-                        <Badge variant={selectedImage.multimodal_fusion_embedding_2688 ? 'default' : 'secondary'}>
-                          {selectedImage.multimodal_fusion_embedding_2688 ? '✓ Present' : '✗ Missing'}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Other Embeddings */}
                     {imageEmbeddings.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No additional embeddings found</p>
+                      <p className="text-xs text-muted-foreground">No embeddings found</p>
                     ) : (
-                      <div>
-                        <h5 className="text-xs font-semibold text-muted-foreground mb-2">
-                          Additional Embeddings ({imageEmbeddings.length})
-                        </h5>
-                        <div className="space-y-2">
-                          {imageEmbeddings.map((emb, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-xs">
-                              <Badge variant="outline" className="text-xs">{emb.embedding_type || 'text'}</Badge>
-                              <span className="text-muted-foreground">
-                                {emb.embedding?.length || 0}D
-                              </span>
+                      <div className="space-y-2">
+                        {imageEmbeddings.map((emb: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="default" className="text-xs">
+                                  {emb.embedding_type}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {emb.vector_dimensions}D
+                                </span>
+                              </div>
+                              {emb.model_name && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Model: {emb.model_name}
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
+                            <Badge variant="outline" className="text-xs">
+                              ✓ Present
+                            </Badge>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </CardContent>
