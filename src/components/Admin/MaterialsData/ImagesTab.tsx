@@ -102,15 +102,34 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
   const loadImageEmbeddings = async (imageId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('embeddings')
-        .select('*')
-        .eq('image_id', imageId);
+      // Check if image has multimodal fusion embedding
+      const { data: imageData, error: imageError } = await supabase
+        .from('document_images')
+        .select('multimodal_fusion_embedding_2688')
+        .eq('id', imageId)
+        .single();
 
-      if (error) throw error;
-      setImageEmbeddings(data || []);
+      if (imageError) {
+        console.error('Failed to check image embedding:', imageError);
+        setImageEmbeddings([]);
+        return;
+      }
+
+      // For now, just indicate if the fusion embedding exists
+      // VECS embeddings are stored separately and not easily queryable from frontend
+      const embeddings = [];
+      if (imageData?.multimodal_fusion_embedding_2688) {
+        embeddings.push({
+          embedding_type: 'multimodal_fusion',
+          model_name: 'SigLIP-SO400M-14-384',
+          vector_dimensions: 2688,
+        });
+      }
+
+      setImageEmbeddings(embeddings);
     } catch (error) {
       console.error('Failed to load embeddings:', error);
+      setImageEmbeddings([]);
     }
   };
 
@@ -265,20 +284,20 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
               No images found
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredImages.map((image) => (
-                <Card key={image.id} className="overflow-hidden flex flex-col min-w-0">
-                  <CardContent className="p-0 flex flex-col h-full min-w-0">
-                    <div className="w-full h-48 flex-shrink-0 overflow-hidden">
+                <Card key={image.id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="aspect-square overflow-hidden bg-muted">
                       <img
                         src={image.image_url}
                         alt={image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                         className="w-full h-full object-cover"
                       />
                     </div>
-                    <div className="p-3 space-y-2 flex-1 flex flex-col min-w-0">
-                      <div className="flex items-start justify-between gap-2 min-w-0">
-                        <p className="text-xs font-medium line-clamp-2 flex-1 min-w-0 break-words" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
+                    <div className="p-3 space-y-2 flex-1 flex flex-col">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-medium line-clamp-1 flex-1 overflow-hidden text-ellipsis" title={image.metadata?.filename || image.caption || `Page ${image.page_number}`}>
                           {image.metadata?.filename || image.caption || `Page ${image.page_number}`}
                         </p>
                         <div className="flex-shrink-0">
@@ -289,7 +308,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                         Page {image.page_number}
                       </p>
                       {image.vision_analysis?.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 break-words" title={image.vision_analysis.description}>
+                        <p className="text-xs text-muted-foreground line-clamp-2 overflow-hidden" title={image.vision_analysis.description}>
                           {image.vision_analysis.description}
                         </p>
                       )}
@@ -371,22 +390,42 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     <CardTitle className="text-sm">Classification</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Type:</span>
-                      <Badge variant={selectedImage.classification === 'material' ? 'default' : 'secondary'}>
-                        {selectedImage.classification || 'Unknown'}
-                      </Badge>
-                    </div>
+                    {selectedImage.category && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Category:</span>
+                        <Badge variant="default">{selectedImage.category}</Badge>
+                      </div>
+                    )}
+                    {selectedImage.image_type && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Type:</span>
+                        <Badge variant="secondary">{selectedImage.image_type}</Badge>
+                      </div>
+                    )}
                     {selectedImage.confidence && (
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Confidence:</span>
                         <span className="text-xs font-medium">{(selectedImage.confidence * 100).toFixed(1)}%</span>
                       </div>
                     )}
+                    {selectedImage.confidence_score && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Confidence Score:</span>
+                        <span className="text-xs font-medium">{(selectedImage.confidence_score * 100).toFixed(1)}%</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Page:</span>
                       <span className="text-xs font-medium">{selectedImage.page_number}</span>
                     </div>
+                    {selectedImage.processing_status && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Status:</span>
+                        <Badge variant={selectedImage.processing_status === 'completed' ? 'default' : 'secondary'}>
+                          {selectedImage.processing_status}
+                        </Badge>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
@@ -414,6 +453,29 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   </Card>
                 )}
 
+                {/* Caption & Alt Text */}
+                {(selectedImage.caption || selectedImage.alt_text) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Image Text</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {selectedImage.caption && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Caption:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{selectedImage.caption}</p>
+                        </div>
+                      )}
+                      {selectedImage.alt_text && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Alt Text:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{selectedImage.alt_text}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* AI Analysis Section */}
                 {(selectedImage.vision_analysis?.description || selectedImage.claude_validation?.description) && (
                   <Card>
@@ -424,15 +486,121 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                       {selectedImage.vision_analysis?.description && (
                         <div>
                           <h5 className="text-xs font-semibold text-muted-foreground mb-1">Vision Model</h5>
-                          <p className="text-xs break-words">{selectedImage.vision_analysis.description}</p>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{selectedImage.vision_analysis.description}</p>
                         </div>
                       )}
                       {selectedImage.claude_validation?.description && (
                         <div>
                           <h5 className="text-xs font-semibold text-muted-foreground mb-1">Claude Validation</h5>
-                          <p className="text-xs break-words">{selectedImage.claude_validation.description}</p>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{selectedImage.claude_validation.description}</p>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Quality Metrics */}
+                {(selectedImage.quality_score || selectedImage.quality_metrics) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Quality Metrics</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {selectedImage.quality_score && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">Quality Score:</span>
+                          <span className="text-xs font-medium">{Number(selectedImage.quality_score).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {selectedImage.quality_metrics && Object.entries(selectedImage.quality_metrics).map(([key, value]: [string, any]) => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                          <span className="text-xs font-medium">{typeof value === 'object' ? JSON.stringify(value) : String(value)}</span>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* OCR Data */}
+                {(selectedImage.ocr_extracted_text || selectedImage.ocr_confidence_score) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">OCR Data</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {selectedImage.ocr_confidence_score && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">OCR Confidence:</span>
+                          <span className="text-xs font-medium">{Number(selectedImage.ocr_confidence_score).toFixed(1)}%</span>
+                        </div>
+                      )}
+                      {selectedImage.ocr_extracted_text && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Extracted Text:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded max-h-32 overflow-y-auto">{selectedImage.ocr_extracted_text}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Context Information */}
+                {(selectedImage.contextual_name || selectedImage.nearest_heading) && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Context</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {selectedImage.contextual_name && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Contextual Name:</span>
+                          <p className="text-xs break-words">{selectedImage.contextual_name}</p>
+                        </div>
+                      )}
+                      {selectedImage.nearest_heading && (
+                        <div>
+                          <span className="text-xs text-muted-foreground block mb-1">Nearest Heading:</span>
+                          <p className="text-xs break-words">{selectedImage.nearest_heading}</p>
+                          {selectedImage.heading_level && (
+                            <span className="text-xs text-muted-foreground">Level {selectedImage.heading_level}</span>
+                          )}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Visual Features */}
+                {selectedImage.visual_features && Object.keys(selectedImage.visual_features).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Visual Features</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(selectedImage.visual_features).map(([key, value]: [string, any]) => (
+                        <div key={key}>
+                          <span className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
+                          <p className="text-xs break-words">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Image Analysis Results */}
+                {selectedImage.image_analysis_results && Object.keys(selectedImage.image_analysis_results).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Image Analysis</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(selectedImage.image_analysis_results).map(([key, value]: [string, any]) => (
+                        <div key={key}>
+                          <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 )}
@@ -472,36 +640,56 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   </Card>
                 )}
 
-                {/* Quality Metrics Section */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Quality Metrics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {selectedImage.quality_score ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Overall Quality:</span>
-                          <span className="text-xs font-medium">{(selectedImage.quality_score * 100).toFixed(0)}%</span>
+                {/* Visual Metadata */}
+                {selectedImage.visual_metadata && Object.keys(selectedImage.visual_metadata).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Visual Metadata</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(selectedImage.visual_metadata).map(([key, value]: [string, any]) => (
+                        <div key={key}>
+                          <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
                         </div>
-                        {selectedImage.metadata?.sharpness_score && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">Sharpness:</span>
-                            <span className="text-xs font-medium">{(selectedImage.metadata.sharpness_score * 100).toFixed(0)}%</span>
-                          </div>
-                        )}
-                        {selectedImage.metadata?.resolution_dpi && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">Resolution:</span>
-                            <span className="text-xs font-medium">{selectedImage.metadata.resolution_dpi} DPI</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No quality metrics available</p>
-                    )}
-                  </CardContent>
-                </Card>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Multimodal Metadata */}
+                {selectedImage.multimodal_metadata && Object.keys(selectedImage.multimodal_metadata).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Multimodal Metadata</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(selectedImage.multimodal_metadata).map(([key, value]: [string, any]) => (
+                        <div key={key}>
+                          <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Extracted Metadata */}
+                {selectedImage.extracted_metadata && Object.keys(selectedImage.extracted_metadata).length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Extracted Metadata</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {Object.entries(selectedImage.extracted_metadata).map(([key, value]: [string, any]) => (
+                        <div key={key}>
+                          <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
+                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Relations Section */}
                 {selectedImage.document_chunks && selectedImage.document_chunks.length > 0 && (
@@ -548,24 +736,54 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                   </Card>
                 )}
 
+                {/* Bounding Box */}
+                {selectedImage.bbox && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Bounding Box</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="text-xs bg-muted p-2 rounded font-mono">
+                        {JSON.stringify(selectedImage.bbox, null, 2)}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Embeddings Section */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm">Embeddings ({imageEmbeddings.length})</CardTitle>
+                    <CardTitle className="text-sm">Embeddings</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-3">
+                    {/* Multimodal Fusion Embedding */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-muted-foreground">Multimodal Fusion (2688D):</span>
+                        <Badge variant={selectedImage.multimodal_fusion_embedding_2688 ? 'default' : 'secondary'}>
+                          {selectedImage.multimodal_fusion_embedding_2688 ? '✓ Present' : '✗ Missing'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Other Embeddings */}
                     {imageEmbeddings.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">No embeddings found</p>
+                      <p className="text-xs text-muted-foreground">No additional embeddings found</p>
                     ) : (
-                      <div className="space-y-2">
-                        {imageEmbeddings.map((emb, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-xs">
-                            <Badge variant="outline" className="text-xs">{emb.embedding_type || 'text'}</Badge>
-                            <span className="text-muted-foreground">
-                              {emb.embedding?.length || 0}D
-                            </span>
-                          </div>
-                        ))}
+                      <div>
+                        <h5 className="text-xs font-semibold text-muted-foreground mb-2">
+                          Additional Embeddings ({imageEmbeddings.length})
+                        </h5>
+                        <div className="space-y-2">
+                          {imageEmbeddings.map((emb, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs">
+                              <Badge variant="outline" className="text-xs">{emb.embedding_type || 'text'}</Badge>
+                              <span className="text-muted-foreground">
+                                {emb.embedding?.length || 0}D
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </CardContent>
