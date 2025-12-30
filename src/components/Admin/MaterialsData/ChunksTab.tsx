@@ -155,7 +155,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

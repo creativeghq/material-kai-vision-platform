@@ -234,7 +234,7 @@ export const MaterialsDataPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="products" className="w-full">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Package className="h-4 w-4 mr-2" />
               Products

@@ -202,7 +202,7 @@ export const AdminPanel: React.FC = () => {
       />
 
       {/* Main Content */}
-      <div className="p-6 space-y-6">
+      <div className="container mx-auto px-6 py-6 space-y-6">
         {/* Refresh Button */}
         <div className="flex justify-end">
           <Button
