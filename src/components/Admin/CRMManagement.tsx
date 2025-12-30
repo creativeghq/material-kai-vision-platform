@@ -396,20 +396,21 @@ export const CRMManagement: React.FC = () => {
         </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="users" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
-          </TabsTrigger>
-          <TabsTrigger value="contacts" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Contacts
-          </TabsTrigger>
-        </TabsList>
+      <Card className="p-6">
+        <Tabs defaultValue="users" className="space-y-4">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Users className="h-4 w-4 mr-2" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Building2 className="h-4 w-4 mr-2" />
+              Contacts
+            </TabsTrigger>
+          </TabsList>
 
         {/* Users Tab */}
-        <TabsContent value="users" className="space-y-4">
+        <TabsContent value="users" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
               <CardTitle>User Management</CardTitle>
@@ -540,7 +541,7 @@ export const CRMManagement: React.FC = () => {
         </TabsContent>
 
         {/* Contacts Tab */}
-        <TabsContent value="contacts" className="space-y-4">
+        <TabsContent value="contacts" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
               <CardTitle>CRM Contacts</CardTitle>
@@ -655,7 +656,8 @@ export const CRMManagement: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+        </Tabs>
+      </Card>
 
       {/* User Edit/Add Modal */}
       <Dialog open={showUserModal} onOpenChange={setShowUserModal}>

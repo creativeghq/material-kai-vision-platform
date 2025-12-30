@@ -187,17 +187,18 @@ export const KnowledgeBaseManagement: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="documents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <FileText className="h-4 w-4 mr-2" />
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="search" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Search className="h-4 w-4 mr-2" />
-              Search
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+        <Card className="p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+              <TabsTrigger value="documents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <FileText className="h-4 w-4 mr-2" />
+                Documents
+              </TabsTrigger>
+              <TabsTrigger value="search" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </TabsTrigger>
+              <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <FolderTree className="h-4 w-4 mr-2" />
               Categories
             </TabsTrigger>
@@ -211,7 +212,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="documents" className="space-y-4">
+          <TabsContent value="documents" className="space-y-4 mt-6">
             <DocumentList
               onEdit={handleEditDocument}
               onCreate={handleCreateDocument}
@@ -219,19 +220,19 @@ export const KnowledgeBaseManagement: React.FC = () => {
             />
           </TabsContent>
 
-          <TabsContent value="search" className="space-y-4">
+          <TabsContent value="search" className="space-y-4 mt-6">
             <SearchInterface />
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-4">
+          <TabsContent value="categories" className="space-y-4 mt-6">
             <CategoryManager />
           </TabsContent>
 
-          <TabsContent value="attachments" className="space-y-4">
+          <TabsContent value="attachments" className="space-y-4 mt-6">
             <ProductAttachments />
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-4">
+          <TabsContent value="analytics" className="space-y-4 mt-6">
             <Card>
               <CardHeader>
                 <CardTitle>Search Analytics</CardTitle>
@@ -241,7 +242,8 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </Card>
       </div>
 
       {/* Document Editor Modal */}

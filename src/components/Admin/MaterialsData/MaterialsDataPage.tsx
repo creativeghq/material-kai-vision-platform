@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
@@ -124,73 +125,155 @@ export const MaterialsDataPage: React.FC = () => {
         title="Materials Data"
         description="View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources"
         badge="All Sources"
+        breadcrumbs={[
+          { label: 'Admin', path: '/admin' },
+          { label: 'Materials Data' },
+        ]}
       />
 
-      <div className="p-6">
-        {/* Job ID Filter */}
-        <div className="mb-4 flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Filter by Job ID (optional)"
-            value={jobIdFilter}
-            onChange={(e) => setJobIdFilter(e.target.value)}
-            className="max-w-md"
-          />
-          {jobIdFilter && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setJobIdFilter('');
-                setSearchParams({});
-              }}
-            >
-              Clear Filter
-            </Button>
-          )}
+      <div className="p-6 space-y-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Package className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.products}</div>
+            <div className="text-sm text-muted-foreground">Products</div>
+          </div>
+
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Grid3X3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.chunks}</div>
+            <div className="text-sm text-muted-foreground">Chunks</div>
+          </div>
+
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <ImageIcon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.images}</div>
+            <div className="text-sm text-muted-foreground">Images</div>
+          </div>
+
+          <div className="dashboard-card transition-all duration-200 hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  borderRadius: 'var(--radius-lg)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Database className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+            </div>
+            <div className="text-2xl font-semibold mb-1">{stats.embeddings}</div>
+            <div className="text-sm text-muted-foreground">Embeddings</div>
+          </div>
         </div>
 
+        {/* Job ID Filter */}
+        <Card className="p-4">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Filter by Job ID (optional)"
+              value={jobIdFilter}
+              onChange={(e) => setJobIdFilter(e.target.value)}
+              className="max-w-md"
+            />
+            {jobIdFilter && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setJobIdFilter('');
+                  setSearchParams({});
+                }}
+              >
+                Clear Filter
+              </Button>
+            )}
+          </div>
+        </Card>
+
+        {/* Main Content */}
         <Tabs defaultValue="products" className="w-full">
-          <TabsList className="w-full h-auto flex-wrap justify-start">
-            <TabsTrigger value="products" className="flex items-center gap-2">
-              <Package className="h-4 w-4" />
-              Products ({stats.products})
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+            <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Package className="h-4 w-4 mr-2" />
+              Products
             </TabsTrigger>
-            <TabsTrigger value="chunks" className="flex items-center gap-2">
-              <Grid3X3 className="h-4 w-4" />
-              Chunks ({stats.chunks})
+            <TabsTrigger value="chunks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Grid3X3 className="h-4 w-4 mr-2" />
+              Chunks
             </TabsTrigger>
-            <TabsTrigger value="images" className="flex items-center gap-2">
-              <ImageIcon className="h-4 w-4" />
-              Images ({stats.images})
+            <TabsTrigger value="images" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Images
             </TabsTrigger>
-            <TabsTrigger value="embeddings" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              Embeddings ({stats.embeddings})
+            <TabsTrigger value="embeddings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Database className="h-4 w-4 mr-2" />
+              Embeddings
             </TabsTrigger>
-            <TabsTrigger value="relations" className="flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
+            <TabsTrigger value="relations" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Link2 className="h-4 w-4 mr-2" />
               Relations
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="products">
+          <TabsContent value="products" className="mt-6">
             <ProductsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
-          <TabsContent value="chunks">
+          <TabsContent value="chunks" className="mt-6">
             <ChunksTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
-          <TabsContent value="images">
+          <TabsContent value="images" className="mt-6">
             <ImagesTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
-          <TabsContent value="embeddings">
+          <TabsContent value="embeddings" className="mt-6">
             <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
 
-          <TabsContent value="relations">
+          <TabsContent value="relations" className="mt-6">
             <RelationsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={loadStats} />
           </TabsContent>
         </Tabs>
