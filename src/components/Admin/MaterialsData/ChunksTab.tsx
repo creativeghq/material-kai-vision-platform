@@ -180,7 +180,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                   {filteredChunks.map((chunk) => (
                     <TableRow key={chunk.id}>
                       <TableCell>
-                        <div className="truncate max-w-[400px]" title={chunk.content?.substring(0, 200)}>
+                        <div className="truncate" title={chunk.content?.substring(0, 200)}>
                           {chunk.content?.substring(0, 100)}...
                         </div>
                       </TableCell>

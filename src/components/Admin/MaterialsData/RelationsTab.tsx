@@ -103,7 +103,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
           View how images, chunks, and products are connected
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -113,16 +113,15 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
             No relations found
           </div>
         ) : (
-          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[120px]">Image</TableHead>
-                  <TableHead className="w-[80px]">Page</TableHead>
-                  <TableHead className="w-[100px]">Source</TableHead>
+                  <TableHead>Image</TableHead>
+                  <TableHead>Page</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Caption</TableHead>
-                  <TableHead className="w-[180px]">Created</TableHead>
-                  <TableHead className="w-[280px]">ID</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>ID</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -158,7 +157,6 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
                 ))}
               </TableBody>
             </Table>
-          </div>
         )}
       </CardContent>
     </Card>
