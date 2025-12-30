@@ -4,6 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Link2, Image as ImageIcon, FileText, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 interface RelationsTabProps {
   workspaceId: string;
@@ -105,68 +113,51 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
             No relations found
           </div>
         ) : (
-          <div className="space-y-4">
-            {relations.map((relation) => (
-              <Card key={relation.id} className="border-l-4 border-l-blue-500">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Image */}
-                    <div className="space-y-2 flex-shrink-0">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <ImageIcon className="h-4 w-4 text-blue-600" />
-                        Image
-                      </div>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Image</TableHead>
+                  <TableHead className="w-[80px]">Page</TableHead>
+                  <TableHead className="w-[100px]">Source</TableHead>
+                  <TableHead>Caption</TableHead>
+                  <TableHead className="w-[180px]">Created</TableHead>
+                  <TableHead className="w-[280px]">ID</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {relations.map((relation) => (
+                  <TableRow key={relation.id}>
+                    <TableCell>
                       {relation.image_url && (
                         <img
                           src={relation.image_url}
                           alt={relation.caption || `Page ${relation.page_number}`}
-                          className="w-48 h-32 object-cover rounded"
+                          className="w-20 h-20 object-cover rounded"
                         />
                       )}
-                      <div className="text-xs text-muted-foreground">
-                        Page {relation.page_number}
-                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {relation.page_number}
+                    </TableCell>
+                    <TableCell>
                       {getSourceBadge(relation.source_type)}
-                    </div>
-
-                    {/* Metadata */}
-                    <div className="space-y-2 flex-1">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <FileText className="h-4 w-4 text-green-600" />
-                        Image Details
+                    </TableCell>
+                    <TableCell className="max-w-md">
+                      <div className="line-clamp-2 text-sm">
+                        {relation.caption || '-'}
                       </div>
-                      <div className="space-y-1">
-                        {relation.caption && (
-                          <div className="text-xs">
-                            <span className="font-medium">Caption:</span> {relation.caption}
-                          </div>
-                        )}
-                        <div className="text-xs">
-                          <span className="font-medium">Created:</span> {new Date(relation.created_at).toLocaleString()}
-                        </div>
-                        <div className="text-xs">
-                          <span className="font-medium">ID:</span> {relation.id}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status */}
-                    <div className="space-y-2 flex-shrink-0 w-64">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Link2 className="h-4 w-4 text-purple-600" />
-                        Status
-                      </div>
-                      <div className="text-xs p-2 bg-muted rounded">
-                        <p className="text-muted-foreground">
-                          Relations feature requires additional database schema setup.
-                          Currently showing basic image data.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {new Date(relation.created_at).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {relation.id}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </CardContent>
