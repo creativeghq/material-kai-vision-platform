@@ -82,7 +82,54 @@ const convertAPISuggestion = (apiSuggestion: APISuggestion): SearchSuggestion =>
   };
 };
 
-// Fetch search suggestions using the new SearchSuggestionsService
+// Fetch product name suggestions directly from Supabase
+const fetchProductNameSuggestions = async (
+  query: string,
+  workspaceId: string,
+): Promise<SearchSuggestion[]> => {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      import.meta.env.VITE_SUPABASE_URL || '',
+      import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+    );
+
+    // Search for products matching the query
+    const { data: products, error } = await supabase
+      .from('products')
+      .select('id, name, metadata')
+      .eq('workspace_id', workspaceId)
+      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .limit(10);
+
+    if (error) {
+      console.error('Error fetching product suggestions:', error);
+      return [];
+    }
+
+    if (!products || products.length === 0) {
+      return [];
+    }
+
+    // Convert products to suggestions
+    return products.map((product, index) => ({
+      id: product.id,
+      text: product.name,
+      type: 'completion' as const,
+      confidence: 1.0 - (index * 0.05), // Slight decrease for ranking
+      category: product.metadata?.material_category,
+      metadata: {
+        product_id: product.id,
+        source: 'product_name',
+      },
+    }));
+  } catch (error) {
+    console.error('Error fetching product name suggestions:', error);
+    return [];
+  }
+};
+
+// Fetch search suggestions using the new SearchSuggestionsService (for trending/recent)
 const fetchSearchSuggestions = async (
   query: string,
   categories: string[] = [],
@@ -148,7 +195,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const suggestionsService = getSearchSuggestionsService();
 
-  // Debounced suggestion fetching with typo correction
+  // Debounced suggestion fetching with product names
   const fetchSuggestions = useCallback(
     async (query: string) => {
       if (!query.trim() || !enableSemanticSuggestions) {
@@ -161,14 +208,52 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       setIsLoading(true);
 
       try {
-        // Check for typos in parallel with fetching suggestions
-        const [suggestionsResult, typoResult] = await Promise.all([
+        // Get workspace ID first
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          import.meta.env.VITE_SUPABASE_URL || '',
+          import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+        );
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setSuggestions([]);
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: workspaceData } = await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .order('joined_at', { ascending: true })
+          .limit(1)
+          .single();
+
+        if (!workspaceData) {
+          setSuggestions([]);
+          setIsLoading(false);
+          return;
+        }
+
+        // Fetch product name suggestions (primary) and API suggestions (secondary) in parallel
+        const [productSuggestions, apiSuggestions, typoResult] = await Promise.all([
+          fetchProductNameSuggestions(query, workspaceData.workspace_id),
           fetchSearchSuggestions(query, categories, semanticThreshold),
           suggestionsService.checkTypoCorrection(query, 0.85, 1),
         ]);
 
+        // Combine suggestions: product names first, then API suggestions
+        const combinedSuggestions = [
+          ...productSuggestions,
+          ...apiSuggestions.filter(
+            (apiSug) => !productSuggestions.some((prodSug) => prodSug.text === apiSug.text)
+          ),
+        ];
+
         // Set suggestions
-        setSuggestions(suggestionsResult.slice(0, maxSuggestions));
+        setSuggestions(combinedSuggestions.slice(0, maxSuggestions));
 
         // Set typo correction if available
         if (typoResult.success && typoResult.recommended_correction) {
