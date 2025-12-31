@@ -2313,26 +2313,55 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     <div className="flex flex-col gap-3">
                       <button
                         onClick={async () => {
+                          if (!selectedJob.document_id) {
+                            alert('❌ No document_id found for this job');
+                            return;
+                          }
+
                           try {
-                            const response = await fetch('https://v1api.materialshub.gr/api/internal/create-chunks/' + selectedJob.id, {
+                            // Fetch current chunks count
+                            const { count: currentChunks } = await supabase
+                              .from('document_chunks')
+                              .select('*', { count: 'exact', head: true })
+                              .eq('document_id', selectedJob.document_id);
+
+                            // Fetch document to get extracted_text
+                            const docResponse = await fetch(`https://v1api.materialshub.gr/api/rag/documents/${selectedJob.document_id}`);
+                            if (!docResponse.ok) {
+                              alert('❌ Failed to fetch document data');
+                              return;
+                            }
+                            const docData = await docResponse.json();
+
+                            // Fetch products for this document
+                            const productsResponse = await fetch(`https://v1api.materialshub.gr/api/products?document_id=${selectedJob.document_id}`);
+                            const productsData = productsResponse.ok ? await productsResponse.json() : { products: [] };
+                            const productIds = productsData.products?.map((p: any) => p.id) || [];
+
+                            // Call create-chunks endpoint (job_id is in URL path, not body)
+                            const response = await fetch(`https://v1api.materialshub.gr/api/internal/create-chunks/${selectedJob.id}`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
-                                job_id: selectedJob.id,
                                 document_id: selectedJob.document_id,
                                 workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                                extracted_text: selectedJob.metadata?.extracted_text || '',
-                                product_ids: selectedJob.metadata?.product_ids || [],
+                                extracted_text: docData.content || docData.extracted_text || '',
+                                product_ids: productIds,
                                 chunk_size: 512,
                                 chunk_overlap: 50
                               })
                             });
+
                             const result = await response.json();
                             if (result.success) {
-                              alert(`✅ Chunks created: ${result.chunks_created}, Embeddings: ${result.embeddings_generated}`);
+                              if (result.skipped) {
+                                alert(`ℹ️ Chunks already exist\nExisting chunks: ${result.existing_chunks}\nExisting embeddings: ${result.existing_embeddings}`);
+                              } else {
+                                alert(`✅ Chunks created: ${result.chunks_created}, Embeddings: ${result.embeddings_generated}`);
+                              }
                               fetchJobDetails(selectedJob);
                             } else {
-                              alert('❌ Failed to create chunks');
+                              alert(`❌ Failed to create chunks: ${JSON.stringify(result)}`);
                             }
                           } catch (error) {
                             alert('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -2341,23 +2370,39 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
                       >
                         <FileText className="h-4 w-4" />
-                        Generate Chunks
+                        Regenerate Chunks ({selectedJob?.metadata?.result?.chunks_created || selectedJob?.metadata?.chunks_created || 0})
                       </button>
                       <button
                         onClick={async () => {
+                          if (!selectedJob.document_id) {
+                            alert('❌ No document_id found for this job');
+                            return;
+                          }
+
                           try {
+                            // Fetch current embeddings count
+                            const { count: currentEmbeddings } = await supabase
+                              .from('document_chunks')
+                              .select('*', { count: 'exact', head: true })
+                              .eq('document_id', selectedJob.document_id)
+                              .not('text_embedding', 'is', null);
+
                             const response = await fetch('https://v1api.materialshub.gr/api/internal/generate-product-embeddings', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
                                 document_id: selectedJob.document_id,
                                 workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                                product_ids: selectedJob.metadata?.product_ids || null
+                                product_ids: null  // Generate for all products in document
                               })
                             });
                             const result = await response.json();
                             if (result.success) {
-                              alert(`✅ ${result.message}\nProducts: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
+                              if (result.products_processed === 0) {
+                                alert(`ℹ️ ${result.message}\nAll products already have embeddings.`);
+                              } else {
+                                alert(`✅ ${result.message}\nProducts: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
+                              }
                               fetchJobDetails(selectedJob);
                             } else {
                               alert('❌ Failed to generate embeddings');
@@ -2369,7 +2414,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
                       >
                         <Zap className="h-4 w-4" />
-                        Generate Product Embeddings
+                        Regenerate Embeddings ({(() => {
+                          const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
+                          const metadataTotal = (imgCheckpoint?.metadata as any)?.clip_embeddings?.total;
+                          if (metadataTotal) return metadataTotal;
+                          const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
+                          const specializedEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.specialized_embeddings || 0;
+                          const totalEmbeddings = clipEmbeddings + specializedEmbeddings;
+                          return totalEmbeddings || selectedJob?.metadata?.embeddings_generated || 0;
+                        })()})
                       </button>
                     </div>
                   </CardContent>
