@@ -8,19 +8,38 @@ This document defines the consistent design patterns used across the entire plat
 
 ## 1. Tabs Component
 
-### Global Styling (src/components/ui/tabs.tsx)
+### Standard Admin Page Tabs Pattern
+**Reference:** `src/components/Admin/MaterialsData/MaterialsDataPage.tsx`
+
 ```tsx
-<TabsList className="inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground">
-  <TabsTrigger>Tab 1</TabsTrigger>
-  <TabsTrigger>Tab 2</TabsTrigger>
-</TabsList>
+<Tabs defaultValue="products" className="w-full">
+  <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+    <TabsTrigger value="products" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+      <Package className="h-4 w-4 mr-2" />
+      Products
+    </TabsTrigger>
+    <TabsTrigger value="chunks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+      <Grid3X3 className="h-4 w-4 mr-2" />
+      Chunks
+    </TabsTrigger>
+  </TabsList>
+</Tabs>
 ```
 
-**Rules:**
-- ✅ Always use `bg-muted` background (defined in tabs.tsx)
-- ✅ Standard height: `h-10`
-- ✅ Standard border radius: `rounded-md`
-- ❌ Never override with `bg-transparent` unless absolutely necessary for specific UI patterns
+**Critical Rules:**
+- ✅ **TabsList**: `className="w-full h-auto flex-wrap justify-start gap-2 p-2"`
+  - `w-full` = background spans full width
+  - `h-auto` = auto height for wrapping
+  - `flex-wrap` = tabs wrap to next line if needed
+  - `justify-start` = tabs aligned to left (NOT stretched across)
+  - `gap-2` = spacing between tab buttons
+  - `p-2` = padding around tabs
+- ✅ **TabsTrigger**: `className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"`
+  - Active state uses primary color
+  - Icons with `h-4 w-4 mr-2`
+- ✅ Background is `bg-muted` (from base component in tabs.tsx)
+- ❌ **NEVER** use `grid w-full grid-cols-X` (makes tabs stretch full width)
+- ❌ **NEVER** use `bg-transparent` (removes background)
 
 ---
 
@@ -319,7 +338,8 @@ import { AdminStatCard } from '../AdminStatCard';
 
 When creating new admin pages or tabs:
 
-- [ ] Use global tabs styling (bg-muted, h-10, rounded-md)
+- [ ] Use standard tabs pattern: `TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2"`
+- [ ] Add active state to TabsTrigger: `className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"`
 - [ ] Add icon to CardTitle with `flex items-center gap-2`
 - [ ] Include CardDescription
 - [ ] For tables: CardContent with `className="p-0"`

@@ -189,29 +189,29 @@ export const EmailManagement: React.FC = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <BarChart3 className="mr-2 h-4 w-4" />
+              <BarChart3 className="h-4 w-4 mr-2" />
               Analytics
             </TabsTrigger>
             <TabsTrigger value="logs" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Mail className="mr-2 h-4 w-4" />
+              <Mail className="h-4 w-4 mr-2" />
               Email Logs
             </TabsTrigger>
             <TabsTrigger value="domains" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Database className="mr-2 h-4 w-4" />
+              <Database className="h-4 w-4 mr-2" />
               Domains
             </TabsTrigger>
             <TabsTrigger value="templates" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Settings className="mr-2 h-4 w-4" />
+              <Settings className="h-4 w-4 mr-2" />
               Templates
             </TabsTrigger>
             <TabsTrigger value="actions" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Zap className="mr-2 h-4 w-4" />
+              <Zap className="h-4 w-4 mr-2" />
               Actions
             </TabsTrigger>
             <TabsTrigger value="campaigns" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Megaphone className="mr-2 h-4 w-4" />
+              <Megaphone className="h-4 w-4 mr-2" />
               Campaigns
             </TabsTrigger>
           </TabsList>

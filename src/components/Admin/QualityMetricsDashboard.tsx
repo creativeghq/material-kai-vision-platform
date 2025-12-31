@@ -271,10 +271,16 @@ export const QualityMetricsDashboard: React.FC = () => {
 
       {/* Tabs for detailed metrics */}
       <Tabs defaultValue="retrieval" className="w-full">
-        <TabsList>
-          <TabsTrigger value="retrieval">Retrieval Quality</TabsTrigger>
-          <TabsTrigger value="response">Response Quality</TabsTrigger>
-          <TabsTrigger value="trends">Trends</TabsTrigger>
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+          <TabsTrigger value="retrieval" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Retrieval Quality
+          </TabsTrigger>
+          <TabsTrigger value="response" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Response Quality
+          </TabsTrigger>
+          <TabsTrigger value="trends" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Trends
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="retrieval" className="space-y-4">

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,8 +29,6 @@ import {
   Package,
   XCircle,
   Trash2,
-  ExternalLink,
-  Copy,
 } from 'lucide-react';
 import {
   Dialog,
@@ -1110,20 +1108,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       {/* 🆕 Job Type Tabs */}
       <Tabs value={selectedTab} onValueChange={(value) => setSelectedTab(value as any)} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="all" className="flex items-center gap-2">
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+          <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
             All Jobs
             <Badge variant="secondary" className="ml-1">{metrics.all_jobs.total}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="pdf_processing" className="flex items-center gap-2">
+          <TabsTrigger value="pdf_processing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
             PDF Processing
             <Badge variant="secondary" className="ml-1">{metrics.pdf_processing.total}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="web_scraping" className="flex items-center gap-2">
+          <TabsTrigger value="web_scraping" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
             Web Scraping
             <Badge variant="secondary" className="ml-1">{metrics.web_scraping.total}</Badge>
           </TabsTrigger>
-          <TabsTrigger value="xml_import" className="flex items-center gap-2">
+          <TabsTrigger value="xml_import" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground flex items-center gap-2">
             XML Import
             <Badge variant="secondary" className="ml-1">{metrics.xml_import.total}</Badge>
           </TabsTrigger>

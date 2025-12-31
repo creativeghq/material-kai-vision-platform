@@ -558,20 +558,20 @@ const PackagesPanel: React.FC = () => {
 
           {/* Package Tables */}
           <Tabs defaultValue="nodejs" className="space-y-4">
-            <TabsList>
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
               <TabsTrigger
                 value="nodejs"
-                className="flex items-center space-x-2"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
-                <Globe className="h-4 w-4" />
-                <span>NodeJS Packages</span>
+                <Globe className="h-4 w-4 mr-2" />
+                NodeJS Packages
               </TabsTrigger>
               <TabsTrigger
                 value="mivaa"
-                className="flex items-center space-x-2"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
-                <Server className="h-4 w-4" />
-                <span>MIVAA Packages</span>
+                <Server className="h-4 w-4 mr-2" />
+                MIVAA Packages
               </TabsTrigger>
             </TabsList>
 

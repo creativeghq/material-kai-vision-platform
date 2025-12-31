@@ -416,9 +416,13 @@ export const ExtractionPromptsPage: React.FC = () => {
           </DialogHeader>
 
           <Tabs defaultValue="template" className="w-full">
-            <TabsList>
-              <TabsTrigger value="template">Prompt Template</TabsTrigger>
-              <TabsTrigger value="system">System Prompt</TabsTrigger>
+            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+              <TabsTrigger value="template" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                Prompt Template
+              </TabsTrigger>
+              <TabsTrigger value="system" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                System Prompt
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="template" className="space-y-4">

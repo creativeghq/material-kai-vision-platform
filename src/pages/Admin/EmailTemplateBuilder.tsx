@@ -205,12 +205,14 @@ export default function EmailTemplate({ userName = 'User', actionUrl = '#', comp
       </div>
 
       <Tabs defaultValue="editor" className="w-full">
-        <TabsList>
-          <TabsTrigger value="editor">
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+          <TabsTrigger value="editor" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Code className="h-4 w-4 mr-2" />
             React Code
           </TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="settings" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Settings
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="editor" className="space-y-4">

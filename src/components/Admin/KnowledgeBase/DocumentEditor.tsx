@@ -351,12 +351,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             {/* Content Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
               <div className="border-b px-6 py-2">
-                <TabsList>
-                  <TabsTrigger value="edit">
+                <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+                  <TabsTrigger value="edit" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Code className="h-4 w-4 mr-2" />
                     Edit
                   </TabsTrigger>
-                  <TabsTrigger value="preview">
+                  <TabsTrigger value="preview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     <Eye className="h-4 w-4 mr-2" />
                     Preview
                   </TabsTrigger>

@@ -297,11 +297,19 @@ export const AIMonitoringDashboard: React.FC = () => {
 
       {/* Tabs */}
       <Tabs defaultValue="models" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="models">Model Usage</TabsTrigger>
-          <TabsTrigger value="tasks">Task Breakdown</TabsTrigger>
-          <TabsTrigger value="confidence">Confidence Distribution</TabsTrigger>
-          <TabsTrigger value="recent">Recent Calls</TabsTrigger>
+        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
+          <TabsTrigger value="models" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Model Usage
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Task Breakdown
+          </TabsTrigger>
+          <TabsTrigger value="confidence" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Confidence Distribution
+          </TabsTrigger>
+          <TabsTrigger value="recent" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            Recent Calls
+          </TabsTrigger>
         </TabsList>
 
         {/* Model Usage Tab */}
