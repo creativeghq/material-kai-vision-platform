@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw } from 'lucide-react';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
@@ -73,6 +73,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [chunks, setChunks] = useState<any[]>([]);
   const [embeddings, setEmbeddings] = useState<any>({});
   const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
+  const [isRelinking, setIsRelinking] = useState(false);
 
   if (!product) return null;
 
@@ -251,6 +252,80 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setCurrentImageIndex((prev) =>
       prev === images.length - 1 ? 0 : prev + 1
     );
+  };
+
+  const handleRelinkChunks = async () => {
+    if (!product?.source_document_id) {
+      console.error('[ProductDetailModal] No source_document_id found');
+      return;
+    }
+
+    try {
+      setIsRelinking(true);
+      console.log('[ProductDetailModal] Re-linking chunks for document:', product.source_document_id);
+
+      const response = await fetch('https://v1api.materialshub.gr/api/admin/linking/link-chunks-to-products', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          document_id: product.source_document_id
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('[ProductDetailModal] Re-linking successful:', result);
+
+        // Reload chunks
+        const { data: chunkRelations } = await supabase
+          .from('chunk_product_relationships')
+          .select(`
+            relevance_score,
+            relationship_type,
+            document_chunks (
+              id,
+              chunk_text,
+              page_number,
+              metadata,
+              created_at
+            )
+          `)
+          .eq('product_id', product.id)
+          .order('relevance_score', { ascending: false });
+
+        if (chunkRelations) {
+          setChunks(chunkRelations.filter(r => r.document_chunks).map(r => ({
+            ...r.document_chunks,
+            relevance_score: r.relevance_score,
+            relationship_type: r.relationship_type,
+          })));
+        }
+
+        // Update counts
+        const { count: chunkCount } = await supabase
+          .from('chunk_product_relationships')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
+        setRelevanceCounts(prev => ({
+          ...prev,
+          chunks: chunkCount || 0
+        }));
+
+        alert(`✅ Successfully created ${result.chunk_product_links} chunk-product relationships!`);
+      } else {
+        console.error('[ProductDetailModal] Re-linking failed:', result.error);
+        alert(`❌ Re-linking failed: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('[ProductDetailModal] Re-linking error:', error);
+      alert(`❌ Re-linking error: ${error}`);
+    } finally {
+      setIsRelinking(false);
+    }
   };
 
   const currentImage = images[currentImageIndex];
@@ -700,7 +775,28 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Related Chunks ({chunks.length})</h3>
-              <Badge variant="outline">{relevanceCounts.chunks} total relevances</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{relevanceCounts.chunks} total relevances</Badge>
+                <Button
+                  onClick={handleRelinkChunks}
+                  disabled={isRelinking || !product?.source_document_id}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                >
+                  {isRelinking ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Re-linking...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      Re-link Chunks
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {chunks.length > 0 ? (
@@ -726,9 +822,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No chunks linked to this product
-              </div>
+              <Card className="border-dashed">
+                <CardContent className="pt-6">
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50 text-muted-foreground" />
+                    <p className="text-muted-foreground mb-4">No chunks linked to this product</p>
+                    {product?.source_document_id && (
+                      <div className="space-y-2">
+                        <p className="text-sm text-gray-600">
+                          This product has a source document but no chunk relationships.
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Click "Re-link Chunks" above to create chunk-product relationships.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         </TabsContent>
