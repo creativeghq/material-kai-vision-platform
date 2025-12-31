@@ -29,6 +29,7 @@ import {
   Package,
   XCircle,
   Trash2,
+  Link,
 } from 'lucide-react';
 import {
   Dialog,
