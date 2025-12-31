@@ -40,7 +40,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { AdminStatCard } from './AdminStatCard';
-import { usersAPI, contactsAPI } from '@/services/crm.service';
+import { usersAPI, contactsAPI, companiesAPI } from '@/services/crm.service';
 
 interface UserWithAuth {
   id: string;
@@ -80,6 +80,7 @@ export const CRMManagement: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [userStats, setUserStats] = useState({
@@ -172,6 +173,24 @@ export const CRMManagement: React.FC = () => {
     }
   };
 
+  // Load companies
+  const loadCompanies = async () => {
+    try {
+      setLoading(true);
+      const response = await companiesAPI.listCompanies(100, 0);
+      setCompanies(response.data || []);
+    } catch (error: any) {
+      console.error('Error loading companies:', error);
+      toast({
+        title: 'Error',
+        description: `Failed to load companies: ${error.message}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Handle add contact - create new contact and navigate to detail page
   const handleAddContact = async () => {
     try {
@@ -206,6 +225,7 @@ export const CRMManagement: React.FC = () => {
     loadRoles();
     loadUsers();
     loadContacts();
+    loadCompanies();
   }, []);
 
   const handleDeleteUser = async (userId: string) => {
@@ -243,6 +263,54 @@ export const CRMManagement: React.FC = () => {
         title: 'Error',
         description:
           error instanceof Error ? error.message : 'Failed to delete contact',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Company handlers
+  const handleAddCompany = async () => {
+    try {
+      const newCompany = {
+        name: 'New Company',
+        email: '',
+        phone: '',
+        website: '',
+        notes: '',
+      };
+
+      const response = await companiesAPI.createCompany(newCompany);
+      toast({
+        title: 'Success',
+        description: 'Company created successfully',
+      });
+
+      navigate(`/admin/crm/companies/${response.data.id}`);
+    } catch (error) {
+      console.error('Error creating company:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create company',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteCompany = async (companyId: string) => {
+    if (!confirm('Are you sure you want to delete this company?')) return;
+
+    try {
+      await companiesAPI.deleteCompany(companyId);
+      toast({
+        title: 'Success',
+        description: 'Company deleted successfully',
+      });
+      loadCompanies();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to delete company',
         variant: 'destructive',
       });
     }
@@ -361,6 +429,13 @@ export const CRMManagement: React.FC = () => {
       contact.email?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
+  const filteredCompanies = companies.filter(
+    (company) =>
+      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.website?.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
@@ -371,7 +446,7 @@ export const CRMManagement: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Stats Cards - Compact Design */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <AdminStatCard
             title="Total Users"
             value={userStats.total}
@@ -393,6 +468,13 @@ export const CRMManagement: React.FC = () => {
             description="CRM contacts"
             variant="glass"
           />
+          <AdminStatCard
+            title="Total Companies"
+            value={companies.length}
+            icon={Building2}
+            description="CRM companies"
+            variant="glass"
+          />
         </div>
 
       {/* Tabs */}
@@ -406,6 +488,10 @@ export const CRMManagement: React.FC = () => {
             <TabsTrigger value="contacts" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Building2 className="h-4 w-4 mr-2" />
               Contacts
+            </TabsTrigger>
+            <TabsTrigger value="companies" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Building2 className="h-4 w-4 mr-2" />
+              Companies
             </TabsTrigger>
           </TabsList>
 
@@ -641,6 +727,138 @@ export const CRMManagement: React.FC = () => {
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                   handleDeleteContact(contact.id);
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Companies Tab */}
+        <TabsContent value="companies" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>CRM Companies</CardTitle>
+              <CardDescription>
+                Manage company accounts and business relationships
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Search */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search companies..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+                <Button onClick={handleAddCompany}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Company
+                </Button>
+              </div>
+
+              {/* Companies Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Website</TableHead>
+                      <TableHead>Industry</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4">
+                          Loading...
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredCompanies.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4">
+                          No companies found
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCompanies.map((company) => (
+                        <TableRow key={company.id}>
+                          <TableCell className="font-medium">
+                            <button
+                              onClick={() => navigate(`/admin/crm/companies/${company.id}`)}
+                              className="text-primary hover:underline flex items-center gap-1"
+                            >
+                              {company.name}
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
+                          </TableCell>
+                          <TableCell>
+                            {company.email ? (
+                              <a
+                                href={`mailto:${company.email}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {company.email}
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {company.phone ? (
+                              <a
+                                href={`tel:${company.phone}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {company.phone}
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {company.website ? (
+                              <a
+                                href={company.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {company.website}
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>{company.industry || '-'}</TableCell>
+                          <TableCell className="text-sm">
+                            {new Date(company.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCompany(company.id)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleDeleteCompany(company.id);
                                 }
                               }}
                             >

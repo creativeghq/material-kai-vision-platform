@@ -29,6 +29,8 @@ import {
   Package,
   XCircle,
   Trash2,
+  ExternalLink,
+  Copy,
 } from 'lucide-react';
 import {
   Dialog,
@@ -2017,8 +2019,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="flex flex-col gap-1 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-foreground">Job ID:</span>
-                  <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono">
-                    {selectedJob?.id?.slice(0, 8)}...
+                  <code className="px-2 py-0.5 bg-muted rounded text-xs font-mono select-all">
+                    {selectedJob?.id}
                   </code>
                 </div>
                 {selectedJob?.document_id && (
@@ -2299,6 +2301,45 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   ) : null}
                 </CardContent>
               </Card>
+
+              {/* Quick Actions */}
+              {selectedJob?.document_id && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Zap className="h-4 w-4" />
+                      Quick Actions
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Generate Chunks ({selectedJob?.metadata?.result?.chunks_created || selectedJob?.metadata?.chunks_created || 0})
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <Zap className="h-4 w-4" />
+                        Generated Embeddings ({(() => {
+                          const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
+                          const metadataTotal = (imgCheckpoint?.metadata as any)?.clip_embeddings?.total;
+                          if (metadataTotal) return metadataTotal;
+                          const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
+                          const specializedEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.specialized_embeddings || 0;
+                          return clipEmbeddings + specializedEmbeddings || selectedJob?.metadata?.embeddings_generated || 0;
+                        })()})
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Pipeline Stages - 14-Stage Workflow (PDF only) */}
               {(selectedJob?.job_type === 'pdf_processing' || selectedJob?.job_type === 'product_discovery_upload') && (

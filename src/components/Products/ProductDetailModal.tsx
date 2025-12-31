@@ -359,11 +359,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             const unit = dim.unit || 'cm';
             return `${dim.width}×${dim.height}${dim.depth ? `×${dim.depth}` : ''} ${unit}`;
           }
+          // Handle string format like "15×38 cm"
+          if (typeof dim === 'string') {
+            return dim;
+          }
           return JSON.stringify(d);
         }
         return String(d);
       }).join(', ')
-    : extractValue(allData?.dimensions) || 'N/A';
+    : (() => {
+        // Try multiple fallback sources
+        const dimValue = extractValue(allData?.dimensions) ||
+                        extractValue(allData?.size) ||
+                        extractValue(allData?.dimension);
+        return dimValue || 'N/A';
+      })();
   const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
   const finish = extractValue(materialPropsData?.finish) || 'N/A';
   const material = extractValue(allData?.material_category) || product.type || 'N/A';
@@ -376,9 +386,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const materialProperties = {
     'Material Category': material,
+    'Materials': extractValue(allData?.materials),
     'Composition': extractValue(materialPropsData?.composition),
     'Body Type': extractValue(materialPropsData?.body_type),
     'Finish': finish,
+    'Finishes': extractValue(allData?.finishes),
     'Patterns': extractValue(materialPropsData?.patterns) || extractValue(appearanceData?.patterns),
     'Surface': extractValue(materialPropsData?.surface),
     'Thickness': thickness
@@ -390,7 +402,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const appearance = {
-    'Colors': extractValue(appearanceData?.colors),
+    'Colors': extractValue(appearanceData?.colors) || extractValue(allData?.colors),
+    'Textures': extractValue(allData?.textures),
     'Shade Variation': extractValue(appearanceData?.shade_variation),
     'Visual Effect': extractValue(appearanceData?.visual_effect),
   };
@@ -405,7 +418,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const application = {
-    'Recommended Use': extractValue(applicationData?.recommended_use),
+    'Recommended Use': extractValue(applicationData?.recommended_use) || extractValue(allData?.applications),
     'Installation': extractValue(applicationData?.installation),
   };
 

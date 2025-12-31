@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Edit2, Link as LinkIcon, Unlink, Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,31 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
-import { contactsAPI, usersAPI } from '@/services/crm.service';
+import { contactsAPI, usersAPI, companiesAPI } from '@/services/crm.service';
 import { UserSearchDropdown } from '@/components/CRM/UserSearchDropdown';
+import { CompanySearchDropdown } from '@/components/CRM/CompanySearchDropdown';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface Contact {
   id: string;
@@ -44,6 +67,7 @@ interface Contact {
   user_id?: string;
   linked_at?: string;
   linked_by?: string;
+  companies?: any[];
 }
 
 /**
@@ -60,6 +84,12 @@ export const ContactDetailPage: React.FC = () => {
   const [contact, setContact] = useState<Contact | null>(null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
   const [linking, setLinking] = useState(false);
+  const [showAddCompanyDialog, setShowAddCompanyDialog] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
+  const [companyRole, setCompanyRole] = useState<string>('');
+  const [isPrimaryContact, setIsPrimaryContact] = useState(false);
+  const [companyNotes, setCompanyNotes] = useState<string>('');
+  const [attachingCompany, setAttachingCompany] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -176,6 +206,65 @@ export const ContactDetailPage: React.FC = () => {
     }
   };
 
+  // Company attachment handlers
+  const handleAttachCompany = async () => {
+    if (!id || !selectedCompanyId) return;
+    try {
+      setAttachingCompany(true);
+      await companiesAPI.attachContact(
+        selectedCompanyId,
+        id,
+        companyRole,
+        isPrimaryContact,
+        companyNotes
+      );
+      toast({
+        title: 'Success',
+        description: 'Company attached to contact successfully',
+      });
+      setShowAddCompanyDialog(false);
+      setSelectedCompanyId('');
+      setCompanyRole('');
+      setIsPrimaryContact(false);
+      setCompanyNotes('');
+      await loadContact();
+    } catch (error: any) {
+      console.error('Error attaching company:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to attach company to contact',
+        variant: 'destructive',
+      });
+    } finally {
+      setAttachingCompany(false);
+    }
+  };
+
+  const handleDetachCompany = async (relationshipId: string) => {
+    if (!confirm('Are you sure you want to remove this company from the contact?')) return;
+    try {
+      // We need to find the company ID from the relationship
+      const companyRelationship = contact?.companies?.find(
+        (c: any) => c.relationship_id === relationshipId
+      );
+      if (!companyRelationship) return;
+
+      await companiesAPI.detachContact(companyRelationship.company_id, relationshipId);
+      toast({
+        title: 'Success',
+        description: 'Company removed from contact successfully',
+      });
+      await loadContact();
+    } catch (error: any) {
+      console.error('Error removing company:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to remove company from contact',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen p-6">
@@ -239,18 +328,14 @@ export const ContactDetailPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
+          <TabsList className="bg-muted">
             <TabsTrigger value="overview">
               <User className="h-4 w-4 mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="company">
+            <TabsTrigger value="companies">
               <Building2 className="h-4 w-4 mr-2" />
-              Company Info
-            </TabsTrigger>
-            <TabsTrigger value="address">
-              <MapPin className="h-4 w-4 mr-2" />
-              Address
+              Companies
             </TabsTrigger>
             <TabsTrigger value="notes">
               <FileText className="h-4 w-4 mr-2" />
@@ -259,13 +344,13 @@ export const ContactDetailPage: React.FC = () => {
           </TabsList>
 
           {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
+          <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Contact Information Card */}
-              <Card className="dashboard-card">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <User className="h-4 w-4" />
                     Contact Information
                   </CardTitle>
                 </CardHeader>
@@ -344,10 +429,10 @@ export const ContactDetailPage: React.FC = () => {
               </Card>
 
               {/* Lead Information Card */}
-              <Card className="dashboard-card">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <FileText className="h-4 w-4" />
                     Lead Information
                   </CardTitle>
                 </CardHeader>
@@ -394,257 +479,243 @@ export const ContactDetailPage: React.FC = () => {
               </Card>
             </div>
 
-            {/* Link to User Account Card */}
-            <Card className="dashboard-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <LinkIcon className="h-5 w-5" />
-                  Link to User Account
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {linkedUser ? (
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{linkedUser.email}</span>
+            {/* Address Card */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <MapPin className="h-4 w-4" />
+                    Address
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div>
+                    <Label htmlFor="address" className="text-sm">Street Address</Label>
+                    <Input
+                      id="address"
+                      value={contact.address || ''}
+                      onChange={(e) => updateField('address', e.target.value)}
+                      disabled={!editing}
+                      className="mt-1"
+                      placeholder="123 Main Street"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="city" className="text-sm">City</Label>
+                      <Input
+                        id="city"
+                        value={contact.city || ''}
+                        onChange={(e) => updateField('city', e.target.value)}
+                        disabled={!editing}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="postal_code" className="text-sm">Postal Code</Label>
+                      <Input
+                        id="postal_code"
+                        value={contact.postal_code || ''}
+                        onChange={(e) => updateField('postal_code', e.target.value)}
+                        disabled={!editing}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="state" className="text-sm">State/Province</Label>
+                      <Input
+                        id="state"
+                        value={contact.state || ''}
+                        onChange={(e) => updateField('state', e.target.value)}
+                        disabled={!editing}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="country" className="text-sm">Country</Label>
+                      <Input
+                        id="country"
+                        value={contact.country || ''}
+                        onChange={(e) => updateField('country', e.target.value)}
+                        disabled={!editing}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Link to User Account Card - Compact Design */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <LinkIcon className="h-4 w-4" />
+                    Linked User Account
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {linkedUser ? (
+                    <>
+                      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm font-medium truncate">{linkedUser.email}</span>
                         </div>
                         {linkedUser.user_profiles?.subscription_tier && (
-                          <Badge variant="outline" className="capitalize">
+                          <Badge variant="outline" className="capitalize text-xs flex-shrink-0">
                             {linkedUser.user_profiles.subscription_tier}
                           </Badge>
                         )}
                       </div>
                       {linkedUser.user_profiles?.full_name && (
-                        <div className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground px-3">
                           {linkedUser.user_profiles.full_name}
-                        </div>
+                        </p>
                       )}
                       {contact.linked_at && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground px-3">
                           <Calendar className="h-3 w-3" />
-                          Linked on {new Date(contact.linked_at).toLocaleDateString()}
+                          Linked {new Date(contact.linked_at).toLocaleDateString()}
                         </div>
                       )}
-                    </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleUnlinkUser}
+                        disabled={linking}
+                        className="w-full"
+                      >
+                        <Unlink className="h-3 w-3 mr-2" />
+                        {linking ? 'Unlinking...' : 'Unlink'}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Link to a user account to track subscription and activity.
+                      </p>
+                      <div>
+                        <Label className="text-sm">Search User</Label>
+                        <div className="mt-1.5">
+                          <UserSearchDropdown
+                            onSelect={handleLinkUser}
+                            placeholder="Search by email..."
+                            selectedUserId={null}
+                          />
+                        </div>
+                      </div>
+                      {linking && (
+                        <p className="text-sm text-muted-foreground text-center">
+                          Linking...
+                        </p>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Companies Tab */}
+          <TabsContent value="companies" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Attached Companies
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Companies associated with this contact
+                  </p>
+                </div>
+                <Button onClick={() => setShowAddCompanyDialog(true)} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Company
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {!contact.companies || contact.companies.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Building2 className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No companies attached to this contact yet</p>
                     <Button
                       variant="outline"
-                      onClick={handleUnlinkUser}
-                      disabled={linking}
-                      className="w-full"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => setShowAddCompanyDialog(true)}
                     >
-                      <Unlink className="h-4 w-4 mr-2" />
-                      {linking ? 'Unlinking...' : 'Unlink User Account'}
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Company
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Link this contact to an authenticated user account to track their subscription, credits, and activity.
-                    </p>
-                    <div>
-                      <Label>Search for User</Label>
-                      <div className="mt-2">
-                        <UserSearchDropdown
-                          onSelect={handleLinkUser}
-                          placeholder="Search users by email or name..."
-                          selectedUserId={null}
-                        />
-                      </div>
-                    </div>
-                    {linking && (
-                      <div className="text-sm text-muted-foreground text-center">
-                        Linking user...
-                      </div>
-                    )}
-                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Company Name</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Industry</TableHead>
+                        <TableHead>Website</TableHead>
+                        <TableHead>Primary</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {contact.companies.map((company: any) => (
+                        <TableRow key={company.relationship_id}>
+                          <TableCell className="font-medium">
+                            <button
+                              onClick={() => navigate(`/admin/crm/companies/${company.company_id}`)}
+                              className="text-primary hover:underline"
+                            >
+                              {company.company_name}
+                            </button>
+                          </TableCell>
+                          <TableCell>{company.role || '-'}</TableCell>
+                          <TableCell>{company.company_industry || '-'}</TableCell>
+                          <TableCell>
+                            {company.company_website ? (
+                              <a
+                                href={company.company_website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-600 hover:underline"
+                              >
+                                {company.company_website}
+                              </a>
+                            ) : (
+                              '-'
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {company.is_primary && (
+                              <Badge variant="secondary">Primary</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDetachCompany(company.relationship_id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Company Info Tab */}
-          <TabsContent value="company" className="space-y-4">
-            <Card className="dashboard-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Company Details
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="company">Company Name</Label>
-                    <Input
-                      id="company"
-                      value={contact.company || ''}
-                      onChange={(e) => updateField('company', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="website">Website</Label>
-                    <Input
-                      id="website"
-                      type="url"
-                      value={contact.website || ''}
-                      onChange={(e) => updateField('website', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="https://example.com"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="industry">Industry</Label>
-                    <Input
-                      id="industry"
-                      value={contact.industry || ''}
-                      onChange={(e) => updateField('industry', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="e.g., Construction, Manufacturing"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="employee_count">Employee Count</Label>
-                    <Input
-                      id="employee_count"
-                      value={contact.employee_count || ''}
-                      onChange={(e) => updateField('employee_count', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="e.g., 50-100, 500+"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="annual_revenue">Annual Revenue</Label>
-                    <Input
-                      id="annual_revenue"
-                      value={contact.annual_revenue || ''}
-                      onChange={(e) => updateField('annual_revenue', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                      placeholder="e.g., $1M-$5M"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t">
-                  <h3 className="text-sm font-medium mb-3">Social Media</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="linkedin">LinkedIn</Label>
-                      <Input
-                        id="linkedin"
-                        value={contact.linkedin || ''}
-                        onChange={(e) => updateField('linkedin', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                        placeholder="LinkedIn URL"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="twitter">Twitter</Label>
-                      <Input
-                        id="twitter"
-                        value={contact.twitter || ''}
-                        onChange={(e) => updateField('twitter', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                        placeholder="Twitter handle"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="facebook">Facebook</Label>
-                      <Input
-                        id="facebook"
-                        value={contact.facebook || ''}
-                        onChange={(e) => updateField('facebook', e.target.value)}
-                        disabled={!editing}
-                        className="mt-1"
-                        placeholder="Facebook URL"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Address Tab */}
-          <TabsContent value="address" className="space-y-4">
-            <Card className="dashboard-card">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Address Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="address">Street Address</Label>
-                  <Input
-                    id="address"
-                    value={contact.address || ''}
-                    onChange={(e) => updateField('address', e.target.value)}
-                    disabled={!editing}
-                    className="mt-1"
-                    placeholder="123 Main Street"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      value={contact.city || ''}
-                      onChange={(e) => updateField('city', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">State/Province</Label>
-                    <Input
-                      id="state"
-                      value={contact.state || ''}
-                      onChange={(e) => updateField('state', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="postal_code">Postal Code</Label>
-                    <Input
-                      id="postal_code"
-                      value={contact.postal_code || ''}
-                      onChange={(e) => updateField('postal_code', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="country">Country</Label>
-                    <Input
-                      id="country"
-                      value={contact.country || ''}
-                      onChange={(e) => updateField('country', e.target.value)}
-                      disabled={!editing}
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           {/* Notes & Activity Tab */}
           <TabsContent value="notes" className="space-y-4">
-            <Card className="dashboard-card">
+            <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
@@ -653,13 +724,13 @@ export const ContactDetailPage: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div>
-                  <Label htmlFor="notes">Internal Notes</Label>
+                  <Label htmlFor="notes" className="text-sm">Internal Notes</Label>
                   <Textarea
                     id="notes"
                     value={contact.notes || ''}
                     onChange={(e) => updateField('notes', e.target.value)}
                     disabled={!editing}
-                    className="mt-1 min-h-[200px]"
+                    className="mt-2 min-h-[300px] resize-none"
                     placeholder="Add notes about this contact..."
                   />
                 </div>
@@ -668,6 +739,87 @@ export const ContactDetailPage: React.FC = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Add Company Dialog */}
+      <Dialog open={showAddCompanyDialog} onOpenChange={setShowAddCompanyDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Attach Company to Contact</DialogTitle>
+            <DialogDescription>
+              Link this contact to a company and specify their role
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {/* Company Search */}
+            <div className="space-y-2">
+              <Label>Company *</Label>
+              <CompanySearchDropdown
+                onSelect={setSelectedCompanyId}
+                excludeCompanyIds={contact?.companies?.map((c: any) => c.company_id) || []}
+                placeholder="Search companies..."
+                selectedCompanyId={selectedCompanyId || null}
+              />
+            </div>
+
+            {/* Role */}
+            <div className="space-y-2">
+              <Label htmlFor="company-role">Role at Company</Label>
+              <Input
+                id="company-role"
+                value={companyRole}
+                onChange={(e) => setCompanyRole(e.target.value)}
+                placeholder="e.g., CEO, Sales Manager, Developer"
+              />
+            </div>
+
+            {/* Primary Contact */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="is-primary"
+                checked={isPrimaryContact}
+                onChange={(e) => setIsPrimaryContact(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="is-primary" className="cursor-pointer">
+                Mark as primary contact for this company
+              </Label>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="company-notes">Notes</Label>
+              <Textarea
+                id="company-notes"
+                value={companyNotes}
+                onChange={(e) => setCompanyNotes(e.target.value)}
+                placeholder="Additional notes about this relationship..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowAddCompanyDialog(false);
+                setSelectedCompanyId('');
+                setCompanyRole('');
+                setIsPrimaryContact(false);
+                setCompanyNotes('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAttachCompany}
+              disabled={!selectedCompanyId || attachingCompany}
+            >
+              {attachingCompany ? 'Attaching...' : 'Attach Company'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

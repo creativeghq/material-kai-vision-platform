@@ -432,3 +432,168 @@ export const contactsAPI = {
     return response.json();
   },
 };
+
+// Companies API
+export const companiesAPI = {
+  async createCompany(company: any) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-companies-api`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(company),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create company');
+    }
+
+    return response.json();
+  },
+
+  async listCompanies(limit = 50, offset = 0, search?: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+      ...(search && { search }),
+    });
+
+    const response = await fetch(`${API_BASE}/crm-companies-api?${params}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch companies');
+    }
+
+    return response.json();
+  },
+
+  async getCompany(companyId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch company');
+    }
+
+    return response.json();
+  },
+
+  async updateCompany(companyId: string, updates: any) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update company');
+    }
+
+    return response.json();
+  },
+
+  async deleteCompany(companyId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete company');
+    }
+
+    return response.json();
+  },
+
+  async attachContact(companyId: string, contactId: string, role?: string, isPrimary?: boolean, notes?: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}/contacts`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contact_id: contactId,
+        role,
+        is_primary: isPrimary,
+        notes,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to attach contact');
+    }
+
+    return response.json();
+  },
+
+  async detachContact(companyId: string, relationshipId: string) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+
+    const response = await fetch(`${API_BASE}/crm-companies-api/${companyId}/contacts/${relationshipId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to detach contact');
+    }
+
+    return response.json();
+  },
+};

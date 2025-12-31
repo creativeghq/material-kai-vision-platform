@@ -113,13 +113,11 @@ export const EmailActionsTab: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="dashboard-card">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold">Email Actions</h3>
-          <p className="text-sm text-muted-foreground">
-            Manage trigger-based emails and assign templates to each action
-          </p>
-        </div>
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold">Email Actions</h3>
+        <p className="text-sm text-muted-foreground">
+          Manage trigger-based emails and assign templates to each action
+        </p>
       </div>
 
       {/* Actions Table */}

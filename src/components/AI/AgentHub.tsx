@@ -288,7 +288,16 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
     const loadConversations = async () => {
       const convos = await agentChatHistoryService.getUserConversations(userId, selectedAgent);
-      setConversations(convos);
+
+      // Clean up empty conversations (0 messages)
+      const emptyConvos = convos.filter(c => c.messageCount === 0);
+      for (const emptyConvo of emptyConvos) {
+        await agentChatHistoryService.deleteConversation(emptyConvo.id);
+      }
+
+      // Filter out empty conversations from the list
+      const nonEmptyConvos = convos.filter(c => c.messageCount > 0);
+      setConversations(nonEmptyConvos);
 
       // IMPORTANT: Reset current conversation when switching agents
       // This prevents using a conversation ID from a different agent

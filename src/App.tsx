@@ -54,6 +54,7 @@ import { RelevancyManagement } from './components/Admin/RelevancyManagement';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
 import { ContactDetailPage } from './pages/ContactDetailPage';
+import { CompanyDetailPage } from './pages/CompanyDetailPage';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
 // Removed: ChunkQualityDashboard - now consolidated in OperationsDashboard
@@ -515,6 +516,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <ContactDetailPage />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/crm/companies/:id"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <CompanyDetailPage />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

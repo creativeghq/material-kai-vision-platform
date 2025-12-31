@@ -90,114 +90,106 @@ export const EmailManagement: React.FC = () => {
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {/* Total Sent Card */}
-          <div className="dashboard-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)'
-                  }}
-                >
-                  <Send className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
+          <div className="dashboard-card" style={{ padding: 'var(--card-padding)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                }}
+              >
+                <Send className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Total Sent</p>
+                <p className="text-lg font-bold">{analytics.totalSent.toLocaleString()}</p>
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Sent</p>
-              <p className="text-2xl font-bold">{analytics.totalSent.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Last 30 days</p>
-            </div>
+            <p className="text-xs text-muted-foreground">Last 30 days</p>
           </div>
 
           {/* Delivery Rate Card */}
-          <div className="dashboard-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(142 71% 45% / 0.1)'
-                  }}
-                >
-                  <BarChart3 className="h-5 w-5" style={{ color: 'hsl(142 71% 45%)' }} />
-                </div>
+          <div className="dashboard-card" style={{ padding: 'var(--card-padding)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'hsl(142 71% 45% / 0.1)'
+                }}
+              >
+                <BarChart3 className="h-4 w-4" style={{ color: 'hsl(142 71% 45%)' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Delivery Rate</p>
+                <p className="text-lg font-bold">{analytics.deliveryRate.toFixed(1)}%</p>
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Delivery Rate</p>
-              <p className="text-2xl font-bold">{analytics.deliveryRate.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground">
-                {analytics.totalDelivered.toLocaleString()} delivered
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              {analytics.totalDelivered.toLocaleString()} delivered
+            </p>
           </div>
 
           {/* Bounce Rate Card */}
-          <div className="dashboard-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: analytics.bounceRate > 5 ? 'hsl(var(--destructive) / 0.1)' : 'hsl(var(--muted) / 0.5)'
-                  }}
-                >
-                  <Mail className="h-5 w-5" style={{ color: analytics.bounceRate > 5 ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))' }} />
-                </div>
+          <div className="dashboard-card" style={{ padding: 'var(--card-padding)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: analytics.bounceRate > 5 ? 'hsl(var(--destructive) / 0.1)' : 'hsl(var(--muted) / 0.5)'
+                }}
+              >
+                <Mail className="h-4 w-4" style={{ color: analytics.bounceRate > 5 ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))' }} />
               </div>
-              <Badge variant={analytics.bounceRate > 5 ? 'destructive' : 'secondary'}>
-                {analytics.bounceRate.toFixed(2)}%
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Bounce Rate</p>
+                <p className="text-lg font-bold">{analytics.totalBounced.toLocaleString()}</p>
+              </div>
+              <Badge variant={analytics.bounceRate > 5 ? 'destructive' : 'secondary'} className="text-xs">
+                {analytics.bounceRate.toFixed(1)}%
               </Badge>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Bounce Rate</p>
-              <p className="text-2xl font-bold">{analytics.totalBounced.toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">bounced emails</p>
-            </div>
+            <p className="text-xs text-muted-foreground">bounced emails</p>
           </div>
 
           {/* Daily Quota Card */}
-          <div className="dashboard-card">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: '2.5rem',
-                    height: '2.5rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(271 76% 53% / 0.1)'
-                  }}
-                >
-                  <Database className="h-5 w-5" style={{ color: 'hsl(271 76% 53%)' }} />
-                </div>
+          <div className="dashboard-card" style={{ padding: 'var(--card-padding)' }}>
+            <div className="flex items-center gap-3 mb-3">
+              <div
+                className="flex items-center justify-center flex-shrink-0"
+                style={{
+                  width: '2rem',
+                  height: '2rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'hsl(271 76% 53% / 0.1)'
+                }}
+              >
+                <Database className="h-4 w-4" style={{ color: 'hsl(271 76% 53%)' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Daily Quota</p>
+                <p className="text-lg font-bold">
+                  {sendingStats.sentLast24Hours} / {sendingStats.max24HourSend}
+                </p>
               </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Daily Quota</p>
-              <p className="text-2xl font-bold">
-                {sendingStats.sentLast24Hours} / {sendingStats.max24HourSend}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {((sendingStats.sentLast24Hours / sendingStats.max24HourSend) * 100).toFixed(1)}% used
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              {((sendingStats.sentLast24Hours / sendingStats.max24HourSend) * 100).toFixed(1)}% used
+            </p>
           </div>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="analytics" className="space-y-6">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <BarChart3 className="mr-2 h-4 w-4" />
               Analytics

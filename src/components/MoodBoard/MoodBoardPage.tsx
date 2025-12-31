@@ -188,7 +188,7 @@ export const MoodBoardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div>
       {/* Page Header */}
       <div className="bg-card py-6">
         <div className="page-container">

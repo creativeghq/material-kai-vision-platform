@@ -37,6 +37,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getErrorFeedback } from '@/utils/errorMessages';
+import { useToast } from '@/hooks/use-toast';
 
 import { EnhancedProgressMonitor } from './EnhancedProgressMonitor';
 import { PDFImageGallery } from './PDFImageGallery';
@@ -129,11 +130,113 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   showImageGallery = false,
   onRetry,
 }: PDFUploadProgressModalProps) => {
+  const { toast } = useToast();
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
     null,
   );
   const [aiMetrics, setAiMetrics] = useState<any>(null);
+  const [updatedChunksCount, setUpdatedChunksCount] = useState<number | null>(null);
+  const [updatedEmbeddingsCount, setUpdatedEmbeddingsCount] = useState<number | null>(null);
   // const [autoScroll, setAutoScroll] = useState(true);
+
+  // Handler for creating chunks
+  const handleCreateChunks = async (jobId: string) => {
+    try {
+      toast({
+        title: 'Creating Chunks',
+        description: 'Triggering chunk creation process...',
+      });
+
+      const response = await fetch(
+        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/internal/create-chunks/${jobId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+            // Add other required parameters from job metadata
+            document_id: (job?.metadata as any)?.document_id,
+            workspace_id: (job?.metadata as any)?.workspace_id,
+            extracted_text: (job?.metadata as any)?.extracted_text || '',
+            product_ids: (job?.metadata as any)?.product_ids || [],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to create chunks');
+      }
+
+      const result = await response.json();
+
+      // Update the chunks count in the UI
+      if (result.chunks_created !== undefined) {
+        setUpdatedChunksCount(result.chunks_created);
+      }
+
+      toast({
+        title: 'Success',
+        description: `Created ${result.chunks_created || 0} chunks successfully`,
+      });
+    } catch (error) {
+      console.error('Error creating chunks:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create chunks. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handler for generating product embeddings
+  const handleGenerateEmbeddings = async (jobId: string) => {
+    try {
+      toast({
+        title: 'Generating Embeddings',
+        description: 'Triggering embedding generation process...',
+      });
+
+      const response = await fetch(
+        `${import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000'}/api/internal/generate-product-embeddings/${jobId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            job_id: jobId,
+            // Add other required parameters from job metadata
+            product_ids: (job?.metadata as any)?.product_ids || [],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to generate embeddings');
+      }
+
+      const result = await response.json();
+
+      // Update the embeddings count in the UI
+      if (result.embeddings_generated !== undefined) {
+        setUpdatedEmbeddingsCount(result.embeddings_generated);
+      }
+
+      toast({
+        title: 'Success',
+        description: `Generated ${result.embeddings_generated || 0} embeddings successfully`,
+      });
+    } catch (error) {
+      console.error('Error generating embeddings:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate embeddings. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Fetch AI metrics for this job
   useEffect(() => {
@@ -424,13 +527,14 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                 const metadata = job.metadata as any || {};
 
                 // Get metrics from backend metadata (source of truth)
+                // Use updated state values if available, otherwise fall back to metadata
                 const totalPages = metadata.total_pages || 0;
                 const pagesCompleted = metadata.pages_completed || 0;
-                const chunksCreated = metadata.chunks_created || 0;
+                const chunksCreated = updatedChunksCount !== null ? updatedChunksCount : (metadata.chunks_created || 0);
                 const imagesExtracted = metadata.images_extracted || 0;
                 const totalImagesExtracted = metadata.total_images_extracted || 0;
                 const productsCreated = metadata.products_created || 0;
-                const embeddingsGenerated = metadata.embeddings_generated || 0;
+                const embeddingsGenerated = updatedEmbeddingsCount !== null ? updatedEmbeddingsCount : (metadata.embeddings_generated || 0);
                 const clipEmbeddings = metadata.clip_embeddings || 0;
                 const ocrPagesProcessed = metadata.ocr_pages_processed || 0;
 
@@ -461,22 +565,36 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
                         </div>
                       )}
                     </div>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
+                    <button
+                      onClick={() => handleCreateChunks(job.id as string)}
+                      className="text-center p-3 bg-card rounded-lg border hover:bg-accent hover:border-primary transition-colors cursor-pointer group"
+                      disabled={!job.id}
+                    >
+                      <div className="text-2xl font-bold text-primary group-hover:scale-110 transition-transform">
                         {chunksCreated}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground group-hover:text-foreground">
                         Chunks Created
                       </div>
-                    </div>
-                    <div className="text-center p-3 bg-card rounded-lg border">
-                      <div className="text-2xl font-bold text-primary">
+                      <div className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Click to regenerate
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleGenerateEmbeddings(job.id as string)}
+                      className="text-center p-3 bg-card rounded-lg border hover:bg-accent hover:border-primary transition-colors cursor-pointer group"
+                      disabled={!job.id}
+                    >
+                      <div className="text-2xl font-bold text-primary group-hover:scale-110 transition-transform">
                         {embeddingsGenerated}
                       </div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-sm text-muted-foreground group-hover:text-foreground">
                         Embeddings Generated
                       </div>
-                    </div>
+                      <div className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Click to regenerate
+                      </div>
+                    </button>
                     <div className="text-center p-3 bg-card rounded-lg border">
                       <div className="text-2xl font-bold text-primary">
                         {pagesCompleted}/{totalPages}
