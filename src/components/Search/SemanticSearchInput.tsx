@@ -534,11 +534,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       {showDropdown && (
         <Card
           ref={dropdownRef}
-          className="absolute top-full left-0 right-0 mt-1 z-[100] max-h-96 overflow-hidden shadow-lg border-white/20"
-          style={{
-            background: 'var(--glass-bg)',
-            backdropFilter: 'var(--glass-blur)',
-          }}
+          className="absolute top-full left-0 right-0 mt-1 z-[100] max-h-96 overflow-hidden shadow-lg bg-background border"
         >
           <CardContent className="p-0">
             <div className="max-h-96 overflow-y-auto">
@@ -577,7 +573,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
               {/* Suggestions */}
               {suggestions.length > 0 && (
                 <div className="p-2">
-                  <div className="text-xs font-medium text-foreground/70 mb-2 px-2">
+                  <div className="text-xs font-semibold text-muted-foreground mb-2 px-2">
                     AI Suggestions
                   </div>
                   {suggestions.map((suggestion, index) => (
@@ -585,8 +581,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                       key={suggestion.id}
                       onClick={() => handleSuggestionSelect(suggestion, index)}
                       className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-white/10 transition-colors',
-                        selectedIndex === index && 'bg-white/10',
+                        'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors',
+                        selectedIndex === index && 'bg-accent',
                       )}
                       role="option"
                       aria-selected={selectedIndex === index}
@@ -597,14 +593,14 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                           {suggestion.text}
                         </div>
                         {suggestion.confidence && (
-                          <div className="text-xs text-foreground/60">
+                          <div className="text-xs text-muted-foreground">
                             Confidence:{' '}
                             {Math.round(suggestion.confidence * 100)}%
                           </div>
                         )}
                       </div>
                       {suggestion.category && (
-                        <Badge className="text-xs border border-white/20 bg-white/10 text-foreground">
+                        <Badge variant="secondary" className="text-xs">
                           {suggestion.category}
                         </Badge>
                       )}
@@ -622,13 +618,15 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
               {showHistory && history.length > 0 && (
                 <div className="p-2">
                   <div className="flex items-center justify-between mb-2 px-2">
-                    <div className="text-xs font-medium text-foreground/70">
+                    <div className="text-xs font-semibold text-muted-foreground">
                       Recent Searches
                     </div>
                     {onClearHistory && (
                       <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={onClearHistory}
-                        className="h-6 px-2 text-xs bg-transparent hover:bg-accent text-foreground/70 hover:text-foreground"
+                        className="h-6 px-2 text-xs"
                       >
                         Clear
                       </Button>
@@ -641,24 +639,24 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                         key={item.id}
                         onClick={() => handleHistorySelect(item)}
                         className={cn(
-                          'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-white/10 transition-colors',
-                          selectedIndex === adjustedIndex && 'bg-white/10',
+                          'w-full flex items-center gap-3 px-3 py-2 text-left rounded-md hover:bg-accent transition-colors',
+                          selectedIndex === adjustedIndex && 'bg-accent',
                         )}
                         role="option"
                         aria-selected={selectedIndex === adjustedIndex}
                       >
-                        <Clock className="h-4 w-4 text-foreground/60" />
+                        <Clock className="h-4 w-4 text-muted-foreground" />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate text-foreground">
                             {item.query}
                           </div>
-                          <div className="text-xs text-foreground/60">
+                          <div className="text-xs text-muted-foreground">
                             {item.resultCount} results •{' '}
                             {formatTimeAgo(item.timestamp)}
                           </div>
                         </div>
                         {item.category && (
-                          <Badge className="text-xs border border-white/20 bg-white/10 text-foreground">
+                          <Badge variant="secondary" className="text-xs">
                             {item.category}
                           </Badge>
                         )}
