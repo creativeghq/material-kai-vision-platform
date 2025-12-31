@@ -268,9 +268,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const applicationData = allData?.application || {};
   const dimensionsData = allData?.dimensions || [];
 
-  const factory = allData?.factory_name || allData?.factory_group_name || 'Unknown Factory';
-  const origin = allData?.origin || allData?.country_of_origin || '';
-  const collection = designData?.collection || allData?.collection || '';
+  const factory = extractValue(allData?.factory_name) || extractValue(allData?.factory_group_name) || 'Unknown Factory';
+  const origin = extractValue(allData?.origin) || extractValue(allData?.country_of_origin) || '';
+  const collection = extractValue(designData?.collection) || extractValue(allData?.collection) || '';
 
   // Extract tile dimensions from available_sizes or dimensions (not page_range!)
   const availableSizes = allData?.available_sizes || dimensionsData || [];
@@ -290,7 +290,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     : extractValue(allData?.dimensions) || 'N/A';
   const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
   const finish = extractValue(materialPropsData?.finish) || 'N/A';
-  const material = allData?.material_category || product.type || 'N/A';
+  const material = extractValue(allData?.material_category) || product.type || 'N/A';
 
   // Metadata categories
   const materialProperties = {
@@ -336,7 +336,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const manufacturing = {
     'Factory': factory,
-    'Factory Group': allData?.factory_group_name || undefined,
+    'Factory Group': extractValue(allData?.factory_group_name) || undefined,
     'Country of Origin': origin || undefined
   };
 
@@ -344,23 +344,40 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const renderValue = (value: unknown): string => {
     if (value === null || value === undefined) return 'N/A';
 
-    // Handle {value, confidence} objects
+    // Handle {value, confidence} objects FIRST
     if (typeof value === 'object' && value !== null && 'value' in value) {
       const obj = value as Record<string, unknown>;
-      return String(obj.value ?? 'N/A');
+      const innerValue = obj.value;
+      // Recursively handle the inner value
+      if (innerValue === null || innerValue === undefined) return 'N/A';
+      if (typeof innerValue === 'object') {
+        // If inner value is still an object, stringify it
+        try {
+          return JSON.stringify(innerValue);
+        } catch {
+          return String(innerValue);
+        }
+      }
+      return String(innerValue);
     }
 
     // Handle arrays
     if (Array.isArray(value)) {
-      return value.map(v => renderValue(v)).join(', ');
+      return value.map(v => {
+        // For each array item, extract if it's an object
+        if (typeof v === 'object' && v !== null && 'value' in v) {
+          return String((v as Record<string, unknown>).value ?? 'N/A');
+        }
+        return String(v);
+      }).join(', ');
     }
 
-    // Handle plain objects
+    // Handle plain objects - stringify them
     if (typeof value === 'object') {
       try {
-        return JSON.stringify(value, null, 2);
+        return JSON.stringify(value);
       } catch {
-        return String(value);
+        return '[Object]';
       }
     }
 
