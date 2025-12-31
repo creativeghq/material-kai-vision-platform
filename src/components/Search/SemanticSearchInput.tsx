@@ -239,7 +239,6 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   const handleSuggestionSelect = async (suggestion: SearchSuggestion, position: number) => {
     onChange(suggestion.text);
     setIsOpen(false);
-    onSuggestionSelect?.(suggestion);
 
     // Track suggestion click
     try {
@@ -256,11 +255,16 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       console.error('Error tracking suggestion click:', error);
     }
 
-    // Auto-search on suggestion select
-    handleSearch(suggestion.text, {
-      ...(suggestion.category && { category: suggestion.category }),
-      semantic: suggestion.type === 'semantic',
-    });
+    // Call parent callback first - if it exists, let parent handle the action
+    if (onSuggestionSelect) {
+      onSuggestionSelect(suggestion);
+    } else {
+      // Fallback: Auto-search on suggestion select if no callback provided
+      handleSearch(suggestion.text, {
+        ...(suggestion.category && { category: suggestion.category }),
+        semantic: suggestion.type === 'semantic',
+      });
+    }
   };
 
   // Handle history selection
@@ -433,7 +437,11 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       {showDropdown && (
         <Card
           ref={dropdownRef}
-          className="absolute top-full left-0 right-0 mt-1 z-50 max-h-96 overflow-hidden shadow-lg"
+          className="absolute top-full left-0 right-0 mt-1 z-[100] max-h-96 overflow-hidden shadow-lg border-white/20"
+          style={{
+            background: 'var(--glass-bg)',
+            backdropFilter: 'var(--glass-blur)',
+          }}
         >
           <CardContent className="p-0">
             <div className="max-h-96 overflow-y-auto">

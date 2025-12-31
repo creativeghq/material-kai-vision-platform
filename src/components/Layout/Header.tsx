@@ -45,6 +45,45 @@ export const Header: React.FC<HeaderProps> = ({
       .slice(0, 2);
   };
 
+  const openProductById = async (productId: string) => {
+    try {
+      const { data: product, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+
+      if (error || !product) {
+        console.error('Error fetching product:', error);
+        toast({
+          title: 'Product Not Found',
+          description: 'Could not load product details.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setSelectedProduct({
+        id: product.id,
+        name: product.name,
+        description: product.description || '',
+        category: product.metadata?.material_category || 'Uncategorized',
+        type: product.metadata?.material_category || 'other',
+        status: product.status || 'active',
+        sku: product.id.substring(0, 8),
+        metadata: product.metadata || {},
+        properties: product.properties || {},
+        specifications: product.specifications || {},
+        images: [],
+        tags: [],
+        pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
+        stock: { quantity: 0, status: 'Unknown', unit: 'pcs' },
+      });
+    } catch (error) {
+      console.error('Error opening product:', error);
+    }
+  };
+
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
       console.log('Empty query, skipping search');
@@ -170,6 +209,18 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
+  const handleSuggestionSelect = (suggestion: any) => {
+    console.log('Suggestion selected:', suggestion);
+
+    // If suggestion has a product_id, open that product directly
+    if (suggestion.metadata?.product_id) {
+      openProductById(suggestion.metadata.product_id);
+    } else {
+      // Otherwise, perform a search with the suggestion text
+      handleSearch(suggestion.text);
+    }
+  };
+
   return (
     <header
       className="sticky top-0 z-50 m-4 rounded-3xl"
@@ -195,6 +246,7 @@ export const Header: React.FC<HeaderProps> = ({
             value={searchQuery}
             onChange={onSearchChange}
             onSearch={handleSearch}
+            onSuggestionSelect={handleSuggestionSelect}
             placeholder="Search materials by name, brand, color, or properties..."
             enableSemanticSuggestions={true}
             showHistory={true}

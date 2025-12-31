@@ -77,6 +77,7 @@ const MIVAA_ENDPOINTS = {
   'admin_job_stream': { path: '/api/admin/jobs/{job_id}/progress/stream', method: 'GET' },  // Stream job progress (SSE)
   'admin_test_product': { path: '/api/admin/test-product-creation', method: 'POST' },  // Test product creation
   'admin_process_ocr': { path: '/api/admin/admin/images/{image_id}/process-ocr', method: 'POST' },  // Process OCR for image
+  'admin_generate_product_embeddings': { path: '/api/admin/generate-product-embeddings', method: 'POST' },  // Generate product embeddings
 
   // ==================== ADMIN PROMPTS ====================
   'admin_prompts_list': { path: '/api/admin/prompts', method: 'GET' },  // List prompts

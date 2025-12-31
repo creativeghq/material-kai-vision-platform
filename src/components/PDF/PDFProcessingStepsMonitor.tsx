@@ -12,6 +12,8 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Sparkles,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,9 @@ import {
   extractStageMetrics,
 } from '@/services/pdf/pdfProcessingMonitor';
 import { formatDistanceToNow } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { mivaaApiClient } from '@/services/mivaaApiClient';
 
 interface ProcessingStep {
   id: number;
@@ -139,6 +144,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
   className,
 }) => {
   const { jobStatus, isPolling, error: monitorError } = usePDFProcessingMonitor(jobId);
+  const { toast } = useToast();
   const [steps, setSteps] = useState<ProcessingStep[]>(
     PROCESSING_STEPS.map(step => ({
       ...step,
@@ -148,6 +154,12 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
   );
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
   const [startTime] = useState(new Date());
+
+  // Admin action states
+  const [chunksCount, setChunksCount] = useState<number>(0);
+  const [embeddingsCount, setEmbeddingsCount] = useState<number>(0);
+  const [isGeneratingChunks, setIsGeneratingChunks] = useState(false);
+  const [isGeneratingEmbeddings, setIsGeneratingEmbeddings] = useState(false);
 
   // Update steps based on job status
   useEffect(() => {
@@ -256,6 +268,143 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
     }
   }, [monitorError, onError]);
 
+  // Fetch chunks and embeddings counts
+  useEffect(() => {
+    const fetchCounts = async () => {
+      if (!jobStatus?.document_id) return;
+
+      try {
+        // Get chunks count
+        const { count: chunksCount } = await supabase
+          .from('document_chunks')
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', jobStatus.document_id);
+
+        setChunksCount(chunksCount || 0);
+
+        // Get embeddings count (chunks with text_embedding)
+        const { count: embeddingsCount } = await supabase
+          .from('document_chunks')
+          .select('*', { count: 'exact', head: true })
+          .eq('document_id', jobStatus.document_id)
+          .not('text_embedding', 'is', null);
+
+        setEmbeddingsCount(embeddingsCount || 0);
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+      }
+    };
+
+    fetchCounts();
+    // Refresh counts every 5 seconds while polling
+    const interval = isPolling ? setInterval(fetchCounts, 5000) : null;
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [jobStatus?.document_id, isPolling]);
+
+  const handleGenerateChunks = async () => {
+    if (!jobStatus?.document_id || !jobStatus?.workspace_id) {
+      toast({
+        title: 'Error',
+        description: 'Missing document or workspace information',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGeneratingChunks(true);
+    try {
+      // Call the internal chunks generation endpoint
+      const response = await mivaaApiClient.request(
+        `/api/internal/create-chunks/${jobId}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            job_id: jobId,
+            document_id: jobStatus.document_id,
+            workspace_id: jobStatus.workspace_id,
+            extracted_text: '', // Will use existing text from DB
+            chunk_size: 512,
+            chunk_overlap: 50,
+          }),
+        }
+      );
+
+      // Check if chunks were skipped (already exist)
+      if (response.skipped) {
+        toast({
+          title: 'Already Exists',
+          description: `Document already has ${response.existing_chunks} chunks with ${response.existing_embeddings} embeddings. No duplicates created.`,
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `Created ${response.chunks_created} chunks with ${response.embeddings_generated} embeddings`,
+        });
+
+        // Refresh counts
+        setTimeout(() => {
+          setChunksCount(prev => prev + response.chunks_created);
+          setEmbeddingsCount(prev => prev + response.embeddings_generated);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Error generating chunks:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to generate chunks',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingChunks(false);
+    }
+  };
+
+  const handleGenerateEmbeddings = async () => {
+    if (!jobStatus?.document_id || !jobStatus?.workspace_id) {
+      toast({
+        title: 'Error',
+        description: 'Missing document or workspace information',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGeneratingEmbeddings(true);
+    try {
+      const response = await mivaaApiClient.request(
+        '/api/internal/generate-product-embeddings',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            workspace_id: jobStatus.workspace_id,
+            document_id: jobStatus.document_id,
+          }),
+        }
+      );
+
+      toast({
+        title: 'Success',
+        description: `Generated embeddings for ${response.products_processed} products (${response.embeddings_queued} queued)`,
+      });
+
+      // Refresh counts after a delay
+      setTimeout(() => {
+        setEmbeddingsCount(prev => prev + response.embeddings_queued);
+      }, 2000);
+    } catch (error) {
+      console.error('Error generating embeddings:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to generate embeddings',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingEmbeddings(false);
+    }
+  };
+
   const toggleStepExpansion = (stepId: number) => {
     setExpandedSteps(prev => {
       const newSet = new Set(prev);
@@ -335,6 +484,55 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
             <span>{completedSteps} of {totalSteps} steps</span>
           </div>
           <Progress value={overallProgress} className="h-2" />
+        </div>
+
+        {/* Admin Actions */}
+        <div className="mt-4 flex flex-col gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={handleGenerateChunks}
+                  disabled={isGeneratingChunks}
+                >
+                  <FileText className="h-3.5 w-3.5 mr-2" />
+                  Generate Chunks ({chunksCount})
+                  {isGeneratingChunks && (
+                    <Loader2 className="h-3 w-3 ml-2 animate-spin" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Create text chunks from document content</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  onClick={handleGenerateEmbeddings}
+                  disabled={isGeneratingEmbeddings}
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-2" />
+                  Generate Embeddings ({embeddingsCount})
+                  {isGeneratingEmbeddings && (
+                    <Loader2 className="h-3 w-3 ml-2 animate-spin" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Generate AI embeddings for products without them</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </CardHeader>
 
