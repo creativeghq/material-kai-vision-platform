@@ -2425,6 +2425,93 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         <Zap className="h-4 w-4" />
                         Regenerate Embeddings ({selectedJob?.metadata?.products_discovered || selectedJob?.metadata?.products_created || 0} products)
                       </button>
+                      <button
+                        onClick={async () => {
+                          if (!selectedJob.document_id) {
+                            alert('❌ No document_id found for this job');
+                            return;
+                          }
+
+                          try {
+                            // Fetch chunks and products count
+                            const [chunksResponse, productsResponse] = await Promise.all([
+                              supabase
+                                .from('document_chunks')
+                                .select('id', { count: 'exact' })
+                                .eq('document_id', selectedJob.document_id),
+                              supabase
+                                .from('products')
+                                .select('id', { count: 'exact' })
+                                .eq('source_document_id', selectedJob.document_id)
+                            ]);
+
+                            const chunksCount = chunksResponse.count || 0;
+                            const productsCount = productsResponse.count || 0;
+
+                            if (chunksCount === 0) {
+                              alert('❌ No chunks found for this document');
+                              return;
+                            }
+
+                            if (productsCount === 0) {
+                              alert('❌ No products found for this document');
+                              return;
+                            }
+
+                            const confirmed = confirm(
+                              `🔗 Create chunk-product relationships?\n\n` +
+                              `Document: ${selectedJob?.metadata?.filename || 'Unknown'}\n` +
+                              `Chunks: ${chunksCount}\n` +
+                              `Products: ${productsCount}\n\n` +
+                              `This will link chunks to products based on:\n` +
+                              `• Page proximity (40%)\n` +
+                              `• Content mentions (30%)\n` +
+                              `• Semantic similarity (30%)\n\n` +
+                              `This is required for search to work!\n\n` +
+                              `Continue?`
+                            );
+                            if (!confirmed) return;
+
+                            // Call the admin linking API
+                            const MIVAA_API_URL = 'https://v1api.materialshub.gr';
+                            const response = await fetch(`${MIVAA_API_URL}/api/admin/linking/link-chunks-to-products`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                document_id: selectedJob.document_id
+                              })
+                            });
+
+                            if (!response.ok) {
+                              const errorText = await response.text();
+                              throw new Error(`API error: ${response.status} - ${errorText}`);
+                            }
+
+                            const result = await response.json();
+
+                            if (result.success) {
+                              alert(
+                                `✅ Chunk relationships created!\n\n` +
+                                `Chunks found: ${result.chunks_found}\n` +
+                                `Products found: ${result.products_found}\n` +
+                                `Relationships created: ${result.chunk_product_links}\n\n` +
+                                `Search should now work for this document!`
+                              );
+                            } else {
+                              alert(`❌ Failed: ${result.error || 'Unknown error'}`);
+                            }
+                          } catch (error) {
+                            console.error('Error creating chunk relationships:', error);
+                            alert(`❌ Failed to create chunk relationships: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                          }
+                        }}
+                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
+                      >
+                        <Link className="h-4 w-4" />
+                        Create Chunk Relationships ({selectedJob?.metadata?.result?.chunks_created || selectedJob?.metadata?.chunks_created || 0} chunks)
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
