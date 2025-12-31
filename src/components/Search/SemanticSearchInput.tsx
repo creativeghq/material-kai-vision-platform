@@ -379,6 +379,18 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   const showDropdown =
     isOpen && (suggestions.length > 0 || (showHistory && history.length > 0));
 
+  // Debug logging
+  useEffect(() => {
+    console.log('SemanticSearchInput state:', {
+      isOpen,
+      suggestionsCount: suggestions.length,
+      historyCount: history.length,
+      showDropdown,
+      value,
+      isLoading,
+    });
+  }, [isOpen, suggestions.length, history.length, showDropdown, value, isLoading]);
+
   return (
     <div className={cn('relative w-full', className)}>
       {/* Search Input */}
