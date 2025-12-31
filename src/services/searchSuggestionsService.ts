@@ -1,11 +1,11 @@
 /**
  * Search Suggestions Service
- * 
+ *
  * Provides intelligent search suggestions, auto-complete, trending searches,
  * typo correction, and query expansion functionality via MIVAA API.
  */
 
-import { getMivaaApiClient } from './mivaaApiClient';
+import { mivaaApi } from './mivaaApiClient';
 
 // Types
 export interface SearchSuggestion {
@@ -90,7 +90,7 @@ export interface TypoCorrectionRequest {
  * Search Suggestions Service
  */
 export class SearchSuggestionsService {
-  private mivaaClient = getMivaaApiClient();
+  private mivaaClient = mivaaApi;
 
   /**
    * Get auto-complete suggestions
