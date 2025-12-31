@@ -46,13 +46,26 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleSearch = async (query: string) => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      console.log('Empty query, skipping search');
+      return;
+    }
+
+    console.log('=== SEARCH STARTED ===');
+    console.log('Query:', query);
 
     setIsSearching(true);
     try {
       // Get user's workspace
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      console.log('Step 1: Getting current user...');
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+
+      if (userError) {
+        console.error('User error:', userError);
+      }
+
       if (!currentUser) {
+        console.error('No user found');
         toast({
           title: 'Authentication Required',
           description: 'Please log in to search products.',
@@ -62,6 +75,9 @@ export const Header: React.FC<HeaderProps> = ({
         return;
       }
 
+      console.log('User ID:', currentUser.id);
+
+      console.log('Step 2: Getting workspace...');
       const { data: workspaceData, error: workspaceError } = await supabase
         .from('workspace_members')
         .select('workspace_id')
@@ -71,8 +87,12 @@ export const Header: React.FC<HeaderProps> = ({
         .limit(1)
         .single();
 
-      if (workspaceError || !workspaceData) {
-        console.error('Workspace error:', workspaceError);
+      if (workspaceError) {
+        console.error('Workspace query error:', workspaceError);
+      }
+
+      if (!workspaceData) {
+        console.error('No workspace data returned');
         toast({
           title: 'Workspace Not Found',
           description: 'No active workspace found. Please contact support.',
@@ -82,56 +102,45 @@ export const Header: React.FC<HeaderProps> = ({
         return;
       }
 
-      // Search products using MIVAA API
-      const MIVAA_API_URL = 'https://v1api.materialshub.gr';
-      const { data: { session } } = await supabase.auth.getSession();
-      const authToken = session?.access_token || '';
+      console.log('Workspace ID:', workspaceData.workspace_id);
 
-      console.log('Searching with query:', query, 'workspace:', workspaceData.workspace_id);
+      // Try simple text search first
+      console.log('Step 3: Searching products in Supabase...');
+      const { data: products, error: searchError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('workspace_id', workspaceData.workspace_id)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+        .limit(5);
 
-      const response = await fetch(`${MIVAA_API_URL}/api/rag/search?strategy=multi_vector`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
-          query,
-          workspace_id: workspaceData.workspace_id,
-          top_k: 5,
-          similarity_threshold: 0.3,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Search API error:', response.status, errorText);
+      if (searchError) {
+        console.error('Search error:', searchError);
         toast({
           title: 'Search Failed',
-          description: `API returned error: ${response.status}`,
+          description: searchError.message,
           variant: 'destructive',
         });
         setIsSearching(false);
         return;
       }
 
-      const data = await response.json();
-      console.log('Search results:', data);
+      console.log('Search results:', products);
 
-      if (data.products && data.products.length > 0) {
+      if (products && products.length > 0) {
+        console.log('Found', products.length, 'products');
         // Open first product
-        const product = data.products[0];
+        const product = products[0];
         setSelectedProduct({
           id: product.id,
           name: product.name,
-          description: product.description,
+          description: product.description || '',
           category: product.metadata?.material_category || 'Uncategorized',
           type: product.metadata?.material_category || 'other',
-          status: 'active',
+          status: product.status || 'active',
           sku: product.id.substring(0, 8),
           metadata: product.metadata || {},
-          properties: {},
-          specifications: {},
+          properties: product.properties || {},
+          specifications: product.specifications || {},
           images: [],
           tags: [],
           pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
@@ -139,9 +148,10 @@ export const Header: React.FC<HeaderProps> = ({
         });
         toast({
           title: 'Search Complete',
-          description: `Found ${data.products.length} result(s)`,
+          description: `Found ${products.length} result(s). Showing: ${product.name}`,
         });
       } else {
+        console.log('No products found');
         toast({
           title: 'No Results',
           description: 'No products found matching your search.',
@@ -156,6 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
       });
     } finally {
       setIsSearching(false);
+      console.log('=== SEARCH ENDED ===');
     }
   };
 
