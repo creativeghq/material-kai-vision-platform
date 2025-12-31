@@ -2319,19 +2319,17 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           }
 
                           try {
-                            // Fetch current chunks count
-                            const { count: currentChunks } = await supabase
-                              .from('document_chunks')
-                              .select('*', { count: 'exact', head: true })
-                              .eq('document_id', selectedJob.document_id);
+                            // Fetch extracted_text from processed_documents table
+                            const { data: processedDoc, error: procError } = await supabase
+                              .from('processed_documents')
+                              .select('content')
+                              .eq('id', selectedJob.document_id)
+                              .single();
 
-                            // Fetch document to get extracted_text
-                            const docResponse = await fetch(`https://v1api.materialshub.gr/api/rag/documents/${selectedJob.document_id}`);
-                            if (!docResponse.ok) {
-                              alert('❌ Failed to fetch document data');
+                            if (procError || !processedDoc?.content) {
+                              alert('❌ No extracted text found. The document may not have been processed yet.');
                               return;
                             }
-                            const docData = await docResponse.json();
 
                             // Fetch products for this document
                             const productsResponse = await fetch(`https://v1api.materialshub.gr/api/products?document_id=${selectedJob.document_id}`);
@@ -2345,7 +2343,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               body: JSON.stringify({
                                 document_id: selectedJob.document_id,
                                 workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                                extracted_text: docData.content || docData.extracted_text || '',
+                                extracted_text: processedDoc.content,
                                 product_ids: productIds,
                                 chunk_size: 512,
                                 chunk_overlap: 50
@@ -2380,12 +2378,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           }
 
                           try {
-                            // Fetch current embeddings count
-                            const { count: currentEmbeddings } = await supabase
-                              .from('document_chunks')
-                              .select('*', { count: 'exact', head: true })
-                              .eq('document_id', selectedJob.document_id)
-                              .not('text_embedding', 'is', null);
+                            // Fetch products for this document to show accurate count
+                            const { data: products, error: productsError } = await supabase
+                              .from('products')
+                              .select('id')
+                              .eq('source_document_id', selectedJob.document_id);
+
+                            if (productsError) {
+                              alert('❌ Error fetching products: ' + productsError.message);
+                              return;
+                            }
+
+                            const totalProducts = products?.length || 0;
 
                             const response = await fetch('https://v1api.materialshub.gr/api/internal/generate-product-embeddings', {
                               method: 'POST',
@@ -2398,8 +2402,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             });
                             const result = await response.json();
                             if (result.success) {
-                              if (result.products_processed === 0) {
-                                alert(`ℹ️ ${result.message}\nAll products already have embeddings.`);
+                              if (result.products_processed === 0 && result.errors.length === 0) {
+                                alert(`ℹ️ ${result.message}\nAll ${totalProducts} products already have embeddings.`);
+                              } else if (result.errors.length > 0) {
+                                alert(`⚠️ Generated Embeddings for ${result.products_processed} products (${result.errors.length} errors)\n\nErrors:\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`);
                               } else {
                                 alert(`✅ ${result.message}\nProducts: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
                               }
@@ -2414,15 +2420,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
                       >
                         <Zap className="h-4 w-4" />
-                        Regenerate Embeddings ({(() => {
-                          const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
-                          const metadataTotal = (imgCheckpoint?.metadata as any)?.clip_embeddings?.total;
-                          if (metadataTotal) return metadataTotal;
-                          const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
-                          const specializedEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.specialized_embeddings || 0;
-                          const totalEmbeddings = clipEmbeddings + specializedEmbeddings;
-                          return totalEmbeddings || selectedJob?.metadata?.embeddings_generated || 0;
-                        })()})
+                        Regenerate Embeddings ({selectedJob?.metadata?.products_discovered || selectedJob?.metadata?.products_created || 0} products)
                       </button>
                     </div>
                   </CardContent>
