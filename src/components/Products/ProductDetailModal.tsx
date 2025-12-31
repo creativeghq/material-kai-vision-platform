@@ -17,13 +17,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database } from 'lucide-react';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
 import { SimilarMaterials } from '@/components/recommendations';
 import { ProductMonitorTab } from '@/components/PriceMonitoring/ProductMonitorTab';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -64,15 +65,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   categoryColor,
 }) => {
+  const { user } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [chunks, setChunks] = useState<any[]>([]);
+  const [embeddings, setEmbeddings] = useState<any>({});
+  const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
 
   if (!product) return null;
 
   const materialCategory = getMaterialCategory(product);
   const theme = getCategoryTheme(materialCategory);
   const effectiveColor = categoryColor || theme.primary;
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+      setIsAdmin(data?.role === 'admin');
+    };
+    checkAdmin();
+  }, [user]);
 
   // Load images from product_image_relationships when modal opens
   useEffect(() => {
@@ -140,6 +160,85 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       loadImages();
     }
   }, [product?.id, isOpen]);
+
+  // Load admin data (chunks, embeddings, relevances)
+  useEffect(() => {
+    const loadAdminData = async () => {
+      if (!product?.id || !isAdmin || !isOpen) return;
+
+      try {
+        // Load embeddings
+        const { data: productData } = await supabase
+          .from('products')
+          .select(`
+            text_embedding_1024,
+            visual_clip_embedding_512,
+            multimodal_fusion_embedding_2048,
+            color_embedding_256,
+            texture_embedding_256,
+            application_embedding_512
+          `)
+          .eq('id', product.id)
+          .single();
+
+        if (productData) {
+          setEmbeddings({
+            text_embedding_1024: !!productData.text_embedding_1024,
+            visual_clip_embedding_512: !!productData.visual_clip_embedding_512,
+            multimodal_fusion_embedding_2048: !!productData.multimodal_fusion_embedding_2048,
+            color_embedding_256: !!productData.color_embedding_256,
+            texture_embedding_256: !!productData.texture_embedding_256,
+            application_embedding_512: !!productData.application_embedding_512,
+          });
+        }
+
+        // Load chunks
+        const { data: chunkRelations } = await supabase
+          .from('chunk_product_relationships')
+          .select(`
+            relevance_score,
+            relationship_type,
+            document_chunks (
+              id,
+              chunk_text,
+              page_number,
+              metadata,
+              created_at
+            )
+          `)
+          .eq('product_id', product.id)
+          .order('relevance_score', { ascending: false });
+
+        if (chunkRelations) {
+          setChunks(chunkRelations.filter(r => r.document_chunks).map(r => ({
+            ...r.document_chunks,
+            relevance_score: r.relevance_score,
+            relationship_type: r.relationship_type,
+          })));
+        }
+
+        // Count relevances
+        const { count: chunkCount } = await supabase
+          .from('chunk_product_relationships')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
+        const { count: imageCount } = await supabase
+          .from('product_image_relationships')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
+        setRelevanceCounts({
+          chunks: chunkCount || 0,
+          images: imageCount || 0,
+        });
+      } catch (error) {
+        console.error('[ProductDetailModal] Failed to load admin data:', error);
+      }
+    };
+
+    loadAdminData();
+  }, [product?.id, isAdmin, isOpen]);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) =>
@@ -241,6 +340,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Country of Origin': origin || undefined
   };
 
+  // Helper function to safely render any value (handles objects, arrays, primitives)
+  const renderValue = (value: unknown): string => {
+    if (value === null || value === undefined) return 'N/A';
+
+    // Handle {value, confidence} objects
+    if (typeof value === 'object' && value !== null && 'value' in value) {
+      const obj = value as Record<string, unknown>;
+      return String(obj.value ?? 'N/A');
+    }
+
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.map(v => renderValue(v)).join(', ');
+    }
+
+    // Handle plain objects
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+
+    // Handle primitives
+    return String(value);
+  };
+
   // Helper function to render metadata category
   const renderMetadataCategory = (title: string, data: Record<string, unknown>) => {
     const filteredData = Object.entries(data).filter(([, value]) => value && value !== 'N/A' && value !== '');
@@ -257,7 +384,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{key}</p>
                 <p className="text-sm font-bold text-gray-900">
-                  {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                  {renderValue(value)}
                 </p>
               </div>
             ))}
@@ -314,14 +441,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
         {/* Tabs for Details and Monitor */}
         <Tabs defaultValue="details" className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-5' : 'grid-cols-2'}`}>
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
-              Product Details
+              Details
             </TabsTrigger>
+            {isAdmin && (
+              <>
+                <TabsTrigger value="chunks" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Chunks ({chunks.length})
+                </TabsTrigger>
+                <TabsTrigger value="knowledge" className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4" />
+                  Knowledge
+                </TabsTrigger>
+                <TabsTrigger value="extraction" className="flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  Extraction
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="monitor" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Price Monitor
+              Monitor
             </TabsTrigger>
           </TabsList>
 
@@ -524,6 +667,119 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <SimilarMaterials materialId={product.id} limit={10} />
         </div>
       </TabsContent>
+
+      {/* Chunks Tab - Admin Only */}
+      {isAdmin && (
+        <TabsContent value="chunks" className="mt-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Related Chunks ({chunks.length})</h3>
+              <Badge variant="outline">{relevanceCounts.chunks} total relevances</Badge>
+            </div>
+
+            {chunks.length > 0 ? (
+              <div className="space-y-3">
+                {chunks.map((chunk: any, index: number) => (
+                  <Card key={chunk.id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm">Chunk #{index + 1}</CardTitle>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline">Page {chunk.page_number}</Badge>
+                          <Badge>Score: {(chunk.relevance_score * 100).toFixed(0)}%</Badge>
+                          <Badge variant="secondary">{chunk.relationship_type}</Badge>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                        {chunk.chunk_text}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No chunks linked to this product
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      )}
+
+      {/* Knowledge Tab - Admin Only */}
+      {isAdmin && (
+        <TabsContent value="knowledge" className="mt-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Knowledge Base Articles</h3>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8 text-muted-foreground">
+                  <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Knowledge base linking coming soon</p>
+                  <p className="text-sm mt-2">
+                    This will show cleaning instructions, maintenance guides, and related documentation
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      )}
+
+      {/* Extraction Tab - Admin Only */}
+      {isAdmin && (
+        <TabsContent value="extraction" className="mt-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Extraction Metadata</h3>
+
+            {/* Embeddings Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Embeddings Attached</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {Object.entries(embeddings).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                      <span className="text-sm font-medium">{key.replace(/_/g, ' ')}</span>
+                      <Badge variant={value ? 'default' : 'outline'}>
+                        {value ? '✓' : '✗'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Relevances Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Relevances</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Chunk Relevances:</span>
+                    <Badge>{relevanceCounts.chunks}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Image Relevances:</span>
+                    <Badge>{relevanceCounts.images}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Total Relationships:</span>
+                    <Badge variant="secondary">
+                      {relevanceCounts.chunks + relevanceCounts.images}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      )}
 
       {/* Monitor Tab */}
       <TabsContent value="monitor" className="mt-6">

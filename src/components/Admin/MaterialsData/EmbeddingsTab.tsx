@@ -66,22 +66,24 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
       const from = (page - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      // Query text embeddings from document_chunks
-      let textQuery = supabase
+      // Query text embeddings from document_chunks with proper join
+      const { data: textData, error: textError, count: textCount } = await supabase
         .from('document_chunks')
-        .select('id, chunk_text, text_embedding, created_at, document_id, documents!inner(workspace_id)', { count: 'exact' })
+        .select(`
+          id,
+          chunk_text,
+          text_embedding,
+          created_at,
+          document_id,
+          documents!inner(workspace_id)
+        `, { count: 'exact' })
         .eq('documents.workspace_id', workspaceId)
-        .not('text_embedding', 'is', null);
-
-      // Note: job_id filtering removed as documents table doesn't have job_id column
-      // If needed, this should be added to the documents table schema
-
-      const { data: textData, error: textError, count: textCount } = await textQuery
+        .not('text_embedding', 'is', null)
         .order('created_at', { ascending: false })
         .range(from, to);
 
       if (textError) {
-        console.error('Error loading embeddings:', textError);
+        console.error('Error loading text embeddings:', textError);
         throw textError;
       }
 
@@ -95,16 +97,17 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
         source_id: chunk.id,
         source_text: chunk.chunk_text?.substring(0, 200) + '...',
         workspace_id: workspaceId,
-        source_job_id: null // documents table doesn't have job_id
+        embedding: chunk.text_embedding,
+        chunk_id: chunk.id
       }));
 
       setEmbeddings(transformedData);
       setTotalCount(textCount || 0);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load embeddings:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load embeddings',
+        description: error?.message || 'Failed to load embeddings',
         variant: 'destructive',
       });
     } finally {

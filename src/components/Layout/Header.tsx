@@ -1,10 +1,9 @@
-import React from 'react';
-import { Search, Bell, Settings, User, Sparkles, LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bell, Settings, User, Sparkles, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +12,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { SemanticSearchInput } from '@/components/Search/SemanticSearchInput';
+import { ProductDetailModal as UnifiedProductDetailModal } from '@/components/Products/ProductDetailModal';
+import { supabase } from '@/integrations/supabase/client';
 
 interface HeaderProps {
   searchQuery: string;
@@ -25,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   const handleSignOut = async () => {
     await signOut();
@@ -37,6 +40,72 @@ export const Header: React.FC<HeaderProps> = ({
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) return;
+
+    try {
+      // Get user's workspace
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return;
+
+      const { data: workspaceData } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'active')
+        .order('joined_at', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (!workspaceData) return;
+
+      // Search products using MIVAA API
+      const MIVAA_API_URL = 'https://v1api.materialshub.gr';
+      const { data: { session } } = await supabase.auth.getSession();
+      const authToken = session?.access_token || '';
+
+      const response = await fetch(`${MIVAA_API_URL}/api/rag/search?strategy=multi_vector`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          query,
+          workspace_id: workspaceData.workspace_id,
+          top_k: 5,
+          similarity_threshold: 0.3,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.products && data.products.length > 0) {
+          // Open first product
+          const product = data.products[0];
+          setSelectedProduct({
+            id: product.id,
+            name: product.name,
+            description: product.description,
+            category: product.metadata?.material_category || 'Uncategorized',
+            type: product.metadata?.material_category || 'other',
+            status: 'active',
+            sku: product.id.substring(0, 8),
+            metadata: product.metadata || {},
+            properties: {},
+            specifications: {},
+            images: [],
+            tags: [],
+            pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
+            stock: { quantity: 0, status: 'Unknown', unit: 'pcs' },
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    }
   };
 
   return (
@@ -60,15 +129,16 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="ml-12 flex-1 max-w-xl">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground w-5 h-5" />
-            <Input
-              placeholder="Search materials, projects, or settings..."
-              className="pl-12 h-12 border-white/20 bg-sidebar"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-          </div>
+          <SemanticSearchInput
+            value={searchQuery}
+            onChange={onSearchChange}
+            onSearch={handleSearch}
+            placeholder="Search materials by name, brand, color, or properties..."
+            enableSemanticSuggestions={true}
+            showHistory={true}
+            maxSuggestions={5}
+            className="h-12"
+          />
         </div>
 
         <div className="ml-auto flex items-center space-x-3">
@@ -125,6 +195,15 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </div>
+
+      {/* Product Detail Modal */}
+      {selectedProduct && (
+        <UnifiedProductDetailModal
+          product={selectedProduct}
+          isOpen={true}
+          onClose={() => setSelectedProduct(null)}
+        />
+      )}
     </header>
   );
 };
