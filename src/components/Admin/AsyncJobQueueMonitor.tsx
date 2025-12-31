@@ -2306,34 +2306,71 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <Zap className="h-4 w-4" />
-                      Quick Actions
+                      Continue Processing
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('https://v1api.materialshub.gr/api/internal/create-chunks/' + selectedJob.id, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                job_id: selectedJob.id,
+                                document_id: selectedJob.document_id,
+                                workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
+                                extracted_text: selectedJob.metadata?.extracted_text || '',
+                                product_ids: selectedJob.metadata?.product_ids || [],
+                                chunk_size: 512,
+                                chunk_overlap: 50
+                              })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                              alert(`✅ Chunks created: ${result.chunks_created}, Embeddings: ${result.embeddings_generated}`);
+                              fetchJobDetails(selectedJob);
+                            } else {
+                              alert('❌ Failed to create chunks');
+                            }
+                          } catch (error) {
+                            alert('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          }
+                        }}
+                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
                       >
                         <FileText className="h-4 w-4" />
-                        Generate Chunks ({selectedJob?.metadata?.result?.chunks_created || selectedJob?.metadata?.chunks_created || 0})
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
+                        Generate Chunks
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch('https://v1api.materialshub.gr/api/internal/generate-product-embeddings', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                document_id: selectedJob.document_id,
+                                workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
+                                product_ids: selectedJob.metadata?.product_ids || null
+                              })
+                            });
+                            const result = await response.json();
+                            if (result.success) {
+                              alert(`✅ ${result.message}\nProducts: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
+                              fetchJobDetails(selectedJob);
+                            } else {
+                              alert('❌ Failed to generate embeddings');
+                            }
+                          } catch (error) {
+                            alert('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          }
+                        }}
+                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
                       >
                         <Zap className="h-4 w-4" />
-                        Generated Embeddings ({(() => {
-                          const imgCheckpoint = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
-                          const metadataTotal = (imgCheckpoint?.metadata as any)?.clip_embeddings?.total;
-                          if (metadataTotal) return metadataTotal;
-                          const clipEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.clip_embeddings || 0;
-                          const specializedEmbeddings = (imgCheckpoint?.checkpoint_data as any)?.specialized_embeddings || 0;
-                          return clipEmbeddings + specializedEmbeddings || selectedJob?.metadata?.embeddings_generated || 0;
-                        })()})
-                      </Button>
+                        Generate Product Embeddings
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
