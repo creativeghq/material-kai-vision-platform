@@ -2336,18 +2336,21 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             const productsData = productsResponse.ok ? await productsResponse.json() : { products: [] };
                             const productIds = productsData.products?.map((p: any) => p.id) || [];
 
-                            // Call create-chunks endpoint (job_id is in URL path, not body)
+                            // Call create-chunks endpoint (job_id required in both URL path AND body)
+                            const requestBody = {
+                              job_id: selectedJob.id,
+                              document_id: selectedJob.document_id,
+                              workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
+                              extracted_text: processedDoc.content,
+                              product_ids: productIds,
+                              chunk_size: 512,
+                              chunk_overlap: 50
+                            };
+
                             const response = await fetch(`https://v1api.materialshub.gr/api/internal/create-chunks/${selectedJob.id}`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                document_id: selectedJob.document_id,
-                                workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                                extracted_text: processedDoc.content,
-                                product_ids: productIds,
-                                chunk_size: 512,
-                                chunk_overlap: 50
-                              })
+                              body: JSON.stringify(requestBody)
                             });
 
                             const result = await response.json();
