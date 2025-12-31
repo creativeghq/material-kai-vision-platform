@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { SemanticSearchInput } from '@/components/Search/SemanticSearchInput';
 import { ProductDetailModal as UnifiedProductDetailModal } from '@/components/Products/ProductDetailModal';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface HeaderProps {
   searchQuery: string;
@@ -27,7 +28,9 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -45,12 +48,21 @@ export const Header: React.FC<HeaderProps> = ({
   const handleSearch = async (query: string) => {
     if (!query.trim()) return;
 
+    setIsSearching(true);
     try {
       // Get user's workspace
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) return;
+      if (!currentUser) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to search products.',
+          variant: 'destructive',
+        });
+        setIsSearching(false);
+        return;
+      }
 
-      const { data: workspaceData } = await supabase
+      const { data: workspaceData, error: workspaceError } = await supabase
         .from('workspace_members')
         .select('workspace_id')
         .eq('user_id', currentUser.id)
@@ -59,12 +71,23 @@ export const Header: React.FC<HeaderProps> = ({
         .limit(1)
         .single();
 
-      if (!workspaceData) return;
+      if (workspaceError || !workspaceData) {
+        console.error('Workspace error:', workspaceError);
+        toast({
+          title: 'Workspace Not Found',
+          description: 'No active workspace found. Please contact support.',
+          variant: 'destructive',
+        });
+        setIsSearching(false);
+        return;
+      }
 
       // Search products using MIVAA API
       const MIVAA_API_URL = 'https://v1api.materialshub.gr';
       const { data: { session } } = await supabase.auth.getSession();
       const authToken = session?.access_token || '';
+
+      console.log('Searching with query:', query, 'workspace:', workspaceData.workspace_id);
 
       const response = await fetch(`${MIVAA_API_URL}/api/rag/search?strategy=multi_vector`, {
         method: 'POST',
@@ -80,31 +103,59 @@ export const Header: React.FC<HeaderProps> = ({
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.products && data.products.length > 0) {
-          // Open first product
-          const product = data.products[0];
-          setSelectedProduct({
-            id: product.id,
-            name: product.name,
-            description: product.description,
-            category: product.metadata?.material_category || 'Uncategorized',
-            type: product.metadata?.material_category || 'other',
-            status: 'active',
-            sku: product.id.substring(0, 8),
-            metadata: product.metadata || {},
-            properties: {},
-            specifications: {},
-            images: [],
-            tags: [],
-            pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
-            stock: { quantity: 0, status: 'Unknown', unit: 'pcs' },
-          });
-        }
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Search API error:', response.status, errorText);
+        toast({
+          title: 'Search Failed',
+          description: `API returned error: ${response.status}`,
+          variant: 'destructive',
+        });
+        setIsSearching(false);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('Search results:', data);
+
+      if (data.products && data.products.length > 0) {
+        // Open first product
+        const product = data.products[0];
+        setSelectedProduct({
+          id: product.id,
+          name: product.name,
+          description: product.description,
+          category: product.metadata?.material_category || 'Uncategorized',
+          type: product.metadata?.material_category || 'other',
+          status: 'active',
+          sku: product.id.substring(0, 8),
+          metadata: product.metadata || {},
+          properties: {},
+          specifications: {},
+          images: [],
+          tags: [],
+          pricing: { retail: 0, wholesale: 0, currency: 'EUR' },
+          stock: { quantity: 0, status: 'Unknown', unit: 'pcs' },
+        });
+        toast({
+          title: 'Search Complete',
+          description: `Found ${data.products.length} result(s)`,
+        });
+      } else {
+        toast({
+          title: 'No Results',
+          description: 'No products found matching your search.',
+        });
       }
     } catch (error) {
       console.error('Search error:', error);
+      toast({
+        title: 'Search Error',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -137,6 +188,7 @@ export const Header: React.FC<HeaderProps> = ({
             enableSemanticSuggestions={true}
             showHistory={true}
             maxSuggestions={5}
+            disabled={isSearching}
             className="h-12"
           />
         </div>

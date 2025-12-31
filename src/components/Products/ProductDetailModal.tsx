@@ -85,11 +85,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     const checkAdmin = async () => {
       if (!user) return;
       const { data } = await supabase
-        .from('user_roles')
+        .from('workspace_members')
         .select('role')
         .eq('user_id', user.id)
-        .single();
-      setIsAdmin(data?.role === 'admin');
+        .eq('status', 'active')
+        .maybeSingle();
+      setIsAdmin(data?.role === 'admin' || data?.role === 'owner');
     };
     checkAdmin();
   }, [user]);
@@ -293,12 +294,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const material = extractValue(allData?.material_category) || product.type || 'N/A';
 
   // Metadata categories
+  // Extract commercial data
+  const commercialData = allData?.commercial || {};
+  const packagingData = allData?.packaging || {};
+  const performanceData = allData?.performance || {};
+
   const materialProperties = {
     'Material Category': material,
     'Composition': extractValue(materialPropsData?.composition),
     'Body Type': extractValue(materialPropsData?.body_type),
     'Finish': finish,
-    'Patterns': extractValue(materialPropsData?.patterns),
+    'Patterns': extractValue(materialPropsData?.patterns) || extractValue(appearanceData?.patterns),
     'Surface': extractValue(materialPropsData?.surface),
     'Thickness': thickness
   };
@@ -316,9 +322,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const performance = {
     'Traffic Level': extractValue(applicationData?.traffic_level),
-    'Slip Resistance': extractValue(materialPropsData?.slip_resistance),
-    'Water Resistance': extractValue(materialPropsData?.water_resistance),
-    'Fire Rating': extractValue(materialPropsData?.fire_rating)
+    'Slip Resistance': extractValue(materialPropsData?.slip_resistance) || extractValue(performanceData?.slip_resistance),
+    'Water Resistance': extractValue(materialPropsData?.water_resistance) || extractValue(performanceData?.water_resistance),
+    'Fire Rating': extractValue(materialPropsData?.fire_rating) || extractValue(performanceData?.fire_rating),
+    'Abrasion Resistance': extractValue(performanceData?.abrasion_resistance),
+    'Frost Resistance': extractValue(performanceData?.frost_resistance),
   };
 
   const application = {
@@ -330,14 +338,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Designer': Array.isArray(designData?.designers)
       ? designData.designers.join(', ')
       : extractValue(designData?.designers) || extractValue(designData?.studio),
+    'Studio': extractValue(designData?.studio),
     'Collection': collection,
     'Brand': extractValue(designData?.brand),
+    'Philosophy': extractValue(designData?.philosophy),
+    'Studio Founded': extractValue(designData?.studio_founded),
   };
 
   const manufacturing = {
     'Factory': factory,
     'Factory Group': extractValue(allData?.factory_group_name) || undefined,
     'Country of Origin': origin || undefined
+  };
+
+  const commercial = {
+    'Product Codes': extractValue(commercialData?.product_codes),
+    'SKU Codes': extractValue(commercialData?.sku_codes),
+    'Grout Suppliers': extractValue(commercialData?.grout_suppliers),
+    'Grout Mapei': extractValue(commercialData?.grout_mapei),
+    'Grout Kerakoll': extractValue(commercialData?.grout_kerakoll),
+    'Grout Color Codes': extractValue(commercialData?.grout_color_codes),
+  };
+
+  const packaging = {
+    'Pieces per Box': extractValue(packagingData?.pieces_per_box),
+    'Boxes per Pallet': extractValue(packagingData?.boxes_per_pallet),
+    'Weight per Box': extractValue(packagingData?.weight_per_box),
+    'Coverage per Box': extractValue(packagingData?.coverage_per_box),
   };
 
   // Helper function to safely render any value (handles objects, arrays, primitives)
@@ -657,27 +684,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {renderMetadataCategory('Application', application)}
           {renderMetadataCategory('Design', design)}
           {renderMetadataCategory('Manufacturing', manufacturing)}
+          {renderMetadataCategory('Commercial Information', commercial)}
+          {renderMetadataCategory('Packaging', packaging)}
         </div>
-
-        {/* Tags Section */}
-        <Card className="mt-4 bg-white border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-gray-900">Product Tags</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {product.tags.map((tag, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="text-sm capitalize px-3 py-1 bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100"
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Similar Materials Section */}
         <div className="mt-6">
