@@ -143,13 +143,13 @@ export const Header: React.FC<HeaderProps> = ({
 
       console.log('Workspace ID:', workspaceData.workspace_id);
 
-      // Try simple text search first (search in name, description, and SKU)
+      // Try simple text search first (search in name and description only - id is UUID)
       console.log('Step 3: Searching products in Supabase...');
       const { data: products, error: searchError } = await supabase
         .from('products')
         .select('*')
         .eq('workspace_id', workspaceData.workspace_id)
-        .or(`name.ilike.%${query}%,description.ilike.%${query}%,id.ilike.%${query}%`)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
         .limit(10);
 
       if (searchError) {
