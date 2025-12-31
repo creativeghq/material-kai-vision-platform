@@ -169,70 +169,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       if (!product?.id || !isAdmin || !isOpen) return;
 
       try {
-        // Load embeddings
-        const { data: productData } = await supabase
-          .from('products')
-          .select(`
-            text_embedding_1024,
-            visual_clip_embedding_512,
-            multimodal_fusion_embedding_2048,
-            color_embedding_256,
-            texture_embedding_256,
-            application_embedding_512
-          `)
-          .eq('id', product.id)
-          .single();
+        // Embeddings are stored in separate tables/VECS, not in products table
+        // Skip embedding status check for now - these columns don't exist in products table
+        setEmbeddings({
+          text_embedding_1024: false,
+          visual_clip_embedding_512: false,
+          multimodal_fusion_embedding_2048: false,
+          color_embedding_256: false,
+          texture_embedding_256: false,
+          application_embedding_512: false,
+        });
 
-        if (productData) {
-          setEmbeddings({
-            text_embedding_1024: !!productData.text_embedding_1024,
-            visual_clip_embedding_512: !!productData.visual_clip_embedding_512,
-            multimodal_fusion_embedding_2048: !!productData.multimodal_fusion_embedding_2048,
-            color_embedding_256: !!productData.color_embedding_256,
-            texture_embedding_256: !!productData.texture_embedding_256,
-            application_embedding_512: !!productData.application_embedding_512,
-          });
-        }
+        // chunk_product_relationships table doesn't exist - skip chunk loading
+        // Chunks are linked differently in the current schema
+        setChunks([]);
 
-        // Load chunks
-        const { data: chunkRelations } = await supabase
-          .from('chunk_product_relationships')
-          .select(`
-            relevance_score,
-            relationship_type,
-            document_chunks (
-              id,
-              chunk_text,
-              page_number,
-              metadata,
-              created_at
-            )
-          `)
-          .eq('product_id', product.id)
-          .order('relevance_score', { ascending: false });
-
-        if (chunkRelations) {
-          setChunks(chunkRelations.filter(r => r.document_chunks).map(r => ({
-            ...r.document_chunks,
-            relevance_score: r.relevance_score,
-            relationship_type: r.relationship_type,
-          })));
-        }
-
-        // Count relevances
-        const { count: chunkCount } = await supabase
-          .from('chunk_product_relationships')
-          .select('*', { count: 'exact', head: true })
-          .eq('product_id', product.id);
-
-        const { count: imageCount } = await supabase
-          .from('product_image_relationships')
-          .select('*', { count: 'exact', head: true })
-          .eq('product_id', product.id);
-
+        // Skip relationship counts - tables don't exist
         setRelevanceCounts({
-          chunks: chunkCount || 0,
-          images: imageCount || 0,
+          chunks: 0,
+          images: 0,
         });
       } catch (error) {
         console.error('[ProductDetailModal] Failed to load admin data:', error);
@@ -279,40 +234,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       if (result.success) {
         console.log('[ProductDetailModal] Re-linking successful:', result);
 
-        // Reload chunks
-        const { data: chunkRelations } = await supabase
-          .from('chunk_product_relationships')
-          .select(`
-            relevance_score,
-            relationship_type,
-            document_chunks (
-              id,
-              chunk_text,
-              page_number,
-              metadata,
-              created_at
-            )
-          `)
-          .eq('product_id', product.id)
-          .order('relevance_score', { ascending: false });
-
-        if (chunkRelations) {
-          setChunks(chunkRelations.filter(r => r.document_chunks).map(r => ({
-            ...r.document_chunks,
-            relevance_score: r.relevance_score,
-            relationship_type: r.relationship_type,
-          })));
-        }
-
-        // Update counts
-        const { count: chunkCount } = await supabase
-          .from('chunk_product_relationships')
-          .select('*', { count: 'exact', head: true })
-          .eq('product_id', product.id);
-
+        // chunk_product_relationships table doesn't exist - skip reload
+        setChunks([]);
         setRelevanceCounts(prev => ({
           ...prev,
-          chunks: chunkCount || 0
+          chunks: 0
         }));
 
         alert(`✅ Successfully created ${result.chunk_product_links} chunk-product relationships!`);
