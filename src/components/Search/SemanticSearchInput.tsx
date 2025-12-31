@@ -95,6 +95,7 @@ const fetchProductNameSuggestions = async (
     );
 
     // Search for products matching the query
+    console.log('[ProductSuggestions] Searching for:', query, 'in workspace:', workspaceId);
     const { data: products, error } = await supabase
       .from('products')
       .select('id, name, metadata')
@@ -103,13 +104,16 @@ const fetchProductNameSuggestions = async (
       .limit(10);
 
     if (error) {
-      console.error('Error fetching product suggestions:', error);
+      console.error('[ProductSuggestions] Error fetching product suggestions:', error);
       return [];
     }
 
     if (!products || products.length === 0) {
+      console.log('[ProductSuggestions] No products found matching:', query);
       return [];
     }
+
+    console.log('[ProductSuggestions] Found', products.length, 'products:', products.map(p => p.name));
 
     // Convert products to suggestions
     return products.map((product, index) => ({
@@ -244,6 +248,9 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
           suggestionsService.checkTypoCorrection(query, 0.85, 1),
         ]);
 
+        console.log('[SemanticSearchInput] Product suggestions:', productSuggestions.length);
+        console.log('[SemanticSearchInput] API suggestions:', apiSuggestions.length);
+
         // Combine suggestions: product names first, then API suggestions
         const combinedSuggestions = [
           ...productSuggestions,
@@ -251,6 +258,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
             (apiSug) => !productSuggestions.some((prodSug) => prodSug.text === apiSug.text)
           ),
         ];
+
+        console.log('[SemanticSearchInput] Combined suggestions:', combinedSuggestions.length, combinedSuggestions.map(s => s.text));
 
         // Set suggestions
         setSuggestions(combinedSuggestions.slice(0, maxSuggestions));
