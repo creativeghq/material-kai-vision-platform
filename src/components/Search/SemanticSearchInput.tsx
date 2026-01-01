@@ -202,7 +202,10 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
   // Debounced suggestion fetching with product names
   const fetchSuggestions = useCallback(
     async (query: string) => {
+      console.log('🔍 [fetchSuggestions] Called with query:', query, 'enableSemanticSuggestions:', enableSemanticSuggestions);
+
       if (!query.trim() || !enableSemanticSuggestions) {
+        console.log('⚠️ [fetchSuggestions] Skipping - empty query or disabled');
         setSuggestions([]);
         setTypoCorrection(null);
         setShowTypoCorrection(false);
