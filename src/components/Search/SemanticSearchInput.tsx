@@ -90,13 +90,13 @@ const fetchProductNameSuggestions = async (
     // Use the existing supabase client from integrations
     const { supabase } = await import('@/integrations/supabase/client');
 
-    // Search for products matching the query
+    // Search for products matching the query (name only for speed)
     console.log('[ProductSuggestions] Searching for:', query, 'in workspace:', workspaceId);
     const { data: products, error } = await supabase
       .from('products')
       .select('id, name, metadata')
       .eq('workspace_id', workspaceId)
-      .or(`name.ilike.%${query}%,description.ilike.%${query}%`)
+      .ilike('name', `%${query}%`)
       .limit(10);
 
     if (error) {

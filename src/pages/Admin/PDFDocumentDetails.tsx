@@ -98,11 +98,11 @@ export const PDFDocumentDetails: React.FC = () => {
         .select('*')
         .eq('source_document_id', documentId);
 
-      // Count embeddings
+      // Count embeddings from document_vectors
       const { count: embeddingsCount } = await supabase
-        .from('embeddings')
+        .from('document_vectors')
         .select('*', { count: 'exact', head: true })
-        .eq('source_document_id', documentId);
+        .eq('document_id', documentId);
 
       setDocument({
         ...docData,

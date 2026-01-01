@@ -1056,10 +1056,10 @@ const createQueryDatabaseTool = () => {
             break;
 
           case 'embeddings':
-            tableName = 'embeddings';
+            tableName = 'document_vectors';
             query = supabase
-              .from('embeddings')
-              .select('id, type, metadata, created_at')
+              .from('document_vectors')
+              .select('id, embedding_type, metadata, created_at')
               .eq('document_id', documentId)
               .limit(5);
             break;
