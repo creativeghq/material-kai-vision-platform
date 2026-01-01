@@ -4,7 +4,6 @@ import { Search, X, Clock, TrendingUp, Loader2, Sparkles, AlertCircle } from 'lu
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { getSearchSuggestionsService } from '@/services/searchSuggestionsService';
@@ -537,11 +536,11 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
 
       {/* Dropdown */}
       {showDropdown && (
-        <Card
+        <div
           ref={dropdownRef}
-          className="absolute top-full left-0 right-0 mt-1 z-[100] max-h-96 overflow-hidden shadow-lg bg-background border"
+          className="absolute top-full left-0 right-0 mt-1 z-[100] max-h-96 overflow-hidden rounded-xl bg-background border border-primary/30 shadow-sm"
         >
-          <CardContent className="p-0">
+          <div className="p-0">
             <div className="max-h-96 overflow-y-auto">
               {/* Typo Correction Banner */}
               {showTypoCorrection && typoCorrection && (
@@ -680,8 +679,8 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
                   </div>
                 )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
     </div>
   );
