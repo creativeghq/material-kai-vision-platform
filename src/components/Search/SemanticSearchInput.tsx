@@ -344,16 +344,16 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
       console.error('Error tracking suggestion click:', error);
     }
 
-    // Call parent callback first - if it exists, let parent handle the action
+    // Call parent callback if provided (for additional handling)
     if (onSuggestionSelect) {
       onSuggestionSelect(suggestion);
-    } else {
-      // Fallback: Auto-search on suggestion select if no callback provided
-      handleSearch(suggestion.text, {
-        ...(suggestion.category && { category: suggestion.category }),
-        semantic: suggestion.type === 'semantic',
-      });
     }
+
+    // Always execute search when suggestion is selected
+    handleSearch(suggestion.text, {
+      ...(suggestion.category && { category: suggestion.category }),
+      semantic: suggestion.type === 'semantic',
+    });
   };
 
   // Handle history selection
