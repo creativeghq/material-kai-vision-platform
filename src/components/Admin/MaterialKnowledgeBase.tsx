@@ -529,26 +529,8 @@ export const MaterialKnowledgeBase: React.FC = () => {
         } else {
           console.log('⚠️ No embeddings found in document_vectors table');
         }
-
-        // Fall back to embeddings table
-        const {
-          data: embeddingsTableData,
-          error: embeddingsError,
-          count: embeddingsCount,
-        } = await supabase
-          .from('embeddings')
-          .select('*', { count: 'exact' })
-          .eq('workspace_id', workspaceId)
-          .order('created_at', { ascending: false });
-
-        if (embeddingsError) {
-          console.warn('⚠️ embeddings table query failed:', embeddingsError);
-        } else {
-          console.log(
-            `✅ Loaded ${embeddingsTableData?.length || 0} embeddings from embeddings table (total count: ${embeddingsCount})`,
-          );
-          embeddingsData = embeddingsTableData || [];
-        }
+        // embeddings table doesn't exist - only using document_vectors
+        embeddingsData = [];
       }
 
       setEmbeddings((embeddingsData || []) as Embedding[]);
