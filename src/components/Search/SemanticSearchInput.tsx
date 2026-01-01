@@ -88,11 +88,8 @@ const fetchProductNameSuggestions = async (
   workspaceId: string,
 ): Promise<SearchSuggestion[]> => {
   try {
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      import.meta.env.VITE_SUPABASE_URL || '',
-      import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-    );
+    // Use the existing supabase client from integrations
+    const { supabase } = await import('@/integrations/supabase/client');
 
     // Search for products matching the query
     console.log('[ProductSuggestions] Searching for:', query, 'in workspace:', workspaceId);
@@ -216,11 +213,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
 
       try {
         // Get workspace ID first
-        const { createClient } = await import('@supabase/supabase-js');
-        const supabase = createClient(
-          import.meta.env.VITE_SUPABASE_URL || '',
-          import.meta.env.VITE_SUPABASE_ANON_KEY || ''
-        );
+        const { supabase } = await import('@/integrations/supabase/client');
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
