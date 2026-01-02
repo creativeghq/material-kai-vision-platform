@@ -40,7 +40,7 @@ export const stripeAPI = {
   async createCreditCheckoutSession(
     creditPackageId: string,
     credits: number,
-    price: number
+    price: number,
   ): Promise<{ url: string }> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
@@ -73,7 +73,7 @@ export const stripeAPI = {
    * Create Stripe Checkout session for subscription
    */
   async createSubscriptionCheckoutSession(
-    priceId: string
+    priceId: string,
   ): Promise<{ url: string }> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');

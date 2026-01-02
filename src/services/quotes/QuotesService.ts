@@ -291,7 +291,7 @@ export class QuotesService {
       notes?: string;
       status?: Quote['status'];
       custom_request_text?: string;
-    }
+    },
   ): Promise<Quote> {
     const { data: quote, error } = await supabase
       .from('quotes')
@@ -356,7 +356,7 @@ export class QuotesService {
       notes?: string;
       selected_size?: string;
       selected_color?: string;
-    }
+    },
   ): Promise<QuoteItem> {
     const { data: item, error } = await supabase
       .from('quote_items')
@@ -438,7 +438,7 @@ export class QuotesService {
     const expiresAt = new Date(quote.expires_at);
     const now = new Date();
     const daysUntilExpiration = Math.ceil(
-      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     return {
@@ -480,7 +480,7 @@ export class QuotesService {
           ...quote,
           items: items || [],
         };
-      })
+      }),
     );
 
     return quotesWithItems;
@@ -671,7 +671,7 @@ export class QuotesService {
       price?: number;
       is_active?: boolean;
       display_order?: number;
-    }
+    },
   ): Promise<Upsell> {
     const { data: upsell, error } = await supabase
       .from('upsells')
@@ -717,7 +717,7 @@ export class QuotesService {
     quoteId: string,
     upsellId: string,
     adminNotes?: string,
-    metadata?: { custom_price?: number; quantity?: number; measurement?: string }
+    metadata?: { custom_price?: number; quantity?: number; measurement?: string },
   ): Promise<QuoteUpsell> {
     const { data, error } = await supabase
       .from('quote_upsells')
@@ -739,7 +739,7 @@ export class QuotesService {
    */
   async updateUpsellAcceptance(
     quoteUpsellId: string,
-    accepted: boolean
+    accepted: boolean,
   ): Promise<QuoteUpsell> {
     // First update the upsell acceptance
     const { data, error } = await supabase
@@ -890,7 +890,7 @@ export class QuotesService {
       description?: string;
       is_active?: boolean;
       display_order?: number;
-    }
+    },
   ): Promise<TimelineStep> {
     const { data: step, error } = await supabase
       .from('timeline_steps')
@@ -1117,7 +1117,7 @@ export class QuotesService {
   private async searchProductsDirectDB(
     query: string,
     workspaceId: string,
-    limit: number
+    limit: number,
   ): Promise<(Product & { image_url?: string })[]> {
     // Search products by name or description
     // Note: products table doesn't have 'sku' column - it may be in metadata
@@ -1189,7 +1189,7 @@ export class QuotesService {
     if (pendingUpsells.length > 0) {
       return {
         success: false,
-        error: `Please decide on all ${pendingUpsells.length} pending extra(s) before accepting the quote.`
+        error: `Please decide on all ${pendingUpsells.length} pending extra(s) before accepting the quote.`,
       };
     }
 
@@ -1243,7 +1243,7 @@ export class QuotesService {
     data: {
       status?: 'pending' | 'in_progress' | 'completed' | 'skipped';
       notes?: string;
-    }
+    },
   ): Promise<QuoteTimeline> {
     const updateData: Record<string, unknown> = { ...data };
 
@@ -1268,7 +1268,7 @@ export class QuotesService {
   async addTimelineStepToQuote(
     quoteId: string,
     timelineStepId: string,
-    notes?: string
+    notes?: string,
   ): Promise<QuoteTimeline> {
     // Get the current max order for this quote
     const { data: existingSteps } = await supabase

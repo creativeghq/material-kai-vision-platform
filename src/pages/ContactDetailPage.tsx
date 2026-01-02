@@ -216,7 +216,7 @@ export const ContactDetailPage: React.FC = () => {
         id,
         companyRole,
         isPrimaryContact,
-        companyNotes
+        companyNotes,
       );
       toast({
         title: 'Success',
@@ -245,7 +245,7 @@ export const ContactDetailPage: React.FC = () => {
     try {
       // We need to find the company ID from the relationship
       const companyRelationship = contact?.companies?.find(
-        (c: any) => c.relationship_id === relationshipId
+        (c: any) => c.relationship_id === relationshipId,
       );
       if (!companyRelationship) return;
 

@@ -8,7 +8,7 @@
  * @example
  * ```typescript
  * import { logger } from '@/services/logger.service';
- * 
+ *
  * logger.info('User logged in', { userId: '123' });
  * logger.error('Failed to fetch data', error, { endpoint: '/api/data' });
  * logger.debug('Processing item', { itemId: 'abc' });
@@ -56,7 +56,7 @@ class LoggerService {
     // Check both Vite and Node.js environment indicators
     this.isProduction = import.meta.env?.PROD || process.env.NODE_ENV === 'production';
     this.isDevelopment = import.meta.env?.DEV || process.env.NODE_ENV === 'development';
-    
+
     // Default configuration
     this.config = {
       minLevel: this.isDevelopment ? LogLevel.DEBUG : LogLevel.INFO,
@@ -65,7 +65,7 @@ class LoggerService {
       serviceName: 'MaterialKAI',
       bufferSize: 100,
     };
-    
+
     this.maxBufferSize = this.config.bufferSize || 100;
   }
 

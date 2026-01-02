@@ -113,7 +113,7 @@ export const ExtractionPromptsPage: React.FC = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to load prompts');
@@ -156,7 +156,7 @@ export const ExtractionPromptsPage: React.FC = () => {
             prompt_template: editedTemplate,
             system_prompt: editedSystemPrompt || null,
           }),
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to save prompt');
@@ -188,7 +188,7 @@ export const ExtractionPromptsPage: React.FC = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to load history');

@@ -50,7 +50,7 @@ export const CreditPackagesPage: React.FC = () => {
     try {
       setProcessingPackageId(packageId);
       const { url } = await billingService.purchaseCredits(packageId);
-      
+
       if (url) {
         window.location.href = url;
       } else {

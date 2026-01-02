@@ -166,7 +166,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
 
   const filteredDocuments = documents.filter((doc) =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.content.toLowerCase().includes(searchQuery.toLowerCase())
+    doc.content.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (

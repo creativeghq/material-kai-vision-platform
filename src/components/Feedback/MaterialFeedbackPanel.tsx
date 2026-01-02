@@ -80,7 +80,7 @@ export const MaterialFeedbackPanel: React.FC<MaterialFeedbackPanelProps> = ({
       setLoading(true);
       const response = await mivaaClient.request(
         `/api/feedback/material/${materialId}?workspace_id=${workspaceId}&limit=50`,
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       if (response.success && response.data) {
@@ -165,8 +165,8 @@ export const MaterialFeedbackPanel: React.FC<MaterialFeedbackPanelProps> = ({
       // Update local state
       setFeedbackList((prev) =>
         prev.map((f) =>
-          f.id === feedbackId ? { ...f, helpful_count: f.helpful_count + 1 } : f
-        )
+          f.id === feedbackId ? { ...f, helpful_count: f.helpful_count + 1 } : f,
+        ),
       );
     } catch (error) {
       console.error('Error marking helpful:', error);

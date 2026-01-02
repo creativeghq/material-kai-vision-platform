@@ -1,7 +1,7 @@
 /**
  * Agent Configuration
  * Central configuration for all AI agents in the Material Kai Vision Platform
- * 
+ *
  * NOTE: Agent execution now happens in Supabase Edge Functions using LangChain.js
  * This file only contains frontend configuration for UI, RBAC, and agent metadata
  */

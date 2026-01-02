@@ -1,6 +1,6 @@
 /**
  * Import History Tab
- * 
+ *
  * Displays past import jobs with status, progress, and details
  */
 
@@ -82,7 +82,7 @@ const ImportHistoryTab: React.FC = () => {
           () => {
             console.log('data_import_jobs changed - refreshing data');
             loadImportHistory();
-          }
+          },
         )
         .subscribe();
 
@@ -94,12 +94,12 @@ const ImportHistoryTab: React.FC = () => {
             event: '*',
             schema: 'public',
             table: 'background_jobs',
-            filter: `job_type=eq.pdf_processing`,
+            filter: 'job_type=eq.pdf_processing',
           },
           () => {
             console.log('background_jobs (PDF) changed - refreshing data');
             loadImportHistory();
-          }
+          },
         )
         .subscribe();
 
@@ -128,7 +128,7 @@ const ImportHistoryTab: React.FC = () => {
           .select('*')
           .eq('job_type', 'pdf_processing')
           .order('created_at', { ascending: false })
-          .limit(25)
+          .limit(25),
       ]);
 
       const xmlJobs = xmlJobsResult.data || [];
@@ -156,7 +156,7 @@ const ImportHistoryTab: React.FC = () => {
 
       // Combine and sort by created_at
       const allJobs = [...xmlJobs, ...pdfJobs].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
 
       setJobs(allJobs);

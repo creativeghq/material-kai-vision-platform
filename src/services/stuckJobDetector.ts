@@ -1,6 +1,6 @@
 /**
  * Stuck Job Detector Service
- * 
+ *
  * Detects and reports stuck jobs across all processing types:
  * - PDF Processing (background_jobs)
  * - Web Scraping (scraping_sessions)

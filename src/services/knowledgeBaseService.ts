@@ -1,6 +1,6 @@
 /**
  * Knowledge Base Service
- * 
+ *
  * Handles all API calls to the Knowledge Base endpoints via MIVAA Gateway
  */
 

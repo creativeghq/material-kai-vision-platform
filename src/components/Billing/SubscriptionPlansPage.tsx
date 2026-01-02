@@ -50,7 +50,7 @@ export const SubscriptionPlansPage: React.FC = () => {
     try {
       setProcessingPlanId(planId);
       const { url } = await billingService.createSubscriptionCheckout(planId);
-      
+
       if (url) {
         window.location.href = url;
       } else {

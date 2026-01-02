@@ -82,7 +82,7 @@ export const SaveSearchModal = ({
       const suggestion = await savedSearchesService.checkForDuplicates(
         searchData.query,
         searchData.filters || {},
-        searchData.materialFilters || {}
+        searchData.materialFilters || {},
       );
 
       if (suggestion) {
@@ -317,7 +317,7 @@ export const SaveSearchModalWithDeduplication = (props: SaveSearchModalProps) =>
         mergeSuggestion.existing_search.id,
         mergeSuggestion.new_query,
         props.searchData.filters || {},
-        props.searchData.materialFilters || ({} as MaterialFilters)
+        props.searchData.materialFilters || ({} as MaterialFilters),
       );
 
       if (props.onSaved) {

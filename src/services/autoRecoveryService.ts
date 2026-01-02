@@ -1,6 +1,6 @@
 /**
  * Auto-Recovery Service
- * 
+ *
  * Automatically recovers stuck jobs with exponential backoff:
  * - Attempt 1: Immediate recovery
  * - Attempt 2: After 5 minutes
@@ -56,7 +56,7 @@ export class AutoRecoveryService {
 
     // Attempt recovery for each stuck job
     const results = await Promise.all(
-      report.jobs.map(job => this.recoverJob(job))
+      report.jobs.map(job => this.recoverJob(job)),
     );
 
     const summary = {
@@ -207,7 +207,7 @@ export class AutoRecoveryService {
           action: 'resume',
           sessionId: job.id,
         }),
-      }
+      },
     );
 
     return response.ok;

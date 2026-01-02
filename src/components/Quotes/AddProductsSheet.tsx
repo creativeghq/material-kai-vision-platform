@@ -127,7 +127,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
         // Filter out products already in quote or already selected
         const selectedIds = selectedProducts.map(p => p.id);
         const filteredResults = results.filter(
-          p => !existingProductIds.includes(p.id) && !selectedIds.includes(p.id)
+          p => !existingProductIds.includes(p.id) && !selectedIds.includes(p.id),
         );
         setSearchResults(filteredResults);
       } catch (error) {
@@ -146,7 +146,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
     setSelectedProducts(prev => [...prev, {
       ...product,
       quantity: 1,
-      selectedSize: sizes.length > 0 ? sizes[0] : undefined
+      selectedSize: sizes.length > 0 ? sizes[0] : undefined,
     }]);
     setSearchQuery('');
     setSearchResults([]);
@@ -158,8 +158,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
       prev.map(p =>
         p.id === productId
           ? { ...p, quantity: Math.max(1, p.quantity + delta) }
-          : p
-      )
+          : p,
+      ),
     );
   }, []);
 
@@ -169,8 +169,8 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
       prev.map(p =>
         p.id === productId
           ? { ...p, selectedSize: size }
-          : p
-      )
+          : p,
+      ),
     );
   }, []);
 

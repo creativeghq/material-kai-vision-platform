@@ -83,7 +83,7 @@ export const PromptTemplatesPage: React.FC = () => {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {

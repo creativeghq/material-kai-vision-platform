@@ -29,7 +29,7 @@ export const EmailLogsTab: React.FC = () => {
     try {
       setLoading(true);
       const filters: any = { limit: 100 };
-      
+
       if (statusFilter !== 'all') {
         filters.status = statusFilter;
       }

@@ -20,7 +20,7 @@ import {
   Eye,
   X,
   Home,
-  Search
+  Search,
 } from 'lucide-react';
 
 interface ModelResult {

@@ -326,7 +326,7 @@ export const PDFImageGallery: React.FC<PDFImageGalleryProps> = ({
                 'absolute bottom-2 right-2 border-0',
                 image.category === 'product'
                   ? 'bg-blue-500/90 text-white'
-                  : 'bg-gray-500/90 text-white'
+                  : 'bg-gray-500/90 text-white',
               )}
             >
               {image.category === 'product' ? 'Product' : 'General'}

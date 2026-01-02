@@ -1,6 +1,6 @@
 /**
  * Admin Log Viewer Component
- * 
+ *
  * Displays backend Python logs from the database.
  * Shows recent logs with filtering, search, and export capabilities.
  */
@@ -108,7 +108,7 @@ export function LogViewer() {
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to load logs from database',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -145,7 +145,7 @@ export function LogViewer() {
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to clear logs',
-        variant: 'destructive'
+        variant: 'destructive',
       });
     }
   };
@@ -153,7 +153,7 @@ export function LogViewer() {
   // Auto-refresh every 5 seconds
   useEffect(() => {
     loadLogs();
-    
+
     if (autoRefresh) {
       const interval = setInterval(loadLogs, 5000);
       return () => clearInterval(interval);
@@ -185,7 +185,7 @@ export function LogViewer() {
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 

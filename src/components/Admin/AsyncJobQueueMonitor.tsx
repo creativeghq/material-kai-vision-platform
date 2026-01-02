@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { TempFileCleanupModal } from './TempFileCleanupModal';
 import {
   RefreshCw,
@@ -286,11 +287,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     try {
       setError(null);
 
-      // Fetch background jobs (PDF, Web Scraping, and Product Discovery)
+      // Fetch background jobs (PDF, Web Scraping, Product Discovery, and Image Embedding Regeneration)
       const { data: bgJobsData, error: bgJobsError } = await supabase
         .from('background_jobs')
         .select('*')
-        .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload'])
+        .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload', 'image_embedding_regeneration'])
         .order('created_at', { ascending: false })
         .limit(100);
 
@@ -328,7 +329,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           // Group product_discovery_upload with pdf_processing
           filteredJobs = jobs.filter(j =>
             j.job_type === 'pdf_processing' ||
-            j.job_type === 'product_discovery_upload'
+            j.job_type === 'product_discovery_upload',
           );
         } else {
           filteredJobs = jobs.filter(j => j.job_type === jobType);
@@ -435,7 +436,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     if (selectedTab === 'pdf_processing') {
       return jobs.filter(job =>
         job.job_type === 'pdf_processing' ||
-        job.job_type === 'product_discovery_upload'
+        job.job_type === 'product_discovery_upload',
       );
     }
 
@@ -458,7 +459,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         () => {
           console.log('background_jobs changed - refreshing data');
           fetchQueueData();
-        }
+        },
       )
       .subscribe();
 
@@ -474,7 +475,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         () => {
           console.log('scraping_sessions changed - refreshing data');
           fetchQueueData();
-        }
+        },
       )
       .subscribe();
 
@@ -490,7 +491,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         () => {
           console.log('data_import_jobs changed - refreshing data');
           fetchQueueData();
-        }
+        },
       )
       .subscribe();
 
@@ -506,7 +507,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         () => {
           console.log('webhook_calls changed - refreshing data');
           fetchQueueData();
-        }
+        },
       )
       .subscribe();
 
@@ -627,7 +628,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   }, [searchParams, jobs, selectedJob, loading, setSearchParams]);
 
-  const getStatusBadge = (status: string) => {
+  // Check if job has recent heartbeat (within last 30 seconds)
+  const hasRecentHeartbeat = (job: BackgroundJob): boolean => {
+    if (!job.last_heartbeat) return false;
+    const heartbeatTime = new Date(job.last_heartbeat).getTime();
+    const now = Date.now();
+    const thirtySecondsAgo = now - 30000;
+    return heartbeatTime > thirtySecondsAgo;
+  };
+
+  const getStatusBadge = (status: string, job?: BackgroundJob) => {
     const statusConfig: Record<string, { color: string; icon: string }> = {
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
       processing: { color: 'bg-blue-100 text-blue-800', icon: '⚙️' },
@@ -638,9 +648,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       retrying: { color: 'bg-purple-100 text-purple-800', icon: '🔄' },
     };
     const config = statusConfig[status] || statusConfig.pending;
+
+    // Add pulsing animation for actively processing jobs with recent heartbeat
+    const isActivelyProcessing = job && (status === 'processing' || status === 'retrying') && hasRecentHeartbeat(job);
+
     return (
-      <Badge className={config.color}>
+      <Badge className={`${config.color} ${isActivelyProcessing ? 'animate-pulse' : ''}`}>
         {config.icon} {status}
+        {isActivelyProcessing && <span className="ml-1 inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>}
       </Badge>
     );
   };
@@ -774,10 +789,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         setSelectedJob(null);
       }
 
-      alert('Job cancelled successfully');
+      toast.success('Job cancelled successfully');
     } catch (error) {
       console.error('Error cancelling job:', error);
-      alert(`Failed to cancel job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to cancel job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setCancellingJob(null);
     }
@@ -786,11 +801,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const handleClearQueue = async () => {
     // Include interrupted jobs in the clear queue operation
     const jobsToClear = jobs.filter(
-      (job) => job.status === 'pending' || job.status === 'failed' || job.status === 'interrupted'
+      (job) => job.status === 'pending' || job.status === 'failed' || job.status === 'interrupted',
     );
 
     if (jobsToClear.length === 0) {
-      alert('No pending, failed, or interrupted jobs to clear');
+      toast.info('No pending, failed, or interrupted jobs to clear');
       return;
     }
 
@@ -809,7 +824,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     if (
       !confirm(
-        `Are you sure you want to clear ${jobsToClear.length} jobs (${statusMessage})? This action cannot be undone.`
+        `Are you sure you want to clear ${jobsToClear.length} jobs (${statusMessage})? This action cannot be undone.`,
       )
     ) {
       return;
@@ -829,7 +844,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               headers: {
                 'Content-Type': 'application/json',
               },
-            }
+            },
           );
 
           if (response.ok) {
@@ -847,11 +862,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       await fetchQueueData();
 
       alert(
-        `Queue cleared: ${successCount} jobs cancelled successfully${failCount > 0 ? `, ${failCount} failed` : ''}`
+        `Queue cleared: ${successCount} jobs cancelled successfully${failCount > 0 ? `, ${failCount} failed` : ''}`,
       );
     } catch (error) {
       console.error('Error clearing queue:', error);
-      alert(`Failed to clear queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to clear queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setClearingQueue(false);
     }
@@ -859,7 +874,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   const handleDeleteJobById = async () => {
     if (!deleteJobId.trim()) {
-      alert('Please enter a job ID');
+      toast.error('Please enter a job ID');
       return;
     }
 
@@ -892,7 +907,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         stats.storage_files_deleted > 0 && `${stats.storage_files_deleted} storage files`,
       ].filter(Boolean).join(', ');
 
-      alert(`Job deleted successfully!\n\nDeleted: ${statsMessage || 'Job record'}`);
+      toast.success(`Job deleted successfully! Deleted: ${statsMessage || 'Job record'}`);
 
       // Close modal and refresh
       setShowDeleteJobModal(false);
@@ -901,7 +916,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     } catch (error) {
       console.error('Error deleting job:', error);
-      alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -930,10 +945,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         setSelectedJob(null);
       }
 
-      alert('Job deleted successfully');
+      toast.success('Job deleted successfully');
     } catch (error) {
       console.error('Error deleting job:', error);
-      alert(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setDeletingJob(null);
     }
@@ -1327,7 +1342,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               Retry {job.metadata.retry_count}
                             </Badge>
                           )}
-                          {getStatusBadge(job.status)}
+                          {getStatusBadge(job.status, job)}
                           {(job.status === 'processing' || job.status === 'pending') && (
                             <button
                               onClick={(e) => {
@@ -1554,7 +1569,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {getStatusBadge(job.status)}
+                          {getStatusBadge(job.status, job)}
                           <Trash2
                             className="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer transition"
                             onClick={() => handleDeleteJob(job.id)}
@@ -1747,7 +1762,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {getStatusBadge(job.status)}
+                          {getStatusBadge(job.status, job)}
                           <Trash2
                             className="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer transition"
                             onClick={() => handleDeleteJob(job.id)}
@@ -1940,7 +1955,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {getStatusBadge(job.status)}
+                          {getStatusBadge(job.status, job)}
                           <Trash2
                             className="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer transition"
                             onClick={() => handleDeleteJob(job.id)}
@@ -2099,7 +2114,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <div className="text-xs text-muted-foreground">Status</div>
-                    <div className="mt-1 transition-all duration-300">{selectedJob && getStatusBadge(selectedJob.status)}</div>
+                    <div className="mt-1 transition-all duration-300">{selectedJob && getStatusBadge(selectedJob.status, selectedJob)}</div>
                   </div>
                   <div>
                     <div className="text-xs text-muted-foreground">Progress</div>
@@ -2116,7 +2131,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         ? formatTime(
                             (new Date(selectedJob.completed_at).getTime() -
                               new Date(selectedJob.started_at).getTime()) /
-                              1000
+                              1000,
                           )
                         : 'N/A'}
                     </div>
@@ -2315,7 +2330,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <button
                         onClick={async () => {
                           if (!selectedJob.document_id) {
-                            alert('❌ No document_id found for this job');
+                            toast.error('❌ No document_id found for this job');
                             return;
                           }
 
@@ -2328,7 +2343,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               .single();
 
                             if (procError || !processedDoc?.content) {
-                              alert('❌ No extracted text found. The document may not have been processed yet.');
+                              toast.error('❌ No extracted text found. The document may not have been processed yet.');
                               return;
                             }
 
@@ -2345,28 +2360,28 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               extracted_text: processedDoc.content,
                               product_ids: productIds,
                               chunk_size: 512,
-                              chunk_overlap: 50
+                              chunk_overlap: 50,
                             };
 
                             const response = await fetch(`https://v1api.materialshub.gr/api/internal/create-chunks/${selectedJob.id}`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(requestBody)
+                              body: JSON.stringify(requestBody),
                             });
 
                             const result = await response.json();
                             if (result.success) {
                               if (result.skipped) {
-                                alert(`ℹ️ Chunks already exist\nExisting chunks: ${result.existing_chunks}\nExisting embeddings: ${result.existing_embeddings}`);
+                                toast.info(`ℹ️ Chunks already exist. Existing chunks: ${result.existing_chunks}, Existing embeddings: ${result.existing_embeddings}`);
                               } else {
-                                alert(`✅ Chunks created: ${result.chunks_created}, Embeddings: ${result.embeddings_generated}`);
+                                toast.success(`✅ Chunks created: ${result.chunks_created}, Embeddings: ${result.embeddings_generated}`);
                               }
                               fetchJobDetails(selectedJob);
                             } else {
-                              alert(`❌ Failed to create chunks: ${JSON.stringify(result)}`);
+                              toast.error(`❌ Failed to create chunks: ${JSON.stringify(result)}`);
                             }
                           } catch (error) {
-                            alert('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                            toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
                         }}
                         className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
@@ -2377,7 +2392,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <button
                         onClick={async () => {
                           if (!selectedJob.document_id) {
-                            alert('❌ No document_id found for this job');
+                            toast.error('❌ No document_id found for this job');
                             return;
                           }
 
@@ -2389,7 +2404,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               .eq('source_document_id', selectedJob.document_id);
 
                             if (productsError) {
-                              alert('❌ Error fetching products: ' + productsError.message);
+                              toast.error('❌ Error fetching products: ' + productsError.message);
                               return;
                             }
 
@@ -2401,24 +2416,24 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               body: JSON.stringify({
                                 document_id: selectedJob.document_id,
                                 workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                                product_ids: null  // Generate for all products in document
-                              })
+                                product_ids: null,  // Generate for all products in document
+                              }),
                             });
                             const result = await response.json();
                             if (result.success) {
                               if (result.products_processed === 0 && result.errors.length === 0) {
-                                alert(`ℹ️ ${result.message}\nAll ${totalProducts} products already have embeddings.`);
+                                toast.info(`ℹ️ ${result.message}. All ${totalProducts} products already have embeddings.`);
                               } else if (result.errors.length > 0) {
-                                alert(`⚠️ Generated Embeddings for ${result.products_processed} products (${result.errors.length} errors)\n\nErrors:\n${result.errors.slice(0, 5).join('\n')}${result.errors.length > 5 ? `\n... and ${result.errors.length - 5} more` : ''}`);
+                                toast.warning(`⚠️ Generated Embeddings for ${result.products_processed} products (${result.errors.length} errors). Errors: ${result.errors.slice(0, 3).join(', ')}${result.errors.length > 3 ? ` ... and ${result.errors.length - 3} more` : ''}`);
                               } else {
-                                alert(`✅ ${result.message}\nProducts: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
+                                toast.success(`✅ ${result.message}. Products: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
                               }
                               fetchJobDetails(selectedJob);
                             } else {
-                              alert('❌ Failed to generate embeddings');
+                              toast.error('❌ Failed to generate embeddings');
                             }
                           } catch (error) {
-                            alert('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                            toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
                         }}
                         className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
@@ -2429,7 +2444,76 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <button
                         onClick={async () => {
                           if (!selectedJob.document_id) {
-                            alert('❌ No document_id found for this job');
+                            toast.error('❌ No document_id found for this job');
+                            return;
+                          }
+
+                          try {
+                            // Fetch images for this document to show accurate count
+                            const { data: images, error: imagesError } = await supabase
+                              .from('document_images')
+                              .select('id')
+                              .eq('document_id', selectedJob.document_id);
+
+                            if (imagesError) {
+                              toast.error('❌ Error fetching images: ' + imagesError.message);
+                              return;
+                            }
+
+                            const totalImages = images?.length || 0;
+
+                            if (totalImages === 0) {
+                              toast.error('❌ No images found for this document');
+                              return;
+                            }
+
+                            const confirmed = confirm(
+                              '🎨 Regenerate Image Embeddings?\n\n' +
+                              `Document: ${selectedJob?.metadata?.filename || 'Unknown'}\n` +
+                              `Images: ${totalImages}\n\n` +
+                              'This will generate 5 CLIP embeddings per image:\n' +
+                              '• Visual (SigLIP 512D)\n' +
+                              '• Color (CLIP 512D)\n' +
+                              '• Texture (CLIP 512D)\n' +
+                              '• Style (CLIP 512D)\n' +
+                              '• Material (CLIP 512D)\n\n' +
+                              `Total embeddings: ${totalImages * 5}\n\n` +
+                              'Continue?',
+                            );
+                            if (!confirmed) return;
+
+                            const response = await fetch('https://v1api.materialshub.gr/api/admin/regenerate-image-embeddings', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                document_id: selectedJob.document_id,
+                                force_regenerate: false,
+                                priority: 0,
+                              }),
+                            });
+
+                            const result = await response.json();
+                            if (result.success) {
+                              toast.success(
+                                `✅ ${result.message}. Job ID: ${result.job_id}. The job has been queued and will process in the background. Check the "Async Job Queue" tab to monitor progress.`
+                              );
+                              fetchJobDetails(selectedJob);
+                            } else {
+                              toast.error(`❌ Failed to queue image embedding regeneration: ${result.error || 'Unknown error'}`);
+                            }
+                          } catch (error) {
+                            toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                          }
+                        }}
+                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
+                      >
+                        <ImageIcon className="h-4 w-4" />
+                        Regenerate Image Embeddings ({selectedJob?.metadata?.images_extracted || selectedJob?.metadata?.total_images_extracted || 0} images)
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!selectedJob.document_id) {
+                            toast.error('❌ No document_id found for this job');
                             return;
                           }
 
@@ -2443,33 +2527,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               supabase
                                 .from('products')
                                 .select('id', { count: 'exact' })
-                                .eq('source_document_id', selectedJob.document_id)
+                                .eq('source_document_id', selectedJob.document_id),
                             ]);
 
                             const chunksCount = chunksResponse.count || 0;
                             const productsCount = productsResponse.count || 0;
 
                             if (chunksCount === 0) {
-                              alert('❌ No chunks found for this document');
+                              toast.error('❌ No chunks found for this document');
                               return;
                             }
 
                             if (productsCount === 0) {
-                              alert('❌ No products found for this document');
+                              toast.error('❌ No products found for this document');
                               return;
                             }
 
                             const confirmed = confirm(
-                              `🔗 Create chunk-product relationships?\n\n` +
+                              '🔗 Create chunk-product relationships?\n\n' +
                               `Document: ${selectedJob?.metadata?.filename || 'Unknown'}\n` +
                               `Chunks: ${chunksCount}\n` +
                               `Products: ${productsCount}\n\n` +
-                              `This will link chunks to products based on:\n` +
-                              `• Page proximity (40%)\n` +
-                              `• Content mentions (30%)\n` +
-                              `• Semantic similarity (30%)\n\n` +
-                              `This is required for search to work!\n\n` +
-                              `Continue?`
+                              'This will link chunks to products based on:\n' +
+                              '• Page proximity (40%)\n' +
+                              '• Content mentions (30%)\n' +
+                              '• Semantic similarity (30%)\n\n' +
+                              'This is required for search to work!\n\n' +
+                              'Continue?',
                             );
                             if (!confirmed) return;
 
@@ -2481,8 +2565,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 'Content-Type': 'application/json',
                               },
                               body: JSON.stringify({
-                                document_id: selectedJob.document_id
-                              })
+                                document_id: selectedJob.document_id,
+                              }),
                             });
 
                             if (!response.ok) {
@@ -2493,19 +2577,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             const result = await response.json();
 
                             if (result.success) {
-                              alert(
-                                `✅ Chunk relationships created!\n\n` +
-                                `Chunks found: ${result.chunks_found}\n` +
-                                `Products found: ${result.products_found}\n` +
-                                `Relationships created: ${result.chunk_product_links}\n\n` +
-                                `Search should now work for this document!`
+                              toast.success(
+                                `✅ Chunk relationships created! Chunks found: ${result.chunks_found}, Products found: ${result.products_found}, Relationships created: ${result.chunk_product_links}. Search should now work for this document!`
                               );
                             } else {
-                              alert(`❌ Failed: ${result.error || 'Unknown error'}`);
+                              toast.error(`❌ Failed: ${result.error || 'Unknown error'}`);
                             }
                           } catch (error) {
                             console.error('Error creating chunk relationships:', error);
-                            alert(`❌ Failed to create chunk relationships: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                            toast.error(`❌ Failed to create chunk relationships: ${error instanceof Error ? error.message : 'Unknown error'}`);
                           }
                         }}
                         className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
@@ -2535,14 +2615,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     {PROCESSING_STAGES.map((stage, stageIndex) => {
                       // Find if this stage has a checkpoint
                       const checkpoint = jobCheckpoints.find(
-                        (cp) => cp.stage.toLowerCase() === stage.checkpoint.toLowerCase()
+                        (cp) => cp.stage.toLowerCase() === stage.checkpoint.toLowerCase(),
                       );
                       const isCompleted = !!checkpoint;
 
                       // Find previous checkpoint for duration calculation
                       const previousCheckpoint = stageIndex > 0
                         ? jobCheckpoints.find(cp =>
-                            cp.stage.toLowerCase() === PROCESSING_STAGES[stageIndex - 1].checkpoint.toLowerCase()
+                            cp.stage.toLowerCase() === PROCESSING_STAGES[stageIndex - 1].checkpoint.toLowerCase(),
                           )
                         : null;
 
@@ -2659,6 +2739,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     <>
                                       <span>🔢 {checkpointData.text_embeddings || checkpointData.text_embeddings_generated} embeddings</span>
                                       <span>📐 1536 dimensions</span>
+                                    </>
+                                  )}
+                                  {/* CLIP Embeddings step (step 9) - show image embedding details */}
+                                  {stage.id === 9 && (checkpointData.image_embeddings || checkpointData.image_embeddings_generated || checkpointData.clip_embeddings_generated) && (
+                                    <>
+                                      <span>🎨 {checkpointData.image_embeddings || checkpointData.image_embeddings_generated || checkpointData.clip_embeddings_generated} embeddings</span>
+                                      <span>📐 512 dimensions (SigLIP + CLIP)</span>
+                                      <span>🖼️ 5 types per image</span>
                                     </>
                                   )}
                                   {/* Other steps - show chunks if not step 4 */}

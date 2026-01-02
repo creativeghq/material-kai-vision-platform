@@ -132,7 +132,7 @@ export const PromptLibrary: React.FC<PromptLibraryProps> = ({ onSelectPrompt, on
           p.prompt_type === 'template' &&
           !p.subcategory?.includes('extraction') &&
           !p.subcategory?.includes('metadata') &&
-          !p.subcategory?.includes('entity_creation')
+          !p.subcategory?.includes('entity_creation'),
         );
 
         if (interiorPrompts.length === 0) {

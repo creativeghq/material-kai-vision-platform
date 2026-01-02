@@ -1,6 +1,6 @@
 /**
  * Relevancy Management Component
- * 
+ *
  * Comprehensive admin interface for viewing and managing entity relationships
  * (Chunk→Product, Product→Image, Chunk→Image) with relevance scoring details.
  */
@@ -345,7 +345,7 @@ export const RelevancyManagement: React.FC = () => {
   const filterBySearch = (items: any[]) => {
     if (!searchQuery) return items;
     const query = searchQuery.toLowerCase();
-    
+
     return items.filter((item) => {
       if ('chunk_content' in item && item.chunk_content.toLowerCase().includes(query)) return true;
       if ('product_name' in item && item.product_name.toLowerCase().includes(query)) return true;
@@ -371,7 +371,7 @@ export const RelevancyManagement: React.FC = () => {
   const currentData = getCurrentData();
   const paginatedData = currentData.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
   const totalPages = Math.ceil(currentData.length / itemsPerPage);
 

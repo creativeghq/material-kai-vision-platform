@@ -121,7 +121,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Brain className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -139,7 +139,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <FolderTree className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -157,7 +157,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Link2 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -175,7 +175,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <BarChart3 className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />

@@ -98,7 +98,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
         source_text: chunk.chunk_text?.substring(0, 200) + '...',
         workspace_id: workspaceId,
         embedding: chunk.text_embedding,
-        chunk_id: chunk.id
+        chunk_id: chunk.id,
       }));
 
       setEmbeddings(transformedData);

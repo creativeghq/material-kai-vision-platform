@@ -9,7 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 /**
  * Button - Reusable button component with dark theme variants
- * 
+ *
  * Usage:
  * <Button variant="primary">Create shipment</Button>
  * <Button variant="secondary">Download report</Button>
@@ -32,7 +32,7 @@ export const Button: React.FC<ButtonProps> = ({
         size === 'sm' && 'px-4 py-2 text-sm',
         size === 'md' && 'px-6 py-2.5 text-base',
         size === 'lg' && 'px-8 py-3 text-lg',
-        className
+        className,
       )}
       {...props}
     >

@@ -56,7 +56,7 @@ export function ContactSearchDropdown({
       try {
         const response = await contactsAPI.listContacts(20, 0, search);
         const filteredContacts = response.data.filter(
-          (contact: Contact) => !excludeContactIds.includes(contact.id)
+          (contact: Contact) => !excludeContactIds.includes(contact.id),
         );
         setContacts(filteredContacts);
       } catch (error) {

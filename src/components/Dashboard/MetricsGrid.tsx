@@ -113,7 +113,7 @@ export const MetricsGrid: React.FC = () => {
       } catch (error) {
         console.error('Error fetching metrics:', error);
         setMetrics((prev) =>
-          prev.map((m) => ({ ...m, change: 'Error loading', loading: false }))
+          prev.map((m) => ({ ...m, change: 'Error loading', loading: false })),
         );
       }
     };
@@ -125,7 +125,7 @@ export const MetricsGrid: React.FC = () => {
     <div style={{
       paddingLeft: 'var(--page-padding-x)',
       paddingRight: 'var(--page-padding-x)',
-      paddingBottom: 'var(--space-xl)'
+      paddingBottom: 'var(--space-xl)',
     }}>
       <div className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4" style={{ gap: 'var(--grid-gap)' }}>
@@ -144,7 +144,7 @@ export const MetricsGrid: React.FC = () => {
                       width: '2.5rem',
                       height: '2.5rem',
                       borderRadius: 'var(--radius-lg)',
-                      backgroundColor: 'hsl(var(--primary) / 0.1)'
+                      backgroundColor: 'hsl(var(--primary) / 0.1)',
                     }}
                   >
                     <metric.icon className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -157,7 +157,7 @@ export const MetricsGrid: React.FC = () => {
                       padding: 'var(--space-xs) calc(var(--space-xs) * 2)',
                       borderRadius: 'var(--radius-full)',
                       backgroundColor: metric.loading ? 'hsl(0 0% 95%)' : 'hsl(142 71% 95%)',
-                      color: metric.loading ? 'hsl(0 0% 40%)' : 'hsl(142 71% 35%)'
+                      color: metric.loading ? 'hsl(0 0% 40%)' : 'hsl(142 71% 35%)',
                     }}
                   >
                     {metric.change}
@@ -169,7 +169,7 @@ export const MetricsGrid: React.FC = () => {
                     fontSize: 'var(--text-4xl)',
                     fontWeight: 'var(--font-semibold)',
                     marginBottom: 'var(--space-xs)',
-                    color: 'hsl(var(--foreground))'
+                    color: 'hsl(var(--foreground))',
                   }}
                 >
                   {metric.value}
@@ -179,7 +179,7 @@ export const MetricsGrid: React.FC = () => {
                   style={{
                     fontSize: 'var(--text-sm)',
                     fontWeight: 'var(--font-normal)',
-                    color: 'hsl(var(--muted-foreground))'
+                    color: 'hsl(var(--muted-foreground))',
                   }}
                 >
                   {metric.label}

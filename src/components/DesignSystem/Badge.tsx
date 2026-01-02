@@ -9,7 +9,7 @@ interface BadgeProps {
 
 /**
  * Badge - Status badge component
- * 
+ *
  * Usage:
  * <Badge variant="success">Delivered</Badge>
  * <Badge variant="warning">Pending</Badge>
@@ -28,7 +28,7 @@ export const Badge: React.FC<BadgeProps> = ({
         variant === 'error' && 'badge-error',
         variant === 'info' && 'badge-info',
         variant === 'neutral' && 'badge-neutral',
-        className
+        className,
       )}
     >
       {children}

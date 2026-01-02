@@ -52,9 +52,15 @@ export const PDFCompletionSummary: React.FC<PDFCompletionSummaryProps> = ({
     },
     {
       icon: Database,
-      label: 'Embeddings Generated',
+      label: 'Text Embeddings',
       value: metadata.embeddings_generated || 0,
       color: 'text-yellow-500',
+    },
+    {
+      icon: Database,
+      label: 'Image Embeddings',
+      value: metadata.clip_embeddings_generated || 0,
+      color: 'text-orange-500',
     },
     {
       icon: Link2,

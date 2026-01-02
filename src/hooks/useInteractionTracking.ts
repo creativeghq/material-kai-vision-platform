@@ -43,7 +43,7 @@ export const useInteractionTracking = ({
       {
         threshold: viewThreshold,
         rootMargin: '0px',
-      }
+      },
     );
 
     observer.observe(elementRef.current);
@@ -100,7 +100,7 @@ export const useInteractionTracking = ({
 export const useClickTracking = (
   materialId: string,
   source: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
 ) => {
   return useCallback(() => {
     RecommendationsService.trackClick(materialId, {
@@ -116,7 +116,7 @@ export const useClickTracking = (
 export const useViewTracking = (
   materialId: string,
   source: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, any>,
 ) => {
   const elementRef = useRef<HTMLElement | null>(null);
   const hasTrackedView = useRef(false);
@@ -138,7 +138,7 @@ export const useViewTracking = (
       },
       {
         threshold: 0.5,
-      }
+      },
     );
 
     observer.observe(elementRef.current);

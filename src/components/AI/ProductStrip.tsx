@@ -15,9 +15,9 @@ interface ProductStripProps {
   title?: string;
 }
 
-export const ProductStrip: React.FC<ProductStripProps> = ({ 
-  products, 
-  title = 'Related Products' 
+export const ProductStrip: React.FC<ProductStripProps> = ({
+  products,
+  title = 'Related Products',
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -39,7 +39,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
     const container = document.getElementById('product-strip-container');
     if (container) {
       const scrollAmount = 320;
-      const newPosition = direction === 'left' 
+      const newPosition = direction === 'left'
         ? Math.max(0, scrollPosition - scrollAmount)
         : scrollPosition + scrollAmount;
       container.scrollTo({ left: newPosition, behavior: 'smooth' });
@@ -73,14 +73,14 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
       </div>
 
       {/* Scrollable Product Cards */}
-      <div 
+      <div
         id="product-strip-container"
         className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent"
         style={{ scrollbarWidth: 'thin' }}
       >
         {products.map((product) => {
           const primaryImage = product.images?.find((img) => img.isPrimary) || product.images?.[0];
-          
+
           return (
             <div
               key={product.id}

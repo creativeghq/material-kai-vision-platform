@@ -82,7 +82,7 @@ class MaterialProductMatcherService {
   async findMatchingProducts(
     materials: DetectedMaterial[],
     workspaceId: string,
-    limit: number = 5
+    limit: number = 5,
   ): Promise<MatchedProduct[]> {
     const allMatches: MatchedProduct[] = [];
 

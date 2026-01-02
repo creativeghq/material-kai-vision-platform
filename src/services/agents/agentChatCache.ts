@@ -1,6 +1,6 @@
 /**
  * Agent Chat Cache Service
- * 
+ *
  * Implements semantic caching for agent chat responses.
  * Uses query normalization and similarity matching for cache hits.
  */
@@ -45,7 +45,7 @@ function normalizeQuery(query: string): string {
 function generateCacheKey(
   query: string,
   agentId: string,
-  workspaceId?: string
+  workspaceId?: string,
 ): string {
   const normalized = normalizeQuery(query);
   // Include workspace to ensure cache isolation
@@ -59,10 +59,10 @@ function generateCacheKey(
 function isSimilarQuery(query1: string, query2: string, threshold = 0.8): boolean {
   const words1 = new Set(normalizeQuery(query1).split(' '));
   const words2 = new Set(normalizeQuery(query2).split(' '));
-  
+
   const intersection = new Set([...words1].filter(x => words2.has(x)));
   const union = new Set([...words1, ...words2]);
-  
+
   const similarity = intersection.size / union.size;
   return similarity >= threshold;
 }
@@ -73,7 +73,7 @@ function isSimilarQuery(query1: string, query2: string, threshold = 0.8): boolea
 export function getCachedResponse(
   query: string,
   agentId: string,
-  workspaceId?: string
+  workspaceId?: string,
 ): CachedAgentResponse | null {
   const cacheKey = generateCacheKey(query, agentId, workspaceId);
   return agentChatCache.get<CachedAgentResponse>(cacheKey);
@@ -91,10 +91,10 @@ export function cacheResponse(
     products?: any[];
   },
   workspaceId?: string,
-  ttl?: number
+  ttl?: number,
 ): void {
   const cacheKey = generateCacheKey(query, agentId, workspaceId);
-  
+
   agentChatCache.set<CachedAgentResponse>(
     cacheKey,
     {
@@ -105,7 +105,7 @@ export function cacheResponse(
       timestamp: Date.now(),
       queryHash: normalizeQuery(query),
     },
-    ttl
+    ttl,
   );
 }
 
@@ -114,10 +114,10 @@ export function cacheResponse(
  */
 export function invalidateAgentCache(agentId?: string, workspaceId?: string): number {
   // Get all entries and filter by prefix
-  const prefix = agentId 
+  const prefix = agentId
     ? `agent:${agentId}:${workspaceId || ''}`
-    : `agent:`;
-  
+    : 'agent:';
+
   // Note: CacheService doesn't have prefix deletion, so we'd need to track keys
   // For now, clear all agent cache
   agentChatCache.clear();

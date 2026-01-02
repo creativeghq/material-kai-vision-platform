@@ -98,7 +98,7 @@ export const EmailManagement: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Send className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -120,7 +120,7 @@ export const EmailManagement: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'hsl(142 71% 45% / 0.1)'
+                  backgroundColor: 'hsl(142 71% 45% / 0.1)',
                 }}
               >
                 <BarChart3 className="h-4 w-4" style={{ color: 'hsl(142 71% 45%)' }} />
@@ -144,7 +144,7 @@ export const EmailManagement: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: analytics.bounceRate > 5 ? 'hsl(var(--destructive) / 0.1)' : 'hsl(var(--muted) / 0.5)'
+                  backgroundColor: analytics.bounceRate > 5 ? 'hsl(var(--destructive) / 0.1)' : 'hsl(var(--muted) / 0.5)',
                 }}
               >
                 <Mail className="h-4 w-4" style={{ color: analytics.bounceRate > 5 ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))' }} />
@@ -169,7 +169,7 @@ export const EmailManagement: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-md)',
-                  backgroundColor: 'hsl(271 76% 53% / 0.1)'
+                  backgroundColor: 'hsl(271 76% 53% / 0.1)',
                 }}
               >
                 <Database className="h-4 w-4" style={{ color: 'hsl(271 76% 53%)' }} />

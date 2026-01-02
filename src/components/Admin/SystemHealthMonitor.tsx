@@ -1,6 +1,6 @@
 /**
  * System Health Monitor Component
- * 
+ *
  * Displays real-time health status for:
  * - Database connection pool
  * - Job monitoring service
@@ -13,16 +13,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Activity, 
-  Database, 
-  AlertTriangle, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  Activity,
+  Database,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
   RefreshCw,
   Clock,
   Zap,
-  TrendingUp
+  TrendingUp,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -382,7 +382,7 @@ export const SystemHealthMonitor: React.FC = () => {
                 {health.database.connection_pool.http2_enabled !== undefined && (
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">HTTP/2</span>
-                    <Badge variant={health.database.connection_pool.http2_enabled ? "default" : "secondary"} className="text-xs">
+                    <Badge variant={health.database.connection_pool.http2_enabled ? 'default' : 'secondary'} className="text-xs">
                       {health.database.connection_pool.http2_enabled ? 'Enabled' : 'Disabled'}
                     </Badge>
                   </div>

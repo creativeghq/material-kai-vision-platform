@@ -79,7 +79,7 @@ export const UsageHistoryTab: React.FC = () => {
   const totalCreditsUsed = usageLogs.reduce((sum, log) => sum + log.credits_debited, 0);
   const totalTokens = usageLogs.reduce(
     (sum, log) => sum + log.input_tokens + log.output_tokens,
-    0
+    0,
   );
 
   return (

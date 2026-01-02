@@ -56,7 +56,7 @@ export const AISuggestFieldsDialog: React.FC<AISuggestFieldsDialogProps> = ({
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
           body: JSON.stringify({ url }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -66,7 +66,7 @@ export const AISuggestFieldsDialog: React.FC<AISuggestFieldsDialogProps> = ({
 
       const data = await response.json();
       setSuggestedFields(data.fields || []);
-      
+
       // Select all fields by default
       setSelectedFields(new Set(data.fields.map((f: FieldMapping) => f.name)));
 
@@ -100,7 +100,7 @@ export const AISuggestFieldsDialog: React.FC<AISuggestFieldsDialogProps> = ({
     const fieldsToApply = suggestedFields.filter((f) => selectedFields.has(f.name));
     onApplyFields(fieldsToApply);
     onOpenChange(false);
-    
+
     toast({
       title: 'Fields Applied',
       description: `Added ${fieldsToApply.length} AI-suggested fields`,

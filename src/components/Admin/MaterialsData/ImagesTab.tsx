@@ -216,7 +216,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
       setSelectedImage({
         ...fullImageData,
         chunk_relationships: chunkRels || [],
-        product_relationships: productRels || []
+        product_relationships: productRels || [],
       });
     }
 

@@ -311,7 +311,7 @@ export const MoodBoardPage = () => {
                       disabled={!board.items || board.items.length === 0 || creatingProposal === board.id}
                       style={{
                         backgroundColor: 'hsl(var(--primary))',
-                        color: 'white'
+                        color: 'white',
                       }}
                     >
                       {creatingProposal === board.id ? (

@@ -64,7 +64,7 @@ export const CompetitorSourceManager: React.FC<CompetitorSourceManagerProps> = (
       // Reset form
       setSourceName('');
       setSourceUrl('');
-      
+
       // Notify parent
       if (onSourceAdded) {
         onSourceAdded();

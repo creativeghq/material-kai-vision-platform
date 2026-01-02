@@ -180,7 +180,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
             const products = await materialProductMatcher.findMatchingProducts(
               detectedMaterials,
               workspaceId,
-              5
+              5,
             );
             console.log('🛍️ Matched products:', products);
             setMatchedProducts(products);

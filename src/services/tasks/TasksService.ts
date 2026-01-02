@@ -126,7 +126,7 @@ export class TasksService {
    */
   async updateColumn(
     columnId: string,
-    updates: Partial<Pick<TaskColumn, 'name' | 'description' | 'color' | 'position'>>
+    updates: Partial<Pick<TaskColumn, 'name' | 'description' | 'color' | 'position'>>,
   ): Promise<TaskColumn> {
     const { data, error } = await supabase
       .from('task_columns')
@@ -200,11 +200,11 @@ export class TasksService {
             ...task,
             assignments,
           };
-        })
+        }),
       );
 
       return tasksWithAssignments.filter((task) =>
-        task.assignments?.some((a) => a.user_id === filters.assigned_to)
+        task.assignments?.some((a) => a.user_id === filters.assigned_to),
       );
     }
 
@@ -297,8 +297,8 @@ export class TasksService {
     if (data.assignees && data.assignees.length > 0) {
       await Promise.all(
         data.assignees.map((userId) =>
-          this.assignUser(task.id, userId, 'assignee')
-        )
+          this.assignUser(task.id, userId, 'assignee'),
+        ),
       );
     }
 
@@ -310,7 +310,7 @@ export class TasksService {
    */
   async updateTask(
     taskId: string,
-    updates: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'due_date' | 'metadata' | 'tags' | 'column_id' | 'position'>>
+    updates: Partial<Pick<Task, 'title' | 'description' | 'priority' | 'status' | 'due_date' | 'metadata' | 'tags' | 'column_id' | 'position'>>,
   ): Promise<TaskWithDetails> {
     const { data, error } = await supabase
       .from('tasks')
@@ -403,7 +403,7 @@ export class TasksService {
   async assignUser(
     taskId: string,
     userId: string,
-    role: TaskAssignment['role'] = 'assignee'
+    role: TaskAssignment['role'] = 'assignee',
   ): Promise<TaskAssignment> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
@@ -456,7 +456,7 @@ export class TasksService {
       description?: string;
       priority?: Task['priority'];
       assignees?: string[];
-    }
+    },
   ): Promise<TaskWithDetails> {
     // Fetch quote details
     const { data: quote, error: quoteError } = await supabase
@@ -468,7 +468,7 @@ export class TasksService {
     if (quoteError) throw quoteError;
 
     const title = additionalData?.title || quote.name || `Quote #${quote.id.substring(0, 8)}`;
-    const description = additionalData?.description || `Quote request from customer`;
+    const description = additionalData?.description || 'Quote request from customer';
 
     return await this.createTask({
       title,
@@ -490,7 +490,7 @@ export class TasksService {
    */
   async getTasksForQuote(quoteId: string): Promise<TaskWithDetails[]> {
     return await this.getTasks({ task_type: 'quote' }).then((tasks) =>
-      tasks.filter((task) => task.quote_id === quoteId)
+      tasks.filter((task) => task.quote_id === quoteId),
     );
   }
 }

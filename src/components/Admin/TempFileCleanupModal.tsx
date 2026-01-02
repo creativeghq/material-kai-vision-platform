@@ -47,7 +47,7 @@ export function TempFileCleanupModal({ open, onOpenChange }: TempFileCleanupModa
           headers: {
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -78,7 +78,7 @@ export function TempFileCleanupModal({ open, onOpenChange }: TempFileCleanupModa
           headers: {
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -86,7 +86,7 @@ export function TempFileCleanupModal({ open, onOpenChange }: TempFileCleanupModa
       }
 
       const data = await response.json();
-      
+
       toast({
         title: 'Cleanup Complete',
         description: `Freed ${data.stats.total_size_freed_mb.toFixed(2)} MB of disk space`,
@@ -145,7 +145,7 @@ export function TempFileCleanupModal({ open, onOpenChange }: TempFileCleanupModa
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 Cleanup Statistics
               </h3>
-              
+
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <span className="text-gray-600">PDF Files:</span>

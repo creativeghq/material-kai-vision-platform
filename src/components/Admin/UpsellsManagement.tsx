@@ -83,7 +83,7 @@ export const UpsellsManagement: React.FC<UpsellsManagementProps> = ({ embedded =
           } catch {
             counts[upsell.id] = 0;
           }
-        })
+        }),
       );
       setUsageCounts(counts);
     } catch (error) {

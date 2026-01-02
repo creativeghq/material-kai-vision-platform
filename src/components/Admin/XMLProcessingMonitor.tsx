@@ -192,7 +192,7 @@ export const XMLProcessingMonitor: React.FC = () => {
           label="Processing Success Rate"
           value={metrics.xmlProcessingSuccessRate}
           unit="%"
-          icon={metrics.xmlProcessingSuccessRate > 90 ? "✅" : "⚠️"}
+          icon={metrics.xmlProcessingSuccessRate > 90 ? '✅' : '⚠️'}
         />
         <MetricCard
           label="Avg Products/XML"

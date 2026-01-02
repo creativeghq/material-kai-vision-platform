@@ -55,7 +55,7 @@ export function CompanySearchDropdown({
       try {
         const response = await companiesAPI.listCompanies(20, 0, search);
         const filteredCompanies = response.data.filter(
-          (company: Company) => !excludeCompanyIds.includes(company.id)
+          (company: Company) => !excludeCompanyIds.includes(company.id),
         );
         setCompanies(filteredCompanies);
       } catch (error) {

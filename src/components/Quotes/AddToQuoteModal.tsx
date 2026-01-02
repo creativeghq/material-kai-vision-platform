@@ -196,7 +196,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
                 className="w-full"
                 style={{
                   backgroundColor: 'hsl(var(--primary))',
-                  color: 'white'
+                  color: 'white',
                 }}
                 disabled={!selectedQuoteId || processing}
               >

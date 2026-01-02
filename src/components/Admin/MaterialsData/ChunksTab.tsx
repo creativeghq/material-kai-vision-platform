@@ -102,7 +102,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
   };
 
   const filteredChunks = chunks.filter((chunk) =>
-    chunk.content?.toLowerCase().includes(searchQuery.toLowerCase())
+    chunk.content?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const getSourceBadge = (sourceType: string | null | undefined) => {

@@ -29,7 +29,7 @@ export function initializeGlobalErrorHandlers(): void {
         lineno,
         colno,
         service: 'window.onerror',
-      }
+      },
     );
   });
 
@@ -46,7 +46,7 @@ export function initializeGlobalErrorHandlers(): void {
         type: 'unhandled_promise_rejection',
         reason: typeof reason === 'object' ? JSON.stringify(reason) : reason,
         service: 'unhandledrejection',
-      }
+      },
     );
   });
 
@@ -65,10 +65,10 @@ export function initializeGlobalErrorHandlers(): void {
         {
           type: 'console_error',
           args: args.slice(1).map(arg =>
-            typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            typeof arg === 'object' ? JSON.stringify(arg) : String(arg),
           ),
           service: 'console.error',
-        }
+        },
       );
     }
   };
@@ -82,7 +82,7 @@ export function initializeGlobalErrorHandlers(): void {
 export function logError(
   error: Error | string,
   context?: Record<string, any>,
-  serviceName = 'frontend'
+  serviceName = 'frontend',
 ): void {
   const message = typeof error === 'string' ? error : error.message;
   const errorObj = typeof error === 'string' ? new Error(error) : error;
@@ -100,7 +100,7 @@ export function logError(
 export function logWarning(
   message: string,
   context?: Record<string, any>,
-  serviceName = 'frontend'
+  serviceName = 'frontend',
 ): void {
   // Log using existing logger (will send to both Sentry and database)
   logger.warn(message, {

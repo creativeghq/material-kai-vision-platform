@@ -50,7 +50,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
 
   const loadProductDetails = async () => {
     const productIds = products.map(p => p.product_id);
-    
+
     const { data, error } = await supabase
       .from('products')
       .select('id, name, metadata')
@@ -67,10 +67,10 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
 
   const loadLatestPrices = async () => {
     const productIds = products.map(p => p.product_id);
-    
+
     // Get latest price for each product
     const pricesMap: Record<string, any> = {};
-    
+
     for (const productId of productIds) {
       const { data } = await supabase
         .from('price_history')
@@ -86,7 +86,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
         };
       }
     }
-    
+
     setLatestPrices(pricesMap);
   };
 
@@ -139,7 +139,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
             action: 'check_now',
             productId,
           }),
-        }
+        },
       );
 
       const result = await response.json();

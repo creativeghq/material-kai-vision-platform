@@ -1422,9 +1422,15 @@ export const MaterialKnowledgeBase: React.FC = () => {
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span>Embeddings Generated</span>
+                    <span>Text Embeddings</span>
                     <Badge variant="secondary">
                       {stats?.totalEmbeddings || 0} generated
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>Image Embeddings</span>
+                    <Badge variant="secondary">
+                      {stats?.totalImageEmbeddings || 0} generated
                     </Badge>
                   </div>
                 </div>

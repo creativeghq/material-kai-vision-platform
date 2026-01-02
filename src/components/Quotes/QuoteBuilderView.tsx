@@ -61,7 +61,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
   const [searchLoading, setSearchLoading] = useState(false);
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [quoteType, setQuoteType] = useState<'products' | 'custom'>(
-    quote.custom_request_text ? 'custom' : 'products'
+    quote.custom_request_text ? 'custom' : 'products',
   );
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
@@ -293,7 +293,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
     const now = new Date();
     const expiration = new Date(quote.expires_at);
     const daysUntilExpiration = Math.ceil(
-      (expiration.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      (expiration.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     if (daysUntilExpiration < 0) {
@@ -709,7 +709,7 @@ export const QuoteBuilderView: React.FC<QuoteBuilderViewProps> = ({
           className="w-full py-6 text-lg"
           style={{
             backgroundColor: 'hsl(var(--primary))',
-            color: 'white'
+            color: 'white',
           }}
         >
           {processing ? (

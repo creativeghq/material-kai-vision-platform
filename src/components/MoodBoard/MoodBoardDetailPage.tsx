@@ -96,7 +96,7 @@ export const MoodBoardDetailPage: React.FC = () => {
   };
 
   const filteredItems = items.filter((item) =>
-    item.material?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    item.material?.name?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (loading) {

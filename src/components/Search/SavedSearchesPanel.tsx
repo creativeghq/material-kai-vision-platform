@@ -82,7 +82,7 @@ export const SavedSearchesPanel = ({
   const handleExecute = async (search: SavedSearch) => {
     try {
       await savedSearchesService.executeSavedSearch(search.id);
-      
+
       if (onExecuteSearch) {
         onExecuteSearch(search);
       }

@@ -161,7 +161,7 @@ export const EmailTemplatesTab: React.FC = () => {
             All templates use HTML with inline CSS for maximum email client compatibility.
           </p>
           <p className="text-muted-foreground">
-            Templates support dynamic variables using the <code className="rounded bg-muted px-1">{`{{variable}}`}</code> syntax.
+            Templates support dynamic variables using the <code className="rounded bg-muted px-1">{'{{variable}}'}</code> syntax.
             Variables are replaced with actual values when sending emails.
           </p>
         </div>

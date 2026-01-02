@@ -5,7 +5,7 @@ import type { FieldMapping } from '@/components/Scraper/FieldMappingStep';
  * Fetches the scraping extraction prompt template from the database
  */
 export async function fetchScrapingPromptTemplate(
-  workspaceId: string
+  workspaceId: string,
 ): Promise<{ template: string; systemPrompt: string | null } | null> {
   try {
     const { data, error } = await supabase
@@ -56,7 +56,7 @@ export function generateFieldDefinitions(fields: FieldMapping[]): string {
  */
 export async function generateExtractionPrompt(
   workspaceId: string,
-  fields: FieldMapping[]
+  fields: FieldMapping[],
 ): Promise<{ prompt: string; systemPrompt: string | null } | null> {
   try {
     // Fetch the template from database
@@ -77,7 +77,7 @@ export async function generateExtractionPrompt(
     // Inject field definitions into template
     const finalPrompt = promptData.template.replace(
       '{{FIELD_DEFINITIONS}}',
-      fieldDefinitions
+      fieldDefinitions,
     );
 
     return {

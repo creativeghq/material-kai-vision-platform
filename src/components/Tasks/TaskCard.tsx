@@ -37,7 +37,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, isDragging })
         'bg-white rounded-lg border border-gray-200 p-3 cursor-pointer',
         'hover:shadow-md hover:border-gray-300 transition-all duration-200',
         'group',
-        isDragging && 'opacity-50 rotate-2 scale-95'
+        isDragging && 'opacity-50 rotate-2 scale-95',
       )}
     >
       {/* Task Header */}

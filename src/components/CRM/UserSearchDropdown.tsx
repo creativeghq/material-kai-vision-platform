@@ -58,7 +58,7 @@ export function UserSearchDropdown({
       try {
         const response = await usersAPI.listUsers(20, 0, search);
         const filteredUsers = response.data.filter(
-          (user: User) => !excludeUserIds.includes(user.id)
+          (user: User) => !excludeUserIds.includes(user.id),
         );
         setUsers(filteredUsers);
       } catch (error) {

@@ -200,7 +200,7 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
                   className="flex-1"
                   style={{
                     backgroundColor: 'hsl(var(--primary))',
-                    color: 'white'
+                    color: 'white',
                   }}
                   disabled={processing}
                 >
@@ -225,7 +225,7 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
                 onClick={() => setShowCreateNew(true)}
                 style={{
                   backgroundColor: 'hsl(var(--primary))',
-                  color: 'white'
+                  color: 'white',
                 }}
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -267,7 +267,7 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
                   className="flex-1"
                   style={{
                     backgroundColor: 'hsl(var(--primary))',
-                    color: 'white'
+                    color: 'white',
                   }}
                   disabled={!selectedMoodboardId || processing}
                 >

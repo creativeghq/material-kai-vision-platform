@@ -22,7 +22,7 @@ export {
   LogLevel,
   type LoggerConfig,
   type LogMetadata,
-  type LogEntry
+  type LogEntry,
 } from '../services/logger.service';
 
 // Global configuration instance

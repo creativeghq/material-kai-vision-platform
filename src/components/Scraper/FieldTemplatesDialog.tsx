@@ -64,7 +64,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
   const [templates, setTemplates] = useState<FieldTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'save'>('browse');
-  
+
   // Save template state
   const [templateName, setTemplateName] = useState('');
   const [templateDescription, setTemplateDescription] = useState('');
@@ -85,7 +85,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to load templates');
@@ -139,7 +139,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
             description: templateDescription || null,
             fields: { fields: currentFields },
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -178,7 +178,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        }
+        },
       );
 
       onApplyTemplate(template.fields.fields);
@@ -211,7 +211,7 @@ export const FieldTemplatesDialog: React.FC<FieldTemplatesDialogProps> = ({
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-        }
+        },
       );
 
       if (!response.ok) throw new Error('Failed to delete template');

@@ -67,72 +67,72 @@ const PROCESSING_STEPS: Array<{ id: number; name: string; description: string }>
   {
     id: 1,
     name: 'Job Initialization',
-    description: 'Creating job record and preparing workspace'
+    description: 'Creating job record and preparing workspace',
   },
   {
     id: 2,
     name: 'Product Discovery',
-    description: 'AI-powered product, certificate, logo, and specification detection'
+    description: 'AI-powered product, certificate, logo, and specification detection',
   },
   {
     id: 3,
     name: 'Focused Extraction',
-    description: 'Extracting text from product pages only (smart filtering)'
+    description: 'Extracting text from product pages only (smart filtering)',
   },
   {
     id: 4,
     name: 'Text Chunking',
-    description: 'Semantic chunking for RAG retrieval'
+    description: 'Semantic chunking for RAG retrieval',
   },
   {
     id: 5,
     name: 'Text Embeddings',
-    description: 'Generating OpenAI embeddings (1536D vectors)'
+    description: 'Generating OpenAI embeddings (1536D vectors)',
   },
   {
     id: 6,
     name: 'Image Extraction',
-    description: 'Extracting images from PDF pages'
+    description: 'Extracting images from PDF pages',
   },
   {
     id: 7,
     name: 'Image Classification',
-    description: 'AI classification (material vs non-material)'
+    description: 'AI classification (material vs non-material)',
   },
   {
     id: 8,
     name: 'Image Analysis',
-    description: 'Vision model analysis for image understanding'
+    description: 'Vision model analysis for image understanding',
   },
   {
     id: 9,
     name: 'CLIP Embeddings',
-    description: 'Multi-vector image embeddings (5 per image)'
+    description: 'Multi-vector image embeddings (5 per image)',
   },
   {
     id: 10,
     name: 'Product Creation',
-    description: 'Creating product entities in database'
+    description: 'Creating product entities in database',
   },
   {
     id: 11,
     name: 'Relationship Mapping',
-    description: 'Linking chunks, images, and products'
+    description: 'Linking chunks, images, and products',
   },
   {
     id: 12,
     name: 'Document Entities',
-    description: 'Creating certificates, logos, and specifications'
+    description: 'Creating certificates, logos, and specifications',
   },
   {
     id: 13,
     name: 'Metadata Extraction',
-    description: 'Extracting and storing document metadata'
+    description: 'Extracting and storing document metadata',
   },
   {
     id: 14,
     name: 'Quality Enhancement',
-    description: 'Final validation and quality checks'
+    description: 'Final validation and quality checks',
   },
 ];
 
@@ -150,7 +150,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
       ...step,
       status: 'pending' as const,
       progress: 0,
-    }))
+    })),
   );
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
   const [startTime] = useState(new Date());
@@ -218,7 +218,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
         }
         // Keep pending stages as-is
         return step;
-      })
+      }),
     );
 
     // Handle job completion
@@ -232,7 +232,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
           progress: 100,
           endTime: step.endTime || new Date(),
           metrics: extractStageMetrics(step.id, mergedCheckpointData),
-        }))
+        })),
       );
       onComplete?.();
     }
@@ -253,7 +253,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
               };
             }
             return step;
-          })
+          }),
         );
       }
 
@@ -328,7 +328,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
             chunk_size: 512,
             chunk_overlap: 50,
           }),
-        }
+        },
       );
 
       // Check if chunks were skipped (already exist)
@@ -381,7 +381,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
             workspace_id: jobStatus.workspace_id,
             document_id: jobStatus.document_id,
           }),
-        }
+        },
       );
 
       toast({
@@ -550,7 +550,7 @@ export const PDFProcessingStepsMonitor: React.FC<PDFProcessingStepsMonitorProps>
                   className={cn(
                     'w-full flex items-center gap-2 py-2 px-1 hover:bg-muted/50 transition-colors text-left',
                     !hasDetails && 'cursor-default',
-                    step.status === 'failed' && 'bg-red-50'
+                    step.status === 'failed' && 'bg-red-50',
                   )}
                 >
                   {/* Expand/Collapse Chevron */}

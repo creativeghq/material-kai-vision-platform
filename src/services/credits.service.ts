@@ -134,7 +134,7 @@ export const creditsAPI = {
     amount: number,
     operationType: string,
     description?: string,
-    metadata?: any
+    metadata?: any,
   ): Promise<DebitResult> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
@@ -159,7 +159,7 @@ export const creditsAPI = {
   calculateCost(
     modelName: string,
     inputTokens: number,
-    outputTokens: number
+    outputTokens: number,
   ): { inputCost: number; outputCost: number; totalCost: number; credits: number } {
     // Model pricing per 1M tokens (in USD)
     const pricing: Record<string, { input: number; output: number }> = {

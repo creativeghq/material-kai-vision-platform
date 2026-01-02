@@ -51,37 +51,37 @@ const SCRAPING_STEPS: Array<{ id: number; name: string; description: string }> =
   {
     id: 1,
     name: 'Session Initialization',
-    description: 'Creating scraping session and background job'
+    description: 'Creating scraping session and background job',
   },
   {
     id: 2,
     name: 'URL Discovery',
-    description: 'Discovering pages to scrape (sitemap/crawl)'
+    description: 'Discovering pages to scrape (sitemap/crawl)',
   },
   {
     id: 3,
     name: 'Page Scraping',
-    description: 'Scraping pages with Firecrawl'
+    description: 'Scraping pages with Firecrawl',
   },
   {
     id: 4,
     name: 'Content Extraction',
-    description: 'Extracting materials using AI prompts'
+    description: 'Extracting materials using AI prompts',
   },
   {
     id: 5,
     name: 'Material Creation',
-    description: 'Creating materials in database'
+    description: 'Creating materials in database',
   },
   {
     id: 6,
     name: 'Image Processing',
-    description: 'Downloading and processing material images'
+    description: 'Downloading and processing material images',
   },
   {
     id: 7,
     name: 'Finalization',
-    description: 'Final validation and cleanup'
+    description: 'Final validation and cleanup',
   },
 ];
 
@@ -97,7 +97,7 @@ export const ScrapingProcessingStepsMonitor: React.FC<ScrapingProcessingStepsMon
       ...step,
       status: 'pending' as const,
       progress: 0,
-    }))
+    })),
   );
   const [expandedSteps, setExpandedSteps] = useState<Set<number>>(new Set());
   const [startTime] = useState(new Date());
@@ -150,13 +150,13 @@ export const ScrapingProcessingStepsMonitor: React.FC<ScrapingProcessingStepsMon
 
   const updateStepsFromJob = (job: any, session: any) => {
     const newSteps = [...steps];
-    
+
     // Map job status to steps
     if (job.status === 'pending') {
       newSteps[0].status = 'running';
     } else if (job.status === 'processing') {
       newSteps[0].status = 'completed';
-      
+
       // Update based on current_stage
       const stage = job.current_stage || 'scraping';
       if (stage.includes('initializing')) {

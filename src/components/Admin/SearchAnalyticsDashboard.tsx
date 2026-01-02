@@ -415,7 +415,7 @@ export const SearchAnalyticsDashboard = () => {
               .map((material, index) => {
                 const demandScore = Math.min(
                   100,
-                  Math.round((material.mention_count / 10) * 100)
+                  Math.round((material.mention_count / 10) * 100),
                 );
                 const priority =
                   demandScore >= 80 ? 'high' : demandScore >= 50 ? 'medium' : 'low';

@@ -1,9 +1,9 @@
 /**
  * Unified Search Service
- * 
+ *
  * Single service for ALL search operations across the Material Kai Vision Platform.
  * Replaces: EnhancedRAGService, MaterialSearchService, and other search wrappers.
- * 
+ *
  * All searches go through Python MIVAA API backend with proper type safety.
  */
 
@@ -29,16 +29,16 @@ export interface UnifiedSearchRequest {
   // Core search parameters
   query: string;
   strategy?: SearchStrategy;
-  
+
   // Result configuration
   top_k?: number;                    // Number of results (default: 10)
   similarity_threshold?: number;     // Minimum similarity score (default: 0.7)
-  
+
   // Workspace and filtering
   workspace_id: string;              // Required for scoped search
   document_ids?: string[];           // Filter by specific documents
   material_filters?: Record<string, any>;  // Material property filters
-  
+
   // Image search parameters
   image_url?: string;                // Image URL for visual search
   image_base64?: string;             // Base64-encoded image
@@ -51,7 +51,7 @@ export interface UnifiedSearchRequest {
   custom_formatting_prompt?: string; // Custom prompt override
   include_related_products?: boolean; // Include related products (default: true)
   related_products_limit?: number;   // Max related products per result (default: 3)
-  
+
   // Content options
   include_content?: boolean;         // Include chunk content (default: true)
 }
@@ -65,17 +65,17 @@ export interface SearchResult {
   document_id: string;
   document_name: string;
   content: string;
-  
+
   // Scoring
   similarity_score: number;
   combined_score: number;
   keyword_score?: number;
-  
+
   // Context
   page_number: number;
   context_before?: string;
   context_after?: string;
-  
+
   // Metadata
   chunk_metadata: Record<string, any>;
   document_tags: string[];
@@ -83,7 +83,7 @@ export interface SearchResult {
   processing_status?: string;
   created_at?: string;
   source_metadata?: Record<string, any>;
-  
+
   // Related products (if enabled)
   related_products?: Array<{
     product_id: string;
@@ -136,7 +136,7 @@ export interface MaterialSearchResult {
 export class UnifiedSearchService {
   /**
    * Main search method - handles ALL search strategies
-   * 
+   *
    * @param request - Unified search request
    * @returns Search results from Python backend
    */
@@ -188,7 +188,7 @@ export class UnifiedSearchService {
         strategy: request.strategy,
         operation: 'Unified search failed',
       });
-      
+
       return {
         success: false,
         query: request.query,

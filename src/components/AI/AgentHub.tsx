@@ -503,7 +503,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             signal: abortController.signal,
             // Prevent browser from timing out the connection
             keepalive: true,
-          }
+          },
         );
 
         console.log('⏳ WAITING FOR RESPONSE...');
@@ -517,7 +517,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           const errorText = await response.text();
           logger.error(`Agent request failed: ${response.status}`, {
             service: 'AgentHub',
-            metadata: { status: response.status, error: errorText }
+            metadata: { status: response.status, error: errorText },
           });
           throw new Error(`Agent execution failed: ${response.status} - ${errorText}`);
         }
@@ -569,8 +569,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     job_id: chunk.job_id,
                     model_count: chunk.model_count,
                     models: chunk.models,
-                    agent: selectedAgent
-                  }
+                    agent: selectedAgent,
+                  },
                 });
 
                 // IMMEDIATELY add a message with the generation grid
@@ -626,7 +626,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'tool_error') {
                 logger.error(`Tool ${chunk.tool} failed: ${chunk.error}`, {
                   service: 'AgentHub',
-                  metadata: { tool: chunk.tool, error: chunk.error }
+                  metadata: { tool: chunk.tool, error: chunk.error },
                 });
               }
             } catch (parseError) {
@@ -638,7 +638,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         if (!finalResult) {
           logger.error('No final result received from agent', {
             service: 'AgentHub',
-            metadata: { agent: selectedAgent }
+            metadata: { agent: selectedAgent },
           });
           throw new Error('No final result received from agent');
         }
@@ -887,10 +887,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           materialData: msg.metadata?.materialData as any | undefined,
           designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
           generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
-        }))
+        })),
       );
     },
-    []
+    [],
   );
 
   const handleNewConversation = useCallback(() => {
@@ -1192,7 +1192,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         className="w-8 h-8 rounded-full flex items-center justify-center border-2"
                         style={{
                           backgroundColor: 'hsl(var(--primary))',
-                          borderColor: 'hsl(var(--primary))'
+                          borderColor: 'hsl(var(--primary))',
                         }}
                       >
                         <Bot className="h-4 w-4 text-white" />
@@ -1217,7 +1217,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           result={{
                             type: 'product_list',
                             data: message.materialData.products,
-                            message: message.materialData.title || 'Material Results'
+                            message: message.materialData.title || 'Material Results',
                           }}
                         />
                       </div>
@@ -1355,7 +1355,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         className="w-8 h-8 rounded-full flex items-center justify-center border-2"
                         style={{
                           backgroundColor: '#1f2937',
-                          borderColor: '#1f2937'
+                          borderColor: '#1f2937',
                         }}
                       >
                         <User className="h-4 w-4 text-white" />
@@ -1373,7 +1373,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       className="w-8 h-8 rounded-full flex items-center justify-center border-2"
                       style={{
                         backgroundColor: 'hsl(var(--primary))',
-                        borderColor: 'hsl(var(--primary))'
+                        borderColor: 'hsl(var(--primary))',
                       }}
                     >
                       <Bot className="h-4 w-4 text-white" />
@@ -1384,7 +1384,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     style={{
                       background: 'var(--glass-bg)',
                       backdropFilter: 'var(--glass-blur)',
-                      borderColor: 'hsl(var(--primary))'
+                      borderColor: 'hsl(var(--primary))',
                     }}
                   >
                     <div className="flex items-center gap-3">

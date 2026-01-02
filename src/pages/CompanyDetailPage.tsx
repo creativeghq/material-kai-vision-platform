@@ -140,7 +140,7 @@ export const CompanyDetailPage: React.FC = () => {
         selectedContactId,
         contactRole,
         isPrimaryContact,
-        contactNotes
+        contactNotes,
       );
       toast({
         title: 'Success',

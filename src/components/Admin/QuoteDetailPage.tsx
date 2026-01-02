@@ -136,7 +136,7 @@ export const QuoteDetailPage: React.FC = () => {
 
   const handleUpdateTimelineStatus = async (
     quoteTimelineId: string,
-    status: 'pending' | 'in_progress' | 'completed' | 'skipped'
+    status: 'pending' | 'in_progress' | 'completed' | 'skipped',
   ) => {
     try {
       setUpdatingTimelineStep(quoteTimelineId);
@@ -444,7 +444,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Boxes className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -463,7 +463,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Gift className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -482,7 +482,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -501,7 +501,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <ListChecks className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -520,7 +520,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Calendar className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -539,7 +539,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Timer className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -558,7 +558,7 @@ export const QuoteDetailPage: React.FC = () => {
                   width: '2rem',
                   height: '2rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <User className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -578,7 +578,7 @@ export const QuoteDetailPage: React.FC = () => {
                     width: '2rem',
                     height: '2rem',
                     borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)'
+                    backgroundColor: 'hsl(var(--primary) / 0.1)',
                   }}
                 >
                   <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
@@ -996,7 +996,7 @@ export const QuoteDetailPage: React.FC = () => {
                                 value={currentNote}
                                 onChange={(e) => setEditingTimelineNotes(prev => ({
                                   ...prev,
-                                  [item.id]: e.target.value
+                                  [item.id]: e.target.value,
                                 }))}
                                 rows={2}
                                 className="text-sm"
@@ -1018,7 +1018,7 @@ export const QuoteDetailPage: React.FC = () => {
                                 onValueChange={(value) =>
                                   handleUpdateTimelineStatus(
                                     item.id,
-                                    value as 'pending' | 'in_progress' | 'completed' | 'skipped'
+                                    value as 'pending' | 'in_progress' | 'completed' | 'skipped',
                                   )
                                 }
                                 disabled={updatingTimelineStep === item.id}

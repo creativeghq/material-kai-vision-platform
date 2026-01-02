@@ -21,7 +21,7 @@ export class RecommendationsService {
     materialId: string,
     interactionType: 'view' | 'click' | 'save' | 'purchase' | 'rate' | 'add_to_quote' | 'share',
     interactionValue: number = 1.0,
-    metadata?: Record<string, any>
+    metadata?: Record<string, any>,
   ): Promise<void> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -46,7 +46,7 @@ export class RecommendationsService {
             session_id: session.user.id,
             metadata: metadata || {},
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -104,7 +104,7 @@ export class RecommendationsService {
    */
   static async getRecommendationsForUser(
     limit: number = 20,
-    algorithm: 'user_user' | 'item_item' | 'hybrid' = 'user_user'
+    algorithm: 'user_user' | 'item_item' | 'hybrid' = 'user_user',
   ): Promise<Recommendation[]> {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -119,7 +119,7 @@ export class RecommendationsService {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -152,7 +152,7 @@ export class RecommendationsService {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {

@@ -108,7 +108,7 @@ export const RecipientsTab: React.FC<RecipientsTabProps> = ({ campaignId }) => {
   };
 
   const filteredRecipients = recipients.filter(r =>
-    r.email.toLowerCase().includes(searchQuery.toLowerCase())
+    r.email.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   if (loading) {

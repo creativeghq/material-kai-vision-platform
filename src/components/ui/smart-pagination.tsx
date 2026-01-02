@@ -14,7 +14,7 @@ export const SmartPagination: React.FC<SmartPaginationProps> = ({
 }) => {
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
-    
+
     if (totalPages <= 7) {
       // Show all pages if 7 or fewer
       for (let i = 1; i <= totalPages; i++) {

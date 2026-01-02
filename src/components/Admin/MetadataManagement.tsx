@@ -1,6 +1,6 @@
 /**
  * Metadata Management Component
- * 
+ *
  * Comprehensive admin interface for viewing and managing extracted metadata
  * from PDF processing pipeline. Supports filtering, editing, and statistics.
  */
@@ -209,7 +209,7 @@ export const MetadataManagement: React.FC = () => {
   // Paginate metadata
   const paginatedMetadata = filteredMetadata.slice(
     (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
+    currentPage * itemsPerPage,
   );
 
   const totalPages = Math.ceil(filteredMetadata.length / itemsPerPage);

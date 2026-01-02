@@ -52,7 +52,7 @@ export const CreditsTab: React.FC = () => {
       const { url, error } = await stripeService.createCreditCheckoutSession(
         pkg.credits,
         pkg.price,
-        user.email || ''
+        user.email || '',
       );
 
       if (error) throw new Error(error);

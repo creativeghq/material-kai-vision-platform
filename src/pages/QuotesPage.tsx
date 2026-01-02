@@ -190,7 +190,7 @@ export const QuotesPage: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <ShoppingCart className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -209,7 +209,7 @@ export const QuotesPage: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <Clock className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -228,7 +228,7 @@ export const QuotesPage: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <CheckCircle className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
@@ -247,7 +247,7 @@ export const QuotesPage: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)'
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
                 }}
               >
                 <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />

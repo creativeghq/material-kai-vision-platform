@@ -1,6 +1,6 @@
 /**
  * Design System Components
- * 
+ *
  * Reusable components following the dark dashboard design
  * All components are styled to match the screenshot provided
  */

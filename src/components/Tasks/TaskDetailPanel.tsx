@@ -41,7 +41,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
       <div
         className={cn(
           'fixed inset-0 bg-black/20 transition-opacity z-40',
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none',
         )}
         onClick={onClose}
       />
@@ -52,7 +52,7 @@ export const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({
           'fixed right-0 top-0 h-full w-[600px] bg-white shadow-2xl z-50',
           'transform transition-transform duration-300 ease-in-out',
           'flex flex-col',
-          isOpen ? 'translate-x-0' : 'translate-x-full'
+          isOpen ? 'translate-x-0' : 'translate-x-full',
         )}
       >
         {/* Header */}

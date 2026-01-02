@@ -9,7 +9,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 /**
  * Input - Dark-themed input component
- * 
+ *
  * Usage:
  * <Input placeholder="Enter text..." />
  * <Input variant="search" placeholder="Search..." />

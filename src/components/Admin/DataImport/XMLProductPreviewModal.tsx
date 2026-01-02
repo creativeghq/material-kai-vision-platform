@@ -1,6 +1,6 @@
 /**
  * XML Product Preview Modal
- * 
+ *
  * Shows a preview of a single product before starting the import
  * Allows users to verify data accuracy and field mappings
  */

@@ -11,7 +11,7 @@ interface SectionContainerProps {
 
 /**
  * SectionContainer - Container for grouping related content
- * 
+ *
  * Usage:
  * <SectionContainer title="Shipments Activities" action={<FilterButton />}>
  *   <YourContent />

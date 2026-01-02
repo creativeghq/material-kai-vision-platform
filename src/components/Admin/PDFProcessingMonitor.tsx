@@ -181,18 +181,18 @@ export const PDFProcessingMonitor: React.FC = () => {
           value={metrics.embeddingSuccessRate}
           unit="%"
           gradient={metrics.embeddingSuccessRate > 80
-            ? "bg-green-50 border-green-200"
-            : "bg-red-50 border-red-200"}
-          icon={metrics.embeddingSuccessRate > 80 ? "✅" : "⚠️"}
+            ? 'bg-green-50 border-green-200'
+            : 'bg-red-50 border-red-200'}
+          icon={metrics.embeddingSuccessRate > 80 ? '✅' : '⚠️'}
         />
         <MetricCard
           label="Image Extraction Rate"
           value={metrics.imageExtractionRate}
           unit="%"
           gradient={metrics.imageExtractionRate > 50
-            ? "bg-green-50 border-green-200"
-            : "bg-red-50 border-red-200"}
-          icon={metrics.imageExtractionRate > 50 ? "✅" : "⚠️"}
+            ? 'bg-green-50 border-green-200'
+            : 'bg-red-50 border-red-200'}
+          icon={metrics.imageExtractionRate > 50 ? '✅' : '⚠️'}
         />
         <MetricCard
           label="Product Generation Rate"

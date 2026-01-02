@@ -122,7 +122,7 @@ const XMLImportTab: React.FC = () => {
             source_url: sourceType === 'url' ? remoteUrl : undefined,
             preview_only: true, // Trigger field detection mode
           },
-        }
+        },
       );
 
       if (functionError) {

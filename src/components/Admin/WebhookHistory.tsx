@@ -1,6 +1,6 @@
 /**
  * Webhook History Component
- * 
+ *
  * Displays webhook call history for jobs including:
  * - Webhook URL and endpoint
  * - Request/response details
@@ -74,7 +74,7 @@ export const WebhookHistory: React.FC<WebhookHistoryProps> = ({
         () => {
           console.log('webhook_calls changed - refreshing data');
           loadWebhookHistory();
-        }
+        },
       )
       .subscribe();
 
@@ -86,7 +86,7 @@ export const WebhookHistory: React.FC<WebhookHistoryProps> = ({
   const loadWebhookHistory = async () => {
     try {
       setLoading(true);
-      
+
       let query = supabase
         .from('webhook_calls')
         .select('*')

@@ -60,7 +60,7 @@ export interface SimpleProduct {
 /**
  * Material category types for category-based templates
  */
-export type MaterialCategory = 
+export type MaterialCategory =
   | 'tiles'
   | 'wood'
   | 'stone'
@@ -76,13 +76,13 @@ export type MaterialCategory =
  */
 export function getMaterialCategory(product: Product | SimpleProduct): MaterialCategory {
   const metadata = product.metadata || {};
-  const category = metadata.material_category || 
-                   (product as Product).type || 
-                   (product as Product).category || 
+  const category = metadata.material_category ||
+                   (product as Product).type ||
+                   (product as Product).category ||
                    'other';
-  
+
   const categoryLower = String(category).toLowerCase();
-  
+
   if (categoryLower.includes('tile') || categoryLower.includes('ceramic') || categoryLower.includes('porcelain')) {
     return 'tiles';
   }
@@ -107,7 +107,7 @@ export function getMaterialCategory(product: Product | SimpleProduct): MaterialC
   if (categoryLower.includes('composite') || categoryLower.includes('engineered')) {
     return 'composite';
   }
-  
+
   return 'other';
 }
 

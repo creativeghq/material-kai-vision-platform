@@ -395,7 +395,7 @@ export const SystemPerformance: React.FC = () => {
                 ? 'hsl(38 92% 50%)'
                 : status === 'error'
                   ? 'hsl(0 84% 60%)'
-                  : 'hsl(var(--primary))'
+                  : 'hsl(var(--primary))',
           }}
         />
         <p className="text-xs text-muted-foreground">{title}</p>

@@ -106,7 +106,7 @@ export const billingService = {
           Authorization: `Bearer ${session.data.session.access_token}`,
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -132,7 +132,7 @@ export const billingService = {
           Authorization: `Bearer ${session.data.session.access_token}`,
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -160,7 +160,7 @@ export const billingService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ plan_id: planId }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -187,7 +187,7 @@ export const billingService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ package_id: packageId }),
-      }
+      },
     );
 
     if (!response.ok) {

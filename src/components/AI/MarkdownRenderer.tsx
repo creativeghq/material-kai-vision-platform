@@ -12,9 +12,9 @@ interface MarkdownRendererProps {
   className?: string;
 }
 
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
-  content, 
-  className = '' 
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+  content,
+  className = '',
 }) => {
   return (
     <div className={`markdown-content prose prose-sm max-w-none dark:prose-invert ${className}`}>
@@ -65,10 +65,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
           hr: () => <hr className="my-3 border-border" />,
           // Links
           a: ({ children, href }) => (
-            <a 
-              href={href} 
-              className="text-primary hover:underline" 
-              target="_blank" 
+            <a
+              href={href}
+              className="text-primary hover:underline"
+              target="_blank"
               rel="noopener noreferrer"
             >
               {children}

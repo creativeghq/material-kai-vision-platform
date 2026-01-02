@@ -1,6 +1,6 @@
 /**
  * Scraping Preview Modal
- * 
+ *
  * Shows a preview of scraped materials before starting the full scraping session
  * Similar to XML preview - allows users to verify data accuracy
  */
@@ -160,7 +160,7 @@ export const ScrapingPreviewModal: React.FC<ScrapingPreviewModalProps> = ({
             Scraping Preview
           </DialogTitle>
           <DialogDescription>
-            Found {materials.length} material{materials.length !== 1 ? 's' : ''} on sample page. 
+            Found {materials.length} material{materials.length !== 1 ? 's' : ''} on sample page.
             Review before scraping {totalPages} page{totalPages !== 1 ? 's' : ''}.
           </DialogDescription>
         </DialogHeader>

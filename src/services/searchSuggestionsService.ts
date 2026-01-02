@@ -96,7 +96,7 @@ export class SearchSuggestionsService {
    * Get auto-complete suggestions
    */
   async getAutoCompleteSuggestions(
-    request: AutoCompleteRequest
+    request: AutoCompleteRequest,
   ): Promise<AutoCompleteResponse> {
     try {
       const response = await this.mivaaClient.request('/api/search/autocomplete', {
@@ -129,7 +129,7 @@ export class SearchSuggestionsService {
     timeWindow: 'hourly' | 'daily' | 'weekly' | 'monthly' = 'daily',
     limit: number = 20,
     category?: string,
-    minSearchCount: number = 2
+    minSearchCount: number = 2,
   ): Promise<TrendingSearchesResponse> {
     try {
       const params = new URLSearchParams({
@@ -144,7 +144,7 @@ export class SearchSuggestionsService {
 
       const response = await this.mivaaClient.request(
         `/api/search/trending?${params.toString()}`,
-        { method: 'GET' }
+        { method: 'GET' },
       );
 
       if (!response.success) {
@@ -172,7 +172,7 @@ export class SearchSuggestionsService {
   async checkTypoCorrection(
     query: string,
     autoApplyThreshold: number = 0.85,
-    maxSuggestions: number = 3
+    maxSuggestions: number = 3,
   ): Promise<TypoCorrectionResponse> {
     try {
       const request: TypoCorrectionRequest = {
@@ -210,7 +210,7 @@ export class SearchSuggestionsService {
     suggestionId: string,
     suggestionText: string,
     userId?: string,
-    sessionId?: string
+    sessionId?: string,
   ): Promise<void> {
     try {
       await this.mivaaClient.request('/api/search/track-click', {

@@ -12,7 +12,7 @@ interface DashboardCardProps {
 
 /**
  * DashboardCard - Reusable dark-themed card component
- * 
+ *
  * Usage:
  * <DashboardCard title="Total Shipping Amount" subtitle="Last 6 months">
  *   <YourContent />

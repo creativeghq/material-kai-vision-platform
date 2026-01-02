@@ -162,7 +162,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             extracted_text: (job?.metadata as any)?.extracted_text || '',
             product_ids: (job?.metadata as any)?.product_ids || [],
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -210,7 +210,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
             // Add other required parameters from job metadata
             product_ids: (job?.metadata as any)?.product_ids || [],
           }),
-        }
+        },
       );
 
       if (!response.ok) {

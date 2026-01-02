@@ -1,6 +1,6 @@
 /**
  * XML Field Mapping Modal
- * 
+ *
  * Interactive UI for reviewing and adjusting AI-suggested field mappings
  * Allows users to map XML fields to product schema and save as templates
  */
@@ -115,7 +115,7 @@ const FieldMappingCombobox: React.FC<FieldMappingComboboxProps> = ({
           disabled={disabled}
           className={cn(
             'w-full justify-between bg-white hover:bg-gray-50',
-            !value && 'text-muted-foreground'
+            !value && 'text-muted-foreground',
           )}
         >
           <span className="truncate">
@@ -149,7 +149,7 @@ const FieldMappingCombobox: React.FC<FieldMappingComboboxProps> = ({
                   <Check
                     className={cn(
                       'mr-2 h-4 w-4',
-                      value === field.value ? 'opacity-100' : 'opacity-0'
+                      value === field.value ? 'opacity-100' : 'opacity-0',
                     )}
                   />
                   {field.label}
@@ -170,7 +170,7 @@ const FieldMappingCombobox: React.FC<FieldMappingComboboxProps> = ({
                   <Check
                     className={cn(
                       'mr-2 h-4 w-4',
-                      value === field.value ? 'opacity-100' : 'opacity-0'
+                      value === field.value ? 'opacity-100' : 'opacity-0',
                     )}
                   />
                   {field.label}
@@ -338,7 +338,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             manual_values: manualValues,
             generate_preview: true,
           },
-        }
+        },
       );
 
       if (functionError) {
@@ -384,7 +384,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
                 ...acc,
                 [field.xml_field]: field.confidence,
               }),
-              {}
+              {},
             ),
           })
           .select()
@@ -422,7 +422,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
             manual_values: manualValues, // Pass manual values separately
             mapping_template_id: templateId,
           },
-        }
+        },
       );
 
       if (functionError) {

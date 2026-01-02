@@ -11,7 +11,7 @@ import {
   CheckCircle2,
   TrendingUp,
   Eye,
-  Home
+  Home,
 } from 'lucide-react';
 
 interface Material {
@@ -196,7 +196,7 @@ export const MaterialMatchingModal: React.FC<MaterialMatchingModalProps> = ({
               const isSelected = selectedMaterials.has(material.id);
               const price = material.metadata?.price || 0;
               const unit = material.metadata?.unit || 'unit';
-              
+
               return (
                 <div
                   key={material.id}

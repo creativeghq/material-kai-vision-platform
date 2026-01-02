@@ -204,7 +204,7 @@ export const WebScrapingMonitor: React.FC = () => {
           label="Scraping Success Rate"
           value={metrics.scrapingSuccessRate}
           unit="%"
-          icon={metrics.scrapingSuccessRate > 90 ? "✅" : "⚠️"}
+          icon={metrics.scrapingSuccessRate > 90 ? '✅' : '⚠️'}
         />
         <MetricCard
           label="Avg Products/Page"

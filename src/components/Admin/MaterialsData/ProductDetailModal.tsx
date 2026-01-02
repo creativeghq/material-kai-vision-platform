@@ -37,12 +37,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     pricing: {
       retail: 0,
       wholesale: 0,
-      currency: 'EUR'
+      currency: 'EUR',
     },
     stock: {
       quantity: 0,
       status: 'Unknown',
-      unit: 'pcs'
+      unit: 'pcs',
     },
   };
 

@@ -87,7 +87,7 @@ export const FieldMappingStep: React.FC<FieldMappingStepProps> = ({
     field: Omit<FieldMapping, 'id'> | FieldMapping,
     setField: (field: Omit<FieldMapping, 'id'> | FieldMapping) => void,
     onSave: () => void,
-    onCancel: () => void
+    onCancel: () => void,
   ) => (
     <Card className="border-2 border-primary/20">
       <CardContent className="pt-6 space-y-4">
@@ -240,7 +240,7 @@ export const FieldMappingStep: React.FC<FieldMappingStepProps> = ({
           () => {
             setIsAdding(false);
             setNewField(defaultField);
-          }
+          },
         )}
 
       {/* Existing Fields List */}
@@ -252,7 +252,7 @@ export const FieldMappingStep: React.FC<FieldMappingStepProps> = ({
                 editingField,
                 (updated) => setEditingField(updated as FieldMapping),
                 handleUpdateField,
-                () => setEditingField(null)
+                () => setEditingField(null),
               )
             ) : (
               <Card>

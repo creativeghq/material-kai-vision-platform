@@ -53,7 +53,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
     try {
       setVerifying(true);
       const result = await emailService.verifyDomain(newDomain);
-      
+
       toast({
         title: 'Domain Added',
         description: `Verification token: ${result.verificationToken}`,
@@ -77,7 +77,7 @@ export const EmailDomainsTab: React.FC<EmailDomainsTabProps> = ({ onDomainVerifi
   const handleCheckVerification = async (domain: string) => {
     try {
       const status = await emailService.checkDomainVerification(domain);
-      
+
       toast({
         title: 'Verification Status',
         description: `Domain is ${status}`,

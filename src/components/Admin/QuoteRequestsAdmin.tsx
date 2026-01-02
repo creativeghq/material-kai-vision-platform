@@ -185,9 +185,9 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: `Quote created for user`,
+        description: 'Quote created for user',
       });
-      
+
       setShowCreateModal(false);
       setSelectedUserId('');
       setQuoteName('');
@@ -343,7 +343,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
               onClick={() => setShowCreateModal(true)}
               style={{
                 backgroundColor: 'hsl(var(--primary))',
-                color: 'white'
+                color: 'white',
               }}
               className="hover:opacity-90"
             >
@@ -377,7 +377,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
               ) : (
                 quoteRequests
                   .filter(quote =>
-                    selectedStatusFilter === 'all' || quote.status_tag_id === selectedStatusFilter
+                    selectedStatusFilter === 'all' || quote.status_tag_id === selectedStatusFilter,
                   )
                   .map((quote) => {
                     const statusTag = statusTags.find(tag => tag.id === quote.status_tag_id);
@@ -506,7 +506,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
                 disabled={creating || !selectedUserId}
                 style={{
                   backgroundColor: 'hsl(var(--primary))',
-                  color: 'white'
+                  color: 'white',
                 }}
                 className="hover:opacity-90"
               >

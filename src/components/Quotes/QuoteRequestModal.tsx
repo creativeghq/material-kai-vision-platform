@@ -358,7 +358,7 @@ export const QuoteRequestModal: React.FC<QuoteRequestModalProps> = ({
                               .reduce((sum, qu) => {
                                 const upsell = upsells.find(u => u.id === qu.upsell_id);
                                 return sum + (upsell?.price || 0);
-                              }, 0)
+                              }, 0),
                           )}
                         </span>
                       </div>

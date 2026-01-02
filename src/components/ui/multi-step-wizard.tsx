@@ -90,7 +90,7 @@ export const MultiStepWizard: React.FC<MultiStepWizardProps> = ({
                         'bg-primary border-primary text-primary-foreground cursor-pointer hover:bg-primary/90',
                       isCurrent && 'border-primary bg-primary/10 text-primary',
                       !isCompleted && !isCurrent && 'border-muted bg-background text-muted-foreground',
-                      index < currentStep && 'cursor-pointer'
+                      index < currentStep && 'cursor-pointer',
                     )}
                   >
                     {isCompleted ? (
@@ -107,7 +107,7 @@ export const MultiStepWizard: React.FC<MultiStepWizardProps> = ({
                         'text-sm font-medium',
                         isCurrent && 'text-primary',
                         isCompleted && 'text-foreground',
-                        !isCompleted && !isCurrent && 'text-muted-foreground'
+                        !isCompleted && !isCurrent && 'text-muted-foreground',
                       )}
                     >
                       {step.title}
@@ -129,7 +129,7 @@ export const MultiStepWizard: React.FC<MultiStepWizardProps> = ({
                     <div
                       className={cn(
                         'h-full transition-all',
-                        index < currentStep ? 'bg-primary' : 'bg-muted'
+                        index < currentStep ? 'bg-primary' : 'bg-muted',
                       )}
                     />
                   </div>

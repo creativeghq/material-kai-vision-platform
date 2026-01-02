@@ -67,7 +67,7 @@ export function getDemoCompetitorSources(productId: string): DemoCompetitorSourc
 export function getDemoCompetitorPrices(
   productId: string,
   basePrice: number = 45.99,
-  currency: string = 'EUR'
+  currency: string = 'EUR',
 ): DemoCompetitorPrice[] {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
@@ -110,14 +110,14 @@ export function getDemoCompetitorPrices(
 export function getDemoPriceHistory(
   productId: string,
   basePrice: number = 45.99,
-  days: number = 30
+  days: number = 30,
 ): DemoPriceHistory[] {
   const history: DemoPriceHistory[] = [];
   const now = new Date();
 
   for (let i = days; i >= 0; i--) {
     const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    
+
     // Add some realistic price variation
     const variation = Math.sin(i / 5) * 0.05 + (Math.random() - 0.5) * 0.03;
     const price = basePrice * (1 + variation);

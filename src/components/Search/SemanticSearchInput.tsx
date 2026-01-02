@@ -250,7 +250,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         const combinedSuggestions = [
           ...productSuggestions,
           ...apiSuggestions.filter(
-            (apiSug) => !productSuggestions.some((prodSug) => prodSug.text === apiSug.text)
+            (apiSug) => !productSuggestions.some((prodSug) => prodSug.text === apiSug.text),
           ),
         ];
 
@@ -338,7 +338,7 @@ export const SemanticSearchInput: React.FC<SemanticSearchInputProps> = ({
         'clicked',
         undefined, // user_id - can be added if available
         undefined, // result_count - will be updated after search
-        undefined  // user_satisfied - can be tracked later
+        undefined,  // user_satisfied - can be tracked later
       );
     } catch (error) {
       console.error('Error tracking suggestion click:', error);

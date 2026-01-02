@@ -1,6 +1,6 @@
 /**
  * XML Import Job Card Component
- * 
+ *
  * Displays detailed information about an XML import job including:
  * - Job status and progress
  * - Product counts (total, processed, failed)

@@ -17,7 +17,7 @@ import {
   ExternalLink,
   Plus,
   Settings,
-  Clock
+  Clock,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -193,7 +193,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
             action: 'check_now',
             productId: productId,
           }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -276,7 +276,7 @@ export const ProductMonitorTab: React.FC<ProductMonitorTabProps> = ({
           status: monitoringEnabled ? 'active' : 'paused',
           updated_at: new Date().toISOString(),
         }, {
-          onConflict: 'product_id,user_id'
+          onConflict: 'product_id,user_id',
         });
 
       if (error) throw error;

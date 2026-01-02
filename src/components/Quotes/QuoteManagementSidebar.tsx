@@ -126,7 +126,7 @@ export const QuoteManagementSidebar: React.FC<QuoteManagementSidebarProps> = ({
     const now = new Date();
     const expiration = new Date(expiresAt);
     const daysUntilExpiration = Math.ceil(
-      (expiration.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+      (expiration.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     if (daysUntilExpiration < 0) {

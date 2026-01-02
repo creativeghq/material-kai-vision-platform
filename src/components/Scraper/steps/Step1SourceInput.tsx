@@ -98,7 +98,7 @@ export const Step1SourceInput: React.FC<Step1SourceInputProps> = ({
                     'p-4 border rounded-lg text-left transition-all',
                     isSelected
                       ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                      : 'border-muted hover:border-muted-foreground/50 hover:bg-accent/5'
+                      : 'border-muted hover:border-muted-foreground/50 hover:bg-accent/5',
                   )}
                 >
                   <div className="flex items-center gap-3 mb-2">

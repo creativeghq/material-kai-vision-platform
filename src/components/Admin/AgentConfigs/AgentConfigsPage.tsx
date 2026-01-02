@@ -170,7 +170,7 @@ export const AgentConfigsPage: React.FC = () => {
     // Prompt type icons
     if (promptType === 'agent') {
       const agentIcons: Record<string, string> = {
-        'pdf-processor': '📄', 'search': '🔍', 'product': '📦', 'interior-designer': '🎨'
+        'pdf-processor': '📄', 'search': '🔍', 'product': '📦', 'interior-designer': '🎨',
       };
       return agentIcons[category] || '🤖';
     }
@@ -185,7 +185,7 @@ export const AgentConfigsPage: React.FC = () => {
       'agent': 'Agent',
       'extraction': 'Extraction',
       'template': 'Template',
-      'search': 'Search'
+      'search': 'Search',
     };
     return labels[type] || type;
   };

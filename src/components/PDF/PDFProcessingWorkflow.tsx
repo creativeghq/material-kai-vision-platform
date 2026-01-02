@@ -11,7 +11,7 @@ import {
   mapCheckpointToStages,
   getCurrentActiveStage,
   extractMetricsFromJob,
-  extractStageMetrics
+  extractStageMetrics,
 } from '@/services/pdf/pdfProcessingMonitor';
 
 interface PDFProcessingWorkflowProps {
@@ -108,8 +108,8 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
         prev.map((stage) =>
           stage.id === activeStageId
             ? { ...stage, status: 'error' as const, error: jobStatus.error }
-            : stage
-        )
+            : stage,
+        ),
       );
     }
   }, [jobStatus, onComplete]);

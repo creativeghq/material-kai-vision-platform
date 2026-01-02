@@ -95,19 +95,19 @@ export const QuoteRequestsPage: React.FC = () => {
     const statusConfig = {
       pending: {
         color: 'bg-[hsl(var(--badge-pending-bg))] text-[hsl(var(--badge-pending-text))] border-[hsl(var(--badge-pending-border))]',
-        icon: Clock
+        icon: Clock,
       },
       updated: {
         color: 'bg-[hsl(var(--badge-updated-bg))] text-[hsl(var(--badge-updated-text))] border-[hsl(var(--badge-updated-border))]',
-        icon: FileText
+        icon: FileText,
       },
       approved: {
         color: 'bg-[hsl(var(--badge-approved-bg))] text-[hsl(var(--badge-approved-text))] border-[hsl(var(--badge-approved-border))]',
-        icon: CheckCircle
+        icon: CheckCircle,
       },
       rejected: {
         color: 'bg-[hsl(var(--badge-rejected-bg))] text-[hsl(var(--badge-rejected-text))] border-[hsl(var(--badge-rejected-border))]',
-        icon: XCircle
+        icon: XCircle,
       },
     };
 

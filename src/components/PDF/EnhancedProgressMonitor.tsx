@@ -135,7 +135,7 @@ const StepItem = React.memo<{
               )}
               <span className={cn(
                 substep.status === 'completed' ? 'text-green-600' :
-                substep.status === 'running' ? 'text-blue-600' : 'text-gray-500'
+                substep.status === 'running' ? 'text-blue-600' : 'text-gray-500',
               )}>
                 {substep.name}
               </span>

@@ -181,7 +181,7 @@ export const SessionDetailView: React.FC<SessionDetailViewProps> = ({
             session_id: sessionId,
             workspace_id: 'default', // TODO: Get from user context
             categories: ['products'],
-            model: 'claude'
+            model: 'claude',
           },
         },
       );

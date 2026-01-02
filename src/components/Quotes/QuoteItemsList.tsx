@@ -332,7 +332,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
           {items.length > 0 ? (
             <div className="space-y-3">
               {items.map((item, index) =>
-                variant === 'compact' ? renderCompactItem(item) : renderDetailedItem(item, index)
+                variant === 'compact' ? renderCompactItem(item) : renderDetailedItem(item, index),
               )}
             </div>
           ) : (

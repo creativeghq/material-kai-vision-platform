@@ -31,7 +31,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
           ? isFirstColumn
             ? 'flex-1 min-w-[600px]'  // Full width for Open column
             : 'w-80'                    // Fixed width for other columns
-          : 'w-16'
+          : 'w-16',
       )}
     >
       {/* Column Container */}
@@ -39,7 +39,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
         className={cn(
           'h-full rounded-2xl overflow-hidden transition-all duration-300',
           'bg-white/70 backdrop-blur-sm border border-gray-200/50',
-          'shadow-sm hover:shadow-md'
+          'shadow-sm hover:shadow-md',
         )}
       >
         {/* Collapsed State - Vertical Title */}

@@ -79,7 +79,7 @@ export const SubscriptionTab: React.FC = () => {
     try {
       const { url, error } = await stripeService.createSubscriptionCheckoutSession(
         tier.priceId,
-        user.email || ''
+        user.email || '',
       );
 
       if (error) throw new Error(error);

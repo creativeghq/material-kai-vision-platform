@@ -68,7 +68,7 @@ export const PriceMonitoringDashboard: React.FC = () => {
       const activeCount = products?.filter(p => p.monitoring_enabled && p.status === 'active').length || 0;
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
-      
+
       const todayJobs = jobs?.filter(j => new Date(j.created_at) >= todayStart) || [];
       const creditsUsed = todayJobs.reduce((sum, j) => sum + (j.credits_consumed || 0), 0);
 

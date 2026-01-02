@@ -1,6 +1,6 @@
 /**
  * Schedule Import Modal
- * 
+ *
  * Configure cron schedules for recurring XML imports
  */
 
@@ -61,7 +61,7 @@ const ScheduleImportModal: React.FC<ScheduleImportModalProps> = ({
 }) => {
   const { toast } = useToast();
   const [selectedPreset, setSelectedPreset] = useState<string>(
-    job.cron_schedule || '0 */6 * * *'
+    job.cron_schedule || '0 */6 * * *',
   );
   const [customCron, setCustomCron] = useState('');
   const [sourceUrl, setSourceUrl] = useState(job.source_url || '');

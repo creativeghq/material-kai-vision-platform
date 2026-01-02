@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, FileText, BookOpen, Database, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { Product, getMaterialCategory, MaterialCategory } from './types';
 import { AddToQuoteButton } from '@/components/Quotes/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/MoodBoard/AddToMoodboardButton';
@@ -199,13 +200,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) =>
-      prev === 0 ? images.length - 1 : prev - 1
+      prev === 0 ? images.length - 1 : prev - 1,
     );
   };
 
   const handleNextImage = () => {
     setCurrentImageIndex((prev) =>
-      prev === images.length - 1 ? 0 : prev + 1
+      prev === images.length - 1 ? 0 : prev + 1,
     );
   };
 
@@ -225,8 +226,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          document_id: product.source_document_id
-        })
+          document_id: product.source_document_id,
+        }),
       });
 
       const result = await response.json();
@@ -238,17 +239,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         setChunks([]);
         setRelevanceCounts(prev => ({
           ...prev,
-          chunks: 0
+          chunks: 0,
         }));
 
-        alert(`✅ Successfully created ${result.chunk_product_links} chunk-product relationships!`);
+        toast.success(`✅ Successfully created ${result.chunk_product_links} chunk-product relationships!`);
       } else {
         console.error('[ProductDetailModal] Re-linking failed:', result.error);
-        alert(`❌ Re-linking failed: ${result.error || 'Unknown error'}`);
+        toast.error(`❌ Re-linking failed: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       console.error('[ProductDetailModal] Re-linking error:', error);
-      alert(`❌ Re-linking error: ${error}`);
+      toast.error(`❌ Re-linking error: ${error}`);
     } finally {
       setIsRelinking(false);
     }
@@ -260,7 +261,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const allData = {
     ...product.metadata,
     ...product.properties,
-    ...product.specifications
+    ...product.specifications,
   };
 
   // Extract from correct nested paths
@@ -319,7 +320,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Finishes': extractValue(allData?.finishes),
     'Patterns': extractValue(materialPropsData?.patterns) || extractValue(appearanceData?.patterns),
     'Surface': extractValue(materialPropsData?.surface),
-    'Thickness': thickness
+    'Thickness': thickness,
   };
 
   const dimensions = {
@@ -362,7 +363,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const manufacturing = {
     'Factory': factory,
     'Factory Group': extractValue(allData?.factory_group_name) || undefined,
-    'Country of Origin': origin || undefined
+    'Country of Origin': origin || undefined,
   };
 
   const commercial = {

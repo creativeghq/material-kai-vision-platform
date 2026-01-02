@@ -87,7 +87,7 @@ export const EmailAnalyticsTab: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: analytics.deliveryRate >= 95 ? 'hsl(142 71% 45% / 0.1)' : 'hsl(var(--destructive) / 0.1)'
+                  backgroundColor: analytics.deliveryRate >= 95 ? 'hsl(142 71% 45% / 0.1)' : 'hsl(var(--destructive) / 0.1)',
                 }}
               >
                 {analytics.deliveryRate >= 95 ? (
@@ -117,7 +117,7 @@ export const EmailAnalyticsTab: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: analytics.bounceRate > 5 ? 'hsl(var(--destructive) / 0.1)' : 'hsl(var(--muted) / 0.5)'
+                  backgroundColor: analytics.bounceRate > 5 ? 'hsl(var(--destructive) / 0.1)' : 'hsl(var(--muted) / 0.5)',
                 }}
               >
                 <Mail className="h-5 w-5" style={{ color: analytics.bounceRate > 5 ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))' }} />
@@ -146,7 +146,7 @@ export const EmailAnalyticsTab: React.FC = () => {
                   width: '2.5rem',
                   height: '2.5rem',
                   borderRadius: 'var(--radius-lg)',
-                  backgroundColor: analytics.complaintRate > 0.1 ? 'hsl(var(--warning) / 0.1)' : 'hsl(var(--muted) / 0.5)'
+                  backgroundColor: analytics.complaintRate > 0.1 ? 'hsl(var(--warning) / 0.1)' : 'hsl(var(--muted) / 0.5)',
                 }}
               >
                 <AlertTriangle className="h-5 w-5" style={{ color: analytics.complaintRate > 0.1 ? 'hsl(var(--warning))' : 'hsl(var(--muted-foreground))' }} />
@@ -183,7 +183,7 @@ export const EmailAnalyticsTab: React.FC = () => {
                 contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
                   border: '1px solid hsl(var(--border))',
-                  borderRadius: 'var(--radius)'
+                  borderRadius: 'var(--radius)',
                 }}
               />
               <Bar dataKey="value" fill="hsl(var(--primary))" />
@@ -207,7 +207,7 @@ export const EmailAnalyticsTab: React.FC = () => {
                 contentStyle={{
                   backgroundColor: 'hsl(var(--card))',
                   border: '1px solid hsl(var(--border))',
-                  borderRadius: 'var(--radius)'
+                  borderRadius: 'var(--radius)',
                 }}
               />
               <Bar dataKey="value" fill="hsl(142 71% 45%)" />

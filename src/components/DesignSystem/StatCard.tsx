@@ -16,11 +16,11 @@ interface StatCardProps {
 
 /**
  * StatCard - Statistics card with optional icon and change indicator
- * 
+ *
  * Usage:
- * <StatCard 
- *   title="Total Revenue" 
- *   value="$12,345" 
+ * <StatCard
+ *   title="Total Revenue"
+ *   value="$12,345"
  *   change={{ value: "+12.5%", type: "increase" }}
  *   icon={DollarSign}
  * />
@@ -46,7 +46,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                   'text-sm font-medium',
                   change.type === 'increase' && 'text-success',
                   change.type === 'decrease' && 'text-error',
-                  change.type === 'neutral' && 'text-muted-foreground'
+                  change.type === 'neutral' && 'text-muted-foreground',
                 )}
               >
                 {change.value}

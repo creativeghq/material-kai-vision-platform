@@ -938,7 +938,7 @@ export const OperationsDashboard: React.FC = () => {
                             agentChats
                               .filter((c) => c.metadata?.responseTimeMs)
                               .reduce((sum, c) => sum + (c.metadata?.responseTimeMs || 0), 0) /
-                              Math.max(agentChats.filter((c) => c.metadata?.responseTimeMs).length, 1)
+                              Math.max(agentChats.filter((c) => c.metadata?.responseTimeMs).length, 1),
                           )}ms`
                         : '0ms'}
                     </div>

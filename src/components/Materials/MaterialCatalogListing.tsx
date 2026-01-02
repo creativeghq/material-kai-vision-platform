@@ -618,7 +618,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
           }
         });
       },
-      { threshold: 0.5 } // Track when 50% visible
+      { threshold: 0.5 }, // Track when 50% visible
     );
 
     observer.observe(cardRef.current);
