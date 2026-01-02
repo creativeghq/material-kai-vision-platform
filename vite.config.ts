@@ -12,6 +12,13 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 8080,
       host: true,
+      proxy: {
+        '/api': {
+          target: env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
     resolve: {
       alias: {

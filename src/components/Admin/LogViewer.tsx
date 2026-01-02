@@ -122,11 +122,11 @@ export function LogViewer() {
       const cutoffTime = new Date();
       cutoffTime.setHours(cutoffTime.getHours() - hours);
 
-      // Delete logs older than cutoff time
+      // Delete logs within the current time range (newer than cutoff time)
       const { error } = await supabase
         .from('system_logs')
         .delete()
-        .lt('timestamp', cutoffTime.toISOString());
+        .gte('timestamp', cutoffTime.toISOString());
 
       if (error) throw error;
 
@@ -135,7 +135,7 @@ export function LogViewer() {
 
       toast({
         title: 'Logs cleared',
-        description: `System logs older than ${hours} hours have been cleared.`,
+        description: `System logs from the last ${hours} hours have been cleared.`,
       });
 
       // Reload to show remaining logs

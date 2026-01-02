@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from './TempFileCleanupModal';
 import {
   RefreshCw,
@@ -763,7 +764,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     setCancellingJob(jobId);
     try {
       // Use admin endpoint with cleanup=true to delete all partial data
-      const response = await fetch(`https://v1api.materialshub.gr/api/admin/jobs/${jobId}?cleanup=true`, {
+      const response = await fetch(`/api/admin/jobs/${jobId}?cleanup=true`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -792,6 +793,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       toast.success('Job cancelled successfully');
     } catch (error) {
       console.error('Error cancelling job:', error);
+      logger.error('Error cancelling job', error, { jobId });
       toast.error(`Failed to cancel job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setCancellingJob(null);
@@ -838,7 +840,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       for (const job of jobsToClear) {
         try {
           const response = await fetch(
-            `https://v1api.materialshub.gr/api/rag/documents/jobs/${job.id}`,
+            `/api/rag/documents/jobs/${job.id}`,
             {
               method: 'DELETE',
               headers: {
@@ -854,6 +856,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           }
         } catch (error) {
           console.error(`Failed to cancel job ${job.id}:`, error);
+          logger.error(`Failed to cancel job ${job.id}`, error);
           failCount++;
         }
       }
@@ -883,7 +886,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`https://v1api.materialshub.gr/api/rag/documents/jobs/${deleteJobId.trim()}`, {
+      const response = await fetch(`/api/rag/documents/jobs/${deleteJobId.trim()}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -916,6 +919,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     } catch (error) {
       console.error('Error deleting job:', error);
+      logger.error('Error deleting job', error, { deleteJobId });
       toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
@@ -2348,7 +2352,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             }
 
                             // Fetch products for this document
-                            const productsResponse = await fetch(`https://v1api.materialshub.gr/api/products?document_id=${selectedJob.document_id}`);
+                            const productsResponse = await fetch(`/api/products?document_id=${selectedJob.document_id}`);
                             const productsData = productsResponse.ok ? await productsResponse.json() : { products: [] };
                             const productIds = productsData.products?.map((p: any) => p.id) || [];
 
@@ -2363,7 +2367,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               chunk_overlap: 50,
                             };
 
-                            const response = await fetch(`https://v1api.materialshub.gr/api/internal/create-chunks/${selectedJob.id}`, {
+                            const response = await fetch(`/api/internal/create-chunks/${selectedJob.id}`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify(requestBody),
@@ -2379,8 +2383,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               fetchJobDetails(selectedJob);
                             } else {
                               toast.error(`❌ Failed to create chunks: ${JSON.stringify(result)}`);
+                              logger.error('Failed to create chunks', result, { jobId: selectedJob.id });
                             }
                           } catch (error) {
+                            logger.error('Error creating chunks', error, { jobId: selectedJob.id });
                             toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
                         }}
@@ -2410,7 +2416,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                             const totalProducts = products?.length || 0;
 
-                            const response = await fetch('https://v1api.materialshub.gr/api/internal/generate-product-embeddings', {
+                            const response = await fetch('/api/internal/generate-product-embeddings', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
@@ -2431,8 +2437,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               fetchJobDetails(selectedJob);
                             } else {
                               toast.error('❌ Failed to generate embeddings');
+                              logger.error('Failed to generate embeddings', result, { jobId: selectedJob.id });
                             }
                           } catch (error) {
+                            logger.error('Error regenerating embeddings', error, { jobId: selectedJob.id });
                             toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
                         }}
@@ -2482,7 +2490,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             );
                             if (!confirmed) return;
 
-                            const response = await fetch('https://v1api.materialshub.gr/api/admin/regenerate-image-embeddings', {
+                            const response = await fetch('/api/admin/regenerate-image-embeddings', {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
@@ -2500,8 +2508,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               fetchJobDetails(selectedJob);
                             } else {
                               toast.error(`❌ Failed to queue image embedding regeneration: ${result.error || 'Unknown error'}`);
+                              logger.error('Failed to queue image embedding regeneration', result, { jobId: selectedJob.id });
                             }
                           } catch (error) {
+                            logger.error('Error regenerating image embeddings', error, { jobId: selectedJob.id });
                             toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
                           }
                         }}
@@ -2558,8 +2568,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             if (!confirmed) return;
 
                             // Call the admin linking API
-                            const MIVAA_API_URL = 'https://v1api.materialshub.gr';
-                            const response = await fetch(`${MIVAA_API_URL}/api/admin/linking/link-chunks-to-products`, {
+                            const response = await fetch(`/api/admin/linking/link-chunks-to-products`, {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
@@ -2582,9 +2591,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               );
                             } else {
                               toast.error(`❌ Failed: ${result.error || 'Unknown error'}`);
+                              logger.error('Failed to create chunk relationships', result, { jobId: selectedJob.id });
                             }
                           } catch (error) {
                             console.error('Error creating chunk relationships:', error);
+                            logger.error('Error creating chunk relationships', error, { jobId: selectedJob.id });
                             toast.error(`❌ Failed to create chunk relationships: ${error instanceof Error ? error.message : 'Unknown error'}`);
                           }
                         }}
