@@ -375,60 +375,105 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
         metrics['Images Processed'] = jobMetadata.images_processed;
       }
 
-      // ✅ NEW: Vision-guided extraction stats
-      if (jobMetadata.vision_guided_count !== undefined && jobMetadata.vision_guided_count > 0) {
-        metrics['Vision-Guided'] = jobMetadata.vision_guided_count;
-      }
-      if (jobMetadata.pymupdf_fallback_count !== undefined && jobMetadata.pymupdf_fallback_count > 0) {
-        metrics['PyMuPDF Fallback'] = jobMetadata.pymupdf_fallback_count;
-      }
-      if (jobMetadata.ai_classified_count !== undefined && jobMetadata.ai_classified_count > 0) {
-        metrics['AI Classified'] = jobMetadata.ai_classified_count;
-      }
-      if (jobMetadata.average_vision_confidence !== undefined) {
-        metrics['Avg Confidence'] = `${Math.round(jobMetadata.average_vision_confidence * 100)}%`;
-      }
-
-      // Show extraction method if available
-      if (jobMetadata.extraction_method) {
-        const method = jobMetadata.extraction_method === 'vision_guided' ? 'Vision-Guided' : 'PyMuPDF';
-        metrics['Method'] = method;
-      }
-
-      // Vision-guided metadata from checkpoint
+      // ✅ NEW: Vision-guided extraction breakdown
       if (jobMetadata.vision_guided) {
         const visionData = jobMetadata.vision_guided;
-        if (visionData.enabled && visionData.success) {
-          if (visionData.images_extracted !== undefined) {
-            metrics['Vision Images'] = visionData.images_extracted;
+        if (visionData.enabled) {
+          // Show extraction method used
+          const method = visionData.extraction_method === 'vision_guided' ? 'Vision-Guided' : 'PyMuPDF Fallback';
+          metrics['Extraction Method'] = method;
+
+          if (visionData.success && visionData.images_extracted !== undefined) {
+            metrics['Vision-Guided Images'] = visionData.images_extracted;
           }
           if (visionData.stats?.average_confidence !== undefined) {
             metrics['Vision Confidence'] = `${Math.round(visionData.stats.average_confidence * 100)}%`;
           }
         }
       }
+
+      // Fallback to old format if vision_guided not available
+      if (!jobMetadata.vision_guided) {
+        if (jobMetadata.vision_guided_count !== undefined && jobMetadata.vision_guided_count > 0) {
+          metrics['Vision-Guided'] = jobMetadata.vision_guided_count;
+        }
+        if (jobMetadata.pymupdf_fallback_count !== undefined && jobMetadata.pymupdf_fallback_count > 0) {
+          metrics['PyMuPDF Fallback'] = jobMetadata.pymupdf_fallback_count;
+        }
+        if (jobMetadata.extraction_method) {
+          const method = jobMetadata.extraction_method === 'vision_guided' ? 'Vision-Guided' : 'PyMuPDF';
+          metrics['Method'] = method;
+        }
+      }
+
+      // ✅ NEW: Classification breakdown (Step 7 specific)
+      if (stageId === 7) {
+        if (jobMetadata.material_images !== undefined) {
+          metrics['Material Images'] = jobMetadata.material_images;
+        }
+        if (jobMetadata.non_material_images !== undefined) {
+          metrics['Non-Material'] = jobMetadata.non_material_images;
+        }
+        if (jobMetadata.classification_errors !== undefined && jobMetadata.classification_errors > 0) {
+          metrics['Classification Errors'] = jobMetadata.classification_errors;
+        }
+      }
+
+      // AI classification stats
+      if (jobMetadata.ai_classified_count !== undefined && jobMetadata.ai_classified_count > 0) {
+        metrics['AI Classified'] = jobMetadata.ai_classified_count;
+      }
+      if (jobMetadata.average_vision_confidence !== undefined) {
+        metrics['Avg Confidence'] = `${Math.round(jobMetadata.average_vision_confidence * 100)}%`;
+      }
       break;
 
     case 9: // CLIP Embeddings (Stage 3)
-      if (jobMetadata.clip_embeddings !== undefined) {
-        metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings;
-      }
-      // Also check for clip_embeddings_generated field (from pipeline_orchestrator.py)
-      if (jobMetadata.clip_embeddings_generated !== undefined) {
-        metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings_generated;
-      }
-      if (jobMetadata.specialized_embeddings !== undefined) {
-        metrics['Specialized Embeddings'] = jobMetadata.specialized_embeddings;
-      }
-      if (jobMetadata.images_saved !== undefined) {
-        // Determine the final embeddings per image value
-        // Prefer embeddings_per_image from metadata if available, otherwise default to 5
-        const embeddingsPerImage = jobMetadata.embeddings_per_image !== undefined
-          ? jobMetadata.embeddings_per_image
-          : 5;
+      // ✅ NEW: Show embedding type breakdown if available
+      if (jobMetadata.clip_embeddings && typeof jobMetadata.clip_embeddings === 'object') {
+        const clipData = jobMetadata.clip_embeddings;
 
-        metrics['Embeddings/Image'] = embeddingsPerImage;
-        metrics['Total Vectors'] = jobMetadata.images_saved * embeddingsPerImage;
+        // Show individual embedding types
+        if (clipData.visual_clip_512 !== undefined) {
+          metrics['Visual CLIP (512D)'] = clipData.visual_clip_512;
+        }
+        if (clipData.color_siglip_1152 !== undefined) {
+          metrics['Color SigLIP (1152D)'] = clipData.color_siglip_1152;
+        }
+        if (clipData.texture_siglip_1152 !== undefined) {
+          metrics['Texture SigLIP (1152D)'] = clipData.texture_siglip_1152;
+        }
+        if (clipData.style_siglip_1152 !== undefined) {
+          metrics['Style SigLIP (1152D)'] = clipData.style_siglip_1152;
+        }
+        if (clipData.material_siglip_1152 !== undefined) {
+          metrics['Material SigLIP (1152D)'] = clipData.material_siglip_1152;
+        }
+        if (clipData.total !== undefined) {
+          metrics['Total Embeddings'] = clipData.total;
+        }
+      } else {
+        // Fallback to old format (single number)
+        if (jobMetadata.clip_embeddings !== undefined) {
+          metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings;
+        }
+        // Also check for clip_embeddings_generated field (from pipeline_orchestrator.py)
+        if (jobMetadata.clip_embeddings_generated !== undefined) {
+          metrics['CLIP Embeddings'] = jobMetadata.clip_embeddings_generated;
+        }
+        if (jobMetadata.specialized_embeddings !== undefined) {
+          metrics['Specialized Embeddings'] = jobMetadata.specialized_embeddings;
+        }
+        if (jobMetadata.images_saved !== undefined) {
+          // Determine the final embeddings per image value
+          // Prefer embeddings_per_image from metadata if available, otherwise default to 5
+          const embeddingsPerImage = jobMetadata.embeddings_per_image !== undefined
+            ? jobMetadata.embeddings_per_image
+            : 5;
+
+          metrics['Embeddings/Image'] = embeddingsPerImage;
+          metrics['Total Vectors'] = jobMetadata.images_saved * embeddingsPerImage;
+        }
       }
       break;
 
@@ -452,15 +497,30 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.relationships_created !== undefined) {
         metrics['Relationships'] = jobMetadata.relationships_created;
       }
-      if (jobMetadata.chunk_product_relationships !== undefined) {
-        metrics['Chunk-Product Links'] = jobMetadata.chunk_product_relationships;
-      }
-      // Also check for chunk_image_relationships and product_image_relationships (from pipeline_orchestrator.py)
-      if (jobMetadata.chunk_image_relationships !== undefined) {
-        metrics['Chunk-Image Links'] = jobMetadata.chunk_image_relationships;
-      }
-      if (jobMetadata.product_image_relationships !== undefined) {
-        metrics['Product-Image Links'] = jobMetadata.product_image_relationships;
+
+      // ✅ NEW: Check entity_links object first (from stage_4_products.py)
+      if (jobMetadata.entity_links) {
+        const links = jobMetadata.entity_links;
+        if (links.product_chunk_links !== undefined) {
+          metrics['Product-Chunk Links'] = links.product_chunk_links;
+        }
+        if (links.product_image_links !== undefined) {
+          metrics['Product-Image Links'] = links.product_image_links;
+        }
+        if (links.image_chunk_links !== undefined) {
+          metrics['Image-Chunk Links'] = links.image_chunk_links;
+        }
+      } else {
+        // Fallback to old format
+        if (jobMetadata.chunk_product_relationships !== undefined) {
+          metrics['Chunk-Product Links'] = jobMetadata.chunk_product_relationships;
+        }
+        if (jobMetadata.chunk_image_relationships !== undefined) {
+          metrics['Chunk-Image Links'] = jobMetadata.chunk_image_relationships;
+        }
+        if (jobMetadata.product_image_relationships !== undefined) {
+          metrics['Product-Image Links'] = jobMetadata.product_image_relationships;
+        }
       }
       break;
 
