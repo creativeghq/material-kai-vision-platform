@@ -117,17 +117,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user is admin (you may need to adjust this based on your role system)
+    // Check if user is admin (level 5) or manager (level 4+)
     const { data: userProfile } = await supabase
       .from('user_profiles')
-      .select('role_id')
+      .select('role_id, roles(name, level)')
       .eq('user_id', user.id)
       .single();
 
-    // Assuming role_id 3 or 4 is admin/owner (adjust as needed)
-    if (!userProfile || (userProfile.role_id !== 3 && userProfile.role_id !== 4)) {
+    // Check if user has admin or manager role (level >= 4)
+    if (!userProfile || !userProfile.roles || userProfile.roles.level < 4) {
       return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
+        JSON.stringify({ error: 'Admin or Manager access required' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
