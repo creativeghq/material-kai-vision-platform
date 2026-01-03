@@ -276,12 +276,50 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
 
             {/* Metrics */}
             {stage.metrics && (
-              <div className="mt-3 pl-8 text-sm text-white/60">
-                {Object.entries(stage.metrics).map(([key, value]) => (
-                  <div key={key}>
-                    • {key}: {value}
-                  </div>
-                ))}
+              <div className="mt-3 pl-8 text-sm text-white/60 space-y-1">
+                {Object.entries(stage.metrics).map(([key, value]) => {
+                  // Special rendering for vision-guided metrics
+                  if (key === 'Vision-Guided' || key === 'PyMuPDF Fallback') {
+                    const isVision = key === 'Vision-Guided';
+                    return (
+                      <div key={key} className={`flex items-center gap-2 ${isVision ? 'text-green-400' : 'text-yellow-400'}`}>
+                        <span className="text-lg">{isVision ? '👁️' : '📄'}</span>
+                        <span className="font-medium">{key}:</span>
+                        <span>{value} images</span>
+                      </div>
+                    );
+                  }
+
+                  // Special rendering for confidence scores
+                  if (key === 'Avg Confidence' || key === 'Vision Confidence') {
+                    return (
+                      <div key={key} className="flex items-center gap-2 text-blue-400">
+                        <span className="text-lg">✨</span>
+                        <span className="font-medium">{key}:</span>
+                        <span>{value}</span>
+                      </div>
+                    );
+                  }
+
+                  // Special rendering for extraction method
+                  if (key === 'Method') {
+                    const isVisionMethod = String(value).includes('Vision');
+                    return (
+                      <div key={key} className={`flex items-center gap-2 ${isVisionMethod ? 'text-green-400' : 'text-gray-400'}`}>
+                        <span className="text-lg">{isVisionMethod ? '🎯' : '📋'}</span>
+                        <span className="font-medium">{key}:</span>
+                        <span>{value}</span>
+                      </div>
+                    );
+                  }
+
+                  // Default rendering
+                  return (
+                    <div key={key}>
+                      • {key}: {value}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

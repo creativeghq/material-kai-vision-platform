@@ -374,6 +374,39 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.images_processed !== undefined) {
         metrics['Images Processed'] = jobMetadata.images_processed;
       }
+
+      // ✅ NEW: Vision-guided extraction stats
+      if (jobMetadata.vision_guided_count !== undefined && jobMetadata.vision_guided_count > 0) {
+        metrics['Vision-Guided'] = jobMetadata.vision_guided_count;
+      }
+      if (jobMetadata.pymupdf_fallback_count !== undefined && jobMetadata.pymupdf_fallback_count > 0) {
+        metrics['PyMuPDF Fallback'] = jobMetadata.pymupdf_fallback_count;
+      }
+      if (jobMetadata.ai_classified_count !== undefined && jobMetadata.ai_classified_count > 0) {
+        metrics['AI Classified'] = jobMetadata.ai_classified_count;
+      }
+      if (jobMetadata.average_vision_confidence !== undefined) {
+        metrics['Avg Confidence'] = `${Math.round(jobMetadata.average_vision_confidence * 100)}%`;
+      }
+
+      // Show extraction method if available
+      if (jobMetadata.extraction_method) {
+        const method = jobMetadata.extraction_method === 'vision_guided' ? 'Vision-Guided' : 'PyMuPDF';
+        metrics['Method'] = method;
+      }
+
+      // Vision-guided metadata from checkpoint
+      if (jobMetadata.vision_guided) {
+        const visionData = jobMetadata.vision_guided;
+        if (visionData.enabled && visionData.success) {
+          if (visionData.images_extracted !== undefined) {
+            metrics['Vision Images'] = visionData.images_extracted;
+          }
+          if (visionData.stats?.average_confidence !== undefined) {
+            metrics['Vision Confidence'] = `${Math.round(visionData.stats.average_confidence * 100)}%`;
+          }
+        }
+      }
       break;
 
     case 9: // CLIP Embeddings (Stage 3)
