@@ -2056,9 +2056,60 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </div>
                 )}
               </div>
-              <p className="text-muted-foreground mt-2">
-                Complete pipeline workflow with all stages, metrics, and AI models used
-              </p>
+
+              {/* Dynamic Processing Status */}
+              {selectedJob?.status === 'processing' && (() => {
+                const currentStage = selectedJob?.metadata?.stage || 'Unknown';
+                const imagesProcessed = selectedJob?.metadata?.images_processed || 0;
+                const imagesTotal = selectedJob?.metadata?.images_extracted || 0;
+                const visionModel = selectedJob?.metadata?.vision_model || 'Siglip2 Vision Model';
+                const chunksCreated = selectedJob?.metadata?.chunks_created || 0;
+                const embeddingsGenerated = selectedJob?.metadata?.embeddings_generated || 0;
+                const productsDiscovered = selectedJob?.metadata?.products_discovered || 0;
+
+                // Determine what to show based on current stage
+                let statusText = 'Complete pipeline workflow with all stages, metrics, and AI models used';
+
+                if (currentStage.includes('image') || currentStage.includes('Image')) {
+                  if (imagesTotal > 0) {
+                    statusText = `Currently Processing ${imagesProcessed}/${imagesTotal} images with ${visionModel}`;
+                  } else {
+                    statusText = `Currently Processing images with ${visionModel}`;
+                  }
+                } else if (currentStage.includes('embedding') || currentStage.includes('Embedding')) {
+                  if (chunksCreated > 0) {
+                    statusText = `Currently Processing ${embeddingsGenerated}/${chunksCreated} embeddings with Voyage AI (voyage-3.5)`;
+                  } else {
+                    statusText = `Currently Processing embeddings with Voyage AI (voyage-3.5)`;
+                  }
+                } else if (currentStage.includes('discovery') || currentStage.includes('Discovery')) {
+                  if (productsDiscovered > 0) {
+                    statusText = `Discovered ${productsDiscovered} products - analyzing with Claude Vision`;
+                  } else {
+                    statusText = `Currently discovering products with Claude Vision`;
+                  }
+                } else if (currentStage.includes('chunk') || currentStage.includes('Chunk')) {
+                  if (chunksCreated > 0) {
+                    statusText = `Created ${chunksCreated} semantic chunks for RAG retrieval`;
+                  } else {
+                    statusText = `Currently creating semantic chunks`;
+                  }
+                } else {
+                  statusText = `Currently Processing: ${currentStage}`;
+                }
+
+                return (
+                  <p className="text-muted-foreground mt-2 font-medium">
+                    {statusText}
+                  </p>
+                );
+              })()}
+
+              {selectedJob?.status !== 'processing' && (
+                <p className="text-muted-foreground mt-2">
+                  Complete pipeline workflow with all stages, metrics, and AI models used
+                </p>
+              )}
             </DialogDescription>
           </DialogHeader>
 
