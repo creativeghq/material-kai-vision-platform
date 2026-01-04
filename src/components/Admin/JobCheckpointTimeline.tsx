@@ -19,18 +19,18 @@ interface JobCheckpointTimelineProps {
 }
 
 const STAGE_LABELS: Record<string, string> = {
-  'initialized': 'Job Initialized',
-  'pdf_extracted': 'PDF Extracted',
-  'products_detected': 'Products Discovered',
-  'chunks_created': 'Text Chunks Created',
-  'text_embeddings_generated': 'Text Embeddings Generated',
-  'images_extracted': 'Images Extracted',
-  'image_embeddings_generated': 'Image Embeddings Generated',
-  'products_created': 'Products Created',
-  'relationships_created': 'Relationships Created',
-  'document_entities_created': 'Document Entities Created',
-  'metadata_extracted': 'Metadata Extracted',
-  'completed': 'Job Completed',
+  'initialized': 'Job Registration',
+  'pdf_extracted': 'Document Text Extraction',
+  'products_detected': 'AI Product Discovery',
+  'chunks_created': 'Semantic Chunking',
+  'text_embeddings_generated': 'Vector Vectorization',
+  'images_extracted': 'Visual Asset Extraction',
+  'image_embeddings_generated': 'Vision Embedding Analysis',
+  'products_created': 'Material Catalog Creation',
+  'relationships_created': 'Relational Entity Linking',
+  'document_entities_created': 'Document Knowledge Graph',
+  'metadata_extracted': 'Structural Metadata Refinement',
+  'completed': 'Pipeline Execution Finalized',
 };
 
 export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointTimelineProps) {
@@ -73,43 +73,52 @@ export function JobCheckpointTimeline({ checkpoints, jobStatus }: JobCheckpointT
               <div key={checkpoint.id} className="relative">
                 {/* Timeline Line */}
                 {!isLast && (
-                  <div className="absolute left-[11px] top-8 bottom-0 w-0.5 bg-slate-200" />
+                  <div className="absolute left-[11px] top-8 bottom-0 w-0.5 bg-slate-100" />
                 )}
                 
                 {/* Checkpoint Item */}
-                <div className="flex gap-3">
+                <div className="flex gap-4">
                   {/* Icon */}
-                  <div className="flex-shrink-0 mt-0.5">
-                    <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
+                  <div className="flex-shrink-0 mt-1">
+                    <div className="w-6 h-6 rounded-full bg-green-50 border border-green-200 flex items-center justify-center">
+                      <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                     </div>
                   </div>
                   
                   {/* Content */}
-                  <div className="flex-1 pb-4">
+                  <div className="flex-1 pb-6">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="font-medium text-sm">{stageName}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
+                        <div className="font-semibold text-sm text-slate-900 leading-none">{stageName}</div>
+                        <div className="text-[10px] text-muted-foreground mt-1 font-medium bg-slate-50 px-1.5 py-0.5 rounded inline-block">
                           {formatDistanceToNow(new Date(checkpoint.created_at), { addSuffix: true })}
                         </div>
                       </div>
-                      <Badge variant="secondary" className="text-xs">
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-tighter bg-white shadow-none px-1 py-0 h-4 font-bold border-slate-200">
                         {checkpoint.stage}
                       </Badge>
                     </div>
                     
                     {/* Checkpoint Metadata */}
                     {checkpoint.metadata && Object.keys(checkpoint.metadata).length > 0 && (
-                      <div className="mt-2 p-2 bg-slate-50 rounded text-xs space-y-1">
-                        {Object.entries(checkpoint.metadata).map(([key, value]) => (
-                          <div key={key} className="flex justify-between">
-                            <span className="text-muted-foreground">{key}:</span>
-                            <span className="font-medium">
-                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                            </span>
-                          </div>
-                        ))}
+                      <div className="mt-2 p-3 bg-slate-50/80 border border-slate-100 rounded-lg text-xs space-y-1.5 shadow-sm">
+                        {Object.entries(checkpoint.metadata).map(([key, value]) => {
+                          const isSuccess = key.includes('success') && value === true;
+                          const isCount = key.includes('count') || key.includes('total');
+                          
+                          return (
+                            <div key={key} className="flex justify-between items-center group">
+                              <span className="text-muted-foreground capitalize text-[10px] font-medium">{key.replace(/_/g, ' ')}</span>
+                              <span className={`font-bold transition-all duration-200 ${
+                                isSuccess ? 'text-green-600' : 
+                                isCount ? 'text-primary' : 
+                                'text-slate-700'
+                              }`}>
+                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
