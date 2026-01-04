@@ -64,7 +64,6 @@ const MIVAA_ENDPOINTS = {
   'admin_get_job': { path: '/api/admin/jobs/{job_id}', method: 'GET' },  // Get job details
   'admin_get_job_status': { path: '/api/admin/jobs/{job_id}/status', method: 'GET' },  // Get job status
   'admin_delete_job': { path: '/api/admin/jobs/{job_id}', method: 'DELETE' },  // Cancel/delete job
-  'admin_bulk_process': { path: '/api/admin/bulk/process', method: 'POST' },  // Bulk processing
   'admin_system_health': { path: '/api/admin/system/health', method: 'GET' },  // System health
   'admin_system_metrics': { path: '/api/admin/system/metrics', method: 'GET' },  // System metrics
   'admin_cleanup_data': { path: '/api/admin/data/cleanup', method: 'DELETE' },  // Cleanup old data
@@ -452,46 +451,8 @@ serve(async (req) => {
     }
     // Prepare request body for POST requests
     let bodyPayload = null;
-    if (payload) {
-      // Force asynchronous processing for single PDF URL by using bulk endpoint
-      if (action === 'pdf_process_url' && payload.url) {
-        endpoint = MIVAA_ENDPOINTS['bulk_process'];
-        finalPath = endpoint.path;
-        bodyPayload = {
-          urls: [payload.url],
-          batch_size: 1,
-          options: {
-            extract_images: payload.options?.extract_images ?? payload.extractImages ?? true,
-            enable_multimodal: payload.options?.enable_multimodal ?? payload.enableMultimodal ?? true,
-            ocr_languages: payload.options?.ocr_languages ?? payload.ocrLanguages ?? ['en'],
-            timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 900,
-            ...payload.options,
-          },
-        };
-      } else if (endpoint.method === 'POST') {
-        if (action === 'bulk_process') {
-          // Handle bulk processing requests
-          const urls = payload.urls || payload.documents || [];
-
-          if (!urls || urls.length === 0) {
-            throw new Error('Missing URLs for bulk processing. Expected urls array in payload.');
-          }
-
-          bodyPayload = {
-            urls: urls,
-            batch_size: payload.batch_size || payload.batchSize || 1,
-            options: {
-              extract_images: payload.options?.extract_images ?? payload.extractImages ?? true,
-              enable_multimodal: payload.options?.enable_multimodal ?? payload.enableMultimodal ?? true,
-              ocr_languages: payload.options?.ocr_languages ?? payload.ocrLanguages ?? ['en'],
-              timeout_seconds: payload.options?.timeout_seconds ?? payload.timeoutSeconds ?? 900,
-              ...payload.options, // Allow frontend to override options
-            },
-          };
-        } else {
-          bodyPayload = payload;
-        }
-      }
+    if (payload && endpoint.method === 'POST') {
+      bodyPayload = payload;
     }
 
     // Make request to MIVAA service

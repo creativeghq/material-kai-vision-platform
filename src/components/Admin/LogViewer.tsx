@@ -3,15 +3,16 @@
  *
  * Displays backend Python logs from the database.
  * Shows recent logs with filtering, search, and export capabilities.
+ * Supports infinite scroll for loading more logs.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Download, RefreshCw, Search, X, Trash2, Clock, AlertCircle, Database } from 'lucide-react';
+import { Download, RefreshCw, Search, X, Trash2, Clock, AlertCircle, Database, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -32,6 +33,8 @@ interface LogEntry {
   created_at: string;
 }
 
+const PAGE_SIZE = 100; // Logs per page for infinite scroll
+
 export function LogViewer() {
   const { toast } = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -43,46 +46,60 @@ export function LogViewer() {
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hours, setHours] = useState<number>(24);
   const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
+
+  // Ref for infinite scroll observer
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   // Get unique loggers from logs
   const loggers = Array.from(new Set(logs.map(log => log.logger_name).filter(Boolean)));
 
-  // Load logs from database
+  // Build query with filters
+  const buildQuery = useCallback((offset: number, limit: number) => {
+    // Calculate cutoff time
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - hours);
+
+    // Build query
+    let query = supabase
+      .from('system_logs')
+      .select('*', { count: 'exact' })
+      .gte('timestamp', cutoffTime.toISOString())
+      .order('timestamp', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    // Apply filters
+    if (selectedLevel !== 'all') {
+      query = query.eq('level', selectedLevel.toUpperCase());
+    }
+
+    if (selectedLogger !== 'all') {
+      query = query.eq('logger_name', selectedLogger);
+    }
+
+    if (selectedSource !== 'all') {
+      query = query.contains('context', { source: selectedSource });
+    }
+
+    if (searchTerm) {
+      query = query.ilike('message', `%${searchTerm}%`);
+    }
+
+    return query;
+  }, [hours, selectedLevel, selectedLogger, selectedSource, searchTerm]);
+
+  // Load initial logs from database
   const loadLogs = async () => {
     try {
       setLoading(true);
+      setPage(0);
 
-      // Calculate cutoff time
-      const cutoffTime = new Date();
-      cutoffTime.setHours(cutoffTime.getHours() - hours);
-
-      // Build query
-      let query = supabase
-        .from('system_logs')
-        .select('*', { count: 'exact' })
-        .gte('timestamp', cutoffTime.toISOString())
-        .order('timestamp', { ascending: false })
-        .limit(500);
-
-      // Apply filters
-      if (selectedLevel !== 'all') {
-        query = query.eq('level', selectedLevel.toUpperCase());
-      }
-
-      if (selectedLogger !== 'all') {
-        query = query.eq('logger_name', selectedLogger);
-      }
-
-      if (selectedSource !== 'all') {
-        query = query.contains('context', { source: selectedSource });
-      }
-
-      if (searchTerm) {
-        query = query.ilike('message', `%${searchTerm}%`);
-      }
-
+      const query = buildQuery(0, PAGE_SIZE);
       const { data, error, count } = await query;
 
       if (error) {
@@ -95,6 +112,7 @@ export function LogViewer() {
           });
           setLogs([]);
           setTotal(0);
+          setHasMore(false);
           return;
         }
         throw error;
@@ -102,6 +120,7 @@ export function LogViewer() {
 
       setLogs(data || []);
       setTotal(count || 0);
+      setHasMore((data?.length || 0) >= PAGE_SIZE && (count || 0) > PAGE_SIZE);
 
     } catch (error) {
       console.error('Failed to load logs:', error);
@@ -114,6 +133,66 @@ export function LogViewer() {
       setLoading(false);
     }
   };
+
+  // Load more logs (for infinite scroll)
+  const loadMoreLogs = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+
+    try {
+      setLoadingMore(true);
+      const nextPage = page + 1;
+      const offset = nextPage * PAGE_SIZE;
+
+      const query = buildQuery(offset, PAGE_SIZE);
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setLogs(prev => [...prev, ...data]);
+        setPage(nextPage);
+        setHasMore(data.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+
+    } catch (error) {
+      console.error('Failed to load more logs:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load more logs',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [page, hasMore, loadingMore, buildQuery, toast]);
+
+  // Setup intersection observer for infinite scroll
+  useEffect(() => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          loadMoreLogs();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loading, loadingMore, loadMoreLogs]);
 
   // Clear all logs
   const clearAllLogs = async () => {
@@ -385,62 +464,92 @@ export function LogViewer() {
                     )}
                   </div>
                 ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50 sticky top-0">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Logger</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {logs.map((log) => (
-                        <tr key={log.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-xs font-mono text-gray-900">
-                                {formatTime(log.timestamp)}
-                              </span>
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {getRelativeTime(log.timestamp)}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            {getLevelBadge(log.level)}
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <Badge variant="outline" className="text-xs">
-                              {log.logger_name}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3 text-sm max-w-md">
-                            <div className="truncate" title={log.message}>
-                              {log.message}
-                            </div>
-                            {log.context?.exception && (
-                              <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
-                                <AlertCircle className="h-3 w-3" />
-                                {log.context.exception.message}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-4 py-3">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openDetailsModal(log)}
-                            >
-                              View
-                            </Button>
-                          </td>
+                  <>
+                    <table className="w-full">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Level</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Logger</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Message</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Details</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {logs.map((log) => (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs font-mono text-gray-900">
+                                  {formatTime(log.timestamp)}
+                                </span>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {getRelativeTime(log.timestamp)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {getLevelBadge(log.level)}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              <Badge variant="outline" className="text-xs">
+                                {log.logger_name}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3 text-sm max-w-md">
+                              <div className="truncate" title={log.message}>
+                                {log.message}
+                              </div>
+                              {log.context?.exception && (
+                                <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
+                                  <AlertCircle className="h-3 w-3" />
+                                  {log.context.exception.message}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDetailsModal(log)}
+                              >
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Infinite scroll trigger */}
+                    <div
+                      ref={loadMoreRef}
+                      className="h-16 flex items-center justify-center"
+                    >
+                      {loadingMore && (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Loading more logs...</span>
+                        </div>
+                      )}
+                      {!loadingMore && hasMore && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={loadMoreLogs}
+                          className="text-gray-500"
+                        >
+                          Load more ({logs.length} of {total})
+                        </Button>
+                      )}
+                      {!hasMore && logs.length > 0 && (
+                        <span className="text-sm text-gray-400">
+                          All {logs.length} logs loaded
+                        </span>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

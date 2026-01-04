@@ -107,7 +107,6 @@ export const MIVAA_ACTION_MAP: Record<
 > = {
   // PDF Processing - Use valid mivaa-gateway actions
   rag_upload: { path: '/api/rag/documents/upload', method: 'POST' },
-  admin_bulk_process: { path: '/api/admin/bulk/process', method: 'POST' },
 
   // Material Recognition - Use valid mivaa-gateway actions
   together_analyze_image: { path: '/api/together-ai/analyze-image', method: 'POST' },

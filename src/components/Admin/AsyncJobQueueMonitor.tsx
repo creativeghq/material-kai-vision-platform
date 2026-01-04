@@ -41,12 +41,42 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+
+interface ProductProgress {
+  id: string;
+  job_id: string;
+  product_id: string;
+  product_name: string;
+  product_index: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
+  current_stage: string | null;
+  stages_completed: string[];
+  error_message: string | null;
+  error_stage: string | null;
+  metrics: {
+    chunks_created?: number;
+    images_processed?: number;
+    images_material?: number;
+    images_non_material?: number;
+    relationships_created?: number;
+  };
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 interface BackgroundJob {
   id: string;
@@ -60,6 +90,7 @@ interface BackgroundJob {
   completed_at: string | null;
   failed_at: string | null;
   interrupted_at: string | null;
+  last_heartbeat: string | null;
   error: string | null;
   metadata: {
     filename?: string;
@@ -133,22 +164,19 @@ interface QueueMetrics {
   total_images_extracted: number;
 }
 
-// 14-stage processing pipeline
-const PROCESSING_STAGES = [
-  { id: 1, name: 'Job Initialization', checkpoint: 'initialized' },
-  { id: 2, name: 'Product Discovery', checkpoint: 'products_detected' },
-  { id: 3, name: 'Focused Extraction', checkpoint: 'pdf_extracted' },
-  { id: 4, name: 'Chunking', checkpoint: 'chunks_created' },
-  { id: 5, name: 'Text Embeddings', checkpoint: 'text_embeddings_generated' },
-  { id: 6, name: 'Image Extraction', checkpoint: 'images_extracted' },
-  { id: 7, name: 'Image Classification', checkpoint: 'images_extracted' },
-  { id: 8, name: 'Image Analysis', checkpoint: 'images_extracted' },
-  { id: 9, name: 'CLIP Embeddings', checkpoint: 'image_embeddings_generated' },
-  { id: 10, name: 'Product Creation', checkpoint: 'products_created' },
-  { id: 11, name: 'Relationship Mapping', checkpoint: 'relationships_created' },
-  { id: 12, name: 'Document Entities', checkpoint: 'document_entities_created' },
-  { id: 13, name: 'Metadata Extraction', checkpoint: 'metadata_extracted' },
-  { id: 14, name: 'Quality Enhancement', checkpoint: 'completed' },
+// Product-centric pipeline stages
+const PRODUCT_STAGES = [
+  { id: 'extraction', name: 'Page Extraction', icon: FileText },
+  { id: 'chunking', name: 'Text Chunking', icon: FileText },
+  { id: 'images', name: 'Image Processing', icon: ImageIcon },
+  { id: 'creation', name: 'Product Creation', icon: Package },
+  { id: 'relationships', name: 'Relationships', icon: Link },
+];
+
+// Global stages (run after all products)
+const GLOBAL_STAGES = [
+  { id: 'document_entities', name: 'Document Entities', checkpoint: 'document_entities_created' },
+  { id: 'quality_enhancement', name: 'Quality Enhancement', checkpoint: 'completed' },
 ];
 
 export const AsyncJobQueueMonitor: React.FC = () => {
@@ -169,6 +197,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [showDeleteJobModal, setShowDeleteJobModal] = useState(false);
   const [deleteJobId, setDeleteJobId] = useState('');
   const [showTempCleanupModal, setShowTempCleanupModal] = useState(false);
+  const [productProgress, setProductProgress] = useState<ProductProgress[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   // Debug log
   console.log('AsyncJobQueueMonitor render - selectedJob:', selectedJob);
@@ -183,6 +213,35 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       }
       return newSet;
     });
+  };
+
+  // Fetch product progress for a job using the new backend API
+  const fetchProductProgress = async (jobId: string) => {
+    try {
+      setLoadingProducts(true);
+
+      // Call the new backend endpoint
+      const response = await fetch(`/api/admin/jobs/${jobId}/products`);
+
+      if (!response.ok) {
+        console.error('Error fetching product progress:', response.statusText);
+        setProductProgress([]);
+        return;
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.products) {
+        setProductProgress(result.products);
+      } else {
+        setProductProgress([]);
+      }
+    } catch (error) {
+      console.error('Error fetching product progress:', error);
+      setProductProgress([]);
+    } finally {
+      setLoadingProducts(false);
+    }
   };
 
   // Fetch job details with checkpoints
@@ -244,6 +303,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         }
         return newCheckpoints;
       });
+
+      // Fetch product progress for PDF processing jobs
+      if (job.job_type === 'pdf_processing' || job.job_type === 'product_discovery_upload') {
+        await fetchProductProgress(job.id);
+      }
     } catch (error) {
       console.error('Error fetching job details:', error);
     } finally {
@@ -270,6 +334,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       completed_at: xmlJob.completed_at,
       failed_at: null,
       interrupted_at: null,
+      last_heartbeat: null,
       error: xmlJob.error_message,
       metadata: {
         source_name: xmlJob.source_name || 'XML Import',
@@ -572,6 +637,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             return checkpoints;
           });
         }
+
+        // Refresh product progress for PDF processing jobs
+        if (jobData.job_type === 'pdf_processing' && jobData.status === 'processing') {
+          await fetchProductProgress(jobData.id);
+        }
       } catch (error) {
         console.error('Error refreshing selected job:', error);
       }
@@ -763,8 +833,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     setCancellingJob(jobId);
     try {
-      // Use admin endpoint with cleanup=true to delete all partial data
-      const response = await fetch(`/api/admin/jobs/${jobId}?cleanup=true`, {
+      
+      const response = await fetch(`/api/jobs/${jobId}?cleanup=true`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -2660,320 +2730,255 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </Card>
               )}
 
-              {/* Pipeline Stages - 14-Stage Workflow (PDF only) */}
+              {/* NEW PRODUCT-CENTRIC PIPELINE (PDF only) */}
               {(selectedJob?.job_type === 'pdf_processing' || selectedJob?.job_type === 'product_discovery_upload') && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Activity className="h-4 w-4" />
-                      14-Stage Processing Pipeline
-                    </CardTitle>
-                    <CardDescription>
-                      Click on completed stages (green) to see detailed metrics, or skipped stages (amber) to understand why they were not applicable
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                    {PROCESSING_STAGES.map((stage, stageIndex) => {
-                      // Find if this stage has a checkpoint
-                      const checkpoint = jobCheckpoints.find(
-                        (cp) => cp.stage.toLowerCase() === stage.checkpoint.toLowerCase(),
-                      );
-                      const isCompleted = !!checkpoint;
+                <>
+                  {/* Stage 1: Job Initialization */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Activity className="h-4 w-4" />
+                        Job Initialization
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        {jobCheckpoints.find(cp => cp.stage === 'initialized') ? (
+                          <>
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span className="text-sm text-green-700 font-medium">Completed</span>
+                          </>
+                        ) : selectedJob?.status === 'processing' ? (
+                          <>
+                            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                            <span className="text-sm text-blue-700 font-medium">Initializing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="h-5 w-5 text-slate-400" />
+                            <span className="text-sm text-muted-foreground">Pending</span>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                      // Find previous checkpoint for duration calculation
-                      const previousCheckpoint = stageIndex > 0
-                        ? jobCheckpoints.find(cp =>
-                            cp.stage.toLowerCase() === PROCESSING_STAGES[stageIndex - 1].checkpoint.toLowerCase(),
-                          )
-                        : null;
+                  {/* Stage 2: Product Discovery */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Product Discovery
+                      </CardTitle>
+                      <CardDescription>
+                        {productProgress.length > 0 && `Found ${productProgress.length} products`}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        {jobCheckpoints.find(cp => cp.stage === 'products_detected') ? (
+                          <>
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            <span className="text-sm text-green-700 font-medium">
+                              Completed - {productProgress.length} products discovered
+                            </span>
+                          </>
+                        ) : selectedJob?.status === 'processing' && !jobCheckpoints.find(cp => cp.stage === 'initialized') ? (
+                          <>
+                            <Clock className="h-5 w-5 text-slate-400" />
+                            <span className="text-sm text-muted-foreground">Waiting for initialization...</span>
+                          </>
+                        ) : selectedJob?.status === 'processing' ? (
+                          <>
+                            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                            <span className="text-sm text-blue-700 font-medium">Discovering products...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="h-5 w-5 text-slate-400" />
+                            <span className="text-sm text-muted-foreground">Pending</span>
+                          </>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                      const stageDuration = isCompleted ? getStageDuration(checkpoint, previousCheckpoint) : null;
+                  {/* Product Accordions */}
+                  {productProgress.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Package className="h-4 w-4" />
+                          Product Processing
+                        </CardTitle>
+                        <CardDescription>
+                          {productProgress.filter(p => p.status === 'completed').length} of {productProgress.length} products completed
+                          {productProgress.filter(p => p.status === 'failed').length > 0 &&
+                            ` (${productProgress.filter(p => p.status === 'failed').length} failed)`}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Accordion type="multiple" className="w-full">
+                          {productProgress.map((product) => {
+                            const isCompleted = product.status === 'completed';
+                            const isFailed = product.status === 'failed';
+                            const isProcessing = product.status === 'processing';
 
-                      // Check if this stage was skipped (job completed but this checkpoint doesn't exist)
-                      const isSkipped = selectedJob?.status === 'completed' && !isCompleted &&
-                        jobCheckpoints.some(cp => cp.stage === 'completed');
+                            return (
+                              <AccordionItem key={product.id} value={product.id}>
+                                <AccordionTrigger className="hover:no-underline">
+                                  <div className="flex items-center gap-3 flex-1">
+                                    {/* Status Icon */}
+                                    {isFailed ? (
+                                      <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                                    ) : isProcessing ? (
+                                      <RefreshCw className="h-5 w-5 text-blue-600 animate-spin flex-shrink-0" />
+                                    ) : isCompleted ? (
+                                      <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                                    ) : (
+                                      <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                                    )}
 
-                      const isFailed = selectedJob?.status === 'failed' && !isCompleted;
-                      const isActive =
-                        selectedJob?.status === 'processing' &&
-                        !isCompleted &&
-                        !isSkipped &&
-                        stage.id === (jobCheckpoints.length + 1);
-                      const isExpanded = expandedStages.has(stage.id);
-
-                      const metadata = checkpoint?.metadata || {};
-                      const checkpointData = checkpoint?.checkpoint_data || {};
-
-                      return (
-                        <div
-                          key={stage.id}
-                          className={`rounded-lg border ${
-                            isFailed
-                              ? 'bg-red-50 border-red-200'
-                              : isActive
-                              ? 'bg-blue-50 border-blue-200'
-                              : isCompleted
-                              ? 'bg-green-50 border-green-200'
-                              : isSkipped
-                              ? 'bg-amber-50 border-amber-200'
-                              : 'bg-slate-50 border-slate-200'
-                          }`}
-                        >
-                          {/* Stage Header - Clickable for completed and skipped stages */}
-                          <button
-                            onClick={() => (isCompleted || isSkipped) && toggleStage(stage.id)}
-                            disabled={!isCompleted && !isSkipped}
-                            className="w-full flex items-start gap-3 p-3 text-left hover:bg-black/5 transition-colors disabled:cursor-default"
-                          >
-                            {/* Status Icon */}
-                            <div className="flex-shrink-0 mt-0.5">
-                              {isFailed ? (
-                                <XCircle className="h-4 w-4 text-red-600" />
-                              ) : isActive ? (
-                                <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                              ) : isCompleted ? (
-                                <CheckCircle className="h-4 w-4 text-green-600" />
-                              ) : isSkipped ? (
-                                <div className="relative">
-                                  <Clock className="h-4 w-4 text-amber-500" />
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <div className="w-3 h-0.5 bg-amber-500 rotate-45"></div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <Clock className="h-4 w-4 text-slate-400" />
-                              )}
-                            </div>
-
-                            {/* Stage Content */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <div className="font-medium text-sm flex items-center gap-2">
-                                  <span>{stage.id}. {stage.name}</span>
-                                  {isSkipped && (
-                                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-normal">
-                                      Skipped
+                                    {/* Product Name */}
+                                    <span className="font-medium text-sm flex-1 text-left">
+                                      {product.product_index}. {product.product_name}
                                     </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {checkpoint && stageDuration && (
-                                    <div className="text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded">
-                                      ⏱️ {stageDuration}
-                                    </div>
-                                  )}
-                                  {checkpoint && (
-                                    <div className="text-xs text-muted-foreground">
-                                      {formatDate(checkpoint.created_at)}
-                                    </div>
-                                  )}
-                                  {(isCompleted || isSkipped) && (
-                                    <div className="flex-shrink-0">
-                                      {isExpanded ? (
-                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+
+                                    {/* Quick Stats */}
+                                    <div className="flex items-center gap-3 text-xs text-muted-foreground mr-2">
+                                      {product.metrics.chunks_created > 0 && (
+                                        <span>{product.metrics.chunks_created} chunks</span>
+                                      )}
+                                      {product.metrics.images_processed > 0 && (
+                                        <span>{product.metrics.images_processed} images</span>
                                       )}
                                     </div>
-                                  )}
-                                </div>
-                              </div>
 
-                              {/* Quick Summary - Always visible for completed stages */}
-                              {isCompleted && !isExpanded && (
-                                <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                  {metadata.discovery_model && (
-                                    <span>🤖 {metadata.discovery_model}</span>
-                                  )}
-                                  {checkpointData.products_detected && (
-                                    <span>📦 {checkpointData.products_detected} products</span>
-                                  )}
-                                  {/* Chunking step (step 4) - show chunks and embedding model */}
-                                  {stage.id === 4 && checkpointData.chunks_created && (
-                                    <>
-                                      <span>📄 {checkpointData.chunks_created} chunks</span>
-                                      <span>🔢 text-embedding-3-small (1536D)</span>
-                                    </>
-                                  )}
-                                  {/* Text Embeddings step (step 5) - show embedding details */}
-                                  {stage.id === 5 && (checkpointData.text_embeddings || checkpointData.text_embeddings_generated) && (
-                                    <>
-                                      <span>🔢 {checkpointData.text_embeddings || checkpointData.text_embeddings_generated} embeddings</span>
-                                      <span>📐 1536 dimensions</span>
-                                    </>
-                                  )}
-                                  {/* CLIP Embeddings step (step 9) - show image embedding details */}
-                                  {stage.id === 9 && (checkpointData.image_embeddings || checkpointData.image_embeddings_generated || checkpointData.clip_embeddings_generated) && (
-                                    <>
-                                      <span>🎨 {checkpointData.image_embeddings || checkpointData.image_embeddings_generated || checkpointData.clip_embeddings_generated} embeddings</span>
-                                      <span>📐 512 dimensions (SigLIP + CLIP)</span>
-                                      <span>🖼️ 5 types per image</span>
-                                    </>
-                                  )}
-                                  {/* Other steps - show chunks if not step 4 */}
-                                  {stage.id !== 4 && checkpointData.chunks_created && (
-                                    <span>📄 {checkpointData.chunks_created} chunks</span>
-                                  )}
-                                  {checkpointData.images_saved && (
-                                    <span>🖼️ {checkpointData.images_saved} images</span>
-                                  )}
-                                  {checkpointData.products_created && (
-                                    <span>✅ {checkpointData.products_created} created</span>
-                                  )}
-                                </div>
-                              )}
+                                    {/* Status Badge */}
+                                    <Badge
+                                      className={
+                                        isFailed
+                                          ? 'bg-red-100 text-red-800 border-red-300'
+                                          : isProcessing
+                                          ? 'bg-blue-100 text-blue-800 border-blue-300'
+                                          : isCompleted
+                                          ? 'bg-green-100 text-green-800 border-green-300'
+                                          : 'bg-slate-100 text-slate-800 border-slate-300'
+                                      }
+                                    >
+                                      {product.status}
+                                    </Badge>
+                                  </div>
+                                </AccordionTrigger>
 
-                              {/* Skipped Stage Explanation */}
-                              {isSkipped && !isExpanded && (
-                                <div className="mt-1 text-xs text-amber-600">
-                                  This stage was not applicable for this document
-                                </div>
-                              )}
+                                <AccordionContent>
+                                  <div className="space-y-3 pl-8 pt-2">
+                                    {/* Error Message */}
+                                    {product.error_message && (
+                                      <Alert variant="destructive">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertDescription>{product.error_message}</AlertDescription>
+                                      </Alert>
+                                    )}
 
-                              {/* Active Stage Indicator */}
-                              {isActive && (
-                                <div className="mt-2 text-xs text-blue-600 font-medium">
-                                  Currently processing...
-                                </div>
-                              )}
-                            </div>
-                          </button>
-
-                          {/* Expanded Details - Accordion Content */}
-                          {isCompleted && isExpanded && (
-                            <div className="px-3 pb-3 pt-0 border-t border-black/10">
-                              <div className="mt-3 space-y-3">
-                                {/* Checkpoint Data Section */}
-                                {Object.keys(checkpointData).length > 0 && (
-                                  <div>
-                                    <h5 className="text-xs font-semibold text-muted-foreground mb-2">Stage Output Data</h5>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs p-2 rounded">
-                                      {Object.entries(checkpointData).map(([key, value]) => {
-                                        // Special rendering for product_names with tooltip
-                                        if (key === 'product_names' && Array.isArray(value) && value.length > 0) {
-                                          return (
-                                            <div key={key} className="break-words">
-                                              <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                              <TooltipProvider>
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <span className="ml-1 font-medium transition-all duration-300 break-words cursor-help underline decoration-dotted">
-                                                      Review ({value.length})
-                                                    </span>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent className="max-w-md max-h-60 overflow-y-auto">
-                                                    <div className="space-y-1">
-                                                      {value.map((name: string, idx: number) => (
-                                                        <div key={idx} className="text-xs">• {name}</div>
-                                                      ))}
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            </div>
-                                          );
-                                        }
+                                    {/* Product Stages */}
+                                    <div className="space-y-2">
+                                      {PRODUCT_STAGES.map((stage) => {
+                                        const isStageCompleted = product.stages_completed?.includes(stage.id);
+                                        const isCurrentStage = product.current_stage === stage.id;
+                                        const Icon = stage.icon;
 
                                         return (
-                                          <div key={key} className="break-words">
-                                            <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                            <span className="ml-1 font-medium transition-all duration-300 break-words">
-                                              {formatValue(value, key)}
-                                            </span>
+                                          <div
+                                            key={stage.id}
+                                            className={`flex items-center gap-2 p-2 rounded ${
+                                              isStageCompleted
+                                                ? 'bg-green-50'
+                                                : isCurrentStage
+                                                ? 'bg-blue-50'
+                                                : 'bg-slate-50'
+                                            }`}
+                                          >
+                                            {isStageCompleted ? (
+                                              <CheckCircle className="h-4 w-4 text-green-600" />
+                                            ) : isCurrentStage ? (
+                                              <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                                            ) : (
+                                              <Clock className="h-4 w-4 text-slate-400" />
+                                            )}
+                                            <Icon className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-sm font-medium">{stage.name}</span>
                                           </div>
                                         );
                                       })}
                                     </div>
-                                  </div>
-                                )}
 
-                                {/* Metadata Section */}
-                                {Object.keys(metadata).length > 0 && (
-                                  <div>
-                                    <h5 className="text-xs font-semibold text-muted-foreground mb-2">Processing Metadata</h5>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs p-2 rounded">
-                                      {Object.entries(metadata).map(([key, value]) => {
-                                        // Special rendering for product_names with tooltip
-                                        if (key === 'product_names' && Array.isArray(value) && value.length > 0) {
-                                          return (
-                                            <div key={key} className="break-words">
-                                              <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                              <TooltipProvider>
-                                                <Tooltip>
-                                                  <TooltipTrigger asChild>
-                                                    <span className="ml-1 font-medium transition-all duration-300 break-words cursor-help underline decoration-dotted">
-                                                      Review ({value.length})
-                                                    </span>
-                                                  </TooltipTrigger>
-                                                  <TooltipContent className="max-w-md max-h-60 overflow-y-auto">
-                                                    <div className="space-y-1">
-                                                      {value.map((name: string, idx: number) => (
-                                                        <div key={idx} className="text-xs">• {name}</div>
-                                                      ))}
-                                                    </div>
-                                                  </TooltipContent>
-                                                </Tooltip>
-                                              </TooltipProvider>
-                                            </div>
-                                          );
-                                        }
-
-                                        return (
-                                          <div key={key} className="break-words">
-                                            <span className="text-muted-foreground">{key.replace(/_/g, ' ')}:</span>
-                                            <span className="ml-1 font-medium transition-all duration-300 break-words">
-                                              {formatValue(value, key)}
-                                            </span>
-                                          </div>
-                                        );
-                                      })}
+                                    {/* Product Metrics */}
+                                    <div className="grid grid-cols-3 gap-2 pt-2">
+                                      <div className="text-center p-2 bg-slate-50 rounded">
+                                        <div className="text-xs text-muted-foreground">Chunks</div>
+                                        <div className="text-lg font-semibold">{product.metrics.chunks_created || 0}</div>
+                                      </div>
+                                      <div className="text-center p-2 bg-slate-50 rounded">
+                                        <div className="text-xs text-muted-foreground">Images</div>
+                                        <div className="text-lg font-semibold">{product.metrics.images_processed || 0}</div>
+                                      </div>
+                                      <div className="text-center p-2 bg-slate-50 rounded">
+                                        <div className="text-xs text-muted-foreground">Links</div>
+                                        <div className="text-lg font-semibold">{product.metrics.relationships_created || 0}</div>
+                                      </div>
                                     </div>
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                                </AccordionContent>
+                              </AccordionItem>
+                            );
+                          })}
+                        </Accordion>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                          {/* Expanded Details - Accordion Content for Skipped Stages */}
-                          {isSkipped && isExpanded && (
-                            <div className="px-3 pb-3 pt-0 border-t border-amber-200">
-                              <div className="mt-3 space-y-3">
-                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                                  <h5 className="text-sm font-semibold text-amber-800 mb-2">Why was this stage skipped?</h5>
-                                  <div className="text-xs text-amber-700 space-y-1">
-                                    {stage.name === 'Text Embeddings' && (
-                                      <p>Text embeddings are generated as part of the Chunking stage. This separate checkpoint is only created in specific processing modes.</p>
-                                    )}
-                                    {stage.name === 'CLIP Embeddings' && (
-                                      <p>CLIP embeddings are generated as part of the Image Extraction stage. This separate checkpoint is only created when specialized embedding generation is enabled.</p>
-                                    )}
-                                    {stage.name === 'Relationship Mapping' && (
-                                      <p>Relationship mapping was not performed for this document, likely because there were no images or chunks to link to products.</p>
-                                    )}
-                                    {stage.name === 'Document Entities' && (
-                                      <p>No document entities (certificates, logos, specifications) were detected in this document.</p>
-                                    )}
-                                    {stage.name === 'Metadata Extraction' && (
-                                      <p>No factory metadata or product-level metadata was extracted from this document.</p>
-                                    )}
-                                    {!['Text Embeddings', 'CLIP Embeddings', 'Relationship Mapping', 'Document Entities', 'Metadata Extraction'].includes(stage.name) && (
-                                      <p>This stage was not applicable or required for this particular document processing job.</p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
+                  {/* Global Stages */}
+                  {GLOBAL_STAGES.map((stage) => {
+                    const checkpoint = jobCheckpoints.find(cp => cp.stage === stage.checkpoint);
+                    const isCompleted = !!checkpoint;
+                    const isActive = selectedJob?.status === 'processing' && !isCompleted;
+
+                    return (
+                      <Card key={stage.id}>
+                        <CardHeader>
+                          <CardTitle className="text-base flex items-center gap-2">
+                            <Activity className="h-4 w-4" />
+                            {stage.name}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center gap-2">
+                            {isCompleted ? (
+                              <>
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm text-green-700 font-medium">Completed</span>
+                              </>
+                            ) : isActive ? (
+                              <>
+                                <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                                <span className="text-sm text-blue-700 font-medium">Processing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="h-5 w-5 text-slate-400" />
+                                <span className="text-sm text-muted-foreground">Pending</span>
+                              </>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </>
               )}
 
-              {/* REMOVED DUPLICATE METRICS SECTION - Metrics are now displayed at the top, before the 14-stage workflow */}
+
             </div>
           )}
         </DialogContent>

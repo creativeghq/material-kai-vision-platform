@@ -8,6 +8,32 @@
 import { WebSocketManager } from '../websocket/WebSocketManager';
 import { WorkflowJob, WorkflowStep } from '../consolidatedPDFWorkflowService';
 
+/**
+ * Product-level progress tracking for product-centric pipeline
+ */
+export interface ProductProgress {
+  productId: string;
+  productName: string;
+  productIndex: number;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
+  currentStage?: string;
+  stagesCompleted: string[];
+  error?: {
+    message: string;
+    stage: string;
+    timestamp: Date;
+  };
+  metrics: {
+    chunksCreated: number;
+    imagesProcessed: number;
+    imagesMaterial: number;
+    imagesNonMaterial: number;
+    relationshipsCreated: number;
+  };
+  startTime?: Date;
+  completedTime?: Date;
+}
+
 export interface PDFProcessingProgress {
   jobId: string;
   documentId?: string;
@@ -35,6 +61,13 @@ export interface PDFProcessingProgress {
     timestamp: Date;
   }>;
   metadata?: Record<string, unknown>;
+
+  // Product-centric pipeline tracking
+  products?: ProductProgress[];
+  productsTotal?: number;
+  productsCompleted?: number;
+  productsFailed?: number;
+  currentProductIndex?: number;
 }
 
 export interface PDFProcessingStep {
