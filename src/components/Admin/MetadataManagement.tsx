@@ -262,16 +262,41 @@ export const MetadataManagement: React.FC = () => {
     }
 
     try {
-      // TODO: Implement delete endpoint
+      // Extract product ID from composite ID (format: "product_id-field_name")
+      const productId = item.id.split('-')[0];
+
+      // Get current product data
+      const { data: product, error: fetchError } = await supabase
+        .from('products')
+        .select('metadata')
+        .eq('id', productId)
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!product) throw new Error('Product not found');
+
+      // Remove the field from metadata
+      const updatedMetadata = { ...product.metadata };
+      delete updatedMetadata[item.field_name];
+
+      // Update product with modified metadata
+      const { error: updateError } = await supabase
+        .from('products')
+        .update({ metadata: updatedMetadata })
+        .eq('id', productId);
+
+      if (updateError) throw updateError;
+
       toast({
         title: 'Success',
-        description: 'Metadata deleted successfully',
+        description: `Metadata field "${item.field_name}" deleted successfully`,
       });
       loadMetadata();
     } catch (error) {
+      console.error('Error deleting metadata:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete metadata',
+        description: error instanceof Error ? error.message : 'Failed to delete metadata',
         variant: 'destructive',
       });
     }

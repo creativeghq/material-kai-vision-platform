@@ -770,8 +770,9 @@ The pipeline has been refactored from a monolithic 2900+ line function into modu
 - `upload_images_to_storage()` - Upload to Supabase Storage
 - `save_images_and_generate_clips()` - DB save + CLIP embeddings
 
-**ChunkingService** (`app/services/chunking_service.py`)
-- `create_chunks_and_embeddings()` - Semantic chunking + text embeddings + relationships
+**UnifiedChunkingService** (`app/services/unified_chunking_service.py`)
+- `chunk_text()` - Semantic/hybrid/fixed-size/layout-aware chunking
+- Supports 4 chunking strategies with quality scoring
 
 **RelevancyService** (`app/services/relevancy_service.py`)
 - `create_chunk_image_relationships()` - Based on embedding similarity

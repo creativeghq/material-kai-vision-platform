@@ -216,27 +216,25 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     });
   };
 
-  // Fetch product progress for a job using the new backend API
+  // Fetch product progress for a job directly from Supabase
   const fetchProductProgress = async (jobId: string) => {
     try {
       setLoadingProducts(true);
 
-      // Call the new backend endpoint
-      const response = await fetch(`/api/admin/jobs/${jobId}/products`);
+      // Query product_progress table directly
+      const { data, error } = await supabase
+        .from('product_progress')
+        .select('*')
+        .eq('job_id', jobId)
+        .order('product_index', { ascending: true });
 
-      if (!response.ok) {
-        console.error('Error fetching product progress:', response.statusText);
+      if (error) {
+        console.error('Error fetching product progress:', error);
         setProductProgress([]);
         return;
       }
 
-      const result = await response.json();
-
-      if (result.success && result.products) {
-        setProductProgress(result.products);
-      } else {
-        setProductProgress([]);
-      }
+      setProductProgress(data || []);
     } catch (error) {
       console.error('Error fetching product progress:', error);
       setProductProgress([]);
@@ -640,7 +638,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         }
 
         // Refresh product progress for PDF processing jobs
-        if (jobData.job_type === 'pdf_processing' && jobData.status === 'processing') {
+        if ((jobData.job_type === 'pdf_processing' || jobData.job_type === 'product_discovery_upload') && jobData.status === 'processing') {
           await fetchProductProgress(jobData.id);
         }
       } catch (error) {
@@ -2190,7 +2188,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             </div>
           ) : (
             <Tabs defaultValue="products" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList>
                 <TabsTrigger value="products">Product Extraction</TabsTrigger>
                 <TabsTrigger value="overview">Global Overview</TabsTrigger>
               </TabsList>
@@ -2620,81 +2618,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               {/* NEW PRODUCT-CENTRIC PIPELINE (PDF only) */}
               {(selectedJob?.job_type === 'pdf_processing' || selectedJob?.job_type === 'product_discovery_upload') && (
                 <>
-                  {/* Stage 1: Job Initialization */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Activity className="h-4 w-4" />
-                        Job Initialization
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2">
-                        {jobCheckpoints.find(cp => cp.stage === 'initialized') ? (
-                          <>
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                            <span className="text-sm text-green-700 font-medium">Completed</span>
-                          </>
-                        ) : selectedJob?.status === 'processing' ? (
-                          <>
-                            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                            <span className="text-sm text-blue-700 font-medium">Initializing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm text-muted-foreground">Pending</span>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Stage 2: Product Discovery */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Product Discovery
-                      </CardTitle>
-                      <CardDescription>
-                        {productProgress.length > 0 && `Found ${productProgress.length} products`}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center gap-2">
-                        {jobCheckpoints.find(cp => cp.stage === 'products_detected') ? (
-                          <>
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                            <span className="text-sm text-green-700 font-medium">
-                              Completed - {productProgress.length} products discovered
-                            </span>
-                          </>
-                        ) : selectedJob?.status === 'processing' && !jobCheckpoints.find(cp => cp.stage === 'initialized') ? (
-                          <>
-                            <Clock className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm text-muted-foreground">Waiting for initialization...</span>
-                          </>
-                        ) : selectedJob?.status === 'processing' ? (
-                          <>
-                            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                            <span className="text-sm text-blue-700 font-medium">
-                              {productProgress.length > 0
-                                ? `Discovering Products: ${productProgress.length} found`
-                                : 'Discovering Products...'}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="h-5 w-5 text-slate-400" />
-                            <span className="text-sm text-muted-foreground">Pending</span>
-                          </>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Product Accordions moved to Product Extraction tab */}
 
                   {/* Global Stages */}
                   {GLOBAL_STAGES.map((stage) => {
