@@ -74,6 +74,7 @@ const MIVAA_ENDPOINTS = {
   'admin_active_progress': { path: '/api/admin/jobs/progress/active', method: 'GET' },  // Active jobs progress
   'admin_job_pages': { path: '/api/admin/jobs/{job_id}/progress/pages', method: 'GET' },  // Job page progress
   'admin_job_stream': { path: '/api/admin/jobs/{job_id}/progress/stream', method: 'GET' },  // Stream job progress (SSE)
+  'admin_job_products': { path: '/api/admin/jobs/{job_id}/products', method: 'GET' },  // Get product progress for job
   'admin_test_product': { path: '/api/admin/test-product-creation', method: 'POST' },  // Test product creation
   'admin_process_ocr': { path: '/api/admin/admin/images/{image_id}/process-ocr', method: 'POST' },  // Process OCR for image
   'admin_generate_product_embeddings': { path: '/api/admin/generate-product-embeddings', method: 'POST' },  // Generate product embeddings

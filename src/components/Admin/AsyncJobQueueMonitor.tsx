@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from './TempFileCleanupModal';
+import { JobCheckpointTimeline } from './JobCheckpointTimeline';
 import {
   RefreshCw,
   AlertTriangle,
@@ -2188,7 +2189,176 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <RefreshCw className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="space-y-6">
+            <Tabs defaultValue="products" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="products">Product Extraction</TabsTrigger>
+                <TabsTrigger value="overview">Global Overview</TabsTrigger>
+              </TabsList>
+
+              {/* Product Extraction Tab */}
+              <TabsContent value="products" className="space-y-6 mt-6">
+                {/* Product Accordions */}
+                {productProgress.length > 0 ? (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Product Processing
+                      </CardTitle>
+                      <CardDescription>
+                        {productProgress.filter(p => p.status === 'completed').length} of {productProgress.length} products completed
+                        {productProgress.filter(p => p.status === 'failed').length > 0 &&
+                          ` (${productProgress.filter(p => p.status === 'failed').length} failed)`}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Accordion type="multiple" className="w-full">
+                        {productProgress.map((product) => {
+                          const isCompleted = product.status === 'completed';
+                          const isFailed = product.status === 'failed';
+                          const isProcessing = product.status === 'processing';
+
+                          return (
+                            <AccordionItem key={product.id} value={product.id}>
+                              <AccordionTrigger className="hover:no-underline">
+                                <div className="flex items-center gap-3 flex-1">
+                                  {/* Status Icon */}
+                                  {isFailed ? (
+                                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                                  ) : isProcessing ? (
+                                    <RefreshCw className="h-5 w-5 text-blue-600 animate-spin flex-shrink-0" />
+                                  ) : isCompleted ? (
+                                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+                                  ) : (
+                                    <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                                  )}
+
+                                  {/* Product Info */}
+                                  <div className="flex-1 text-left">
+                                    <div className="font-medium">{product.product_name}</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      Product #{product.product_index + 1}
+                                      {product.current_stage && ` • ${product.current_stage}`}
+                                    </div>
+                                  </div>
+
+                                  {/* Status Badge */}
+                                  <Badge
+                                    variant={
+                                      isFailed ? 'destructive' :
+                                      isProcessing ? 'default' :
+                                      isCompleted ? 'secondary' :
+                                      'outline'
+                                    }
+                                    className="ml-auto"
+                                  >
+                                    {product.status}
+                                  </Badge>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="space-y-3 pl-8 pt-2">
+                                  {/* Error Message */}
+                                  {product.error_message && (
+                                    <Alert variant="destructive">
+                                      <AlertCircle className="h-4 w-4" />
+                                      <AlertDescription>{product.error_message}</AlertDescription>
+                                    </Alert>
+                                  )}
+
+                                  {/* Product Stages */}
+                                  <div className="space-y-2">
+                                    {PRODUCT_STAGES.map((stage) => {
+                                      const isStageCompleted = product.stages_completed?.includes(stage.id);
+                                      const isCurrentStage = product.current_stage === stage.id;
+                                      const Icon = stage.icon;
+
+                                      return (
+                                        <div
+                                          key={stage.id}
+                                          className={`flex items-center gap-2 p-2 rounded ${
+                                            isStageCompleted
+                                              ? 'bg-green-50'
+                                              : isCurrentStage
+                                              ? 'bg-blue-50'
+                                              : 'bg-slate-50'
+                                          }`}
+                                        >
+                                          {isStageCompleted ? (
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                          ) : isCurrentStage ? (
+                                            <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                                          ) : (
+                                            <Clock className="h-4 w-4 text-slate-400" />
+                                          )}
+                                          <Icon className="h-4 w-4 text-muted-foreground" />
+                                          <span className="text-sm font-medium">{stage.name}</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Product Metrics */}
+                                  <div className="grid grid-cols-3 gap-2 pt-2">
+                                    <div className="text-center p-2 bg-slate-50 rounded">
+                                      <div className="text-xs text-muted-foreground">Chunks</div>
+                                      <div className="text-lg font-semibold">{product.metrics.chunks_created || 0}</div>
+                                    </div>
+                                    <div className="text-center p-2 bg-slate-50 rounded">
+                                      <div className="text-xs text-muted-foreground">Images</div>
+                                      <div className="text-lg font-semibold">{product.metrics.images_processed || 0}</div>
+                                    </div>
+                                    <div className="text-center p-2 bg-slate-50 rounded">
+                                      <div className="text-xs text-muted-foreground">Links</div>
+                                      <div className="text-lg font-semibold">{product.metrics.relationships_created || 0}</div>
+                                    </div>
+                                  </div>
+
+                                  {/* Product Actions - Placeholder for now */}
+                                  {isCompleted && (
+                                    <div className="flex flex-wrap gap-2 pt-3 border-t mt-3">
+                                      <button className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors">
+                                        <FileText className="h-3 w-3" />
+                                        Chunks
+                                      </button>
+                                      <button className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded hover:bg-purple-100 transition-colors">
+                                        <Zap className="h-3 w-3" />
+                                        Embeddings
+                                      </button>
+                                      <button className="flex items-center gap-1 px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors">
+                                        <ImageIcon className="h-3 w-3" />
+                                        Images
+                                      </button>
+                                      <button className="flex items-center gap-1 px-2 py-1 text-xs bg-orange-50 text-orange-700 rounded hover:bg-orange-100 transition-colors">
+                                        <Link className="h-3 w-3" />
+                                        Links
+                                      </button>
+                                      <button className="flex items-center gap-1 px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100 transition-colors">
+                                        <Trash2 className="h-3 w-3" />
+                                        Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                      </Accordion>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No products found for this job</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* Global Overview Tab */}
+              <TabsContent value="overview" className="space-y-6 mt-6">
               {/* Job Overview */}
               <Card>
                 <CardHeader>
@@ -2441,294 +2611,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Quick Actions */}
-              {selectedJob?.document_id && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Zap className="h-4 w-4" />
-                      Continue Processing
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col gap-3">
-                      <button
-                        onClick={async () => {
-                          if (!selectedJob.document_id) {
-                            toast.error('❌ No document_id found for this job');
-                            return;
-                          }
-
-                          try {
-                            // Fetch extracted_text from processed_documents table
-                            const { data: processedDoc, error: procError } = await supabase
-                              .from('processed_documents')
-                              .select('content')
-                              .eq('id', selectedJob.document_id)
-                              .single();
-
-                            if (procError || !processedDoc?.content) {
-                              toast.error('❌ No extracted text found. The document may not have been processed yet.');
-                              return;
-                            }
-
-                            // Fetch products for this document
-                            const productsResponse = await fetch(`/api/products?document_id=${selectedJob.document_id}`);
-                            const productsData = productsResponse.ok ? await productsResponse.json() : { products: [] };
-                            const productIds = productsData.products?.map((p: any) => p.id) || [];
-
-                            // Call create-chunks endpoint (job_id required in both URL path AND body)
-                            const requestBody = {
-                              job_id: selectedJob.id,
-                              document_id: selectedJob.document_id,
-                              workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                              extracted_text: processedDoc.content,
-                              product_ids: productIds,
-                              chunk_size: 512,
-                              chunk_overlap: 50,
-                            };
-
-                            const response = await fetch(`/api/internal/create-chunks/${selectedJob.id}`, {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(requestBody),
-                            });
-
-                            const result = await response.json();
-                            if (result.success) {
-                              if (result.skipped) {
-                                toast.info(`ℹ️ Chunks already exist. Existing chunks: ${result.existing_chunks}, Existing embeddings: ${result.existing_embeddings}`);
-                              } else {
-                                toast.success(`✅ Chunks created: ${result.chunks_created}, Embeddings: ${result.embeddings_generated}`);
-                              }
-                              fetchJobDetails(selectedJob);
-                            } else {
-                              toast.error(`❌ Failed to create chunks: ${JSON.stringify(result)}`);
-                              logger.error('Failed to create chunks', result, { jobId: selectedJob.id });
-                            }
-                          } catch (error) {
-                            logger.error('Error creating chunks', error, { jobId: selectedJob.id });
-                            toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
-                          }
-                        }}
-                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
-                      >
-                        <FileText className="h-4 w-4" />
-                        Regenerate Chunks ({selectedJob?.metadata?.result?.chunks_created || selectedJob?.metadata?.chunks_created || 0})
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!selectedJob.document_id) {
-                            toast.error('❌ No document_id found for this job');
-                            return;
-                          }
-
-                          try {
-                            // Fetch products for this document to show accurate count
-                            const { data: products, error: productsError } = await supabase
-                              .from('products')
-                              .select('id')
-                              .eq('source_document_id', selectedJob.document_id);
-
-                            if (productsError) {
-                              toast.error('❌ Error fetching products: ' + productsError.message);
-                              return;
-                            }
-
-                            const totalProducts = products?.length || 0;
-
-                            const response = await fetch('/api/internal/generate-product-embeddings', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                document_id: selectedJob.document_id,
-                                workspace_id: selectedJob.workspace_id || 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-                                product_ids: null,  // Generate for all products in document
-                              }),
-                            });
-                            const result = await response.json();
-                            if (result.success) {
-                              if (result.products_processed === 0 && result.errors.length === 0) {
-                                toast.info(`ℹ️ ${result.message}. All ${totalProducts} products already have embeddings.`);
-                              } else if (result.errors.length > 0) {
-                                toast.warning(`⚠️ Generated Embeddings for ${result.products_processed} products (${result.errors.length} errors). Errors: ${result.errors.slice(0, 3).join(', ')}${result.errors.length > 3 ? ` ... and ${result.errors.length - 3} more` : ''}`);
-                              } else {
-                                toast.success(`✅ ${result.message}. Products: ${result.products_processed}, Chunks: ${result.chunks_created}, Embeddings: ${result.embeddings_queued}`);
-                              }
-                              fetchJobDetails(selectedJob);
-                            } else {
-                              toast.error('❌ Failed to generate embeddings');
-                              logger.error('Failed to generate embeddings', result, { jobId: selectedJob.id });
-                            }
-                          } catch (error) {
-                            logger.error('Error regenerating embeddings', error, { jobId: selectedJob.id });
-                            toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
-                          }
-                        }}
-                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
-                      >
-                        <Zap className="h-4 w-4" />
-                        Regenerate Embeddings ({selectedJob?.metadata?.products_discovered || selectedJob?.metadata?.products_created || 0} products)
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!selectedJob.document_id) {
-                            toast.error('❌ No document_id found for this job');
-                            return;
-                          }
-
-                          try {
-                            // Fetch images for this document to show accurate count
-                            const { data: images, error: imagesError } = await supabase
-                              .from('document_images')
-                              .select('id')
-                              .eq('document_id', selectedJob.document_id);
-
-                            if (imagesError) {
-                              toast.error('❌ Error fetching images: ' + imagesError.message);
-                              return;
-                            }
-
-                            const totalImages = images?.length || 0;
-
-                            if (totalImages === 0) {
-                              toast.error('❌ No images found for this document');
-                              return;
-                            }
-
-                            const confirmed = confirm(
-                              '🎨 Regenerate Image Embeddings?\n\n' +
-                              `Document: ${selectedJob?.metadata?.filename || 'Unknown'}\n` +
-                              `Images: ${totalImages}\n\n` +
-                              'This will generate 5 CLIP embeddings per image:\n' +
-                              '• Visual (SigLIP 512D)\n' +
-                              '• Color (CLIP 512D)\n' +
-                              '• Texture (CLIP 512D)\n' +
-                              '• Style (CLIP 512D)\n' +
-                              '• Material (CLIP 512D)\n\n' +
-                              `Total embeddings: ${totalImages * 5}\n\n` +
-                              'Continue?',
-                            );
-                            if (!confirmed) return;
-
-                            const response = await fetch('/api/admin/regenerate-image-embeddings', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                document_id: selectedJob.document_id,
-                                force_regenerate: false,
-                                priority: 0,
-                              }),
-                            });
-
-                            const result = await response.json();
-                            if (result.success) {
-                              toast.success(
-                                `✅ ${result.message}. Job ID: ${result.job_id}. The job has been queued and will process in the background. Check the "Async Job Queue" tab to monitor progress.`
-                              );
-                              fetchJobDetails(selectedJob);
-                            } else {
-                              toast.error(`❌ Failed to queue image embedding regeneration: ${result.error || 'Unknown error'}`);
-                              logger.error('Failed to queue image embedding regeneration', result, { jobId: selectedJob.id });
-                            }
-                          } catch (error) {
-                            logger.error('Error regenerating image embeddings', error, { jobId: selectedJob.id });
-                            toast.error('❌ Error: ' + (error instanceof Error ? error.message : 'Unknown error'));
-                          }
-                        }}
-                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
-                      >
-                        <ImageIcon className="h-4 w-4" />
-                        Regenerate Image Embeddings ({selectedJob?.metadata?.images_extracted || selectedJob?.metadata?.total_images_extracted || 0} images)
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!selectedJob.document_id) {
-                            toast.error('❌ No document_id found for this job');
-                            return;
-                          }
-
-                          try {
-                            // Fetch chunks and products count
-                            const [chunksResponse, productsResponse] = await Promise.all([
-                              supabase
-                                .from('document_chunks')
-                                .select('id', { count: 'exact' })
-                                .eq('document_id', selectedJob.document_id),
-                              supabase
-                                .from('products')
-                                .select('id', { count: 'exact' })
-                                .eq('source_document_id', selectedJob.document_id),
-                            ]);
-
-                            const chunksCount = chunksResponse.count || 0;
-                            const productsCount = productsResponse.count || 0;
-
-                            if (chunksCount === 0) {
-                              toast.error('❌ No chunks found for this document');
-                              return;
-                            }
-
-                            if (productsCount === 0) {
-                              toast.error('❌ No products found for this document');
-                              return;
-                            }
-
-                            const confirmed = confirm(
-                              '🔗 Create chunk-product relationships?\n\n' +
-                              `Document: ${selectedJob?.metadata?.filename || 'Unknown'}\n` +
-                              `Chunks: ${chunksCount}\n` +
-                              `Products: ${productsCount}\n\n` +
-                              'This will link chunks to products based on:\n' +
-                              '• Page proximity (40%)\n' +
-                              '• Content mentions (30%)\n' +
-                              '• Semantic similarity (30%)\n\n' +
-                              'This is required for search to work!\n\n' +
-                              'Continue?',
-                            );
-                            if (!confirmed) return;
-
-                            // Call the admin linking API
-                            const response = await fetch(`/api/admin/linking/link-chunks-to-products`, {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                document_id: selectedJob.document_id,
-                              }),
-                            });
-
-                            if (!response.ok) {
-                              const errorText = await response.text();
-                              throw new Error(`API error: ${response.status} - ${errorText}`);
-                            }
-
-                            const result = await response.json();
-
-                            if (result.success) {
-                              toast.success(
-                                `✅ Chunk relationships created! Chunks found: ${result.chunks_found}, Products found: ${result.products_found}, Relationships created: ${result.chunk_product_links}. Search should now work for this document!`
-                              );
-                            } else {
-                              toast.error(`❌ Failed: ${result.error || 'Unknown error'}`);
-                              logger.error('Failed to create chunk relationships', result, { jobId: selectedJob.id });
-                            }
-                          } catch (error) {
-                            console.error('Error creating chunk relationships:', error);
-                            logger.error('Error creating chunk relationships', error, { jobId: selectedJob.id });
-                            toast.error(`❌ Failed to create chunk relationships: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                          }
-                        }}
-                        className="text-left text-sm text-primary hover:underline flex items-center gap-2 cursor-pointer bg-transparent border-0 p-0"
-                      >
-                        <Link className="h-4 w-4" />
-                        Create Chunk Relationships ({selectedJob?.metadata?.result?.chunks_created || selectedJob?.metadata?.chunks_created || 0} chunks)
-                      </button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Checkpoint Timeline */}
+              <JobCheckpointTimeline
+                checkpoints={jobCheckpoints}
+                jobStatus={selectedJob?.status || 'unknown'}
+              />
 
               {/* NEW PRODUCT-CENTRIC PIPELINE (PDF only) */}
               {(selectedJob?.job_type === 'pdf_processing' || selectedJob?.job_type === 'product_discovery_upload') && (
@@ -2791,7 +2678,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         ) : selectedJob?.status === 'processing' ? (
                           <>
                             <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                            <span className="text-sm text-blue-700 font-medium">Discovering products...</span>
+                            <span className="text-sm text-blue-700 font-medium">
+                              {productProgress.length > 0
+                                ? `Discovering Products: ${productProgress.length} found`
+                                : 'Discovering Products...'}
+                            </span>
                           </>
                         ) : (
                           <>
@@ -2803,140 +2694,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Product Accordions */}
-                  {productProgress.length > 0 && (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base flex items-center gap-2">
-                          <Package className="h-4 w-4" />
-                          Product Processing
-                        </CardTitle>
-                        <CardDescription>
-                          {productProgress.filter(p => p.status === 'completed').length} of {productProgress.length} products completed
-                          {productProgress.filter(p => p.status === 'failed').length > 0 &&
-                            ` (${productProgress.filter(p => p.status === 'failed').length} failed)`}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <Accordion type="multiple" className="w-full">
-                          {productProgress.map((product) => {
-                            const isCompleted = product.status === 'completed';
-                            const isFailed = product.status === 'failed';
-                            const isProcessing = product.status === 'processing';
-
-                            return (
-                              <AccordionItem key={product.id} value={product.id}>
-                                <AccordionTrigger className="hover:no-underline">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    {/* Status Icon */}
-                                    {isFailed ? (
-                                      <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                                    ) : isProcessing ? (
-                                      <RefreshCw className="h-5 w-5 text-blue-600 animate-spin flex-shrink-0" />
-                                    ) : isCompleted ? (
-                                      <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-                                    ) : (
-                                      <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
-                                    )}
-
-                                    {/* Product Name */}
-                                    <span className="font-medium text-sm flex-1 text-left">
-                                      {product.product_index}. {product.product_name}
-                                    </span>
-
-                                    {/* Quick Stats */}
-                                    <div className="flex items-center gap-3 text-xs text-muted-foreground mr-2">
-                                      {product.metrics.chunks_created > 0 && (
-                                        <span>{product.metrics.chunks_created} chunks</span>
-                                      )}
-                                      {product.metrics.images_processed > 0 && (
-                                        <span>{product.metrics.images_processed} images</span>
-                                      )}
-                                    </div>
-
-                                    {/* Status Badge */}
-                                    <Badge
-                                      className={
-                                        isFailed
-                                          ? 'bg-red-100 text-red-800 border-red-300'
-                                          : isProcessing
-                                          ? 'bg-blue-100 text-blue-800 border-blue-300'
-                                          : isCompleted
-                                          ? 'bg-green-100 text-green-800 border-green-300'
-                                          : 'bg-slate-100 text-slate-800 border-slate-300'
-                                      }
-                                    >
-                                      {product.status}
-                                    </Badge>
-                                  </div>
-                                </AccordionTrigger>
-
-                                <AccordionContent>
-                                  <div className="space-y-3 pl-8 pt-2">
-                                    {/* Error Message */}
-                                    {product.error_message && (
-                                      <Alert variant="destructive">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertDescription>{product.error_message}</AlertDescription>
-                                      </Alert>
-                                    )}
-
-                                    {/* Product Stages */}
-                                    <div className="space-y-2">
-                                      {PRODUCT_STAGES.map((stage) => {
-                                        const isStageCompleted = product.stages_completed?.includes(stage.id);
-                                        const isCurrentStage = product.current_stage === stage.id;
-                                        const Icon = stage.icon;
-
-                                        return (
-                                          <div
-                                            key={stage.id}
-                                            className={`flex items-center gap-2 p-2 rounded ${
-                                              isStageCompleted
-                                                ? 'bg-green-50'
-                                                : isCurrentStage
-                                                ? 'bg-blue-50'
-                                                : 'bg-slate-50'
-                                            }`}
-                                          >
-                                            {isStageCompleted ? (
-                                              <CheckCircle className="h-4 w-4 text-green-600" />
-                                            ) : isCurrentStage ? (
-                                              <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                                            ) : (
-                                              <Clock className="h-4 w-4 text-slate-400" />
-                                            )}
-                                            <Icon className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-sm font-medium">{stage.name}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-
-                                    {/* Product Metrics */}
-                                    <div className="grid grid-cols-3 gap-2 pt-2">
-                                      <div className="text-center p-2 bg-slate-50 rounded">
-                                        <div className="text-xs text-muted-foreground">Chunks</div>
-                                        <div className="text-lg font-semibold">{product.metrics.chunks_created || 0}</div>
-                                      </div>
-                                      <div className="text-center p-2 bg-slate-50 rounded">
-                                        <div className="text-xs text-muted-foreground">Images</div>
-                                        <div className="text-lg font-semibold">{product.metrics.images_processed || 0}</div>
-                                      </div>
-                                      <div className="text-center p-2 bg-slate-50 rounded">
-                                        <div className="text-xs text-muted-foreground">Links</div>
-                                        <div className="text-lg font-semibold">{product.metrics.relationships_created || 0}</div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </AccordionContent>
-                              </AccordionItem>
-                            );
-                          })}
-                        </Accordion>
-                      </CardContent>
-                    </Card>
-                  )}
+                  {/* Product Accordions moved to Product Extraction tab */}
 
                   {/* Global Stages */}
                   {GLOBAL_STAGES.map((stage) => {
@@ -2977,9 +2735,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   })}
                 </>
               )}
-
-
-            </div>
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
@@ -2998,58 +2755,41 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label htmlFor="deleteJobId" className="block text-sm font-medium mb-2">
+              <label htmlFor="jobIdToDelete" className="text-sm font-medium">
                 Job ID
               </label>
               <input
-                id="deleteJobId"
+                id="jobIdToDelete"
                 type="text"
                 value={deleteJobId}
                 onChange={(e) => setDeleteJobId(e.target.value)}
-                placeholder="Enter job ID (e.g., 123e4567-e89b-12d3-a456-426614174000)"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleDeleteJobById();
-                  }
-                }}
+                placeholder="Enter job ID..."
+                className="w-full mt-1 px-3 py-2 border rounded-md"
               />
-            </div>
-            <div className="bg-orange-50 border border-orange-200 rounded-md p-3">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-orange-800">
-                  <p className="font-semibold mb-1">⚠️ Warning: This action cannot be undone!</p>
-                  <p className="text-xs">This will permanently delete:</p>
-                  <ul className="text-xs mt-1 ml-4 list-disc space-y-0.5">
-                    <li>Job record</li>
-                    <li>Document record</li>
-                    <li>All chunks and embeddings</li>
-                    <li>All images</li>
-                    <li>All products</li>
-                    <li>Storage files</li>
-                    <li>Checkpoints</li>
-                  </ul>
-                </div>
-              </div>
             </div>
             <div className="flex justify-end gap-2">
               <button
-                onClick={() => {
-                  setShowDeleteJobModal(false);
-                  setDeleteJobId('');
-                }}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md text-sm font-medium transition-all"
+                onClick={() => setShowDeleteJobModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteJobById}
-                disabled={!deleteJobId.trim()}
-                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!deleteJobId.trim() || deletingJob === deleteJobId}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                <Trash2 className="w-4 h-4 inline mr-1.5" />
-                Delete Job
+                {deletingJob === deleteJobId ? (
+                  <>
+                    <RefreshCw className="w-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 inline mr-1.5" />
+                    Delete Job
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -3065,3 +2805,5 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     </div>
   );
 };
+
+export default AsyncJobQueueMonitor;
