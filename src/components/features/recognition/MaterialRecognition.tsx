@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Badge } from '@/components/core/ui/badge';
 import { Progress } from '@/components/core/ui/progress';
 import { RecognitionResult } from '@/types/materials';
-import { mivaaService } from '@/services/mivaaIntegrationService';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 import { RecognitionResults } from './RecognitionResults';
 
@@ -71,11 +71,10 @@ export const MaterialRecognition: React.FC = () => {
           reader.readAsDataURL(file);
         });
 
-        // Call MIVAA service for material analysis
-        const response = await mivaaService.analyzeMaterial(base64, {
-          includeProperties: true,
-          includeComposition: true,
-          confidenceThreshold: 0.8,
+        // Call MIVAA API for material analysis
+        const response = await mivaaApi.analyzeMaterial({
+          image_data: base64,
+          analysis_type: 'hybrid',
         });
 
         if (response.success && response.data) {

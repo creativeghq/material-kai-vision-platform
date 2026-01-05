@@ -1,10 +1,5 @@
 import { z } from 'zod';
 
-import {
-  MivaaIntegrationService,
-  PdfExtractionRequest,
-  defaultMivaaConfig,
-} from '../../services/pdf/mivaaIntegrationService';
 import { apiGatewayService } from '../../services/apiGateway/apiGatewayService';
 import {
   JWTAuthMiddleware,

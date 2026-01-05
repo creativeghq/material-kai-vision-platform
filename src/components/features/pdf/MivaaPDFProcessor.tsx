@@ -7,7 +7,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Progress } from '@/components/core/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { mivaaService } from '@/services/mivaaIntegrationService';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 interface PDFProcessingResult {
   id: string;
@@ -67,21 +67,12 @@ export const MivaaPDFProcessor: React.FC = () => {
         const file = files[i];
         setProgress((i / files.length) * 90);
 
-        // Upload file to temporary storage and get URL
+        // Upload file to MIVAA for processing
         const formData = new FormData();
         formData.append('file', file);
 
-        // For demo purposes, we'll use a placeholder URL
-        // In production, you'd upload to Supabase storage first
-        const fileUrl = `https://example.com/temp/${file.name}`;
-
-        // Call MIVAA service for PDF processing with polling
-        const response = await mivaaService.processPDF(fileUrl, {
-          extractImages: true,
-          extractText: true,
-          extractTables: true,
-          ocrEnabled: true,
-        });
+        // Call MIVAA API for PDF processing
+        const response = await mivaaApi.uploadPDF(formData);
 
         // If we get a job ID, start polling for status updates
         if (response.success && response.data?.job_id) {
