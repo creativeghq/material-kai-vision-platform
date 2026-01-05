@@ -5,11 +5,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Mail, Filter, Download, Eye } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { emailService, EmailLog } from '@/services/email/emailService';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';

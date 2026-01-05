@@ -14,13 +14,13 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AddKnowledgeEntry } from '@/components/RAG/AddKnowledgeEntry';
-import { EnhancedRAGInterface } from '@/components/RAG/EnhancedRAGInterface';
+} from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Alert, AlertDescription } from '@/components/core/ui/alert';
+import { AddKnowledgeEntry } from '@/components/features/rag/AddKnowledgeEntry';
+import { EnhancedRAGInterface } from '@/components/features/rag/EnhancedRAGInterface';
 import { useToast } from '@/hooks/use-toast';
 
 export const PDFKnowledgeDemo: React.FC = () => {

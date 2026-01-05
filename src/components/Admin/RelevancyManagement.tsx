@@ -18,18 +18,18 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/core/ui/select';
 import {
   Table,
   TableBody,
@@ -37,16 +37,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
+} from '@/components/core/ui/dialog';
+import { Label } from '@/components/core/ui/label';
+import { Progress } from '@/components/core/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { supabase } from '@/integrations/supabase/client';

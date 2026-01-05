@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trash2, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Input } from '@/components/core/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';

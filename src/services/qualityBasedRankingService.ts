@@ -11,7 +11,7 @@
  * - Mixed query support (text + image)
  */
 
-import { SearchResult } from '@/components/Search/SearchResultCard';
+import { SearchResult } from '@/components/features/search/SearchResultCard';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface RankingWeights {

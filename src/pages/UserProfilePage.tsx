@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, CreditCard, DollarSign, FileText, Activity } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ProfileTab } from '@/components/Profile/ProfileTab';
-import { SubscriptionTab } from '@/components/Profile/SubscriptionTab';
-import { CreditsTab } from '@/components/Profile/CreditsTab';
-import { BillingHistoryTab } from '@/components/Profile/BillingHistoryTab';
-import { UsageHistoryTab } from '@/components/Profile/UsageHistoryTab';
+import { Button } from '@/components/core/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { ProfileTab } from '@/components/core/Profile/ProfileTab';
+import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
+import { CreditsTab } from '@/components/core/Profile/CreditsTab';
+import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
+import { UsageHistoryTab } from '@/components/core/Profile/UsageHistoryTab';
 
 export const UserProfilePage: React.FC = () => {
   const navigate = useNavigate();

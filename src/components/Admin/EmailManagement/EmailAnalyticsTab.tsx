@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Mail, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { emailService } from '@/services/email/emailService';
 import { useToast } from '@/hooks/use-toast';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';

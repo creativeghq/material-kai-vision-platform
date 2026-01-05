@@ -26,10 +26,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from '@/components/core/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Badge } from '@/components/core/ui/badge';
+import { Alert, AlertDescription } from '@/components/core/ui/alert';
 
 // Type assertions for recharts components
 const RechartResponsiveContainer = ResponsiveContainer as any;

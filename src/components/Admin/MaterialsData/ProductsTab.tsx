@@ -6,23 +6,23 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+} from '@/components/core/ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/core/ui/select';
 import { Search, Eye, Loader2, Trash2, FileText, Code, Globe, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
-import { SmartPagination } from '@/components/ui/smart-pagination';
+import { SmartPagination } from '@/components/core/ui/smart-pagination';
 
 interface Product {
   id: string;

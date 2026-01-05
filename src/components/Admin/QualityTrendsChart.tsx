@@ -16,7 +16,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { QualityTrend } from '@/services/QualityDashboardService';
 
 interface QualityTrendsChartProps {

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Link2, Image as ImageIcon, FileText, Package } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SmartPagination } from '@/components/ui/smart-pagination';
+import { SmartPagination } from '@/components/core/ui/smart-pagination';
 import {
   Table,
   TableBody,
@@ -12,7 +12,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 
 interface RelationsTabProps {
   workspaceId: string;

@@ -15,10 +15,10 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   Table,
   TableBody,
@@ -26,15 +26,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
+} from '@/components/core/ui/table';
+import { Input } from '@/components/core/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/core/ui/select';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 

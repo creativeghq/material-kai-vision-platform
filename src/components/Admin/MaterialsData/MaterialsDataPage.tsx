@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Input } from '@/components/core/ui/input';
+import { Button } from '@/components/core/ui/button';
+import { Card } from '@/components/core/ui/card';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';

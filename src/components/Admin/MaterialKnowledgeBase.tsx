@@ -25,7 +25,7 @@ import { ProductFormModal } from './ProductFormModal';
 import { ProductDeleteConfirmation } from './ProductDeleteConfirmation';
 import { ProductPreviewModal } from './ProductPreviewModal';
 import { ChunkDetailModal } from './ChunkDetailModal';
-import { ExtractionMethodBadge } from '@/components/Images/ExtractionMethodBadge';
+import { ExtractionMethodBadge } from '@/components/features/images/ExtractionMethodBadge';
 
 import {
   Card,
@@ -33,18 +33,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+} from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Input } from '@/components/core/ui/input';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
+} from '@/components/core/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import {

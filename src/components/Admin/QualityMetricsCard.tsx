@@ -8,8 +8,8 @@
 import React from 'react';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Progress } from '@/components/core/ui/progress';
 
 interface QualityMetricsCardProps {
   title: string;

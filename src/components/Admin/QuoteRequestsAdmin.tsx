@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Loader2, Eye, Plus, CheckCircle, XCircle, Clock, Trash2, UserPlus, ListChecks, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -11,30 +11,30 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/core/ui/dialog';
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+} from '@/components/core/ui/sheet';
+import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag } from '@/services/quotes/QuotesService';
 import { usersAPI } from '@/services/crm.service';

@@ -26,9 +26,9 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
 import {
   Table,
   TableBody,
@@ -36,18 +36,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
+} from '@/components/core/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Progress } from '@/components/core/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from './UnifiedProcessingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
-import { KanbanBoard } from '@/components/Tasks/KanbanBoard';
-import { TaskDetailPanel } from '@/components/Tasks/TaskDetailPanel';
-import { CreateTaskModal } from '@/components/Tasks/CreateTaskModal';
+import { KanbanBoard } from '@/components/features/tasks/KanbanBoard';
+import { TaskDetailPanel } from '@/components/features/tasks/TaskDetailPanel';
+import { CreateTaskModal } from '@/components/features/tasks/CreateTaskModal';
 import type { TaskWithDetails } from '@/services/tasks';
 
 // Model pricing per 1M tokens (in USD)

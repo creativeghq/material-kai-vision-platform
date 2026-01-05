@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Loader2, GitBranch, ArrowUp, ArrowDown, GripVertical, Save } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -10,14 +10,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
+} from '@/components/core/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,10 +27,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
+} from '@/components/core/ui/alert-dialog';
+import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, TimelineStep } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';

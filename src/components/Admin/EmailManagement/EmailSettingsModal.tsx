@@ -12,10 +12,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@/components/core/ui/dialog';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 

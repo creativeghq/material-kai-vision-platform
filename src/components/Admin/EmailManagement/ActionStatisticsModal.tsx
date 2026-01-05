@@ -5,8 +5,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Mail, CheckCircle, XCircle, AlertTriangle, Eye } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 

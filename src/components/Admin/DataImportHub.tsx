@@ -11,15 +11,15 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Globe, FileText, FileType, ExternalLink, AlertCircle } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Button } from '@/components/core/ui/button';
+import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { PDFUploadSection } from '@/components/PDF/PDFUploadSection';
-import { NewScraperPage } from '@/components/Scraper/NewScraperPage';
+import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
+import { NewScraperPage } from '@/components/experimental/scraper/NewScraperPage';
 import { supabase } from '@/integrations/supabase/client';
 
 // PDFProcessingStepsMonitor has been removed - all monitoring now happens in AsyncJobQueueMonitor

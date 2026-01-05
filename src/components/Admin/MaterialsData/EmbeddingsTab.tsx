@@ -6,27 +6,27 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+} from '@/components/core/ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+} from '@/components/core/ui/select';
+import { Badge } from '@/components/core/ui/badge';
 import { Eye, Loader2, FileText, Code, Globe, Database } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SmartPagination } from '@/components/ui/smart-pagination';
+import { SmartPagination } from '@/components/core/ui/smart-pagination';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/core/ui/dialog';
 
 interface EmbeddingsTabProps {
   workspaceId: string;

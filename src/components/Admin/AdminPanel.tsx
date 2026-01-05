@@ -10,9 +10,9 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
 import {
   Table,
   TableBody,
@@ -20,8 +20,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from '@/components/core/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 
 // import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';

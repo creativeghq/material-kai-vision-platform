@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { Mail, Send, Database, BarChart3, Settings, TestTube, Zap, Megaphone } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import { emailService } from '@/services/email/emailService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { EmailDomainsTab } from './EmailManagement/EmailDomainsTab';

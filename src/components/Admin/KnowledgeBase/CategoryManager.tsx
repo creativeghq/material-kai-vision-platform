@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { FolderTree, Plus, Edit, Trash2 } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
+import { Textarea } from '@/components/core/ui/textarea';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/core/ui/dialog';
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { KBCategory } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';

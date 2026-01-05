@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Bot, Edit, Save, X, History, Clock, Sparkles } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Textarea } from '@/components/core/ui/textarea';
+import { Label } from '@/components/core/ui/label';
+import { Input } from '@/components/core/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 

@@ -2,15 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, Loader2, CheckCircle, XCircle, FileText, DollarSign, Gift, AlertCircle, Check, X, ShoppingCart, Tag, Timer, Boxes, Milestone, RotateCcw } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteUpsell, QuoteTimeline } from '@/services/quotes/QuotesService';
-import { AddProductsSheet } from '@/components/Quotes/AddProductsSheet';
-import { QuoteItemsList } from '@/components/Quotes/QuoteItemsList';
+import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
+import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
 
 /**
  * Customer-facing Quote Detail Page

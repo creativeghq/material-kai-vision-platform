@@ -5,12 +5,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, CheckCircle, XCircle, Clock, Copy, RefreshCw } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/core/ui/dialog';
 import { emailService, EmailDomain } from '@/services/email/emailService';
 import { useToast } from '@/hooks/use-toast';
 

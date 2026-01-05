@@ -5,8 +5,8 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+} from '@/components/core/ui/dialog';
+import { Button } from '@/components/core/ui/button';
 import { Trash2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 

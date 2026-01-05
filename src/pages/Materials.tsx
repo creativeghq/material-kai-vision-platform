@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { MaterialCatalogListing } from '@/components/Materials/MaterialCatalogListing';
+import { MaterialCatalogListing } from '@/components/features/materials/MaterialCatalogListing';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+} from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Badge } from '@/components/core/ui/badge';
 import { Loader2, Package, Search, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';

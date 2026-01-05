@@ -12,6 +12,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { RetryHelper } from '@/utils/retryHelper';
 
 // MIVAA API Configuration - use environment variable directly
 const MIVAA_API_URL = process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
@@ -54,91 +55,128 @@ export class MivaaApiClient {
   }
 
   /**
-   * Make authenticated request to MIVAA API
+   * Make authenticated request to MIVAA API with retry logic
    */
   private async request<T = any>(
     endpoint: string,
     options: RequestInit = {},
   ): Promise<MivaaApiResponse<T>> {
-    try {
-      const token = await this.getAuthToken();
-      const url = `${this.baseUrl}${endpoint}`;
+    return RetryHelper.withRetry(
+      async () => {
+        try {
+          const token = await this.getAuthToken();
+          const url = `${this.baseUrl}${endpoint}`;
 
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          ...options.headers,
+          const response = await fetch(url, {
+            ...options,
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              ...options.headers,
+            },
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const error = new Error(
+              errorData.error ||
+                errorData.message ||
+                `HTTP ${response.status}: ${response.statusText}`,
+            );
+            (error as any).status = response.status;
+            throw error;
+          }
+
+          const data = await response.json();
+          return {
+            success: true,
+            data,
+            processing_time: data.processing_time,
+          };
+        } catch (error) {
+          console.error(`MIVAA API Error [${endpoint}]:`, error);
+          throw error;
+        }
+      },
+      {
+        maxAttempts: 3,
+        delay: 1000,
+        backoffMultiplier: 2,
+        retryCondition: (error: unknown) => {
+          // Retry on network errors and 5xx server errors
+          if (error instanceof Error) {
+            const status = (error as any).status;
+            return !status || status >= 500;
+          }
+          return true;
         },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error ||
-            errorData.message ||
-            `HTTP ${response.status}: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
-      return {
-        success: true,
-        data,
-        processing_time: data.processing_time,
-      };
-    } catch (error) {
-      console.error(`MIVAA API Error [${endpoint}]:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+      },
+    ).catch((error) => ({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }));
   }
 
   /**
-   * Make authenticated request with FormData (for file uploads)
+   * Make authenticated request with FormData (for file uploads) with retry logic
    */
   private async requestFormData<T = any>(
     endpoint: string,
     formData: FormData,
   ): Promise<MivaaApiResponse<T>> {
-    try {
-      const token = await this.getAuthToken();
-      const url = `${this.baseUrl}${endpoint}`;
+    return RetryHelper.withRetry(
+      async () => {
+        try {
+          const token = await this.getAuthToken();
+          const url = `${this.baseUrl}${endpoint}`;
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          // Don't set Content-Type for FormData - browser sets it with boundary
+          const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              // Don't set Content-Type for FormData - browser sets it with boundary
+            },
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const error = new Error(
+              errorData.error ||
+                errorData.message ||
+                `HTTP ${response.status}: ${response.statusText}`,
+            );
+            (error as any).status = response.status;
+            throw error;
+          }
+
+          const data = await response.json();
+          return {
+            success: true,
+            data,
+            processing_time: data.processing_time,
+          };
+        } catch (error) {
+          console.error(`MIVAA API Error [${endpoint}]:`, error);
+          throw error;
+        }
+      },
+      {
+        maxAttempts: 3,
+        delay: 1000,
+        backoffMultiplier: 2,
+        retryCondition: (error: unknown) => {
+          if (error instanceof Error) {
+            const status = (error as any).status;
+            return !status || status >= 500;
+          }
+          return true;
         },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error ||
-            errorData.message ||
-            `HTTP ${response.status}: ${response.statusText}`,
-        );
-      }
-
-      const data = await response.json();
-      return {
-        success: true,
-        data,
-        processing_time: data.processing_time,
-      };
-    } catch (error) {
-      console.error(`MIVAA API Error [${endpoint}]:`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+      },
+    ).catch((error) => ({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    }));
   }
 
   // ==================== AI ANALYSIS ====================
@@ -456,6 +494,9 @@ export class MivaaApiClient {
 
 // Export singleton instance
 export const mivaaApi = new MivaaApiClient();
+
+// Legacy export for backward compatibility
+export const getMivaaApiClient = () => mivaaApi;
 
 // Export default
 export default mivaaApi;

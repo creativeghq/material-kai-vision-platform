@@ -16,10 +16,10 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Progress } from '@/components/core/ui/progress';
 import {
   Table,
   TableBody,
@@ -27,8 +27,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+} from '@/components/core/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { BrowserApiIntegrationService } from '@/services/apiGateway/browserApiIntegrationService';

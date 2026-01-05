@@ -1,8 +1,8 @@
 import React from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { CheckCircle, Clock, AlertCircle, Activity } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
 
 interface JobCheckpoint {
   id: string;

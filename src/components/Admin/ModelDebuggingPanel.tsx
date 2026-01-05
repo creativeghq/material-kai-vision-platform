@@ -19,16 +19,16 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+} from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from '@/components/ui/accordion';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from '@/components/core/ui/accordion';
+import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';

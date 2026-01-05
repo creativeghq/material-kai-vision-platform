@@ -6,19 +6,19 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+} from '@/components/core/ui/dialog';
+import { Button } from '@/components/core/ui/button';
+import { Input } from '@/components/core/ui/input';
+import { Label } from '@/components/core/ui/label';
+import { Textarea } from '@/components/core/ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
+} from '@/components/core/ui/select';
+import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Save, X, Plus, Trash2 } from 'lucide-react';
 import type { Product } from '@/types/unified-material-api';

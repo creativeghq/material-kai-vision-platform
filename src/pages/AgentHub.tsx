@@ -7,7 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot } from 'lucide-react';
 
-import { AgentHub as AgentHubComponent } from '@/components/AI/AgentHub';
+import { AgentHub as AgentHubComponent } from '@/components/features/ai/AgentHub';
 import { supabase } from '@/integrations/supabase/client';
 
 const AgentHubPage: React.FC = () => {

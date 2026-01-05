@@ -6,7 +6,7 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { GlobalAdminHeader } from '@/components/admin/GlobalAdminHeader';
 
 import {
   Card,
@@ -14,9 +14,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+} from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -24,15 +24,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Label } from '@/components/ui/label';
+} from '@/components/core/ui/table';
+import { Label } from '@/components/core/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 interface PromptTemplate {

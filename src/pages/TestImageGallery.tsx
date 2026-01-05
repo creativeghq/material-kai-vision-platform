@@ -14,11 +14,11 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { PDFImageGallery } from '@/components/PDF/PDFImageGallery';
+} from '@/components/core/ui/card';
+import { Input } from '@/components/core/ui/input';
+import { Button } from '@/components/core/ui/button';
+import { Label } from '@/components/core/ui/label';
+import { PDFImageGallery } from '@/components/features/pdf/PDFImageGallery';
 
 const TestImageGallery: React.FC = () => {
   const [documentId, setDocumentId] = useState('');

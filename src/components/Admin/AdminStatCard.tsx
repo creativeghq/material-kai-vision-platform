@@ -1,6 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { cn } from '@/lib/utils';
 
 interface AdminStatCardProps {

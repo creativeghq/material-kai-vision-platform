@@ -2,8 +2,8 @@ import React from 'react';
 import { Brain, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 
 interface GlobalAdminHeaderProps {
   title: string;

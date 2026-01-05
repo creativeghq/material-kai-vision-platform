@@ -13,8 +13,8 @@ import {
   Filter,
 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -22,12 +22,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from '@/components/core/ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -35,9 +35,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
+} from '@/components/core/ui/command';
 import { useToast } from '@/hooks/use-toast';
-import { CreateQuoteModal } from '@/components/Quotes/CreateQuoteModal';
+import { CreateQuoteModal } from '@/components/business/quotes/CreateQuoteModal';
 import { quotesService, QuoteWithItems } from '@/services/quotes/QuotesService';
 
 type StatusFilter = 'all' | 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';

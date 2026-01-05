@@ -9,8 +9,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
+} from '@/components/core/ui/alert-dialog';
+import { Button } from '@/components/core/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';

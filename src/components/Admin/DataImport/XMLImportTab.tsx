@@ -7,10 +7,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Link } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/core/ui/button';
+import { Alert, AlertDescription } from '@/components/core/ui/alert';
+import { Input } from '@/components/core/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import XMLFieldMappingModal from './XMLFieldMappingModal';
 import { logger } from '@/services/logger.service';

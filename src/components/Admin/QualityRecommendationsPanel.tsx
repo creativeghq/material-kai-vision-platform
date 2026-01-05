@@ -7,8 +7,8 @@
 import React from 'react';
 import { Lightbulb, CheckCircle } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
 
 interface QualityRecommendationsPanelProps {
   recommendations: string[];

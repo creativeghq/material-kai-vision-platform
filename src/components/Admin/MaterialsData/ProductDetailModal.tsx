@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { ProductDetailModal as UnifiedProductDetailModal } from '@/components/Products/ProductDetailModal';
+import { ProductDetailModal as UnifiedProductDetailModal } from '@/components/features/products/ProductDetailModal';
 
 interface ProductDetailModalProps {
   product: any;

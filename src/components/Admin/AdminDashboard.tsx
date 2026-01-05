@@ -19,8 +19,8 @@ import {
   Mail,
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { ResetPlatformDialog } from './ResetPlatformDialog';
 

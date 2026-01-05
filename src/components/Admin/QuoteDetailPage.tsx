@@ -2,24 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
+import { Textarea } from '@/components/core/ui/textarea';
+import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
-import { QuoteItemsList } from '@/components/Quotes/QuoteItemsList';
-import { AddProductsSheet } from '@/components/Quotes/AddProductsSheet';
+import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
+import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from '@/components/core/ui/select';
 
 export const QuoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

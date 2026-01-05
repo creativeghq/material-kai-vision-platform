@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Tag, Loader2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import {
   Table,
   TableBody,
@@ -10,16 +10,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from '@/components/core/ui/table';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+} from '@/components/core/ui/dialog';
+import { Input } from '@/components/core/ui/input';
+import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, StatusTag } from '@/services/quotes/QuotesService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';

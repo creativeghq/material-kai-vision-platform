@@ -7,8 +7,8 @@
 import React from 'react';
 import { AlertTriangle, AlertCircle, Info } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
 import { QualityIssue } from '@/services/QualityDashboardService';
 
 interface QualityIssuesPanelProps {

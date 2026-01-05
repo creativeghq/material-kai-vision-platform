@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { FieldMapping } from '@/components/Scraper/FieldMappingStep';
+import type { FieldMapping } from '@/components/experimental/scraper/FieldMappingStep';
 
 /**
  * Fetches the scraping extraction prompt template from the database

@@ -8,7 +8,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '@/components/core/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import type { Product } from '@/types/unified-material-api';

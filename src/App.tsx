@@ -2,13 +2,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as Sonner } from '@/components/ui/sonner';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/core/ui/toaster';
+import { Toaster as Sonner } from '@/components/core/ui/sonner';
+import { TooltipProvider } from '@/components/core/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { AuthGuard } from '@/components/Layout/AuthGuard';
+import { AuthGuard } from '@/components/core/AuthGuard';
 
-import { AdminGuard } from './components/Layout/AdminGuard';
+import { AdminGuard } from './components/core/AdminGuard';
 
 // @ts-ignore - Temporary workaround for import issue
 // Import CORS debug utility for troubleshooting
@@ -16,62 +16,62 @@ import './debug/cors-debug';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
-import AdminDashboard from './components/Admin/AdminDashboard';
-import { KnowledgeBaseManagement } from './components/Admin/KnowledgeBase';
-import { MaterialsDataPage } from './components/Admin/MaterialsData';
-import { LogViewer } from './components/Admin/LogViewer';
+import AdminDashboard from './components/admin/AdminDashboard';
+import { KnowledgeBaseManagement } from './components/admin/KnowledgeBase';
+import { MaterialsDataPage } from './components/admin/MaterialsData';
+import { LogViewer } from './components/admin/LogViewer';
 
-import { AgentConfigsPage } from './components/Admin/AgentConfigs';
-import { PromptTemplatesPage } from './components/Admin/PromptTemplates/PromptTemplatesPage';
-import { ExtractionPromptsPage } from './components/Admin/ExtractionPrompts/ExtractionPromptsPage';
-import { AdminPanel } from './components/Admin/AdminPanel';
-import { ApiGatewayAdmin } from './components/Admin/ApiGatewayAdmin';
-import { AITestingPanel } from './components/Admin/AITestingPanel';
-import { AIMonitoringDashboard } from './components/Admin/AIMonitoringDashboard';
-import { OperationsDashboard } from './components/Admin/OperationsDashboard';
-import { SystemPerformance } from './components/Admin/SystemPerformance';
-import { MaterialRecognition } from './components/Recognition/MaterialRecognition';
-import { MoodBoardPage } from './components/MoodBoard/MoodBoardPage';
-import { MoodBoardDetailPage } from './components/MoodBoard/MoodBoardDetailPage';
-import { SVBRDFExtractionPage } from './components/SVBRDF/SVBRDFExtractionPage';
-import { Layout } from './components/Layout/Layout';
+import { AgentConfigsPage } from './components/admin/AgentConfigs';
+import { PromptTemplatesPage } from './components/admin/PromptTemplates/PromptTemplatesPage';
+import { ExtractionPromptsPage } from './components/admin/ExtractionPrompts/ExtractionPromptsPage';
+import { AdminPanel } from './components/admin/AdminPanel';
+import { ApiGatewayAdmin } from './components/admin/ApiGatewayAdmin';
+import { AITestingPanel } from './components/admin/AITestingPanel';
+import { AIMonitoringDashboard } from './components/admin/AIMonitoringDashboard';
+import { OperationsDashboard } from './components/admin/OperationsDashboard';
+import { SystemPerformance } from './components/admin/SystemPerformance';
+import { MaterialRecognition } from './components/features/recognition/MaterialRecognition';
+import { MoodBoardPage } from './components/business/moodboard/MoodBoardPage';
+import { MoodBoardDetailPage } from './components/business/moodboard/MoodBoardDetailPage';
+import { SVBRDFExtractionPage } from './components/experimental/svbrdf/SVBRDFExtractionPage';
+import { Layout } from './components/core/Layout';
 // Removed: SearchHub - functionality available on frontend
 import AgentHub from './pages/AgentHub';
-import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
-import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';
-import PackagesPanel from './components/Admin/PackagesPanel';
+import { MaterialSuggestionsPanel } from './components/admin/MaterialSuggestionsPanel';
+import ModelDebuggingPanel from './components/admin/ModelDebuggingPanel';
+import PackagesPanel from './components/admin/PackagesPanel';
 import { PDFKnowledgeDemo } from './pages/PDFKnowledgeDemo';
 import { UserProfilePage } from './pages/UserProfilePage';
 import HealthPage from './pages/Health';
 import {
   CriticalErrorBoundary,
   PageErrorBoundary,
-} from './components/ErrorBoundary/ErrorBoundary';
+} from './components/core/ErrorBoundary';
 // Removed: MivaaDocsViewer - now external links in admin header
 // Removed: QualityStabilityMetricsPanel and Phase3MetricsPanel - now consolidated in OperationsDashboard
-import { MetadataManagement } from './components/Admin/MetadataManagement';
-import { RelevancyManagement } from './components/Admin/RelevancyManagement';
+import { MetadataManagement } from './components/admin/MetadataManagement';
+import { RelevancyManagement } from './components/admin/RelevancyManagement';
 import { AuthCallbackPage } from './pages/AuthCallbackPage';
-import { CRMManagement } from './components/Admin/CRMManagement';
+import { CRMManagement } from './components/admin/CRMManagement';
 import { ContactDetailPage } from './pages/ContactDetailPage';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
-import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
+import { AsyncJobQueueMonitor } from './components/admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
 // Removed: ChunkQualityDashboard - now consolidated in OperationsDashboard
 import { PDFDocumentDetails } from './pages/Admin/PDFDocumentDetails';
-import DataImportHub from './components/Admin/DataImportHub';
-import { SubscriptionPlansPage } from './components/Billing/SubscriptionPlansPage';
-import { CreditPackagesPage } from './components/Billing/CreditPackagesPage';
-import { QuoteRequestsPage } from './components/Quotes/QuoteRequestsPage';
+import DataImportHub from './components/admin/DataImportHub';
+import { SubscriptionPlansPage } from './components/business/billing/SubscriptionPlansPage';
+import { CreditPackagesPage } from './components/business/billing/CreditPackagesPage';
+import { QuoteRequestsPage } from './components/business/quotes/QuoteRequestsPage';
 import { QuotesPage } from './pages/QuotesPage';
 import { QuoteDetailCustomerPage } from './pages/QuoteDetailCustomerPage';
-import { SystemSettingsPage } from './components/Admin/SystemSettingsPage';
-import { QuoteRequestsAdmin } from './components/Admin/QuoteRequestsAdmin';
-import { QuoteDetailPage } from './components/Admin/QuoteDetailPage';
-import { StatusTagsManagement } from './components/Admin/StatusTagsManagement';
-import { UpsellsManagement } from './components/Admin/UpsellsManagement';
-import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
-import { EmailManagement } from './components/Admin/EmailManagement';
+import { SystemSettingsPage } from './components/admin/SystemSettingsPage';
+import { QuoteRequestsAdmin } from './components/admin/QuoteRequestsAdmin';
+import { QuoteDetailPage } from './components/admin/QuoteDetailPage';
+import { StatusTagsManagement } from './components/admin/StatusTagsManagement';
+import { UpsellsManagement } from './components/admin/UpsellsManagement';
+import { TimelineStepsManagement } from './components/admin/TimelineStepsManagement';
+import { EmailManagement } from './components/admin/EmailManagement';
 import { EmailTemplateBuilder } from './pages/Admin/EmailTemplateBuilder';
 
 // Coverage page component
