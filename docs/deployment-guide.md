@@ -56,6 +56,7 @@
 | `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
 | `TOGETHER_AI_API_KEY` | **Secret** | Server ENV | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `TOGETHER_AI_TIER` | Public | Server ENV | Together AI build tier (1-5) based on spend. Controls rate limits and concurrency. Default: 1 | `1` (Tier 1: $5 spent, 600 RPM, 12 concurrent)<br>`2` (Tier 2: $50 spent, 1800 RPM, 20 concurrent)<br>`3` (Tier 3: $100 spent, 3000 RPM, 20 concurrent)<br>`4` (Tier 4: $250 spent, 4500 RPM, 20 concurrent)<br>`5` (Tier 5: $1000 spent, 6000 RPM, 20 concurrent) |
 | `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for embeddings | `pa-xxxxxxxxxxxxxxxx` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
@@ -73,9 +74,39 @@
 |---------|------------|------------|------------|---------|
 | **OpenAI** | `OPENAI_API_KEY` | Frontend, Backend | https://platform.openai.com/api-keys | Pay-per-use |
 | **Anthropic** | `ANTHROPIC_API_KEY` | Backend | https://console.anthropic.com/ | Pay-per-use |
-| **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use |
+| **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use (see rate limits below) |
 | **Voyage AI** | `VOYAGE_API_KEY` | Backend | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
+
+### **Together AI Rate Limiting Configuration**
+
+Together AI uses a tier-based rate limiting system based on total spend. Configure the `TOGETHER_AI_TIER` environment variable to match your account tier:
+
+| Tier | Total Spend | LLM RPM | Embeddings RPM | Re-rank RPM | Vision Concurrency* | Set Variable |
+|------|-------------|---------|----------------|-------------|---------------------|--------------|
+| **1** | **$5.00** | 600 | 3,000 | 500,000 | 12 | `TOGETHER_AI_TIER=1` |
+| **2** | **$50.00** | 1,800 | 5,000 | 1,500,000 | 20 | `TOGETHER_AI_TIER=2` |
+| **3** | **$100.00** | 3,000 | 5,000 | 2,000,000 | 20 | `TOGETHER_AI_TIER=3` |
+| **4** | **$250.00** | 4,500 | 10,000 | 3,000,000 | 20 | `TOGETHER_AI_TIER=4` |
+| **5** | **$1,000.00** | 6,000 | 10,000 | 10,000,000 | 20 | `TOGETHER_AI_TIER=5` |
+
+*Vision Concurrency = Safe number of concurrent vision model requests (calculated automatically)
+
+**How to Set:**
+1. Check your total spend in [Together AI Dashboard](https://api.together.xyz/settings/billing)
+2. Determine your tier from the table above
+3. Set `TOGETHER_AI_TIER` environment variable in systemd service file
+4. Restart the service
+
+**Default:** Tier 1 (if not specified)
+
+**Benefits:**
+- ✅ Prevents 429 (Too Many Requests) errors
+- ✅ Automatic concurrency adjustment based on tier
+- ✅ 40% headroom for retries and burst traffic
+- ✅ Easy to upgrade as spend increases
+
+**See also:** `mivaa-pdf-extractor/RATE_LIMITING.md` for detailed configuration guide
 
 ### **Price Monitoring API Keys**
 
@@ -491,6 +522,7 @@ WorkingDirectory=/var/www/mivaa-pdf-extractor
 Environment=SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 Environment=SUPABASE_SERVICE_KEY=<your-service-key>
 Environment=TOGETHER_AI_API_KEY=<your-together-ai-key>
+Environment=TOGETHER_AI_TIER=1
 Environment=ANTHROPIC_API_KEY=<your-anthropic-key>
 Environment=OPENAI_API_KEY=<your-openai-key>
 Environment=VOYAGE_API_KEY=<your-voyage-ai-key>
@@ -736,6 +768,7 @@ JWT_SECRET_KEY=your_jwt_secret
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
 TOGETHER_AI_API_KEY=your_together_ai_key
+TOGETHER_AI_TIER=1  # Optional: 1-5 based on spend (default: 1)
 VOYAGE_API_KEY=your_voyage_ai_key
 HUGGINGFACE_API_KEY=your_huggingface_key
 MATERIAL_KAI_API_URL=https://v1api.materialshub.gr
