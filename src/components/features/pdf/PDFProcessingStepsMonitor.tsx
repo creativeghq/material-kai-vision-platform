@@ -92,7 +92,7 @@ const PROCESSING_STEPS: Array<{ id: number; name: string; description: string }>
   {
     id: 6,
     name: 'Image Extraction',
-    description: 'Extracting images from PDF pages',
+    description: '4-layer extraction: embedded images, full page renders, vision AI crops, deduplication',
   },
   {
     id: 7,

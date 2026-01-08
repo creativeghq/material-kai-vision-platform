@@ -375,36 +375,7 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
         metrics['Images Processed'] = jobMetadata.images_processed;
       }
 
-      // ✅ NEW: Vision-guided extraction breakdown
-      if (jobMetadata.vision_guided) {
-        const visionData = jobMetadata.vision_guided;
-        if (visionData.enabled) {
-          // Show extraction method used
-          const method = visionData.extraction_method === 'vision_guided' ? 'Vision-Guided' : 'PyMuPDF Fallback';
-          metrics['Extraction Method'] = method;
 
-          if (visionData.success && visionData.images_extracted !== undefined) {
-            metrics['Vision-Guided Images'] = visionData.images_extracted;
-          }
-          if (visionData.stats?.average_confidence !== undefined) {
-            metrics['Vision Confidence'] = `${Math.round(visionData.stats.average_confidence * 100)}%`;
-          }
-        }
-      }
-
-      // Fallback to old format if vision_guided not available
-      if (!jobMetadata.vision_guided) {
-        if (jobMetadata.vision_guided_count !== undefined && jobMetadata.vision_guided_count > 0) {
-          metrics['Vision-Guided'] = jobMetadata.vision_guided_count;
-        }
-        if (jobMetadata.pymupdf_fallback_count !== undefined && jobMetadata.pymupdf_fallback_count > 0) {
-          metrics['PyMuPDF Fallback'] = jobMetadata.pymupdf_fallback_count;
-        }
-        if (jobMetadata.extraction_method) {
-          const method = jobMetadata.extraction_method === 'vision_guided' ? 'Vision-Guided' : 'PyMuPDF';
-          metrics['Method'] = method;
-        }
-      }
 
       // ✅ NEW: Classification breakdown (Step 7 specific)
       if (stageId === 7) {

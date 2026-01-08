@@ -472,8 +472,9 @@ response = client.chat.completions.create(
     messages=[{
         "role": "user",
         "content": [
-            {"type": "image_url", "image_url": {"url": image_url}},
-            {"type": "text", "text": "Analyze this material image..."}
+            # CRITICAL: Text must come BEFORE image for Qwen models
+            {"type": "text", "text": "Analyze this material image..."},
+            {"type": "image_url", "image_url": {"url": image_url}}
         ]
     }]
 )

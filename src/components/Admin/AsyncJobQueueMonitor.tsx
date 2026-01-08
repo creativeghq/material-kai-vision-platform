@@ -178,12 +178,38 @@ const GLOBAL_PIPELINE_FLOW = [
   { id: 'quality', name: 'Quality Enhancement', icon: Activity, checkpoint: 'completed' },
 ];
 
+// Enhanced Product Stages with detailed sub-steps
 const PRODUCT_STAGES = [
-  { id: 'extraction', name: 'Page Extraction', icon: FileText },
-  { id: 'chunking', name: 'Text Chunking', icon: FileText },
-  { id: 'images', name: 'Image Processing', icon: ImageIcon },
-  { id: 'creation', name: 'Product Creation', icon: Package },
-  { id: 'relationships', name: 'Relationships', icon: Link },
+  {
+    id: 'extraction',
+    name: 'Page Extraction',
+    icon: FileText,
+    description: 'Map catalog pages to PDF pages + YOLO layout detection'
+  },
+  {
+    id: 'chunking',
+    name: 'Text Chunking',
+    icon: FileText,
+    description: 'Create semantic chunks + embeddings'
+  },
+  {
+    id: 'images',
+    name: 'Image Processing',
+    icon: ImageIcon,
+    description: '4-layer extraction + Vision classification'
+  },
+  {
+    id: 'creation',
+    name: 'Product Creation',
+    icon: Package,
+    description: 'Create product record + metadata'
+  },
+  {
+    id: 'relationships',
+    name: 'Relationships',
+    icon: Link,
+    description: 'Link entities + create relations'
+  },
 ];
 
 export const AsyncJobQueueMonitor: React.FC = () => {
@@ -2271,189 +2297,296 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             </div>
           ) : (
             <>
-            <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="overview">Global Overview</TabsTrigger>
-                <TabsTrigger value="products">Product Extraction</TabsTrigger>
+            <Tabs defaultValue="products" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="products">Product Extraction Pipeline</TabsTrigger>
                 <TabsTrigger value="logs">Technical Logs</TabsTrigger>
               </TabsList>
 
-              {/* Global Overview Tab */}
-              <TabsContent value="overview" className="space-y-6 mt-6">
-                {/* Process Flow */}
-                <Card>
+              {/* Product Extraction Tab - Enhanced with complete pipeline */}
+              <TabsContent value="products" className="space-y-6 mt-6">
+                {/* Step 0: Product Discovery Header */}
+                <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
-                      <Activity className="h-4 w-4" />
-                      Pipeline Process Flow
+                      <Zap className="h-5 w-5 text-primary" />
+                      Step 0: Product Discovery
                     </CardTitle>
                     <CardDescription>
-                      Real-time monitoring of all pipeline stages and system metrics
+                      AI-powered product detection and catalog analysis
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-8 relative">
-                    {GLOBAL_PIPELINE_FLOW.map((stage, index) => {
-                      const checkpoint = jobCheckpoints.find(cp => cp.stage === stage.checkpoint);
-                      const isCompleted = !!checkpoint || (selectedJob?.status === 'completed');
-                      const isActive = selectedJob?.status === 'processing' && !isCompleted && 
-                                      (index === 0 || !!jobCheckpoints.find(cp => cp.stage === GLOBAL_PIPELINE_FLOW[index-1].checkpoint));
-                      const isPending = !isCompleted && !isActive;
-                      
-                      const Icon = stage.icon;
-                      const isLast = index === GLOBAL_PIPELINE_FLOW.length - 1;
-                      
-                      const previousCheckpoint = index > 0 
-                        ? jobCheckpoints.find(cp => cp.stage === GLOBAL_PIPELINE_FLOW[index-1].checkpoint)
-                        : null;
-                      const stageDuration = isCompleted ? getStageDuration(checkpoint, previousCheckpoint) : null;
-
-                      // Extract stage-specific metrics
-                      const getStageMetrics = () => {
-                        if (stage.id === 'extraction') {
-                          const total = selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || 0;
-                          const processed = selectedJob?.metadata?.result?.pages_processed || 0;
-                          if (total > 0) return `${processed}/${total} pages extracted`;
-                        }
-                        if (stage.id === 'discovery') {
-                          const discovered = selectedJob?.metadata?.products_discovered || 0;
-                          if (discovered > 0) return `${discovered} products identified`;
-                        }
-                        if (stage.id === 'processing') {
-                          const total = productProgress.length;
-                          const completed = productProgress.filter(p => p.status === 'completed').length;
-                          if (total > 0) return `${completed}/${total} products processed`;
-                        }
-                        if (stage.id === 'entities' && isCompleted) {
-                          const relations = (selectedJob?.metadata?.result?.total_relations || 0);
-                          if (relations > 0) return `${relations} relationship links created`;
-                        }
-                        return null;
-                      };
-
-                      const stageMetrics = getStageMetrics();
-
-                      // Get sub-action durations if they exist within this stage
-                      const getSubActions = () => {
-                        const subActions: { name: string; duration: string; timestamp: string }[] = [];
-                        
-                        if (stage.id === 'extraction') {
-                          const imgCp = jobCheckpoints.find(cp => cp.stage === 'images_extracted');
-                          const chunkCp = jobCheckpoints.find(cp => cp.stage === 'chunks_created');
-                          
-                          if (imgCp) {
-                            subActions.push({ 
-                              name: 'Image Extraction', 
-                              duration: getStageDuration(imgCp, previousCheckpoint),
-                              timestamp: imgCp.created_at
-                            });
-                          }
-                          if (chunkCp) {
-                            subActions.push({ 
-                              name: 'Semantic Chunking', 
-                              duration: getStageDuration(chunkCp, imgCp || previousCheckpoint),
-                              timestamp: chunkCp.created_at
-                            });
-                          }
-                        }
-                        return subActions;
-                      };
-
-                      const subActions = getSubActions();
-
-                      return (
-                        <div key={stage.id} className="relative flex gap-6">
-                          {/* Connector Line */}
-                          {!isLast && (
-                            <div className={`absolute left-[19px] top-10 w-0.5 h-[calc(100%+8px)] ${isCompleted ? 'bg-primary' : 'bg-slate-200'}`} />
+                  <CardContent>
+                    <div className="space-y-3">
+                      {/* Discovery Status */}
+                      <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          {selectedJob?.metadata?.products_discovered ? (
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                          ) : (
+                            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
                           )}
-
-                          {/* Icon Container */}
-                          <div className="relative z-10">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                              isCompleted ? 'bg-primary border-primary text-primary-foreground' :
-                              isActive ? 'bg-white border-primary text-primary animate-pulse shadow-md' :
-                              'bg-slate-50 border-slate-200 text-slate-400'
-                            }`}>
-                              {isCompleted ? (
-                                <CheckCircle className="h-6 w-6" />
-                              ) : isActive ? (
-                                <RefreshCw className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <Icon className="h-5 w-5" />
-                              )}
+                          <div>
+                            <div className="font-semibold text-sm">
+                              {selectedJob?.metadata?.products_discovered
+                                ? `${selectedJob.metadata.products_discovered} Products Detected`
+                                : 'Analyzing document...'}
                             </div>
-                          </div>
-
-                          {/* Stage Details */}
-                          <div className="flex-1 pt-1 pb-4">
-                            <div className="flex items-center justify-between">
-                              <h4 className={`font-semibold text-sm ${isActive ? 'text-primary' : isPending ? 'text-slate-500' : 'text-slate-900'}`}>
-                                {stage.name}
-                              </h4>
-                              {isCompleted && checkpoint?.created_at && (
-                                <div className="flex items-center gap-2">
-                                  {stageDuration && stageDuration !== 'N/A' && (
-                                    <Badge variant="outline" className="text-[9px] bg-slate-50 text-slate-500 border-slate-200 py-0 h-4 uppercase font-bold tracking-tighter">
-                                      Took {stageDuration}
-                                    </Badge>
-                                  )}
-                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                    {formatDate(checkpoint.created_at)}
-                                  </span>
-                                </div>
-                              )}
+                            <div className="text-xs text-muted-foreground">
+                              Using Claude 4.5 Sonnet for intelligent product identification
                             </div>
-                            
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {isCompleted ? 'Task finished successfully' :
-                               isActive ? 'System is currently working on this step' :
-                               'Waiting for previous steps to complete'}
-                            </p>
-
-                            {/* Real-time Metrics Display */}
-                            {(isActive || isCompleted) && stageMetrics && (
-                              <div className="mt-3 bg-slate-50 border border-slate-100 rounded-md p-2 flex items-center gap-2 animate-in fade-in slide-in-from-left-2">
-                                <Activity className="h-3 w-3 text-primary" />
-                                <span className="text-xs font-medium text-slate-700">{stageMetrics}</span>
-                              </div>
-                            )}
-
-                            {/* Sub-actions Breakdown */}
-                            {subActions.length > 0 && (
-                              <div className="mt-3 space-y-2 pl-2 border-l-2 border-slate-100 ml-1">
-                                {subActions.map((sub, idx) => (
-                                  <div key={idx} className="flex items-center justify-between text-[11px]">
-                                    <div className="flex items-center gap-2 text-slate-600">
-                                      <div className="w-1.5 h-1.5 rounded-full bg-slate-300" />
-                                      {sub.name}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-slate-500">Took {sub.duration}</span>
-                                      <span className="text-slate-300">|</span>
-                                      <span className="text-muted-foreground">{new Date(sub.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Stage-specific detail content */}
-                            {isCompleted && checkpoint?.metadata && Object.keys(checkpoint.metadata).length > 0 && (
-                              <div className="mt-2 grid grid-cols-2 gap-2">
-                                {Object.entries(checkpoint.metadata).slice(0, 4).map(([key, value]) => (
-                                  <div key={key} className="text-[10px] flex gap-1">
-                                    <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
-                                    <span className="font-medium text-slate-700">
-                                      {typeof value === 'object' ? '...' : String(value)}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
                           </div>
                         </div>
-                      );
-                    })}
+                        {selectedJob?.metadata?.products_discovered && (
+                          <Badge className="bg-green-50 text-green-700 border-green-200">
+                            Complete
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Discovery Metrics */}
+                      {selectedJob?.metadata?.products_discovered && (
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="bg-white border rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground mb-1">Products Found</div>
+                            <div className="text-2xl font-bold text-primary">
+                              {selectedJob.metadata.products_discovered}
+                            </div>
+                          </div>
+                          <div className="bg-white border rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground mb-1">Pages Analyzed</div>
+                            <div className="text-2xl font-bold text-slate-900">
+                              {selectedJob.metadata.total_pages || 0}
+                            </div>
+                          </div>
+                          <div className="bg-white border rounded-lg p-3">
+                            <div className="text-xs text-muted-foreground mb-1">AI Model</div>
+                            <div className="text-sm font-semibold text-slate-900">
+                              Claude 4.5
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Product Processing Pipeline */}
+                <Card>
+                  <CardHeader className="pb-3 border-b bg-slate-50/50">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Package className="h-5 w-5 text-primary" />
+                        Product Processing Pipeline
+                      </CardTitle>
+                      <div className="text-xs text-muted-foreground font-medium">
+                        {productProgress.filter(p => p.status === 'completed').length} / {productProgress.length} Completed
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    {productProgress.length > 0 ? (
+                      <Accordion type="multiple" className="w-full">
+                        {productProgress.map((product, productIndex) => {
+                          const isCompleted = product.status === 'completed';
+                          const isFailed = product.status === 'failed';
+                          const isProcessing = product.status === 'processing';
+
+                          return (
+                            <AccordionItem key={product.id} value={product.id} className="border-b px-4">
+                              <AccordionTrigger className="hover:no-underline py-4">
+                                <div className="flex items-center gap-3 flex-1">
+                                  {/* Status Icon */}
+                                  {isFailed ? (
+                                    <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                                      <XCircle className="h-5 w-5 text-red-600" />
+                                    </div>
+                                  ) : isProcessing ? (
+                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                      <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                                    </div>
+                                  ) : isCompleted ? (
+                                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
+                                      <Clock className="h-5 w-5 text-slate-400" />
+                                    </div>
+                                  )}
+
+                                  {/* Product Info */}
+                                  <div className="flex-1 text-left">
+                                    <div className="font-semibold text-slate-900 leading-tight flex items-center gap-2">
+                                      <span>#{productIndex + 1}</span>
+                                      <span>{product.product_name}</span>
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
+                                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                                        ID: {product.product_id.slice(0, 8)}
+                                      </span>
+                                      {product.current_stage && (
+                                        <span className="flex items-center gap-1 text-primary">
+                                          <Activity className="h-3 w-3" />
+                                          {product.current_stage}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Status Badge */}
+                                  <Badge
+                                    className={`ml-auto shadow-none ${
+                                      isFailed ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' :
+                                      isProcessing ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' :
+                                      isCompleted ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' :
+                                      'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                                    }`}
+                                    variant="outline"
+                                  >
+                                    {product.status.toUpperCase()}
+                                  </Badge>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent className="pb-6 pt-2">
+                                <div className="space-y-4 pl-11">
+                                  {/* Error Message */}
+                                  {product.error_message && (
+                                    <div className="bg-red-50 border border-red-100 rounded-md p-3 flex gap-3">
+                                      <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                                      <div>
+                                        <h5 className="text-xs font-semibold text-red-900">Processing Error</h5>
+                                        <p className="text-xs text-red-700 mt-0.5">{product.error_message}</p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Product Pipeline Stages */}
+                                  <div className="space-y-3">
+                                    <h5 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Processing Pipeline</h5>
+
+                                    {/* Stage Flow */}
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                                      {PRODUCT_STAGES.map((stage) => {
+                                        const isStageCompleted = product.stages_completed?.includes(stage.id);
+                                        const isCurrentStage = product.current_stage === stage.id;
+                                        const StageIcon = stage.icon;
+
+                                        return (
+                                          <div
+                                            key={stage.id}
+                                            className={`flex flex-col items-center text-center p-3 rounded-lg border transition-all duration-200 ${
+                                              isStageCompleted ? 'bg-green-50 border-green-200 text-green-900' :
+                                              isCurrentStage ? 'bg-blue-50 border-blue-200 text-blue-900 ring-2 ring-blue-100' :
+                                              'bg-slate-50/50 border-slate-100 text-slate-400'
+                                            }`}
+                                          >
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${
+                                              isStageCompleted ? 'bg-green-100' :
+                                              isCurrentStage ? 'bg-blue-100 animate-pulse' :
+                                              'bg-slate-100'
+                                            }`}>
+                                              {isCurrentStage ? (
+                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                              ) : (
+                                                <StageIcon className="h-4 w-4" />
+                                              )}
+                                            </div>
+                                            <span className="text-[10px] font-bold uppercase tracking-tight leading-tight">{stage.name}</span>
+                                            <span className="text-[9px] text-muted-foreground mt-1 leading-tight">{stage.description}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {/* Detailed Metrics */}
+                                    {product.metadata && (
+                                      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {/* Pages Extracted */}
+                                        {product.metadata.total_pages_extracted !== undefined && (
+                                          <div className="bg-white border rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Pages Extracted</div>
+                                            <div className="text-lg font-bold text-slate-900">{product.metadata.total_pages_extracted}</div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">PDF pages mapped</div>
+                                          </div>
+                                        )}
+
+                                        {/* Chunks Created */}
+                                        {product.metadata.total_chunks_created !== undefined && (
+                                          <div className="bg-white border rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Text Chunks</div>
+                                            <div className="text-lg font-bold text-slate-900">{product.metadata.total_chunks_created}</div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">Semantic segments</div>
+                                          </div>
+                                        )}
+
+                                        {/* Images Extracted */}
+                                        {product.metadata.total_images_extracted !== undefined && (
+                                          <div className="bg-white border rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Images</div>
+                                            <div className="text-lg font-bold text-slate-900">{product.metadata.total_images_extracted}</div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">4-layer extraction</div>
+                                          </div>
+                                        )}
+
+                                        {/* Processing Time */}
+                                        {product.metadata.processing_time_ms !== undefined && (
+                                          <div className="bg-white border rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Time Spent</div>
+                                            <div className="text-lg font-bold text-slate-900">
+                                              {(product.metadata.processing_time_ms / 1000).toFixed(1)}s
+                                            </div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">Total processing</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* AI Models Used */}
+                                    {product.metadata?.models_used && (
+                                      <div className="mt-4 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100 rounded-lg p-3">
+                                        <h6 className="text-[10px] font-semibold text-purple-900 uppercase tracking-wide mb-2 flex items-center gap-1">
+                                          <Zap className="h-3 w-3" />
+                                          AI Models Used
+                                        </h6>
+                                        <div className="flex flex-wrap gap-2">
+                                          {Object.entries(product.metadata.models_used).map(([model, usage]) => (
+                                            <Badge key={model} variant="outline" className="bg-white/80 text-purple-900 border-purple-200 text-[9px]">
+                                              {model}: {String(usage)}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Technical Details */}
+                                    {product.metadata && Object.keys(product.metadata).length > 0 && (
+                                      <details className="mt-4 group">
+                                        <summary className="cursor-pointer text-[10px] font-semibold text-slate-600 uppercase tracking-wide hover:text-primary transition-colors flex items-center gap-1">
+                                          <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
+                                          Technical Metadata
+                                        </summary>
+                                        <div className="mt-2 bg-slate-50 border rounded-md p-3 text-[10px] font-mono">
+                                          <pre className="whitespace-pre-wrap text-slate-700">
+                                            {JSON.stringify(product.metadata, null, 2)}
+                                          </pre>
+                                        </div>
+                                      </details>
+                                    )}
+                                  </div>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                      </Accordion>
+                    ) : (
+                      <div className="p-12 text-center text-muted-foreground">
+                        <Package className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                        <p className="text-sm font-medium">No products detected yet</p>
+                        <p className="text-xs mt-1">Products will appear here once the discovery phase completes</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -2515,204 +2648,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </TabsContent>
-
-              {/* Product Extraction Tab */}
-              <TabsContent value="products" className="space-y-6 mt-6">
-                {/* Product Detail Header */}
-                <div className="flex items-center justify-between px-1">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Extracted Products</h3>
-                    <p className="text-sm text-muted-foreground">Detailed status tracking for individual products identified in the document</p>
-                  </div>
-                  <Badge variant="outline" className="px-3 py-1 bg-white">
-                    {productProgress.length} items
-                  </Badge>
-                </div>
-                {/* Product Accordions */}
-                {productProgress.length > 0 ? (
-                  <div className="space-y-4">
-                    <Card>
-                      <CardHeader className="pb-3 border-b bg-slate-50/50">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Package className="h-4 w-4 text-primary" />
-                            Active Extractions
-                          </CardTitle>
-                          <div className="text-[11px] text-muted-foreground font-medium">
-                            {productProgress.filter(p => p.status === 'completed').length} COMPLETED | {productProgress.filter(p => p.status === 'failed').length} FAILED
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <Accordion type="multiple" className="w-full">
-                          {productProgress.map((product) => {
-                            const isCompleted = product.status === 'completed';
-                            const isFailed = product.status === 'failed';
-                            const isProcessing = product.status === 'processing';
-
-                            return (
-                              <AccordionItem key={product.id} value={product.id} className="border-b px-4">
-                                <AccordionTrigger className="hover:no-underline py-4">
-                                  <div className="flex items-center gap-3 flex-1">
-                                    {/* Status Icon */}
-                                    {isFailed ? (
-                                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
-                                        <XCircle className="h-5 w-5 text-red-600" />
-                                      </div>
-                                    ) : isProcessing ? (
-                                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                                      </div>
-                                    ) : isCompleted ? (
-                                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                        <CheckCircle className="h-5 w-5 text-green-600" />
-                                      </div>
-                                    ) : (
-                                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                        <Clock className="h-5 w-5 text-slate-400" />
-                                      </div>
-                                    )}
-
-                                    {/* Product Info */}
-                                    <div className="flex-1 text-left">
-                                      <div className="font-semibold text-slate-900 leading-tight">{product.product_name}</div>
-                                      <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
-                                        <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">ID: {product.product_id.slice(0, 8)}</span>
-                                        {product.current_stage && (
-                                          <span className="flex items-center gap-1 text-primary">
-                                            <Activity className="h-3 w-3" />
-                                            {product.current_stage}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-
-                                    {/* Status Badge */}
-                                    <Badge
-                                      className={`ml-auto shadow-none ${
-                                        isFailed ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' :
-                                        isProcessing ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                                        isCompleted ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' :
-                                        'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-                                      }`}
-                                      variant="outline"
-                                    >
-                                      {product.status.toUpperCase()}
-                                    </Badge>
-                                  </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="pb-6 pt-2">
-                                  <div className="space-y-4 pl-11">
-                                    {/* Error Message */}
-                                    {product.error_message && (
-                                      <div className="bg-red-50 border border-red-100 rounded-md p-3 flex gap-3">
-                                        <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
-                                        <div>
-                                          <h5 className="text-xs font-semibold text-red-900">Processing Error</h5>
-                                          <p className="text-xs text-red-700 mt-0.5">{product.error_message}</p>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Product Pipeline Flow */}
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                                      {PRODUCT_STAGES.map((stage) => {
-                                        const isStageCompleted = product.stages_completed?.includes(stage.id);
-                                        const isCurrentStage = product.current_stage === stage.id;
-                                        const StageIcon = stage.icon;
-
-                                        return (
-                                          <div
-                                            key={stage.id}
-                                            className={`flex flex-col items-center text-center p-3 rounded-lg border transition-all duration-200 ${
-                                              isStageCompleted ? 'bg-green-50 border-green-100 text-green-900' :
-                                              isCurrentStage ? 'bg-blue-50 border-blue-200 text-blue-900 ring-1 ring-blue-100' :
-                                              'bg-slate-50/50 border-slate-100 text-slate-400'
-                                            }`}
-                                          >
-                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center mb-2 ${
-                                              isStageCompleted ? 'bg-green-100' :
-                                              isCurrentStage ? 'bg-blue-100 animate-pulse' :
-                                              'bg-slate-100'
-                                            }`}>
-                                              {isCurrentStage ? (
-                                                <RefreshCw className="h-4 w-4 animate-spin" />
-                                              ) : (
-                                                <StageIcon className="h-4 w-4" />
-                                              )}
-                                            </div>
-                                            <span className="text-[10px] font-bold uppercase tracking-tight">{stage.name}</span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-
-                                    {/* Product Metrics Grid */}
-                                    <div className="grid grid-cols-3 gap-3">
-                                      <div className="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <FileText className="h-3 w-3 text-muted-foreground" />
-                                          <span className="text-[10px] text-muted-foreground font-medium uppercase">Chunks</span>
-                                        </div>
-                                        <div className="text-lg font-bold text-slate-900">
-                                          {product.metrics.chunks_created || 0}
-                                        </div>
-                                      </div>
-                                      <div className="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <ImageIcon className="h-3 w-3 text-muted-foreground" />
-                                          <span className="text-[10px] text-muted-foreground font-medium uppercase">Images</span>
-                                        </div>
-                                        <div className="text-lg font-bold text-slate-900">
-                                          {product.metrics.images_processed || 0}
-                                        </div>
-                                      </div>
-                                      <div className="bg-white border rounded-lg p-3 shadow-sm hover:shadow-md transition-shadow">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <Link className="h-3 w-3 text-muted-foreground" />
-                                          <span className="text-[10px] text-muted-foreground font-medium uppercase">Relational Links</span>
-                                        </div>
-                                        <div className="text-lg font-bold text-slate-900">
-                                          {product.metrics.relationships_created || 0}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Action Shortcuts */}
-                                    {isCompleted && (
-                                      <div className="flex gap-2 justify-end">
-                                        <button className="text-[10px] font-medium bg-slate-900 text-white px-3 py-1 rounded hover:bg-slate-800 transition-colors uppercase tracking-wider">
-                                          View Data
-                                        </button>
-                                        <button className="text-[10px] font-medium border px-3 py-1 rounded hover:bg-slate-50 transition-colors uppercase tracking-wider">
-                                          Re-sync
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </AccordionContent>
-                              </AccordionItem>
-                            );
-                          })}
-                        </Accordion>
-                      </CardContent>
-                    </Card>
-
-                  </div>
-                ) : (
-                  <Card className="border-dashed border-2 bg-slate-50/50">
-                    <CardContent className="py-20 text-center">
-                      <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto mb-4 border ring-4 ring-slate-100">
-                        <Package className="h-8 w-8 text-slate-300" />
-                      </div>
-                      <h4 className="text-base font-semibold text-slate-900">No products discovered yet</h4>
-                      <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-2">
-                        Wait for the "Product Discovery" stage of the pipeline to identify materials and items in the document.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
               </TabsContent>
             </Tabs>
 

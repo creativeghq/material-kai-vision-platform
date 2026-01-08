@@ -92,7 +92,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
           </div>
           <AlertDialogDescription className="text-left space-y-4 pt-4">
             <p className="font-semibold text-foreground">
-              ⚠️ This action will permanently delete the following data (70 tables + storage):
+              ⚠️ This action will permanently delete the following data (72 tables + storage):
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>Agent Chat (conversations, messages, uploaded files)</li>
@@ -107,6 +107,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>PDF Processing (jobs, checkpoints, progress, AI queue, image queue)</li>
               <li>Knowledge Base (chunks, embeddings, images, documents)</li>
               <li>Products & Materials Catalog (products, visual analysis)</li>
+              <li>YOLO Layout Data (layout regions, extracted tables)</li>
               <li>Processing Results & Quality Data</li>
               <li>Web Scraping (sessions, pages, temp materials)</li>
               <li>Data Import (jobs, history)</li>

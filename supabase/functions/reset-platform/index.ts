@@ -59,6 +59,8 @@ const TABLES_TO_CLEAR = [
   'ai_analysis_queue',             // AI analysis queue
   'image_processing_queue',        // Image processing queue
   'embeddings',                    // Text and image embeddings
+  'product_tables',                // YOLO extracted tables (child of products)
+  'product_layout_regions',        // YOLO layout regions (child of products)
   'document_images',               // Extracted images from PDFs
   'document_chunks',               // Semantic text chunks
   'products',                      // Extracted products

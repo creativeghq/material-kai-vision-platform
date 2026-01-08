@@ -67,6 +67,21 @@
 | `ENVIRONMENT` | Public | Server ENV | Environment name | `production`, `staging`, `development` |
 | `DEBUG` | Public | Server ENV | Debug mode | `false` (production), `true` (development) |
 | `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
+| `VISION_GUIDED_ENABLED` | Public | Server ENV | Enable Vision AI Layer 3 for image extraction | `false` (default), `true` |
+| `VISION_GUIDED_PROVIDER` | Public | Server ENV | Vision AI provider (uses existing API keys) | `anthropic`, `openai`, `together` |
+| `VISION_GUIDED_MODEL` | Public | Server ENV | Vision model for image analysis | `claude-sonnet-4-5-20250929`, `gpt-4o`, `Qwen/Qwen2-VL-72B-Instruct` |
+| `VISION_GUIDED_CONFIDENCE_THRESHOLD` | Public | Server ENV | Minimum confidence for vision crops | `0.8` (default, range: 0.0-1.0) |
+| `VISION_GUIDED_FALLBACK_TO_PYMUPDF` | Public | Server ENV | Fallback to PyMuPDF if Vision AI fails | `true` (default), `false` |
+| `HF_TOKEN` | **Secret** | Server ENV | HuggingFace API token for Chandra OCR Inference Endpoint (with write permissions) | `hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `CHANDRA_ENDPOINT_URL` | Public | Server ENV | Chandra OCR Inference Endpoint URL | `https://kgvlceo5zrww8a6m.us-east-1.aws.endpoints.huggingface.cloud` |
+| `CHANDRA_ENDPOINT_NAME` | Public | Server ENV | Chandra OCR Inference Endpoint name for pause/resume | `mh-chandra` (default) |
+| `CHANDRA_NAMESPACE` | Public | Server ENV | HuggingFace namespace/username for endpoint management | `basiliskan` (default) |
+| `CHANDRA_ENABLED` | Public | Server ENV | Enable Chandra OCR fallback when EasyOCR confidence is low | `true` (default), `false` |
+| `CHANDRA_CONFIDENCE_THRESHOLD` | Public | Server ENV | EasyOCR confidence threshold - use Chandra if below this value | `0.7` (default, range: 0.0-1.0) |
+| `CHANDRA_AUTO_PAUSE_TIMEOUT` | Public | Server ENV | Seconds of idle time before auto-pausing endpoint (prevents billing) | `60` (default) |
+| `CHANDRA_MAX_RESUME_RETRIES` | Public | Server ENV | Maximum retry attempts for resuming endpoint | `3` (default) |
+| `CHANDRA_RESUME_TIMEOUT` | Public | Server ENV | Timeout in seconds for endpoint resume operation | `300` (default, 5 minutes) |
+| `CHANDRA_INFERENCE_TIMEOUT` | Public | Server ENV | Timeout in seconds for OCR inference calls | `30` (default) |
 
 ### **AI Service API Keys**
 
@@ -77,6 +92,7 @@
 | **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use (see rate limits below) |
 | **Voyage AI** | `VOYAGE_API_KEY` | Backend | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
+| **HuggingFace** | `HF_TOKEN` | Backend | https://huggingface.co/settings/tokens | Free (Inference Endpoints billed separately) |
 
 ### **Together AI Rate Limiting Configuration**
 
@@ -107,6 +123,91 @@ Together AI uses a tier-based rate limiting system based on total spend. Configu
 - ✅ Easy to upgrade as spend increases
 
 **See also:** `mivaa-pdf-extractor/RATE_LIMITING.md` for detailed configuration guide
+
+---
+
+### **Chandra OCR Inference Endpoint Configuration**
+
+**Chandra OCR** is a high-accuracy OCR model deployed as a serverless HuggingFace Inference Endpoint. It provides GPU-accelerated OCR with automatic pause/resume for cost control.
+
+#### **How It Works:**
+1. **EasyOCR Primary**: Fast, local, free OCR (runs first)
+2. **Chandra Fallback**: If EasyOCR confidence < 0.7, use Chandra endpoint (GPU, high accuracy)
+3. **Auto Pause/Resume**: Endpoint automatically pauses when idle to prevent billing
+4. **Cost Control**: ~$0.02 per 30-page document, $0/hour when paused
+
+#### **Required Secrets:**
+
+| Secret Name | Type | Default | Description |
+|------------|------|---------|-------------|
+| `HF_TOKEN` | **Secret** | *(required)* | HuggingFace API token with **write** permissions |
+| `CHANDRA_ENDPOINT_URL` | Public | `https://kgvlceo5zrww8a6m.us-east-1.aws.endpoints.huggingface.cloud` | Chandra OCR Inference Endpoint URL |
+| `CHANDRA_ENDPOINT_NAME` | Public | `mh-chandra` | Endpoint name for pause/resume operations |
+| `CHANDRA_NAMESPACE` | Public | `basiliskan` | HuggingFace namespace/username |
+| `CHANDRA_ENABLED` | Public | `true` | Enable/disable Chandra OCR fallback |
+| `CHANDRA_CONFIDENCE_THRESHOLD` | Public | `0.7` | EasyOCR confidence threshold (0.0-1.0) |
+| `CHANDRA_AUTO_PAUSE_TIMEOUT` | Public | `60` | Seconds before auto-pause (prevents billing) |
+| `CHANDRA_MAX_RESUME_RETRIES` | Public | `3` | Max retry attempts for resuming endpoint |
+| `CHANDRA_RESUME_TIMEOUT` | Public | `300` | Timeout for resume operation (seconds) |
+| `CHANDRA_INFERENCE_TIMEOUT` | Public | `30` | Timeout for OCR inference calls (seconds) |
+
+#### **Setup Instructions:**
+
+1. **Get HuggingFace Token:**
+   - Go to: https://huggingface.co/settings/tokens
+   - Click "New token"
+   - Name: "Chandra OCR Endpoint"
+   - Type: **Write** (required for pause/resume)
+   - Copy token (starts with `hf_...`)
+
+2. **Create Inference Endpoint** (if not already created):
+   - Go to: https://ui.endpoints.huggingface.co/
+   - Click "New endpoint"
+   - Model: `datalab-to/chandra`
+   - Instance: GPU (e.g., `nvidia-a10g`)
+   - Region: `us-east-1`
+   - Name: `mh-chandra`
+   - Click "Create"
+   - Copy endpoint URL
+
+3. **Configure Environment Variables:**
+   ```bash
+   # Required
+   HF_TOKEN=hf_your_token_here
+
+   # Optional (defaults shown)
+   CHANDRA_ENDPOINT_URL=https://kgvlceo5zrww8a6m.us-east-1.aws.endpoints.huggingface.cloud
+   CHANDRA_ENDPOINT_NAME=mh-chandra
+   CHANDRA_NAMESPACE=basiliskan
+   CHANDRA_ENABLED=true
+   CHANDRA_CONFIDENCE_THRESHOLD=0.7
+   CHANDRA_AUTO_PAUSE_TIMEOUT=60
+   ```
+
+4. **Verify Endpoint Status:**
+   - Endpoint should be **PAUSED** by default (no billing)
+   - Will auto-resume when OCR is needed
+   - Will auto-pause after 60 seconds of idle time
+
+#### **Cost Estimation:**
+
+| Scenario | Time | Cost |
+|----------|------|------|
+| **Endpoint paused** | N/A | **$0/hour** ✅ |
+| **Endpoint running** | N/A | **~$0.60/hour** |
+| **30-page scanned PDF** | ~110s | **~$0.02** |
+| **100 documents/month** | N/A | **~$2/month** |
+
+**Key:** Endpoint is paused 99% of the time = **NO BILLING** 🎉
+
+#### **Billing Safety Features:**
+- ✅ Auto-pause after 60 seconds idle
+- ✅ Force-pause after batch processing
+- ✅ Endpoint status monitoring
+- ✅ Cost tracking per document
+- ✅ Fallback to EasyOCR if endpoint fails
+
+---
 
 ### **Price Monitoring API Keys**
 
@@ -785,6 +886,14 @@ HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384
 HUGGINGFACE_BATCH_SIZE=10
 HUGGINGFACE_TIMEOUT=60
 HUGGINGFACE_MAX_RETRIES=3
+
+# 4-Layer Image Extraction - Vision AI (Optional, Layer 3)
+# NOTE: Uses existing ANTHROPIC_API_KEY, OPENAI_API_KEY, or TOGETHER_AI_API_KEY
+VISION_GUIDED_ENABLED=false  # Set to true to enable Vision AI Layer 3
+VISION_GUIDED_PROVIDER=anthropic  # anthropic, openai, or together
+VISION_GUIDED_MODEL=claude-sonnet-4-5-20250929  # Model for vision analysis
+VISION_GUIDED_CONFIDENCE_THRESHOLD=0.8  # Minimum confidence for vision crops (0.0-1.0)
+VISION_GUIDED_FALLBACK_TO_PYMUPDF=true  # Fallback to Layers 1+2 if Vision AI fails
 ```
 
 #### **Deployment Process**

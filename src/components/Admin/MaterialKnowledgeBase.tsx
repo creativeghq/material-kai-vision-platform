@@ -25,7 +25,6 @@ import { ProductFormModal } from './ProductFormModal';
 import { ProductDeleteConfirmation } from './ProductDeleteConfirmation';
 import { ProductPreviewModal } from './ProductPreviewModal';
 import { ChunkDetailModal } from './ChunkDetailModal';
-import { ExtractionMethodBadge } from '@/components/features/images/ExtractionMethodBadge';
 
 import {
   Card,
@@ -1696,14 +1695,6 @@ export const MaterialKnowledgeBase: React.FC = () => {
                               {Math.round((image.confidence || 0) * 100)}%
                               confidence
                             </Badge>
-                            <ExtractionMethodBadge
-                              extractionMethod={image.extraction_method}
-                              detectionConfidence={image.detection_confidence}
-                              visionProvider={image.vision_provider}
-                              visionModel={image.vision_model}
-                              size="sm"
-                              showConfidence={false}
-                            />
                           </div>
 
                           <h4 className="font-medium">
@@ -1794,19 +1785,7 @@ export const MaterialKnowledgeBase: React.FC = () => {
                                             {image.image_type || 'Unknown'}
                                           </span>
                                         </div>
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-blue-700 dark:text-blue-300">
-                                            Extraction:
-                                          </span>
-                                          <ExtractionMethodBadge
-                                            extractionMethod={image.extraction_method}
-                                            detectionConfidence={image.detection_confidence}
-                                            visionProvider={image.vision_provider}
-                                            visionModel={image.vision_model}
-                                            size="sm"
-                                            showConfidence={false}
-                                          />
-                                        </div>
+
                                         <div className="flex justify-between">
                                           <span className="text-blue-700 dark:text-blue-300">
                                             Page:

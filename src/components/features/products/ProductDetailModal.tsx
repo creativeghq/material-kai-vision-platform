@@ -26,6 +26,7 @@ import { SimilarMaterials } from '@/components/features/recommendations';
 import { ProductMonitorTab } from '@/components/business/price-monitoring/ProductMonitorTab';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { generateGroutRecommendations, formatGroutSuggestion } from '@/utils/groutSuggestions';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -366,12 +367,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Country of Origin': origin || undefined,
   };
 
+  // Generate AI grout suggestions if not present
+  const groutRecommendations = React.useMemo(() => {
+    return generateGroutRecommendations(allData || {});
+  }, [allData]);
+
   const commercial = {
     'Product Codes': extractValue(commercialData?.product_codes),
     'SKU Codes': extractValue(commercialData?.sku_codes),
     'Grout Suppliers': extractValue(commercialData?.grout_suppliers),
-    'Grout Mapei': extractValue(commercialData?.grout_mapei),
-    'Grout Kerakoll': extractValue(commercialData?.grout_kerakoll),
+    'Grout Mapei': extractValue(commercialData?.grout_mapei) ||
+      (groutRecommendations.mapei ? `${formatGroutSuggestion(groutRecommendations.mapei)} (AI Suggested)` : undefined),
+    'Grout Kerakoll': extractValue(commercialData?.grout_kerakoll) ||
+      (groutRecommendations.kerakoll ? `${formatGroutSuggestion(groutRecommendations.kerakoll)} (AI Suggested)` : undefined),
+    'Grout Isomat': extractValue(commercialData?.grout_isomat) ||
+      (groutRecommendations.isomat ? `${formatGroutSuggestion(groutRecommendations.isomat)} (AI Suggested)` : undefined),
+    'Grout Technica': extractValue(commercialData?.grout_technica) ||
+      (groutRecommendations.technica ? `${formatGroutSuggestion(groutRecommendations.technica)} (AI Suggested)` : undefined),
     'Grout Color Codes': extractValue(commercialData?.grout_color_codes),
   };
 

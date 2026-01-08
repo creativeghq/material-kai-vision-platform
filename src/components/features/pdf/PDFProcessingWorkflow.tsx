@@ -278,7 +278,30 @@ export const PDFProcessingWorkflow: React.FC<PDFProcessingWorkflowProps> = ({
             {stage.metrics && (
               <div className="mt-3 pl-8 text-sm text-white/60 space-y-1">
                 {Object.entries(stage.metrics).map(([key, value]) => {
-                  // Special rendering for vision-guided metrics
+                  // Special rendering for 4-layer extraction metrics
+                  if (key === 'Layer 1 (Embedded)' || key === 'Layer 2 (Full Render)' || key === 'Layer 3 (Vision AI)' || key === 'Layer 4 (Deduplicated)') {
+                    const layerIcons: Record<string, string> = {
+                      'Layer 1 (Embedded)': '📎',
+                      'Layer 2 (Full Render)': '🖼️',
+                      'Layer 3 (Vision AI)': '👁️',
+                      'Layer 4 (Deduplicated)': '✨'
+                    };
+                    const layerColors: Record<string, string> = {
+                      'Layer 1 (Embedded)': 'text-blue-400',
+                      'Layer 2 (Full Render)': 'text-purple-400',
+                      'Layer 3 (Vision AI)': 'text-green-400',
+                      'Layer 4 (Deduplicated)': 'text-yellow-400'
+                    };
+                    return (
+                      <div key={key} className={`flex items-center gap-2 ${layerColors[key]}`}>
+                        <span className="text-lg">{layerIcons[key]}</span>
+                        <span className="font-medium">{key}:</span>
+                        <span>{value} images</span>
+                      </div>
+                    );
+                  }
+
+                  // Legacy: Special rendering for vision-guided metrics
                   if (key === 'Vision-Guided' || key === 'PyMuPDF Fallback') {
                     const isVision = key === 'Vision-Guided';
                     return (

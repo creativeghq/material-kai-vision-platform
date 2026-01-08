@@ -204,8 +204,9 @@ response = await client.post(
     json={
         "model": "Qwen/Qwen3-VL-8B-Instruct",
         "messages": [{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
-            {"type": "text", "text": analysis_prompt}
+            # CRITICAL: Text must come BEFORE image for Qwen models
+            {"type": "text", "text": analysis_prompt},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
         ]}]
     }
 )

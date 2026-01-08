@@ -20,7 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/core/ui/dialog';
-import { ExtractionMethodBadge } from '@/components/features/images/ExtractionMethodBadge';
 
 interface ImagesTabProps {
   workspaceId: string;
@@ -376,14 +375,6 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                       {image.image_type || 'Unknown'}
                     </Badge>
                     {getSourceBadge(image.source_type)}
-                    <ExtractionMethodBadge
-                      extractionMethod={image.extraction_method}
-                      detectionConfidence={image.detection_confidence}
-                      visionProvider={image.vision_provider}
-                      visionModel={image.vision_model}
-                      size="sm"
-                      showConfidence={true}
-                    />
                   </div>
 
                   {/* Title */}
@@ -451,18 +442,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     <CardTitle className="text-sm">Classification</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
-                    {/* Extraction Method Badge */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Extraction:</span>
-                      <ExtractionMethodBadge
-                        extractionMethod={selectedImage.extraction_method}
-                        detectionConfidence={selectedImage.detection_confidence}
-                        visionProvider={selectedImage.vision_provider}
-                        visionModel={selectedImage.vision_model}
-                        size="sm"
-                        showConfidence={true}
-                      />
-                    </div>
+
                     {selectedImage.category && (
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Category:</span>
@@ -515,58 +495,6 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                     )}
                   </CardContent>
                 </Card>
-
-                {/* Vision-Guided Extraction Metadata */}
-                {selectedImage.extraction_method === 'vision_guided' && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        <Eye className="h-4 w-4 text-green-600" />
-                        Vision-Guided Extraction
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {selectedImage.product_name && (
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-1">Product Name:</span>
-                          <Badge variant="outline" className="text-xs">
-                            {selectedImage.product_name}
-                          </Badge>
-                        </div>
-                      )}
-                      {selectedImage.detection_confidence !== null && selectedImage.detection_confidence !== undefined && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Detection Confidence:</span>
-                          <span className="text-xs font-medium text-green-700">
-                            {Math.round(selectedImage.detection_confidence * 100)}%
-                          </span>
-                        </div>
-                      )}
-                      {selectedImage.bbox && (
-                        <div>
-                          <span className="text-xs text-muted-foreground block mb-1">Bounding Box:</span>
-                          <code className="text-xs bg-muted px-2 py-1 rounded block">
-                            {JSON.stringify(selectedImage.bbox)}
-                          </code>
-                        </div>
-                      )}
-                      {selectedImage.vision_provider && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Provider:</span>
-                          <Badge variant="secondary" className="text-xs">
-                            {selectedImage.vision_provider}
-                          </Badge>
-                        </div>
-                      )}
-                      {selectedImage.vision_model && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Model:</span>
-                          <span className="text-xs font-mono">{selectedImage.vision_model}</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
 
                 {/* Vision Analysis - Rich Details */}
                 {selectedImage.vision_analysis && (

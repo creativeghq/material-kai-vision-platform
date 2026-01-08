@@ -239,20 +239,29 @@ Complete documentation for Material Kai Vision Platform.
 - Automatic placeholder replacement
 - Phase 1 complete (metadata extraction), Phases 2-4 pending
 
-**[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing
-- Pipeline overview
+**[pdf-processing-pipeline.md](pdf-processing-pipeline.md)** - 14-stage PDF processing ✨ UPDATED
+- Product-centric architecture (process each product individually)
 - Stage 0A: Product Discovery (0-10%) - Products + Metadata extraction
 - Stage 0B: Document Entity Discovery (10-15%) - Certificates, Logos, Specs
-- Stage 1: Focused Extraction (15-30%)
-- Stage 2: Text Extraction (30-40%)
-- Stage 3: Semantic Chunking (40-50%)
-- Stage 4: Text Embeddings (50-60%)
-- Stage 5: Image Extraction (60-70%)
-- Stage 6: Image Analysis (70-80%)
-- Stages 7-10: Multi-Vector Embeddings (80-91%)
-- Stage 11: Product Creation (91-95%)
-- Stage 12: Metafield Extraction (95-97%)
-- Stage 13: Quality Enhancement (97-100%)
+- Stage 1: Extract Product Pages (15-25%)
+- Stage 2: Text Extraction (25-35%)
+- Stage 3: Image Extraction (35-45%)
+- Stage 4: Product Creation (45-50%)
+- **Stage 4.5: YOLO Layout Detection + Table Extraction (50-65%)** ✨ NEW
+  - 6 region types: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA
+  - Automatic table extraction (Camelot)
+  - Enabled by default (YOLO_ENABLED=true)
+  - Stores in product_layout_regions and product_tables
+- Stage 5: Entity Linking (65-70%)
+- Stage 6: AI Classification (70-75%)
+- Stage 7: CLIP Embeddings (75-85%)
+- Stage 8: Qwen Vision Analysis (85-90%)
+- **Layout-Aware Chunking** ✨ NEW
+  - Uses YOLO regions for intelligent chunking
+  - Respects region boundaries
+  - Combines TITLE + TEXT
+  - Keeps tables intact
+  - Preserves reading order
 - Checkpoint recovery (9 checkpoints)
 - Performance metrics
 - API endpoint

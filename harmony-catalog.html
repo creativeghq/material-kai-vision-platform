@@ -763,7 +763,7 @@
                             </div>
                         </div>` : ''}
 
-                        ${product.metadata.groutMapei || product.metadata.groutKerakoll ? `
+                        ${product.metadata.groutMapei || product.metadata.groutKerakoll || product.metadata.groutIsomat || product.metadata.groutTechnica ? `
                         <div class="metadata-section">
                             <h3 class="metadata-title">🔧 Grout Recommendations</h3>
                             <div class="metadata-grid">
@@ -776,6 +776,16 @@
                                 <div class="metadata-item">
                                     <div class="metadata-label">Kerakoll</div>
                                     <div class="metadata-value">${product.metadata.groutKerakoll}</div>
+                                </div>` : ''}
+                                ${product.metadata.groutIsomat ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Isomat</div>
+                                    <div class="metadata-value">${product.metadata.groutIsomat}</div>
+                                </div>` : ''}
+                                ${product.metadata.groutTechnica ? `
+                                <div class="metadata-item">
+                                    <div class="metadata-label">Technica</div>
+                                    <div class="metadata-value">${product.metadata.groutTechnica}</div>
                                 </div>` : ''}
                             </div>
                         </div>` : ''}
