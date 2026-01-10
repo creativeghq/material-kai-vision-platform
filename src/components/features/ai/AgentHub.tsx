@@ -143,9 +143,8 @@ const AI_MODELS = [
   { id: 'anthropic/claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', provider: 'anthropic', type: 'language' },
   { id: 'openai/gpt-5', name: 'GPT-5', provider: 'openai', type: 'language' },
 
-  // Vision Models
-  { id: 'together/Qwen/Qwen3-VL-32B-Instruct', name: 'Qwen3-VL-32B', provider: 'together', type: 'vision' },
-  { id: 'together/Qwen/Qwen3-VL-8B-Instruct', name: 'Qwen3-VL-8B', provider: 'together', type: 'vision' },
+  // Vision Models (HuggingFace Endpoint - 32B only)
+  { id: 'huggingface/Qwen/Qwen3-VL-32B-Instruct', name: 'Qwen3-VL-32B', provider: 'huggingface', type: 'vision' },
 
   // Visual Embedding Models
   { id: 'google/siglip-so400m-patch14-384', name: 'SigLIP-SO400M', provider: 'google', type: 'visual-embedding' },

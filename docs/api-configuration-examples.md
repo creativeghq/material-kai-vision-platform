@@ -35,11 +35,11 @@ If you don't provide `ai_config`, the system uses these defaults:
 ```
 
 **Defaults Used**:
-- Visual Embeddings: SigLIP (primary) → CLIP (fallback)
-- Classification: Qwen Vision (primary) → Claude Sonnet (validation)
+- Visual Embeddings: SLIG (SigLIP2) - HuggingFace endpoint (768D)
+- Classification: Qwen3-VL-32B-Instruct - HuggingFace endpoint
 - Discovery: Claude Sonnet 4.5
 - Metadata: Claude
-- Text Embeddings: OpenAI text-embedding-3-small
+- Text Embeddings: Voyage AI voyage-3.5 (1024D) → OpenAI fallback (1024D)
 
 ### Custom Configuration
 
@@ -67,10 +67,12 @@ Best overall accuracy and reliability.
 ```json
 {
   "ai_config": {
-    "visual_embedding_primary": "google/siglip2-so400m-patch14-384",
-    "visual_embedding_fallback": "openai/clip-vit-base-patch32",
-    "text_embedding_model": "text-embedding-3-small",
-    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
+    "visual_embedding_model": "SLIG",
+    "visual_embedding_dimensions": 768,
+    "text_embedding_model": "voyage-3.5",
+    "text_embedding_dimensions": 1024,
+    "text_embedding_input_type": "document",
+    "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.7,
     "discovery_model": "claude-sonnet-4-20250514",

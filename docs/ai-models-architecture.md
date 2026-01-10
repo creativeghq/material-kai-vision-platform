@@ -2,14 +2,15 @@
 
 ## Executive Summary
 
-MIVAA Platform uses **8 different AI models** across **4 providers** for different purposes:
+MIVAA Platform uses **7 different AI models** across **4 providers** for different purposes:
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
-| **Google** | SigLIP ViT-SO400M | Visual embeddings (512D) |
-| **OpenAI** | text-embedding-3-small, GPT-4o, GPT-5 | Text embeddings, chat, product discovery |
+| **Google (HuggingFace)** | SigLIP2 ViT-SO400M (SLIG) | Visual embeddings (768D) - Cloud endpoint |
+| **Voyage AI** | voyage-3.5 | Text embeddings (1024D) - Primary for semantic search |
+| **OpenAI** | text-embedding-3-small, GPT-4o, GPT-5 | Text embeddings fallback, chat, product discovery |
 | **Anthropic** | Claude Sonnet 4.5, Claude Haiku 4.5 | Vision analysis, validation, agents |
-| **TogetherAI** | Qwen3-VL 17B Vision | Image analysis, OCR, material detection |
+| **Qwen (HuggingFace)** | Qwen3-VL-32B-Instruct | Image analysis, OCR, material detection - Cloud endpoint |
 
 ---
 
@@ -38,11 +39,13 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 3: Image Analysis (Primary)                                      │
-│ Model: Qwen3-VL 17B Vision (TogetherAI)                          │
+│ Model: Qwen3-VL-32B-Instruct (HuggingFace Endpoint)                   │
+│ Endpoint: https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud │
+│ Service: mh-qwen332binstruct (namespace: basiliskan)                   │
 │ Purpose: Detailed material analysis, color detection, texture          │
 │ Input: Product images                                                  │
 │ Output: Material properties, colors, textures, quality scores          │
-│ Why: 69.4% MMMU score, #1 OCR performance, cost-effective             │
+│ Why: State-of-the-art vision-language model, superior OCR, cloud-based│
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -55,33 +58,41 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STAGE 5: Visual Embeddings (5 types)                                   │
-│ Primary Model: SigLIP ViT-SO400M (Google)                             │
-│ Fallback Model: OpenAI CLIP ViT-B/32 (if SigLIP fails)               │
-│ Purpose: Generate 5 specialized 512D embeddings per image             │
+│ STAGE 5: Visual Embeddings (5 types) - 100% CLOUD                     │
+│ Model: SLIG (SigLIP2 ViT-SO400M) - HuggingFace Endpoint               │
+│ Endpoint: https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud  │
+│ Service: mh-siglip2 (namespace: basiliskan)                           │
+│ Purpose: Generate 5 specialized 768D embeddings per image             │
 │ Types:                                                                 │
-│   1. Visual (general appearance)                                       │
-│   2. Color (color palette)                                            │
-│   3. Texture (surface patterns)                                       │
-│   4. Style (design aesthetic)                                         │
-│   5. Material (material type)                                         │
-│ Why: SigLIP has +19-29% accuracy over CLIP, CLIP is reliable fallback│
+│   1. Visual (general appearance) - image_embedding mode                │
+│   2. Color (color palette) - text_embedding mode                      │
+│   3. Texture (surface patterns) - text_embedding mode                 │
+│   4. Style (design aesthetic) - text_embedding mode                   │
+│   5. Material (material type) - text_embedding mode                   │
+│ Why: Cloud-based, auto-pause enabled, 0GB local RAM, superior quality │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STAGE 6: Text Embeddings                                               │
-│ Model: OpenAI text-embedding-3-small                                  │
-│ Purpose: Generate 1536D embeddings for text chunks                    │
+│ Primary Model: Voyage AI voyage-3.5                                   │
+│ Fallback Model: OpenAI text-embedding-3-small                         │
+│ Purpose: Generate 1024D embeddings for text chunks                    │
 │ Input: Product descriptions, specifications, chunk text               │
-│ Output: 1536D text embeddings                                         │
-│ Why: Industry standard, high quality, cost-effective                  │
+│ Output: 1024D text embeddings (Voyage) or 1024D (OpenAI fallback)    │
+│ Input Types: "document" for indexing, "query" for search             │
+│ Why: Superior quality to OpenAI, optimized for retrieval, $0.06/1M   │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         STORAGE (Supabase)                              │
 │ - Products table (metadata)                                            │
-│ - Images table (5x 512D embeddings per image)                         │
-│ - Chunks table (1536D text embeddings)                                │
+│ - VECS Collections (5x 768D visual embeddings per image)              │
+│   • image_siglip_embeddings (768D)                                    │
+│   • image_color_embeddings (768D)                                     │
+│   • image_texture_embeddings (768D)                                   │
+│   • image_material_embeddings (768D)                                  │
+│   • image_style_embeddings (768D)                                     │
+│ - Chunks table (1024D text embeddings - Voyage AI)                    │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -91,8 +102,9 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ SEARCH: Direct Vector DB RAG (Claude 4.5 + Multi-Vector)              │
 │ Models:                                                                │
-│   - Text Embeddings: Voyage AI 3.5 (1024D)                           │
-│   - Visual Embeddings: 6x CLIP specialized (SigLIP, color, texture)  │
+│   - Text Embeddings: Voyage AI voyage-3.5 (1024D)                    │
+│   - Visual Embeddings: 5x SLIG specialized (768D each)               │
+│     • Visual, Color, Texture, Material, Style                        │
 │   - LLM: Claude Sonnet 4.5 (200K context)                            │
 │ Purpose: Multi-vector search + intelligent synthesis                  │
 │ Why: Direct vector DB queries, no intermediate indexing layer         │
@@ -114,48 +126,48 @@ MIVAA Platform uses **8 different AI models** across **4 providers** for differe
 
 ## 🔍 Detailed Model Breakdown
 
-### 1. **Google SigLIP ViT-SO400M (Primary) + OpenAI CLIP ViT-B/32 (Fallback)** 🎯
+### 1. **SLIG (SigLIP2) Cloud Endpoint** 🎯
 
-**File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py`
+**File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
 
-**Primary Model - SigLIP** (using transformers directly):
+**Cloud-Only Architecture** (HuggingFace Inference Endpoint):
 ```python
-from transformers import AutoModel, AutoProcessor
-import torch
+# SLIG Client - 4 modes: zero_shot, image_embedding, text_embedding, similarity
+async def get_image_embedding(image_url=None, image_data=None):
+    """Get 768D image embedding from SLIG endpoint"""
+    payload = {
+        "mode": "image_embedding",
+        "image": image_data or image_url
+    }
+    result = await client.post(endpoint_url, json=payload)
+    return result["embedding"]  # 768D vector
 
-model = AutoModel.from_pretrained('google/siglip-so400m-patch14-384')
-processor = AutoProcessor.from_pretrained('google/siglip-so400m-patch14-384')
-model.eval()
-
-with torch.no_grad():
-    inputs = processor(images=pil_image, return_tensors="pt")
-    image_features = model.get_image_features(**inputs)
-    embedding = image_features / image_features.norm(dim=-1, keepdim=True)  # L2 normalize
-    embedding = embedding.squeeze().cpu().numpy()
+# Specialized embeddings using similarity mode
+async def get_specialized_embedding(image_data, text_prompt):
+    """Create text-guided embeddings using similarity scoring"""
+    # 1. Get base image embedding (768D)
+    # 2. Get similarity score with text prompt
+    # 3. Get text embedding (768D)
+    # 4. Blend: weighted_emb = (blend_weight * image + (1-blend_weight) * text)
+    # 5. Normalize to unit vector
 ```
 
-**Note**: Using `transformers` directly instead of `sentence-transformers` to avoid `'SiglipConfig' object has no attribute 'hidden_size'` error with SigLIP's composite config structure.
-
-**Fallback Model - CLIP** (if SigLIP fails):
-```python
-from transformers import CLIPProcessor, CLIPModel
-model = CLIPModel.from_pretrained('openai/clip-vit-base-patch32')
-processor = CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32')
-inputs = processor(images=pil_image, return_tensors="pt")
-embedding = model.get_image_features(**inputs)
-embedding = embedding / embedding.norm(dim=-1, keepdim=True)  # Normalize
-```
+**Benefits**:
+- ✅ No local model loading (faster startup, lower memory)
+- ✅ 768D embeddings (vs 1152D local SigLIP)
+- ✅ Automatic endpoint pause/resume (cost control)
+- ✅ Specialized embeddings via similarity mode
 
 **Purpose**:
-- Generate 512D visual embeddings for images
+- Generate 768D visual embeddings for images
 - 5 specialized embeddings per image (visual, color, texture, style, material)
-- Two-tier approach: Try SigLIP first (better accuracy), fall back to CLIP if needed
+- Cloud-only architecture: No local model loading, faster startup, lower memory
 
 **Impact on Flow**:
 - ✅ **PDF Processing**: Generates all 5 visual embeddings (65-75% progress)
 - ✅ **Search**: Enables visual similarity search
-- ✅ **Accuracy**: SigLIP has +19-29% improvement over CLIP
-- ✅ **Reliability**: CLIP fallback ensures embeddings are always generated
+- ✅ **Specialized Embeddings**: Text-guided embeddings via similarity mode
+- ✅ **Cost Control**: Automatic endpoint pause/resume
 - ✅ **Metadata Tracking**: Records which model was actually used
 
 **Cost**: Free (Hugging Face)

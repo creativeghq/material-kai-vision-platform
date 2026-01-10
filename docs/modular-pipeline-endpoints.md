@@ -18,7 +18,7 @@ The PDF processing pipeline has been refactored into **6 modular internal API en
     ↓                      Returns: uploaded_images with storage URLs
 
 30. save-images-db       → Receives: ONLY uploaded material images (from step 20)
-    ↓                      Returns: images_saved + visual embeddings count (SigLIP/CLIP)
+    ↓                      Returns: images_saved + visual embeddings count (SLIG 768D)
 
 40. extract-metadata     → Receives: product_ids + PDF text
     ↓                      Returns: enriched products with extracted metadata
@@ -42,15 +42,17 @@ All endpoints support **dynamic AI model configuration** via the optional `ai_co
 
 ```typescript
 interface AIModelConfig {
-  // Visual Embedding Models (SigLIP2 primary, CLIP fallback)
-  visual_embedding_primary?: string;          // Default: "google/siglip2-so400m-patch14-384"
-  visual_embedding_fallback?: string;         // Default: "openai/clip-vit-base-patch32"
+  // Visual Embedding Model (SLIG via HuggingFace Endpoint)
+  visual_embedding_model?: string;            // Default: "SLIG"
+  visual_embedding_dimensions?: number;       // Default: 768
 
-  // Text Embedding Model
-  text_embedding_model?: string;              // Default: "text-embedding-3-small"
+  // Text Embedding Model (Voyage AI)
+  text_embedding_model?: string;              // Default: "voyage-3.5"
+  text_embedding_dimensions?: number;         // Default: 1024
+  text_embedding_input_type?: string;         // Default: "document"
 
   // Image Classification Models
-  classification_primary_model?: string;      // Default: "Qwen/Qwen3-VL-8B-Instruct"
+  classification_primary_model?: string;      // Default: "Qwen/Qwen3-VL-32B-Instruct"
   classification_validation_model?: string;   // Default: "claude-sonnet-4-20250514"
   classification_confidence_threshold?: number; // Default: 0.7
 
@@ -80,8 +82,9 @@ interface AIModelConfig {
 **DEFAULT_AI_CONFIG** (Balanced):
 - Best overall accuracy and reliability
 - Uses Claude Sonnet 4.5 for discovery and metadata
-- Uses SigLIP for visual embeddings with CLIP fallback
-- Uses Qwen Vision for fast classification with Claude validation
+- Uses SLIG (SigLIP2) for visual embeddings (768D, HuggingFace endpoint)
+- Uses Voyage AI voyage-3.5 for text embeddings (1024D)
+- Uses Qwen3-VL-32B-Instruct for vision classification (HuggingFace endpoint) with Claude validation
 
 **FAST_CONFIG** (Speed Optimized):
 - Uses GPT-4o instead of Claude for faster processing
@@ -105,10 +108,11 @@ interface AIModelConfig {
   "job_id": "abc123",
   "extracted_images": [...],
   "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.8,
-    "visual_embedding_primary": "google/siglip-so400m-patch14-384"
+    "visual_embedding_model": "SLIG",
+    "visual_embedding_dimensions": 768
   }
 }
 ```
@@ -145,8 +149,8 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 - Uses AI to determine if each image is material-related or not
 
 **AI Processing**:
-- **Stage 1 - Qwen Vision (Fast & Cheap)**:
-  - Model: `Qwen/Qwen3-VL-8B-Instruct` (TogetherAI)
+- **Stage 1 - Qwen Vision (Fast & Accurate)**:
+  - Model: `Qwen/Qwen3-VL-32B-Instruct` (HuggingFace Endpoint)
   - Classifies images into 3 categories:
     - `material_closeup`: Close-up of material texture/surface/pattern
     - `material_in_situ`: Material shown in application/context
@@ -165,10 +169,12 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
 All endpoints accept an optional `ai_config` parameter to customize AI models:
 ```json
 {
-  "visual_embedding_primary": "google/siglip-so400m-patch14-384",
-  "visual_embedding_fallback": "openai/clip-vit-base-patch32",
-  "text_embedding_model": "text-embedding-3-small",
-  "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
+  "visual_embedding_model": "SLIG",
+  "visual_embedding_dimensions": 768,
+  "text_embedding_model": "voyage-3.5",
+  "text_embedding_dimensions": 1024,
+  "text_embedding_input_type": "document",
+  "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
   "classification_validation_model": "claude-sonnet-4-20250514",
   "classification_confidence_threshold": 0.7,
   "discovery_model": "claude-sonnet-4-20250514",
@@ -191,7 +197,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
     }
   ],
   "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
+    "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
     "classification_validation_model": "claude-sonnet-4-20250514",
     "classification_confidence_threshold": 0.7
   }
@@ -312,34 +318,34 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - The orchestrator passes only the `uploaded_images` output from upload-images endpoint
 - These are already filtered twice: (1) AI classification, (2) successful upload
 
-**AI Processing - Visual Embeddings (SigLIP2 Exclusive)**:
-- **Model**: Google SigLIP2 ViT-SO400M (`google/siglip2-so400m-patch14-384`)
-  - +19-29% accuracy improvement over CLIP
-  - Better visual understanding for material search
-  - Exclusive model - no CLIP fallback for dimensional consistency
-- **Embedding Dimension**: 1152D per embedding
+**AI Processing - Visual Embeddings (SLIG via HuggingFace Endpoint)**:
+- **Model**: SLIG (SigLIP2) via HuggingFace Inference Endpoint
+  - Cloud-based GPU inference for consistent performance
+  - Auto-pause enabled to reduce costs
+  - Superior to CLIP for material understanding
+- **Embedding Dimension**: 768D per embedding
 - **5 Embedding Types Per Image**:
-  1. **Visual** (1152D): General visual features from SigLIP2 image encoder
-  2. **Color** (1152D): Text-guided SigLIP2 embedding optimized for color matching
-  3. **Texture** (1152D): Text-guided SigLIP2 embedding optimized for texture matching
-  4. **Style** (1152D): Text-guided SigLIP2 embedding optimized for style matching
-  5. **Material** (1152D): Text-guided SigLIP2 embedding optimized for material type matching
+  1. **Visual** (768D): General visual features from SLIG image encoder (image_embedding mode)
+  2. **Color** (768D): Text-guided SLIG embedding optimized for color matching (text_embedding mode)
+  3. **Texture** (768D): Text-guided SLIG embedding optimized for texture matching (text_embedding mode)
+  4. **Style** (768D): Text-guided SLIG embedding optimized for style matching (text_embedding mode)
+  5. **Material** (768D): Text-guided SLIG embedding optimized for material type matching (text_embedding mode)
 
 **Technical Details**:
-- Uses SigLIP exclusively for all visual embeddings
-- Generates base visual embedding (1152D) using SigLIP image encoder
-- Creates 4 text-guided specialized embeddings using SigLIP with text prompts
+- Uses SLIG HuggingFace endpoint exclusively for all visual embeddings
+- Generates base visual embedding (768D) using SLIG image_embedding mode
+- Creates 4 text-guided specialized embeddings using SLIG text_embedding mode with prompts
 - Each embedding is normalized to unit vector (L2 normalization)
-- Total: 5 × 1152D = 5,760 dimensions per image
-- All embeddings use siglip-so400m-patch14-384 model
+- Total: 5 × 768D = 3,840 dimensions per image
+- All embeddings use SLIG endpoint (mh-siglip2)
 
 **Storage**:
 - Saves to `document_images` table (PostgreSQL) with embedding columns:
-  - visual_clip_512 (CLIP base embedding)
-  - color_siglip_1152 (SigLIP color embedding)
-  - texture_siglip_1152 (SigLIP texture embedding)
-  - style_siglip_1152 (SigLIP style embedding)
-  - material_siglip_1152 (SigLIP material embedding)
+  - visual_slig_768 (SLIG base embedding)
+  - color_slig_768 (SLIG color embedding)
+  - texture_slig_768 (SLIG texture embedding)
+  - style_slig_768 (SLIG style embedding)
+  - material_slig_768 (SLIG material embedding)
 
 **Request**:
 ```json
@@ -362,11 +368,11 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 {
   "success": true,
   "images_saved": 65,
-  "clip_embeddings_generated": 325
+  "slig_embeddings_generated": 325
 }
 ```
 
-**Calculation**: 65 images × 5 embeddings = 325 total CLIP embeddings
+**Calculation**: 65 images × 5 embeddings = 325 total SLIG embeddings (768D each)
 
 **Defaults**:
 - Embeddings per image: 5 (visual, color, texture, style, material)
@@ -463,10 +469,11 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
   - Creates chunks of specified size with overlap
 
 - **Text Embeddings**:
-  - Model: OpenAI `text-embedding-3-small`
-  - Dimension: 1536D
+  - Model: Voyage AI `voyage-3.5`
+  - Dimension: 1024D
+  - Input Type: `document`
   - One embedding per chunk
-  - Uses OpenAI API (not HuggingFace)
+  - Uses Voyage AI API (fallback to OpenAI text-embedding-3-small if needed)
 
 - **Relationships**:
   - Creates chunk-to-product relationships
@@ -523,7 +530,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 
 **Processing**:
 - **Chunk-Image Relationships**:
-  - Method: Cosine similarity between chunk text embeddings (1536D) and image CLIP embeddings (512D)
+  - Method: Cosine similarity between chunk text embeddings (1024D) and image SLIG embeddings (768D)
   - Threshold: 0.5 (default)
   - Links semantically related chunks and images
   - Example: A chunk describing "oak wood texture" links to images of oak textures
@@ -573,7 +580,7 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
   - Classifies ALL images with AI
   - Uploads ONLY material images to storage
   - Saves ONLY material images to database
-  - Generates CLIP embeddings ONLY for material images
+  - Generates SLIG embeddings (768D) ONLY for material images
   - Skips non-material images (faces, logos, charts, text)
 
 ### Extract Categories
@@ -588,9 +595,9 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 
 ### AI Models Used
 1. **Product Discovery**: Claude Sonnet 4.5 or GPT-5 (configurable)
-2. **Image Classification**: Qwen3-VL 17B Vision → Claude Sonnet 4.5 (validation)
-3. **Visual Embeddings**: Google SigLIP ViT-SO400M (primary) / OpenAI CLIP ViT-B/32 (fallback) - 5 types per image, 512D each
-4. **Text Embeddings**: OpenAI text-embedding-3-small (1536D)
+2. **Image Classification**: Qwen3-VL-32B-Instruct (HuggingFace Endpoint) → Claude Sonnet 4.5 (validation)
+3. **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint - 5 types per image, 768D each
+4. **Text Embeddings**: Voyage AI voyage-3.5 (1024D) → OpenAI text-embedding-3-small fallback (1024D)
 
 ### Thresholds
 - **Image Classification Confidence**: 0.7 (70% minimum)
@@ -608,10 +615,10 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 ## 📊 Progress Tracking
 
 ### Pipeline Stages (50-100%)
-- **50-60%**: Image Classification (Qwen + Claude)
+- **50-60%**: Image Classification (Qwen3-VL-32B + Claude)
 - **60-65%**: Image Upload (Supabase Storage)
-- **65-75%**: Save Images & CLIP Embeddings (5 per image)
-- **75-85%**: Chunking & Text Embeddings
+- **65-75%**: Save Images & SLIG Embeddings (5 per image, 768D each)
+- **75-85%**: Chunking & Text Embeddings (Voyage AI 1024D)
 - **85-100%**: Relationships (chunk-image, product-image)
 
 ### Infrastructure Integration
@@ -627,28 +634,29 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 
 ### What Each Endpoint Does
 
-1. **classify-images**: AI classification (Qwen → Claude) to filter material vs non-material images
+1. **classify-images**: AI classification (Qwen3-VL-32B → Claude) to filter material vs non-material images
 2. **upload-images**: Upload material images to Supabase Storage (receives pre-filtered list)
-3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SigLIP primary / CLIP fallback)
-4. **create-chunks**: Semantic chunking + text embeddings (OpenAI text-embedding-3-small)
+3. **save-images-db**: Save to DB + generate 5 visual embeddings per image (SLIG 768D via HuggingFace endpoint)
+4. **create-chunks**: Semantic chunking + text embeddings (Voyage AI voyage-3.5 1024D)
 5. **create-relationships**: Chunk-image and product-image relationships via similarity
 
 ### Default Processing Flow
 
 1. Extract ALL images from PDF
-2. Classify ALL images with AI (Qwen + Claude) → **material_images** + non_material_images
+2. Classify ALL images with AI (Qwen3-VL-32B + Claude) → **material_images** + non_material_images
 3. Upload ONLY **material_images** to storage → **uploaded_images**
 4. Save ONLY **uploaded_images** to database
-5. Generate 5 visual embeddings per saved image (SigLIP primary / CLIP fallback)
+5. Generate 5 visual embeddings per saved image (SLIG 768D via HuggingFace endpoint)
 6. Create semantic chunks from text
-7. Generate text embeddings for chunks (OpenAI text-embedding-3-small)
+7. Generate text embeddings for chunks (Voyage AI voyage-3.5 1024D)
 8. Create relationships between chunks, images, and products
 
 ### Key Features
 
 - ✅ **Focused extraction by default** (only material images)
-- ✅ **Two-stage AI classification** (Qwen fast, Claude validation)
-- ✅ **5 visual embeddings per image** (SigLIP ViT-SO400M primary / CLIP ViT-B/32 fallback: visual, color, texture, style, material)
+- ✅ **Two-stage AI classification** (Qwen3-VL-32B fast, Claude validation)
+- ✅ **5 visual embeddings per image** (SLIG 768D via HuggingFace endpoint: visual, color, texture, style, material)
+- ✅ **High-quality text embeddings** (Voyage AI voyage-3.5 1024D)
 - ✅ **Semantic chunking** with product boundary respect
 - ✅ **Comprehensive progress tracking** (5% increments)
 - ✅ **Checkpoint creation** at each stage for recovery

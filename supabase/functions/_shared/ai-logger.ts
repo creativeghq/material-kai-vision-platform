@@ -40,12 +40,10 @@ const AI_PRICING = {
     'voyage-3-lite': { input: 0.02, output: 0.00 },
     'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
   },
-  // Qwen Vision Models (TogetherAI)
+  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
   qwen: {
-    'qwen3-vl-32b': { input: 0.50, output: 1.50 },
-    'qwen3-vl-8b': { input: 0.08, output: 0.50 },
-    'Qwen/Qwen3-VL-32B-Instruct': { input: 0.50, output: 1.50 },
-    'Qwen/Qwen3-VL-8B-Instruct': { input: 0.08, output: 0.50 },
+    'qwen3-vl-32b': { input: 0.40, output: 0.40 },
+    'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
   },
   // Vision Models
   vision: {

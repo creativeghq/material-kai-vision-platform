@@ -37,7 +37,6 @@
 | `MIVAA_API_KEY` | **Secret** | Production | MIVAA JWT token | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 | `VITE_OPENAI_API_KEY` | **Secret** | Production | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `VITE_ANTHROPIC_API_KEY` | **Secret** | Production | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
-| `VITE_TOGETHER_AI_API_KEY` | **Secret** | Production | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `VITE_REPLICATE_API_TOKEN` | **Secret** | Production | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Public | Production, Preview | Stripe publishable key | `pk_test_...` or `pk_live_...` |
 | `VITE_STRIPE_PRO_PRICE_ID` | Public | Production, Preview | Stripe price ID for Pro subscription | `price_...` |
@@ -55,9 +54,15 @@
 | `JWT_SECRET_KEY` | **Secret** | Server ENV | JWT signing secret | `your-super-secret-jwt-secret-with-at-least-32-characters` |
 | `OPENAI_API_KEY` | **Secret** | Server ENV | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `ANTHROPIC_API_KEY` | **Secret** | Server ENV | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
-| `TOGETHER_AI_API_KEY` | **Secret** | Server ENV | Together AI API key | `xxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TOGETHER_AI_TIER` | Public | Server ENV | Together AI build tier (1-5) based on spend. Controls rate limits and concurrency. Default: 1 | `1` (Tier 1: $5 spent, 600 RPM, 12 concurrent)<br>`2` (Tier 2: $50 spent, 1800 RPM, 20 concurrent)<br>`3` (Tier 3: $100 spent, 3000 RPM, 20 concurrent)<br>`4` (Tier 4: $250 spent, 4500 RPM, 20 concurrent)<br>`5` (Tier 5: $1000 spent, 6000 RPM, 20 concurrent) |
-| `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for embeddings | `pa-xxxxxxxxxxxxxxxx` |
+| `VOYAGE_API_KEY` | **Secret** | Server ENV | Voyage AI API key for text embeddings | `pa-xxxxxxxxxxxxxxxx` |
+| `QWEN_ENDPOINT_URL` | Public | Server ENV | Qwen HuggingFace endpoint URL | `https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud` |
+| `QWEN_ENDPOINT_TOKEN` | **Secret** | Server ENV | Qwen HuggingFace endpoint token | `hf_xxxxxxxxxxxxxxxx` |
+| `QWEN_ENDPOINT_NAME` | Public | Server ENV | Qwen endpoint service name | `mh-qwen332binstruct` |
+| `QWEN_NAMESPACE` | Public | Server ENV | Qwen endpoint namespace | `basiliskan` |
+| `SLIG_ENDPOINT_URL` | Public | Server ENV | SLIG HuggingFace endpoint URL | `https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud` |
+| `SLIG_ENDPOINT_TOKEN` | **Secret** | Server ENV | SLIG HuggingFace endpoint token | `hf_xxxxxxxxxxxxxxxx` |
+| `SLIG_ENDPOINT_NAME` | Public | Server ENV | SLIG endpoint service name | `mh-siglip2` |
+| `SLIG_NAMESPACE` | Public | Server ENV | SLIG endpoint namespace | `basiliskan` |
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
 | `GOOGLE_SHOPPING_API_KEY` | **Secret** | Server ENV | Google Shopping API key (optional) | `AIzaSyxxxxxxxxxxxxxxxx` |
@@ -89,40 +94,46 @@
 |---------|------------|------------|------------|---------|
 | **OpenAI** | `OPENAI_API_KEY` | Frontend, Backend | https://platform.openai.com/api-keys | Pay-per-use |
 | **Anthropic** | `ANTHROPIC_API_KEY` | Backend | https://console.anthropic.com/ | Pay-per-use |
-| **Together AI** | `TOGETHER_AI_API_KEY` | Backend | https://api.together.xyz/settings/api-keys | Pay-per-use (see rate limits below) |
 | **Voyage AI** | `VOYAGE_API_KEY` | Backend | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
-| **HuggingFace** | `HF_TOKEN` | Backend | https://huggingface.co/settings/tokens | Free (Inference Endpoints billed separately) |
+| **HuggingFace** | `QWEN_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Inference Endpoints (auto-pause enabled) |
 
-### **Together AI Rate Limiting Configuration**
+### **HuggingFace Inference Endpoints Configuration**
 
-Together AI uses a tier-based rate limiting system based on total spend. Configure the `TOGETHER_AI_TIER` environment variable to match your account tier:
+The platform uses HuggingFace Inference Endpoints for vision models and visual embeddings:
 
-| Tier | Total Spend | LLM RPM | Embeddings RPM | Re-rank RPM | Vision Concurrency* | Set Variable |
-|------|-------------|---------|----------------|-------------|---------------------|--------------|
-| **1** | **$5.00** | 600 | 3,000 | 500,000 | 12 | `TOGETHER_AI_TIER=1` |
-| **2** | **$50.00** | 1,800 | 5,000 | 1,500,000 | 20 | `TOGETHER_AI_TIER=2` |
-| **3** | **$100.00** | 3,000 | 5,000 | 2,000,000 | 20 | `TOGETHER_AI_TIER=3` |
-| **4** | **$250.00** | 4,500 | 10,000 | 3,000,000 | 20 | `TOGETHER_AI_TIER=4` |
-| **5** | **$1,000.00** | 6,000 | 10,000 | 10,000,000 | 20 | `TOGETHER_AI_TIER=5` |
+**Qwen3-VL-32B-Instruct Endpoint:**
+- **URL**: `https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `mh-qwen332binstruct`
+- **Namespace**: `basiliskan`
+- **Auto-pause**: Enabled (pauses after 15 minutes of inactivity)
 
-*Vision Concurrency = Safe number of concurrent vision model requests (calculated automatically)
+**SLIG (SigLIP2) Endpoint:**
+- **URL**: `https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `mh-siglip2`
+- **Namespace**: `basiliskan`
+- **Auto-pause**: Enabled (pauses after 15 minutes of inactivity)
 
-**How to Set:**
-1. Check your total spend in [Together AI Dashboard](https://api.together.xyz/settings/billing)
-2. Determine your tier from the table above
-3. Set `TOGETHER_AI_TIER` environment variable in systemd service file
-4. Restart the service
+**Required Environment Variables:**
+```bash
+# Qwen Vision Model
+QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
+QWEN_ENDPOINT_TOKEN=hf_your_token_here
+QWEN_ENDPOINT_NAME=mh-qwen332binstruct
+QWEN_NAMESPACE=basiliskan
 
-**Default:** Tier 1 (if not specified)
+# SLIG Visual Embeddings
+SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
+SLIG_ENDPOINT_TOKEN=hf_your_token_here
+SLIG_ENDPOINT_NAME=mh-siglip2
+SLIG_NAMESPACE=basiliskan
+```
 
 **Benefits:**
-- ✅ Prevents 429 (Too Many Requests) errors
-- ✅ Automatic concurrency adjustment based on tier
-- ✅ 40% headroom for retries and burst traffic
-- ✅ Easy to upgrade as spend increases
-
-**See also:** `mivaa-pdf-extractor/RATE_LIMITING.md` for detailed configuration guide
+- ✅ Auto-pause reduces costs during inactivity
+- ✅ Dedicated GPU resources for consistent performance
+- ✅ No rate limiting concerns
+- ✅ Full control over model versions
 
 ---
 
@@ -622,11 +633,17 @@ User=root
 WorkingDirectory=/var/www/mivaa-pdf-extractor
 Environment=SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 Environment=SUPABASE_SERVICE_KEY=<your-service-key>
-Environment=TOGETHER_AI_API_KEY=<your-together-ai-key>
-Environment=TOGETHER_AI_TIER=1
 Environment=ANTHROPIC_API_KEY=<your-anthropic-key>
 Environment=OPENAI_API_KEY=<your-openai-key>
 Environment=VOYAGE_API_KEY=<your-voyage-ai-key>
+Environment=QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
+Environment=QWEN_ENDPOINT_TOKEN=<your-hf-token>
+Environment=QWEN_ENDPOINT_NAME=mh-qwen332binstruct
+Environment=QWEN_NAMESPACE=basiliskan
+Environment=SLIG_ENDPOINT_URL=<your-slig-endpoint-url>
+Environment=SLIG_ENDPOINT_TOKEN=<your-hf-token>
+Environment=SLIG_ENDPOINT_NAME=mh-siglip2
+Environment=SLIG_NAMESPACE=basiliskan
 ExecStart=/var/www/mivaa-pdf-extractor/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=3
@@ -847,8 +864,9 @@ All deployment results are displayed on the main GitHub Action page with:
 - **Process Management**: systemd service (mivaa-pdf-extractor.service)
 - **Web Framework**: FastAPI with Uvicorn ASGI server
 - **Database**: Supabase PostgreSQL with vector extensions
-- **AI Integration**: OpenAI, Anthropic, TogetherAI, Voyage AI, HuggingFace APIs
-- **Visual Embeddings**: SigLIP (local CPU or remote GPU via HuggingFace)
+- **AI Integration**: OpenAI, Anthropic, Voyage AI, HuggingFace Inference Endpoints
+- **Visual Embeddings**: SLIG (SigLIP2) via HuggingFace Endpoint (768D)
+- **Vision Models**: Qwen3-VL-32B-Instruct via HuggingFace Endpoint
 - **Monitoring**: Sentry error tracking and structured logging
 - **Security**: JWT authentication and environment-based secrets
 
@@ -868,10 +886,17 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 JWT_SECRET_KEY=your_jwt_secret
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
-TOGETHER_AI_API_KEY=your_together_ai_key
-TOGETHER_AI_TIER=1  # Optional: 1-5 based on spend (default: 1)
 VOYAGE_API_KEY=your_voyage_ai_key
-HUGGINGFACE_API_KEY=your_huggingface_key
+
+# HuggingFace Inference Endpoints
+QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
+QWEN_ENDPOINT_TOKEN=hf_your_token_here
+QWEN_ENDPOINT_NAME=mh-qwen332binstruct
+QWEN_NAMESPACE=basiliskan
+SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
+SLIG_ENDPOINT_TOKEN=hf_your_token_here
+SLIG_ENDPOINT_NAME=mh-siglip2
+SLIG_NAMESPACE=basiliskan
 MATERIAL_KAI_API_URL=https://v1api.materialshub.gr
 MATERIAL_KAI_API_KEY=your_api_key
 SENTRY_DSN=your_sentry_dsn
@@ -888,9 +913,9 @@ HUGGINGFACE_TIMEOUT=60
 HUGGINGFACE_MAX_RETRIES=3
 
 # 4-Layer Image Extraction - Vision AI (Optional, Layer 3)
-# NOTE: Uses existing ANTHROPIC_API_KEY, OPENAI_API_KEY, or TOGETHER_AI_API_KEY
+# NOTE: Uses existing ANTHROPIC_API_KEY or OPENAI_API_KEY
 VISION_GUIDED_ENABLED=false  # Set to true to enable Vision AI Layer 3
-VISION_GUIDED_PROVIDER=anthropic  # anthropic, openai, or together
+VISION_GUIDED_PROVIDER=anthropic  # anthropic or openai
 VISION_GUIDED_MODEL=claude-sonnet-4-5-20250929  # Model for vision analysis
 VISION_GUIDED_CONFIDENCE_THRESHOLD=0.8  # Minimum confidence for vision crops (0.0-1.0)
 VISION_GUIDED_FALLBACK_TO_PYMUPDF=true  # Fallback to Layers 1+2 if Vision AI fails
@@ -1111,13 +1136,14 @@ jobs:
      - SUPABASE_SERVICE_KEY
      - OPENAI_API_KEY
      - ANTHROPIC_API_KEY
-     - TOGETHER_AI_API_KEY
      - VOYAGE_API_KEY (for text embeddings)
+     - QWEN_ENDPOINT_URL (for vision models)
+     - QWEN_ENDPOINT_TOKEN (for vision models)
+     - SLIG_ENDPOINT_URL (for visual embeddings)
+     - SLIG_ENDPOINT_TOKEN (for visual embeddings)
      - FIRECRAWL_API_KEY (for price monitoring)
      - GOOGLE_SHOPPING_API_KEY (optional)
      - GOOGLE_SHOPPING_CX (optional)
-     - VISUAL_EMBEDDING_MODE (optional - for remote embeddings)
-     - VISUAL_EMBEDDING_PRIMARY_MODEL (optional - for SigLIP v2 upgrade)
 
 2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments

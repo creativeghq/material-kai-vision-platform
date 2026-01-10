@@ -16,20 +16,20 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 | Claude Opus 4.5 | Anthropic | Complex reasoning | Highest accuracy | $15 input / $75 output |
 | GPT-4o | OpenAI | Alternative discovery | 94%+ accuracy | $2.50 input / $10 output |
 | GPT-4o Mini | OpenAI | Lightweight tasks | Fast & cheap | $0.15 input / $0.60 output |
-| Qwen3-VL 17B | Together AI | Open-source alternative | Good performance | $0.20 input / $0.20 output |
 | **Text Embeddings** |
-| Voyage-3 | Voyage AI | **PRIMARY** Text embeddings | 1024D vectors | $0.06 input |
-| Voyage-3 Lite | Voyage AI | Lightweight embeddings | 512D vectors | $0.02 input |
-| text-embedding-3-small | OpenAI | Legacy text embeddings | 1536D vectors | $0.02 input |
+| voyage-3.5 | Voyage AI | **PRIMARY** Text embeddings | 1024D vectors | $0.06 input |
+| voyage-3 | Voyage AI | Alternative text embeddings | 1024D vectors | $0.06 input |
+| voyage-3-lite | Voyage AI | Lightweight embeddings | 512D vectors | $0.02 input |
+| text-embedding-3-small | OpenAI | **FALLBACK** Text embeddings | 1024D vectors | $0.02 input |
 | text-embedding-3-large | OpenAI | Large text embeddings | 3072D vectors | $0.13 input |
 | **Vision Models** |
-| Qwen3-VL-32B | Together AI | **PRIMARY** Vision analysis | State-of-the-art | $0.50 input / $1.50 output |
-| Qwen3-VL-8B | Together AI | Lightweight vision | Fast vision | $0.08 input / $0.50 output |
-| CLIP (Visual) | OpenAI | Visual embeddings | 512D vectors | Free |
-| CLIP (Color) | OpenAI | Color analysis | 512D vectors | Free |
-| CLIP (Texture) | OpenAI | Texture analysis | 512D vectors | Free |
-| CLIP (Style) | OpenAI | Style analysis | 512D vectors | Free |
-| CLIP (Material) | OpenAI | Material classification | 512D vectors | Free |
+| Qwen3-VL-32B-Instruct | HuggingFace Endpoint | **PRIMARY** Vision analysis | State-of-the-art OCR | Cloud endpoint |
+| **Visual Embeddings** |
+| SLIG (SigLIP2) Visual | HuggingFace Endpoint | General visual embeddings | 768D vectors | Cloud endpoint |
+| SLIG (SigLIP2) Color | HuggingFace Endpoint | Color-guided embeddings | 768D vectors | Cloud endpoint |
+| SLIG (SigLIP2) Texture | HuggingFace Endpoint | Texture-guided embeddings | 768D vectors | Cloud endpoint |
+| SLIG (SigLIP2) Style | HuggingFace Endpoint | Style-guided embeddings | 768D vectors | Cloud endpoint |
+| SLIG (SigLIP2) Material | HuggingFace Endpoint | Material-guided embeddings | 768D vectors | Cloud endpoint |
 
 ---
 
@@ -173,36 +173,48 @@ embedding = response['data'][0]['embedding']  # 1536D vector
 
 ---
 
-### 5. Qwen3-VL 17B Vision (Together AI)
+### 5. Qwen3-VL-32B-Instruct (HuggingFace Endpoint) - PRIMARY VISION MODEL
 
-**Purpose**: Image analysis, OCR, material recognition
+**Purpose**: State-of-the-art vision-language model for image analysis, OCR, material recognition
+
+**Endpoint Configuration**:
+- **URL**: `https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `mh-qwen332binstruct`
+- **Namespace**: `basiliskan`
+- **Model**: Locked to 32B only (8B removed)
 
 **Capabilities**:
+- Advanced image understanding
 - Optical Character Recognition (OCR)
 - Material property extraction
+- Color and texture analysis
 - Image quality scoring
-- Material identification
-
-**Specifications**:
-- MMMU Score: 69.4% (#1 for OCR)
-- Vision Capability: Excellent
-- Speed: Fast inference
+- Multi-image reasoning
 
 **Usage**:
 ```python
-import together
+import httpx
 
-response = together.Complete.create(
-    model="Qwen/Qwen3-VL-8B-Instruct",
-    prompt="Analyze this material image...",
-    image_url="https://..."
-)
+async with httpx.AsyncClient() as client:
+    response = await client.post(
+        "https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud",
+        headers={
+            "Authorization": f"Bearer {QWEN_ENDPOINT_TOKEN}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "inputs": {
+                "text": "Analyze this material image...",
+                "image": image_base64
+            }
+        }
+    )
 ```
 
 **Performance**:
-- Accuracy: 90%+ for material recognition
-- Latency: 2-4 seconds per image
-- Cost: $0.40 per 1M tokens
+- Accuracy: State-of-the-art vision understanding
+- Latency: 2-5 seconds per image
+- Cost: Cloud endpoint (auto-pause enabled)
 
 **When to Use**:
 - Image analysis
@@ -372,7 +384,11 @@ response = result['answer']  # Claude 4.5 synthesis
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
-TOGETHER_AI_API_KEY=...
+VOYAGE_API_KEY=pa-...
+QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
+QWEN_ENDPOINT_TOKEN=hf_...
+SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
+SLIG_ENDPOINT_TOKEN=hf_...
 ```
 
 **Configuration**:
@@ -381,8 +397,9 @@ TOGETHER_AI_API_KEY=...
 MODELS = {
     "discovery": "claude-sonnet-4-5",
     "validation": "claude-haiku-4-5",
-    "embeddings": "text-embedding-3-small",
-    "vision": "Qwen/Qwen3-VL-8B-Instruct"
+    "text_embeddings": "voyage-3.5",
+    "vision": "Qwen/Qwen3-VL-32B-Instruct",
+    "visual_embeddings": "SLIG"
 }
 ```
 
@@ -451,73 +468,57 @@ embeddings = result.embeddings
 
 ---
 
-### Qwen3-VL-32B (Together AI) - PRIMARY VISION MODEL
+### SLIG (SigLIP2) - VISUAL EMBEDDINGS (HuggingFace Endpoint)
 
-**Purpose**: State-of-the-art vision-language model for image analysis
+**Purpose**: Cloud-based visual embeddings for image similarity search
+
+**Endpoint Configuration**:
+- **URL**: `https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud`
+- **Service Name**: `mh-siglip2`
+- **Namespace**: `basiliskan`
+- **Dimensions**: 768D (all embeddings)
 
 **Capabilities**:
-- Advanced image understanding
-- OCR and text extraction
-- Material identification
-- Color and texture analysis
-- Multi-image reasoning
+- General visual embeddings (image_embedding mode)
+- Text-guided visual embeddings (text_embedding mode)
+  - Color-guided embeddings
+  - Texture-guided embeddings
+  - Material-guided embeddings
+  - Style-guided embeddings
+- Zero-shot classification (zero_shot mode)
+- Image-text similarity (similarity mode)
 
 **Usage**:
 ```python
-from together import Together
+from app.services.embeddings.slig_endpoint_manager import SLIGEndpointManager
 
-client = Together(api_key=TOGETHER_API_KEY)
-response = client.chat.completions.create(
-    model="Qwen/Qwen3-VL-32B-Instruct",
-    messages=[{
-        "role": "user",
-        "content": [
-            # CRITICAL: Text must come BEFORE image for Qwen models
-            {"type": "text", "text": "Analyze this material image..."},
-            {"type": "image_url", "image_url": {"url": image_url}}
-        ]
-    }]
+slig = SLIGEndpointManager(
+    endpoint_url=SLIG_ENDPOINT_URL,
+    token=SLIG_ENDPOINT_TOKEN,
+    endpoint_name="mh-siglip2",
+    namespace="basiliskan"
+)
+
+# Generate visual embedding
+visual_embedding = await slig.generate_image_embedding(image_base64)
+
+# Generate text-guided embedding
+color_embedding = await slig.generate_text_embedding(
+    text="focus on color palette and color relationships"
 )
 ```
 
 **Performance**:
-- Accuracy: State-of-the-art vision understanding
-- Latency: 2-5 seconds
-- Cost: $0.50 input / $1.50 output per 1M tokens
-- Quality: Superior to GPT-4V and Qwen Vision
-
-**When to Use**:
-- **PRIMARY** choice for vision tasks
-- Material image analysis
-- PDF image extraction
-- Product photo analysis
-- Quality assessment
-
-**Migration**: Replaced Qwen3-VL 90B Vision and GPT-4V
-
----
-
-### Qwen3-VL-8B (Together AI) - LIGHTWEIGHT VISION
-
-**Purpose**: Fast, cost-effective vision model for simple tasks
-
-**Capabilities**:
-- Basic image understanding
-- Fast OCR
-- Simple material identification
-- Quick validation
-
-**Performance**:
-- Accuracy: Good for simple tasks
+- Dimensions: 768D (all embeddings)
 - Latency: 500ms-2s
-- Cost: $0.08 input / $0.50 output per 1M tokens
-- Quality: 6x cheaper than Qwen3-VL-32B
+- Cost: Cloud endpoint (auto-pause enabled)
+- Quality: Superior to CLIP, optimized for materials
 
 **When to Use**:
-- Simple image validation
-- Fast OCR tasks
-- Cost-sensitive operations
-- Batch processing
+- **PRIMARY** choice for visual embeddings
+- Image similarity search
+- Text-guided visual search (color, texture, material, style)
+- Multimodal fusion (text + visual)
 
 ---
 
@@ -552,9 +553,13 @@ response = client.chat.completions.create(
 3. **text-embedding-3-small** - Legacy (being phased out)
 
 ### Vision Analysis
-1. **Qwen3-VL-32B** (PRIMARY) - All production vision tasks
-2. **Qwen3-VL-8B** - Simple/fast vision tasks
-3. **CLIP models** - Visual embeddings only (not analysis)
+1. **Qwen3-VL-32B-Instruct** (PRIMARY) - All production vision tasks (HuggingFace endpoint)
+2. **Claude Sonnet 4.5** - Validation for low-confidence results
+
+### Visual Embeddings
+1. **SLIG (SigLIP2)** (PRIMARY) - All visual embeddings (768D, HuggingFace endpoint)
+   - General visual (image_embedding mode)
+   - Text-guided (color, texture, material, style) (text_embedding mode)
 
 ### Text Generation
 1. **Claude Sonnet 4.5** (PRIMARY) - Complex reasoning

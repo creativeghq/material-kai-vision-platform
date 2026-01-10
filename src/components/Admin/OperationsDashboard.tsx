@@ -71,11 +71,9 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   'voyage-3-lite': { input: 0.02, output: 0.00 },
   'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
 
-  // Qwen Vision Models
-  'qwen3-vl-32b': { input: 0.50, output: 1.50 },
-  'qwen3-vl-8b': { input: 0.08, output: 0.50 },
-  'Qwen/Qwen3-VL-32B-Instruct': { input: 0.50, output: 1.50 },
-  'Qwen/Qwen3-VL-8B-Instruct': { input: 0.08, output: 0.50 },
+  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
+  'qwen3-vl-32b': { input: 0.40, output: 0.40 },
+  'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
 };
 
 // Estimate tokens from content length (rough approximation: 4 chars = 1 token)
@@ -118,12 +116,11 @@ const MODEL_CONFIGS: ModelConfig[] = [
   { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o', inputCostPer1M: 2.50, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Fallback', 'Chunking'], totalInputTokens: 0, totalOutputTokens: 0 },
   { id: 'text-embedding-3-small', name: 'Text Embedding 3 Small', provider: 'openai', model: 'text-embedding-3-small', inputCostPer1M: 0.02, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Text Embeddings'], totalInputTokens: 0, totalOutputTokens: 0 },
 
-  // Qwen Vision Models
-  { id: 'qwen3-vl-8b', name: 'Qwen3-VL-8B-Instruct', provider: 'meta', model: 'Qwen/Qwen3-VL-8B-Instruct', inputCostPer1M: 0.08, outputCostPer1M: 0.50, speed: 'fast', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
+  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
+  { id: 'qwen3-vl-32b', name: 'Qwen3-VL-32B-Instruct', provider: 'huggingface', model: 'Qwen/Qwen3-VL-32B-Instruct', inputCostPer1M: 0.40, outputCostPer1M: 0.40, speed: 'medium', usedFor: ['Image Classification', 'Vision Analysis'], totalInputTokens: 0, totalOutputTokens: 0 },
 
-  // Vision/Embedding Models
-  { id: 'siglip', name: 'SigLIP SO400M', provider: 'google', model: 'google/siglip-so400m-patch14-384', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'clip', name: 'CLIP ViT Base', provider: 'openai', model: 'openai/clip-vit-base-patch32', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Fallback)'], totalInputTokens: 0, totalOutputTokens: 0 },
+  // Vision/Embedding Models (SLIG Cloud Endpoint)
+  { id: 'slig-768d', name: 'SLIG 768D', provider: 'huggingface', model: 'SLIG-768D', inputCostPer1M: 0.00, outputCostPer1M: 0.00, speed: 'fast', usedFor: ['Visual Embeddings (Primary)'], totalInputTokens: 0, totalOutputTokens: 0 },
 ];
 
 const getProviderStyle = (provider: string) => {
