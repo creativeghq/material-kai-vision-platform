@@ -2461,6 +2461,48 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     </div>
                                   )}
 
+                                  {/* Timing Information */}
+                                  {(product.started_at || product.completed_at) && (
+                                    <div className="bg-slate-50 border border-slate-100 rounded-md p-3">
+                                      <div className="grid grid-cols-2 gap-3 text-xs">
+                                        {product.started_at && (
+                                          <div>
+                                            <span className="text-slate-500 font-medium">Started:</span>
+                                            <span className="ml-2 text-slate-700">
+                                              {new Date(product.started_at).toLocaleTimeString()}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {product.completed_at && (
+                                          <div>
+                                            <span className="text-slate-500 font-medium">Completed:</span>
+                                            <span className="ml-2 text-slate-700">
+                                              {new Date(product.completed_at).toLocaleTimeString()}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {product.started_at && product.completed_at && (
+                                          <div className="col-span-2">
+                                            <span className="text-slate-500 font-medium">Processing Time:</span>
+                                            <span className="ml-2 text-slate-700 font-semibold">
+                                              {(() => {
+                                                const start = new Date(product.started_at).getTime();
+                                                const end = new Date(product.completed_at).getTime();
+                                                const durationMs = end - start;
+                                                const seconds = Math.floor(durationMs / 1000);
+                                                const minutes = Math.floor(seconds / 60);
+                                                const remainingSeconds = seconds % 60;
+                                                return minutes > 0
+                                                  ? `${minutes}m ${remainingSeconds}s`
+                                                  : `${seconds}s`;
+                                              })()}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {/* Product Pipeline Stages */}
                                   <div className="space-y-3">
                                     <h5 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Processing Pipeline</h5>
