@@ -5,7 +5,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { QuoteItemWithProduct } from '@/services/quotes/QuotesService';
-import { ProductDetailModal } from '@/components/features/products/ProductDetailModal';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { Product, SimpleProduct } from '@/components/features/products/types';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")

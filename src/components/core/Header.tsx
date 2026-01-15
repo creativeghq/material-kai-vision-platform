@@ -13,7 +13,7 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
 import { SemanticSearchInput } from '@/components/features/search/SemanticSearchInput';
-import { ProductDetailModal as UnifiedProductDetailModal } from '@/components/features/products/ProductDetailModal';
+import UnifiedProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
