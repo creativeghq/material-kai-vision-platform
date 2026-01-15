@@ -8,7 +8,7 @@ import React, { useState } from 'react';
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Product } from '@/components/features/products/types';
-import { ProductDetailModal } from '@/components/features/products/ProductDetailModal';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 
 interface ProductStripProps {
   products: Product[];
