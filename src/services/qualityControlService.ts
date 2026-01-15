@@ -338,18 +338,15 @@ export class QualityControlService {
         throw new Error(`Failed to fetch image: ${imageError?.message}`);
       }
 
-      // Get validation results
-      const { data: validation } = await supabase
-        .from('image_validations')
-        .select('*')
-        .eq('image_id', imageId)
-        .single();
+      // ✅ REMOVED: image_validations table no longer exists
+      // Quality metrics are now stored in document_images.metadata
 
-      // Calculate quality metrics
+      // Calculate quality metrics from image metadata
+      const metadata = image.metadata || {};
       const qualityMetrics = {
-        quality_score: validation?.quality_score || 0,
-        relevance_score: validation?.relevance_score || 0,
-        ocr_confidence: validation?.ocr_confidence || 0,
+        quality_score: metadata.quality_score || 0,
+        relevance_score: metadata.relevance_score || 0,
+        ocr_confidence: metadata.ocr_confidence || 0,
         embedding_coverage: this.calculateImageEmbeddingCoverage(image),
         format_valid: validation?.format_valid ? 1 : 0,
         dimensions_valid: validation?.dimensions_valid ? 1 : 0,

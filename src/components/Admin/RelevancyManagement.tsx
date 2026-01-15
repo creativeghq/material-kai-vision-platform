@@ -188,14 +188,15 @@ export const RelevancyManagement: React.FC = () => {
   };
 
   const loadProductImageRelationships = async () => {
+    // ✅ UPDATED: Use image_product_associations table
     let query = supabase
-      .from('product_image_relationships')
+      .from('image_product_associations')
       .select(`
         id,
         product_id,
         image_id,
-        relationship_type,
-        relevance_score,
+        reasoning,
+        overall_score,
         created_at,
         products!inner(name),
         document_images!inner(image_url)
@@ -628,7 +629,7 @@ export const RelevancyManagement: React.FC = () => {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleDelete(rel.id, 'product_image_relationships')}
+                                  onClick={() => handleDelete(rel.id, 'image_product_associations')}
                                 >
                                   <Trash2 className="h-4 w-4 text-red-600" />
                                 </Button>

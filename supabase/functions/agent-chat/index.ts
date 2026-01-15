@@ -1292,9 +1292,10 @@ const createGetRelationshipCountsTool = () => {
         console.log(`🔗 Getting relationship counts for document: ${documentId}`);
 
         // Query all relationship tables
+        // ✅ UPDATED: Use image_product_associations table
         const [chunkProductRels, productImageRels, chunkImageRels, productDocRels] = await Promise.all([
           supabase.from('chunk_product_relationships').select('id', { count: 'exact', head: true }).eq('chunk_id', documentId),
-          supabase.from('product_image_relationships').select('id', { count: 'exact', head: true }),
+          supabase.from('image_product_associations').select('id', { count: 'exact', head: true }),
           supabase.from('chunk_image_relationships').select('id', { count: 'exact', head: true }),
           supabase.from('product_document_relationships').select('id', { count: 'exact', head: true })
         ]);

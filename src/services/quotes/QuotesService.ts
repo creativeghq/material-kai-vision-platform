@@ -250,11 +250,12 @@ export class QuotesService {
     const productImageMap: Record<string, string> = {};
 
     if (productIds.length > 0) {
+      // ✅ UPDATED: Use image_product_associations table
       const { data: imageRelations } = await supabase
-        .from('product_image_relationships')
+        .from('image_product_associations')
         .select('product_id, image:document_images(image_url)')
         .in('product_id', productIds)
-        .order('relevance_score', { ascending: false });
+        .order('overall_score', { ascending: false });
 
       if (imageRelations) {
         for (const rel of imageRelations) {
@@ -1077,11 +1078,12 @@ export class QuotesService {
       const productsNeedingImages = products.filter(p => !productDataMap[p.id]?.image_url).map(p => p.id);
 
       if (productsNeedingImages.length > 0) {
+        // ✅ UPDATED: Use image_product_associations table
         const { data: relationships } = await supabase
-          .from('product_image_relationships')
+          .from('image_product_associations')
           .select('product_id, image:document_images(image_url)')
           .in('product_id', productsNeedingImages)
-          .order('relevance_score', { ascending: false });
+          .order('overall_score', { ascending: false });
 
         if (relationships) {
           for (const rel of relationships) {
@@ -1147,13 +1149,14 @@ export class QuotesService {
     if (error) throw error;
     if (!products || products.length === 0) return [];
 
-    // Get images for these products from product_image_relationships
+    // Get images for these products from image_product_associations
+    // ✅ UPDATED: Use image_product_associations table
     const productIds = products.map(p => p.id);
     const { data: relationships } = await supabase
-      .from('product_image_relationships')
+      .from('image_product_associations')
       .select('product_id, image:document_images(image_url)')
       .in('product_id', productIds)
-      .order('relevance_score', { ascending: false });
+      .order('overall_score', { ascending: false });
 
     // Create a map of product_id to first image URL
     const productImageMap: Record<string, string> = {};

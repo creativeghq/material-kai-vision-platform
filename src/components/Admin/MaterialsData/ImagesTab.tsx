@@ -200,11 +200,12 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
         .eq('image_id', image.id);
 
       // Load product relationships
+      // ✅ UPDATED: Use image_product_associations table
       const { data: productRels } = await supabase
-        .from('product_image_relationships')
+        .from('image_product_associations')
         .select(`
-          relationship_type,
-          relevance_score,
+          reasoning,
+          overall_score,
           product_enrichments!inner(
             id,
             product_name,

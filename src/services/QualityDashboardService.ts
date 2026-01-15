@@ -1,14 +1,15 @@
 /**
  * Quality Dashboard Service
  *
- * Aggregates quality metrics from Image Validation, Product Enrichment,
- * and Validation Rules services to provide comprehensive quality insights.
+ * Aggregates quality metrics from Product Enrichment and Validation Rules services
+ * to provide comprehensive quality insights.
+ *
+ * ✅ UPDATED: Removed ImageValidationService (image_validations table dropped)
  */
 
 import { supabase } from '@/integrations/supabase/client';
 
 import { BaseService } from './base/BaseService';
-import { ImageValidationService } from './ImageValidationService';
 import { ProductEnrichmentService } from './ProductEnrichmentService';
 import { ValidationRulesService } from './ValidationRulesService';
 import { pdfProcessingWebSocketService } from './realtime/PDFProcessingWebSocketService';
@@ -68,7 +69,7 @@ export interface QualityDashboardData {
 }
 
 class QualityDashboardServiceImpl extends BaseService {
-  private imageValidationService: ImageValidationService;
+  // ✅ REMOVED: imageValidationService (image_validations table dropped)
   private productEnrichmentService: ProductEnrichmentService;
   private validationRulesService: ValidationRulesService;
 
@@ -83,7 +84,6 @@ class QualityDashboardServiceImpl extends BaseService {
       timeout: 30000,
     });
 
-    this.imageValidationService = ImageValidationService.getInstance();
     this.productEnrichmentService = ProductEnrichmentService.getInstance();
     this.validationRulesService = ValidationRulesService.getInstance();
   }
@@ -97,7 +97,7 @@ class QualityDashboardServiceImpl extends BaseService {
    */
   protected async doInitialize(): Promise<void> {
     // Initialize dependent services
-    await this.imageValidationService.initialize();
+    // ✅ REMOVED: imageValidationService initialization
     await this.productEnrichmentService.initialize();
     await this.validationRulesService.initialize();
   }
@@ -107,9 +107,7 @@ class QualityDashboardServiceImpl extends BaseService {
    */
   async getQualityMetrics(workspaceId: string): Promise<QualityMetrics> {
     return this.executeOperation(async () => {
-      // Get image validation stats
-      const imageStats =
-        await this.imageValidationService.getValidationStats(workspaceId);
+      // ✅ REMOVED: Image validation stats (image_validations table dropped)
 
       // Get product enrichment stats
       const enrichmentStats =
@@ -120,14 +118,9 @@ class QualityDashboardServiceImpl extends BaseService {
         await this.validationRulesService.getValidationStats(workspaceId);
 
       // Calculate overall quality score (weighted average)
-      const imageQualityWeight = 0.3;
-      const enrichmentQualityWeight = 0.35;
-      const validationQualityWeight = 0.35;
-
-      const imageQualityScore =
-        imageStats.total_images > 0
-          ? imageStats.valid_images / imageStats.total_images
-          : 0;
+      // ✅ UPDATED: Removed image quality weight, redistributed
+      const enrichmentQualityWeight = 0.5;
+      const validationQualityWeight = 0.5;
 
       const enrichmentQualityScore =
         (enrichmentStats as any).total_chunks > 0
@@ -136,19 +129,18 @@ class QualityDashboardServiceImpl extends BaseService {
           : 0;
 
       const overallQualityScore =
-        imageQualityScore * imageQualityWeight +
         enrichmentQualityScore * enrichmentQualityWeight +
         validationStats.pass_rate * validationQualityWeight;
 
       const metrics: QualityMetrics = {
         timestamp: new Date().toISOString(),
         workspace_id: workspaceId,
-        total_images_validated: imageStats.total_images,
-        valid_images: imageStats.valid_images,
-        invalid_images: imageStats.invalid_images,
-        images_needing_review: (imageStats as any).needs_review || 0,
-        average_image_quality_score:
-          (imageStats as any).avg_quality_score || imageStats.avg_quality_score,
+        // ✅ REMOVED: Image validation metrics (set to 0)
+        total_images_validated: 0,
+        valid_images: 0,
+        invalid_images: 0,
+        images_needing_review: 0,
+        average_image_quality_score: 0,
         total_chunks_enriched: (enrichmentStats as any).total_chunks || 0,
         enriched_chunks: enrichmentStats.enriched_count,
         unenriched_chunks: (enrichmentStats as any).unenriched_chunks || 0,
