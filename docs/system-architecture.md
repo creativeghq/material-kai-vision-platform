@@ -242,7 +242,7 @@ USING (workspace_id = auth.uid());
 
 **Consolidation Notes:**
 - ✅ PDF Extraction endpoints (`/api/pdf/extract/*`) consolidated into `/api/rag/documents/upload`
-- ✅ All extraction functionality available via RAG pipeline with `processing_mode="quick"`
+- ✅ All extraction functionality available via RAG pipeline with deep processing mode
 - ✅ Internal utilities preserved in `app/core/extractor.py`
 
 ---

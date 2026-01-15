@@ -5660,17 +5660,23 @@
             "title": "Tags",
             "description": "Comma-separated tags"
           },
-          "processing_mode": {
-            "type": "string",
-            "title": "Processing Mode",
-            "description": "Processing mode: 'quick' (extract only), 'standard' (full RAG), 'deep' (complete analysis)",
-            "default": "standard"
-          },
           "categories": {
             "type": "string",
             "title": "Categories",
             "description": "Categories to extract: 'products', 'certificates', 'logos', 'specifications', 'all', 'extract_only'. Comma-separated.",
             "default": "all"
+          },
+          "material_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Material Category",
+            "description": "Material category: 'tiles', 'wood', 'decor', 'furniture', 'general_materials', 'paint_wall_decor', 'heating', 'sanitary', 'kitchen', 'lighting', etc."
           },
           "file_url": {
             "anyOf": [

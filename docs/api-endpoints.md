@@ -46,7 +46,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 **Previous Updates (v2.2.0):**
 - **DATA IMPORT:** 4 endpoints for XML import and web scraping with dynamic field mapping
 - **DUPLICATE DETECTION:** 7 endpoints for duplicate detection and product merging (factory-based only)
-- **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload` with `processing_mode="quick"`
+- **CONSOLIDATED PDF EXTRACTION:** `/api/pdf/extract/*` endpoints removed - use `/api/rag/documents/upload`
 - **CONSOLIDATED UPLOAD:** Single `/api/rag/documents/upload` endpoint replaces 3 separate upload endpoints
 - **CONSOLIDATED SEARCH:** Single `/api/rag/search` endpoint with strategy parameter replaces 8+ search endpoints
 - **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
@@ -599,20 +599,22 @@ Parameters (Form Data):
 - file: PDF file (for file upload)
 - file_url: URL to PDF (for URL-based upload)
 
-# Processing Mode (choose one)
-- processing_mode: "quick" | "standard" | "deep" (default: "standard")
-  * quick: Extract only (no embeddings, no AI analysis)
-  * standard: Full RAG processing (embeddings + basic AI)
-  * deep: Complete analysis (embeddings + advanced AI + validation)
-
 # Category Extraction (choose one or more)
 - categories: "products" | "certificates" | "logos" | "specifications" | "all" | "extract_only"
   * products: Extract product information
   * certificates: Extract certificates (async)
   * logos: Extract logos (async)
   * specifications: Extract specifications (async)
-  * all: Extract all categories
+  * all: Extract all categories (comprehensive deep analysis)
   * extract_only: No category extraction, just chunks
+
+# Processing Mode
+All uploads use deep processing mode with:
+- Complete AI analysis with all models
+- Image embeddings (CLIP)
+- Advanced product enrichment
+- Quality validation
+- Full RAG pipeline
 
 # AI Model Selection
 - discovery_model: "claude" | "gpt" | "haiku" (default: "claude")
@@ -2438,7 +2440,7 @@ Content-Type: application/json
 - `POST /api/pdf/extract/tables` ❌ DELETED
 - `POST /api/pdf/extract/images` ❌ DELETED
 
-**Replacement:** Use `POST /api/rag/documents/upload` with `processing_mode="quick"`
+**Replacement:** Use `POST /api/rag/documents/upload`
 
 The RAG endpoint provides identical functionality using the same PyMuPDF4LLM library:
 ```http
@@ -2448,7 +2450,6 @@ Content-Type: multipart/form-data
 Body:
 {
   "file": <PDF file>,
-  "processing_mode": "quick",  // Fast extraction without RAG
   "workspace_id": "uuid"
 }
 

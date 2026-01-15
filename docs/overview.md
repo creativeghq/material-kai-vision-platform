@@ -402,7 +402,7 @@ The platform uses **6 embedding types** for comprehensive search:
 13. AI Metrics Routes (2 endpoints - AI performance tracking)
 
 **Consolidation Summary**:
-- ✅ PDF Extraction: `/api/pdf/extract/*` (3 endpoints) → `/api/rag/documents/upload` with `processing_mode="quick"`
+- ✅ PDF Extraction: `/api/pdf/extract/*` (3 endpoints) → `/api/rag/documents/upload`
 - ✅ Document Management: `/api/documents/*` (18 endpoints) → `/api/rag/*` (27 endpoints)
 - ✅ Health Checks: 10+ individual endpoints → Single `/health` endpoint
 
