@@ -159,10 +159,10 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       // Create FormData - backend expects application/x-www-form-urlencoded
       const formData = new URLSearchParams();
       formData.append('file_url', publicUrl);
-      formData.append('categories', 'products'); // Backend only accepts: products, certificates, logos, specifications, all, extract_only
+      formData.append('categories', 'products'); // Extraction type: products, certificates, logos, specifications, all, extract_only
+      formData.append('material_category', category); // Material category: tiles, wood, heating, sanitary, etc.
       formData.append('workspace_id', 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e'); // Default workspace ID
       formData.append('title', file.name);
-      formData.append('processing_mode', 'standard');
 
       const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/upload`, {
         method: 'POST',

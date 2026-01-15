@@ -1,7 +1,7 @@
 // import React from 'react'; // Not needed for functional components
 
 import { Layout } from '@/components/core/Layout';
-import { MaterialSuggestionsPanel } from '@/components/admin/MaterialSuggestionsPanel';
+import { MaterialSuggestionsPanel } from '@/components/Admin/MaterialSuggestionsPanel';
 
 const MaterialSuggestions = () => {
   return (

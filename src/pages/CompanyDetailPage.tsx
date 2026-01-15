@@ -9,7 +9,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { GlobalAdminHeader } from '@/components/admin/GlobalAdminHeader';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { companiesAPI } from '@/services/crm.service';
 import { ContactSearchDropdown } from '@/components/business/crm/ContactSearchDropdown';
 import {

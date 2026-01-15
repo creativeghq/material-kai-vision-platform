@@ -38,7 +38,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { quotesService, QuoteWithItems, QuoteItemWithProduct, Product } from '@/services/quotes/QuotesService';
-import { ProductDetailModal } from '@/components/admin/PDFProcessingData/ProductDetailModal';
+import { ProductDetailModal } from '@/components/Admin/PDFProcessingData/ProductDetailModal';
 
 interface QuoteBuilderViewProps {
   quote: QuoteWithItems;

@@ -10,7 +10,7 @@ import {
   X,
   Code,
 } from 'lucide-react';
-import { GlobalAdminHeader } from '@/components/admin/GlobalAdminHeader';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 import {
   Card,

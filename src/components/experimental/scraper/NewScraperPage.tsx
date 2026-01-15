@@ -31,7 +31,7 @@ import {
 } from '@/components/core/ui/select';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Separator } from '@/components/core/ui/separator';
-import { GlobalAdminHeader } from '@/components/admin/GlobalAdminHeader';
+import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 
 import { SessionDetailView } from './SessionDetailView';
 import { ScrapingSessionsList } from './ScrapingSessionsList';
