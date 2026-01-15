@@ -5,5 +5,5 @@
  */
 
 // Re-export from the global Products folder
-export { ProductDetailModal } from '@/components/features/products/ProductDetailModal';
+export { default as ProductDetailModal } from '@/components/features/products/ProductDetailModal';
 export { default } from '@/components/features/products/ProductDetailModal';

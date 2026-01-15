@@ -8,5 +8,5 @@ export * from './types';
 
 // Components
 export { ProductCard } from './ProductCard';
-export { ProductDetailModal } from './ProductDetailModal';
+export { default as ProductDetailModal } from './ProductDetailModal';
 
