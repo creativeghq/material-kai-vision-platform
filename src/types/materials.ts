@@ -344,21 +344,6 @@ export const MATERIAL_CATEGORIES = {
   },
 } as const;
 
-// Type for material category with metadata (legacy format)
-export type MaterialCategoryData = {
-  name: string;
-  finish: string[];
-  size: string[];
-  installationMethod: string[];
-  application: string[];
-};
-
-// Legacy compatibility type
-export type LegacyCategoryData = {
-  name: string;
-  description: string;
-};
-
 /**
  * Helper functions to extract filter options from MATERIAL_CATEGORIES
  * These provide static data for UI filtering components

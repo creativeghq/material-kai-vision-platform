@@ -55,13 +55,9 @@ export interface StandardMivaaPayload {
 
 /**
  * Standard MIVAA response structure
- *
- * @deprecated Use UnifiedApiResponse from '@/types/unified-api-response' instead.
- * This interface is kept for backward compatibility during migration.
+ * Alias for UnifiedApiResponse for use within this module.
  */
-export interface StandardMivaaResponse<T = any> extends UnifiedApiResponse<T> {
-  // Extends UnifiedApiResponse for backward compatibility
-}
+export type StandardMivaaResponse<T = any> = UnifiedApiResponse<T>;
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -138,53 +134,53 @@ export const MIVAA_ACTION_MAP: Record<
 // =============================================================================
 
 /**
- * Transforms legacy payload formats to standardized format
+ * Transforms various payload formats to standardized format
  */
 export class MivaaPayloadTransformer {
   /**
-   * Transform any legacy payload to standard format
+   * Transform input payload to standard format
    */
   static transformToStandard(
-    legacyPayload: any,
+    inputPayload: any,
     action: string,
   ): StandardMivaaPayload {
     const standardPayload: StandardMivaaPayload = {
       action,
-      requestId: legacyPayload.requestId || crypto.randomUUID(),
+      requestId: inputPayload.requestId || crypto.randomUUID(),
     };
 
     // Handle different resource URL field names
-    if (legacyPayload.documentId) {
-      standardPayload.resourceUrl = legacyPayload.documentId;
+    if (inputPayload.documentId) {
+      standardPayload.resourceUrl = inputPayload.documentId;
       standardPayload.resourceType = 'pdf';
-    } else if (legacyPayload.fileUrl) {
-      standardPayload.resourceUrl = legacyPayload.fileUrl;
+    } else if (inputPayload.fileUrl) {
+      standardPayload.resourceUrl = inputPayload.fileUrl;
       standardPayload.resourceType = this.inferResourceType(
-        legacyPayload.fileUrl,
+        inputPayload.fileUrl,
       );
-    } else if (legacyPayload.url) {
-      standardPayload.resourceUrl = legacyPayload.url;
-      standardPayload.resourceType = this.inferResourceType(legacyPayload.url);
-    } else if (legacyPayload.image_data) {
-      standardPayload.resourceUrl = legacyPayload.image_data;
+    } else if (inputPayload.url) {
+      standardPayload.resourceUrl = inputPayload.url;
+      standardPayload.resourceType = this.inferResourceType(inputPayload.url);
+    } else if (inputPayload.image_data) {
+      standardPayload.resourceUrl = inputPayload.image_data;
       standardPayload.resourceType = 'image';
     }
 
     // Handle different name field names
-    if (legacyPayload.filename) {
-      standardPayload.resourceName = legacyPayload.filename;
-    } else if (legacyPayload.document_name) {
-      standardPayload.resourceName = legacyPayload.document_name;
-    } else if (legacyPayload.name) {
-      standardPayload.resourceName = legacyPayload.name;
+    if (inputPayload.filename) {
+      standardPayload.resourceName = inputPayload.filename;
+    } else if (inputPayload.document_name) {
+      standardPayload.resourceName = inputPayload.document_name;
+    } else if (inputPayload.name) {
+      standardPayload.resourceName = inputPayload.name;
     }
 
     // Transform options
-    standardPayload.options = this.transformOptions(legacyPayload, action);
+    standardPayload.options = this.transformOptions(inputPayload, action);
 
     // Preserve metadata and tags
-    standardPayload.metadata = legacyPayload.metadata || {};
-    standardPayload.tags = legacyPayload.tags || [];
+    standardPayload.metadata = inputPayload.metadata || {};
+    standardPayload.tags = inputPayload.tags || [];
 
     return standardPayload;
   }
@@ -253,28 +249,28 @@ export class MivaaPayloadTransformer {
   }
 
   private static transformOptions(
-    legacyPayload: any,
+    inputPayload: any,
     _action: string,
   ): StandardMivaaPayload['options'] {
     const options: StandardMivaaPayload['options'] = {};
 
     // Extract common options
-    if (legacyPayload.extractionType)
-      options.extractionType = legacyPayload.extractionType;
-    if (legacyPayload.outputFormat)
-      options.outputFormat = legacyPayload.outputFormat;
-    if (legacyPayload.analysis_options) {
+    if (inputPayload.extractionType)
+      options.extractionType = inputPayload.extractionType;
+    if (inputPayload.outputFormat)
+      options.outputFormat = inputPayload.outputFormat;
+    if (inputPayload.analysis_options) {
       options.includeProperties =
-        legacyPayload.analysis_options.include_properties;
+        inputPayload.analysis_options.include_properties;
       options.includeComposition =
-        legacyPayload.analysis_options.include_composition;
+        inputPayload.analysis_options.include_composition;
       options.confidenceThreshold =
-        legacyPayload.analysis_options.confidence_threshold;
+        inputPayload.analysis_options.confidence_threshold;
     }
 
     // Merge any existing options
-    if (legacyPayload.options) {
-      Object.assign(options, legacyPayload.options);
+    if (inputPayload.options) {
+      Object.assign(options, inputPayload.options);
     }
 
     return options;

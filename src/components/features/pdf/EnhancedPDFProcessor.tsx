@@ -434,12 +434,13 @@ export function EnhancedPDFProcessor() {
         );
 
         // Process PDF using MIVAA integration service via direct call
+        // Using standardized field names consistent with other upload flows
         const extractionResponse = await callMivaaGatewayDirect(
           'pdf_process_document',
           {
-            documentId: publicUrl,
-            extractionType: 'all',
-            outputFormat: 'json',
+            file_url: publicUrl, // Standardized field name (was documentId)
+            extraction_type: 'all', // Snake_case for backend consistency
+            output_format: 'json',
           },
         );
 

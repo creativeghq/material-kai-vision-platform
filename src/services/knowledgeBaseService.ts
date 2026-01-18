@@ -102,6 +102,37 @@ export class KnowledgeBaseService {
   }
 
   /**
+   * Call MIVAA Gateway with FormData (for file uploads)
+   * FormData must be sent directly to a dedicated file upload endpoint,
+   * not wrapped in JSON.
+   */
+  private async callGatewayWithFile(
+    file: File,
+    metadata: Record<string, string>,
+  ): Promise<any> {
+    // First, upload file to Supabase storage
+    const fileName = `kb-uploads/${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('pdf-documents')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      throw new Error(`File upload failed: ${uploadError.message}`);
+    }
+
+    // Get public URL
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('pdf-documents').getPublicUrl(fileName);
+
+    // Now call gateway with file_url instead of FormData
+    return this.callGateway('kb_create_from_pdf', {
+      file_url: publicUrl,
+      ...metadata,
+    });
+  }
+
+  /**
    * Create a new document
    */
   async createDocument(doc: Partial<KBDocument>): Promise<KBDocument> {
@@ -131,15 +162,23 @@ export class KnowledgeBaseService {
 
   /**
    * Create document from PDF
+   * Uploads file to Supabase storage first, then sends file_url to gateway
    */
-  async createFromPDF(file: File, workspaceId: string, title: string, categoryId?: string): Promise<KBDocument> {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('workspace_id', workspaceId);
-    formData.append('title', title);
-    if (categoryId) formData.append('category_id', categoryId);
+  async createFromPDF(
+    file: File,
+    workspaceId: string,
+    title: string,
+    categoryId?: string,
+  ): Promise<KBDocument> {
+    const metadata: Record<string, string> = {
+      workspace_id: workspaceId,
+      title: title,
+    };
+    if (categoryId) {
+      metadata.category_id = categoryId;
+    }
 
-    return this.callGateway('kb_create_from_pdf', formData);
+    return this.callGatewayWithFile(file, metadata);
   }
 
   /**

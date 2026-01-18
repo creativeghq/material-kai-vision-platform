@@ -8,7 +8,7 @@ import {
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { X, Package } from 'lucide-react';
-import ProductDetailModal from './ProductDetailModal';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 
 interface Design3DModalProps {
   design: {

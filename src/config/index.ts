@@ -1,11 +1,11 @@
 /**
  * Main Configuration Index
  *
- * This file provides a unified interface for both the legacy API configuration system
- * and the new centralized configuration management system for microservice integration.
+ * This file provides a unified interface for the API configuration system
+ * and centralized configuration management system for microservice integration.
  */
 
-// Legacy API Configuration System
+// API Configuration System
 import { apiRegistry, ApiConfig, SupabaseApiConfig } from './apiConfig';
 import replicateConfig from './apis/replicateConfig';
 import supabaseConfig from './apis/supabaseConfig';
@@ -30,14 +30,14 @@ let globalConfig: AppConfig | null = null;
 
 /**
  * Initialize the complete configuration system
- * This includes both legacy API configs and the new centralized system
+ * This includes API configs and the centralized system
  */
 export const initializeConfiguration = async (): Promise<AppConfig> => {
   try {
     // Initialize the centralized configuration first
     globalConfig = await configFactory.create();
 
-    // Initialize legacy API configuration system
+    // Initialize API configuration system
     initializeApiConfigurations();
 
     console.log('✅ Complete configuration system initialized successfully');
@@ -103,7 +103,7 @@ export const reloadConfiguration = async (): Promise<AppConfig> => {
   return globalConfig;
 };
 
-// Initialize and register all API configurations (Legacy System)
+// Initialize and register all API configurations
 export function initializeApiConfigurations(): void {
   // Register Replicate API configuration
   apiRegistry.registerApi(replicateConfig);

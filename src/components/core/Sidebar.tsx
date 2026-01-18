@@ -45,17 +45,14 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`min-h-screen flex flex-col py-6 transition-all duration-300 m-4 rounded-3xl bg-sidebar-background ${
-        isExpanded ? 'w-72' : 'w-20'
+      className={`min-h-screen flex flex-col py-8 transition-all duration-500 m-4 rounded-[2.5rem] glass-panel bg-white/40 border-white/20 shadow-2xl ${
+        isExpanded ? 'w-72' : 'w-24'
       }`}
-      style={{
-        boxShadow: 'var(--shadow-sm)',
-      }}
     >
       {/* Logo/Brand and Toggle */}
-      <div className="mb-8 px-4">
-        <div className="flex items-center justify-between">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center">
+      <div className={`mb-10 px-4 flex flex-col ${!isExpanded ? 'items-center' : ''}`}>
+        <div className="flex items-center justify-between w-full">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 transition-transform hover:scale-105 active:scale-95">
             <span className="text-primary-foreground font-bold text-xl">K</span>
           </div>
           {isExpanded && (
@@ -70,31 +67,31 @@ export const Sidebar: React.FC = () => {
           )}
         </div>
         {isExpanded && (
-          <div className="mt-3">
-            <h2 className="font-bold text-base text-sidebar-foreground">KAI Platform</h2>
-            <p className="text-sm text-muted-foreground">Material Intelligence</p>
+          <div className="mt-4">
+            <h2 className="font-bold text-lg text-sidebar-foreground tracking-tight">KAI Platform</h2>
+            <p className="text-xs text-muted-foreground/80 uppercase tracking-widest font-medium">Intelligence</p>
           </div>
         )}
       </div>
 
       {/* Navigation Icons */}
       <TooltipProvider>
-        <nav className="flex-1 flex flex-col space-y-2 px-3">
+        <nav className={`flex-1 flex flex-col space-y-3 px-4 ${!isExpanded ? 'items-center' : ''}`}>
           {navigationItems.map((item) => (
             <Tooltip key={item.id} delayDuration={isExpanded ? 99999 : 300}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  className={`${isExpanded ? 'w-full justify-start' : 'w-14'} h-14 rounded-2xl transition-all duration-200 ${
+                  className={`${isExpanded ? 'w-full justify-start' : 'w-14 px-0'} h-14 rounded-2xl transition-all duration-300 ${
                     isActive(item.path)
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-sidebar-foreground hover:bg-secondary'
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-white/40 border border-transparent hover:border-white/20'
                   }`}
                   asChild
                 >
-                  <Link to={item.path}>
+                  <Link to={item.path} className="flex items-center justify-center">
                     <item.icon className={`${isExpanded ? 'w-5 h-5' : 'w-6 h-6'}`} />
-                    {isExpanded && <span className="ml-4 font-medium">{item.label}</span>}
+                    {isExpanded && <span className="ml-4 font-bold tracking-tight">{item.label}</span>}
                   </Link>
                 </Button>
               </TooltipTrigger>
@@ -108,46 +105,45 @@ export const Sidebar: React.FC = () => {
         </nav>
       </TooltipProvider>
 
-      {/* Expand Button (when collapsed) */}
-      {!isExpanded && (
-        <div className="px-3 mb-6">
+      {/* User Profile at Bottom */}
+      <div className={`px-4 mt-auto mb-2 flex flex-col ${!isExpanded ? 'items-center' : ''}`}>
+        {!isExpanded && (
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className="w-14 h-14 rounded-2xl text-sidebar-foreground hover:bg-sidebar-accent"
+            className="w-14 h-14 rounded-2xl text-sidebar-foreground hover:bg-white/40 mb-4 border border-transparent hover:border-white/20 transition-all duration-300"
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
-        </div>
-      )}
-
-      {/* User Profile at Bottom */}
-      <TooltipProvider>
-        <Tooltip delayDuration={isExpanded ? 99999 : 300}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              className={`${isExpanded ? 'w-full justify-start mx-3' : 'w-14 mx-auto'} h-14 rounded-2xl text-sidebar-foreground hover:bg-sidebar-accent`}
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <User className="w-5 h-5 text-primary" />
-              </div>
-              {isExpanded && (
-                <div className="ml-4 text-left">
-                  <p className="text-sm font-semibold text-sidebar-foreground">Profile</p>
-                  <p className="text-xs text-sidebar-foreground/60">Settings</p>
+        )}
+        
+        <TooltipProvider>
+          <Tooltip delayDuration={isExpanded ? 99999 : 300}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className={`h-16 rounded-2xl transition-all duration-300 ${isExpanded ? 'w-full justify-start px-3' : 'w-14 px-0'} text-sidebar-foreground hover:bg-white/40 border border-transparent hover:border-white/20 group`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner group-hover:bg-primary/25 transition-colors">
+                  <User className="w-5 h-5 text-primary" />
                 </div>
-              )}
-            </Button>
-          </TooltipTrigger>
-          {!isExpanded && (
-            <TooltipContent side="right" className="rounded-xl">
-              <p>Profile</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
-      </TooltipProvider>
+                {isExpanded && (
+                  <div className="ml-4 text-left">
+                    <p className="text-sm font-bold text-foreground tracking-tight">Profile</p>
+                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-bold">Settings</p>
+                  </div>
+                )}
+              </Button>
+            </TooltipTrigger>
+            {!isExpanded && (
+              <TooltipContent side="right" className="rounded-xl font-bold">
+                <p>User Profile</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+      </div>
     </aside>
   );
 };

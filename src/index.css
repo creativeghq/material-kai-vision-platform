@@ -245,6 +245,15 @@ All colors MUST be HSL.
     --badge-draft-bg: 0 0% 95%;          /* Very light gray */
     --badge-draft-text: 0 0% 35%;        /* Dark gray */
     --badge-draft-border: 0 0% 70%;      /* Medium gray */
+
+    /* ===== GLASSMORPHISM SYSTEM (NEW) ===== */
+    --glass-background: rgba(255, 255, 255, 0.7);
+    --glass-blur: 12px;
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+
+    /* ===== REFINED SHADOWS (NEW) ===== */
+    --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.05), 0 5px 20px -5px rgba(0, 0, 0, 0.1);
   }
 
 .dark {
@@ -309,20 +318,26 @@ All colors MUST be HSL.
 
   /* Dashboard Card - Glass morphism effect (Notion-style) */
   .dashboard-card {
-    background: rgba(255, 255, 255, 0.7);  /* Semi-transparent white */
-    backdrop-filter: blur(10px);  /* Glass blur effect */
-    -webkit-backdrop-filter: blur(10px);  /* Safari support */
-    border-radius: var(--radius);
+    background: var(--glass-background);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border-radius: var(--radius-lg);
     padding: var(--card-padding);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.04);  /* Very subtle shadow */
-    transition: var(--transition-smooth);
-    border: 1px solid rgba(0, 0, 0, 0.06);  /* Very soft border */
+    box-shadow: var(--glass-shadow);
+    transition: var(--transition-bounce);
+    border: 1px solid var(--glass-border);
   }
 
   .dashboard-card:hover {
-    background: rgba(255, 255, 255, 0.85);  /* Slightly more opaque on hover */
-    box-shadow: 0 2px 4px 0 rgb(0 0 0 / 0.06);
-    border-color: rgba(0, 0, 0, 0.08);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: var(--shadow-premium);
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+
+  /* Liquid Glass Utility */
+  .glass-panel {
+    @apply dashboard-card;
   }
 
   /* Card with subtle gradient (Notion-like) */

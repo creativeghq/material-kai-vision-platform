@@ -534,7 +534,7 @@ export class ConsolidatedPDFController {
           });
         }
 
-        result = { ...uploadResult.data, jobId };
+        result = { ...uploadResult.data, job_id: jobId };
       }
 
       // Log usage

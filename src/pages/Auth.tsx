@@ -23,6 +23,7 @@ export const Auth: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('signup');
   const { signIn, signUp, resetPassword, user } = useAuth();
   const navigate = useNavigate();
 
@@ -91,7 +92,7 @@ export const Auth: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signup" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="hidden">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -208,11 +209,7 @@ export const Auth: React.FC = () => {
                     <span className="text-muted-foreground">Don't have an account? </span>
                     <button
                       type="button"
-                      onClick={() => {
-                        const tabsList = document.querySelector('[role="tablist"]');
-                        const signupTab = tabsList?.querySelector('[value="signup"]') as HTMLElement;
-                        signupTab?.click();
-                      }}
+                      onClick={() => setActiveTab('signup')}
                       className="text-foreground underline hover:text-primary font-medium"
                     >
                       Sign up
@@ -290,14 +287,10 @@ export const Auth: React.FC = () => {
                 <OAuthButtons />
 
                 <div className="text-center text-sm pt-2">
-                  <span className="text-muted-foreground">Have any account? </span>
+                  <span className="text-muted-foreground">Have an account? </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      const tabsList = document.querySelector('[role="tablist"]');
-                      const signinTab = tabsList?.querySelector('[value="signin"]') as HTMLElement;
-                      signinTab?.click();
-                    }}
+                    onClick={() => setActiveTab('signin')}
                     className="text-foreground underline hover:text-primary font-medium"
                   >
                     Sign in

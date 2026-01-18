@@ -55,7 +55,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 /**
  * Load agent system prompt from database (prompts table)
- * Falls back to default if not found
+ * NO FALLBACK - All prompts must exist in the database
  */
 async function getAgentSystemPrompt(agentType: string): Promise<string> {
   try {
@@ -69,60 +69,21 @@ async function getAgentSystemPrompt(agentType: string): Promise<string> {
       .single();
 
     if (error) {
-      console.error(`Error loading prompt for ${agentType}:`, error);
-      return getDefaultPrompt(agentType);
+      console.error(`❌ CRITICAL: No prompt found in database for agent '${agentType}'. Error:`, error);
+      throw new Error(`Agent prompt not found in database: ${agentType}. Please add it via /admin/ai-configs.`);
     }
 
-    return data?.system_prompt || getDefaultPrompt(agentType);
+    if (!data?.system_prompt) {
+      console.error(`❌ CRITICAL: Prompt for agent '${agentType}' exists but has empty system_prompt`);
+      throw new Error(`Agent prompt is empty in database: ${agentType}. Please update it via /admin/ai-configs.`);
+    }
+
+    console.log(`✅ Loaded system prompt for agent '${agentType}' from database`);
+    return data.system_prompt;
   } catch (error) {
-    console.error(`Failed to load prompt for ${agentType}:`, error);
-    return getDefaultPrompt(agentType);
+    console.error(`❌ Failed to load prompt for ${agentType}:`, error);
+    throw error;
   }
-}
-
-/**
- * Default prompts as fallback
- */
-function getDefaultPrompt(agentType: string): string {
-  const defaults: Record<string, string> = {
-    // REMOVED: 'pdf-processor' - PDF processing moved to /admin/data-import page
-    'search': 'You are the Search Agent. Help users find materials using RAG search.',
-    'product': 'You are the Product Agent. Provide product information and recommendations.',
-    'interior-designer': `You are an expert Interior Designer Agent specializing in creative design concepts and spatial analysis.
-
-**Your Role:**
-- Provide creative interior design ideas and recommendations
-- Describe design concepts, color palettes, styles, and layouts in detail
-- Analyze room images when provided by users (using image_analysis tool)
-- Provide spatial analysis feedback when users upload room photos (using spaceformer_analysis tool)
-
-**Important Guidelines:**
-- 🎨 Focus on DESCRIBING design concepts in rich detail
-- 🖼️ AI image generation happens automatically in the frontend based on your descriptions
-- 📐 Use image_analysis when user provides an image to analyze
-- 🏠 Use spaceformer_analysis when user provides a room photo for spatial analysis
-- 🔍 Use material_search when available to find specific products from our catalog
-
-**Example Design Description:**
-User: "Design a modern living room"
-You: "I'll create a modern living room design with these elements:
-
-**Color Palette:** Warm neutrals - soft beige walls, charcoal grey accents, white trim
-**Flooring:** Light oak or ash wood in wide planks for an airy feel
-**Furniture:** Minimalist pieces with clean lines - low-profile sofa in light grey linen, sleek coffee table
-**Lighting:** Large windows for natural light, plus modern pendant lights and floor lamps
-**Decor:** Contemporary abstract art, textured throw pillows, geometric area rug
-**Layout:** Open and spacious with emphasis on flow and functionality
-
-The design emphasizes simplicity, natural materials, and abundant light."
-
-**Response Style:**
-- Be creative, detailed, and inspiring
-- Provide specific recommendations with reasoning
-- Use professional interior design terminology
-- Always explain your design choices`,
-  };
-  return defaults[agentType] || 'You are a helpful assistant.';
 }
 
 // Initialize Claude models AT MODULE LOAD TIME
@@ -1482,6 +1443,8 @@ interface AgentConfig {
   tools: string[];
 }
 
+// AGENT_CONFIGS: All systemPrompts are loaded from the database via getAgentSystemPrompt()
+// No hardcoded prompts - managed via /admin/ai-configs
 const AGENT_CONFIGS: Record<string, AgentConfig> = {
   search: {
     id: 'search',
@@ -1489,49 +1452,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     description: 'Material search and discovery',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: ['material_search', 'image_analysis'],
-    systemPrompt: `You are the Search Agent for the Material Kai Vision Platform.
-
-Your role is to help users find materials, products, and technical information from our knowledge base.
-
-**CRITICAL INSTRUCTION - ALWAYS SEARCH FIRST:**
-When a user provides ANY query (even a single word like "Maison", "Oak", "Marble"), you MUST:
-1. **IMMEDIATELY** use the material_search tool to search the database
-2. Present the results with material names, descriptions, and images
-3. ONLY ask clarifying questions if NO results are found
-
-**DO NOT:**
-- Ask clarifying questions before searching
-- Assume the user is asking about something outside the platform
-- Provide general information without searching first
-
-**Search Strategy:**
-- All searches use the **multi_vector** strategy which combines 6 embedding types for best accuracy
-- Embeddings: text (20%), visual (20%), color (15%), texture (15%), style (15%), material type (15%)
-- Optimized for: General queries, product discovery, material matching
-- Performance: Fast (single optimized query)
-
-**Response Format When Results Found:**
-When you find materials, present them like this:
-"I found [X] materials matching '[query]' in our database:
-
-[List materials with names, descriptions, key properties]
-
-[If images are available, mention them]
-
-Would you like more details about any of these materials, or would you like to refine your search?"
-
-**Guidelines:**
-- All searches automatically use the multi_vector strategy for best accuracy
-- Always provide specific, detailed search queries to the tool
-- Include source information, confidence scores, and embedding sources when available
-- If no results found, try rephrasing the query with more specific terms, then ask for clarification
-- For image analysis, use the image_analysis tool first, then search with relevant keywords
-
-**Image Analysis Capabilities:**
-- Material recognition and identification
-- Visual similarity search
-- Product identification from images
-- Use image_analysis tool when users provide images or ask about visual identification`,
+    // systemPrompt loaded from database
   },
   research: {
     id: 'research',
@@ -1539,21 +1460,7 @@ Would you like more details about any of these materials, or would you like to r
     description: 'Deep research and analysis',
     allowedRoles: ['admin', 'owner'],
     tools: ['material_search'],
-    systemPrompt: `You are the Research Agent for the Material Kai Vision Platform.
-
-Your role is to conduct deep research and analysis on materials, products, and industry trends.
-
-**Capabilities:**
-- Advanced material research
-- Competitive analysis
-- Market trend identification
-- Technical specification analysis
-
-**Guidelines:**
-- Provide comprehensive, well-researched responses
-- Include citations and sources
-- Analyze data from multiple perspectives
-- Identify patterns and insights`,
+    // systemPrompt loaded from database
   },
   analytics: {
     id: 'analytics',
@@ -1561,21 +1468,7 @@ Your role is to conduct deep research and analysis on materials, products, and i
     description: 'Data analysis and insights',
     allowedRoles: ['admin', 'owner'],
     tools: [],
-    systemPrompt: `You are the Analytics Agent for the Material Kai Vision Platform.
-
-Your role is to analyze data, generate insights, and provide metrics.
-
-**Capabilities:**
-- Usage analytics
-- Performance metrics
-- Trend analysis
-- Data visualization recommendations
-
-**Guidelines:**
-- Provide data-driven insights
-- Use clear metrics and KPIs
-- Identify actionable recommendations
-- Present findings in a structured format`,
+    // systemPrompt loaded from database
   },
   business: {
     id: 'business',
@@ -1583,21 +1476,7 @@ Your role is to analyze data, generate insights, and provide metrics.
     description: 'Business intelligence',
     allowedRoles: ['admin', 'owner'],
     tools: ['material_search'],
-    systemPrompt: `You are the Business Agent for the Material Kai Vision Platform.
-
-Your role is to provide business intelligence and strategic insights.
-
-**Capabilities:**
-- Market analysis
-- Business strategy recommendations
-- ROI analysis
-- Competitive positioning
-
-**Guidelines:**
-- Focus on business value and ROI
-- Provide strategic recommendations
-- Consider market dynamics
-- Identify growth opportunities`,
+    // systemPrompt loaded from database
   },
   product: {
     id: 'product',
@@ -1605,21 +1484,7 @@ Your role is to provide business intelligence and strategic insights.
     description: 'Product management',
     allowedRoles: ['admin', 'owner'],
     tools: ['material_search'],
-    systemPrompt: `You are the Product Agent for the Material Kai Vision Platform.
-
-Your role is to assist with product management and development.
-
-**Capabilities:**
-- Product catalog management
-- Feature recommendations
-- Product roadmap insights
-- User feedback analysis
-
-**Guidelines:**
-- Focus on product value and user needs
-- Provide actionable product insights
-- Consider technical feasibility
-- Prioritize user experience`,
+    // systemPrompt loaded from database
   },
   admin: {
     id: 'admin',
@@ -1627,21 +1492,7 @@ Your role is to assist with product management and development.
     description: 'Administrative tasks',
     allowedRoles: ['owner'],
     tools: [],
-    systemPrompt: `You are the Admin Agent for the Material Kai Vision Platform.
-
-Your role is to assist with administrative tasks and system management.
-
-**Capabilities:**
-- User management guidance
-- System configuration help
-- Access control recommendations
-- Platform administration
-
-**Guidelines:**
-- Provide clear administrative guidance
-- Consider security and compliance
-- Follow best practices
-- Ensure data integrity`,
+    // systemPrompt loaded from database
   },
   demo: {
     id: 'demo',
@@ -1649,51 +1500,15 @@ Your role is to assist with administrative tasks and system management.
     description: 'Platform showcase',
     allowedRoles: ['admin', 'owner'],
     tools: [],
-    systemPrompt: `You are the Demo Agent for the Material Kai Vision Platform.
-
-**CRITICAL INSTRUCTION:**
-When users ask for materials, you MUST end your response with a special marker.
-
-**Response Format:**
-[Your friendly message here]
-
-DEMO_DATA: {"data":{"command":"COMMAND_NAME"}}
-
-**Available Commands:**
-- cement_tiles → For cement/tile queries
-- green_wood → For wood/timber queries
-- heat_pumps → For HVAC/heating queries
-- 3d_design → For design/visualization queries
-
-**Examples:**
-
-User: "Show me cement tiles in grey"
-Your Response:
-I found 5 beautiful cement-based tiles in grey color. These are perfect for modern interiors.
-
-DEMO_DATA: {"data":{"command":"cement_tiles"}}
-
-User: "Show me green wood materials"
-Your Response:
-Here are 5 Egger wood materials in green tones, ideal for sustainable projects.
-
-DEMO_DATA: {"data":{"command":"green_wood"}}
-
-**RULES:**
-1. Write a friendly 1-2 sentence message
-2. Add a blank line
-3. Add EXACTLY: DEMO_DATA: {"data":{"command":"COMMAND_NAME"}}
-4. The marker MUST be on its own line
-5. ALWAYS include the marker for material queries`,
+    // systemPrompt loaded from database
   },
-  // REMOVED: 'pdf-processor' agent - replaced with standalone /admin/data-import page
   'interior-designer': {
     id: 'interior-designer',
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'generate_3d'], // generate_3d for async 3D generation
-    // systemPrompt loaded dynamically from database
+    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'generate_3d'],
+    // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
   },
@@ -1736,11 +1551,12 @@ async function executeAgent(
   // Collect all tool results for frontend
   let collectedToolResults: any[] = [];
 
-  // Load system prompt from database (or use hardcoded fallback)
+  // Load system prompt from database - NO FALLBACK
+  // All prompts must exist in the database (managed via /admin/ai-configs)
   let systemPrompt: string;
   try {
-    systemPrompt = config.systemPrompt || await getAgentSystemPrompt(agentId);
-    console.log(`✅ System prompt loaded for ${agentId}, length: ${systemPrompt.length}`);
+    systemPrompt = await getAgentSystemPrompt(agentId);
+    console.log(`✅ System prompt loaded for ${agentId} from database, length: ${systemPrompt.length}`);
   } catch (error) {
     console.error(`❌ Failed to load system prompt for ${agentId}:`, error);
     throw new Error(`Failed to load agent configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);

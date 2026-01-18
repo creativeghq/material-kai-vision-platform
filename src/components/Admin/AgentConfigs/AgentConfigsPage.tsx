@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Edit, Save, X, History, Clock, Sparkles } from 'lucide-react';
+import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, ChevronRight, Info } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/core/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -39,17 +40,46 @@ interface PromptHistory {
   changed_at: string;
 }
 
+// Type-specific icons
+const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  agent: Bot,
+  extraction: FileText,
+  template: Layers,
+  search: SearchIcon,
+  classification: Cpu,
+};
+
+// Type-specific colors
+const TYPE_COLORS: Record<string, string> = {
+  agent: 'bg-violet-500/10 text-violet-600 border-violet-500/20',
+  extraction: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  template: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+  search: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+  classification: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
+};
+
+// Stage badge colors
+const STAGE_COLORS: Record<string, string> = {
+  discovery: 'bg-cyan-100 text-cyan-700',
+  chunking: 'bg-purple-100 text-purple-700',
+  entity_creation: 'bg-green-100 text-green-700',
+  image_analysis: 'bg-orange-100 text-orange-700',
+  scraping: 'bg-pink-100 text-pink-700',
+};
+
 export const AgentConfigsPage: React.FC = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
   const [editedText, setEditedText] = useState('');
+  const [editedDescription, setEditedDescription] = useState('');
   const [changeReason, setChangeReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyData, setHistoryData] = useState<PromptHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -64,14 +94,12 @@ export const AgentConfigsPage: React.FC = () => {
         .select('*')
         .eq('is_active', true)
         .order('prompt_type', { ascending: true })
+        .order('stage', { ascending: true })
         .order('category', { ascending: true });
 
       if (error) throw error;
 
       console.log('[AI Configs] Loaded prompts:', data?.length || 0);
-      console.log('[AI Configs] Prompt types:', [...new Set(data?.map(p => p.prompt_type))]);
-      console.log('[AI Configs] Extraction prompts:', data?.filter(p => p.prompt_type === 'extraction').map(p => p.name));
-
       setPrompts(data || []);
     } catch (error) {
       console.error('Error loading prompts:', error);
@@ -83,12 +111,11 @@ export const AgentConfigsPage: React.FC = () => {
 
   const handleEdit = (prompt: Prompt) => {
     setEditingPrompt(prompt);
-    // For extraction/template/search prompts, use prompt_text (the detailed instructions)
-    // For agent prompts, use system_prompt (the conversational system message)
     const textToEdit = prompt.prompt_type === 'agent'
       ? (prompt.system_prompt || prompt.prompt_text)
       : (prompt.prompt_text || prompt.system_prompt);
     setEditedText(textToEdit);
+    setEditedDescription(prompt.description || '');
     setChangeReason('');
   };
 
@@ -124,7 +151,6 @@ export const AgentConfigsPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Determine which field to update based on prompt type
       const isAgentPrompt = editingPrompt.prompt_type === 'agent';
 
       // Save to history
@@ -140,16 +166,17 @@ export const AgentConfigsPage: React.FC = () => {
         changed_by: user.id,
       });
 
-      // Update the appropriate field based on prompt type
+      // Update prompt
       const updateData = isAgentPrompt
-        ? { system_prompt: editedText }  // Agent prompts use system_prompt
-        : { prompt_text: editedText };   // Extraction/template/search prompts use prompt_text
+        ? { system_prompt: editedText, description: editedDescription }
+        : { prompt_text: editedText, description: editedDescription };
 
       await supabase.from('prompts').update(updateData).eq('id', editingPrompt.id);
 
       toast({ title: 'Success', description: `${editingPrompt.name} updated successfully` });
       setEditingPrompt(null);
       setEditedText('');
+      setEditedDescription('');
       setChangeReason('');
       loadPrompts();
     } catch (error) {
@@ -166,28 +193,22 @@ export const AgentConfigsPage: React.FC = () => {
     });
   };
 
-  const getPromptIcon = (promptType: string, category: string) => {
-    // Prompt type icons
-    if (promptType === 'agent') {
-      const agentIcons: Record<string, string> = {
-        'pdf-processor': '📄', 'search': '🔍', 'product': '📦', 'interior-designer': '🎨',
-      };
-      return agentIcons[category] || '🤖';
-    }
-    if (promptType === 'extraction') return '🔬';
-    if (promptType === 'template') return '📋';
-    if (promptType === 'search') return '🔎';
-    return '✨';
-  };
-
   const getPromptTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
-      'agent': 'Agent',
-      'extraction': 'Extraction',
-      'template': 'Template',
-      'search': 'Search',
+      agent: 'Agent',
+      extraction: 'Extraction',
+      template: 'Template',
+      search: 'Search',
+      classification: 'Classification',
     };
     return labels[type] || type;
+  };
+
+  const getPromptLength = (prompt: Prompt) => {
+    const text = prompt.prompt_type === 'agent'
+      ? (prompt.system_prompt || prompt.prompt_text)
+      : (prompt.prompt_text || prompt.system_prompt);
+    return text?.length || 0;
   };
 
   const filteredPrompts = selectedType === 'all'
@@ -196,161 +217,353 @@ export const AgentConfigsPage: React.FC = () => {
 
   const promptTypes = ['all', ...Array.from(new Set(prompts.map(p => p.prompt_type)))];
 
-  return (
-    <div className="min-h-screen p-6">
-      <GlobalAdminHeader title="AI Configurations" description="Manage all AI prompts and configurations across the platform" />
+  // Group prompts by type and stage for better organization
+  const groupedPrompts = filteredPrompts.reduce((acc, prompt) => {
+    const key = prompt.stage || 'general';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(prompt);
+    return acc;
+  }, {} as Record<string, Prompt[]>);
 
-      {/* Filter Tabs */}
-      <div className="mt-6 flex gap-2 border-b border-gray-200">
-        {promptTypes.map((type) => (
+  const stageOrder = ['discovery', 'chunking', 'entity_creation', 'image_analysis', 'scraping', 'general'];
+  const sortedStages = Object.keys(groupedPrompts).sort((a, b) => {
+    const aIndex = stageOrder.indexOf(a);
+    const bIndex = stageOrder.indexOf(b);
+    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+  });
+
+  return (
+    <TooltipProvider>
+      <div className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-muted/20">
+        <GlobalAdminHeader
+          title="AI Configurations"
+          description="Manage all AI prompts and system configurations. Changes are tracked and versioned."
+        />
+
+        {/* Stats Bar */}
+        <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+          {promptTypes.filter(t => t !== 'all').map((type) => {
+            const count = prompts.filter(p => p.prompt_type === type).length;
+            const TypeIcon = TYPE_ICONS[type] || Sparkles;
+            return (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`p-4 rounded-xl border transition-all duration-200 ${
+                  selectedType === type
+                    ? 'ring-2 ring-primary shadow-lg scale-[1.02]'
+                    : 'hover:shadow-md hover:scale-[1.01]'
+                } ${TYPE_COLORS[type] || 'bg-muted'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <TypeIcon className="h-5 w-5" />
+                  <div className="text-left">
+                    <div className="text-2xl font-bold">{count}</div>
+                    <div className="text-xs opacity-80">{getPromptTypeLabel(type)}</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
           <button
-            key={type}
-            onClick={() => setSelectedType(type)}
-            className={`px-4 py-2 font-medium transition-colors ${
-              selectedType === type
-                ? 'border-b-2 border-primary text-primary'
-                : 'text-gray-600 hover:text-gray-900'
+            onClick={() => setSelectedType('all')}
+            className={`p-4 rounded-xl border transition-all duration-200 ${
+              selectedType === 'all'
+                ? 'ring-2 ring-primary shadow-lg scale-[1.02] bg-primary/10'
+                : 'hover:shadow-md hover:scale-[1.01] bg-muted/50'
             }`}
           >
-            {type === 'all' ? 'All Prompts' : `${getPromptTypeLabel(type)} (${prompts.filter(p => p.prompt_type === type).length})`}
+            <div className="flex items-center gap-3">
+              <Layers className="h-5 w-5" />
+              <div className="text-left">
+                <div className="text-2xl font-bold">{prompts.length}</div>
+                <div className="text-xs opacity-80">All Prompts</div>
+              </div>
+            </div>
           </button>
-        ))}
-      </div>
+        </div>
 
-      <div className="mt-6 space-y-6">
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-4 text-muted-foreground">Loading prompts...</p>
-          </div>
-        ) : filteredPrompts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No prompts found</p>
-          </div>
-        ) : (
-          <div className="grid gap-6">
-            {filteredPrompts.map((prompt) => (
-              <Card key={prompt.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
+        {/* Main Content */}
+        <div className="mt-8">
+          {loading ? (
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+              <p className="mt-4 text-muted-foreground">Loading prompts...</p>
+            </div>
+          ) : filteredPrompts.length === 0 ? (
+            <div className="text-center py-16">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No prompts found</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {sortedStages.map((stage) => (
+                <div key={stage} className="space-y-4">
+                  {/* Stage Header */}
+                  {selectedType !== 'agent' && stage !== 'general' && (
                     <div className="flex items-center gap-3">
-                      <div className="text-4xl">{getPromptIcon(prompt.prompt_type, prompt.category)}</div>
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          {prompt.name}
-                          <Badge variant="outline" className="ml-2">{getPromptTypeLabel(prompt.prompt_type)}</Badge>
-                          <Badge variant="outline" className="ml-2">v{prompt.version}</Badge>
-                          {prompt.status === 'active' && <Badge className="bg-green-100 text-green-800">Active</Badge>}
+                      <Badge className={`${STAGE_COLORS[stage] || 'bg-gray-100 text-gray-700'} px-3 py-1 text-sm font-medium`}>
+                        {stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Badge>
+                      <div className="flex-1 h-px bg-border"></div>
+                      <span className="text-sm text-muted-foreground">{groupedPrompts[stage].length} prompts</span>
+                    </div>
+                  )}
+
+                  {/* Prompts Grid */}
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {groupedPrompts[stage].map((prompt) => {
+                      const TypeIcon = TYPE_ICONS[prompt.prompt_type] || Sparkles;
+                      const isExpanded = expandedPrompt === prompt.id;
+
+                      return (
+                        <Card
+                          key={prompt.id}
+                          className={`group hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 ${
+                            TYPE_COLORS[prompt.prompt_type]?.includes('violet') ? 'border-l-violet-500' :
+                            TYPE_COLORS[prompt.prompt_type]?.includes('blue') ? 'border-l-blue-500' :
+                            TYPE_COLORS[prompt.prompt_type]?.includes('amber') ? 'border-l-amber-500' :
+                            TYPE_COLORS[prompt.prompt_type]?.includes('emerald') ? 'border-l-emerald-500' :
+                            TYPE_COLORS[prompt.prompt_type]?.includes('rose') ? 'border-l-rose-500' :
+                            'border-l-gray-500'
+                          }`}
+                          onClick={() => setExpandedPrompt(isExpanded ? null : prompt.id)}
+                        >
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`p-2 rounded-lg ${TYPE_COLORS[prompt.prompt_type] || 'bg-muted'}`}>
+                                  <TypeIcon className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <CardTitle className="text-base font-semibold truncate">{prompt.name}</CardTitle>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="outline" className="text-xs">{prompt.category}</Badge>
+                                    <Badge variant="outline" className="text-xs">v{prompt.version}</Badge>
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                            </div>
+                          </CardHeader>
+
+                          <CardContent className="pt-0">
+                            {/* Description */}
+                            {prompt.description ? (
+                              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                                {prompt.description}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground/50 italic mb-3">
+                                No description available
+                              </p>
+                            )}
+
+                            {/* Metadata Row */}
+                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1">
+                                    <FileText className="h-3 w-3" />
+                                    <span>{getPromptLength(prompt).toLocaleString()} chars</span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>Prompt length</TooltipContent>
+                              </Tooltip>
+
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{new Date(prompt.updated_at).toLocaleDateString()}</span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>Last updated</TooltipContent>
+                              </Tooltip>
+
+                              {prompt.stage && (
+                                <Badge className={`text-xs ${STAGE_COLORS[prompt.stage] || 'bg-gray-100 text-gray-700'}`}>
+                                  {prompt.stage.replace('_', ' ')}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Expanded Actions */}
+                            {isExpanded && (
+                              <div className="mt-4 pt-4 border-t flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  onClick={() => handleEdit(prompt)}
+                                  variant="default"
+                                  size="sm"
+                                  className="flex-1"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Prompt
+                                </Button>
+                                <Button
+                                  onClick={() => handleViewHistory(prompt)}
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  <History className="h-4 w-4 mr-2" />
+                                  History
+                                </Button>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editingPrompt} onOpenChange={() => setEditingPrompt(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                {editingPrompt && (
+                  <div className={`p-2 rounded-lg ${TYPE_COLORS[editingPrompt.prompt_type] || 'bg-muted'}`}>
+                    {(() => {
+                      const TypeIcon = TYPE_ICONS[editingPrompt.prompt_type] || Sparkles;
+                      return <TypeIcon className="h-5 w-5" />;
+                    })()}
+                  </div>
+                )}
+                <div>
+                  <DialogTitle>{editingPrompt?.name}</DialogTitle>
+                  <DialogDescription>
+                    {editingPrompt?.prompt_type === 'agent' ? 'System Prompt' : 'Extraction Prompt'} •
+                    Category: {editingPrompt?.category} •
+                    {editingPrompt?.stage && ` Stage: ${editingPrompt.stage} •`}
+                    Version {editingPrompt?.version}
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* Description Field */}
+              <div>
+                <Label htmlFor="description" className="flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Description
+                </Label>
+                <Input
+                  id="description"
+                  value={editedDescription}
+                  onChange={(e) => setEditedDescription(e.target.value)}
+                  placeholder="Brief description of what this prompt does..."
+                  className="mt-2"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Helps identify the purpose of this prompt in the admin panel
+                </p>
+              </div>
+
+              {/* Prompt Text */}
+              <div>
+                <Label htmlFor="prompt" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  {editingPrompt?.prompt_type === 'agent' ? 'System Prompt' : 'Prompt Text'}
+                </Label>
+                <Textarea
+                  id="prompt"
+                  value={editedText}
+                  onChange={(e) => setEditedText(e.target.value)}
+                  className="min-h-[400px] font-mono text-sm mt-2"
+                  placeholder="Enter prompt text..."
+                />
+                <p className="text-sm text-muted-foreground mt-2">{editedText.length.toLocaleString()} characters</p>
+              </div>
+
+              {/* Change Reason */}
+              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
+                <Label htmlFor="reason" className="text-amber-700 dark:text-amber-400 font-medium">
+                  Change Reason (Required)
+                </Label>
+                <Input
+                  id="reason"
+                  value={changeReason}
+                  onChange={(e) => setChangeReason(e.target.value)}
+                  placeholder="e.g., Improved extraction accuracy for product dimensions"
+                  className="mt-2"
+                />
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                  This will be recorded in the change history for auditing
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingPrompt(null)}>
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !changeReason.trim()}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* History Dialog */}
+        <Dialog open={showHistory} onOpenChange={setShowHistory}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Change History</DialogTitle>
+              <DialogDescription>Last 5 changes to this prompt</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {loadingHistory ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                </div>
+              ) : historyData.length === 0 ? (
+                <div className="text-center py-8">
+                  <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No history available</p>
+                </div>
+              ) : (
+                historyData.map((entry, index) => (
+                  <Card key={entry.id} className="border-l-4 border-l-blue-500">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Badge variant="outline">#{historyData.length - index}</Badge>
+                          {entry.change_reason || 'No reason provided'}
                         </CardTitle>
-                        <CardDescription>
-                          {prompt.description || `${prompt.category} - ${prompt.subcategory || 'General'}`}
-                          {prompt.stage && <span className="ml-2 text-xs">• Stage: {prompt.stage}</span>}
-                        </CardDescription>
+                        <span className="text-sm text-muted-foreground">{formatDate(entry.changed_at)}</span>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={() => handleViewHistory(prompt)} variant="outline" size="sm">
-                        <History className="h-4 w-4 mr-2" />History
-                      </Button>
-                      <Button onClick={() => handleEdit(prompt)} variant="default" size="sm">
-                        <Edit className="h-4 w-4 mr-2" />Edit Prompt
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-muted-foreground">Prompt Preview</Label>
-                      <div className="mt-2 p-4 bg-muted rounded-lg">
-                        <p className="text-sm font-mono line-clamp-3">
-                          {prompt.prompt_type === 'agent'
-                            ? (prompt.system_prompt || prompt.prompt_text)
-                            : (prompt.prompt_text || prompt.system_prompt)}
-                        </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Previous</Label>
+                          <div className="mt-1 p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs font-mono line-clamp-3 border border-red-200 dark:border-red-800">
+                            {entry.old_prompt_text}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Updated</Label>
+                          <div className="mt-1 p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs font-mono line-clamp-3 border border-green-200 dark:border-green-800">
+                            {entry.new_prompt_text}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />Updated {formatDate(prompt.updated_at)}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />{prompt.configuration?.model || 'Default Model'}
-                      </div>
-                      <div>{(prompt.system_prompt || prompt.prompt_text).length.toLocaleString()} characters</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-      <Dialog open={!!editingPrompt} onOpenChange={() => setEditingPrompt(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit {editingPrompt?.name}</DialogTitle>
-            <DialogDescription>Update the system prompt for this agent. Changes will be tracked in history.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="prompt">System Prompt</Label>
-              <Textarea id="prompt" value={editedText} onChange={(e) => setEditedText(e.target.value)}
-                className="min-h-[400px] font-mono text-sm mt-2" placeholder="Enter system prompt..." />
-              <p className="text-sm text-muted-foreground mt-2">{editedText.length.toLocaleString()} characters</p>
-            </div>
-            <div>
-              <Label htmlFor="reason">Change Reason *</Label>
-              <Input id="reason" value={changeReason} onChange={(e) => setChangeReason(e.target.value)}
-                placeholder="e.g., Improved product detection accuracy" className="mt-2" />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingPrompt(null)}><X className="h-4 w-4 mr-2" />Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}><Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Changes'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={showHistory} onOpenChange={setShowHistory}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Prompt History</DialogTitle>
-            <DialogDescription>Last 5 changes to this prompt</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {loadingHistory ? (
-              <div className="text-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div></div>
-            ) : historyData.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No history available</p>
-            ) : (
-              historyData.map((entry, index) => (
-                <Card key={entry.id}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm">Change #{historyData.length - index}</CardTitle>
-                      <span className="text-sm text-muted-foreground">{formatDate(entry.changed_at)}</span>
-                    </div>
-                    {entry.change_reason && <CardDescription>{entry.change_reason}</CardDescription>}
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Old Prompt</Label>
-                        <div className="mt-1 p-2 bg-red-50 rounded text-xs font-mono line-clamp-2">{entry.old_prompt_text}</div>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-muted-foreground">New Prompt</Label>
-                        <div className="mt-1 p-2 bg-green-50 rounded text-xs font-mono line-clamp-2">{entry.new_prompt_text}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </TooltipProvider>
   );
 };
-

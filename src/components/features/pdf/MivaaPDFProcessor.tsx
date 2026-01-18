@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Progress } from '@/components/core/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { mivaaApi } from '@/services/mivaaApiClient';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PDFProcessingResult {
   id: string;
@@ -63,13 +64,37 @@ export const MivaaPDFProcessor: React.FC = () => {
 
       const processingResults: PDFProcessingResult[] = [];
 
+      // Get current user for file path
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setProgress((i / files.length) * 90);
 
-        // Upload file to MIVAA for processing
+        // Step 1: Upload file to Supabase storage first (standardized approach)
+        const userId = user?.id || 'anonymous';
+        const fileName = `${userId}/${Date.now()}-${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('pdf-documents')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          console.error('Supabase upload error:', uploadError);
+          throw new Error(`Failed to upload file: ${uploadError.message}`);
+        }
+
+        // Get public URL for the uploaded file
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from('pdf-documents').getPublicUrl(fileName);
+
+        // Step 2: Send file_url to MIVAA for processing (consistent with other upload flows)
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file_url', publicUrl);
+        formData.append('title', file.name);
 
         // Call MIVAA API for PDF processing
         const response = await mivaaApi.uploadPDF(formData);
@@ -82,16 +107,19 @@ export const MivaaPDFProcessor: React.FC = () => {
         }
 
         if (response.success && response.data) {
+          // Cast to any to handle both async job response and potential legacy sync response
+          // TODO: Refactor to use proper job polling for async processing
+          const data = response.data as any;
           processingResults.push({
             id: crypto.randomUUID(),
             fileName: file.name,
-            markdownContent: response.data.markdown_content || '',
-            extractedImages: response.data.extracted_images || [],
-            extractedTables: response.data.extracted_tables || [],
+            markdownContent: data.markdown_content || '',
+            extractedImages: data.extracted_images || [],
+            extractedTables: data.extracted_tables || [],
             metadata: {
-              pageCount: response.data.page_count || 0,
-              wordCount: response.data.word_count || 0,
-              processingTime: response.metadata.processingTime,
+              pageCount: data.page_count || 0,
+              wordCount: data.word_count || 0,
+              processingTime: data.processing_time || 0,
             },
           });
         } else {

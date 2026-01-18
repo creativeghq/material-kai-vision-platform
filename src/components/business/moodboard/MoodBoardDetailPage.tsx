@@ -8,9 +8,8 @@ import { useToast } from '@/hooks/use-toast';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import type { MoodBoard, MoodBoardItem } from '@/types/materials';
 import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
-import { ProductDetailModal } from '@/components/features/ai/ProductDetailModal';
-import { Product } from '@/components/features/ai/ProductCard';
-import { RecommendationsService } from '@/services/recommendationsService';
+import { ProductDetailModal } from '@/components/features/products/ProductDetailModal';
+import type { Product } from '@/components/features/products/types';
 import { RecommendationsService } from '@/services/recommendationsService';
 
 export const MoodBoardDetailPage: React.FC = () => {

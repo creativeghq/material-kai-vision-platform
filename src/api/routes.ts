@@ -1,4 +1,3 @@
-import { MivaaGatewayController } from './mivaa-gateway';
 import { VisualSearchController } from './controllers/visualSearchController';
 
 // Express types (would be imported from @types/express in real implementation)
@@ -37,14 +36,12 @@ interface Route {
  * API Routes Configuration
  *
  * Centralizes all API route definitions for the application.
- * Implements the gateway pattern for MIVAA requests and standard document processing.
+ * Note: MIVAA gateway is now handled via Supabase Edge Functions (supabase/functions/mivaa-gateway)
  */
 export class ApiRoutes {
-  private mivaaGateway: MivaaGatewayController;
   private visualSearchController: VisualSearchController;
 
   constructor() {
-    this.mivaaGateway = new MivaaGatewayController();
     this.visualSearchController = new VisualSearchController();
   }
 
@@ -53,20 +50,6 @@ export class ApiRoutes {
    */
   public getRoutes(): Route[] {
     return [
-      // MIVAA Gateway Routes
-      {
-        method: 'POST',
-        path: '/api/mivaa/gateway',
-        handler: this.mivaaGateway.processRequest,
-        middleware: [],
-      },
-      {
-        method: 'GET',
-        path: '/api/mivaa/health',
-        handler: this.mivaaGateway.healthCheck,
-        middleware: [],
-      },
-
       // Visual Search API Routes
       {
         method: 'POST',

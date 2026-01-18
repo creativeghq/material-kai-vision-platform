@@ -149,8 +149,8 @@ export function mapCheckpointToStages(checkpoint: string): number[] {
     'initialized': [1], // Job Initialization
     'products_detected': [2], // Product Discovery (Stage 0)
     'pdf_extracted': [3], // Focused Extraction (Stage 1)
-    'chunks_created': [4, 5], // Chunking + Text Embeddings (Stage 2)
-    'text_embeddings_generated': [5], // Text Embeddings Complete
+    'chunks_created': [4], // Chunking only (Stage 2) - embeddings marked separately
+    'text_embeddings_generated': [4, 5], // Chunking + Text Embeddings Complete
     'images_extracted': [6, 7, 8], // Image Extraction + Classification + Analysis (Stage 3)
     'image_embeddings_generated': [9], // CLIP Embeddings (Stage 3)
     'products_created': [10], // Product Creation (Stage 4)
@@ -355,8 +355,9 @@ export function extractStageMetrics(stageId: number, jobMetadata?: Record<string
       if (jobMetadata.text_embeddings_generated !== undefined) {
         metrics['Embeddings Generated'] = jobMetadata.text_embeddings_generated;
       }
-      metrics['Model'] = 'OpenAI text-embedding-3-small';
-      metrics['Dimensions'] = '1536D';
+      // Use backend-provided model info if available, otherwise show default
+      metrics['Model'] = jobMetadata.embedding_model || 'Voyage AI voyage-3.5';
+      metrics['Dimensions'] = jobMetadata.embedding_dimensions || '1024D';
       break;
 
     case 6: // Image Extraction (Stage 3)

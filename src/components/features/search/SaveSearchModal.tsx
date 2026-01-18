@@ -21,16 +21,56 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-// REMOVED: savedSearchesService deleted during cleanup
-// import { savedSearchesService, CreateSavedSearchData, MergeSuggestion } from '@/services/savedSearchesService';
-type CreateSavedSearchData = any;
-type MergeSuggestion = any;
-const savedSearchesService = {
-  checkForDuplicates: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
-  createSavedSearch: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
-  mergeIntoExisting: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
-};
 import { MaterialFilters } from './MaterialFiltersPanel';
+
+// Types for saved search functionality
+type CreateSavedSearchData = {
+  name: string;
+  description?: string;
+  query: string;
+  search_strategy: string;
+  filters?: Record<string, unknown>;
+  material_filters?: MaterialFilters;
+  conversation_id?: string;
+  moodboard_id?: string;
+  generation_3d_id?: string;
+  spatial_context?: Record<string, unknown>;
+  results_snapshot?: unknown[];
+  is_public: boolean;
+  tags: string[];
+  recommendation_frequency: 'daily' | 'weekly' | 'never';
+};
+
+type MergeSuggestion = {
+  existing_search: { id: string; name: string };
+  new_query: string;
+  similarity_score: number;
+} | null;
+
+// Placeholder service - implement with MIVAA API calls
+const savedSearchesService = {
+  checkForDuplicates: async (
+    _query: string,
+    _filters: Record<string, unknown>,
+    _materialFilters: MaterialFilters | Record<string, unknown>
+  ): Promise<MergeSuggestion> => {
+    // TODO: Implement with MIVAA API /api/saved-searches
+    return null;
+  },
+  createSavedSearch: async (_data: CreateSavedSearchData): Promise<void> => {
+    // TODO: Implement with MIVAA API /api/saved-searches
+    console.log('Save search not yet implemented');
+  },
+  mergeIntoExisting: async (
+    _searchId: string,
+    _query: string,
+    _filters: Record<string, unknown>,
+    _materialFilters: MaterialFilters
+  ): Promise<void> => {
+    // TODO: Implement with MIVAA API /api/saved-searches
+    console.log('Merge search not yet implemented');
+  },
+};
 import { MergeSearchModal } from './MergeSearchModal';
 
 interface SaveSearchModalProps {

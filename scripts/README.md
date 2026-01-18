@@ -1,80 +1,33 @@
-# Scripts Directory
+Run Full Workflow Test Script for MIVAA PDF Extractor with ssh mcp and monitor the process.
 
-Essential scripts for the Material Kai Vision Platform testing, database management, and utilities.
+You need to use ssh mcp to connect to the server and then test and monitor the process from there, through the test file and console.
 
-## 📁 Directory Structure
+The script is named test_full_workflow.sh and use test_single_product=true
 
-### `testing/`
-Production-ready test scripts for QA and workflow validation:
+We need to ensure we start and finish with 100% completelition and we get back everything that worked.
 
-- **`qa-comprehensive-test.js`** - Main QA test suite
-  - Tests all 6 critical flows (PDF processing, storage, search, quality, auth, errors)
-  - 13 comprehensive tests
-  - Run: `node scripts/testing/qa-comprehensive-test.js`
+Chunks
+Images Extracted
+Images generated Clips
+Embeddings
+Relations
+MetaData Extracted
 
-- **`end-to-end-workflow.js`** - Basic end-to-end workflow test
-  - 6-step workflow mimicking frontend flow
-  - Tests PDF upload → processing → storage → retrieval
-  - Run: `node scripts/testing/end-to-end-workflow.js`
+Ebverything should be working properly from start to finish. If you see issue, stop the job, fix the issue, and then restart the job. Do this until we finish with success and without issues.
 
-- **`comprehensive-workflow-testing.js`** - Advanced workflow with metrics
-  - 8-step enhanced workflow
-  - Includes layout analysis, quality scoring, similarity testing
-  - Run: `node scripts/testing/comprehensive-workflow-testing.js`
+I want you to be clever, identify the issues, work your mind around them to cover them as good as possible. 
 
-### `database/`
-Database management and maintenance scripts:
+We need to investigate all issues and fix them. The best possible way is to check a step, see if it is success, if it is then we move to next layer. If fails, we go back and see why, fix restart the process until the step in  the process if fixed 100% without errors.
 
-- **`cleanup-database.js`** - Database and storage cleanup utility
-  - Clears all test data while preserving user/config data
-  - Deletes storage files from all buckets
-  - Reports detailed cleanup statistics
-  - Run: `node scripts/database/cleanup-database.js`
+The the job .log created at tmp folder you can then use
+Product Checker: /tmp/check_products_created.sh - Monitors when products appear in database
 
-### `utilities/`
-General utility scripts and tools:
+To look for it and see the updates of the job. The script should take approx 30 - 45mins, if you see it taking it longer, stop the job and fix the issue. It is important to ensure that our Huggingface APIs' are been properly called, as checking the logs and they are not being called, then we need to fix the issue. So monitor all the processes that they are being called.
 
-- **`generate-keys.ps1`** - PowerShell script to generate API keys and secrets
-- **`generate-mivaa-key.cjs`** - MIVAA API key generation
-- **`error-handling-diagnostic.cjs`** - Error handling diagnostic tool
+We need to ensure:
 
-## 🚀 Quick Start
+1. All the tracking steps are properly tracked, if you see we get no responses or not proper return on the job or we do not have enough checkpoints, report so we can build them
 
-### Run QA Tests
-```bash
-node scripts/testing/qa-comprehensive-test.js
-```
+2. Read logs and report any warning and issues, so we can  fix
 
-### Clean Database
-```bash
-node scripts/database/cleanup-database.js
-```
-
-### Generate Keys
-```powershell
-.\scripts\utilities\generate-keys.ps1
-```
-
-## 📊 What Was Cleaned Up
-
-This directory was reorganized from **225 scripts** down to **8 essential scripts** (96% reduction).
-
-**Removed:**
-- ~120 one-off test scripts (test-*.js)
-- ~80 debugging scripts (check-*, debug-*, monitor-*, verify-*)
-- ~15 workflow-specific test scripts
-- 6 subdirectories of old tests (auth-tests, frontend-tests, integration-tests, mivaa-tests, etc.)
-- All result/output JSON files
-
-**Kept:**
-- 3 production-ready test scripts
-- 1 database cleanup utility
-- 3 utility scripts
-- 2 README files
-
-## 📝 Notes
-
-- All scripts are production-ready and actively maintained
-- Test scripts output results to terminal for easy monitoring
-- Database cleanup preserves user data and configuration
-- Each script includes comprehensive error handling and reporting
+3. I need you to be sure that we run the discovery and we discovery 11 products. If not 11 discovered, cancel everything.  I need you to ensure that from those products, we only process 1 product, not more. If more staretd to be processed, cancel them all. I need you to ensure that when done, we update final-result.html file. If not, do not do anything else.

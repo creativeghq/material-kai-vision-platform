@@ -83,6 +83,10 @@ interface PDFUploadProgressModalProps {
   onClose: () => void;
   job: WorkflowJob | null;
   enablePolling?: boolean;
+  /**
+   * EnhancedProgressMonitor is now enabled by default for real-time WebSocket updates.
+   * Set to false only if you need to disable it for debugging purposes.
+   */
   useEnhancedMonitor?: boolean;
   showImageGallery?: boolean;
   onRetry?: () => void;
@@ -126,7 +130,7 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
   onClose,
   job,
   enablePolling = false,
-  useEnhancedMonitor = false,
+  useEnhancedMonitor = true, // Default to true for real-time WebSocket updates
   showImageGallery = false,
   onRetry,
 }: PDFUploadProgressModalProps) => {
@@ -276,11 +280,11 @@ export const PDFUploadProgressModal: React.FC<PDFUploadProgressModalProps> = ({
       const startPolling = () => {
         const interval = setInterval(async () => {
           try {
-            // Use MIVAA API endpoint directly instead of edge function
+            // Use MIVAA API endpoint directly - correct endpoint path
             const mivaaApiUrl =
               import.meta.env?.VITE_MIVAA_SERVICE_URL ||
               'https://v1api.materialshub.gr';
-            const jobStatusEndpoint = `${mivaaApiUrl}/api/documents/job/${job.id}`;
+            const jobStatusEndpoint = `${mivaaApiUrl}/api/rag/documents/job/${job.id}`;
 
             const response = await fetch(jobStatusEndpoint, {
               method: 'GET',

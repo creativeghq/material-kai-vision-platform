@@ -4,8 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { ProductCard, Product } from './ProductCard';
-import { ProductDetailModal } from './ProductDetailModal';
+import ProductCard from '@/components/features/products/ProductCard';
+import type { Product } from '@/components/features/products/types';
+import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import Design3DModal from './Design3DModal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';

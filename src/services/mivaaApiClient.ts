@@ -29,6 +29,105 @@ export interface MivaaApiResponse<T = any> {
 }
 
 /**
+ * PDF Upload Response - returned by /api/rag/documents/upload
+ */
+export interface PDFUploadResponse {
+  job_id: string;
+  document_id?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  message?: string;
+}
+
+/**
+ * Job Status Response - returned by /api/rag/documents/job/{job_id}
+ */
+export interface JobStatusResponse {
+  job_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  document_id?: string;
+  progress: number; // 0-100
+  error?: string;
+  metadata?: {
+    filename?: string;
+    file_size?: number;
+    current_stage?: string;
+    total_pages?: number;
+    pages_completed?: number;
+    chunks_created?: number;
+    images_extracted?: number;
+    embeddings_generated?: number;
+    products_created?: number;
+    embedding_model?: string;
+    embedding_dimensions?: string;
+    [key: string]: unknown;
+  };
+  created_at: string;
+  updated_at: string;
+  last_checkpoint?: {
+    stage: string;
+    created_at: string;
+    checkpoint_data?: Record<string, unknown>;
+    metadata?: Record<string, unknown>;
+  };
+}
+
+/**
+ * PDF Extraction Result - returned from pdf_process_document action
+ */
+export interface PDFExtractionResult {
+  document_id: string;
+  content?: {
+    chunks?: Array<{
+      id: string;
+      content: string;
+      text?: string;
+      page_number: number;
+      metadata?: Record<string, unknown>;
+    }>;
+    images?: Array<{
+      id: string;
+      url: string;
+      page_number: number;
+      caption?: string;
+      classification?: 'material' | 'non-material' | 'unknown';
+    }>;
+    markdown_content?: string;
+  };
+  metrics?: {
+    word_count: number;
+    page_count: number;
+    processing_time_seconds: number;
+  };
+  metadata?: {
+    author?: string;
+    title?: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Search Result Item
+ */
+export interface SearchResultItem {
+  id: string;
+  result_type: 'product' | 'chunk' | 'image' | 'document';
+  similarity_score: number;
+  title?: string;
+  content?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Search Response - returned by search endpoints
+ */
+export interface SearchResponse {
+  results: SearchResultItem[];
+  total_count: number;
+  query_embedding?: number[];
+  processing_time_ms: number;
+}
+
+/**
  * MIVAA API Client Class
  */
 export class MivaaApiClient {
@@ -461,8 +560,10 @@ export class MivaaApiClient {
    * Upload PDF for processing
    * Uses consolidated /api/rag/documents/upload endpoint
    * Supports both file upload and URL-based processing
+   *
+   * @returns PDFUploadResponse with job_id for tracking
    */
-  async uploadPDF(formData: FormData): Promise<MivaaApiResponse> {
+  async uploadPDF(formData: FormData): Promise<MivaaApiResponse<PDFUploadResponse>> {
     return this.requestFormData('/api/rag/documents/upload', formData);
   }
 
@@ -470,13 +571,9 @@ export class MivaaApiClient {
    * Get job status - ALIGNED WITH BACKEND ENDPOINT
    *
    * Backend endpoint: GET /api/rag/documents/job/{job_id}
-   * Returns: {
-   *   job_id, status, document_id, progress (0-100),
-   *   error, metadata, created_at, updated_at,
-   *   last_checkpoint: { stage, created_at, data }
-   * }
+   * @returns JobStatusResponse with progress, metadata, and last_checkpoint
    */
-  async getJobStatus(jobId: string): Promise<MivaaApiResponse> {
+  async getJobStatus(jobId: string): Promise<MivaaApiResponse<JobStatusResponse>> {
     return this.request(`/api/rag/documents/job/${jobId}`, {
       method: 'GET',
     });
@@ -484,10 +581,48 @@ export class MivaaApiClient {
 
   /**
    * Get job result
+   * @returns PDFExtractionResult with document content and metrics
    */
-  async getJobResult(jobId: string): Promise<MivaaApiResponse> {
+  async getJobResult(jobId: string): Promise<MivaaApiResponse<PDFExtractionResult>> {
     return this.request(`/api/rag/documents/job/${jobId}/result`, {
       method: 'GET',
+    });
+  }
+
+  // ==================== INTERNAL/ADMIN ENDPOINTS ====================
+
+  /**
+   * Create chunks for a document
+   * Used by admin UI to manually trigger chunk generation
+   */
+  async createChunks(
+    jobId: string,
+    payload: {
+      job_id: string;
+      document_id: string;
+      workspace_id: string;
+      extracted_text?: string;
+      chunk_size?: number;
+      chunk_overlap?: number;
+    },
+  ): Promise<MivaaApiResponse> {
+    return this.request(`/api/internal/create-chunks/${jobId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Generate embeddings for products
+   * Used by admin UI to manually trigger embedding generation
+   */
+  async generateProductEmbeddings(payload: {
+    workspace_id: string;
+    document_id: string;
+  }): Promise<MivaaApiResponse> {
+    return this.request('/api/internal/generate-product-embeddings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 }
@@ -495,7 +630,7 @@ export class MivaaApiClient {
 // Export singleton instance
 export const mivaaApi = new MivaaApiClient();
 
-// Legacy export for backward compatibility
+// Factory function for explicit instantiation
 export const getMivaaApiClient = () => mivaaApi;
 
 // Export default

@@ -3,36 +3,42 @@ import type { FieldMapping } from '@/components/experimental/scraper/FieldMappin
 
 /**
  * Fetches the scraping extraction prompt template from the database
+ * NO FALLBACK - All prompts must exist in the database
  */
 export async function fetchScrapingPromptTemplate(
   workspaceId: string,
-): Promise<{ template: string; systemPrompt: string | null } | null> {
-  try {
-    const { data, error } = await supabase
-      .from('prompts')
-      .select('prompt_text, system_prompt')
-      .eq('workspace_id', workspaceId)
-      .eq('prompt_type', 'extraction')
-      .eq('stage', 'scraping')
-      .eq('category', 'materials')
-      .eq('is_active', true)
-      .order('version', { ascending: false })
-      .limit(1)
-      .single();
+): Promise<{ template: string; systemPrompt: string | null }> {
+  const { data, error } = await supabase
+    .from('prompts')
+    .select('prompt_text, system_prompt')
+    .eq('workspace_id', workspaceId)
+    .eq('prompt_type', 'extraction')
+    .eq('stage', 'scraping')
+    .eq('category', 'materials')
+    .eq('is_active', true)
+    .order('version', { ascending: false })
+    .limit(1)
+    .single();
 
-    if (error) {
-      console.error('Error fetching scraping prompt template:', error);
-      return null;
-    }
-
-    return {
-      template: data.prompt_text || '',
-      systemPrompt: data.system_prompt,
-    };
-  } catch (error) {
-    console.error('Error in fetchScrapingPromptTemplate:', error);
-    return null;
+  if (error) {
+    console.error('CRITICAL: Scraping prompt not found in database:', error);
+    throw new Error(
+      `Scraping prompt not found in database. Please add it via /admin/ai-configs. ` +
+      `Required: prompt_type='extraction', stage='scraping', category='materials'. ` +
+      `Error: ${error.message}`
+    );
   }
+
+  if (!data?.prompt_text) {
+    throw new Error(
+      'Scraping prompt exists but has empty prompt_text. Please update it via /admin/ai-configs.'
+    );
+  }
+
+  return {
+    template: data.prompt_text,
+    systemPrompt: data.system_prompt,
+  };
 }
 
 /**
@@ -53,67 +59,30 @@ export function generateFieldDefinitions(fields: FieldMapping[]): string {
 
 /**
  * Generates the complete extraction prompt by combining template and field mappings
+ * NO FALLBACK - All prompts must exist in the database
  */
 export async function generateExtractionPrompt(
   workspaceId: string,
   fields: FieldMapping[],
-): Promise<{ prompt: string; systemPrompt: string | null } | null> {
-  try {
-    // Fetch the template from database
-    const promptData = await fetchScrapingPromptTemplate(workspaceId);
+): Promise<{ prompt: string; systemPrompt: string | null }> {
+  // Fetch the template from database - throws if not found
+  const promptData = await fetchScrapingPromptTemplate(workspaceId);
 
-    if (!promptData) {
-      // Fallback to default template if DB fetch fails
-      console.warn('Using fallback prompt template');
-      return {
-        prompt: generateFallbackPrompt(fields),
-        systemPrompt: 'You are a precise data extraction assistant. Focus on accuracy and structured output. Always return valid JSON.',
-      };
-    }
-
-    // Generate field definitions
-    const fieldDefinitions = generateFieldDefinitions(fields);
-
-    // Inject field definitions into template
-    const finalPrompt = promptData.template.replace(
-      '{{FIELD_DEFINITIONS}}',
-      fieldDefinitions,
-    );
-
-    return {
-      prompt: finalPrompt,
-      systemPrompt: promptData.systemPrompt,
-    };
-  } catch (error) {
-    console.error('Error generating extraction prompt:', error);
-    return {
-      prompt: generateFallbackPrompt(fields),
-      systemPrompt: 'You are a precise data extraction assistant. Focus on accuracy and structured output. Always return valid JSON.',
-    };
-  }
-}
-
-/**
- * Fallback prompt template if database fetch fails
- */
-function generateFallbackPrompt(fields: FieldMapping[]): string {
+  // Generate field definitions
   const fieldDefinitions = generateFieldDefinitions(fields);
 
-  return `You are an expert at extracting structured material data from web pages.
+  // Inject field definitions into template
+  const finalPrompt = promptData.template.replace(
+    '{{FIELD_DEFINITIONS}}',
+    fieldDefinitions,
+  );
 
-Extract the following information from this webpage:
+  console.log('Loaded scraping prompt from database successfully');
 
-${fieldDefinitions}
-
-Instructions:
-- Extract data accurately based on the field descriptions provided
-- Return data in valid JSON format matching the field names exactly
-- If a field cannot be found, use null for that field
-- For array fields, return an empty array [] if no data is found
-- For number fields, extract only numeric values (remove currency symbols, commas, etc.)
-- Ensure all extracted data is relevant and accurate
-
-Return the data as a JSON object with the exact field names specified above.`;
+  return {
+    prompt: finalPrompt,
+    systemPrompt: promptData.systemPrompt,
+  };
 }
 
 /**
@@ -160,4 +129,3 @@ export function generateJsonSchema(fields: FieldMapping[]): Record<string, any> 
     required,
   };
 }
-

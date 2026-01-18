@@ -6,6 +6,36 @@ This document defines the consistent design patterns used across the entire plat
 
 ---
 
+## 0. Premium "Rich Aesthetic" Standard (2026)
+
+### Glassmorphism (Liquid Glass)
+**Pattern:**
+```css
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: var(--shadow-md);
+}
+```
+- ✅ **Opacity**: Base at 0.7, hover at 0.85
+- ✅ **Blur**: 10px-16px range
+- ✅ **Border**: Subtle white translucent border for edge definition
+
+### Bento Grid Layout
+**Standard for Dashboards:**
+```tsx
+<div className="grid grid-cols-12 gap-6">
+  <div className="col-span-12 lg:col-span-8 glass-panel h-[400px]">...</div>
+  <div className="col-span-12 lg:col-span-4 glass-panel h-[200px]">...</div>
+  {/* etc */}
+</div>
+```
+- ✅ **Gap**: Use `gap-6` (24px) for distinct compartments
+- ✅ **Variable Heights**: Use a mix of spans to create visual interest
+
+---
+
 ## 1. Tabs Component
 
 ### Standard Admin Page Tabs Pattern
@@ -331,6 +361,36 @@ import { AdminStatCard } from '../AdminStatCard';
 - ✅ Grid: `grid-cols-1 md:grid-cols-2 lg:grid-cols-4`
 - ✅ Compact design with icon + title on same line
 - ❌ Never create custom stat cards with big icons and spacing
+
+---
+
+## 8. Agentic UI Patterns
+
+### Thinking / Reasoning Logs
+When an AI agent is performing a multi-step task, use the `ThinkingLog` pattern.
+
+**Reference:** `src/pages/AgentHub.tsx`
+```tsx
+<div className="animate-fade-in glass-panel p-4 mb-4">
+  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+    <Brain className="h-4 w-4 animate-pulse" />
+    <span className="text-sm font-medium">Thinking...</span>
+  </div>
+  <ul className="space-y-1 text-xs text-muted-foreground/80">
+    <li>Searching PDF: Catalog_A.pdf...</li>
+    <li>Found 3 matches for 'marble'...</li>
+  </ul>
+</div>
+```
+
+### Source Badges (Floating)
+Display PDF sources as floating glass badges near the relevant content.
+```tsx
+<Badge variant="glass" className="flex items-center gap-1">
+  <FileText className="h-3 w-3" />
+  ProjectSpecs.pdf (p.12)
+</Badge>
+```
 
 ---
 

@@ -643,64 +643,6 @@ async function sendWebhookNotification(webhookUrl: string, data: any): Promise<v
   }
 }
 
-function calculateEstimatedCompletion(documentCount: number): string {
-  // Rough estimate: 30 seconds per document
-  const estimatedSeconds = documentCount * 30;
-  const estimatedDate = new Date(Date.now() + estimatedSeconds * 1000);
-  return estimatedDate.toISOString();
-}
-
-function getClientIP(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) {
-    return forwarded.split(',')[0].trim();
-  }
-
-  const realIP = req.headers.get('x-real-ip');
-  if (realIP) {
-    return realIP;
-  }
-
-  const cfConnectingIP = req.headers.get('cf-connecting-ip');
-  if (cfConnectingIP) {
-    return cfConnectingIP;
-  }
-
-  return '127.0.0.1';
-}
-
-async function logApiUsage(supabase: any, logData: any): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('api_usage_logs')
-      .insert(logData);
-
-    if (error) {
-      console.error('Error logging API usage:', error);
-    }
-  } catch (error) {
-    console.error('Error logging API usage:', error);
-  }
-}
-
-function createErrorResponse(
-  message: string,
-  status: number,
-  startTime: number,
-): Response {
-  const responseTime = Date.now() - startTime;
-
-  const response: BatchProcessResponse = {
-    success: false,
-    error: message,
-    statusCode: status,
-  };
-
-  return new Response(
-    JSON.stringify(response),
-    {
-      status,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    },
-  );
-}
+// Note: Utility functions (calculateEstimatedCompletion, getClientIP, logApiUsage, createErrorResponse)
+// are now imported from ../_shared/config.ts via Utils and Logger namespaces.
+// Removed redundant local definitions to avoid code duplication.

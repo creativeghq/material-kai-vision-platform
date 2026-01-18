@@ -8,6 +8,7 @@ import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
 interface PDFUploadSectionProps {
   onUploadComplete: (jobId: string, fileName?: string) => void;
@@ -153,37 +154,26 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
         .from('pdf-documents')
         .getPublicUrl(fileName);
 
-      // Call MIVAA API to start processing
-      const MIVAA_API_URL = import.meta.env?.VITE_MIVAA_SERVICE_URL || 'https://v1api.materialshub.gr';
-
-      // Create FormData - backend expects application/x-www-form-urlencoded
-      const formData = new URLSearchParams();
+      // Call MIVAA API to start processing using standardized client
+      const formData = new FormData();
       formData.append('file_url', publicUrl);
       formData.append('categories', 'products'); // Extraction type: products, certificates, logos, specifications, all, extract_only
       formData.append('material_category', category); // Material category: tiles, wood, heating, sanitary, etc.
       formData.append('workspace_id', 'ffafc28b-1b8b-4b0d-b226-9f9a6154004e'); // Default workspace ID
       formData.append('title', file.name);
 
-      const response = await fetch(`${MIVAA_API_URL}/api/rag/documents/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData.toString(),
-      });
+      const response = await mivaaApi.uploadPDF(formData);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Processing failed: ${response.statusText} - ${errorText}`);
+      if (!response.success) {
+        throw new Error(`Processing failed: ${response.error || 'Unknown error'}`);
       }
 
-      const result = await response.json();
-      console.log('📦 Upload Response:', result);
+      console.log('📦 Upload Response:', response);
 
-      const jobId = result.job_id;
+      const jobId = response.data?.job_id;
 
       if (!jobId) {
-        console.error('❌ No job ID in response:', result);
+        console.error('❌ No job ID in response:', response);
         throw new Error('No job ID returned from API');
       }
 

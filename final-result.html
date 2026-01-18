@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harmony Collection - 11 Products | MIVAA Pipeline Result</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #8b7355;
+            --accent: #c9a96e;
+            --light: #f8f6f3;
+            --dark: #1a1a1a;
+            --success: #27ae60;
+            --info: #3498db;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--light);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        /* Header */
+        .hero {
+            background: linear-gradient(135deg, var(--primary) 0%, #1a252f 100%);
+            color: white;
+            padding: 60px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 100%;
+            background: url('https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192428_page7_page_7_image_0.jpeg') center/cover;
+            opacity: 0.3;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .brand-tag {
+            display: inline-block;
+            background: var(--accent);
+            color: var(--dark);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 4rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: 8px;
+        }
+
+        .tagline {
+            font-size: 1.1rem;
+            font-weight: 300;
+            opacity: 0.9;
+            margin-bottom: 30px;
+        }
+
+        .designer-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .designer-badge {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .designer-badge span {
+            display: block;
+            font-size: 11px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .designer-badge strong {
+            font-size: 16px;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        /* Stats Bar */
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 20px;
+            margin: -60px 40px 40px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card .icon {
+            width: 50px;
+            height: 50px;
+            background: var(--light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 24px;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-card .label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .stat-card.success .icon { background: #e8f5e9; }
+        .stat-card.success .value { color: var(--success); }
+
+        /* Section Titles */
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--accent);
+            display: inline-block;
+        }
+
+        /* Product Cards */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 30px;
+            margin-bottom: 60px;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .product-header {
+            background: linear-gradient(135deg, var(--primary) 0%, #1a252f 100%);
+            color: white;
+            padding: 20px;
+        }
+
+        .product-header h3 {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+
+        .product-header .designer {
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        .product-body {
+            padding: 20px;
+        }
+
+        .product-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .meta-item {
+            background: var(--light);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .meta-item .label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .meta-item .value {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--dark);
+        }
+
+        .color-swatches {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .color-chip {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .color-chip.white { background: #f5f5f5; border: 1px solid #ddd; }
+        .color-chip.clay { background: #b5651d; color: white; }
+        .color-chip.sand { background: #c2b280; }
+        .color-chip.taupe { background: #8b8589; color: white; }
+        .color-chip.green { background: #4caf50; color: white; }
+        .color-chip.blue { background: #2196f3; color: white; }
+        .color-chip.grey, .color-chip.silver { background: #9e9e9e; color: white; }
+        .color-chip.anthracite { background: #424242; color: white; }
+        .color-chip.bordeaux { background: #800020; color: white; }
+        .color-chip.mint { background: #98ff98; }
+        .color-chip.navy { background: #000080; color: white; }
+        .color-chip.brown { background: #795548; color: white; }
+        .color-chip.teal { background: #009688; color: white; }
+
+        .inspiration-text {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+
+        /* Image Gallery */
+        .gallery-section {
+            margin-bottom: 60px;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .gallery-item {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            background: white;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .gallery-item .overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 15px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .gallery-item:hover .overlay {
+            opacity: 1;
+        }
+
+        .gallery-item .page-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--accent);
+            color: var(--dark);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Designers Section */
+        .designers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+
+        .designer-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        .designer-card h4 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .designer-card p {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Pipeline Info */
+        .pipeline-info {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            margin-bottom: 60px;
+        }
+
+        .pipeline-stages {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            position: relative;
+        }
+
+        .pipeline-stages::before {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: 60px;
+            right: 60px;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+        }
+
+        .stage {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stage-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            color: white;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .stage-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Fixes Section */
+        .fixes-section {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 40px;
+            border-radius: 16px;
+            margin-bottom: 60px;
+            color: white;
+        }
+
+        .fixes-section .section-title {
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .fix-item {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--success);
+        }
+
+        .fix-item h4 {
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .fix-item p {
+            font-size: 13px;
+            opacity: 0.85;
+        }
+
+        .fix-item code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--dark);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .footer-stats {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .footer-stat {
+            text-align: center;
+        }
+
+        .footer-stat .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .footer-stat .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.6;
+        }
+
+        .footer-credit {
+            font-size: 12px;
+            opacity: 0.5;
+            margin-top: 20px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; letter-spacing: 4px; }
+            .products-grid { grid-template-columns: 1fr; }
+            .pipeline-stages { flex-direction: column; gap: 20px; }
+            .pipeline-stages::before { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-content">
+            <span class="brand-tag">Harmony Collection 24-25</span>
+            <h1>11 PRODUCTS</h1>
+            <p class="tagline">VALENOVA, FOLD, PIQUE, ONA, CASTELLO, MARE, LOG, BOW, LINS, RAS, MAISON</p>
+            <div class="designer-info">
+                <div class="designer-badge">
+                    <span>Pipeline</span>
+                    <strong>MIVAA PDF Extractor</strong>
+                </div>
+                <div class="designer-badge">
+                    <span>Physical Pages</span>
+                    <strong>141 (0-based)</strong>
+                </div>
+                <div class="designer-badge">
+                    <span>Status</span>
+                    <strong>Completed</strong>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat-card success">
+            <div class="icon">&#10003;</div>
+            <div class="value">11</div>
+            <div class="label">Products Discovered</div>
+        </div>
+        <div class="stat-card success">
+            <div class="icon">&#128196;</div>
+            <div class="value">6</div>
+            <div class="label">Images Extracted</div>
+        </div>
+        <div class="stat-card success">
+            <div class="icon">&#127912;</div>
+            <div class="value">8</div>
+            <div class="label">Unique Designers</div>
+        </div>
+        <div class="stat-card success">
+            <div class="icon">&#128203;</div>
+            <div class="value">141</div>
+            <div class="label">Physical Pages</div>
+        </div>
+        <div class="stat-card">
+            <div class="icon">&#128200;</div>
+            <div class="value">95%</div>
+            <div class="label">Avg Confidence</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Products Section -->
+        <section>
+            <h2 class="section-title">Products Extracted</h2>
+            <div class="products-grid">
+                <!-- VALENOVA -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>VALENOVA</h3>
+                        <div class="designer">by Stacy Garcia (SG NY)</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 14, 15, 16</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip clay">Clay</span>
+                            <span class="color-chip sand">Sand</span>
+                            <span class="color-chip taupe">Taupe</span>
+                        </div>
+                        <p class="inspiration-text">"Inspired by the elegance of folded paper, redefining the aesthetics of wall covering"</p>
+                    </div>
+                </div>
+
+                <!-- FOLD -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>FOLD</h3>
+                        <div class="designer">by Estudi{H}ac</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 18, 19, 20</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip clay">Clay</span>
+                            <span class="color-chip green">Green</span>
+                        </div>
+                        <p class="inspiration-text">"Inspired by pleats and accordion-like movement of pleated fabric"</p>
+                    </div>
+                </div>
+
+                <!-- PIQUE -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>PIQUE</h3>
+                        <div class="designer">by Estudi{H}ac (Jose Manuel Ferrero)</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 21-26</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip sand">Sand</span>
+                            <span class="color-chip bordeaux">Bordeaux</span>
+                            <span class="color-chip anthracite">Anthracite</span>
+                        </div>
+                        <p class="inspiration-text">"Inspired by 18th century mechanized technique for weaving double cloth with heavy cording weft"</p>
+                    </div>
+                </div>
+
+                <!-- ONA -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>ONA</h3>
+                        <div class="designer">by Dsignio</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 28, 29, 30</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip mint">Mint</span>
+                            <span class="color-chip green">Green</span>
+                        </div>
+                        <p class="inspiration-text">"Designed to conjure up all the beauty and hypnotic flow of the sea's waves"</p>
+                    </div>
+                </div>
+
+                <!-- CASTELLO -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>CASTELLO</h3>
+                        <div class="designer">by Dsignio</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 31, 32, 33</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">Full Body Ceramics</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall (Screen)</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip grey">Grey</span>
+                            <span class="color-chip clay">Clay</span>
+                        </div>
+                        <p class="inspiration-text">"Inspired by defensive openings found in the walls of medieval castles"</p>
+                    </div>
+                </div>
+
+                <!-- MARE -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>MARE</h3>
+                        <div class="designer">by Dsignio</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 34-37</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip silver">Silver</span>
+                            <span class="color-chip sand">Sand</span>
+                        </div>
+                        <p class="inspiration-text">"Inspired by Mediterranean woven fibres - wickerwork baskets, straw hats, cane roofs"</p>
+                    </div>
+                </div>
+
+                <!-- LOG -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>LOG</h3>
+                        <div class="designer">by ALT Design</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 39-42</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip sand">Sand</span>
+                            <span class="color-chip taupe">Taupe</span>
+                            <span class="color-chip green">Green</span>
+                            <span class="color-chip silver">Silver</span>
+                            <span class="color-chip anthracite">Anthracite</span>
+                        </div>
+                        <p class="inspiration-text">"Inspired by woodworking techniques and mountain cabin construction with log walls"</p>
+                    </div>
+                </div>
+
+                <!-- BOW -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>BOW</h3>
+                        <div class="designer">by MUT</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 44-49</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt/Gloss</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Award</div>
+                                <div class="value">Archiproducts 2020</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip blue">Blue</span>
+                            <span class="color-chip" style="background:#87ceeb">Azure</span>
+                            <span class="color-chip" style="background:#87ceeb">Sky</span>
+                            <span class="color-chip clay">Clay</span>
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip bordeaux">Bordeaux</span>
+                            <span class="color-chip brown">Brown</span>
+                            <span class="color-chip silver">Silver</span>
+                            <span class="color-chip teal">Teal</span>
+                            <span class="color-chip green">Green</span>
+                        </div>
+                        <p class="inspiration-text">"Modern new take on traditional Mediterranean roof tiles"</p>
+                    </div>
+                </div>
+
+                <!-- LINS -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>LINS</h3>
+                        <div class="designer">by YONOH</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 51-55</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Wall</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip bordeaux">Bordeaux</span>
+                            <span class="color-chip green">Green</span>
+                            <span class="color-chip navy">Navy</span>
+                            <span class="color-chip" style="background:#ff7f50">Sunset</span>
+                            <span class="color-chip" style="background:#ff6347">Pumpkin</span>
+                            <span class="color-chip taupe">Taupe</span>
+                            <span class="color-chip brown">Brown</span>
+                            <span class="color-chip mint">Mint</span>
+                            <span class="color-chip teal">Teal</span>
+                            <span class="color-chip" style="background:#f0e68c">Moonlight</span>
+                            <span class="color-chip grey">Grey</span>
+                        </div>
+                        <p class="inspiration-text">"Crisscrossing lines with shadow play creating volumetric effects"</p>
+                    </div>
+                </div>
+
+                <!-- RAS -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>RAS</h3>
+                        <div class="designer">by Fran Silvestre Arquitectos</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 57-60</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">White Body Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt/Gloss Combined</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Technology</div>
+                                <div class="value">LAYER TECH, DEEP TECH</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip silver">Silver</span>
+                            <span class="color-chip blue">Blue</span>
+                            <span class="color-chip anthracite">Anthracite</span>
+                        </div>
+                        <p class="inspiration-text">"Create tiled wall surfaces that spark off interplay with the light"</p>
+                    </div>
+                </div>
+
+                <!-- MAISON -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <h3>MAISON</h3>
+                        <div class="designer">by ONSET (Francisco Segarra)</div>
+                    </div>
+                    <div class="product-body">
+                        <div class="product-meta">
+                            <div class="meta-item">
+                                <div class="label">Pages</div>
+                                <div class="value">12, 62-64</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Body Type</div>
+                                <div class="value">Porcelain Tile</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Finish</div>
+                                <div class="value">Matt</div>
+                            </div>
+                            <div class="meta-item">
+                                <div class="label">Application</div>
+                                <div class="value">Floor</div>
+                            </div>
+                        </div>
+                        <div class="color-swatches">
+                            <span class="color-chip white">White</span>
+                            <span class="color-chip anthracite">Anthracite</span>
+                        </div>
+                        <p class="inspiration-text">"Transformed aged looking ceramic tiles into a chic upper class design tool"</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Image Gallery -->
+        <section class="gallery-section">
+            <h2 class="section-title">Extracted Images (6)</h2>
+            <div class="gallery-grid">
+                <div class="gallery-item">
+                    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192428_page7_page_7_image_0.jpeg" alt="Page 12 Image 1">
+                    <span class="page-badge">Page 12</span>
+                    <div class="overlay">Product Image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192429_page7_page_7_image_1.jpeg" alt="Page 12 Image 2">
+                    <span class="page-badge">Page 12</span>
+                    <div class="overlay">Product Image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192430_page8_page_8_image_0.jpeg" alt="Page 14 Image 1">
+                    <span class="page-badge">Page 14</span>
+                    <div class="overlay">Product Image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192430_page8_page_8_image_1.jpeg" alt="Page 14 Image 2">
+                    <span class="page-badge">Page 14</span>
+                    <div class="overlay">Product Image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192427_page9_page_9_image_0.jpeg" alt="Page 16 Image 1">
+                    <span class="page-badge">Page 16</span>
+                    <div class="overlay">Product Image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/pdf-tiles/extracted/f3868a64-bc6f-47b8-be00-08ad296546b6/20260117_192428_page9_page_9_image_1.jpeg" alt="Page 16 Image 2">
+                    <span class="page-badge">Page 16</span>
+                    <div class="overlay">Product Image</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Designers Section -->
+        <section>
+            <h2 class="section-title">Designers Identified (8)</h2>
+            <div class="designers-grid">
+                <div class="designer-card">
+                    <h4>Stacy Garcia (SG NY)</h4>
+                    <p>VALENOVA</p>
+                </div>
+                <div class="designer-card">
+                    <h4>Estudi{H}ac</h4>
+                    <p>FOLD, PIQUE</p>
+                </div>
+                <div class="designer-card">
+                    <h4>Dsignio</h4>
+                    <p>ONA, CASTELLO, MARE</p>
+                </div>
+                <div class="designer-card">
+                    <h4>ALT Design</h4>
+                    <p>LOG</p>
+                </div>
+                <div class="designer-card">
+                    <h4>MUT</h4>
+                    <p>BOW</p>
+                </div>
+                <div class="designer-card">
+                    <h4>YONOH</h4>
+                    <p>LINS</p>
+                </div>
+                <div class="designer-card">
+                    <h4>Fran Silvestre Arquitectos</h4>
+                    <p>RAS</p>
+                </div>
+                <div class="designer-card">
+                    <h4>ONSET (Francisco Segarra)</h4>
+                    <p>MAISON</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Fixes Applied Section -->
+        <section class="fixes-section">
+            <h2 class="section-title">Bug Fixes Applied (Jan 17, 2026)</h2>
+
+            <div class="fix-item">
+                <h4>1. YOLO Bounding Box Format Fix</h4>
+                <p>Fixed YOLO layout detector to support both coordinate formats: <code>xmin/ymin/xmax/ymax</code> AND <code>x1/y1/x2/y2</code>. Previously returned degenerate 0,0,0,0 boxes because the actual YOLO API uses x1/y1/x2/y2 format.</p>
+            </div>
+
+            <div class="fix-item">
+                <h4>2. Page Detection Substring Fallback Removed</h4>
+                <p>Removed substring matching fallback in product page detection. Previously caused false positives: ONA matching 30+ pages (internacional, tradicional, emocional), LOG matching 16+ pages (catalogo, dialog). Now uses word-boundary regex only.</p>
+            </div>
+
+            <div class="fix-item">
+                <h4>3. Physical Page Count (0-Based Indexing)</h4>
+                <p>Changed from 1-based to 0-based page counting. Cover page is now page 0, giving correct total of 141 physical pages (was incorrectly showing 140). Spread detection remains automatic via aspect ratio.</p>
+            </div>
+        </section>
+
+        <!-- Pipeline Info -->
+        <section class="pipeline-info">
+            <h2 class="section-title">Processing Pipeline</h2>
+            <p style="color: #666; margin-top: -20px;">Successfully completed all stages</p>
+
+            <div class="pipeline-stages">
+                <div class="stage">
+                    <div class="stage-icon">&#128196;</div>
+                    <div class="stage-label">PDF Upload</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-icon">&#128269;</div>
+                    <div class="stage-label">Product Discovery</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-icon">&#127912;</div>
+                    <div class="stage-label">Image Extraction</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-icon">&#129302;</div>
+                    <div class="stage-label">AI Classification</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-icon">&#128202;</div>
+                    <div class="stage-label">Metadata Extraction</div>
+                </div>
+                <div class="stage">
+                    <div class="stage-icon">&#10003;</div>
+                    <div class="stage-label">Complete</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-stats">
+            <div class="footer-stat">
+                <div class="value">100%</div>
+                <div class="label">Completion Rate</div>
+            </div>
+            <div class="footer-stat">
+                <div class="value">11</div>
+                <div class="label">Products</div>
+            </div>
+            <div class="footer-stat">
+                <div class="value">141</div>
+                <div class="label">Physical Pages</div>
+            </div>
+            <div class="footer-stat">
+                <div class="value">3</div>
+                <div class="label">Bug Fixes</div>
+            </div>
+        </div>
+
+        <div style="border-top: 1px solid #333; padding-top: 20px;">
+            <strong style="color: var(--accent);">MIVAA PDF Extractor</strong>
+            <p style="font-size: 13px; opacity: 0.6; margin-top: 8px;">
+                Latest Run: 2026-01-17 19:21 UTC
+            </p>
+            <p style="font-size: 11px; opacity: 0.4; margin-top: 4px;">
+                Document ID: f3868a64-bc6f-47b8-be00-08ad296546b6
+            </p>
+        </div>
+
+        <p class="footer-credit">
+            Powered by Claude Vision API, Qwen3-VL-32B, YOLO DocParser
+        </p>
+    </footer>
+</body>
+</html>

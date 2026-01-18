@@ -40,9 +40,15 @@ import {
 } from '@/components/features/search/MaterialFiltersPanel';
 import { SavedSearchesPanel } from '@/components/features/search/SavedSearchesPanel';
 import { SaveSearchModal } from '@/components/features/search/SaveSearchModal';
-// REMOVED: savedSearchesService deleted during cleanup
-// import { SavedSearch } from '@/services/savedSearchesService';
-type SavedSearch = any;
+
+// Type for saved search records (matching SavedSearchesPanel)
+type SavedSearch = {
+  id: string;
+  name: string;
+  query: string;
+  search_strategy: string;
+  material_filters?: Record<string, unknown>;
+};
 
 interface EnhancedRAGInterfaceProps {
   onResultsFound?: (results: Record<string, unknown>[]) => void;

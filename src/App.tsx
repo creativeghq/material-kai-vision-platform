@@ -10,9 +10,6 @@ import { AuthGuard } from '@/components/core/AuthGuard';
 
 import { AdminGuard } from './components/core/AdminGuard';
 
-// @ts-ignore - Temporary workaround for import issue
-// Import CORS debug utility for troubleshooting
-import './debug/cors-debug';
 import Index from './pages/Index';
 import Auth from './pages/Auth';
 import NotFound from './pages/NotFound';
@@ -35,7 +32,6 @@ import { MoodBoardPage } from './components/business/moodboard/MoodBoardPage';
 import { MoodBoardDetailPage } from './components/business/moodboard/MoodBoardDetailPage';
 import { SVBRDFExtractionPage } from './components/experimental/svbrdf/SVBRDFExtractionPage';
 import { Layout } from './components/core/Layout';
-// Removed: SearchHub - functionality available on frontend
 import AgentHub from './pages/AgentHub';
 import { MaterialSuggestionsPanel } from './components/Admin/MaterialSuggestionsPanel';
 import ModelDebuggingPanel from './components/Admin/ModelDebuggingPanel';

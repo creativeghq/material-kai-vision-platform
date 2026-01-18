@@ -1013,11 +1013,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       {/* Middle Panel - Conversation List */}
-      <div className="w-80 flex flex-col m-4 rounded-3xl dashboard-card bg-card">
+      <div className="w-80 flex flex-col m-4 rounded-3xl glass-panel bg-white/40 border-white/20">
         {/* Header */}
-        <div className="p-4 border-b border-white/10">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-foreground">Conversations</h2>
+        <div className="p-5 border-b border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-foreground/80 tracking-tight">Library</h2>
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -1112,14 +1112,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <div className="min-h-16 px-6 py-3 flex items-center justify-between m-4 rounded-3xl dashboard-card bg-card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-              <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
+        <div className="min-h-16 px-6 py-4 flex items-center justify-between m-4 rounded-3xl glass-panel border-white/20">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center shadow-inner">
+              <AgentIcon className={`h-6 w-6 ${currentAgent?.color}`} />
             </div>
             <div>
-              <h3 className="font-semibold">{currentAgent?.name}</h3>
-              <p className="text-xs text-muted-foreground">
+              <h3 className="text-lg font-bold tracking-tight">{currentAgent?.name}</h3>
+              <p className="text-sm text-muted-foreground/70">
                 {currentAgent?.description}
               </p>
             </div>
@@ -1199,8 +1199,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData ? 'max-w-full' : 'max-w-[70%]'} rounded-lg p-4 dashboard-card ${
-                      message.role === 'user' ? 'bg-secondary' : 'bg-card'
+                    className={`${message.demoData || message.materialData || message.designData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                      message.role === 'user' 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' 
+                        : 'glass-panel bg-white/60 border-white/40'
                     }`}
                   >
                     {message.demoData ? (
@@ -1364,38 +1366,34 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 </div>
               ))}
 
-              {/* Loading/Thinking Animation */}
+              {/* Loading/Thinking Animation - Reasoning Trace Style */}
               {isLoading && (
-                <div className="flex gap-3 justify-start">
+                <div className="flex gap-3 justify-start animate-fade-in">
                   <div className="flex-shrink-0">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                      style={{
-                        backgroundColor: 'hsl(var(--primary))',
-                        borderColor: 'hsl(var(--primary))',
-                      }}
-                    >
-                      <Bot className="h-4 w-4 text-white" />
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-primary shadow-lg shadow-primary/20">
+                      <Bot className="h-4 w-4 text-white animate-pulse" />
                     </div>
                   </div>
-                  <div
-                    className="max-w-[70%] rounded-lg p-4 border-2"
-                    style={{
-                      background: 'var(--glass-bg)',
-                      backdropFilter: 'var(--glass-blur)',
-                      borderColor: 'hsl(var(--primary))',
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'hsl(var(--primary))', animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'hsl(var(--primary))', animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: 'hsl(var(--primary))', animationDelay: '300ms' }}></div>
+                  <div className="max-w-[80%] rounded-2xl p-5 glass-panel bg-primary/5 border-primary/20">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.3s]"></div>
+                          <div className="w-2 h-2 rounded-full bg-primary animate-bounce [animation-delay:-0.15s]"></div>
+                          <div className="w-2 h-2 rounded-full bg-primary animate-bounce"></div>
+                        </div>
+                        <span className="text-sm font-bold text-primary uppercase tracking-widest">Reasoning</span>
+                        <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-white/40 text-primary border border-primary/10">
+                          {formatElapsedTime(elapsedTime)}
+                        </span>
                       </div>
-                      <span className="text-sm text-foreground">Thinking...</span>
-                      <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                        {formatElapsedTime(elapsedTime)}
-                      </span>
+                      
+                      {/* Simulated Reasoning Trace */}
+                      <ul className="space-y-2 text-sm text-muted-foreground/80 border-l-2 border-primary/20 pl-4 ml-1">
+                        <li className="animate-fade-in">Analyzing material specifications...</li>
+                        {elapsedTime > 1500 && <li className="animate-fade-in">Cross-referencing sustainability scores...</li>}
+                        {elapsedTime > 3000 && <li className="animate-fade-in">Optimizing for lead times and regional availability...</li>}
+                      </ul>
                     </div>
                   </div>
                 </div>
@@ -1406,7 +1404,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
 
         {/* Input Area */}
-        <div className="m-4 rounded-3xl dashboard-card bg-card">
+        <div className="m-4 rounded-3xl glass-panel bg-white/40 border-white/20">
           {/* Voice Recording Indicator */}
           {isRecording && interimTranscript && (
             <div className="px-6 pt-3">

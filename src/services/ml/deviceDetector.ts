@@ -263,22 +263,3 @@ export class DeviceDetectorService extends BaseService<DeviceDetectorServiceConf
 
 // Export singleton instance using factory method
 export const deviceDetectorService = DeviceDetectorService.createInstance();
-
-// Maintain backward compatibility with static methods
-export class DeviceDetector {
-  static getOptimalDevice(): DeviceType {
-    return deviceDetectorService.getOptimalDevice();
-  }
-
-  static async checkWebGPUSupport(): Promise<boolean> {
-    return deviceDetectorService.checkWebGPUSupport();
-  }
-
-  static getDeviceInfo(): Promise<{
-    supportsWebGPU: boolean;
-    optimalDevice: DeviceType;
-    userAgent: string;
-  }> {
-    return deviceDetectorService.getDeviceInfo();
-  }
-}

@@ -17,16 +17,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-// REMOVED: savedSearchesService deleted during cleanup - use MIVAA API instead
-// import { savedSearchesService, SavedSearch } from '@/services/savedSearchesService';
-
-// Temporary types until migration to MIVAA API
-type SavedSearch = any;
-const savedSearchesService = {
-  getSavedSearches: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
-  deleteSavedSearch: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
-  executeSavedSearch: async () => { throw new Error('Deprecated: Use MIVAA API /api/saved-searches'); },
-};
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,6 +27,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
+
+// Type for saved search records
+interface SavedSearch {
+  id: string;
+  name: string;
+  query: string;
+  search_strategy: string;
+  material_filters?: Record<string, unknown>;
+  is_public: boolean;
+  tags: string[];
+  use_count: number;
+  last_used_at?: string;
+  shared_with_users: string[];
+  is_active_for_recommendations: boolean;
+  recommendation_frequency: 'daily' | 'weekly' | 'never';
+  relevance_score: number;
+}
+
+// Placeholder service - implement with MIVAA API calls
+const savedSearchesService = {
+  getUserSavedSearches: async (_options: {
+    sortBy: string;
+    sortOrder: string;
+  }): Promise<SavedSearch[]> => {
+    // TODO: Implement with MIVAA API /api/saved-searches
+    return [];
+  },
+  deleteSavedSearch: async (_id: string): Promise<void> => {
+    // TODO: Implement with MIVAA API /api/saved-searches
+    console.log('Delete search not yet implemented');
+  },
+  executeSavedSearch: async (_id: string): Promise<void> => {
+    // TODO: Implement with MIVAA API /api/saved-searches
+    console.log('Execute search not yet implemented');
+  },
+};
 
 interface SavedSearchesPanelProps {
   onLoadSearch?: (search: SavedSearch) => void;

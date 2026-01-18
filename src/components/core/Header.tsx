@@ -223,13 +223,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header
-      className="sticky top-0 z-50 m-4 rounded-3xl"
-      style={{
-        background: 'var(--glass-bg)',
-        backdropFilter: 'var(--glass-blur)',
-        border: '1px solid var(--glass-border)',
-        boxShadow: 'var(--glass-shadow)',
-      }}
+      className="sticky top-0 z-50 m-4 rounded-3xl glass-panel bg-white/50 border-white/30"
     >
       <div className="flex h-20 items-center px-8">
         <div className="flex items-center space-x-3">
