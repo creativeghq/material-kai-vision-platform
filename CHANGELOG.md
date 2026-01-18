@@ -4,6 +4,135 @@ All notable changes to the Material Kai Vision Platform.
 
 ---
 
+## [2026-01-18] - Major Feature Expansion & Documentation Update
+
+### 🚀 New Features
+
+**Web Scraping Integration**
+- Firecrawl-powered web scraping for automatic product discovery from manufacturer websites
+- AI-powered product extraction using Claude Sonnet 4.5
+- Background processing with real-time progress tracking
+- Automatic image extraction and linking
+- 3 API endpoints: `/api/scraping/process-session`, `/api/scraping/session/{id}/status`, `/api/scraping/session/{id}/retry`
+
+**Spaceformer Spatial Analysis**
+- AI-powered spatial reasoning using Claude Vision
+- Room layout optimization and furniture placement suggestions
+- Material placement recommendations with surface area calculations
+- Accessibility compliance analysis (ADA compliance)
+- Traffic flow optimization and bottleneck identification
+- API endpoint: `/api/spaceformer/analyze`
+
+**Price Monitoring System**
+- Competitive price monitoring for products across multiple sources
+- On-demand and scheduled price checks (hourly, daily, weekly)
+- Price history tracking and trend analysis
+- Configurable price alerts with multiple notification channels
+- Competitor source management
+- 14+ API endpoints for comprehensive price tracking
+
+**Saved Searches with AI Deduplication**
+- Smart search deduplication using Claude Haiku 4.5
+- Semantic similarity analysis (85-95% threshold)
+- Auto-merge for highly similar searches (95%+)
+- Integration context support (chat, moodboard, 3d_generation)
+- Usage tracking and relevance scoring
+- 7+ API endpoints for search management
+
+**Interior Design Generation**
+- Multi-model AI interior design generation (14 total models)
+- 7 text-to-image models (FLUX, SDXL, Playground, Stable Diffusion 3, etc.)
+- 7 image-to-image models for room transformation (3 production-ready)
+- Parallel processing with retry logic
+- Permanent storage in Supabase Storage
+- Real-time progress tracking via database polling
+- Credit-based billing system
+
+### 📝 API Expansion
+
+**New Route Categories:**
+- Web Scraping Routes (3 endpoints)
+- Spaceformer Routes (1 endpoint)
+- Price Monitoring Routes (14+ endpoints)
+- Saved Searches Routes (7+ endpoints)
+- Interior Design Routes (2 endpoints)
+
+**Total API Endpoints:** 150+ (updated from 114)
+
+### 🗄️ Database Schema Updates
+
+**New Tables:**
+- `scraping_sessions` - Web scraping job tracking
+- `scraping_pages` - Scraped page content storage
+- `spatial_analysis` - Spaceformer analysis results
+- `price_monitoring_products` - Products being monitored
+- `price_history` - Historical price data
+- `competitor_sources` - Competitor source URLs
+- `price_alerts` - User-configured price alerts
+- `price_monitoring_jobs` - Price check job history
+- `saved_searches` - User saved searches with AI metadata
+- `generation_3d` - Interior design generation jobs
+
+### 🔧 Technical Improvements
+
+**Async Architecture:**
+- Fully async processing across all methods (PDF, Web, XML)
+- Unified concurrency limits (5 TogetherAI, 2 Claude, 10 uploads, 20 CLIP)
+- Timeout configuration (300s discovery, 120s AI, 30s downloads)
+- Shared services across all processing pathways
+
+**Production Hardening:**
+- Source tracking for all generated content
+- Heartbeat monitoring for stuck job detection
+- Sentry error tracking with transaction monitoring
+- Comprehensive error handling and retry logic
+
+**Credit System:**
+- Internal credit-based billing for AI operations
+- Per-model cost tracking
+- Automatic credit deduction after generation
+- Balance tracking per workspace
+
+### 📚 Documentation Updates
+
+**New Documentation Files:**
+- `docs/web-scraping-integration.md` - Complete web scraping guide
+- `docs/spaceformer_architecture.md` - Spatial analysis system architecture
+- `docs/price-monitoring-system.md` - Price monitoring features
+- `docs/price-monitoring-deployment-guide.md` - Deployment instructions
+- `docs/saved-searches-deduplication.md` - Smart search deduplication
+- `docs/interior-design-models.md` - AI model inventory
+- `docs/interior-design-data-flow.md` - Generation workflow
+- `docs/interior-designer-agent-user-guide.md` - User guide
+- `docs/internal-pricing-credit-system.md` - Credit system documentation
+
+**Updated Documentation:**
+- `README.md` - Added new features and updated metrics
+- `docs/INDEX.md` - Complete feature catalog update
+- `docs/README.md` - Updated learning paths
+- `docs/api-endpoints.md` - New API routes documented
+- `docs/system-architecture.md` - Architecture updates
+
+### 🎯 Performance Impact
+
+**Web Scraping:**
+- Processing time: 2-5 minutes for 10-25 products
+- Success rate: 95%+ scraping, 85%+ product discovery
+- Cost: $0.02-0.05 per product
+
+**Spaceformer Analysis:**
+- Analysis time: 3-8 seconds per room
+- Supports: layout, materials, accessibility, flow optimization
+- Cost: ~$0.01-0.02 per analysis
+
+**Interior Design:**
+- Generation time: 5-13 seconds per model
+- Parallel processing: 3 concurrent models
+- Success rate: 90%+ for working models
+- Cost: $0.015-0.055 per generation per model
+
+---
+
 ## [2025-11-18] - Memory Optimization & CLIP Integration
 
 ### 🚀 Major Performance Improvements

@@ -44,7 +44,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
         to: formData.to,
         subject: formData.subject,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="font-family: 'Open Sans', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <h2 style="color: #1a1a1a; margin-bottom: 20px;">Test Email</h2>
             <p style="color: #525252; line-height: 1.6; margin-bottom: 20px;">
               ${formData.message}

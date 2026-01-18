@@ -2,23 +2,32 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalog PDFs into searchable, intelligent knowledge using 8 AI models across 4 providers in a sophisticated 14-stage processing pipeline.
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using 12+ AI models across 4 providers.
 
 ---
 
 ## 🎯 Executive Summary
 
-Material Kai Vision Platform is an enterprise AI system that automatically extracts, analyzes, and organizes material information from PDF catalogs. Using advanced computer vision, natural language processing, and semantic search, it enables users to discover materials by visual similarity, properties, applications, and natural language queries.
+Material Kai Vision Platform is an enterprise AI system that automatically extracts, analyzes, and organizes material information from multiple sources: PDF catalogs, manufacturer websites, and XML feeds. Using advanced computer vision, natural language processing, semantic search, spatial analysis, and interior design generation, it enables comprehensive material discovery and application.
 
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **8 AI models** across 4 providers (Anthropic, OpenAI, Google, TogetherAI)
-- **14-stage processing pipeline**
+- **12+ AI models** across 4 providers (Anthropic, OpenAI, Google, TogetherAI, Replicate)
+- **150+ API endpoints** across 16 categories
+- **3 ingestion methods** (PDF, Web Scraping, XML)
+- **14-stage PDF processing pipeline**
 - **6 embedding types** for multi-modal search
 - **95%+ product detection accuracy**
 - **85%+ search relevance**
 - **90%+ material recognition accuracy**
+
+**New Capabilities (2026):**
+- 🌐 **Web Scraping**: Automatic product discovery from websites
+- 🏠 **Spaceformer**: AI-powered spatial analysis and room optimization
+- 💰 **Price Monitoring**: Competitive price tracking across sources
+- 🎨 **Interior Design**: 14 AI models for design generation
+- 🔍 **Smart Search Management**: AI-powered search deduplication
 
 ---
 

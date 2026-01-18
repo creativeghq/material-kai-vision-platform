@@ -10,16 +10,20 @@
 
 ## 🎯 Overview
 
-The **Material Kai Vision Platform** is a production-grade AI system that transforms PDF catalogs into searchable, intelligent material databases using advanced computer vision, natural language processing, and multi-vector embeddings.
+The **Material Kai Vision Platform** is a production-grade AI system that transforms material catalogs into searchable, intelligent databases using advanced computer vision, natural language processing, and multi-vector embeddings. The platform supports multiple input methods (PDF, Web Scraping, XML) and provides comprehensive AI-powered analysis.
 
 ### **Key Capabilities**
-- 📄 **PDF Processing**: Extract products, images, and metadata from material catalogs
-- 🤖 **AI Analysis**: 12 AI models across 7 pipeline stages for comprehensive material understanding
-- 🔍 **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, application, multimodal)
-- 💬 **AI Agents**: Intelligent material recommendations and search assistance
+- 📄 **PDF Processing**: Extract products, images, and metadata from material catalogs with 14-stage pipeline
+- 🌐 **Web Scraping**: Automatic product discovery from manufacturer websites using Firecrawl
+- 🤖 **AI Analysis**: 12+ AI models across multiple providers for comprehensive understanding
+- 🔍 **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, style, material)
+- 💬 **AI Agents**: Intelligent material recommendations, search assistance, and interior design
 - 📊 **Knowledge Base**: Semantic chunking, quality scoring, and relationship mapping
 - 🎨 **Visual Recognition**: CLIP + Qwen3-VL Vision for image analysis
-- 🏷️ **Auto-Metadata**: AI-powered metadata extraction and population
+- 🏷️ **Auto-Metadata**: AI-powered metadata extraction (200+ fields)
+- 🏠 **Spatial Analysis**: AI-powered room layout optimization and accessibility analysis
+- 💰 **Price Monitoring**: Competitive price tracking across multiple sources
+- 🎨 **Interior Design**: Multi-model AI interior design generation (14 models)
 
 ### **Production Stats**
 - **Active Users**: 5,000+
@@ -27,6 +31,8 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Products Cataloged**: 10,000+
 - **Search Accuracy**: 85%+
 - **Uptime**: 99.5%+
+- **API Endpoints**: 150+
+- **AI Models**: 12+ across 4 providers
 
 ---
 
@@ -55,12 +61,13 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Tables**: 15+ tables (materials, products, chunks, images, embeddings, etc.)
 - **Indexes**: Optimized ivfflat vector indexes
 
-#### **AI Models** (12 models across 7 stages)
-1. **OpenAI**: text-embedding-3-small (1536D embeddings)
-2. **Anthropic**: Claude Haiku 4.5 (fast classification), Claude Sonnet 4.5 (deep enrichment)
-3. **Together AI**: Qwen3-VL 17B Vision (69.4% MMMU, #1 OCR)
-4. **CLIP**: Visual embeddings (512D)
-5. **Custom Models**: Color, texture, application embeddings
+#### **AI Models** (12+ models across 4 providers)
+1. **OpenAI**: text-embedding-3-small (1536D embeddings), GPT-4o, GPT-5
+2. **Anthropic**: Claude Haiku 4.5 (fast classification), Claude Sonnet 4.5 (deep enrichment, spatial analysis)
+3. **Together AI**: Qwen3-VL 17B Vision (69.4% MMMU, vision analysis)
+4. **Google**: SigLIP ViT-SO400M (primary CLIP model)
+5. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
+6. **Custom Embeddings**: Visual, color, texture, style, material, application (6 types)
 
 ### **System Diagram**
 ```
@@ -171,46 +178,65 @@ LOG_LEVEL=ERROR
 
 ## 📚 Documentation
 
-### **Core Platform**
-- [Platform Overview](./docs/README.md) - Complete platform documentation index
+### **🎯 Getting Started**
+- [Documentation Index](./docs/INDEX.md) - Complete documentation index with learning paths
+- [Platform Overview](./docs/overview.md) - Executive summary and key features
 - [Platform Flows](./docs/platform-flows.md) - End-to-end workflow documentation
-- [Platform Functionality](./docs/platform-functionality.md) - Feature catalog
-- [System Diagrams](./docs/system-diagrams.md) - Architecture visualizations
+- [Features Guide](./docs/features-guide.md) - Comprehensive feature catalog
+- [System Architecture](./docs/system-architecture.md) - Three-tier architecture overview
 
-### **AI & Machine Learning**
-- [AI Models Inventory](./docs/ai-models-inventory.md) - All 12 AI models documented
-- [Multi-Vector Storage](./docs/multi-vector-storage-system.md) - 6 embedding types architecture
-- [Embeddings & Search Strategy](./docs/embeddings-search-strategy.md) - Search optimization
-- [Multimodal Analysis](./docs/multimodal-analysis.md) - Text + image processing
+### **🤖 AI & Processing**
+- [AI Models Guide](./docs/ai-models-guide.md) - 12+ AI models across 4 providers
+- [PDF Processing Pipeline](./docs/pdf-processing-pipeline.md) - 14-stage processing pipeline
+- [Product Discovery Architecture](./docs/product-discovery-architecture.md) - AI-powered extraction
+- [Agent System](./docs/agent-system.md) - Database-driven AI agents
+- [Prompt Enhancement System](./docs/prompt-enhancement-system.md) - Dynamic prompt system
 
-### **PDF Processing**
-- [PDF Processing Flow](./docs/pdf-processing-complete-flow.md) - Complete pipeline (14 stages)
-- [Product Detection](./docs/product-detection-and-chunk-quality-improvements.md) - Two-stage classification
-- [Two-Stage Classification](./docs/two-stage-product-classification.md) - Claude Haiku + Sonnet system
-- [Chunk Quality](./docs/product-detection-and-chunk-quality-improvements.md) - Quality scoring & deduplication
+### **🔍 Search & Discovery**
+- [Search Strategies](./docs/search-strategies.md) - 6 search strategies (100% implemented)
+- [Image Relevancy and Search](./docs/image-relevancy-and-search.md) - Multi-vector search (6 embeddings)
+- [Saved Searches Deduplication](./docs/saved-searches-deduplication.md) - AI-powered deduplication
 
-### **API Documentation**
-- [Complete API Reference](./docs/api-documentation.md) - All 37+ endpoints
-- [MIVAA Service](./docs/mivaa-service.md) - Backend API service documentation
-- [Agents System](./docs/agents-system.md) - AI agent capabilities
-- [Search APIs](./docs/api-documentation.md#search-apis) - Semantic, vector, hybrid search
+### **📥 Data Import**
+- [Web Scraping Integration](./docs/web-scraping-integration.md) - Firecrawl web scraping
+- [Data Import System](./docs/data-import-system.md) - XML import with AI mapping
+- [Unified Product Generation Flow](./docs/unified-product-generation-flow.md) - Multi-source integration
+- [Async Processing & Limits](./docs/async-processing-and-limits.md) - Concurrency architecture
 
-### **Admin & Management**
-- [Admin Panel Guide](./docs/admin-panel-guide.md) - Admin interface documentation
-- [Admin Knowledge Base](./docs/admin-knowledge-base-api.md) - Knowledge base management
-- [Agent Configurations](./docs/agent-system.md) - AI agent prompt management
-- [Metadata Inventory](./docs/metadata-inventory-system.md) - 200+ metadata fields
-- [CRM & User Management](./docs/crm-user-management.md) - User administration
+### **🏠 Interior Design & Spatial**
+- [Spaceformer Architecture](./docs/spaceformer_architecture.md) - Spatial analysis system
+- [Interior Design Models](./docs/interior-design-models.md) - 14 AI models inventory
+- [Interior Design Data Flow](./docs/interior-design-data-flow.md) - Generation workflow
+- [Interior Designer Agent Guide](./docs/interior-designer-agent-user-guide.md) - User guide
 
-### **Deployment & Operations**
-- [Deployment Guide](./docs/deployment-guide.md) - Production deployment instructions
-- [Setup & Configuration](./docs/setup-configuration.md) - Environment setup
-- [Environment Variables](./docs/environment-variables-guide.md) - Configuration reference
-- [Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
+### **💰 Business Features**
+- [Price Monitoring System](./docs/price-monitoring-system.md) - Competitive price tracking
+- [Price Monitoring Deployment](./docs/price-monitoring-deployment-guide.md) - Setup guide
+- [Email System](./docs/email-system.md) - Amazon SES integration
+- [Campaign System](./docs/campaign-system.md) - Email campaign management
+- [Quotes System](./docs/quotes-system-architecture.md) - Quote management
+- [Internal Pricing & Credits](./docs/internal-pricing-credit-system.md) - Credit system
 
-### **Security & Testing**
-- [Security & Authentication](./docs/security-authentication.md) - JWT, RLS, RBAC
-- [Testing Strategy](./docs/testing-strategy.md) - Test coverage and validation
+### **🗄️ Data & Metadata**
+- [Comprehensive Metadata Fields](./docs/comprehensive-metadata-fields-guide.md) - 200+ fields
+- [Metadata Management System](./docs/metadata-management-system.md) - Dynamic extraction
+- [Meta Field Aggregation](./docs/meta-field-aggregation.md) - 3-source redundancy
+- [Relevancy System](./docs/relevancy-system.md) - Entity linking
+
+### **📊 Monitoring & Analytics**
+- [Monitoring & Analytics System](./docs/monitoring-analytics-system.md) - Real-time monitoring
+- [Job Queue System](./docs/job-queue-system.md) - Async job processing
+- [Monitoring and Alerting](./docs/monitoring-and-alerting.md) - Alert configuration
+- [Troubleshooting Guide](./docs/troubleshooting-guide.md) - Common issues
+
+### **🔌 API Reference**
+- [API Endpoints](./docs/api-endpoints.md) - 150+ endpoints across 16 categories
+- [API Documentation](./docs/api-docs.md) - Complete API reference
+- [Modular Pipeline Endpoints](./docs/modular-pipeline-endpoints.md) - Pipeline API
+
+### **🚀 Deployment & Operations**
+- [Deployment Guide](./docs/deployment-guide.md) - Production deployment
+- [Supabase Types Automation](./docs/supabase-types-automation.md) - TypeScript generation
 
 ---
 
@@ -240,77 +266,123 @@ curl https://v1api.materialshub.gr/docs
 
 ## 🎯 Key Features
 
-### **1. PDF Processing Pipeline** (14 stages)
-1. PDF Upload & Validation
-2. PDF Extraction (PyMuPDF4LLM)
-3. Image Extraction
-4. Semantic Chunking (HierarchicalNodeParser)
-5. Quality Scoring & Validation (min score 0.7)
-6. Hash Generation & Exact Duplicate Detection (SHA-256)
-7. Semantic Similarity Detection (85% threshold)
-8. Borderline Quality Flagging (score 0.6-0.7)
-9. Chunk Classification
-10. Embedding Generation (6 types)
-11. Image Analysis (Claude Haiku 4.5 + Qwen3-VL Vision)
-12. Product Detection (Four-layer validation)
-13. Product Enrichment (Claude Sonnet 4.5)
-14. Multi-Vector Embedding Generation
+### **1. Multi-Source Product Ingestion**
+
+**PDF Processing Pipeline** (14 stages)
+- Product-centric architecture with individual processing
+- YOLO layout detection for tables and regions
+- Page-aware chunking respecting document structure
+- 200+ metadata fields extracted automatically
+- 95%+ product detection accuracy
+
+**Web Scraping Integration**
+- Firecrawl-powered automatic website scraping
+- AI-powered product discovery from unstructured web content
+- Background processing with real-time progress tracking
+- Automatic image extraction and storage
+- 85%+ success rate
+
+**XML Import**
+- AI-powered dynamic field mapping (Claude Sonnet 4.5)
+- Batch processing (10 products at a time)
+- Concurrent image downloads (5 parallel)
+- Cron-based scheduling for recurring imports
+- Checkpoint recovery for resilience
 
 ### **2. Multi-Vector Search** (6 embedding types)
 - **Text Embeddings** (1536D): Semantic text understanding
 - **Visual CLIP Embeddings** (512D): Cross-modal visual-text matching
-- **Multimodal Fusion** (2048D): Combined text+visual understanding
-- **Color Embeddings** (256D): Color palette and harmony matching
-- **Texture Embeddings** (256D): Surface texture and pattern recognition
-- **Application Embeddings** (512D): Use-case and context-specific matching
+- **Color Embeddings**: Color palette and harmony matching
+- **Texture Embeddings**: Surface texture and pattern recognition
+- **Style Embeddings**: Design style recognition
+- **Material Embeddings**: Material type classification
 
-**Search Accuracy**: 85%+ improvement over single-vector methods
+**Search Strategies**: Semantic, Vector, Multi-Vector, Hybrid, Material, Image
+**Performance**: 300-500ms response time, 85%+ relevance
 
-### **3. AI Agents**
-- **Research Agent** (Admin only): Advanced material research and analysis
-- **MIVAA Search Agent** (All users): Intelligent search assistance
-- **PraisonAI Integration**: Role-based access control and orchestration
+### **3. AI Agents & Chat**
+- **Material Search Agent**: Intelligent product recommendations
+- **Interior Designer Agent**: Room design and spatial analysis
+- **PDF Processor Agent**: Document understanding and analysis
+- **LangChain.js Integration**: Tool orchestration and function calling
+- **Database-Driven Prompts**: Real-time prompt updates without deployment
 
-### **4. Knowledge Base**
+### **4. Spatial Analysis (Spaceformer)**
+- AI-powered room layout optimization
+- Furniture placement suggestions with confidence scores
+- Material placement recommendations
+- Accessibility compliance analysis (ADA)
+- Traffic flow optimization
+- Bottleneck identification
+
+### **5. Interior Design Generation**
+- 14 AI models (7 text-to-image, 7 image-to-image)
+- Parallel processing (3 concurrent generations)
+- Multiple variations per request
+- Permanent storage in Supabase
+- Credit-based billing system
+- Models: FLUX, SDXL, Stable Diffusion 3, Playground, ComfyUI
+
+### **6. Price Monitoring**
+- Competitive price tracking across sources
+- Scheduled monitoring (hourly, daily, weekly, on-demand)
+- Price history and trend analysis
+- Configurable price alerts
+- Competitor source management
+- Statistics and reporting
+
+### **7. Saved Searches with AI Deduplication**
+- Smart duplicate detection using Claude Haiku 4.5
+- Semantic similarity analysis (85-95% threshold)
+- Auto-merge for highly similar searches
+- Usage tracking and relevance scoring
+- Integration context support
+
+### **8. Knowledge Base & RAG**
 - **Semantic Chunking**: Intelligent document segmentation
 - **Quality Scoring**: Automated quality assessment (0-1 scale)
 - **Deduplication**: Hash-based + semantic similarity detection
 - **Relationship Mapping**: Chunk relationships (semantic, sequential, hierarchical)
-- **Metadata Extraction**: AI-powered metadata population
+- **Metadata Extraction**: 200+ fields with AI-powered extraction
 
-### **5. Admin Dashboard**
-- **Chunk Quality Dashboard**: Monitor and review chunk quality
-- **Product Management**: Create, edit, and enrich products
-- **Metadata Management**: Define and manage 200+ metadata fields
-- **Agent Configurations**: Manage AI agent system prompts
-- **User Management**: CRM and user administration
-- **Analytics**: Performance metrics and usage statistics
+### **9. Admin Dashboard**
+- **PDF Processing Monitor**: Real-time job tracking with 9 checkpoints
+- **Analytics Dashboard**: Usage metrics, AI costs, search patterns
+- **Product Management**: Create, edit, enrich products
+- **Metadata Management**: 200+ metadata fields configuration
+- **Agent Configurations**: AI agent prompt management
+- **User Management**: CRM and workspace administration
+- **Email Campaigns**: Bulk email with tracking and analytics
 
 ---
 
 ## 📊 Performance Metrics
 
 ### **Processing Performance**
-- **PDF Processing**: 2-5 minutes per document (average)
+- **PDF Processing**: 2-5 minutes per document (14-stage pipeline)
+- **Web Scraping**: 2-5 minutes for 10-25 products
+- **XML Import**: <1 minute for 100 products
 - **Product Detection**: 25-55 seconds for 200 chunks → 15 products
-- **Embedding Generation**: 1.5-3 seconds per entity
-- **Search Response**: 200-800ms (semantic search)
-- **Multi-Modal Analysis**: 1-4 seconds
+- **Multi-Vector Search**: 300-500ms (6 embeddings in parallel)
+- **Spaceformer Analysis**: 3-8 seconds per room
+- **Interior Design**: 5-13 seconds per model (parallel processing)
 
 ### **Quality Metrics**
-- **Search Accuracy**: 85%+
-- **Product Classification**: 85%+ (two-stage system)
+- **Search Accuracy**: 85%+ relevance
+- **Product Discovery**: 85%+ (AI-powered)
+- **Web Scraping Success**: 95%+ scraping, 85%+ discovery
 - **Entity Extraction**: 90%+ precision
-- **Material Recognition**: 80%+ accuracy
+- **Material Recognition**: 90%+ accuracy (Qwen3-VL)
 - **Processing Success Rate**: 95%+
-- **Chunk Quality Score**: Average 0.82 (scale 0-1)
+- **Metadata Extraction**: 200+ fields with 90%+ accuracy
 
 ### **System Performance**
 - **Uptime**: 99.5%+
 - **Concurrent Users**: 100+
-- **Daily Document Processing**: 50+ PDFs
+- **Daily Processing**: 50+ PDFs, 100+ web scraping sessions
 - **API Throughput**: 100+ queries per minute
 - **Error Rate**: <1%
+- **API Endpoints**: 150+ across 16 categories
 
 ---
 

@@ -70,7 +70,7 @@ export default function EmailTemplate({ userName = 'User', actionUrl = '#', comp
   return (
     <Html lang="en">
       <Head />
-      <Body style={{ backgroundColor: '#f4f4f4', fontFamily: 'Arial, sans-serif' }}>
+      <Body style={{ backgroundColor: '#f4f4f4', fontFamily: "'Open Sans', Arial, sans-serif" }}>
         <Container style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: '#ffffff', padding: '20px' }}>
           <Heading style={{ color: '#000000', fontSize: '24px', textAlign: 'center', marginBottom: '20px' }}>
             {companyName}

@@ -361,22 +361,24 @@ For questions or issues:
 
 ---
 
-**Last Updated**: December 30, 2025
-**Version**: 2.5.0
+**Last Updated**: January 18, 2026
+**Version**: 3.0.0
 **Status**: Production
-**Total Documentation**: 40 comprehensive guides
-**Total Lines**: 13,000+
+**Total Documentation**: 55+ comprehensive guides
+**Total Lines**: 15,000+
 **Coverage**: 100% of platform features
-**Planning Documents**: 10 files in /planning directory
+**API Endpoints**: 150+ across 16 categories
 
 **Recent Additions**:
-- ✨ **NEW**: campaign-system.md - Complete email campaign management documentation
-- ✨ Added campaign creation, scheduling, and sending workflows
-- ✨ Documented recipient tracking and analytics
-- ✨ Added campaign admin dashboard documentation
-- ✨ monitoring-analytics-system.md - Complete monitoring and analytics documentation
-- ✨ Stage 0 and Stage 1 monitoring integration
-- ✨ Stage 3.5 (Embedding-to-Text) and Stage 4 (Metadata Consolidation) documentation
-- ✨ Real-time job tracking with Supabase subscriptions
-- ✨ PDF Processing Monitor dashboard documentation
-- ✨ Analytics Dashboard comprehensive guide
+- ✨ **NEW**: web-scraping-integration.md - Firecrawl integration guide
+- ✨ **NEW**: spaceformer_architecture.md - Spatial analysis system
+- ✨ **NEW**: price-monitoring-system.md - Competitive price tracking
+- ✨ **NEW**: price-monitoring-deployment-guide.md - Setup instructions
+- ✨ **NEW**: saved-searches-deduplication.md - AI-powered search deduplication
+- ✨ **NEW**: interior-design-models.md - 14 AI models inventory
+- ✨ **NEW**: interior-design-data-flow.md - Generation workflow
+- ✨ **NEW**: interior-designer-agent-user-guide.md - User guide
+- ✨ **NEW**: internal-pricing-credit-system.md - Credit system documentation
+- ✨ Updated README.md and CHANGELOG.md with all new features
+- ✨ Documented async processing and concurrency limits
+- ✨ Added production hardening documentation

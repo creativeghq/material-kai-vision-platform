@@ -314,8 +314,9 @@ export class NotificationService {
       <html>
         <head>
           <meta charset="utf-8">
+          <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            body { font-family: 'Open Sans', Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background: #4F46E5; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
             .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
