@@ -1,13 +1,23 @@
 # MIVAA API Endpoints Reference
 
-**Last Updated:** 2025-12-30
-**API Version:** v2.5.0
-**Total Endpoints:** 113
+**Last Updated:** 2026-01-21
+**API Version:** v2.6.0
+**Total Endpoints:** 140+
 
 
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
-**Recent Updates (v2.5.0 - December 30, 2025):**
+**Recent Updates (v2.6.0 - January 2026):**
+- **MULTI-CHANNEL MESSAGING:** 10+ endpoints for SMS, WhatsApp, Viber via Infobip (NEW)
+  - `POST /functions/v1/messaging-api` - Unified messaging API (action-based routing)
+  - Send single/bulk messages across SMS, WhatsApp, Viber
+  - Template management with variable substitution
+  - Infobip sender sync (Numbers API, WhatsApp senders)
+  - WhatsApp pre-approved template support
+  - Delivery analytics and cost tracking
+  - Opt-out compliance management
+
+**Previous Updates (v2.5.0 - December 30, 2025):**
 - **IMAGE RE-CLASSIFICATION:** 1 new endpoint for AI-powered image re-classification
   - `POST /api/images/reclassify/{image_id}` - Re-run material vs non-material classification
   - Force validation with secondary model (Qwen-32B or Claude)
@@ -52,7 +62,8 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - **CONSOLIDATED HEALTH:** Single `/health` endpoint replaces 10+ individual health checks
 - **METADATA MANAGEMENT:** 4 endpoints for scope detection, application, listing, and statistics
 
-**Total API Endpoints:** 125+ endpoints across 17 categories
+**Total API Endpoints:** 140+ endpoints across 19 categories
+- **MULTI-CHANNEL MESSAGING:** SMS, WhatsApp, Viber messaging via Infobip ✨ NEW
 - **KNOWLEDGE BASE:** Complete documentation management system with AI embeddings
 - **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
@@ -85,6 +96,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 16. [Job Health Routes](#16-job-health-routes) - Job monitoring and health checks
 17. [Suggestions Routes](#17-suggestions-routes) - Search suggestions and auto-complete
 18. [Spaceformer Routes](#18-spaceformer-routes) - Spatial analysis, room layout, accessibility ✨ NEW v2.4.0
+19. [Messaging Routes](#19-messaging-routes-sms-whatsapp-viber--new-v260) - SMS, WhatsApp, Viber via Infobip ✨ NEW v2.6.0
 
 ---
 
@@ -3775,11 +3787,548 @@ All endpoints return JSON:
 
 ---
 
+## 19. Messaging Routes (SMS, WhatsApp, Viber) ✨ NEW v2.6.0
+
+**Base Path:** Supabase Edge Function `/functions/v1/messaging-api`
+**Purpose:** Multi-channel messaging via Infobip (SMS, WhatsApp, Viber)
+**Provider:** Infobip - Single SDK for all channels
+**Philosophy:** Unified messaging API with templates, campaigns, analytics, and compliance
+
+### Environment Variables (Supabase Secrets)
+
+```
+INFOBIP_API_KEY=your_api_key
+INFOBIP_BASE_URL=https://api.infobip.com (or your dedicated URL)
+```
+
+### 19.1 POST /functions/v1/messaging-api (action: send)
+
+**Purpose:** Send a single message via SMS, WhatsApp, or Viber
+**Used In:** Test messages, transactional notifications, OTP delivery
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "send",
+  "channel": "sms" | "whatsapp" | "viber",
+  "to": "+1234567890",
+  "content": "Your verification code is 123456",
+  "from": "+1987654321",  // Optional, uses default channel if not provided
+  "messageType": "transactional" | "marketing" | "otp" | "notification",
+  "variables": {"code": "123456"},  // For template rendering
+  "templateSlug": "otp-template",  // Optional template
+  "mediaUrl": "https://...",  // For MMS/rich messages
+  "mediaType": "image" | "video" | "document" | "audio",
+  "buttons": [{"type": "url", "text": "Click Here", "url": "https://..."}],
+  "tags": {"campaign": "welcome"},
+  "callbackData": "custom-tracking-id",
+  // WhatsApp specific
+  "whatsappTemplateName": "order_confirmation",
+  "whatsappTemplateNamespace": "your_namespace",
+  "whatsappLanguageCode": "en"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "messageId": "msg-uuid-12345",
+  "bulkId": "bulk-uuid-67890",
+  "logId": "log-uuid-abcde",
+  "messages": [
+    {
+      "id": "uuid",
+      "to_number": "+1234567890",
+      "status": "sent"
+    }
+  ]
+}
+```
+
+**Infobip API Endpoints Used:**
+- SMS: `POST /sms/2/text/advanced`
+- WhatsApp Text: `POST /whatsapp/1/message/text`
+- WhatsApp Template: `POST /whatsapp/1/message/template`
+- WhatsApp Media: `POST /whatsapp/1/message/{mediaType}`
+- Viber: `POST /viber/1/message/promotional`
+
+---
+
+### 19.2 POST /functions/v1/messaging-api (action: send-bulk)
+
+**Purpose:** Send messages to multiple recipients in bulk
+**Used In:** Marketing campaigns, mass notifications
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "send-bulk",
+  "channel": "sms",
+  "recipients": [
+    {"to": "+1234567890", "variables": {"name": "John"}},
+    {"to": "+0987654321", "variables": {"name": "Jane"}}
+  ],
+  "content": "Hello {{name}}, welcome to our service!",
+  "templateSlug": "welcome-template",
+  "messageType": "marketing",
+  "from": "+1987654321"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "bulkId": "bulk-uuid-12345",
+  "total": 100,
+  "sent": 95,
+  "failed": 3,
+  "optedOut": 2,
+  "results": [
+    {"to": "+1234567890", "status": "sent", "messageId": "msg-1"},
+    {"to": "+0987654321", "status": "failed", "error": "Invalid number"},
+    {"to": "+1111111111", "status": "opted_out", "error": "Recipient has opted out"}
+  ]
+}
+```
+
+---
+
+### 19.3 POST /functions/v1/messaging-api (action: channels)
+
+**Purpose:** List all configured messaging channels
+**Used In:** Channel management UI, channel selection dropdowns
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "channels",
+  "channelType": "sms"  // Optional filter: "sms" | "whatsapp" | "viber"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "channels": [
+    {
+      "id": "uuid",
+      "channel_type": "sms",
+      "provider": "infobip",
+      "sender_id": "+1234567890",
+      "display_name": "Marketing SMS",
+      "is_active": true,
+      "is_default": true,
+      "daily_quota": 10000,
+      "max_send_rate": 100,
+      "config": {}
+    }
+  ]
+}
+```
+
+**Database Table:** `messaging_channels`
+
+---
+
+### 19.4 POST /functions/v1/messaging-api (action: templates)
+
+**Purpose:** List all messaging templates
+**Used In:** Template management UI, campaign creation
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "templates",
+  "channelType": "whatsapp"  // Optional filter
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "templates": [
+    {
+      "id": "uuid",
+      "name": "Order Confirmation",
+      "slug": "order-confirmation",
+      "channel_type": "whatsapp",
+      "content": "Hi {{name}}, your order #{{order_id}} has been confirmed.",
+      "variables": ["name", "order_id"],
+      "category": "transactional",
+      "whatsapp_template_name": "order_confirmation",
+      "is_approved": true,
+      "is_active": true
+    }
+  ]
+}
+```
+
+**Database Table:** `messaging_templates`
+
+---
+
+### 19.5 POST /functions/v1/messaging-api (action: logs)
+
+**Purpose:** Get message delivery logs with filtering
+**Used In:** Message logs tab, delivery tracking, debugging
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "logs",
+  "channelType": "sms",  // Optional
+  "status": "delivered",  // Optional: queued|sent|delivered|read|failed|rejected
+  "messageType": "marketing",  // Optional
+  "limit": 50
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "logs": [
+    {
+      "id": "uuid",
+      "channel_type": "sms",
+      "provider_message_id": "infobip-msg-id",
+      "from_number": "+1234567890",
+      "to_number": "+0987654321",
+      "content": "Hello John!",
+      "status": "delivered",
+      "sent_at": "2025-01-15T10:30:00Z",
+      "delivered_at": "2025-01-15T10:30:05Z",
+      "cost": 0.0055,
+      "currency": "EUR"
+    }
+  ]
+}
+```
+
+**Database Table:** `messaging_logs`
+
+---
+
+### 19.6 POST /functions/v1/messaging-api (action: analytics)
+
+**Purpose:** Get aggregated messaging analytics
+**Used In:** Analytics dashboard, reporting
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "analytics",
+  "channelType": "sms",  // Optional
+  "dateRange": {
+    "start": "2025-01-01",
+    "end": "2025-01-31"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "totalSent": 10000,
+  "totalDelivered": 9800,
+  "totalRead": 5000,  // WhatsApp/Viber only
+  "totalFailed": 200,
+  "totalCost": 55.00,
+  "deliveryRate": 98.0,
+  "readRate": 51.02,
+  "failureRate": 2.0,
+  "dailyData": [
+    {"date": "2025-01-15", "channel_type": "sms", "total_sent": 500, "total_delivered": 490}
+  ]
+}
+```
+
+**Database Table:** `messaging_analytics`
+
+---
+
+### 19.7 POST /functions/v1/messaging-api (action: balance)
+
+**Purpose:** Get Infobip account balance
+**Used In:** Header balance display, billing monitoring
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "balance"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "balance": 150.50,
+  "currency": "EUR"
+}
+```
+
+**Infobip API Endpoint:** `GET /account/1/balance`
+
+---
+
+### 19.8 POST /functions/v1/messaging-api (action: sync-senders)
+
+**Purpose:** Sync senders/numbers from Infobip account to local database
+**Used In:** Channel sync button, initial setup
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "sync-senders",
+  "autoImport": true  // Set to true to automatically import to database
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "senders": {
+    "sms": [
+      {"sender_id": "+1234567890", "display_name": "Marketing", "status": "active"}
+    ],
+    "whatsapp": [
+      {"sender_id": "+1234567890", "display_name": "Business", "status": "active", "quality_rating": "GREEN"}
+    ],
+    "viber": [
+      {"sender_id": "MyBrand", "display_name": "My Brand Viber", "status": "active"}
+    ]
+  },
+  "total": 3,
+  "imported": true
+}
+```
+
+**Infobip API Endpoints Used:**
+- Numbers: `GET /numbers/1/numbers` - List purchased phone numbers
+- WhatsApp: `GET /whatsapp/1/senders` - List WhatsApp business senders
+- Viber: `GET /viber/1/senders` - List Viber senders (if available)
+
+---
+
+### 19.9 POST /functions/v1/messaging-api (action: whatsapp-templates)
+
+**Purpose:** Fetch WhatsApp templates from Infobip for a specific sender
+**Used In:** WhatsApp template selection, template sync
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "whatsapp-templates",
+  "sender": "+1234567890"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "templates": [
+    {
+      "name": "order_confirmation",
+      "status": "APPROVED",
+      "language": "en",
+      "category": "TRANSACTIONAL",
+      "structure": {
+        "body": {"text": "Hi {{1}}, your order {{2}} is confirmed."}
+      }
+    }
+  ]
+}
+```
+
+**Infobip API Endpoint:** `GET /whatsapp/2/senders/{sender}/templates`
+
+---
+
+### 19.10 POST /functions/v1/messaging-api (action: send-test)
+
+**Purpose:** Send a test message for a campaign
+**Used In:** Campaign testing, preview verification
+
+**Request:**
+```http
+POST /functions/v1/messaging-api
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "action": "send-test",
+  "campaignId": "uuid",
+  "testNumber": "+1234567890"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "messageId": "msg-uuid-12345"
+}
+```
+
+---
+
+### Infobip API Reference (Internal)
+
+**Base URL:** `https://api.infobip.com` (or dedicated instance URL)
+**Authentication:** `App {API_KEY}` header
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/sms/2/text/advanced` | POST | Send SMS messages |
+| `/sms/1/reports` | GET | Get SMS delivery reports |
+| `/whatsapp/1/message/text` | POST | Send WhatsApp text message |
+| `/whatsapp/1/message/template` | POST | Send WhatsApp template message |
+| `/whatsapp/1/message/image` | POST | Send WhatsApp image |
+| `/whatsapp/1/message/video` | POST | Send WhatsApp video |
+| `/whatsapp/1/message/document` | POST | Send WhatsApp document |
+| `/whatsapp/1/senders` | GET | List WhatsApp senders |
+| `/whatsapp/1/senders/quality` | GET | Get WhatsApp sender quality |
+| `/whatsapp/2/senders/{sender}/templates` | GET | Get WhatsApp templates |
+| `/viber/1/message/promotional` | POST | Send Viber promotional message |
+| `/numbers/1/numbers` | GET | List purchased phone numbers |
+| `/account/1/balance` | GET | Get account balance |
+
+**Documentation:** https://www.infobip.com/docs/api/channels
+
+---
+
+### Database Tables
+
+```sql
+-- Messaging channels (SMS, WhatsApp, Viber senders)
+messaging_channels (
+  id UUID PRIMARY KEY,
+  channel_type TEXT NOT NULL,  -- 'sms' | 'whatsapp' | 'viber'
+  provider TEXT DEFAULT 'infobip',
+  sender_id TEXT NOT NULL,
+  display_name TEXT,
+  is_active BOOLEAN DEFAULT true,
+  is_default BOOLEAN DEFAULT false,
+  config JSONB DEFAULT '{}',
+  daily_quota INTEGER DEFAULT 10000,
+  max_send_rate INTEGER DEFAULT 100
+)
+
+-- Messaging templates
+messaging_templates (
+  id UUID PRIMARY KEY,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  channel_type TEXT NOT NULL,
+  content TEXT NOT NULL,
+  variables TEXT[],
+  category TEXT DEFAULT 'marketing',
+  whatsapp_template_name TEXT,
+  is_approved BOOLEAN DEFAULT false,
+  is_active BOOLEAN DEFAULT true
+)
+
+-- Message logs
+messaging_logs (
+  id UUID PRIMARY KEY,
+  channel_type TEXT NOT NULL,
+  provider_message_id TEXT,
+  from_number TEXT NOT NULL,
+  to_number TEXT NOT NULL,
+  content TEXT,
+  status TEXT DEFAULT 'queued',
+  sent_at TIMESTAMPTZ,
+  delivered_at TIMESTAMPTZ,
+  read_at TIMESTAMPTZ,
+  cost DECIMAL(10,4),
+  currency TEXT DEFAULT 'EUR'
+)
+
+-- Analytics (aggregated daily)
+messaging_analytics (
+  id UUID PRIMARY KEY,
+  date DATE NOT NULL,
+  channel_type TEXT NOT NULL,
+  total_sent INTEGER DEFAULT 0,
+  total_delivered INTEGER DEFAULT 0,
+  total_read INTEGER DEFAULT 0,
+  total_failed INTEGER DEFAULT 0,
+  total_cost DECIMAL(10,2) DEFAULT 0
+)
+
+-- Opt-outs (compliance)
+messaging_optouts (
+  id UUID PRIMARY KEY,
+  phone_number TEXT NOT NULL,
+  channel_type TEXT NOT NULL,
+  source TEXT DEFAULT 'manual',
+  opted_out_at TIMESTAMPTZ DEFAULT NOW()
+)
+```
+
+---
+
 ## Summary
 
-**Total Endpoints:** 128+
-**Latest Version:** v2.4.0
-**Last Updated:** December 3, 2025
+**Total Endpoints:** 140+
+**Latest Version:** v2.6.0
+**Last Updated:** January 2026
+
+**New in v2.6.0:**
+- ✨ Multi-channel Messaging (SMS, WhatsApp, Viber) via Infobip
+- ✨ Unified messaging templates with variable substitution
+- ✨ Bulk messaging with recipient-specific variables
+- ✨ Infobip sender sync (Numbers API, WhatsApp senders)
+- ✨ WhatsApp template support (pre-approved templates)
+- ✨ Delivery analytics and cost tracking
+- ✨ Opt-out compliance management
+
+**New in v2.5.0:**
+- ✨ Image re-classification with AI validation
 
 **New in v2.4.0:**
 - ✨ Spaceformer Spatial Analysis with Claude Vision
@@ -3795,4 +4344,5 @@ All endpoints return JSON:
 - ✅ Advanced duplicate detection
 - ✅ Data import with AI field mapping
 - ✅ Spatial analysis with Claude Vision
+- ✅ Multi-channel messaging via Infobip
 - ✅ Full FastAPI documentation at `/docs` and `/redoc`

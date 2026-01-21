@@ -70,7 +70,7 @@ import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
 import { EmailManagement } from './components/Admin/EmailManagement';
 import { EmailTemplateBuilder } from './pages/Admin/EmailTemplateBuilder';
-import { MessagingManagement } from './components/admin/MessagingManagement';
+import { MessagingManagement } from './components/Admin/MessagingManagement';
 
 // Coverage page component
 const CoveragePage = () => (

@@ -18,6 +18,12 @@ Email sending, domain verification, and analytics using AWS SES.
 - **Features:** Template-based emails, domain verification, analytics, sending stats
 - **Access:** Authenticated users
 
+#### [Messaging API](./messaging-api.md)
+Multi-channel messaging (SMS, WhatsApp, Viber) using Infobip.
+- **Function:** `messaging-api`
+- **Features:** SMS, WhatsApp, Viber messaging, templates, delivery tracking, analytics
+- **Access:** Authenticated users
+
 #### [CRM Contacts API](./crm-contacts-api.md)
 Contact management for CRM system.
 - **Function:** `crm-contacts-api`
