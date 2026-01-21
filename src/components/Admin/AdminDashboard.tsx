@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   ScrollText,
   Mail,
+  MessageSquare,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -160,6 +161,14 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/emails',
         status: 'active',
         count: 'SES Integration',
+      },
+      {
+        title: 'Messaging (SMS/WhatsApp/Viber)',
+        description: 'Send SMS, WhatsApp, and Viber campaigns with Infobip integration',
+        icon: MessageSquare,
+        path: '/admin/messaging',
+        status: 'active',
+        count: 'Infobip',
       },
     ],
     'System Monitoring': [

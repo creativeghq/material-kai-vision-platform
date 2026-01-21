@@ -73,15 +73,43 @@ interface Contact {
 /**
  * Contact Detail Page
  * Full page view for a single CRM contact with comprehensive information
+ * Supports creating new contacts when id is "new"
  */
 export const ContactDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [contact, setContact] = useState<Contact | null>(null);
+  const [editing, setEditing] = useState(isNew); // Start in editing mode for new contacts
+  const [contact, setContact] = useState<Contact | null>(isNew ? {
+    id: '',
+    name: '',
+    email: '',
+    phone: '',
+    mobile: '',
+    company: '',
+    position: '',
+    department: '',
+    website: '',
+    address: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: '',
+    notes: '',
+    linkedin: '',
+    twitter: '',
+    facebook: '',
+    lead_source: '',
+    lead_status: '',
+    industry: '',
+    annual_revenue: '',
+    employee_count: '',
+    tags: [],
+    created_at: new Date().toISOString(),
+  } : null);
   const [linkedUser, setLinkedUser] = useState<any>(null);
   const [linking, setLinking] = useState(false);
   const [showAddCompanyDialog, setShowAddCompanyDialog] = useState(false);
@@ -92,10 +120,10 @@ export const ContactDetailPage: React.FC = () => {
   const [attachingCompany, setAttachingCompany] = useState(false);
 
   useEffect(() => {
-    if (id) {
+    if (id && !isNew) {
       loadContact();
     }
-  }, [id]);
+  }, [id, isNew]);
 
   // Load linked user when contact loads
   useEffect(() => {
@@ -125,21 +153,45 @@ export const ContactDetailPage: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!contact || !id) return;
+    if (!contact) return;
+
+    // Validate required fields
+    if (!contact.name || contact.name.trim() === '') {
+      toast({
+        title: 'Validation Error',
+        description: 'Contact name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-      await contactsAPI.updateContact(id, contact);
-      toast({
-        title: 'Success',
-        description: 'Contact updated successfully',
-      });
-      setEditing(false);
-      await loadContact();
+
+      if (isNew) {
+        // Create new contact
+        const response = await contactsAPI.createContact(contact);
+        toast({
+          title: 'Success',
+          description: 'Contact created successfully',
+        });
+        // Navigate to the new contact's page
+        navigate(`/admin/crm/contacts/${response.data.id}`, { replace: true });
+      } else {
+        // Update existing contact
+        await contactsAPI.updateContact(id!, contact);
+        toast({
+          title: 'Success',
+          description: 'Contact updated successfully',
+        });
+        setEditing(false);
+        await loadContact();
+      }
     } catch (error) {
       console.error('Error saving contact:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save contact',
+        description: isNew ? 'Failed to create contact' : 'Failed to save contact',
         variant: 'destructive',
       });
     } finally {
@@ -294,7 +346,7 @@ export const ContactDetailPage: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
-        title={contact.name}
+        title={isNew ? 'New Contact' : contact.name || 'Untitled Contact'}
         description={contact.company || 'Contact Details'}
         badge="CRM"
       />
@@ -309,12 +361,19 @@ export const ContactDetailPage: React.FC = () => {
           <div className="flex gap-2">
             {editing ? (
               <>
-                <Button variant="outline" onClick={() => setEditing(false)}>
+                <Button variant="outline" onClick={() => {
+                  if (isNew) {
+                    navigate('/admin/crm');
+                  } else {
+                    setEditing(false);
+                    loadContact(); // Reload to discard changes
+                  }
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={handleSave} disabled={saving}>
                   <Save className="h-4 w-4 mr-2" />
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saving ? 'Saving...' : (isNew ? 'Create Contact' : 'Save Changes')}
                 </Button>
               </>
             ) : (

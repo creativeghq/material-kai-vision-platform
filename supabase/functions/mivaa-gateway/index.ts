@@ -437,12 +437,51 @@ serve(async (req) => {
     if (payload && payload.session_id && finalPath.includes('{session_id}')) {
       finalPath = finalPath.replace('{session_id}', payload.session_id);
     }
+    // Knowledge Base path parameters
+    if (payload && payload.doc_id && finalPath.includes('{doc_id}')) {
+      finalPath = finalPath.replace('{doc_id}', payload.doc_id);
+    }
+    if (payload && payload.product_id && finalPath.includes('{product_id}')) {
+      finalPath = finalPath.replace('{product_id}', payload.product_id);
+    }
+    // Admin prompts path parameters
+    if (payload && payload.stage && finalPath.includes('{stage}')) {
+      finalPath = finalPath.replace('{stage}', payload.stage);
+    }
+    if (payload && payload.category && finalPath.includes('{category}')) {
+      finalPath = finalPath.replace('{category}', payload.category);
+    }
+    if (payload && payload.prompt_id && finalPath.includes('{prompt_id}')) {
+      finalPath = finalPath.replace('{prompt_id}', payload.prompt_id);
+    }
+    // Entity and image path parameters
+    if (payload && payload.entity_id && finalPath.includes('{entity_id}')) {
+      finalPath = finalPath.replace('{entity_id}', payload.entity_id);
+    }
+    if (payload && payload.image_id && finalPath.includes('{image_id}')) {
+      finalPath = finalPath.replace('{image_id}', payload.image_id);
+    }
+    if (payload && payload.factory_name && finalPath.includes('{factory_name}')) {
+      finalPath = finalPath.replace('{factory_name}', encodeURIComponent(payload.factory_name));
+    }
+    if (payload && payload.task_type && finalPath.includes('{task_type}')) {
+      finalPath = finalPath.replace('{task_type}', payload.task_type);
+    }
+    if (payload && payload.model_name && finalPath.includes('{model_name}')) {
+      finalPath = finalPath.replace('{model_name}', payload.model_name);
+    }
 
     // Handle query parameters for GET requests
+    // Exclude path parameters from query string
+    const pathParamKeys = [
+      'job_id', 'document_id', 'session_id', 'doc_id', 'product_id',
+      'stage', 'category', 'prompt_id', 'entity_id', 'image_id',
+      'factory_name', 'task_type', 'model_name'
+    ];
     if (endpoint.method === 'GET' && payload && Object.keys(payload).length > 0) {
       const queryParams = new URLSearchParams();
       Object.entries(payload).forEach(([key, value]) => {
-        if (key !== 'job_id' && key !== 'document_id' && value !== undefined && value !== null) {
+        if (!pathParamKeys.includes(key) && value !== undefined && value !== null) {
           queryParams.append(key, String(value));
         }
       });
@@ -450,10 +489,15 @@ serve(async (req) => {
         finalPath += `?${queryParams.toString()}`;
       }
     }
-    // Prepare request body for POST requests
+    // Prepare request body for POST, PUT, and PATCH requests (not DELETE or GET)
     let bodyPayload = null;
-    if (payload && endpoint.method === 'POST') {
-      bodyPayload = payload;
+    if (payload && ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+      // For requests with path parameters, exclude those from body
+      const bodyData = { ...payload };
+      pathParamKeys.forEach(key => delete bodyData[key]);
+      if (Object.keys(bodyData).length > 0) {
+        bodyPayload = bodyData;
+      }
     }
 
     // Make request to MIVAA service
@@ -490,6 +534,18 @@ serve(async (req) => {
     console.log(`📥 Response Content-Type: ${response.headers.get('content-type')}`);
     console.log(`📥 Response Length: ${responseText.length} bytes`);
 
+    // Handle 204 No Content responses (common for DELETE operations)
+    if (response.status === 204 || (response.ok && responseText.length === 0)) {
+      console.log(`📥 MIVAA Response: ${response.status} [No Content - Success]`);
+      return new Response(
+        JSON.stringify({ success: true, message: 'Operation completed successfully' }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        },
+      );
+    }
+
     if (isDocsEndpoint) {
       responseData = responseText;
       responseContentType = 'text/html';
@@ -519,8 +575,11 @@ serve(async (req) => {
       throw new Error(`MIVAA API error: ${response.status} ${response.statusText}`);
     }
 
+    // Wrap response in success object if it doesn't already have success field
+    const finalResponse = responseData?.success !== undefined ? responseData : { success: true, data: responseData };
+
     return new Response(
-      isDocsEndpoint || isJsonEndpoint ? responseData : JSON.stringify(responseData),
+      isDocsEndpoint || isJsonEndpoint ? responseData : JSON.stringify(finalResponse),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': responseContentType },

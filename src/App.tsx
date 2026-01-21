@@ -51,6 +51,7 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CRMManagement } from './components/Admin/CRMManagement';
 import { ContactDetailPage } from './pages/ContactDetailPage';
 import { CompanyDetailPage } from './pages/CompanyDetailPage';
+import { UserDetailPage } from './pages/UserDetailPage';
 import { AsyncJobQueueMonitor } from './components/Admin/AsyncJobQueueMonitor';
 import MaterialsPage from './pages/Materials';
 // Removed: ChunkQualityDashboard - now consolidated in OperationsDashboard
@@ -69,6 +70,7 @@ import { UpsellsManagement } from './components/Admin/UpsellsManagement';
 import { TimelineStepsManagement } from './components/Admin/TimelineStepsManagement';
 import { EmailManagement } from './components/Admin/EmailManagement';
 import { EmailTemplateBuilder } from './pages/Admin/EmailTemplateBuilder';
+import { MessagingManagement } from './components/admin/MessagingManagement';
 
 // Coverage page component
 const CoveragePage = () => (
@@ -530,6 +532,18 @@ const App = () => (
                 }
               />
               <Route
+                path="/admin/crm/users/:id"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <UserDetailPage />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
                 path="/billing/subscriptions"
                 element={
                   <AuthGuard>
@@ -636,6 +650,18 @@ const App = () => (
                     <AdminGuard>
                       <Layout>
                         <EmailManagement />
+                      </Layout>
+                    </AdminGuard>
+                  </AuthGuard>
+                }
+              />
+              <Route
+                path="/admin/messaging"
+                element={
+                  <AuthGuard>
+                    <AdminGuard>
+                      <Layout>
+                        <MessagingManagement />
                       </Layout>
                     </AdminGuard>
                   </AuthGuard>

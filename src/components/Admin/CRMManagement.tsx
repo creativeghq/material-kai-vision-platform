@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Building2, Plus, Edit, Trash2, Search, Mail, Shield, CreditCard, Key, ExternalLink } from 'lucide-react';
+import { Users, Building2, Plus, Trash2, Search, Mail, CreditCard, Key, ExternalLink } from 'lucide-react';
 
 import {
   Card,
@@ -28,13 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/core/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -89,16 +82,12 @@ export const CRMManagement: React.FC = () => {
     inactive: 0,
   });
 
-  // User modal state
-  const [showUserModal, setShowUserModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserWithAuth | null>(null);
-  const [userEmail, setUserEmail] = useState('');
-  const [userPassword, setUserPassword] = useState('');
-  const [userDisplayName, setUserDisplayName] = useState('');
-  const [userRoleId, setUserRoleId] = useState('');
-  const [userSubscription, setUserSubscription] = useState('free');
-  const [userStatus, setUserStatus] = useState('active');
-  const [userCredits, setUserCredits] = useState(0);
+  // Add user modal state (simplified - only for creating new users)
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserDisplayName, setNewUserDisplayName] = useState('');
+  const [creatingUser, setCreatingUser] = useState(false);
 
 
 
@@ -191,34 +180,9 @@ export const CRMManagement: React.FC = () => {
     }
   };
 
-  // Handle add contact - create new contact and navigate to detail page
-  const handleAddContact = async () => {
-    try {
-      // Create a new contact with minimal data
-      const newContact = {
-        name: 'New Contact',
-        email: '',
-        phone: '',
-        company: '',
-        notes: '',
-      };
-
-      const response = await contactsAPI.createContact(newContact);
-      toast({
-        title: 'Success',
-        description: 'Contact created successfully',
-      });
-
-      // Navigate to the new contact's detail page
-      navigate(`/admin/crm/contacts/${response.data.id}`);
-    } catch (error) {
-      console.error('Error creating contact:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create contact',
-        variant: 'destructive',
-      });
-    }
+  // Handle add contact - navigate to new contact page
+  const handleAddContact = () => {
+    navigate('/admin/crm/contacts/new');
   };
 
   useEffect(() => {
@@ -249,51 +213,34 @@ export const CRMManagement: React.FC = () => {
   };
 
   const handleDeleteContact = async (contactId: string) => {
-    if (!confirm('Are you sure you want to delete this contact?')) return;
+    // Use window.confirm explicitly for better compatibility
+    const confirmed = window.confirm('Are you sure you want to delete this contact?');
+    if (!confirmed) return;
 
     try {
+      setLoading(true);
       await contactsAPI.deleteContact(contactId);
       toast({
         title: 'Success',
         description: 'Contact deleted successfully',
       });
-      loadContacts();
+      await loadContacts();
     } catch (error) {
+      console.error('Error deleting contact:', error);
       toast({
         title: 'Error',
         description:
           error instanceof Error ? error.message : 'Failed to delete contact',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Company handlers
-  const handleAddCompany = async () => {
-    try {
-      const newCompany = {
-        name: 'New Company',
-        email: '',
-        phone: '',
-        website: '',
-        notes: '',
-      };
-
-      const response = await companiesAPI.createCompany(newCompany);
-      toast({
-        title: 'Success',
-        description: 'Company created successfully',
-      });
-
-      navigate(`/admin/crm/companies/${response.data.id}`);
-    } catch (error) {
-      console.error('Error creating company:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create company',
-        variant: 'destructive',
-      });
-    }
+  // Company handlers - navigate to new company page
+  const handleAddCompany = () => {
+    navigate('/admin/crm/companies/new');
   };
 
   const handleDeleteCompany = async (companyId: string) => {
@@ -316,83 +263,57 @@ export const CRMManagement: React.FC = () => {
     }
   };
 
-  // Handle edit user
-  const handleEditUser = (user: UserWithAuth) => {
-    setEditingUser(user);
-    setUserEmail(user.email);
-    setUserDisplayName(user.email); // We don't have display_name in the current schema
-    setUserRoleId(user.role_id || '');
-    setUserSubscription(user.subscription_tier || 'free');
-    setUserStatus(user.status || 'active');
-    setUserCredits(user.credits || 0);
-    setUserPassword(''); // Don't pre-fill password
-    setShowUserModal(true);
-  };
-
-  // Handle add user
+  // Handle add user - open modal for creating new users
   const handleAddUser = () => {
-    setEditingUser(null);
-    setUserEmail('');
-    setUserPassword('');
-    setUserDisplayName('');
-    setUserRoleId(roles.find(r => r.name === 'user')?.id || '');
-    setUserSubscription('free');
-    setUserStatus('active');
-    setUserCredits(0);
-    setShowUserModal(true);
+    setNewUserEmail('');
+    setNewUserPassword('');
+    setNewUserDisplayName('');
+    setShowAddUserModal(true);
   };
 
-  // Handle save user
-  const handleSaveUser = async () => {
+  // Handle create new user
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserPassword) {
+      toast({
+        title: 'Validation Error',
+        description: 'Email and password are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
-      if (editingUser) {
-        // Update existing user
-        await usersAPI.updateUser(editingUser.user_id, {
-          role_id: userRoleId,
-          subscription_tier: userSubscription,
-          status: userStatus,
-        });
-
-        // Update credits if changed
-        if (userCredits !== editingUser.credits) {
-          await supabase
-            .from('user_credits')
-            .update({ balance: userCredits })
-            .eq('user_id', editingUser.user_id);
-        }
-
-        toast({
-          title: 'Success',
-          description: 'User updated successfully',
-        });
-      } else {
-        // Create new user
-        const { data, error } = await supabase.auth.signUp({
-          email: userEmail,
-          password: userPassword,
-          options: {
-            data: {
-              display_name: userDisplayName,
-            },
+      setCreatingUser(true);
+      const { error } = await supabase.auth.signUp({
+        email: newUserEmail,
+        password: newUserPassword,
+        options: {
+          data: {
+            display_name: newUserDisplayName,
           },
-        });
+        },
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        toast({
-          title: 'Success',
-          description: 'User created successfully. They will receive a confirmation email.',
-        });
-      }
+      toast({
+        title: 'Success',
+        description: 'User created successfully. They will receive a confirmation email.',
+      });
 
-      setShowUserModal(false);
+      setShowAddUserModal(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setNewUserDisplayName('');
       await loadUsers();
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to save user',
+        description: error.message || 'Failed to create user',
         variant: 'destructive',
       });
+    } finally {
+      setCreatingUser(false);
     }
   };
 
@@ -478,9 +399,8 @@ export const CRMManagement: React.FC = () => {
         </div>
 
       {/* Tabs */}
-      <Card className="p-6">
-        <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="users" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Users className="h-4 w-4 mr-2" />
               Users
@@ -553,10 +473,14 @@ export const CRMManagement: React.FC = () => {
                       filteredUsers.map((user) => (
                         <TableRow key={user.id}>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => navigate(`/admin/crm/users/${user.user_id}`)}
+                              className="text-primary hover:underline flex items-center gap-2"
+                            >
                               <Mail className="h-4 w-4 text-muted-foreground" />
                               {user.email}
-                            </div>
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
@@ -590,14 +514,6 @@ export const CRMManagement: React.FC = () => {
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditUser(user)}
-                                title="Edit user"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -875,131 +791,62 @@ export const CRMManagement: React.FC = () => {
           </Card>
         </TabsContent>
         </Tabs>
-      </Card>
 
-      {/* User Edit/Add Modal */}
-      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
+      {/* Add User Modal */}
+      <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>
-              {editingUser ? 'Edit User' : 'Add New User'}
-            </DialogTitle>
+            <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>
-              {editingUser
-                ? 'Update user information, role, subscription, and credits'
-                : 'Create a new user account. They will receive a confirmation email.'}
+              Create a new user account. They will receive a confirmation email.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {!editingUser && (
-              <>
-                <div>
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={userEmail}
-                    onChange={(e) => setUserEmail(e.target.value)}
-                    placeholder="user@example.com"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={userPassword}
-                    onChange={(e) => setUserPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="displayName">Display Name</Label>
-                  <Input
-                    id="displayName"
-                    value={userDisplayName}
-                    onChange={(e) => setUserDisplayName(e.target.value)}
-                    placeholder="John Doe"
-                    className="mt-1"
-                  />
-                </div>
-              </>
-            )}
-            {editingUser && (
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4" />
-                  <span className="font-medium">{editingUser.email}</span>
-                </div>
-              </div>
-            )}
             <div>
-              <Label htmlFor="role">Role *</Label>
-              <Select value={userRoleId} onValueChange={setUserRoleId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select role..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        {role.name} (Level {role.level})
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="new-email">Email *</Label>
+              <Input
+                id="new-email"
+                type="email"
+                value={newUserEmail}
+                onChange={(e) => setNewUserEmail(e.target.value)}
+                placeholder="user@example.com"
+                className="mt-1"
+              />
             </div>
             <div>
-              <Label htmlFor="subscription">Subscription Tier *</Label>
-              <Select value={userSubscription} onValueChange={setUserSubscription}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="free">Free</SelectItem>
-                  <SelectItem value="pro">Pro</SelectItem>
-                  <SelectItem value="enterprise">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="new-password">Password *</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newUserPassword}
+                onChange={(e) => setNewUserPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+                className="mt-1"
+              />
             </div>
             <div>
-              <Label htmlFor="status">Status *</Label>
-              <Select value={userStatus} onValueChange={setUserStatus}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="new-displayName">Display Name</Label>
+              <Input
+                id="new-displayName"
+                value={newUserDisplayName}
+                onChange={(e) => setNewUserDisplayName(e.target.value)}
+                placeholder="John Doe"
+                className="mt-1"
+              />
             </div>
-            {editingUser && (
-              <div>
-                <Label htmlFor="credits">Credits</Label>
-                <Input
-                  id="credits"
-                  type="number"
-                  value={userCredits}
-                  onChange={(e) => setUserCredits(parseInt(e.target.value) || 0)}
-                  className="mt-1"
-                />
-              </div>
-            )}
+            <p className="text-sm text-muted-foreground">
+              After creating the user, you can edit their role, subscription, and other details from their profile page.
+            </p>
             <div className="flex justify-end gap-2 pt-4">
               <Button
                 variant="outline"
-                onClick={() => setShowUserModal(false)}
+                onClick={() => setShowAddUserModal(false)}
+                disabled={creatingUser}
               >
                 Cancel
               </Button>
-              <Button onClick={handleSaveUser}>
-                {editingUser ? 'Save Changes' : 'Create User'}
+              <Button onClick={handleCreateUser} disabled={creatingUser}>
+                {creatingUser ? 'Creating...' : 'Create User'}
               </Button>
             </div>
           </div>

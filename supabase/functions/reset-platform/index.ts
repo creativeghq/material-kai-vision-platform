@@ -14,9 +14,10 @@ const TABLES_TO_CLEAR = [
   'agent_chat_conversations',      // Chat conversations
   'agent_uploaded_files',          // Files uploaded in chat
 
-  // CRM Contacts (DELETE)
-  'crm_contact_relationships',     // Contact relationships (child of contacts)
-  'crm_contacts',                  // CRM contacts
+  // CRM Contacts - PRESERVED (users requested to keep contacts and companies)
+  // 'crm_contact_relationships',     // Contact relationships (child of contacts) - PRESERVED
+  // 'crm_contacts',                  // CRM contacts - PRESERVED
+  // NOTE: crm_companies is also PRESERVED (not in this list)
 
   // Quotes System (DELETE - except global upsells and timeline steps)
   'quote_timeline',                // Quote timeline progress (child of quotes)

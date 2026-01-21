@@ -53,7 +53,7 @@ export const Sidebar: React.FC = () => {
       <div className={`mb-10 px-4 flex flex-col ${!isExpanded ? 'items-center' : ''}`}>
         <div className="flex items-center justify-between w-full">
           <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 transition-transform hover:scale-105 active:scale-95">
-            <span className="text-primary-foreground font-bold text-xl">K</span>
+            <span className="text-primary-foreground font-light text-xl">K</span>
           </div>
           {isExpanded && (
             <Button
@@ -68,8 +68,8 @@ export const Sidebar: React.FC = () => {
         </div>
         {isExpanded && (
           <div className="mt-4">
-            <h2 className="font-bold text-lg text-sidebar-foreground tracking-tight">KAI Platform</h2>
-            <p className="text-xs text-muted-foreground/80 uppercase tracking-widest font-medium">Intelligence</p>
+            <h2 className="font-light text-lg text-sidebar-foreground tracking-tight">KAI Platform</h2>
+            <p className="text-xs text-muted-foreground/80 uppercase tracking-widest font-light">Intelligence</p>
           </div>
         )}
       </div>
@@ -91,7 +91,7 @@ export const Sidebar: React.FC = () => {
                 >
                   <Link to={item.path} className="flex items-center justify-center">
                     <item.icon className={`${isExpanded ? 'w-5 h-5' : 'w-6 h-6'}`} />
-                    {isExpanded && <span className="ml-4 font-bold tracking-tight">{item.label}</span>}
+                    {isExpanded && <span className="ml-4 font-light tracking-tight">{item.label}</span>}
                   </Link>
                 </Button>
               </TooltipTrigger>
@@ -130,14 +130,14 @@ export const Sidebar: React.FC = () => {
                 </div>
                 {isExpanded && (
                   <div className="ml-4 text-left">
-                    <p className="text-sm font-bold text-foreground tracking-tight">Profile</p>
-                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-bold">Settings</p>
+                    <p className="text-sm font-light text-foreground tracking-tight">Profile</p>
+                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-light">Settings</p>
                   </div>
                 )}
               </Button>
             </TooltipTrigger>
             {!isExpanded && (
-              <TooltipContent side="right" className="rounded-xl font-bold">
+              <TooltipContent side="right" className="rounded-xl font-light">
                 <p>User Profile</p>
               </TooltipContent>
             )}

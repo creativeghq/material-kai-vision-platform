@@ -286,15 +286,39 @@ All colors MUST be HSL.
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-weight: var(--font-medium);  /* Medium weight for headings */
+    font-weight: var(--font-light);  /* Light weight for headings (300) */
   }
 
   strong, b {
-    font-weight: var(--font-semibold);  /* Semi-bold for emphasis */
+    font-weight: var(--font-medium);  /* Medium weight for emphasis (500) */
   }
 
   p, span, div {
     font-weight: var(--font-normal);  /* Regular weight for body text */
+  }
+
+  /* ===== GLOBAL LIGHTER FONT WEIGHT OVERRIDES ===== */
+  /* Make all bold/semibold/medium classes lighter across the entire app */
+  /* This ensures consistency without changing every component manually */
+
+  .font-black {
+    font-weight: var(--font-light) !important;  /* 300 instead of 900 */
+  }
+
+  .font-extrabold {
+    font-weight: var(--font-light) !important;  /* 300 instead of 800 */
+  }
+
+  .font-bold {
+    font-weight: var(--font-light) !important;  /* 300 instead of 700 */
+  }
+
+  .font-semibold {
+    font-weight: var(--font-normal) !important;  /* 400 instead of 600 */
+  }
+
+  .font-medium {
+    font-weight: var(--font-normal) !important;  /* 400 instead of 500 */
   }
 
   /* Hide number input spinners - we use custom +/- buttons instead */

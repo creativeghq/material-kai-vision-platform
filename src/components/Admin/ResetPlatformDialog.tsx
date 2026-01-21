@@ -96,7 +96,6 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>Agent Chat (conversations, messages, uploaded files)</li>
-              <li>CRM (contacts, relationships)</li>
               <li>Quotes System (quotes, items, timeline, upsells, status tags)</li>
               <li>Moodboards (moodboards, items, products, quote requests)</li>
               <li>3D Generation History</li>
@@ -120,6 +119,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>Users & Authentication</li>
               <li>Profiles & Workspaces</li>
+              <li>CRM (contacts, companies, relationships)</li>
               <li>API Keys & Usage Logs</li>
               <li>Global Upsells (admin-managed)</li>
               <li>Global Timeline Elements</li>

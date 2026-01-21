@@ -63,15 +63,38 @@ interface Company {
 /**
  * Company Detail Page
  * Full page view for a single CRM company with comprehensive information
+ * Supports creating new companies when id is "new"
  */
 export const CompanyDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isNew = id === 'new';
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [company, setCompany] = useState<Company | null>(null);
+  const [editing, setEditing] = useState(isNew); // Start in editing mode for new companies
+  const [company, setCompany] = useState<Company | null>(isNew ? {
+    id: '',
+    name: '',
+    email: '',
+    phone: '',
+    website: '',
+    industry: '',
+    employee_count: '',
+    annual_revenue: '',
+    address: '',
+    city: '',
+    state: '',
+    postal_code: '',
+    country: '',
+    description: '',
+    notes: '',
+    linkedin: '',
+    twitter: '',
+    facebook: '',
+    created_at: new Date().toISOString(),
+    contacts: [],
+  } : null);
   const [showAddContactDialog, setShowAddContactDialog] = useState(false);
   const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [contactRole, setContactRole] = useState<string>('');
@@ -80,10 +103,10 @@ export const CompanyDetailPage: React.FC = () => {
   const [attachingContact, setAttachingContact] = useState(false);
 
   useEffect(() => {
-    if (id) {
+    if (id && !isNew) {
       loadCompany();
     }
-  }, [id]);
+  }, [id, isNew]);
 
   const loadCompany = async () => {
     if (!id) return;
@@ -104,21 +127,45 @@ export const CompanyDetailPage: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!company || !id) return;
+    if (!company) return;
+
+    // Validate required fields
+    if (!company.name || company.name.trim() === '') {
+      toast({
+        title: 'Validation Error',
+        description: 'Company name is required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       setSaving(true);
-      await companiesAPI.updateCompany(id, company);
-      toast({
-        title: 'Success',
-        description: 'Company updated successfully',
-      });
-      setEditing(false);
-      await loadCompany();
+
+      if (isNew) {
+        // Create new company
+        const response = await companiesAPI.createCompany(company);
+        toast({
+          title: 'Success',
+          description: 'Company created successfully',
+        });
+        // Navigate to the new company's page
+        navigate(`/admin/crm/companies/${response.data.id}`, { replace: true });
+      } else {
+        // Update existing company
+        await companiesAPI.updateCompany(id!, company);
+        toast({
+          title: 'Success',
+          description: 'Company updated successfully',
+        });
+        setEditing(false);
+        await loadCompany();
+      }
     } catch (error) {
       console.error('Error saving company:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save company',
+        description: isNew ? 'Failed to create company' : 'Failed to save company',
         variant: 'destructive',
       });
     } finally {
@@ -212,8 +259,8 @@ export const CompanyDetailPage: React.FC = () => {
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader
-        title={company.name}
-        description={`Company Details • Created ${new Date(company.created_at).toLocaleDateString()}`}
+        title={isNew ? 'New Company' : company.name || 'Untitled Company'}
+        description={isNew ? 'Create a new company' : `Company Details • Created ${new Date(company.created_at).toLocaleDateString()}`}
         badge="CRM"
       />
 
@@ -228,14 +275,18 @@ export const CompanyDetailPage: React.FC = () => {
             {editing ? (
               <>
                 <Button variant="outline" onClick={() => {
-                  setEditing(false);
-                  loadCompany();
+                  if (isNew) {
+                    navigate('/admin/crm');
+                  } else {
+                    setEditing(false);
+                    loadCompany();
+                  }
                 }}>
                   Cancel
                 </Button>
                 <Button onClick={handleSave} disabled={saving}>
                   <Save className="h-4 w-4 mr-2" />
-                  {saving ? 'Saving...' : 'Save Changes'}
+                  {saving ? 'Saving...' : (isNew ? 'Create Company' : 'Save Changes')}
                 </Button>
               </>
             ) : (

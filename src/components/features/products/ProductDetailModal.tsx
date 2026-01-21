@@ -107,13 +107,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         setIsLoadingImages(true);
         console.log('[ProductDetailModal] Loading images for product:', product.id, product.name);
 
-        // Fetch images from product_image_relationships table
+        // Fetch images from image_product_associations table (created during PDF processing)
         const { data: imageRelations, error } = await supabase
-          .from('product_image_relationships')
+          .from('image_product_associations')
           .select(`
             image_id,
-            relevance_score,
-            relationship_type,
+            overall_score,
+            reasoning,
             created_at,
             document_images (
               id,
@@ -124,7 +124,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             )
           `)
           .eq('product_id', product.id)
-          .order('relevance_score', { ascending: false });
+          .order('overall_score', { ascending: false });
 
         if (error) {
           console.error('[ProductDetailModal] Error loading images:', error);
@@ -142,8 +142,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               page_number: rel.document_images.page_number,
               caption: rel.document_images.caption,
               metadata: rel.document_images.metadata,
-              relationship_score: rel.relevance_score,
-              relationship_type: rel.relationship_type,
+              relationship_score: rel.overall_score,
+              relationship_type: rel.reasoning || 'associated',
             }));
 
           console.log('[ProductDetailModal] Loaded images:', loadedImages.length);
@@ -182,14 +182,56 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           application_embedding_512: false,
         });
 
-        // chunk_product_relationships table doesn't exist - skip chunk loading
-        // Chunks are linked differently in the current schema
-        setChunks([]);
+        // Load chunks from chunk_product_relationships table
+        const { data: chunkRelations, error: chunkError } = await supabase
+          .from('chunk_product_relationships')
+          .select(`
+            chunk_id,
+            relevance_score,
+            created_at,
+            document_chunks (
+              id,
+              content,
+              page_number,
+              chunk_index
+            )
+          `)
+          .eq('product_id', product.id)
+          .order('relevance_score', { ascending: false });
 
-        // Skip relationship counts - tables don't exist
+        if (chunkError) {
+          console.error('[ProductDetailModal] Error loading chunks:', chunkError);
+          setChunks([]);
+        } else if (chunkRelations && chunkRelations.length > 0) {
+          const loadedChunks = chunkRelations
+            .filter(rel => rel.document_chunks)
+            .map(rel => ({
+              id: rel.document_chunks.id,
+              content: rel.document_chunks.content,
+              page_number: rel.document_chunks.page_number,
+              chunk_index: rel.document_chunks.chunk_index,
+              relevance_score: rel.relevance_score,
+            }));
+          console.log('[ProductDetailModal] Loaded chunks:', loadedChunks.length);
+          setChunks(loadedChunks);
+        } else {
+          setChunks([]);
+        }
+
+        // Get relationship counts
+        const { count: chunkCount } = await supabase
+          .from('chunk_product_relationships')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
+        const { count: imageCount } = await supabase
+          .from('image_product_associations')
+          .select('*', { count: 'exact', head: true })
+          .eq('product_id', product.id);
+
         setRelevanceCounts({
-          chunks: 0,
-          images: 0,
+          chunks: chunkCount || 0,
+          images: imageCount || 0,
         });
       } catch (error) {
         console.error('[ProductDetailModal] Failed to load admin data:', error);
@@ -392,6 +434,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Boxes per Pallet': extractValue(packagingData?.boxes_per_pallet),
     'Weight per Box': extractValue(packagingData?.weight_per_box),
     'Coverage per Box': extractValue(packagingData?.coverage_per_box),
+  };
+
+  // Extract compliance data
+  const complianceData = allData?.compliance || {};
+
+  const careAndMaintenance = {
+    'Care Instructions': extractValue(applicationData?.care_instructions) || extractValue(allData?.care_instructions),
+    'Maintenance': extractValue(applicationData?.maintenance) || extractValue(allData?.maintenance),
+    'Cleaning': extractValue(allData?.cleaning),
+  };
+
+  const certifications = {
+    'Certifications': extractValue(allData?.certifications) || extractValue(complianceData?.certifications),
+    'Standards': extractValue(allData?.standards) || extractValue(complianceData?.standards),
+    'Eco Friendly': extractValue(allData?.eco_friendly) || extractValue(complianceData?.eco_friendly),
+    'Sustainability Rating': extractValue(allData?.sustainability_rating) || extractValue(complianceData?.sustainability_rating),
+    'Fire Rating': extractValue(complianceData?.fire_rating) || extractValue(allData?.fire_rating),
   };
 
   // Helper function to safely render any value (handles objects, arrays, primitives)
@@ -709,6 +768,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {renderMetadataCategory('Appearance', appearance)}
           {renderMetadataCategory('Performance', performance)}
           {renderMetadataCategory('Application', application)}
+          {renderMetadataCategory('Care & Maintenance', careAndMaintenance)}
+          {renderMetadataCategory('Certifications & Compliance', certifications)}
           {renderMetadataCategory('Design', design)}
           {renderMetadataCategory('Manufacturing', manufacturing)}
           {renderMetadataCategory('Commercial Information', commercial)}

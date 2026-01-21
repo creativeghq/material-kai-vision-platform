@@ -1,15 +1,16 @@
 /**
  * Notification Service
- * Unified notification system supporting email, push, webhook, and SMS
+ * Unified notification system supporting email, push, webhook, SMS, WhatsApp, and Viber
  */
 
 import { supabase } from '@/integrations/supabase/client';
 import { emailService } from '@/services/email/emailService';
+import { messagingService } from '@/services/messaging';
 
 // =====================================================
 // TYPES
 // =====================================================
-export type NotificationChannel = 'email' | 'push' | 'webhook' | 'sms';
+export type NotificationChannel = 'email' | 'push' | 'webhook' | 'sms' | 'whatsapp' | 'viber';
 export type NotificationStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'cancelled';
 
 export interface NotificationPayload {
@@ -174,7 +175,14 @@ export class NotificationService {
           result = await this.sendWebhook(payload);
           break;
         case 'sms':
-          throw new Error('SMS notifications not yet implemented');
+          result = await this.sendSms(payload);
+          break;
+        case 'whatsapp':
+          result = await this.sendWhatsApp(payload);
+          break;
+        case 'viber':
+          result = await this.sendViber(payload);
+          break;
         default:
           throw new Error(`Unknown channel: ${channel}`);
       }
@@ -303,6 +311,140 @@ export class NotificationService {
 
     if (dispatchError) throw dispatchError;
     return data;
+  }
+
+  /**
+   * Send SMS notification via Infobip
+   */
+  private async sendSms(payload: NotificationPayload): Promise<any> {
+    // Get user's phone number from preferences or profile
+    const phoneNumber = await this.getUserPhoneNumber(payload.userId);
+    if (!phoneNumber) {
+      throw new Error('User phone number not found');
+    }
+
+    // Check if user has opted out
+    const hasOptedOut = await messagingService.checkOptOut(phoneNumber, 'sms');
+    if (hasOptedOut) {
+      throw new Error('User has opted out of SMS notifications');
+    }
+
+    // Send SMS using messaging service
+    const result = await messagingService.sendMessage({
+      channel: 'sms',
+      to: phoneNumber,
+      content: `${payload.title}\n\n${payload.message}`,
+      messageType: 'notification',
+      tags: {
+        notification_type: payload.notificationType,
+        user_id: payload.userId,
+      },
+    });
+
+    return {
+      message_id: result.messageId,
+      log_id: result.logId,
+    };
+  }
+
+  /**
+   * Send WhatsApp notification via Infobip
+   */
+  private async sendWhatsApp(payload: NotificationPayload): Promise<any> {
+    // Get user's phone number
+    const phoneNumber = await this.getUserPhoneNumber(payload.userId);
+    if (!phoneNumber) {
+      throw new Error('User phone number not found');
+    }
+
+    // Check if user has opted out
+    const hasOptedOut = await messagingService.checkOptOut(phoneNumber, 'whatsapp');
+    if (hasOptedOut) {
+      throw new Error('User has opted out of WhatsApp notifications');
+    }
+
+    // Send WhatsApp using messaging service
+    const result = await messagingService.sendMessage({
+      channel: 'whatsapp',
+      to: phoneNumber,
+      content: `*${payload.title}*\n\n${payload.message}`,
+      messageType: 'notification',
+      tags: {
+        notification_type: payload.notificationType,
+        user_id: payload.userId,
+      },
+    });
+
+    return {
+      message_id: result.messageId,
+      log_id: result.logId,
+    };
+  }
+
+  /**
+   * Send Viber notification via Infobip
+   */
+  private async sendViber(payload: NotificationPayload): Promise<any> {
+    // Get user's phone number
+    const phoneNumber = await this.getUserPhoneNumber(payload.userId);
+    if (!phoneNumber) {
+      throw new Error('User phone number not found');
+    }
+
+    // Check if user has opted out
+    const hasOptedOut = await messagingService.checkOptOut(phoneNumber, 'viber');
+    if (hasOptedOut) {
+      throw new Error('User has opted out of Viber notifications');
+    }
+
+    // Send Viber using messaging service
+    const result = await messagingService.sendMessage({
+      channel: 'viber',
+      to: phoneNumber,
+      content: `${payload.title}\n\n${payload.message}`,
+      messageType: 'notification',
+      tags: {
+        notification_type: payload.notificationType,
+        user_id: payload.userId,
+      },
+    });
+
+    return {
+      message_id: result.messageId,
+      log_id: result.logId,
+    };
+  }
+
+  /**
+   * Get user's phone number from profile or preferences
+   */
+  private async getUserPhoneNumber(userId: string): Promise<string | null> {
+    // Try to get from user metadata
+    const { data: userData } = await supabase
+      .from('profiles')
+      .select('phone_number')
+      .eq('id', userId)
+      .single();
+
+    if (userData?.phone_number) {
+      return userData.phone_number;
+    }
+
+    // Try to get from notification preferences config
+    const { data: prefData } = await supabase
+      .from('user_notification_preferences')
+      .select('config')
+      .eq('user_id', userId)
+      .in('channel_type', ['sms', 'whatsapp', 'viber'])
+      .not('config->phone_number', 'is', null)
+      .limit(1)
+      .single();
+
+    if (prefData?.config?.phone_number) {
+      return prefData.config.phone_number;
+    }
+
+    return null;
   }
 
   /**

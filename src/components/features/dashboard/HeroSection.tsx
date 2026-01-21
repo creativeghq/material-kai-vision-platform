@@ -17,13 +17,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
       
       <div className="relative z-10 p-8 text-center max-w-2xl mx-auto flex flex-col gap-6">
         <div className="flex justify-center animate-float">
-          <div className="hero-badge flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium border border-primary/20">
+          <div className="hero-badge flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-light border border-primary/20">
             <heroConfig.badge.icon className="h-4 w-4" />
             {heroConfig.badge.text}
           </div>
         </div>
 
-        <h1 className="text-5xl font-black tracking-tight leading-tight">
+        <h1 className="text-5xl font-light tracking-tight leading-tight">
           {heroConfig.title}
           <br />
           <span className="text-primary">{heroConfig.subtitle}</span>
@@ -38,9 +38,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onNavigate }) => {
             <Button
               key={index}
               variant={action.type === 'primary' ? 'default' : 'outline'}
-              className={`h-12 px-8 text-lg font-semibold transition-all duration-300 hover:scale-105 ${
-                action.type === 'primary' 
-                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border-none' 
+              className={`h-12 px-8 text-lg font-light transition-all duration-300 hover:scale-105 ${
+                action.type === 'primary'
+                  ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 border-none'
                   : 'bg-background/50 backdrop-blur-sm border-white/30'
               }`}
               onClick={() => onNavigate(action.path)}

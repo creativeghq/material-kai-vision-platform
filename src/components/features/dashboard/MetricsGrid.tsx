@@ -151,7 +151,7 @@ export const MetricsGrid: React.FC = () => {
                   </div>
                   {/* Change badge with proper contrast */}
                   <div
-                    className="font-medium"
+                    className="font-light"
                     style={{
                       fontSize: 'var(--text-xs)',
                       padding: 'var(--space-xs) calc(var(--space-xs) * 2)',
@@ -167,7 +167,7 @@ export const MetricsGrid: React.FC = () => {
                 <div
                   style={{
                     fontSize: 'var(--text-4xl)',
-                    fontWeight: 'var(--font-semibold)',
+                    fontWeight: 'var(--font-light)',
                     marginBottom: 'var(--space-xs)',
                     color: 'hsl(var(--foreground))',
                   }}

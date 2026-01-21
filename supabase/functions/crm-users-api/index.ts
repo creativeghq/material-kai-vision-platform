@@ -133,7 +133,8 @@ Deno.serve(async (req) => {
     if (method === 'GET' && path.length === 1) {
       const userId = path[0];
 
-      const { data, error } = await supabase
+      // Fetch user profile
+      const { data: profileData, error: profileError } = await supabase
         .from('user_profiles')
         .select(`
           id,
@@ -143,20 +144,37 @@ Deno.serve(async (req) => {
           status,
           created_at,
           updated_at,
-          roles(name, level, description)
+          roles(id, name, level, description)
         `)
         .eq('user_id', userId)
         .single();
 
-      if (error) {
+      if (profileError) {
         return new Response(
           JSON.stringify({ error: 'User not found' }),
           { status: 404, headers: corsHeaders },
         );
       }
 
+      // Fetch auth user to get email
+      const { data: authData, error: authError } = await supabase.auth.admin.getUserById(userId);
+
+      // Fetch user credits
+      const { data: creditsData } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', userId)
+        .single();
+
+      // Merge data
+      const mergedData = {
+        ...profileData,
+        email: authData?.user?.email || '',
+        credits: creditsData?.balance || 0,
+      };
+
       return new Response(
-        JSON.stringify({ data }),
+        JSON.stringify({ data: mergedData }),
         { status: 200, headers: corsHeaders },
       );
     }

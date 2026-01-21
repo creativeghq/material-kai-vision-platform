@@ -36,6 +36,7 @@ import {
   Terminal,
   Download,
   Copy,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Dialog,
@@ -61,7 +62,7 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 interface ProductProgress {
   id: string;
   job_id: string;
-  product_id: string;
+  product_id: string | null;
   product_name: string;
   product_index: number;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
@@ -75,6 +76,18 @@ interface ProductProgress {
     images_material?: number;
     images_non_material?: number;
     relationships_created?: number;
+    pages_extracted?: number;
+    product_db_id?: string;
+    processing_time_ms?: number;
+    text_embeddings_generated?: number;
+    clip_embeddings_generated?: number;
+    layout_regions_detected?: number;
+  };
+  metadata?: {
+    product_db_id?: string;
+    page_range?: number[];
+    confidence?: number;
+    [key: string]: any;
   };
   started_at: string | null;
   completed_at: string | null;
@@ -253,20 +266,78 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     try {
       setLoadingProducts(true);
 
-      // Query product_progress table directly
+      // Query product_processing_status table (the correct table name)
       const { data, error } = await supabase
-        .from('product_progress')
+        .from('product_processing_status')
         .select('*')
         .eq('job_id', jobId)
         .order('product_index', { ascending: true });
 
       if (error) {
         console.error('Error fetching product progress:', error);
+      }
+
+      // If we have products in the processing status table, use them
+      if (data && data.length > 0) {
+        // Map the data to match the ProductProgress interface
+        const mappedData = data.map(item => ({
+          id: item.id,
+          job_id: item.job_id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          product_index: item.product_index,
+          status: item.status as 'pending' | 'processing' | 'completed' | 'failed' | 'skipped',
+          current_stage: item.current_stage,
+          stages_completed: item.stages_completed || [],
+          error_message: item.error_message,
+          error_stage: item.error_stage,
+          metrics: item.metrics || {},
+          started_at: item.started_at,
+          completed_at: item.completed_at,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+        }));
+
+        setProductProgress(mappedData);
+        return;
+      }
+
+      // Fallback: If no products in processing status table, check job_checkpoints
+      // This is useful during Stage 0 discovery when products are discovered but not yet in processing
+      const { data: checkpointData, error: checkpointError } = await supabase
+        .from('job_checkpoints')
+        .select('checkpoint_data, metadata')
+        .eq('job_id', jobId)
+        .eq('stage', 'products_detected')
+        .single();
+
+      if (checkpointError || !checkpointData) {
+        // No checkpoint found either, set empty array
         setProductProgress([]);
         return;
       }
 
-      setProductProgress(data || []);
+      // Extract product names from checkpoint data
+      const productNames = checkpointData.checkpoint_data?.product_names || [];
+      const discoveredProducts = productNames.map((name: string, index: number) => ({
+        id: `discovered-${jobId}-${index}`,
+        job_id: jobId,
+        product_id: null,
+        product_name: name,
+        product_index: index,
+        status: 'pending' as const,
+        current_stage: 'discovery',
+        stages_completed: ['discovery'],
+        error_message: null,
+        error_stage: null,
+        metrics: {},
+        started_at: null,
+        completed_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      setProductProgress(discoveredProducts);
     } catch (error) {
       console.error('Error fetching product progress:', error);
       setProductProgress([]);
@@ -483,6 +554,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         // Calculate totals from metadata
         const totalProducts = allJobs.reduce((sum, job) => {
           return sum + (
+            job.metadata?.result?.products_discovered ||
             job.metadata?.products_discovered ||
             job.metadata?.products_created ||
             job.metadata?.processed_products || // XML jobs
@@ -639,8 +711,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         if (jobError || !jobData) return;
 
         const typedJobData = jobData as BackgroundJob;
-        const productsDiscoveredCount = typedJobData.metadata?.products_discovered || 0;
-        const previousProductsCount = selectedJob.metadata?.products_discovered || 0;
+        const productsDiscoveredCount = typedJobData.metadata?.result?.products_discovered || typedJobData.metadata?.products_discovered || 0;
+        const previousProductsCount = selectedJob.metadata?.result?.products_discovered || selectedJob.metadata?.products_discovered || 0;
 
         // Update selected job ONLY if data actually changed
         setSelectedJob(prev => {
@@ -919,24 +991,26 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   const handleClearQueue = async () => {
-    // Include interrupted jobs in the clear queue operation
+    // Include ALL jobs that can be cleared: pending, failed, interrupted, AND processing
     const jobsToClear = jobs.filter(
-      (job) => job.status === 'pending' || job.status === 'failed' || job.status === 'interrupted',
+      (job) => job.status === 'pending' || job.status === 'failed' || job.status === 'interrupted' || job.status === 'processing' || job.status === 'retrying',
     );
 
     if (jobsToClear.length === 0) {
-      toast.info('No pending, failed, or interrupted jobs to clear');
+      toast.info('No jobs to clear');
       return;
     }
 
     // Count jobs by status for confirmation message
     const statusCounts = {
       pending: jobsToClear.filter(j => j.status === 'pending').length,
+      processing: jobsToClear.filter(j => j.status === 'processing' || j.status === 'retrying').length,
       failed: jobsToClear.filter(j => j.status === 'failed').length,
       interrupted: jobsToClear.filter(j => j.status === 'interrupted').length,
     };
 
     const statusMessage = [
+      statusCounts.processing > 0 && `${statusCounts.processing} processing (will be interrupted)`,
       statusCounts.pending > 0 && `${statusCounts.pending} pending`,
       statusCounts.failed > 0 && `${statusCounts.failed} failed`,
       statusCounts.interrupted > 0 && `${statusCounts.interrupted} interrupted`,
@@ -944,7 +1018,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     if (
       !confirm(
-        `Are you sure you want to clear ${jobsToClear.length} jobs (${statusMessage})? This action cannot be undone.`,
+        `Are you sure you want to clear ALL ${jobsToClear.length} jobs (${statusMessage})?\n\nThis will:\n• Interrupt all processing jobs\n• Delete all job data (chunks, embeddings, images, products)\n\nThis action cannot be undone.`,
       )
     ) {
       return;
@@ -953,8 +1027,39 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     setClearingQueue(true);
     let successCount = 0;
     let failCount = 0;
+    let interruptedCount = 0;
 
     try {
+      // First, interrupt any processing jobs by marking them as interrupted in the database
+      const processingJobs = jobsToClear.filter(j => j.status === 'processing' || j.status === 'retrying');
+      if (processingJobs.length > 0) {
+        toast.info(`Interrupting ${processingJobs.length} processing job(s)...`);
+
+        for (const job of processingJobs) {
+          try {
+            // Mark as interrupted in the database so the worker stops
+            const { error } = await supabase
+              .from('background_jobs')
+              .update({
+                status: 'interrupted',
+                interrupted_at: new Date().toISOString(),
+                error: 'Job interrupted by user via Clear Queue'
+              })
+              .eq('id', job.id);
+
+            if (!error) {
+              interruptedCount++;
+            }
+          } catch (error) {
+            console.error(`Failed to interrupt job ${job.id}:`, error);
+          }
+        }
+
+        // Wait a moment for workers to acknowledge the interruption
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // Now delete all jobs (including the newly interrupted ones)
       for (const job of jobsToClear) {
         try {
           const response = await fetch(
@@ -973,8 +1078,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             failCount++;
           }
         } catch (error) {
-          console.error(`Failed to cancel job ${job.id}:`, error);
-          logger.error(`Failed to cancel job ${job.id}`, error);
+          console.error(`Failed to delete job ${job.id}:`, error);
+          logger.error(`Failed to delete job ${job.id}`, error);
           failCount++;
         }
       }
@@ -982,9 +1087,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // Refresh the job list
       await fetchQueueData();
 
-      alert(
-        `Queue cleared: ${successCount} jobs cancelled successfully${failCount > 0 ? `, ${failCount} failed` : ''}`,
-      );
+      const resultMessage = [
+        interruptedCount > 0 && `${interruptedCount} interrupted`,
+        successCount > 0 && `${successCount} deleted`,
+        failCount > 0 && `${failCount} failed`,
+      ].filter(Boolean).join(', ');
+
+      toast.success(`Queue cleared: ${resultMessage}`);
     } catch (error) {
       console.error('Error clearing queue:', error);
       toast.error(`Failed to clear queue: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1043,21 +1152,38 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   const handleDeleteJob = async (jobId: string) => {
-    if (!confirm('Are you sure you want to permanently delete this job? This action cannot be undone.')) {
+    console.log('[AsyncJobQueueMonitor] handleDeleteJob called with jobId:', jobId);
+
+    if (!confirm('Are you sure you want to permanently delete this job and ALL its associated data (chunks, embeddings, images, products)? This action cannot be undone.')) {
+      console.log('[AsyncJobQueueMonitor] User cancelled delete confirmation');
       return;
     }
 
+    console.log('[AsyncJobQueueMonitor] User confirmed delete, starting deletion...');
     setDeletingJob(jobId);
-    try {
-      // Delete from Supabase directly (removes job and all related data)
-      const { error } = await supabase
-        .from('background_jobs')
-        .delete()
-        .eq('id', jobId);
 
-      if (error) {
-        throw error;
+    try {
+      // Use the API endpoint which properly deletes all related data
+      const apiUrl = `/api/rag/documents/jobs/${jobId}`;
+      console.log('[AsyncJobQueueMonitor] Calling DELETE:', apiUrl);
+
+      const response = await fetch(apiUrl, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('[AsyncJobQueueMonitor] Response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('[AsyncJobQueueMonitor] Delete failed:', errorData);
+        throw new Error(errorData.detail || `Failed to delete job: ${response.statusText}`);
       }
+
+      const result = await response.json();
+      console.log('[AsyncJobQueueMonitor] Delete result:', result);
 
       // Refresh the job list
       await fetchQueueData();
@@ -1067,7 +1193,17 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         setSelectedJob(null);
       }
 
-      toast.success('Job deleted successfully');
+      // Show success message with stats
+      const stats = result.stats || {};
+      const statsMessage = [
+        stats.chunks_deleted > 0 && `${stats.chunks_deleted} chunks`,
+        stats.embeddings_deleted > 0 && `${stats.embeddings_deleted} embeddings`,
+        stats.images_deleted > 0 && `${stats.images_deleted} images`,
+        stats.products_deleted > 0 && `${stats.products_deleted} products`,
+        stats.storage_files_deleted > 0 && `${stats.storage_files_deleted} storage files`,
+      ].filter(Boolean).join(', ');
+
+      toast.success(`Job deleted successfully!${statsMessage ? ` Deleted: ${statsMessage}` : ''}`);
     } catch (error) {
       console.error('Error deleting job:', error);
       toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1692,10 +1828,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(job.status, job)}
-                          <Trash2
-                            className="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer transition"
-                            onClick={() => handleDeleteJob(job.id)}
-                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleDeleteJob(job.id);
+                            }}
+                            disabled={deletingJob === job.id}
+                            className="p-1 rounded hover:bg-red-100 disabled:opacity-50"
+                            title="Delete job"
+                          >
+                            <Trash2 className={`w-4 h-4 text-red-600 hover:text-red-800 transition ${deletingJob === job.id ? 'animate-spin' : ''}`} />
+                          </button>
                         </div>
                       </div>
                     ))
@@ -1885,10 +2030,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(job.status, job)}
-                          <Trash2
-                            className="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer transition"
-                            onClick={() => handleDeleteJob(job.id)}
-                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleDeleteJob(job.id);
+                            }}
+                            disabled={deletingJob === job.id}
+                            className="p-1 rounded hover:bg-red-100 disabled:opacity-50"
+                            title="Delete job"
+                          >
+                            <Trash2 className={`w-4 h-4 text-red-600 hover:text-red-800 transition ${deletingJob === job.id ? 'animate-spin' : ''}`} />
+                          </button>
                         </div>
                       </div>
                     ))
@@ -2078,10 +2232,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(job.status, job)}
-                          <Trash2
-                            className="w-4 h-4 text-red-600 hover:text-red-800 cursor-pointer transition"
-                            onClick={() => handleDeleteJob(job.id)}
-                          />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleDeleteJob(job.id);
+                            }}
+                            disabled={deletingJob === job.id}
+                            className="p-1 rounded hover:bg-red-100 disabled:opacity-50"
+                            title="Delete job"
+                          >
+                            <Trash2 className={`w-4 h-4 text-red-600 hover:text-red-800 transition ${deletingJob === job.id ? 'animate-spin' : ''}`} />
+                          </button>
                         </div>
                       </div>
                     ))
@@ -2188,6 +2351,10 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-tight">Queue Wait:</span>
                       <span className="text-[11px] font-bold text-slate-700">
                         {(() => {
+                          // For completed jobs without started_at, show minimal wait time
+                          if (selectedJob.status === 'completed' && !selectedJob.started_at) {
+                            return '< 1s';
+                          }
                           if (!selectedJob.started_at) return 'Waiting...';
                           const waitMs = new Date(selectedJob.started_at).getTime() - new Date(selectedJob.created_at).getTime();
                           return formatTime(Math.max(0, waitMs / 1000));
@@ -2198,7 +2365,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <Activity className="h-3 w-3 text-primary" />
                       <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-tight">Total Processing:</span>
                       <span className="text-[11px] font-bold text-slate-700">
-                        {selectedJob.status === 'processing' ? <LiveTimer job={selectedJob} /> : getElapsedTime(selectedJob)}
+                        {(() => {
+                          if (selectedJob.status === 'processing') {
+                            return <LiveTimer job={selectedJob} />;
+                          }
+                          // For completed jobs without started_at, calculate from created_at to completed_at
+                          if (selectedJob.status === 'completed' && !selectedJob.started_at && selectedJob.completed_at) {
+                            const start = new Date(selectedJob.created_at).getTime();
+                            const end = new Date(selectedJob.completed_at).getTime();
+                            return formatTime(Math.floor((end - start) / 1000));
+                          }
+                          return getElapsedTime(selectedJob);
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -2213,7 +2391,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 const visionModel = selectedJob?.metadata?.vision_model || 'Siglip2 Vision Model';
                 const chunksCreated = selectedJob?.metadata?.chunks_created || 0;
                 const embeddingsGenerated = selectedJob?.metadata?.embeddings_generated || 0;
-                const productsDiscovered = selectedJob?.metadata?.products_discovered || 0;
+                const productsDiscovered = selectedJob?.metadata?.result?.products_discovered || selectedJob?.metadata?.products_discovered || 0;
 
                 // Determine what to show based on current stage
                 let statusText = 'Complete pipeline workflow with all stages, metrics, and AI models used';
@@ -2305,71 +2483,175 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
               {/* Product Extraction Tab - Enhanced with complete pipeline */}
               <TabsContent value="products" className="space-y-6 mt-6">
-                {/* Step 0: Product Discovery Header */}
-                <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Zap className="h-5 w-5 text-primary" />
-                      Step 0: Product Discovery
-                    </CardTitle>
-                    <CardDescription>
-                      AI-powered product detection and catalog analysis
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {/* Discovery Status */}
-                      <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                        <div className="flex items-center gap-3">
-                          {selectedJob?.metadata?.products_discovered ? (
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                          ) : (
-                            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                          )}
-                          <div>
-                            <div className="font-semibold text-sm">
-                              {selectedJob?.metadata?.products_discovered
-                                ? `${selectedJob.metadata.products_discovered} Products Detected`
-                                : 'Analyzing document...'}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              Using Claude 4.5 Sonnet for intelligent product identification
-                            </div>
-                          </div>
-                        </div>
-                        {selectedJob?.metadata?.products_discovered && (
-                          <Badge className="bg-green-50 text-green-700 border-green-200">
-                            Complete
-                          </Badge>
-                        )}
-                      </div>
+                {/* Pipeline Progress Overview */}
+                {(() => {
+                  // Define pipeline stages with checkpoint mapping
+                  const pipelineStages = [
+                    { id: 'warmup', name: 'AI Warmup', checkpoint: 'warmup_complete', icon: '🔥' },
+                    { id: 'initialized', name: 'Initialized', checkpoint: 'initialized', icon: '🚀' },
+                    { id: 'discovery', name: 'Product Discovery', checkpoint: 'products_detected', icon: '🔍' },
+                    { id: 'processing', name: 'Product Processing', checkpoint: null, icon: '⚙️' },
+                    { id: 'completed', name: 'Complete', checkpoint: 'completed', icon: '✅' },
+                  ];
 
-                      {/* Discovery Metrics */}
-                      {selectedJob?.metadata?.products_discovered && (
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="bg-white border rounded-lg p-3">
-                            <div className="text-xs text-muted-foreground mb-1">Products Found</div>
-                            <div className="text-2xl font-bold text-primary">
-                              {selectedJob.metadata.products_discovered}
-                            </div>
-                          </div>
-                          <div className="bg-white border rounded-lg p-3">
-                            <div className="text-xs text-muted-foreground mb-1">Pages Analyzed</div>
-                            <div className="text-2xl font-bold text-slate-900">
-                              {selectedJob.metadata.total_pages || 0}
-                            </div>
-                          </div>
-                          <div className="bg-white border rounded-lg p-3">
-                            <div className="text-xs text-muted-foreground mb-1">AI Model</div>
-                            <div className="text-sm font-semibold text-slate-900">
-                              Claude 4.5
-                            </div>
-                          </div>
+                  // Get completed checkpoints
+                  const completedCheckpoints = jobCheckpoints.map(cp => cp.stage);
+
+                  // Determine current stage based on checkpoints and job status
+                  const getCurrentStage = () => {
+                    if (selectedJob?.status === 'completed') return 'completed';
+                    if (selectedJob?.status === 'failed') return 'failed';
+                    if (completedCheckpoints.includes('completed')) return 'completed';
+                    if (productProgress.some(p => p.status === 'processing')) return 'processing';
+                    if (completedCheckpoints.includes('products_detected')) return 'processing';
+                    if (completedCheckpoints.includes('initialized')) return 'discovery';
+                    if (completedCheckpoints.includes('warmup_complete')) return 'initialized';
+                    return 'warmup';
+                  };
+
+                  const currentStage = getCurrentStage();
+                  const isJobCompleted = selectedJob?.status === 'completed' || currentStage === 'completed';
+                  const isJobFailed = selectedJob?.status === 'failed';
+
+                  // Get metrics from various sources
+                  const productsDiscovered = selectedJob?.metadata?.result?.products_discovered ||
+                    jobCheckpoints.find(cp => cp.stage === 'products_detected')?.checkpoint_data?.products_detected ||
+                    productProgress.length || 0;
+
+                  const pagesAnalyzed = selectedJob?.metadata?.result?.pages_processed ||
+                    jobCheckpoints.find(cp => cp.stage === 'products_detected')?.checkpoint_data?.total_pages || 0;
+
+                  const chunksCreated = selectedJob?.metadata?.result?.chunks_created ||
+                    selectedJob?.metadata?.chunks_created || 0;
+
+                  const imagesProcessed = selectedJob?.metadata?.result?.images_processed ||
+                    selectedJob?.metadata?.images_extracted || 0;
+
+                  const productsCreated = selectedJob?.metadata?.result?.products_created ||
+                    productProgress.filter(p => p.status === 'completed').length || 0;
+
+                  return (
+                    <Card className={`border-2 ${isJobCompleted ? 'border-green-200 bg-gradient-to-br from-green-50/50 to-transparent' : isJobFailed ? 'border-red-200 bg-gradient-to-br from-red-50/50 to-transparent' : 'border-primary/20 bg-gradient-to-br from-primary/5 to-transparent'}`}>
+                      <CardHeader className="pb-4">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base flex items-center gap-2">
+                            {isJobCompleted ? (
+                              <>
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                Pipeline Complete
+                              </>
+                            ) : isJobFailed ? (
+                              <>
+                                <XCircle className="h-5 w-5 text-red-600" />
+                                Pipeline Failed
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="h-5 w-5 text-primary animate-spin" />
+                                Processing Pipeline
+                              </>
+                            )}
+                          </CardTitle>
+                          <Badge className={isJobCompleted ? 'bg-green-50 text-green-700 border-green-200' : isJobFailed ? 'bg-red-50 text-red-700 border-red-200' : 'bg-blue-50 text-blue-700 border-blue-200'}>
+                            {isJobCompleted ? '100% Complete' : isJobFailed ? 'Failed' : `${selectedJob?.progress || 0}%`}
+                          </Badge>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                        <CardDescription>
+                          {isJobCompleted
+                            ? 'All extraction stages completed successfully'
+                            : isJobFailed
+                            ? selectedJob?.error || 'An error occurred during processing'
+                            : 'AI-powered document analysis and product extraction'}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {/* Pipeline Stage Flow */}
+                          <div className="flex items-center justify-between gap-2">
+                            {pipelineStages.map((stage, index) => {
+                              const isComplete =
+                                (stage.checkpoint && completedCheckpoints.includes(stage.checkpoint)) ||
+                                (stage.id === 'processing' && (completedCheckpoints.includes('completed') || productsCreated > 0)) ||
+                                (stage.id === 'completed' && isJobCompleted);
+                              const isCurrent = currentStage === stage.id && !isJobCompleted && !isJobFailed;
+                              const isPending = !isComplete && !isCurrent;
+
+                              return (
+                                <React.Fragment key={stage.id}>
+                                  <div className={`flex flex-col items-center flex-1 ${isPending ? 'opacity-40' : ''}`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg mb-1 ${
+                                      isComplete ? 'bg-green-100' :
+                                      isCurrent ? 'bg-blue-100 ring-2 ring-blue-300 ring-offset-1' :
+                                      'bg-slate-100'
+                                    }`}>
+                                      {isCurrent ? (
+                                        <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                                      ) : (
+                                        <span>{stage.icon}</span>
+                                      )}
+                                    </div>
+                                    <span className={`text-[10px] font-medium text-center leading-tight ${
+                                      isComplete ? 'text-green-700' :
+                                      isCurrent ? 'text-blue-700' :
+                                      'text-slate-400'
+                                    }`}>
+                                      {stage.name}
+                                    </span>
+                                  </div>
+                                  {index < pipelineStages.length - 1 && (
+                                    <div className={`h-0.5 flex-1 max-w-8 ${isComplete ? 'bg-green-300' : 'bg-slate-200'}`} />
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </div>
+
+                          {/* Summary Metrics */}
+                          <div className="grid grid-cols-5 gap-3 pt-4 border-t">
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-primary">{productsDiscovered}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Products Found</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-slate-900">{pagesAnalyzed}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Pages Analyzed</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-slate-900">{chunksCreated}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Text Chunks</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-slate-900">{imagesProcessed}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Images</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-2xl font-bold text-green-600">{productsCreated}</div>
+                              <div className="text-[10px] text-muted-foreground uppercase">Products Created</div>
+                            </div>
+                          </div>
+
+                          {/* AI Models Used */}
+                          {jobCheckpoints.length > 0 && (
+                            <div className="flex flex-wrap gap-2 pt-3 border-t">
+                              <span className="text-[10px] text-muted-foreground uppercase font-medium">AI Models:</span>
+                              {completedCheckpoints.includes('warmup_complete') && (
+                                <>
+                                  <Badge variant="outline" className="text-[9px] bg-amber-50 border-amber-200 text-amber-700">YOLO Layout</Badge>
+                                  <Badge variant="outline" className="text-[9px] bg-purple-50 border-purple-200 text-purple-700">SigLIP Vision</Badge>
+                                  <Badge variant="outline" className="text-[9px] bg-blue-50 border-blue-200 text-blue-700">Qwen OCR</Badge>
+                                </>
+                              )}
+                              {completedCheckpoints.includes('products_detected') && (
+                                <Badge variant="outline" className="text-[9px] bg-green-50 border-green-200 text-green-700">Claude Vision</Badge>
+                              )}
+                              <Badge variant="outline" className="text-[9px] bg-indigo-50 border-indigo-200 text-indigo-700">Voyage Embeddings</Badge>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 {/* Product Processing Pipeline */}
                 <Card>
@@ -2422,9 +2704,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                       <span>{product.product_name}</span>
                                     </div>
                                     <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
-                                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
-                                        ID: {product.product_id.slice(0, 8)}
-                                      </span>
+                                      {product.product_id ? (
+                                        <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                                          ID: {product.product_id.slice(0, 8)}
+                                        </span>
+                                      ) : (
+                                        <span className="bg-amber-50 px-1.5 py-0.5 rounded text-amber-600">
+                                          Awaiting Creation
+                                        </span>
+                                      )}
                                       {product.current_stage && (
                                         <span className="flex items-center gap-1 text-primary">
                                           <Activity className="h-3 w-3" />
@@ -2507,12 +2795,33 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                   <div className="space-y-3">
                                     <h5 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Processing Pipeline</h5>
 
-                                    {/* Stage Flow */}
+                                    {/* Stage Flow with Details */}
                                     <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                                       {PRODUCT_STAGES.map((stage) => {
                                         const isStageCompleted = product.stages_completed?.includes(stage.id);
                                         const isCurrentStage = product.current_stage === stage.id;
                                         const StageIcon = stage.icon;
+
+                                        // Get stage-specific metrics from product.metrics
+                                        const getStageMetric = () => {
+                                          const metrics = product.metrics || {};
+                                          switch(stage.id) {
+                                            case 'extraction':
+                                              return metrics.pages_extracted ? `${metrics.pages_extracted} pages` : null;
+                                            case 'chunking':
+                                              return metrics.chunks_created ? `${metrics.chunks_created} chunks` : null;
+                                            case 'images':
+                                              return metrics.images_processed ? `${metrics.images_processed} images` : null;
+                                            case 'creation':
+                                              return metrics.product_db_id ? 'Created' : null;
+                                            case 'relationships':
+                                              return metrics.relationships_created ? `${metrics.relationships_created} links` : null;
+                                            default:
+                                              return null;
+                                          }
+                                        };
+
+                                        const stageMetric = getStageMetric();
 
                                         return (
                                           <div
@@ -2535,50 +2844,80 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                               )}
                                             </div>
                                             <span className="text-[10px] font-bold uppercase tracking-tight leading-tight">{stage.name}</span>
-                                            <span className="text-[9px] text-muted-foreground mt-1 leading-tight">{stage.description}</span>
+                                            {stageMetric && isStageCompleted && (
+                                              <span className="text-[11px] font-semibold text-green-700 mt-1">{stageMetric}</span>
+                                            )}
+                                            {!stageMetric && (
+                                              <span className="text-[9px] text-muted-foreground mt-1 leading-tight">{stage.description}</span>
+                                            )}
                                           </div>
                                         );
                                       })}
                                     </div>
 
-                                    {/* Detailed Metrics */}
-                                    {product.metadata && (
-                                      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        {/* Pages Extracted */}
-                                        {product.metadata.total_pages_extracted !== undefined && (
-                                          <div className="bg-white border rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Pages Extracted</div>
-                                            <div className="text-lg font-bold text-slate-900">{product.metadata.total_pages_extracted}</div>
-                                            <div className="text-[9px] text-muted-foreground mt-0.5">PDF pages mapped</div>
-                                          </div>
-                                        )}
-
+                                    {/* Detailed Metrics - Show metrics from product.metrics */}
+                                    {product.metrics && Object.keys(product.metrics).length > 0 && (
+                                      <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
                                         {/* Chunks Created */}
-                                        {product.metadata.total_chunks_created !== undefined && (
+                                        {product.metrics.chunks_created !== undefined && (
                                           <div className="bg-white border rounded-lg p-3">
                                             <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Text Chunks</div>
-                                            <div className="text-lg font-bold text-slate-900">{product.metadata.total_chunks_created}</div>
+                                            <div className="text-lg font-bold text-slate-900">{product.metrics.chunks_created}</div>
                                             <div className="text-[9px] text-muted-foreground mt-0.5">Semantic segments</div>
                                           </div>
                                         )}
 
-                                        {/* Images Extracted */}
-                                        {product.metadata.total_images_extracted !== undefined && (
+                                        {/* Images Processed */}
+                                        {product.metrics.images_processed !== undefined && (
                                           <div className="bg-white border rounded-lg p-3">
                                             <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Images</div>
-                                            <div className="text-lg font-bold text-slate-900">{product.metadata.total_images_extracted}</div>
-                                            <div className="text-[9px] text-muted-foreground mt-0.5">4-layer extraction</div>
+                                            <div className="text-lg font-bold text-slate-900">{product.metrics.images_processed}</div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">Vision classified</div>
+                                          </div>
+                                        )}
+
+                                        {/* Relationships Created */}
+                                        {product.metrics.relationships_created !== undefined && (
+                                          <div className="bg-white border rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Relations</div>
+                                            <div className="text-lg font-bold text-slate-900">{product.metrics.relationships_created}</div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">Entity links</div>
                                           </div>
                                         )}
 
                                         {/* Processing Time */}
-                                        {product.metadata.processing_time_ms !== undefined && (
+                                        {product.metrics.processing_time_ms !== undefined && (
                                           <div className="bg-white border rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Time Spent</div>
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Time</div>
                                             <div className="text-lg font-bold text-slate-900">
-                                              {(product.metadata.processing_time_ms / 1000).toFixed(1)}s
+                                              {(() => {
+                                                const ms = product.metrics.processing_time_ms;
+                                                const seconds = Math.floor(ms / 1000);
+                                                const minutes = Math.floor(seconds / 60);
+                                                return minutes > 0 ? `${minutes}m ${seconds % 60}s` : `${seconds}s`;
+                                              })()}
                                             </div>
-                                            <div className="text-[9px] text-muted-foreground mt-0.5">Total processing</div>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">Processing</div>
+                                          </div>
+                                        )}
+
+                                        {/* Product DB Link */}
+                                        {product.metrics.product_db_id && (
+                                          <div className="bg-white border rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Product</div>
+                                            <button
+                                              onClick={() => {
+                                                // TODO: Open product modal
+                                                toast.info(`Product ID: ${product.metrics.product_db_id}`);
+                                              }}
+                                              className="text-sm font-bold text-primary hover:underline flex items-center gap-1"
+                                            >
+                                              <ExternalLink className="h-3 w-3" />
+                                              View Product
+                                            </button>
+                                            <div className="text-[9px] text-muted-foreground mt-0.5">
+                                              ID: {product.metrics.product_db_id.slice(0, 8)}
+                                            </div>
                                           </div>
                                         )}
                                       </div>
@@ -2638,50 +2977,265 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 <div className="flex items-center justify-between px-1">
                   <div>
                     <h3 className="text-lg font-semibold text-slate-900">Checkpoint Stream</h3>
-                    <p className="text-sm text-muted-foreground">Raw chronological sequence of system events and operation metadata</p>
+                    <p className="text-sm text-muted-foreground">Complete processing history with AI models, metrics, and system events</p>
                   </div>
+                  <Badge variant="outline" className="text-xs">
+                    {jobCheckpoints.length} checkpoints
+                  </Badge>
                 </div>
-                
+
                 <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
-                  <div className="bg-slate-50 border-b px-4 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                    <div className="flex items-center gap-6">
-                      <span className="w-20">Timestamp</span>
-                      <span className="w-32">Stage/Operation</span>
-                      <span>Details / Metadata</span>
-                    </div>
-                    <span>Status</span>
-                  </div>
-                  <div className="divide-y max-h-[500px] overflow-y-auto">
+                  <div className="divide-y max-h-[600px] overflow-y-auto">
                     {jobCheckpoints.length > 0 ? (
-                      [...jobCheckpoints].reverse().map((cp, idx) => (
-                        <div key={cp.id || idx} className="px-4 py-3 hover:bg-slate-50/50 transition-colors flex items-start justify-between">
-                          <div className="flex items-start gap-6">
-                            <span className="text-[10px] font-mono text-slate-400 w-20 pt-0.5">
-                              {new Date(cp.created_at).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </span>
-                            <div className="w-32">
-                              <Badge variant="outline" className="text-[9px] bg-slate-100 text-slate-600 border-none font-bold uppercase py-0 leading-4">
-                                {cp.stage}
-                              </Badge>
-                            </div>
-                            <div className="flex-1 max-w-md">
-                              <p className="text-xs font-medium text-slate-700">
-                                {cp.checkpoint_data?.message || cp.checkpoint_data?.status || 'Operation successful'}
-                              </p>
-                              {cp.metadata && Object.keys(cp.metadata).length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                  {Object.entries(cp.metadata).map(([k, v]) => (
-                                    <span key={k} className="text-[9px] text-muted-foreground">
-                                      <span className="font-semibold">{k}:</span> {typeof v === 'object' ? '...' : String(v)}
-                                    </span>
+                      [...jobCheckpoints].reverse().map((cp, idx) => {
+                        // Get stage-specific icon and color
+                        const getStageStyle = (stage: string) => {
+                          // Warmup stages
+                          if (stage.includes('warmup')) return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', icon: '🔥' };
+                          // Initialization
+                          if (stage === 'initialized') return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', icon: '🚀' };
+                          // Discovery
+                          if (stage === 'products_detected') return { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', icon: '🔍' };
+                          // Stage 1 - PDF Extraction
+                          if (stage === 'pdf_extracted' || stage === 'pdf_pages_numbered') return { bg: 'bg-cyan-50', border: 'border-cyan-200', text: 'text-cyan-700', icon: '📄' };
+                          // Stage 2 - Chunking & Text Embeddings
+                          if (stage === 'chunks_created') return { bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700', icon: '📝' };
+                          if (stage === 'text_embeddings_generated') return { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', icon: '🧠' };
+                          // Stage 3 - Images & CLIP Embeddings
+                          if (stage === 'images_extracted') return { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-700', icon: '🖼️' };
+                          if (stage === 'image_embeddings_generated') return { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', icon: '🎨' };
+                          // Stage 4 - Product Creation
+                          if (stage === 'products_created') return { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', icon: '🏭' };
+                          // Stage 5 - Relationships
+                          if (stage === 'relationships_created') return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', icon: '🔗' };
+                          // Other metadata stages
+                          if (stage === 'metadata_extracted' || stage === 'document_entities_created') return { bg: 'bg-lime-50', border: 'border-lime-200', text: 'text-lime-700', icon: '📊' };
+                          // Completion
+                          if (stage === 'completed') return { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700', icon: '✅' };
+                          return { bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700', icon: '📋' };
+                        };
+                        const style = getStageStyle(cp.stage);
+
+                        // Format checkpoint-specific details
+                        const getCheckpointDetails = () => {
+                          const data = cp.checkpoint_data || {};
+                          const meta = cp.metadata || {};
+
+                          switch(cp.stage) {
+                            case 'warmup_started':
+                              return {
+                                title: 'HuggingFace Endpoint Warm-up Started',
+                                details: [
+                                  { label: 'Endpoints', value: data.endpoints_to_warmup?.join(', ') || 'N/A' },
+                                  { label: 'Total', value: data.total_endpoints }
+                                ]
+                              };
+                            case 'warmup_complete':
+                              return {
+                                title: 'AI Model Endpoints Ready',
+                                details: [
+                                  { label: 'Ready', value: `${data.total_ready} endpoints` },
+                                  { label: 'Models', value: data.endpoint_names?.join(', ') || 'N/A' },
+                                  { label: 'Failed', value: meta.warmup_summary?.failed_count || 0 }
+                                ]
+                              };
+                            case 'initialized':
+                              return {
+                                title: 'Document Processing Initialized',
+                                details: [
+                                  { label: 'File', value: data.filename },
+                                  { label: 'Size', value: data.file_size ? `${(data.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A' },
+                                  { label: 'Discovery Model', value: meta.discovery_model || 'claude-vision' }
+                                ]
+                              };
+                            case 'products_detected':
+                              return {
+                                title: 'Product Discovery Complete',
+                                details: [
+                                  { label: 'Products', value: data.products_detected },
+                                  { label: 'Product Names', value: data.product_names?.join(', ') || 'N/A' },
+                                  { label: 'Pages', value: data.total_pages },
+                                  { label: 'Confidence', value: meta.confidence_score ? `${(meta.confidence_score * 100).toFixed(0)}%` : 'N/A' },
+                                  { label: 'Model', value: meta.discovery_model || 'claude-vision' },
+                                  { label: 'Processing Time', value: meta.processing_time_ms ? `${(meta.processing_time_ms / 1000).toFixed(1)}s` : 'N/A' }
+                                ]
+                              };
+                            case 'completed':
+                              return {
+                                title: 'Processing Pipeline Complete',
+                                details: [
+                                  { label: 'Products Created', value: data.products_created },
+                                  { label: 'Chunks Created', value: data.chunks_created },
+                                  { label: 'Images Processed', value: data.images_processed },
+                                  { label: 'Total Time', value: meta.processing_time ? `${meta.processing_time.toFixed(1)}s` : 'N/A' },
+                                  { label: 'Pages Processed', value: meta.pages_processed }
+                                ]
+                              };
+                            // Stage 1: PDF Extraction
+                            case 'pdf_extracted':
+                              return {
+                                title: `PDF Pages Extracted - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'Pages', value: data.pages_extracted },
+                                  { label: 'Physical Pages', value: data.physical_pages?.join(', ') || 'N/A' },
+                                  { label: 'Layout Regions', value: meta.layout_regions_detected || 0 },
+                                  { label: 'Spread Layout', value: meta.has_spread_layout ? 'Yes' : 'No' }
+                                ]
+                              };
+                            case 'pdf_pages_numbered':
+                              return {
+                                title: 'PDF Pages Numbered',
+                                details: [
+                                  { label: 'Total Pages', value: data.total_pages },
+                                  { label: 'Pages Numbered', value: data.pages_numbered || data.total_pages }
+                                ]
+                              };
+                            // Stage 2: Chunking & Embeddings
+                            case 'chunks_created':
+                              return {
+                                title: `Text Chunks Created - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'Chunks', value: data.chunks_created },
+                                  { label: 'Text Embeddings', value: meta.text_embeddings_generated || 0 },
+                                  { label: 'Layout-Aware', value: meta.layout_aware ? 'Yes' : 'No' }
+                                ]
+                              };
+                            case 'text_embeddings_generated':
+                              return {
+                                title: `Text Embeddings Generated - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'Embeddings', value: data.text_embeddings_generated },
+                                  { label: 'Chunks', value: meta.chunks_created || 0 }
+                                ]
+                              };
+                            // Stage 3: Images & CLIP
+                            case 'images_extracted':
+                              return {
+                                title: `Images Extracted - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'Images', value: data.images_processed },
+                                  { label: 'Material', value: meta.images_material || 0 },
+                                  { label: 'Non-Material', value: meta.images_non_material || 0 }
+                                ]
+                              };
+                            case 'image_embeddings_generated':
+                              return {
+                                title: `CLIP Embeddings Generated - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'CLIP Embeddings', value: data.clip_embeddings_generated },
+                                  { label: 'Images', value: meta.images_processed || 0 }
+                                ]
+                              };
+                            // Stage 4: Product Creation
+                            case 'products_created':
+                              return {
+                                title: `Product Created in DB - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'DB ID', value: data.product_db_id?.slice(0, 8) || 'N/A' },
+                                  { label: 'Layout Regions', value: meta.layout_regions_stored || 0 },
+                                  { label: 'Tables', value: meta.tables_extracted || 0 }
+                                ]
+                              };
+                            // Stage 5: Relationships
+                            case 'relationships_created':
+                              return {
+                                title: `Entity Links Created - ${data.product_name || 'Product'}`,
+                                details: [
+                                  { label: 'Product', value: data.product_name || 'N/A' },
+                                  { label: 'Product #', value: data.product_index },
+                                  { label: 'Relationships', value: data.relationships_created },
+                                  { label: 'Chunks Linked', value: meta.chunks_linked || 0 },
+                                  { label: 'Images Linked', value: meta.images_linked || 0 }
+                                ]
+                              };
+                            // Other stages
+                            case 'metadata_extracted':
+                              return {
+                                title: 'Metadata Extracted',
+                                details: [
+                                  { label: 'Fields', value: Object.keys(data).length },
+                                  ...Object.entries(data).slice(0, 4).map(([k, v]) => ({
+                                    label: k.replace(/_/g, ' '),
+                                    value: typeof v === 'object' ? JSON.stringify(v).slice(0, 30) : String(v)
+                                  }))
+                                ]
+                              };
+                            case 'document_entities_created':
+                              return {
+                                title: 'Document Entities Created',
+                                details: [
+                                  { label: 'Entities', value: data.entities_created || 0 },
+                                  { label: 'Types', value: data.entity_types?.join(', ') || 'N/A' }
+                                ]
+                              };
+                            default:
+                              return {
+                                title: cp.stage.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                                details: Object.entries(data).slice(0, 5).map(([k, v]) => ({
+                                  label: k.replace(/_/g, ' '),
+                                  value: typeof v === 'object' ? JSON.stringify(v).slice(0, 50) : String(v)
+                                }))
+                              };
+                          }
+                        };
+
+                        const details = getCheckpointDetails();
+
+                        return (
+                          <div key={cp.id || idx} className={`px-4 py-4 hover:bg-slate-50/50 transition-colors ${style.bg}`}>
+                            <div className="flex items-start gap-4">
+                              {/* Timestamp and Icon */}
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-2xl">{style.icon}</span>
+                                <span className="text-[10px] font-mono text-slate-400">
+                                  {new Date(cp.created_at).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                </span>
+                              </div>
+
+                              {/* Main Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Badge variant="outline" className={`text-[10px] ${style.bg} ${style.text} ${style.border} font-bold uppercase py-0.5`}>
+                                    {cp.stage.replace(/_/g, ' ')}
+                                  </Badge>
+                                  <span className="text-xs font-medium text-slate-700">{details.title}</span>
+                                </div>
+
+                                {/* Details Grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
+                                  {details.details.filter(d => d.value !== undefined && d.value !== null && d.value !== 'N/A').map((detail, i) => (
+                                    <div key={i} className="text-[11px]">
+                                      <span className="text-slate-500">{detail.label}:</span>
+                                      <span className="ml-1 text-slate-700 font-medium">
+                                        {String(detail.value).length > 60
+                                          ? String(detail.value).slice(0, 60) + '...'
+                                          : String(detail.value)}
+                                      </span>
+                                    </div>
                                   ))}
                                 </div>
-                              )}
+                              </div>
+
+                              {/* Status Badge */}
+                              <Badge className="bg-green-50 text-green-700 border-green-100 text-[9px] h-5 shrink-0">
+                                ✓ OK
+                              </Badge>
                             </div>
                           </div>
-                          <Badge className="bg-green-50 text-green-700 border-green-100 text-[9px] h-4">OK</Badge>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="p-12 text-center text-muted-foreground">
                         <Terminal className="h-8 w-8 mx-auto mb-2 opacity-20" />
@@ -2753,7 +3307,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   <CardContent className="p-4">
                     <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Products</div>
                     <div className="text-2xl font-black text-slate-900">
-                      {selectedJob?.metadata?.products_discovered || productProgress.length || 0}
+                      {selectedJob?.metadata?.result?.products_discovered || selectedJob?.metadata?.products_discovered || productProgress.length || 0}
                     </div>
                     <div className="text-[9px] text-muted-foreground mt-1">AI Identified</div>
                   </CardContent>
@@ -2809,14 +3363,258 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   <CardContent className="p-4">
                     <div className="text-[10px] font-bold text-green-700 uppercase tracking-wider mb-1">Quality</div>
                     <div className="text-2xl font-black text-slate-900">
-                      {selectedJob?.metadata?.result?.confidence_score 
-                        ? `${(selectedJob.metadata.result.confidence_score * 100).toFixed(0)}%` 
+                      {selectedJob?.metadata?.result?.confidence_score
+                        ? `${(selectedJob.metadata.result.confidence_score * 100).toFixed(0)}%`
                         : '94%'}
                     </div>
                     <div className="text-[9px] text-muted-foreground mt-1">Model Conf.</div>
                   </CardContent>
                 </Card>
               </div>
+
+              {/* AI Model Cost & Usage Analytics */}
+              {(() => {
+                // AI Model pricing configuration (per 1M tokens or per operation)
+                const AI_PRICING = {
+                  // Claude models (per 1M tokens)
+                  'claude-haiku': { input: 0.80, output: 4.00, type: 'token' },
+                  'claude-sonnet': { input: 3.00, output: 15.00, type: 'token' },
+                  'claude-opus': { input: 15.00, output: 75.00, type: 'token' },
+                  'claude-vision': { input: 3.00, output: 15.00, type: 'token' },
+                  // HuggingFace Endpoints (per GPU hour)
+                  'qwen-vision': { gpuHourly: 0.60, type: 'gpu', description: 'Qwen3-VL-32B Product Discovery' },
+                  'slig-embeddings': { gpuHourly: 0.45, type: 'gpu', description: 'SLIG-768D Visual Embeddings' },
+                  'yolo-layout': { gpuHourly: 0.60, type: 'gpu', description: 'YOLO DocParser Layout Detection' },
+                  'chandra-ocr': { gpuHourly: 0.30, type: 'gpu', description: 'Chandra OCR Engine' },
+                  // Free/bundled models
+                  'clip': { perImage: 0.0, type: 'free', description: 'OpenAI CLIP (open-source)' },
+                };
+
+                // Calculate costs from checkpoints and metadata
+                const aiTracking = selectedJob?.metadata?.ai_tracking || {};
+                const stageSummary = aiTracking.ai_stage_summary || {};
+
+                // Estimate costs based on usage
+                const calculateModelCosts = () => {
+                  const costs: Record<string, {
+                    model: string;
+                    generations: number;
+                    inputTokens: number;
+                    outputTokens: number;
+                    gpuSeconds: number;
+                    cost: number;
+                    description: string;
+                  }> = {};
+
+                  // Get data from checkpoints for more accurate metrics
+                  const warmupCheckpoint = jobCheckpoints.find(cp => cp.stage === 'warmup_complete');
+                  const discoveryCheckpoint = jobCheckpoints.find(cp => cp.stage === 'products_detected');
+                  const productsCreated = selectedJob?.metadata?.result?.products_discovered || productProgress.length || 0;
+                  const chunksCreated = selectedJob?.metadata?.chunks_created || 0;
+                  const imagesProcessed = selectedJob?.metadata?.images_stored || selectedJob?.metadata?.result?.images_processed || 0;
+                  const totalPages = selectedJob?.metadata?.total_pages || selectedJob?.metadata?.extracted_pages || 0;
+
+                  // Calculate processing time
+                  const startTime = selectedJob?.started_at ? new Date(selectedJob.started_at).getTime() : 0;
+                  const endTime = selectedJob?.completed_at ? new Date(selectedJob.completed_at).getTime() : Date.now();
+                  const totalTimeSeconds = (endTime - startTime) / 1000;
+
+                  // Qwen Vision - Product Discovery (estimate: ~2 min active for discovery)
+                  if (discoveryCheckpoint || productsCreated > 0) {
+                    const discoveryTimeMs = discoveryCheckpoint?.metadata?.processing_time_ms || 120000;
+                    const gpuSeconds = discoveryTimeMs / 1000;
+                    costs['qwen'] = {
+                      model: 'Qwen3-VL-32B',
+                      generations: productsCreated,
+                      inputTokens: totalPages * 2000, // ~2k tokens per page (vision)
+                      outputTokens: productsCreated * 500, // ~500 tokens per product
+                      gpuSeconds,
+                      cost: (gpuSeconds / 3600) * 0.60,
+                      description: `Product discovery: ${productsCreated} products from ${totalPages} pages`
+                    };
+                  }
+
+                  // SLIG - Visual Embeddings (estimate: 0.5s per image)
+                  const clipEmbeddings = selectedJob?.metadata?.clip_embeddings || selectedJob?.metadata?.result?.clip_embeddings || imagesProcessed;
+                  if (clipEmbeddings > 0) {
+                    const gpuSeconds = clipEmbeddings * 0.5;
+                    costs['slig'] = {
+                      model: 'SLIG-768D',
+                      generations: clipEmbeddings,
+                      inputTokens: 0,
+                      outputTokens: 0,
+                      gpuSeconds,
+                      cost: (gpuSeconds / 3600) * 0.45,
+                      description: `Visual embeddings: ${clipEmbeddings} images → 768D vectors`
+                    };
+                  }
+
+                  // YOLO - Layout Detection (estimate: 1s per page)
+                  const layoutRegions = selectedJob?.metadata?.layout_regions_detected || 0;
+                  if (layoutRegions > 0 || totalPages > 0) {
+                    const pagesWithLayout = layoutRegions > 0 ? Math.ceil(layoutRegions / 10) : totalPages;
+                    const gpuSeconds = pagesWithLayout * 1.0;
+                    costs['yolo'] = {
+                      model: 'YOLO DocParser',
+                      generations: layoutRegions || pagesWithLayout * 8, // ~8 regions per page
+                      inputTokens: 0,
+                      outputTokens: 0,
+                      gpuSeconds,
+                      cost: (gpuSeconds / 3600) * 0.60,
+                      description: `Layout detection: ${layoutRegions || 'N/A'} regions on ${pagesWithLayout} pages`
+                    };
+                  }
+
+                  // Claude Vision - Metadata Extraction (if used)
+                  const metadataExtracted = selectedJob?.metadata?.metadata_fields_extracted || 0;
+                  if (metadataExtracted > 0 || productsCreated > 0) {
+                    const inputTokens = productsCreated * 3000; // ~3k tokens per product
+                    const outputTokens = productsCreated * 1000; // ~1k tokens output
+                    costs['claude'] = {
+                      model: 'Claude Sonnet',
+                      generations: productsCreated,
+                      inputTokens,
+                      outputTokens,
+                      gpuSeconds: 0,
+                      cost: (inputTokens / 1000000) * 3.00 + (outputTokens / 1000000) * 15.00,
+                      description: `Metadata extraction: ${productsCreated} products analyzed`
+                    };
+                  }
+
+                  // Text Embeddings (typically free or very cheap)
+                  const textEmbeddings = selectedJob?.metadata?.text_embeddings || chunksCreated;
+                  if (textEmbeddings > 0) {
+                    const inputTokens = chunksCreated * 500; // ~500 tokens per chunk
+                    costs['embeddings'] = {
+                      model: 'text-embedding-3-small',
+                      generations: textEmbeddings,
+                      inputTokens,
+                      outputTokens: 0,
+                      gpuSeconds: 0,
+                      cost: (inputTokens / 1000000) * 0.02,
+                      description: `Text embeddings: ${chunksCreated} chunks → 1536D vectors`
+                    };
+                  }
+
+                  return costs;
+                };
+
+                const modelCosts = calculateModelCosts();
+                const totalCost = Object.values(modelCosts).reduce((sum, m) => sum + m.cost, 0);
+                const totalGpuSeconds = Object.values(modelCosts).reduce((sum, m) => sum + m.gpuSeconds, 0);
+                const totalTokens = Object.values(modelCosts).reduce((sum, m) => sum + m.inputTokens + m.outputTokens, 0);
+                const totalGenerations = Object.values(modelCosts).reduce((sum, m) => sum + m.generations, 0);
+
+                return (
+                  <div className="mt-6 pt-6 border-t border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-amber-500" />
+                        AI Model Cost & Usage Analytics
+                      </h4>
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Total: ${totalCost.toFixed(4)}
+                        </Badge>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                          {totalGenerations.toLocaleString()} generations
+                        </Badge>
+                      </div>
+                    </div>
+
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                      <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+                        <CardContent className="p-3">
+                          <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Total Cost</div>
+                          <div className="text-xl font-black text-amber-900">${totalCost.toFixed(4)}</div>
+                          <div className="text-[9px] text-amber-600">USD estimated</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
+                        <CardContent className="p-3">
+                          <div className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">GPU Time</div>
+                          <div className="text-xl font-black text-purple-900">{totalGpuSeconds.toFixed(1)}s</div>
+                          <div className="text-[9px] text-purple-600">${(totalGpuSeconds / 3600 * 0.55).toFixed(4)} @ avg rate</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                        <CardContent className="p-3">
+                          <div className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Total Tokens</div>
+                          <div className="text-xl font-black text-blue-900">{(totalTokens / 1000).toFixed(1)}K</div>
+                          <div className="text-[9px] text-blue-600">input + output</div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                        <CardContent className="p-3">
+                          <div className="text-[10px] font-bold text-green-700 uppercase tracking-wider">AI Generations</div>
+                          <div className="text-xl font-black text-green-900">{totalGenerations.toLocaleString()}</div>
+                          <div className="text-[9px] text-green-600">total operations</div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Per-Model Breakdown */}
+                    <div className="space-y-2">
+                      {Object.entries(modelCosts).map(([key, data]) => (
+                        <div key={key} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold ${
+                                key === 'qwen' ? 'bg-gradient-to-br from-orange-500 to-red-500' :
+                                key === 'slig' ? 'bg-gradient-to-br from-purple-500 to-pink-500' :
+                                key === 'yolo' ? 'bg-gradient-to-br from-blue-500 to-cyan-500' :
+                                key === 'claude' ? 'bg-gradient-to-br from-amber-500 to-orange-500' :
+                                'bg-gradient-to-br from-green-500 to-teal-500'
+                              }`}>
+                                {key === 'qwen' ? '🔮' : key === 'slig' ? '🖼️' : key === 'yolo' ? '📐' : key === 'claude' ? '🧠' : '📝'}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-sm text-slate-900">{data.model}</div>
+                                <div className="text-[10px] text-slate-500">{data.description}</div>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-bold text-sm text-slate-900">${data.cost.toFixed(4)}</div>
+                              <div className="text-[10px] text-slate-500">
+                                {data.gpuSeconds > 0 ? `${data.gpuSeconds.toFixed(1)}s GPU` : `${((data.inputTokens + data.outputTokens) / 1000).toFixed(1)}K tokens`}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Detailed metrics bar */}
+                          <div className="mt-2 pt-2 border-t border-slate-200 grid grid-cols-4 gap-2 text-center">
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase">Generations</div>
+                              <div className="font-semibold text-xs text-slate-700">{data.generations.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase">Input Tokens</div>
+                              <div className="font-semibold text-xs text-slate-700">{data.inputTokens > 0 ? `${(data.inputTokens / 1000).toFixed(1)}K` : '-'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase">Output Tokens</div>
+                              <div className="font-semibold text-xs text-slate-700">{data.outputTokens > 0 ? `${(data.outputTokens / 1000).toFixed(1)}K` : '-'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase">GPU Time</div>
+                              <div className="font-semibold text-xs text-slate-700">{data.gpuSeconds > 0 ? `${data.gpuSeconds.toFixed(1)}s` : '-'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Cost breakdown note */}
+                    <div className="mt-3 p-2 bg-blue-50/50 rounded-lg border border-blue-100">
+                      <p className="text-[10px] text-blue-700">
+                        <strong>Note:</strong> Costs are estimated based on current pricing. GPU costs: Qwen ($0.60/hr), SLIG ($0.45/hr), YOLO ($0.60/hr).
+                        Token costs: Claude Sonnet ($3/$15 per 1M), Embeddings ($0.02 per 1M). Actual costs may vary.
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
             </>
           )}

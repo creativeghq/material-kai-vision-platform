@@ -220,6 +220,13 @@ SLIG_NAMESPACE=basiliskan
 
 ---
 
+### **Messaging Service API Keys (SMS/WhatsApp/Viber)**
+
+| Service | Secret Name | Where Used | How to Get | Required? |
+|---------|------------|------------|------------|-----------|
+| **Infobip** | `INFOBIP_API_KEY` | Supabase Edge Functions | https://portal.infobip.com → Developers → API Keys | ✅ **Required** for messaging |
+| **Infobip** | `INFOBIP_BASE_URL` | Supabase Edge Functions | https://portal.infobip.com → Dashboard (your dedicated URL) | ⭕ Optional (default: `https://api.infobip.com`) |
+
 ### **Price Monitoring API Keys**
 
 | Service | Secret Name | Where Used | How to Get | Required? |
@@ -250,6 +257,8 @@ SLIG_NAMESPACE=basiliskan
 | `AWS_REGION` | Public | Supabase Dashboard | AWS region for SES | `us-east-1` |
 | `AWS_ACCESS_KEY_ID` | **Secret** | Supabase Dashboard | AWS IAM access key for SES | `AKIAXXXXXXXXXXXXXXXX` |
 | `AWS_SECRET_ACCESS_KEY` | **Secret** | Supabase Dashboard | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `INFOBIP_API_KEY` | **Secret** | Supabase Dashboard | Infobip API key for SMS/WhatsApp/Viber | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `INFOBIP_BASE_URL` | Public | Supabase Dashboard | Infobip API base URL | `https://api.infobip.com` or your dedicated URL |
 
 > **Note:** Default sender email and name are now configured through the Admin Panel at `/admin/email` → Email Settings, not as environment variables.
 
