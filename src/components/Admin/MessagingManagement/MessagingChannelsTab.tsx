@@ -1,10 +1,10 @@
 /**
  * Messaging Channels Tab
- * Configure SMS, WhatsApp, and Viber sender channels
+ * Configure SMS and WhatsApp sender channels via Twilio
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Phone, MessageCircle, Smartphone, Check, X, Trash2, Edit2, RefreshCw, Download, AlertCircle } from 'lucide-react';
+import { Plus, Phone, MessageCircle, Check, Trash2, Edit2, RefreshCw, Download } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -18,13 +18,11 @@ import { messagingService, MessagingChannel, MessagingChannelType } from '@/serv
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
   sms: <Phone className="h-5 w-5" />,
   whatsapp: <MessageCircle className="h-5 w-5 text-green-500" />,
-  viber: <Smartphone className="h-5 w-5 text-purple-500" />,
 };
 
 const channelLabels: Record<MessagingChannelType, string> = {
   sms: 'SMS',
   whatsapp: 'WhatsApp',
-  viber: 'Viber',
 };
 
 export const MessagingChannelsTab: React.FC = () => {
@@ -32,12 +30,6 @@ export const MessagingChannelsTab: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showSyncModal, setShowSyncModal] = useState(false);
-  const [infobipSenders, setInfobipSenders] = useState<{
-    sms: Array<{ sender_id: string; display_name: string; status: string }>;
-    whatsapp: Array<{ sender_id: string; display_name: string; status: string; quality_rating?: string }>;
-    viber: Array<{ sender_id: string; display_name: string; status: string }>;
-  } | null>(null);
   const [editingChannel, setEditingChannel] = useState<MessagingChannel | null>(null);
   const { toast } = useToast();
 
@@ -122,89 +114,33 @@ export const MessagingChannelsTab: React.FC = () => {
     }
   };
 
-  const handleSyncFromInfobip = async () => {
+  const handleSyncChannels = async () => {
     try {
       setSyncing(true);
-      const result = await messagingService.syncSendersFromInfobip(false);
-      setInfobipSenders(result.senders);
-      setShowSyncModal(true);
+      const result = await messagingService.syncChannels();
 
-      if (result.total === 0) {
+      if (result.synced > 0) {
         toast({
-          title: 'No senders found',
-          description: 'No SMS, WhatsApp, or Viber senders are configured in your Infobip account.',
-          variant: 'destructive',
+          title: 'Sync Complete',
+          description: result.message || `Synced ${result.synced} channel(s) from Twilio`,
+        });
+      } else {
+        toast({
+          title: 'No Channels Found',
+          description: result.message || 'No channels found in Twilio. You can manually add channels using the Add Channel button.',
         });
       }
+
+      if (result.errors && result.errors.length > 0) {
+        console.warn('Sync warnings:', result.errors);
+      }
+
+      loadChannels();
     } catch (error: any) {
-      console.error('Error syncing from Infobip:', error);
+      console.error('Error syncing channels:', error);
       toast({
         title: 'Sync Failed',
-        description: error.message || 'Failed to fetch senders from Infobip. Please check your API key.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleImportSender = async (channelType: MessagingChannelType, sender: { sender_id: string; display_name: string; status: string }) => {
-    try {
-      // Check if already exists
-      const existing = channels.find(c => c.channel_type === channelType && c.sender_id === sender.sender_id);
-      if (existing) {
-        toast({
-          title: 'Already exists',
-          description: 'This sender is already configured.',
-        });
-        return;
-      }
-
-      await messagingService.createChannel({
-        channel_type: channelType,
-        provider: 'infobip',
-        sender_id: sender.sender_id,
-        display_name: sender.display_name,
-        is_active: sender.status === 'active' || sender.status === 'ACTIVE',
-        is_default: channels.filter(c => c.channel_type === channelType).length === 0,
-        config: { imported_from_infobip: true },
-        daily_quota: 10000,
-        max_send_rate: channelType === 'sms' ? 100 : 30,
-      });
-
-      toast({
-        title: 'Imported',
-        description: `${sender.display_name || sender.sender_id} has been added.`,
-      });
-
-      loadChannels();
-    } catch (error) {
-      console.error('Error importing sender:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to import sender',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleImportAll = async () => {
-    if (!infobipSenders) return;
-
-    try {
-      setSyncing(true);
-      await messagingService.syncSendersFromInfobip(true);
-      toast({
-        title: 'Import complete',
-        description: 'All senders have been imported from Infobip.',
-      });
-      setShowSyncModal(false);
-      loadChannels();
-    } catch (error) {
-      console.error('Error importing all senders:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to import senders',
+        description: error.message || 'Failed to sync channels from Twilio. Check your API credentials.',
         variant: 'destructive',
       });
     } finally {
@@ -230,17 +166,21 @@ export const MessagingChannelsTab: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold">Messaging Channels</h3>
             <p className="text-sm text-muted-foreground">
-              Configure sender IDs for SMS, WhatsApp, and Viber
+              Configure sender IDs for SMS and WhatsApp via Twilio
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleSyncFromInfobip} disabled={syncing}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync from Infobip'}
+            <Button variant="outline" onClick={loadChannels} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <Button variant="outline" onClick={handleSyncChannels} disabled={syncing}>
+              <Download className={`h-4 w-4 mr-2 ${syncing ? 'animate-pulse' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync from Twilio'}
             </Button>
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Manually
+              Add Channel
             </Button>
           </div>
         </div>
@@ -253,7 +193,7 @@ export const MessagingChannelsTab: React.FC = () => {
             <Phone className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No channels configured</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Add your first messaging channel to get started
+              Add your first messaging channel to get started with Twilio
             </p>
             <Button onClick={() => setShowCreateModal(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -287,6 +227,12 @@ export const MessagingChannelsTab: React.FC = () => {
                   <span className="text-muted-foreground">Provider</span>
                   <span className="capitalize">{channel.provider}</span>
                 </div>
+                {channel.channel_type === 'whatsapp' && channel.config?.messaging_service_sid && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Messaging Service</span>
+                    <span className="font-mono text-xs truncate max-w-[150px]">{channel.config.messaging_service_sid}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Daily Quota</span>
                   <span>{channel.daily_quota.toLocaleString()}</span>
@@ -360,172 +306,6 @@ export const MessagingChannelsTab: React.FC = () => {
           }}
         />
       )}
-
-      {/* Sync from Infobip Modal */}
-      {showSyncModal && infobipSenders && (
-        <Dialog open onOpenChange={() => setShowSyncModal(false)}>
-          <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Infobip Senders</DialogTitle>
-              <DialogDescription>
-                These are the senders configured in your Infobip account. Click to import them.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-6">
-              {/* SMS Senders */}
-              <div>
-                <h4 className="font-semibold flex items-center gap-2 mb-3">
-                  <Phone className="h-4 w-4" />
-                  SMS Senders ({infobipSenders.sms.length})
-                </h4>
-                {infobipSenders.sms.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">No SMS senders found</p>
-                ) : (
-                  <div className="space-y-2">
-                    {infobipSenders.sms.map((sender, i) => {
-                      const exists = channels.some(c => c.channel_type === 'sms' && c.sender_id === sender.sender_id);
-                      return (
-                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{sender.display_name || sender.sender_id}</p>
-                            <p className="text-sm text-muted-foreground">{sender.sender_id}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={sender.status === 'active' || sender.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                              {sender.status}
-                            </Badge>
-                            {exists ? (
-                              <Badge variant="outline" className="text-green-600">
-                                <Check className="h-3 w-3 mr-1" />
-                                Imported
-                              </Badge>
-                            ) : (
-                              <Button size="sm" onClick={() => handleImportSender('sms', sender)}>
-                                <Download className="h-3 w-3 mr-1" />
-                                Import
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* WhatsApp Senders */}
-              <div>
-                <h4 className="font-semibold flex items-center gap-2 mb-3">
-                  <MessageCircle className="h-4 w-4 text-green-500" />
-                  WhatsApp Senders ({infobipSenders.whatsapp.length})
-                </h4>
-                {infobipSenders.whatsapp.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">No WhatsApp senders found</p>
-                ) : (
-                  <div className="space-y-2">
-                    {infobipSenders.whatsapp.map((sender, i) => {
-                      const exists = channels.some(c => c.channel_type === 'whatsapp' && c.sender_id === sender.sender_id);
-                      return (
-                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{sender.display_name || sender.sender_id}</p>
-                            <p className="text-sm text-muted-foreground">{sender.sender_id}</p>
-                            {sender.quality_rating && (
-                              <p className="text-xs text-muted-foreground">Quality: {sender.quality_rating}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={sender.status === 'active' || sender.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                              {sender.status}
-                            </Badge>
-                            {exists ? (
-                              <Badge variant="outline" className="text-green-600">
-                                <Check className="h-3 w-3 mr-1" />
-                                Imported
-                              </Badge>
-                            ) : (
-                              <Button size="sm" onClick={() => handleImportSender('whatsapp', sender)}>
-                                <Download className="h-3 w-3 mr-1" />
-                                Import
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Viber Senders */}
-              <div>
-                <h4 className="font-semibold flex items-center gap-2 mb-3">
-                  <Smartphone className="h-4 w-4 text-purple-500" />
-                  Viber Senders ({infobipSenders.viber.length})
-                </h4>
-                {infobipSenders.viber.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-2">No Viber senders found</p>
-                ) : (
-                  <div className="space-y-2">
-                    {infobipSenders.viber.map((sender, i) => {
-                      const exists = channels.some(c => c.channel_type === 'viber' && c.sender_id === sender.sender_id);
-                      return (
-                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{sender.display_name || sender.sender_id}</p>
-                            <p className="text-sm text-muted-foreground">{sender.sender_id}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={sender.status === 'active' || sender.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                              {sender.status}
-                            </Badge>
-                            {exists ? (
-                              <Badge variant="outline" className="text-green-600">
-                                <Check className="h-3 w-3 mr-1" />
-                                Imported
-                              </Badge>
-                            ) : (
-                              <Button size="sm" onClick={() => handleImportSender('viber', sender)}>
-                                <Download className="h-3 w-3 mr-1" />
-                                Import
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {infobipSenders.sms.length === 0 && infobipSenders.whatsapp.length === 0 && infobipSenders.viber.length === 0 && (
-                <div className="text-center py-8">
-                  <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-semibold mb-2">No senders found</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your Infobip account doesn't have any SMS, WhatsApp, or Viber senders configured.
-                    <br />
-                    Please set up senders in the Infobip portal first.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowSyncModal(false)}>
-                Close
-              </Button>
-              {(infobipSenders.sms.length > 0 || infobipSenders.whatsapp.length > 0 || infobipSenders.viber.length > 0) && (
-                <Button onClick={handleImportAll} disabled={syncing}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Import All New
-                </Button>
-              )}
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };
@@ -546,6 +326,8 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
     max_send_rate: channel?.max_send_rate || 100,
     is_active: channel?.is_active ?? true,
     is_default: channel?.is_default ?? false,
+    // Twilio-specific config
+    messaging_service_sid: channel?.config?.messaging_service_sid || '',
   });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -556,7 +338,7 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
     if (!formData.sender_id) {
       toast({
         title: 'Error',
-        description: 'Sender ID is required',
+        description: 'Phone number is required',
         variant: 'destructive',
       });
       return;
@@ -565,17 +347,33 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
     try {
       setSaving(true);
 
+      // Build config object based on channel type
+      const config: Record<string, any> = {};
+      if (formData.channel_type === 'whatsapp' && formData.messaging_service_sid) {
+        config.messaging_service_sid = formData.messaging_service_sid;
+      }
+
+      const channelData = {
+        channel_type: formData.channel_type,
+        sender_id: formData.sender_id,
+        display_name: formData.display_name,
+        daily_quota: formData.daily_quota,
+        max_send_rate: formData.max_send_rate,
+        is_active: formData.is_active,
+        is_default: formData.is_default,
+        config,
+      };
+
       if (channel) {
-        await messagingService.updateChannel(channel.id, formData);
+        await messagingService.updateChannel(channel.id, channelData);
         toast({
           title: 'Success',
           description: 'Channel updated successfully',
         });
       } else {
         await messagingService.createChannel({
-          ...formData,
-          provider: 'infobip',
-          config: {},
+          ...channelData,
+          provider: 'twilio',
         });
         toast({
           title: 'Success',
@@ -603,6 +401,9 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
           <DialogTitle>
             {channel ? 'Edit Channel' : 'Add Messaging Channel'}
           </DialogTitle>
+          <DialogDescription>
+            Configure a Twilio messaging channel for SMS or WhatsApp.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -619,24 +420,36 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
               <SelectContent>
                 <SelectItem value="sms">SMS</SelectItem>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="viber">Viber</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
-            <Label>Sender ID / Phone Number</Label>
+            <Label>Phone Number</Label>
             <Input
               value={formData.sender_id}
               onChange={(e) => setFormData({ ...formData, sender_id: e.target.value })}
-              placeholder={formData.channel_type === 'sms' ? 'YourBrand or +1234567890' : '+1234567890'}
+              placeholder="+1234567890"
             />
             <p className="text-xs text-muted-foreground">
-              {formData.channel_type === 'sms'
-                ? 'Alphanumeric sender ID or phone number'
-                : 'Phone number in E.164 format'}
+              Your Twilio phone number in E.164 format
             </p>
           </div>
+
+          {/* WhatsApp-specific: Messaging Service SID */}
+          {formData.channel_type === 'whatsapp' && (
+            <div className="space-y-2">
+              <Label>Messaging Service SID (Optional)</Label>
+              <Input
+                value={formData.messaging_service_sid}
+                onChange={(e) => setFormData({ ...formData, messaging_service_sid: e.target.value })}
+                placeholder="MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              />
+              <p className="text-xs text-muted-foreground">
+                Twilio Messaging Service SID for WhatsApp (found in Twilio Console)
+              </p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Display Name (Optional)</Label>
@@ -645,6 +458,9 @@ const ChannelModal: React.FC<ChannelModalProps> = ({ channel, onClose, onSuccess
               onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
               placeholder="Marketing SMS"
             />
+            <p className="text-xs text-muted-foreground">
+              Friendly name shown in the admin panel
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

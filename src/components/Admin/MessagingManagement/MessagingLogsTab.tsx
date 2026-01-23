@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Phone, MessageCircle, Smartphone, Search, Filter } from 'lucide-react';
+import { RefreshCw, Phone, MessageCircle, Search, Filter } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -16,7 +16,6 @@ import { format } from 'date-fns';
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
   sms: <Phone className="h-4 w-4" />,
   whatsapp: <MessageCircle className="h-4 w-4 text-green-500" />,
-  viber: <Smartphone className="h-4 w-4 text-purple-500" />,
 };
 
 const statusColors: Record<MessageStatus, string> = {
@@ -99,7 +98,6 @@ export const MessagingLogsTab: React.FC = () => {
               <SelectItem value="all">All Channels</SelectItem>
               <SelectItem value="sms">SMS</SelectItem>
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              <SelectItem value="viber">Viber</SelectItem>
             </SelectContent>
           </Select>
           <Select value={filterStatus} onValueChange={setFilterStatus}>

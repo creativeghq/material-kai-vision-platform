@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, UserX, Search, Phone, MessageCircle, Smartphone } from 'lucide-react';
+import { Plus, Trash2, UserX, Search, Phone, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -18,7 +18,6 @@ import { format } from 'date-fns';
 const channelIcons: Record<string, React.ReactNode> = {
   sms: <Phone className="h-4 w-4" />,
   whatsapp: <MessageCircle className="h-4 w-4 text-green-500" />,
-  viber: <Smartphone className="h-4 w-4 text-purple-500" />,
   all: <UserX className="h-4 w-4 text-red-500" />,
 };
 
@@ -113,7 +112,6 @@ export const MessagingOptoutsTab: React.FC = () => {
               <SelectItem value="all">All Channels</SelectItem>
               <SelectItem value="sms">SMS</SelectItem>
               <SelectItem value="whatsapp">WhatsApp</SelectItem>
-              <SelectItem value="viber">Viber</SelectItem>
             </SelectContent>
           </Select>
           <div className="flex-1 min-w-[200px]">
@@ -131,7 +129,7 @@ export const MessagingOptoutsTab: React.FC = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="dashboard-card">
           <div className="text-sm text-muted-foreground">Total Opt-outs</div>
           <div className="text-2xl font-bold">{optouts.length}</div>
@@ -146,12 +144,6 @@ export const MessagingOptoutsTab: React.FC = () => {
           <div className="text-sm text-muted-foreground">WhatsApp Opt-outs</div>
           <div className="text-2xl font-bold">
             {optouts.filter(o => o.channel_type === 'whatsapp').length}
-          </div>
-        </div>
-        <div className="dashboard-card">
-          <div className="text-sm text-muted-foreground">Viber Opt-outs</div>
-          <div className="text-2xl font-bold">
-            {optouts.filter(o => o.channel_type === 'viber').length}
           </div>
         </div>
       </div>
@@ -318,7 +310,6 @@ const AddOptoutModal: React.FC<AddOptoutModalProps> = ({ onClose, onSuccess }) =
                 <SelectItem value="all">All Channels</SelectItem>
                 <SelectItem value="sms">SMS Only</SelectItem>
                 <SelectItem value="whatsapp">WhatsApp Only</SelectItem>
-                <SelectItem value="viber">Viber Only</SelectItem>
               </SelectContent>
             </Select>
           </div>

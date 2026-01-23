@@ -2,10 +2,11 @@
 
 ## Overview
 
-The Messaging API is a Supabase Edge Function that handles multi-channel messaging (SMS, WhatsApp, Viber) using Infobip as the unified provider.
+The Messaging API is a Supabase Edge Function that handles multi-channel messaging (SMS, WhatsApp) using **Twilio** as the unified provider.
 
 **Edge Function:** `messaging-api`
 **Base URL:** `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/messaging-api`
+**Twilio Docs:** https://www.twilio.com/docs/messaging/api
 
 ## Authentication
 
@@ -15,13 +16,23 @@ All requests require authentication via Supabase Auth:
 Authorization: Bearer <supabase_access_token>
 ```
 
+## Provider: Twilio
+
+The messaging service uses [Twilio](https://www.twilio.com/docs/messaging/api) for all channels:
+- **SMS**: Send SMS with sender ID support - [Docs](https://www.twilio.com/docs/messaging/services/api)
+- **WhatsApp**: Text, template, and media messages - [Docs](https://www.twilio.com/docs/whatsapp/api)
+
+### Twilio Authentication
+
+Twilio uses Basic authentication with Account SID and Auth Token.
+
 ## Actions
 
 The API uses an action-based routing system. All requests are POST with an `action` parameter.
 
 ### 1. Send Message
 
-Send a single message via SMS, WhatsApp, or Viber.
+Send a single message via SMS or WhatsApp.
 
 **Action:** `send`
 
@@ -29,22 +40,17 @@ Send a single message via SMS, WhatsApp, or Viber.
 ```typescript
 {
   action: 'send',
-  channel: 'sms' | 'whatsapp' | 'viber',  // Channel type (required)
-  to: string,                               // Recipient phone number (E.164 format)
-  from?: string,                            // Sender ID (uses default if not provided)
-  content?: string,                         // Message content (required if no template)
-  templateSlug?: string,                    // Template slug from messaging_templates
-  variables?: Record<string, string>,       // Variables for template rendering
-  mediaUrl?: string,                        // Media URL for MMS/rich messages
-  buttons?: Array<{                         // Interactive buttons (WhatsApp/Viber)
-    type: 'url' | 'call' | 'reply',
-    text: string,
-    url?: string
-  }>,
+  channel: 'sms' | 'whatsapp',           // Channel type (required)
+  to: string,                             // Recipient phone number (E.164 format)
+  from?: string,                          // Sender ID (uses default if not provided)
+  content?: string,                       // Message content (required if no template)
+  templateSlug?: string,                  // Template slug from messaging_templates
+  variables?: Record<string, string>,     // Variables for template rendering
+  mediaUrl?: string,                      // Media URL for MMS/rich messages
   messageType?: 'transactional' | 'marketing' | 'otp',
-  callbackData?: string,                    // Custom data for delivery reports
-  tags?: Record<string, string>,            // Custom tags for tracking
-  scheduledAt?: string                      // ISO date for scheduled sending
+  tags?: Record<string, string>,          // Custom tags for tracking
+  // WhatsApp template specific
+  whatsappContentSid?: string,            // Twilio Content SID for approved templates
 }
 ```
 
@@ -52,7 +58,7 @@ Send a single message via SMS, WhatsApp, or Viber.
 ```typescript
 {
   success: true,
-  messageId: string,    // Infobip message ID
+  messageId: string,    // Twilio message SID
   logId: string         // messaging_logs record ID
 }
 ```
@@ -80,16 +86,15 @@ Send messages to multiple recipients.
 ```typescript
 {
   action: 'send-bulk',
-  channel: 'sms' | 'whatsapp' | 'viber',
-  to: string[],                             // Array of phone numbers
+  channel: 'sms' | 'whatsapp',
+  recipients: Array<{
+    to: string,
+    variables?: Record<string, string>
+  }>,
   from?: string,
   content?: string,
   templateSlug?: string,
   variables?: Record<string, string>,       // Applied to all messages
-  recipientVariables?: Array<{              // Per-recipient variables
-    to: string,
-    variables: Record<string, string>
-  }>,
   messageType?: 'transactional' | 'marketing' | 'otp',
   tags?: Record<string, string>
 }
@@ -99,12 +104,16 @@ Send messages to multiple recipients.
 ```typescript
 {
   success: true,
-  bulkId: string,          // Infobip bulk ID
-  totalSent: number,
-  messages: Array<{
+  bulkId: string,
+  total: number,
+  sent: number,
+  failed: number,
+  optedOut: number,
+  results: Array<{
     to: string,
-    messageId: string,
-    status: 'pending' | 'sent' | 'failed'
+    status: 'sent' | 'failed' | 'opted_out',
+    messageId?: string,
+    error?: string
   }>
 }
 ```
@@ -119,7 +128,7 @@ Retrieve configured messaging channels.
 ```typescript
 {
   action: 'channels',
-  channelType?: 'sms' | 'whatsapp' | 'viber'  // Filter by type
+  channelType?: 'sms' | 'whatsapp'  // Filter by type
 }
 ```
 
@@ -129,13 +138,17 @@ Retrieve configured messaging channels.
   success: true,
   channels: Array<{
     id: string,
-    channelType: 'sms' | 'whatsapp' | 'viber',
-    senderId: string,
-    displayName: string,
-    isActive: boolean,
-    isDefault: boolean,
-    dailyQuota: number,
-    maxSendRate: number
+    channel_type: 'sms' | 'whatsapp',
+    provider: 'twilio',
+    sender_id: string,
+    display_name: string,
+    is_active: boolean,
+    is_default: boolean,
+    config: {
+      messaging_service_sid?: string    // For WhatsApp
+    },
+    daily_quota: number,
+    max_send_rate: number
   }>
 }
 ```
@@ -150,8 +163,7 @@ Retrieve messaging templates.
 ```typescript
 {
   action: 'templates',
-  channelType?: 'sms' | 'whatsapp' | 'viber',  // Filter by channel
-  category?: 'transactional' | 'marketing' | 'otp'
+  channelType?: 'sms' | 'whatsapp'
 }
 ```
 
@@ -163,14 +175,14 @@ Retrieve messaging templates.
     id: string,
     name: string,
     slug: string,
-    channelType: string,
+    channel_type: string,
     content: string,
     variables: string[],
     category: string,
-    isApproved: boolean,        // For WhatsApp templates
-    isActive: boolean,
-    createdAt: string,
-    updatedAt: string
+    is_approved: boolean,        // For WhatsApp templates
+    is_active: boolean,
+    created_at: string,
+    updated_at: string
   }>
 }
 ```
@@ -185,13 +197,10 @@ Retrieve message delivery logs.
 ```typescript
 {
   action: 'logs',
-  channelType?: 'sms' | 'whatsapp' | 'viber',
-  status?: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'rejected',
-  startDate?: string,           // ISO date string
-  endDate?: string,             // ISO date string
-  toNumber?: string,            // Filter by recipient
-  limit?: number,               // Default: 50, max: 200
-  offset?: number
+  channelType?: 'sms' | 'whatsapp',
+  status?: 'queued' | 'sent' | 'delivered' | 'read' | 'failed',
+  messageType?: 'transactional' | 'marketing' | 'otp',
+  limit?: number               // Default: 50
 }
 ```
 
@@ -201,23 +210,22 @@ Retrieve message delivery logs.
   success: true,
   logs: Array<{
     id: string,
-    channelType: string,
-    fromNumber: string,
-    toNumber: string,
+    channel_type: string,
+    from_number: string,
+    to_number: string,
     content: string,
     status: string,
-    sentAt: string | null,
-    deliveredAt: string | null,
-    readAt: string | null,
-    failedAt: string | null,
-    errorCode: string | null,
-    errorMessage: string | null,
+    sent_at: string | null,
+    delivered_at: string | null,
+    read_at: string | null,
+    failed_at: string | null,
+    error_code: string | null,
+    error_message: string | null,
     cost: number | null,
     currency: string,
-    createdAt: string
-  }>,
-  total: number,
-  hasMore: boolean
+    segment_count: number | null,
+    created_at: string
+  }>
 }
 ```
 
@@ -231,10 +239,11 @@ Retrieve messaging analytics and statistics.
 ```typescript
 {
   action: 'analytics',
-  channelType?: 'sms' | 'whatsapp' | 'viber',
-  startDate?: string,           // ISO date string
-  endDate?: string,             // ISO date string
-  groupBy?: 'day' | 'week' | 'month'
+  channelType?: 'sms' | 'whatsapp',
+  dateRange?: {
+    start: string,    // ISO date string
+    end: string       // ISO date string
+  }
 }
 ```
 
@@ -242,36 +251,29 @@ Retrieve messaging analytics and statistics.
 ```typescript
 {
   success: true,
-  analytics: {
-    summary: {
-      totalSent: number,
-      totalDelivered: number,
-      totalRead: number,
-      totalFailed: number,
-      totalCost: number,
-      deliveryRate: number,
-      readRate: number
-    },
-    byChannel: {
-      sms: { sent: number, delivered: number, failed: number, cost: number },
-      whatsapp: { sent: number, delivered: number, read: number, failed: number, cost: number },
-      viber: { sent: number, delivered: number, read: number, failed: number, cost: number }
-    },
-    timeSeries: Array<{
-      date: string,
-      sent: number,
-      delivered: number,
-      read: number,
-      failed: number,
-      cost: number
-    }>
-  }
+  totalSent: number,
+  totalDelivered: number,
+  totalRead: number,
+  totalFailed: number,
+  totalCost: number,
+  deliveryRate: number,      // Percentage
+  readRate: number,          // Percentage
+  failureRate: number,       // Percentage
+  dailyData: Array<{
+    date: string,
+    channel_type: string,
+    total_sent: number,
+    total_delivered: number,
+    total_read: number,
+    total_failed: number,
+    total_cost: number
+  }>
 }
 ```
 
 ### 7. Get Account Balance
 
-Check Infobip account balance and quota.
+Check Twilio account balance.
 
 **Action:** `balance`
 
@@ -286,81 +288,15 @@ Check Infobip account balance and quota.
 ```typescript
 {
   success: true,
-  balance: {
-    amount: number,
-    currency: string,
-    creditLimit: number | null
-  },
-  quota: {
-    sms: { daily: number, used: number, remaining: number },
-    whatsapp: { daily: number, used: number, remaining: number },
-    viber: { daily: number, used: number, remaining: number }
-  }
+  balance: number,
+  currency: string,
+  raw: object           // Full Twilio response
 }
 ```
 
-### 8. Sync Senders
+### 8. Send Test Message
 
-Synchronize sender IDs from Infobip.
-
-**Action:** `sync-senders`
-
-**Request:**
-```typescript
-{
-  action: 'sync-senders'
-}
-```
-
-**Response:**
-```typescript
-{
-  success: true,
-  synced: {
-    sms: number,
-    whatsapp: number,
-    viber: number
-  },
-  total: number
-}
-```
-
-### 9. Get WhatsApp Templates
-
-Retrieve WhatsApp Business template status from Infobip/Meta.
-
-**Action:** `whatsapp-templates`
-
-**Request:**
-```typescript
-{
-  action: 'whatsapp-templates',
-  status?: 'APPROVED' | 'PENDING' | 'REJECTED'
-}
-```
-
-**Response:**
-```typescript
-{
-  success: true,
-  templates: Array<{
-    name: string,
-    namespace: string,
-    status: 'APPROVED' | 'PENDING' | 'REJECTED',
-    category: string,
-    language: string,
-    components: Array<{
-      type: 'HEADER' | 'BODY' | 'FOOTER' | 'BUTTONS',
-      text?: string,
-      format?: string
-    }>
-  }>
-}
-```
-
-### 10. Send Test Message
-
-Send a test message for template preview.
+Send a test message for campaign preview.
 
 **Action:** `send-test`
 
@@ -368,11 +304,8 @@ Send a test message for template preview.
 ```typescript
 {
   action: 'send-test',
-  channel: 'sms' | 'whatsapp' | 'viber',
-  to: string,                   // Test phone number
-  templateSlug?: string,
-  content?: string,
-  variables?: Record<string, string>
+  campaignId: string,     // Campaign ID
+  testNumber: string      // Test phone number
 }
 ```
 
@@ -380,55 +313,51 @@ Send a test message for template preview.
 ```typescript
 {
   success: true,
-  messageId: string,
-  preview: {
-    renderedContent: string,
-    characterCount: number,
-    segmentCount: number      // For SMS only
-  }
+  messageId: string
 }
 ```
 
 ## Webhook Endpoint
 
-The `messaging-webhook` edge function handles delivery reports from Infobip.
+The `messaging-webhook` edge function handles delivery reports and status callbacks from Twilio.
 
 **Edge Function:** `messaging-webhook`
 **URL:** `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/messaging-webhook`
 
-### Supported Events
+### Webhook Types
 
-- **DELIVERED** - Message delivered to recipient
-- **SEEN** / **READ** - Message read (WhatsApp/Viber)
-- **FAILED** - Delivery failed
-- **REJECTED** - Message rejected
-- **UNDELIVERED** - Could not be delivered
+Use query parameter `?type=` to specify webhook type:
 
-### Webhook Payload
+| Type | Description |
+|------|-------------|
+| `status` (default) | Delivery reports (SMS, WhatsApp) |
+| `incoming` | Incoming messages (SMS, WhatsApp) |
+
+### Twilio Status Callback Payload
+
+Twilio sends status callbacks as form-urlencoded POST data:
 
 ```typescript
 {
-  results: Array<{
-    messageId: string,
-    to: string,
-    status: {
-      groupName: 'DELIVERED' | 'UNDELIVERED' | 'SEEN' | 'REJECTED',
-      name: string,
-      description: string
-    },
-    error?: {
-      groupName: string,
-      name: string,
-      description: string
-    },
-    doneAt: string,
-    price?: {
-      pricePerMessage: number,
-      currency: string
-    }
-  }]
+  MessageSid: string,
+  MessageStatus: 'accepted' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed' | 'read',
+  To: string,
+  From: string,
+  ErrorCode?: string,
+  ErrorMessage?: string,
+  Price?: string,
+  PriceUnit?: string
 }
 ```
+
+### Supported Events
+
+| Event | Action |
+|-------|--------|
+| `delivered` | Updates message status to 'delivered' |
+| `read` | Updates message status to 'read' |
+| `undelivered` / `failed` | Updates message status to 'failed' |
+| Incoming STOP keyword | Adds to opt-out list |
 
 ## Database Schema
 
@@ -437,13 +366,13 @@ The `messaging-webhook` edge function handles delivery reports from Infobip.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | Primary key |
-| channel_type | TEXT | 'sms', 'whatsapp', or 'viber' |
-| provider | TEXT | Default: 'infobip' |
-| sender_id | TEXT | Phone number or sender name |
+| channel_type | TEXT | 'sms' or 'whatsapp' |
+| provider | TEXT | 'twilio' |
+| sender_id | TEXT | Phone number in E.164 format |
 | display_name | TEXT | Friendly name |
 | is_active | BOOLEAN | Whether channel is active |
 | is_default | BOOLEAN | Default channel for type |
-| config | JSONB | Channel-specific config |
+| config | JSONB | Twilio-specific config (messaging_service_sid for WhatsApp) |
 | daily_quota | INTEGER | Daily sending limit |
 | max_send_rate | INTEGER | Messages per minute |
 
@@ -460,7 +389,7 @@ The `messaging-webhook` edge function handles delivery reports from Infobip.
 | buttons | JSONB | Interactive buttons |
 | variables | TEXT[] | List of variable names |
 | category | TEXT | 'transactional', 'marketing', 'otp' |
-| whatsapp_template_name | TEXT | Meta template name |
+| whatsapp_content_sid | TEXT | Twilio Content SID for approved templates |
 | is_approved | BOOLEAN | WhatsApp approval status |
 | is_active | BOOLEAN | Whether template is active |
 
@@ -472,8 +401,7 @@ The `messaging-webhook` edge function handles delivery reports from Infobip.
 | channel_type | TEXT | Channel used |
 | template_id | UUID | FK to messaging_templates |
 | channel_id | UUID | FK to messaging_channels |
-| provider_message_id | TEXT | Infobip message ID |
-| bulk_id | TEXT | Infobip bulk ID |
+| provider_message_id | TEXT | Twilio message SID |
 | from_number | TEXT | Sender |
 | to_number | TEXT | Recipient |
 | content | TEXT | Message content |
@@ -485,7 +413,8 @@ The `messaging-webhook` edge function handles delivery reports from Infobip.
 | error_code | TEXT | Error code |
 | error_message | TEXT | Error description |
 | cost | DECIMAL | Message cost |
-| currency | TEXT | Cost currency |
+| currency | TEXT | Cost currency (USD) |
+| segment_count | INTEGER | SMS segment count |
 | variables | JSONB | Variables used |
 | tags | JSONB | Custom tags |
 
@@ -495,9 +424,10 @@ The `messaging-webhook` edge function handles delivery reports from Infobip.
 |--------|------|-------------|
 | id | UUID | Primary key |
 | phone_number | TEXT | Opted-out number |
-| channel_type | TEXT | Channel type |
+| channel_type | TEXT | Channel type or 'all' |
 | opted_out_at | TIMESTAMPTZ | When opted out |
 | reason | TEXT | Opt-out reason |
+| source | TEXT | 'keyword', 'manual', 'api', 'complaint' |
 
 ## Error Handling
 
@@ -506,50 +436,80 @@ All errors return a standard format:
 ```typescript
 {
   success: false,
-  error: string,       // Error message
-  code?: string,       // Error code (e.g., 'INVALID_PHONE', 'QUOTA_EXCEEDED')
-  details?: object     // Additional error details
+  error: string       // Error message
 }
 ```
 
-### Common Error Codes
+### Common Error Messages
 
-| Code | Description |
-|------|-------------|
-| INVALID_PHONE | Invalid phone number format |
-| OPTED_OUT | Recipient has opted out |
-| QUOTA_EXCEEDED | Daily quota reached |
-| TEMPLATE_NOT_FOUND | Template slug not found |
-| TEMPLATE_NOT_APPROVED | WhatsApp template not approved |
-| CHANNEL_NOT_FOUND | Channel not configured |
-| INFOBIP_ERROR | Error from Infobip API |
-| INSUFFICIENT_BALANCE | Account balance too low |
+| Error | Description |
+|-------|-------------|
+| `Twilio credentials not configured` | Missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN |
+| `No default {channel} channel configured` | No default channel for the specified type |
+| `All recipients have opted out` | All recipients are in the opt-out list |
+| `Template not found` | Template slug doesn't exist |
+| `Twilio API error` | API error from Twilio |
 
-## Infobip API Reference
+## Twilio API Reference
 
-The API wraps the following Infobip endpoints:
+The API wraps the following Twilio endpoints:
 
-| Feature | Infobip Endpoint |
-|---------|------------------|
-| SMS | `/sms/2/text/advanced` |
-| WhatsApp | `/whatsapp/1/message/template` |
-| WhatsApp Text | `/whatsapp/1/message/text` |
-| Viber | `/viber/1/message/text` |
-| Delivery Reports | Webhook callback |
-| Balance | `/account/1/balance` |
+| Feature | Twilio Endpoint | Docs |
+|---------|-----------------|------|
+| SMS | `POST /Messages.json` | [Link](https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource) |
+| WhatsApp Text | `POST /Messages.json` | [Link](https://www.twilio.com/docs/whatsapp/api#sending-a-freeform-whatsapp-message) |
+| WhatsApp Template | `POST /Messages.json` with ContentSid | [Link](https://www.twilio.com/docs/content-api/send-a-content-api-resource) |
+| Balance | `GET /Balance.json` | [Link](https://www.twilio.com/docs/usage/api/balance) |
 
-## Related Documentation
+## Channel Configuration
 
-- [Email API](./email-api.md) - Similar pattern for email
-- [Campaign System](../campaign-system.md) - Multi-channel campaigns
-- [API Endpoints](../api-endpoints.md) - Complete API reference
+### SMS Channel
+
+```json
+{
+  "channel_type": "sms",
+  "provider": "twilio",
+  "sender_id": "+1234567890",
+  "config": {}
+}
+```
+
+### WhatsApp Channel
+
+```json
+{
+  "channel_type": "whatsapp",
+  "provider": "twilio",
+  "sender_id": "+1234567890",
+  "config": {
+    "messaging_service_sid": "MGxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+}
+```
 
 ## Environment Variables
 
 Required secrets in Supabase:
 
 ```
-INFOBIP_API_KEY=your_api_key
-INFOBIP_BASE_URL=https://api.infobip.com
-INFOBIP_WEBHOOK_SECRET=webhook_signing_secret
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
 ```
+
+Get your credentials from the [Twilio Console](https://console.twilio.com/).
+
+## Webhook Setup in Twilio
+
+1. Go to Twilio Console > Phone Numbers > Manage > Active Numbers
+2. Select your phone number
+3. Configure webhooks:
+   - **SMS Status Callback**: `https://your-project.supabase.co/functions/v1/messaging-webhook?type=status`
+   - **WhatsApp Status Callback**: `https://your-project.supabase.co/functions/v1/messaging-webhook?type=status`
+   - **Incoming Messages**: `https://your-project.supabase.co/functions/v1/messaging-webhook?type=incoming`
+
+## Related Documentation
+
+- [Email API](./email-api.md) - Similar pattern for email
+- [Campaign System](../campaign-system.md) - Multi-channel campaigns
+- [API Endpoints](../api-endpoints.md) - Complete API reference
+- [Twilio API Docs](https://www.twilio.com/docs/messaging/api) - Official Twilio documentation

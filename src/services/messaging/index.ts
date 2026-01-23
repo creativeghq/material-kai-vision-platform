@@ -28,11 +28,12 @@ export type {
   SendMessageOptions,
   SendBulkOptions,
   MessageLogFilters,
-  // Infobip types
-  InfobipConfig,
-  InfobipResponse,
-  InfobipDeliveryReport,
-  InfobipSeenReport,
+  // Twilio types
+  TwilioConfig,
+  TwilioMessageRequest,
+  TwilioMessageResponse,
+  TwilioStatusCallback,
+  TwilioIncomingMessage,
   // Analytics
   MessagingAnalyticsResponse,
   MessagingCampaignStats,

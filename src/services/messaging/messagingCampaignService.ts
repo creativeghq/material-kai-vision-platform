@@ -1,6 +1,6 @@
 /**
  * Messaging Campaign Service
- * Helper functions for managing SMS, WhatsApp, and Viber campaigns
+ * Helper functions for managing SMS and WhatsApp campaigns via Twilio
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -322,7 +322,7 @@ class MessagingCampaignService {
     let query = supabase
       .from('campaigns')
       .select('*')
-      .in('channel_type', ['sms', 'whatsapp', 'viber'])
+      .in('channel_type', ['sms', 'whatsapp'])
       .order('created_at', { ascending: false });
 
     if (channelType) {

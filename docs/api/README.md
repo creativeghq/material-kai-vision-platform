@@ -19,9 +19,9 @@ Email sending, domain verification, and analytics using AWS SES.
 - **Access:** Authenticated users
 
 #### [Messaging API](./messaging-api.md)
-Multi-channel messaging (SMS, WhatsApp, Viber) using Infobip.
+Multi-channel messaging (SMS, WhatsApp) using Twilio.
 - **Function:** `messaging-api`
-- **Features:** SMS, WhatsApp, Viber messaging, templates, delivery tracking, analytics
+- **Features:** SMS, WhatsApp messaging, templates, delivery tracking, analytics
 - **Access:** Authenticated users
 
 #### [CRM Contacts API](./crm-contacts-api.md)

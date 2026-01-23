@@ -8,11 +8,11 @@
 Complete reference of all consolidated API endpoints with detailed usage information, database operations, and integration points.
 
 **Recent Updates (v2.6.0 - January 2026):**
-- **MULTI-CHANNEL MESSAGING:** 10+ endpoints for SMS, WhatsApp, Viber via Infobip (NEW)
+- **MULTI-CHANNEL MESSAGING:** 10+ endpoints for SMS, WhatsApp via Twilio (NEW)
   - `POST /functions/v1/messaging-api` - Unified messaging API (action-based routing)
-  - Send single/bulk messages across SMS, WhatsApp, Viber
+  - Send single/bulk messages across SMS, WhatsApp
   - Template management with variable substitution
-  - Infobip sender sync (Numbers API, WhatsApp senders)
+  - Twilio Content API for WhatsApp templates
   - WhatsApp pre-approved template support
   - Delivery analytics and cost tracking
   - Opt-out compliance management
@@ -63,7 +63,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 - **METADATA MANAGEMENT:** 4 endpoints for scope detection, application, listing, and statistics
 
 **Total API Endpoints:** 140+ endpoints across 19 categories
-- **MULTI-CHANNEL MESSAGING:** SMS, WhatsApp, Viber messaging via Infobip ✨ NEW
+- **MULTI-CHANNEL MESSAGING:** SMS, WhatsApp messaging via Twilio ✨ NEW
 - **KNOWLEDGE BASE:** Complete documentation management system with AI embeddings
 - **FRONTEND UPDATED:** All API clients updated to use new consolidated endpoints
 - **FEATURES PRESERVED:** Prompt enhancement, category extraction, all processing modes intact
@@ -96,7 +96,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 16. [Job Health Routes](#16-job-health-routes) - Job monitoring and health checks
 17. [Suggestions Routes](#17-suggestions-routes) - Search suggestions and auto-complete
 18. [Spaceformer Routes](#18-spaceformer-routes) - Spatial analysis, room layout, accessibility ✨ NEW v2.4.0
-19. [Messaging Routes](#19-messaging-routes-sms-whatsapp-viber--new-v260) - SMS, WhatsApp, Viber via Infobip ✨ NEW v2.6.0
+19. [Messaging Routes](#19-messaging-routes-sms-whatsapp--new-v260) - SMS, WhatsApp via Twilio ✨ NEW v2.6.0
 
 ---
 
@@ -3787,23 +3787,23 @@ All endpoints return JSON:
 
 ---
 
-## 19. Messaging Routes (SMS, WhatsApp, Viber) ✨ NEW v2.6.0
+## 19. Messaging Routes (SMS, WhatsApp) ✨ NEW v2.6.0
 
 **Base Path:** Supabase Edge Function `/functions/v1/messaging-api`
-**Purpose:** Multi-channel messaging via Infobip (SMS, WhatsApp, Viber)
-**Provider:** Infobip - Single SDK for all channels
+**Purpose:** Multi-channel messaging via Twilio (SMS, WhatsApp)
+**Provider:** Twilio - Single API for all channels
 **Philosophy:** Unified messaging API with templates, campaigns, analytics, and compliance
 
 ### Environment Variables (Supabase Secrets)
 
 ```
-INFOBIP_API_KEY=your_api_key
-INFOBIP_BASE_URL=https://api.infobip.com (or your dedicated URL)
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=your_auth_token
 ```
 
 ### 19.1 POST /functions/v1/messaging-api (action: send)
 
-**Purpose:** Send a single message via SMS, WhatsApp, or Viber
+**Purpose:** Send a single message via SMS or WhatsApp
 **Used In:** Test messages, transactional notifications, OTP delivery
 
 **Request:**
@@ -3814,7 +3814,7 @@ Content-Type: application/json
 
 {
   "action": "send",
-  "channel": "sms" | "whatsapp" | "viber",
+  "channel": "sms" | "whatsapp",
   "to": "+1234567890",
   "content": "Your verification code is 123456",
   "from": "+1987654321",  // Optional, uses default channel if not provided
@@ -3822,14 +3822,9 @@ Content-Type: application/json
   "variables": {"code": "123456"},  // For template rendering
   "templateSlug": "otp-template",  // Optional template
   "mediaUrl": "https://...",  // For MMS/rich messages
-  "mediaType": "image" | "video" | "document" | "audio",
-  "buttons": [{"type": "url", "text": "Click Here", "url": "https://..."}],
   "tags": {"campaign": "welcome"},
-  "callbackData": "custom-tracking-id",
   // WhatsApp specific
-  "whatsappTemplateName": "order_confirmation",
-  "whatsappTemplateNamespace": "your_namespace",
-  "whatsappLanguageCode": "en"
+  "whatsappContentSid": "HXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"  // Twilio Content SID
 }
 ```
 
@@ -3837,25 +3832,14 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "messageId": "msg-uuid-12345",
-  "bulkId": "bulk-uuid-67890",
-  "logId": "log-uuid-abcde",
-  "messages": [
-    {
-      "id": "uuid",
-      "to_number": "+1234567890",
-      "status": "sent"
-    }
-  ]
+  "messageId": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "logId": "log-uuid-abcde"
 }
 ```
 
-**Infobip API Endpoints Used:**
-- SMS: `POST /sms/2/text/advanced`
-- WhatsApp Text: `POST /whatsapp/1/message/text`
-- WhatsApp Template: `POST /whatsapp/1/message/template`
-- WhatsApp Media: `POST /whatsapp/1/message/{mediaType}`
-- Viber: `POST /viber/1/message/promotional`
+**Twilio API Endpoints Used:**
+- SMS: `POST /2010-04-01/Accounts/{AccountSid}/Messages.json`
+- WhatsApp: `POST /2010-04-01/Accounts/{AccountSid}/Messages.json` (with `whatsapp:` prefix)
 
 ---
 
@@ -3916,7 +3900,7 @@ Content-Type: application/json
 
 {
   "action": "channels",
-  "channelType": "sms"  // Optional filter: "sms" | "whatsapp" | "viber"
+  "channelType": "sms"  // Optional filter: "sms" | "whatsapp"
 }
 ```
 
@@ -3928,7 +3912,7 @@ Content-Type: application/json
     {
       "id": "uuid",
       "channel_type": "sms",
-      "provider": "infobip",
+      "provider": "twilio",
       "sender_id": "+1234567890",
       "display_name": "Marketing SMS",
       "is_active": true,
@@ -4015,7 +3999,7 @@ Content-Type: application/json
     {
       "id": "uuid",
       "channel_type": "sms",
-      "provider_message_id": "infobip-msg-id",
+      "provider_message_id": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       "from_number": "+1234567890",
       "to_number": "+0987654321",
       "content": "Hello John!",
@@ -4023,7 +4007,7 @@ Content-Type: application/json
       "sent_at": "2025-01-15T10:30:00Z",
       "delivered_at": "2025-01-15T10:30:05Z",
       "cost": 0.0055,
-      "currency": "EUR"
+      "currency": "USD"
     }
   ]
 }
@@ -4060,7 +4044,7 @@ Content-Type: application/json
   "success": true,
   "totalSent": 10000,
   "totalDelivered": 9800,
-  "totalRead": 5000,  // WhatsApp/Viber only
+  "totalRead": 5000,  // WhatsApp only
   "totalFailed": 200,
   "totalCost": 55.00,
   "deliveryRate": 98.0,
@@ -4078,7 +4062,7 @@ Content-Type: application/json
 
 ### 19.7 POST /functions/v1/messaging-api (action: balance)
 
-**Purpose:** Get Infobip account balance
+**Purpose:** Get Twilio account balance
 **Used In:** Header balance display, billing monitoring
 
 **Request:**
@@ -4097,17 +4081,17 @@ Content-Type: application/json
 {
   "success": true,
   "balance": 150.50,
-  "currency": "EUR"
+  "currency": "USD"
 }
 ```
 
-**Infobip API Endpoint:** `GET /account/1/balance`
+**Twilio API Endpoint:** `GET /2010-04-01/Accounts/{AccountSid}/Balance.json`
 
 ---
 
 ### 19.8 POST /functions/v1/messaging-api (action: sync-senders)
 
-**Purpose:** Sync senders/numbers from Infobip account to local database
+**Purpose:** Sync senders/numbers from Twilio account to local database
 **Used In:** Channel sync button, initial setup
 
 **Request:**
@@ -4131,27 +4115,23 @@ Content-Type: application/json
       {"sender_id": "+1234567890", "display_name": "Marketing", "status": "active"}
     ],
     "whatsapp": [
-      {"sender_id": "+1234567890", "display_name": "Business", "status": "active", "quality_rating": "GREEN"}
-    ],
-    "viber": [
-      {"sender_id": "MyBrand", "display_name": "My Brand Viber", "status": "active"}
+      {"sender_id": "+1234567890", "display_name": "Business", "status": "active"}
     ]
   },
-  "total": 3,
+  "total": 2,
   "imported": true
 }
 ```
 
-**Infobip API Endpoints Used:**
-- Numbers: `GET /numbers/1/numbers` - List purchased phone numbers
-- WhatsApp: `GET /whatsapp/1/senders` - List WhatsApp business senders
-- Viber: `GET /viber/1/senders` - List Viber senders (if available)
+**Twilio API Endpoints Used:**
+- Phone Numbers: `GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json`
+- WhatsApp Senders: Configured via Twilio Console
 
 ---
 
 ### 19.9 POST /functions/v1/messaging-api (action: whatsapp-templates)
 
-**Purpose:** Fetch WhatsApp templates from Infobip for a specific sender
+**Purpose:** Fetch WhatsApp templates from Twilio Content API
 **Used In:** WhatsApp template selection, template sync
 
 **Request:**
@@ -4161,8 +4141,7 @@ Authorization: Bearer YOUR_JWT_TOKEN
 Content-Type: application/json
 
 {
-  "action": "whatsapp-templates",
-  "sender": "+1234567890"
+  "action": "whatsapp-templates"
 }
 ```
 
@@ -4172,19 +4151,20 @@ Content-Type: application/json
   "success": true,
   "templates": [
     {
-      "name": "order_confirmation",
-      "status": "APPROVED",
+      "sid": "HXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+      "friendly_name": "order_confirmation",
       "language": "en",
-      "category": "TRANSACTIONAL",
-      "structure": {
-        "body": {"text": "Hi {{1}}, your order {{2}} is confirmed."}
+      "types": {
+        "twilio/text": {
+          "body": "Hi {{1}}, your order {{2}} is confirmed."
+        }
       }
     }
   ]
 }
 ```
 
-**Infobip API Endpoint:** `GET /whatsapp/2/senders/{sender}/templates`
+**Twilio API Endpoint:** `GET /v1/Content` (Twilio Content API)
 
 ---
 
@@ -4216,44 +4196,35 @@ Content-Type: application/json
 
 ---
 
-### Infobip API Reference (Internal)
+### Twilio API Reference (Internal)
 
-**Base URL:** `https://api.infobip.com` (or dedicated instance URL)
-**Authentication:** `App {API_KEY}` header
+**Base URL:** `https://api.twilio.com`
+**Authentication:** HTTP Basic Auth (Account SID + Auth Token)
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/sms/2/text/advanced` | POST | Send SMS messages |
-| `/sms/1/reports` | GET | Get SMS delivery reports |
-| `/whatsapp/1/message/text` | POST | Send WhatsApp text message |
-| `/whatsapp/1/message/template` | POST | Send WhatsApp template message |
-| `/whatsapp/1/message/image` | POST | Send WhatsApp image |
-| `/whatsapp/1/message/video` | POST | Send WhatsApp video |
-| `/whatsapp/1/message/document` | POST | Send WhatsApp document |
-| `/whatsapp/1/senders` | GET | List WhatsApp senders |
-| `/whatsapp/1/senders/quality` | GET | Get WhatsApp sender quality |
-| `/whatsapp/2/senders/{sender}/templates` | GET | Get WhatsApp templates |
-| `/viber/1/message/promotional` | POST | Send Viber promotional message |
-| `/numbers/1/numbers` | GET | List purchased phone numbers |
-| `/account/1/balance` | GET | Get account balance |
+| `/2010-04-01/Accounts/{AccountSid}/Messages.json` | POST | Send SMS/WhatsApp messages |
+| `/2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json` | GET | List phone numbers |
+| `/2010-04-01/Accounts/{AccountSid}/Balance.json` | GET | Get account balance |
+| `/v1/Content` | GET | List WhatsApp content templates (Content API) |
 
-**Documentation:** https://www.infobip.com/docs/api/channels
+**Documentation:** https://www.twilio.com/docs/messaging/api
 
 ---
 
 ### Database Tables
 
 ```sql
--- Messaging channels (SMS, WhatsApp, Viber senders)
+-- Messaging channels (SMS, WhatsApp senders)
 messaging_channels (
   id UUID PRIMARY KEY,
-  channel_type TEXT NOT NULL,  -- 'sms' | 'whatsapp' | 'viber'
-  provider TEXT DEFAULT 'infobip',
+  channel_type TEXT NOT NULL,  -- 'sms' | 'whatsapp'
+  provider TEXT DEFAULT 'twilio',
   sender_id TEXT NOT NULL,
   display_name TEXT,
   is_active BOOLEAN DEFAULT true,
   is_default BOOLEAN DEFAULT false,
-  config JSONB DEFAULT '{}',
+  config JSONB DEFAULT '{}',  -- messaging_service_sid for WhatsApp
   daily_quota INTEGER DEFAULT 10000,
   max_send_rate INTEGER DEFAULT 100
 )
@@ -4267,7 +4238,7 @@ messaging_templates (
   content TEXT NOT NULL,
   variables TEXT[],
   category TEXT DEFAULT 'marketing',
-  whatsapp_template_name TEXT,
+  whatsapp_content_sid TEXT,  -- Twilio Content SID for approved templates
   is_approved BOOLEAN DEFAULT false,
   is_active BOOLEAN DEFAULT true
 )
@@ -4276,7 +4247,7 @@ messaging_templates (
 messaging_logs (
   id UUID PRIMARY KEY,
   channel_type TEXT NOT NULL,
-  provider_message_id TEXT,
+  provider_message_id TEXT,  -- Twilio Message SID
   from_number TEXT NOT NULL,
   to_number TEXT NOT NULL,
   content TEXT,
@@ -4285,7 +4256,7 @@ messaging_logs (
   delivered_at TIMESTAMPTZ,
   read_at TIMESTAMPTZ,
   cost DECIMAL(10,4),
-  currency TEXT DEFAULT 'EUR'
+  currency TEXT DEFAULT 'USD'
 )
 
 -- Analytics (aggregated daily)
@@ -4319,11 +4290,10 @@ messaging_optouts (
 **Last Updated:** January 2026
 
 **New in v2.6.0:**
-- ✨ Multi-channel Messaging (SMS, WhatsApp, Viber) via Infobip
+- ✨ Multi-channel Messaging (SMS, WhatsApp) via Twilio
 - ✨ Unified messaging templates with variable substitution
 - ✨ Bulk messaging with recipient-specific variables
-- ✨ Infobip sender sync (Numbers API, WhatsApp senders)
-- ✨ WhatsApp template support (pre-approved templates)
+- ✨ WhatsApp template support via Twilio Content API
 - ✨ Delivery analytics and cost tracking
 - ✨ Opt-out compliance management
 
@@ -4344,5 +4314,5 @@ messaging_optouts (
 - ✅ Advanced duplicate detection
 - ✅ Data import with AI field mapping
 - ✅ Spatial analysis with Claude Vision
-- ✅ Multi-channel messaging via Infobip
+- ✅ Multi-channel messaging via Twilio
 - ✅ Full FastAPI documentation at `/docs` and `/redoc`

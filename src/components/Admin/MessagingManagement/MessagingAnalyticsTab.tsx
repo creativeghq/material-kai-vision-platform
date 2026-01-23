@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign, Phone, MessageCircle, Smartphone } from 'lucide-react';
+import { RefreshCw, Send, CheckCircle, Eye, XCircle, DollarSign, Phone, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -126,7 +126,6 @@ export const MessagingAnalyticsTab: React.FC = () => {
                 <SelectItem value="all">All Channels</SelectItem>
                 <SelectItem value="sms">SMS</SelectItem>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="viber">Viber</SelectItem>
               </SelectContent>
             </Select>
             <Select value={dateRange} onValueChange={setDateRange}>
@@ -187,15 +186,15 @@ export const MessagingAnalyticsTab: React.FC = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <StatCard
               title="Total Cost"
-              value={`${analytics.totalCost.toFixed(2)} EUR`}
-              subtitle={`Average: ${(analytics.totalSent > 0 ? analytics.totalCost / analytics.totalSent : 0).toFixed(4)} EUR/msg`}
+              value={`${analytics.totalCost.toFixed(2)} USD`}
+              subtitle={`Average: ${(analytics.totalSent > 0 ? analytics.totalCost / analytics.totalSent : 0).toFixed(4)} USD/msg`}
               icon={<DollarSign className="h-5 w-5 text-yellow-500" />}
             />
             {accountBalance && (
               <StatCard
                 title="Account Balance"
                 value={`${accountBalance.balance.toFixed(2)} ${accountBalance.currency}`}
-                subtitle="Infobip account balance"
+                subtitle="Twilio account balance"
                 icon={<DollarSign className="h-5 w-5 text-green-500" />}
               />
             )}
@@ -205,8 +204,8 @@ export const MessagingAnalyticsTab: React.FC = () => {
           {filterChannel === 'all' && analytics.dailyData && analytics.dailyData.length > 0 && (
             <div className="dashboard-card">
               <h4 className="font-semibold mb-4">Channel Breakdown</h4>
-              <div className="grid gap-4 md:grid-cols-3">
-                {['sms', 'whatsapp', 'viber'].map((channel) => {
+              <div className="grid gap-4 md:grid-cols-2">
+                {['sms', 'whatsapp'].map((channel) => {
                   const channelData = analytics.dailyData?.filter(d => d.channel_type === channel) || [];
                   const totalSent = channelData.reduce((sum, d) => sum + d.total_sent, 0);
                   const totalDelivered = channelData.reduce((sum, d) => sum + d.total_delivered, 0);
@@ -215,7 +214,6 @@ export const MessagingAnalyticsTab: React.FC = () => {
                   const icons: Record<string, React.ReactNode> = {
                     sms: <Phone className="h-5 w-5" />,
                     whatsapp: <MessageCircle className="h-5 w-5 text-green-500" />,
-                    viber: <Smartphone className="h-5 w-5 text-purple-500" />,
                   };
 
                   return (
@@ -235,7 +233,7 @@ export const MessagingAnalyticsTab: React.FC = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Cost</span>
-                          <span>{totalCost.toFixed(2)} EUR</span>
+                          <span>{totalCost.toFixed(2)} USD</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Delivery Rate</span>

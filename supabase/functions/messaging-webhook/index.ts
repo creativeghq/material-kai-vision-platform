@@ -1,6 +1,8 @@
 /**
  * Messaging Webhook Handler
- * Handles delivery reports, read receipts, and opt-out requests from Infobip
+ * Handles delivery reports and status callbacks from Twilio
+ * @see https://www.twilio.com/docs/messaging/guides/webhook-request
+ * @see https://www.twilio.com/docs/usage/webhooks/messaging-webhooks
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -12,80 +14,116 @@ const corsHeaders = {
 };
 
 // =====================================================
-// Types
+// Twilio Webhook Types
+// @see https://www.twilio.com/docs/usage/webhooks/messaging-webhooks
 // =====================================================
 
-interface InfobipDeliveryReport {
-  results: Array<{
-    bulkId?: string;
-    messageId: string;
-    to: string;
-    sender?: string;
-    sentAt?: string;
-    doneAt?: string;
-    messageCount?: number;
-    price?: {
-      pricePerMessage: number;
-      currency: string;
-    };
-    status: {
-      groupId: number;
-      groupName: 'PENDING' | 'UNDELIVERABLE' | 'DELIVERED' | 'EXPIRED' | 'REJECTED' | 'ACCEPTED';
-      id: number;
-      name: string;
-      description: string;
-    };
-    error?: {
-      groupId: number;
-      groupName: string;
-      id: number;
-      name: string;
-      description: string;
-      permanent: boolean;
-    };
-    callbackData?: string;
-  }>;
+/**
+ * Twilio Status Callback Parameters
+ * Sent as form-urlencoded POST data
+ */
+interface TwilioStatusCallback {
+  MessageSid: string;
+  MessageStatus: 'accepted' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed' | 'read';
+  To: string;
+  From: string;
+  ApiVersion?: string;
+  AccountSid?: string;
+  ErrorCode?: string;
+  ErrorMessage?: string;
+  // SMS specific
+  SmsSid?: string;
+  SmsStatus?: string;
+  // WhatsApp specific
+  ChannelPrefix?: string;
+  // Pricing
+  Price?: string;
+  PriceUnit?: string;
 }
 
-interface InfobipSeenReport {
-  results: Array<{
-    messageId: string;
-    to: string;
-    seenAt: string;
-    sender?: string;
-    callbackData?: string;
-  }>;
-}
-
-interface InfobipIncomingMessage {
-  results: Array<{
-    messageId: string;
-    from: string;
-    to: string;
-    text: string;
-    receivedAt: string;
-    keyword?: string;
-    callbackData?: string;
-  }>;
+/**
+ * Twilio Incoming Message Parameters
+ */
+interface TwilioIncomingMessage {
+  MessageSid: string;
+  From: string;
+  To: string;
+  Body: string;
+  NumMedia?: string;
+  MediaContentType0?: string;
+  MediaUrl0?: string;
+  // WhatsApp specific
+  ProfileName?: string;
+  WaId?: string;
 }
 
 // =====================================================
 // Status Mapping
 // =====================================================
 
-function mapInfobipStatus(groupName: string): 'sent' | 'delivered' | 'failed' | 'rejected' | 'expired' {
-  switch (groupName) {
-    case 'DELIVERED':
+function mapTwilioStatus(status: string): 'queued' | 'sent' | 'delivered' | 'read' | 'failed' {
+  switch (status.toLowerCase()) {
+    case 'accepted':
+    case 'queued':
+    case 'sending':
+      return 'queued';
+    case 'sent':
+      return 'sent';
+    case 'delivered':
       return 'delivered';
-    case 'UNDELIVERABLE':
-    case 'REJECTED':
+    case 'read':
+      return 'read';
+    case 'undelivered':
+    case 'failed':
       return 'failed';
-    case 'EXPIRED':
-      return 'expired';
-    case 'PENDING':
-    case 'ACCEPTED':
     default:
       return 'sent';
+  }
+}
+
+function getChannelTypeFromNumber(phoneNumber: string): 'sms' | 'whatsapp' {
+  if (phoneNumber.startsWith('whatsapp:')) {
+    return 'whatsapp';
+  }
+  return 'sms';
+}
+
+function cleanPhoneNumber(phoneNumber: string): string {
+  return phoneNumber.replace('whatsapp:', '');
+}
+
+// =====================================================
+// Parse Form Data
+// =====================================================
+
+async function parseFormData(request: Request): Promise<Record<string, string>> {
+  const contentType = request.headers.get('content-type') || '';
+
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    const text = await request.text();
+    const params = new URLSearchParams(text);
+    const result: Record<string, string> = {};
+    params.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  }
+
+  if (contentType.includes('application/json')) {
+    return await request.json();
+  }
+
+  // Try to parse as form data anyway
+  try {
+    const text = await request.text();
+    const params = new URLSearchParams(text);
+    const result: Record<string, string> = {};
+    params.forEach((value, key) => {
+      result[key] = value;
+    });
+    return result;
+  } catch {
+    return {};
   }
 }
 
@@ -104,220 +142,166 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify webhook secret if configured
-    const webhookSecret = Deno.env.get('INFOBIP_WEBHOOK_SECRET');
-    if (webhookSecret) {
-      const signature = req.headers.get('x-infobip-signature');
-      // Note: Implement proper signature verification based on Infobip's documentation
-      // For now, we'll just check if the secret header matches
-      const authHeader = req.headers.get('authorization');
-      if (authHeader && authHeader !== `Bearer ${webhookSecret}`) {
-        console.warn('Invalid webhook signature');
-        // Continue processing but log the warning
-      }
-    }
-
-    const body = await req.json();
-
-    // Determine the type of webhook
     const url = new URL(req.url);
-    const webhookType = url.searchParams.get('type') || 'delivery';
+    const webhookType = url.searchParams.get('type') || 'status';
+
+    // Parse the request body (Twilio sends form-urlencoded data)
+    const body = await parseFormData(req);
 
     console.log(`Processing ${webhookType} webhook:`, JSON.stringify(body).substring(0, 500));
 
     switch (webhookType) {
       // =====================================================
-      // Delivery Reports
+      // Status Callbacks (Delivery Reports)
+      // @see https://www.twilio.com/docs/usage/webhooks/messaging-webhooks
       // =====================================================
+      case 'status':
       case 'delivery': {
-        const report: InfobipDeliveryReport = body;
+        const callback = body as unknown as TwilioStatusCallback;
 
-        if (!report.results || report.results.length === 0) {
-          return new Response(JSON.stringify({ message: 'No results to process' }), {
+        if (!callback.MessageSid) {
+          return new Response(JSON.stringify({ message: 'Missing MessageSid' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           });
         }
 
-        for (const result of report.results) {
-          const messageId = result.messageId;
-          const status = mapInfobipStatus(result.status.groupName);
+        const messageSid = callback.MessageSid;
+        const status = mapTwilioStatus(callback.MessageStatus || '');
+        const channelType = getChannelTypeFromNumber(callback.From || callback.To || '');
 
-          // Find the message log entry
-          const { data: messageLog } = await supabase
+        // Find message log by provider message ID
+        const { data: messageLog } = await supabase
+          .from('messaging_logs')
+          .select('id, campaign_id, status')
+          .eq('provider_message_id', messageSid)
+          .single();
+
+        if (!messageLog) {
+          // Try finding by recipient phone number
+          const recipientPhone = cleanPhoneNumber(callback.To);
+          const { data: logByPhone } = await supabase
             .from('messaging_logs')
-            .select('id, campaign_id')
-            .eq('provider_message_id', messageId)
+            .select('id, campaign_id, status')
+            .eq('recipient', recipientPhone)
+            .in('status', ['queued', 'sent'])
+            .order('created_at', { ascending: false })
+            .limit(1)
             .single();
 
-          if (!messageLog) {
-            console.warn('Message log not found for messageId:', messageId);
-            continue;
+          if (!logByPhone) {
+            console.warn('Message log not found for:', messageSid);
+            return new Response(JSON.stringify({ message: 'Message not found' }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200,
+            });
           }
+        }
 
-          // Update message log
-          const updateData: any = {
-            status,
+        const logId = messageLog?.id;
+        if (!logId) {
+          return new Response(JSON.stringify({ message: 'No log ID' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        }
+
+        // Prepare update data
+        const updateData: Record<string, any> = {
+          status,
+        };
+
+        if (status === 'delivered') {
+          updateData.delivered_at = new Date().toISOString();
+        } else if (status === 'read') {
+          updateData.read_at = new Date().toISOString();
+        } else if (status === 'failed') {
+          updateData.failed_at = new Date().toISOString();
+          if (callback.ErrorCode) {
+            updateData.error_code = callback.ErrorCode;
+          }
+          if (callback.ErrorMessage) {
+            updateData.error_message = callback.ErrorMessage;
+          }
+        }
+
+        // Update cost if provided
+        if (callback.Price) {
+          updateData.cost = parseFloat(callback.Price);
+          updateData.currency = callback.PriceUnit || 'USD';
+        }
+
+        await supabase
+          .from('messaging_logs')
+          .update(updateData)
+          .eq('id', logId);
+
+        // Update campaign recipient if applicable
+        if (messageLog?.campaign_id) {
+          const recipientUpdate: Record<string, any> = {
+            status: status === 'delivered' ? 'delivered' : status === 'failed' ? 'failed' : 'sent',
           };
 
           if (status === 'delivered') {
-            updateData.delivered_at = result.doneAt || new Date().toISOString();
-          } else if (status === 'failed' || status === 'rejected') {
-            updateData.failed_at = result.doneAt || new Date().toISOString();
-            updateData.error_code = result.error?.id?.toString();
-            updateData.error_message = result.error?.description || result.status.description;
-          } else if (status === 'expired') {
-            updateData.failed_at = result.doneAt || new Date().toISOString();
-            updateData.error_message = 'Message expired';
-          }
-
-          // Add cost if available
-          if (result.price) {
-            updateData.cost = result.price.pricePerMessage;
-            updateData.currency = result.price.currency;
-          }
-
-          if (result.messageCount) {
-            updateData.segment_count = result.messageCount;
+            recipientUpdate.delivered_at = new Date().toISOString();
+          } else if (status === 'failed') {
+            recipientUpdate.failed_at = new Date().toISOString();
+            recipientUpdate.error_message = callback.ErrorMessage;
           }
 
           await supabase
-            .from('messaging_logs')
-            .update(updateData)
-            .eq('id', messageLog.id);
-
-          // Update campaign recipient if applicable
-          if (messageLog.campaign_id) {
-            const recipientUpdate: any = {
-              status: status === 'delivered' ? 'delivered' : status === 'failed' ? 'failed' : 'sent',
-            };
-
-            if (status === 'delivered') {
-              recipientUpdate.delivered_at = result.doneAt || new Date().toISOString();
-            } else if (status === 'failed') {
-              recipientUpdate.failed_at = result.doneAt || new Date().toISOString();
-              recipientUpdate.error_message = result.error?.description || result.status.description;
-            }
-
-            await supabase
-              .from('messaging_campaign_recipients')
-              .update(recipientUpdate)
-              .eq('message_log_id', messageLog.id);
-          }
-
-          console.log(`Updated message ${messageId} to status: ${status}`);
+            .from('messaging_campaign_recipients')
+            .update(recipientUpdate)
+            .eq('message_log_id', logId);
         }
 
-        return new Response(JSON.stringify({ message: 'Delivery reports processed' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        console.log(`Updated message ${messageSid} status: ${status}`);
+
+        // Return empty TwiML response (Twilio expects this)
+        return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
           status: 200,
         });
       }
 
       // =====================================================
-      // Seen/Read Reports (WhatsApp/Viber)
-      // =====================================================
-      case 'seen': {
-        const report: InfobipSeenReport = body;
-
-        if (!report.results || report.results.length === 0) {
-          return new Response(JSON.stringify({ message: 'No results to process' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        }
-
-        for (const result of report.results) {
-          const messageId = result.messageId;
-
-          // Find the message log entry
-          const { data: messageLog } = await supabase
-            .from('messaging_logs')
-            .select('id, campaign_id')
-            .eq('provider_message_id', messageId)
-            .single();
-
-          if (!messageLog) {
-            console.warn('Message log not found for messageId:', messageId);
-            continue;
-          }
-
-          // Update message log
-          await supabase
-            .from('messaging_logs')
-            .update({
-              status: 'read',
-              read_at: result.seenAt || new Date().toISOString(),
-            })
-            .eq('id', messageLog.id);
-
-          // Update campaign recipient if applicable
-          if (messageLog.campaign_id) {
-            await supabase
-              .from('messaging_campaign_recipients')
-              .update({
-                status: 'read',
-                read_at: result.seenAt || new Date().toISOString(),
-              })
-              .eq('message_log_id', messageLog.id);
-          }
-
-          console.log(`Updated message ${messageId} to read status`);
-        }
-
-        return new Response(JSON.stringify({ message: 'Seen reports processed' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
-
-      // =====================================================
-      // Incoming Messages (for opt-out handling)
+      // Incoming Messages (SMS/WhatsApp)
+      // @see https://www.twilio.com/docs/messaging/guides/webhook-request
       // =====================================================
       case 'incoming': {
-        const report: InfobipIncomingMessage = body;
+        const message = body as unknown as TwilioIncomingMessage;
 
-        if (!report.results || report.results.length === 0) {
-          return new Response(JSON.stringify({ message: 'No results to process' }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        if (!message.From || !message.Body) {
+          return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+            headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
             status: 200,
           });
         }
 
-        // Check if auto opt-out is enabled
-        const { data: settings } = await supabase
-          .from('messaging_settings')
-          .select('setting_value')
-          .eq('setting_key', 'auto_optout_enabled')
-          .single();
+        const phone = cleanPhoneNumber(message.From);
+        const text = message.Body.toUpperCase().trim();
+        const channelType = getChannelTypeFromNumber(message.From);
 
-        const autoOptoutEnabled = settings?.setting_value !== 'false';
+        // Check for opt-out keywords
+        const optOutKeywords = ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT', 'STOPALL', 'STOP ALL'];
+        const isOptOut = optOutKeywords.some(keyword =>
+          text === keyword || text.startsWith(keyword + ' ')
+        );
 
-        for (const result of report.results) {
-          const text = result.text?.toUpperCase().trim();
-          const fromNumber = result.from;
+        if (isOptOut) {
+          // Check if auto opt-out is enabled
+          const { data: settings } = await supabase
+            .from('messaging_settings')
+            .select('*')
+            .single();
 
-          // Check for opt-out keywords
-          const optOutKeywords = ['STOP', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
-          const isOptOut = optOutKeywords.some(keyword => text === keyword || text?.startsWith(keyword + ' '));
+          const autoOptoutEnabled = settings?.auto_optout_enabled !== false;
 
-          if (isOptOut && autoOptoutEnabled) {
-            // Parse callback data to get channel type
-            let channelType = 'sms';
-            if (result.callbackData) {
-              try {
-                const callbackData = JSON.parse(result.callbackData);
-                channelType = callbackData.channel || 'sms';
-              } catch {
-                // Ignore parse errors
-              }
-            }
-
-            // Add to opt-out list
+          if (autoOptoutEnabled) {
             await supabase
               .from('messaging_optouts')
               .upsert({
-                phone_number: fromNumber,
+                phone_number: phone,
                 channel_type: channelType,
                 reason: `STOP keyword: ${text}`,
                 source: 'keyword',
@@ -326,30 +310,48 @@ serve(async (req) => {
                 onConflict: 'phone_number,channel_type',
               });
 
-            console.log(`Added ${fromNumber} to opt-out list for ${channelType}`);
+            console.log(`Added ${phone} to opt-out list via keyword: ${text}`);
           }
-
-          // Log incoming message (optional)
-          console.log(`Incoming message from ${fromNumber}: ${text?.substring(0, 50)}`);
         }
 
-        return new Response(JSON.stringify({ message: 'Incoming messages processed' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        // Check for opt-in keywords
+        const optInKeywords = ['START', 'YES', 'UNSTOP', 'SUBSCRIBE'];
+        const isOptIn = optInKeywords.some(keyword =>
+          text === keyword || text.startsWith(keyword + ' ')
+        );
+
+        if (isOptIn) {
+          // Remove from opt-out list
+          await supabase
+            .from('messaging_optouts')
+            .delete()
+            .eq('phone_number', phone)
+            .eq('channel_type', channelType);
+
+          console.log(`Removed ${phone} from opt-out list via keyword: ${text}`);
+        }
+
+        console.log(`Incoming ${channelType} from ${phone}: ${text.substring(0, 50)}`);
+
+        // Return empty TwiML response
+        return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
           status: 200,
         });
       }
 
       default:
-        return new Response(JSON.stringify({ message: 'Unknown webhook type' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400,
+        return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+          status: 200,
         });
     }
   } catch (error) {
     console.error('Error processing webhook:', error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+    // Still return 200 to prevent Twilio from retrying
+    return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+      status: 200,
     });
   }
 });

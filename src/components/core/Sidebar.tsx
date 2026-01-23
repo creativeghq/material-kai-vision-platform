@@ -82,16 +82,16 @@ export const Sidebar: React.FC = () => {
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  className={`${isExpanded ? 'w-full justify-start' : 'w-14 px-0'} h-14 rounded-2xl transition-all duration-300 ${
+                  className={`${isExpanded ? 'w-full justify-start px-4' : 'w-14 px-0 justify-center'} h-14 rounded-2xl transition-all duration-300 ${
                     isActive(item.path)
                       ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
                       : 'text-muted-foreground hover:text-foreground hover:bg-white/40 border border-transparent hover:border-white/20'
                   }`}
                   asChild
                 >
-                  <Link to={item.path} className="flex items-center justify-center">
-                    <item.icon className={`${isExpanded ? 'w-5 h-5' : 'w-6 h-6'}`} />
-                    {isExpanded && <span className="ml-4 font-light tracking-tight">{item.label}</span>}
+                  <Link to={item.path} className={`flex items-center ${isExpanded ? 'justify-start' : 'justify-center'}`}>
+                    <item.icon className={`${isExpanded ? 'w-5 h-5 flex-shrink-0' : 'w-6 h-6'}`} />
+                    {isExpanded && <span className="ml-3 font-light tracking-tight">{item.label}</span>}
                   </Link>
                 </Button>
               </TooltipTrigger>

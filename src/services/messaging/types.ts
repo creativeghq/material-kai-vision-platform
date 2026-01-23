@@ -1,13 +1,14 @@
 /**
  * Messaging Service Types
- * Type definitions for SMS, WhatsApp, and Viber messaging via Infobip
+ * Type definitions for SMS and WhatsApp messaging via Twilio
+ * @see https://www.twilio.com/docs/messaging/api
  */
 
 // =====================================================
 // Channel Types
 // =====================================================
 
-export type MessagingChannelType = 'sms' | 'whatsapp' | 'viber';
+export type MessagingChannelType = 'sms' | 'whatsapp';
 export type MessageStatus = 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'rejected' | 'expired';
 export type MessageType = 'transactional' | 'marketing' | 'otp' | 'notification';
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'not_required';
@@ -45,6 +46,8 @@ export interface MessagingTemplate {
   buttons: MessageButton[];
   variables: string[];
   category: MessageType;
+  // Twilio WhatsApp Content Templates
+  whatsapp_content_sid?: string;
   whatsapp_template_name?: string;
   whatsapp_template_namespace?: string;
   whatsapp_language_code?: string;
@@ -158,7 +161,8 @@ export interface SendMessageOptions {
   callbackData?: string;
   tags?: Record<string, string>;
   scheduledAt?: Date;
-  // WhatsApp-specific
+  // WhatsApp-specific (Twilio Content Templates)
+  whatsappContentSid?: string;
   whatsappTemplateName?: string;
   whatsappTemplateNamespace?: string;
   whatsappLanguageCode?: string;
@@ -183,139 +187,71 @@ export interface MessageLogFilters {
 }
 
 // =====================================================
-// Infobip API Types
+// Twilio API Types
+// @see https://www.twilio.com/docs/messaging/api
 // =====================================================
 
-export interface InfobipConfig {
-  apiKey: string;
-  baseUrl: string;
+export interface TwilioConfig {
+  accountSid: string;
+  authToken: string;
 }
 
-export interface InfobipSmsRequest {
-  messages: Array<{
-    from: string;
-    destinations: Array<{ to: string; messageId?: string }>;
-    text: string;
-    notifyUrl?: string;
-    notifyContentType?: string;
-    callbackData?: string;
-  }>;
+export interface TwilioMessageRequest {
+  From: string;
+  To: string;
+  Body?: string;
+  MediaUrl?: string;
+  StatusCallback?: string;
+  // WhatsApp Content Templates
+  ContentSid?: string;
+  ContentVariables?: string;
 }
 
-export interface InfobipWhatsAppTextRequest {
+export interface TwilioMessageResponse {
+  sid: string;
+  account_sid: string;
   from: string;
   to: string;
-  messageId?: string;
-  content: {
-    text: string;
-  };
-  callbackData?: string;
-  notifyUrl?: string;
+  body: string;
+  status: 'accepted' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed' | 'read';
+  num_segments: string;
+  num_media: string;
+  direction: 'inbound' | 'outbound-api' | 'outbound-call' | 'outbound-reply';
+  price?: string;
+  price_unit?: string;
+  error_code?: string;
+  error_message?: string;
+  date_created: string;
+  date_updated: string;
+  date_sent?: string;
 }
 
-export interface InfobipWhatsAppTemplateRequest {
-  from: string;
-  to: string;
-  messageId?: string;
-  content: {
-    templateName: string;
-    templateData: {
-      body: {
-        placeholders: string[];
-      };
-    };
-    language: string;
-  };
-  callbackData?: string;
-  notifyUrl?: string;
+export interface TwilioStatusCallback {
+  MessageSid: string;
+  MessageStatus: 'accepted' | 'queued' | 'sending' | 'sent' | 'delivered' | 'undelivered' | 'failed' | 'read';
+  To: string;
+  From: string;
+  ApiVersion?: string;
+  AccountSid?: string;
+  ErrorCode?: string;
+  ErrorMessage?: string;
+  SmsSid?: string;
+  SmsStatus?: string;
+  ChannelPrefix?: string;
+  Price?: string;
+  PriceUnit?: string;
 }
 
-export interface InfobipWhatsAppMediaRequest {
-  from: string;
-  to: string;
-  messageId?: string;
-  content: {
-    mediaUrl: string;
-    caption?: string;
-  };
-  callbackData?: string;
-  notifyUrl?: string;
-}
-
-export interface InfobipViberRequest {
-  messages: Array<{
-    from: string;
-    to: string;
-    content: {
-      text?: string;
-      media?: {
-        url: string;
-        type?: string;
-      };
-      button?: {
-        text: string;
-        url: string;
-      };
-    };
-    callbackData?: string;
-    notifyUrl?: string;
-  }>;
-}
-
-export interface InfobipResponse {
-  bulkId?: string;
-  messages: Array<{
-    to: string;
-    status: {
-      groupId: number;
-      groupName: string;
-      id: number;
-      name: string;
-      description: string;
-    };
-    messageId: string;
-  }>;
-}
-
-export interface InfobipDeliveryReport {
-  results: Array<{
-    bulkId?: string;
-    messageId: string;
-    to: string;
-    sender?: string;
-    sentAt?: string;
-    doneAt?: string;
-    messageCount?: number;
-    price?: {
-      pricePerMessage: number;
-      currency: string;
-    };
-    status: {
-      groupId: number;
-      groupName: 'PENDING' | 'UNDELIVERABLE' | 'DELIVERED' | 'EXPIRED' | 'REJECTED' | 'ACCEPTED';
-      id: number;
-      name: string;
-      description: string;
-    };
-    error?: {
-      groupId: number;
-      groupName: string;
-      id: number;
-      name: string;
-      description: string;
-      permanent: boolean;
-    };
-    callbackData?: string;
-  }>;
-}
-
-export interface InfobipSeenReport {
-  results: Array<{
-    messageId: string;
-    to: string;
-    seenAt: string;
-    callbackData?: string;
-  }>;
+export interface TwilioIncomingMessage {
+  MessageSid: string;
+  From: string;
+  To: string;
+  Body: string;
+  NumMedia?: string;
+  MediaContentType0?: string;
+  MediaUrl0?: string;
+  ProfileName?: string;
+  WaId?: string;
 }
 
 // =====================================================

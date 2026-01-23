@@ -220,12 +220,12 @@ SLIG_NAMESPACE=basiliskan
 
 ---
 
-### **Messaging Service API Keys (SMS/WhatsApp/Viber)**
+### **Messaging Service API Keys (SMS/WhatsApp)**
 
 | Service | Secret Name | Where Used | How to Get | Required? |
 |---------|------------|------------|------------|-----------|
-| **Infobip** | `INFOBIP_API_KEY` | Supabase Edge Functions | https://portal.infobip.com → Developers → API Keys | ✅ **Required** for messaging |
-| **Infobip** | `INFOBIP_BASE_URL` | Supabase Edge Functions | https://portal.infobip.com → Dashboard (your dedicated URL) | ⭕ Optional (default: `https://api.infobip.com`) |
+| **Twilio** | `TWILIO_ACCOUNT_SID` | Supabase Edge Functions | https://console.twilio.com/ → Account SID | ✅ **Required** for messaging |
+| **Twilio** | `TWILIO_AUTH_TOKEN` | Supabase Edge Functions | https://console.twilio.com/ → Auth Token | ✅ **Required** for messaging |
 
 ### **Price Monitoring API Keys**
 
@@ -257,8 +257,8 @@ SLIG_NAMESPACE=basiliskan
 | `AWS_REGION` | Public | Supabase Dashboard | AWS region for SES | `us-east-1` |
 | `AWS_ACCESS_KEY_ID` | **Secret** | Supabase Dashboard | AWS IAM access key for SES | `AKIAXXXXXXXXXXXXXXXX` |
 | `AWS_SECRET_ACCESS_KEY` | **Secret** | Supabase Dashboard | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `INFOBIP_API_KEY` | **Secret** | Supabase Dashboard | Infobip API key for SMS/WhatsApp/Viber | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `INFOBIP_BASE_URL` | Public | Supabase Dashboard | Infobip API base URL | `https://api.infobip.com` or your dedicated URL |
+| `TWILIO_ACCOUNT_SID` | **Secret** | Supabase Dashboard | Twilio Account SID for SMS/WhatsApp | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `TWILIO_AUTH_TOKEN` | **Secret** | Supabase Dashboard | Twilio Auth Token for authentication | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 
 > **Note:** Default sender email and name are now configured through the Admin Panel at `/admin/email` → Email Settings, not as environment variables.
 

@@ -1,6 +1,10 @@
 /**
  * Messaging API Edge Function
- * Handles SMS, WhatsApp, and Viber messaging via Infobip
+ * Provider-agnostic messaging service with Twilio implementation
+ * Supports SMS and WhatsApp channels
+ *
+ * @see https://www.twilio.com/docs/messaging
+ * @see https://www.twilio.com/docs/whatsapp
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -15,23 +19,18 @@ const corsHeaders = {
 // Types
 // =====================================================
 
+type ChannelType = 'sms' | 'whatsapp';
+
 interface SendMessageRequest {
-  channel: 'sms' | 'whatsapp' | 'viber';
+  channel: ChannelType;
   to: string | string[];
   from?: string;
   content?: string;
-  templateSlug?: string;
-  variables?: Record<string, string>;
+  templateId?: string;
+  templateVariables?: Record<string, string>;
   mediaUrl?: string;
-  mediaType?: string;
-  buttons?: Array<{ type: string; text: string; url?: string }>;
+  statusCallback?: string;
   messageType?: 'transactional' | 'marketing' | 'otp' | 'notification';
-  callbackData?: string;
-  tags?: Record<string, string>;
-  // WhatsApp specific
-  whatsappTemplateName?: string;
-  whatsappTemplateNamespace?: string;
-  whatsappLanguageCode?: string;
 }
 
 interface SendBulkRequest extends Omit<SendMessageRequest, 'to'> {
@@ -41,244 +40,278 @@ interface SendBulkRequest extends Omit<SendMessageRequest, 'to'> {
   }>;
 }
 
+interface MessageResult {
+  success: boolean;
+  messageId?: string;
+  status?: string;
+  error?: string;
+  to?: string;
+}
+
 // =====================================================
-// Infobip API Client
+// Messaging Provider Interface (Provider Agnostic)
 // =====================================================
 
-class InfobipClient {
-  private apiKey: string;
-  private baseUrl: string;
-  private webhookUrl: string;
-
-  constructor(apiKey: string, baseUrl: string, webhookUrl: string) {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.webhookUrl = webhookUrl;
-  }
-
-  private async request(endpoint: string, method: string, body?: any): Promise<any> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method,
-      headers: {
-        'Authorization': `App ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(error.requestError?.serviceException?.text || error.message || 'Infobip API error');
-    }
-
-    return response.json();
-  }
-
-  // SMS
-  async sendSms(params: {
-    from: string;
-    to: string | string[];
-    text: string;
-    callbackData?: string;
-  }): Promise<any> {
-    const destinations = (Array.isArray(params.to) ? params.to : [params.to]).map(to => ({ to }));
-
-    return this.request('/sms/2/text/advanced', 'POST', {
-      messages: [{
-        from: params.from,
-        destinations,
-        text: params.text,
-        notifyUrl: this.webhookUrl,
-        notifyContentType: 'application/json',
-        callbackData: params.callbackData,
-      }],
-    });
-  }
-
-  // WhatsApp Text
-  async sendWhatsAppText(params: {
+interface MessagingProvider {
+  sendSms(params: {
     from: string;
     to: string;
-    text: string;
-    callbackData?: string;
-  }): Promise<any> {
-    return this.request('/whatsapp/1/message/text', 'POST', {
-      from: params.from,
-      to: params.to,
-      content: {
-        text: params.text,
-      },
-      notifyUrl: this.webhookUrl,
-      callbackData: params.callbackData,
-    });
+    body: string;
+    statusCallback?: string;
+  }): Promise<MessageResult>;
+
+  sendWhatsApp(params: {
+    from: string;
+    to: string;
+    body: string;
+    mediaUrl?: string;
+    statusCallback?: string;
+  }): Promise<MessageResult>;
+
+  sendWhatsAppTemplate(params: {
+    from: string;
+    to: string;
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+    statusCallback?: string;
+  }): Promise<MessageResult>;
+
+  getAccountInfo(): Promise<{ balance?: number; currency?: string }>;
+
+  listPhoneNumbers(): Promise<Array<{
+    phoneNumber: string;
+    friendlyName: string;
+    capabilities: { sms: boolean; voice: boolean; mms: boolean };
+  }>>;
+}
+
+// =====================================================
+// Twilio Provider Implementation
+// @see https://www.twilio.com/docs/messaging/api
+// =====================================================
+
+class TwilioProvider implements MessagingProvider {
+  private accountSid: string;
+  private authToken: string;
+  private baseUrl: string;
+
+  constructor(accountSid: string, authToken: string) {
+    this.accountSid = accountSid;
+    this.authToken = authToken;
+    this.baseUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}`;
   }
 
-  // WhatsApp Template
+  /**
+   * Make authenticated request to Twilio API
+   */
+  private async request(
+    endpoint: string,
+    method: string,
+    body?: Record<string, string>
+  ): Promise<any> {
+    const auth = btoa(`${this.accountSid}:${this.authToken}`);
+
+    const options: RequestInit = {
+      method,
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    };
+
+    if (body && method !== 'GET') {
+      const formData = new URLSearchParams();
+      for (const [key, value] of Object.entries(body)) {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      }
+      options.body = formData.toString();
+    }
+
+    const response = await fetch(`${this.baseUrl}${endpoint}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errorMessage = data.message || data.error_message || `Twilio API error: ${response.statusText}`;
+      throw new Error(errorMessage);
+    }
+
+    return data;
+  }
+
+  /**
+   * Send SMS message
+   * @see https://www.twilio.com/docs/messaging/api/message-resource#create-a-message-resource
+   */
+  async sendSms(params: {
+    from: string;
+    to: string;
+    body: string;
+    statusCallback?: string;
+  }): Promise<MessageResult> {
+    try {
+      const requestBody: Record<string, string> = {
+        From: params.from,
+        To: params.to,
+        Body: params.body,
+      };
+
+      if (params.statusCallback) {
+        requestBody.StatusCallback = params.statusCallback;
+      }
+
+      const result = await this.request('/Messages.json', 'POST', requestBody);
+
+      return {
+        success: true,
+        messageId: result.sid,
+        status: result.status,
+        to: params.to,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        to: params.to,
+      };
+    }
+  }
+
+  /**
+   * Send WhatsApp message
+   * @see https://www.twilio.com/docs/whatsapp/api#sending-a-freeform-whatsapp-message
+   */
+  async sendWhatsApp(params: {
+    from: string;
+    to: string;
+    body: string;
+    mediaUrl?: string;
+    statusCallback?: string;
+  }): Promise<MessageResult> {
+    try {
+      // WhatsApp numbers must be prefixed with 'whatsapp:'
+      const from = params.from.startsWith('whatsapp:') ? params.from : `whatsapp:${params.from}`;
+      const to = params.to.startsWith('whatsapp:') ? params.to : `whatsapp:${params.to}`;
+
+      const requestBody: Record<string, string> = {
+        From: from,
+        To: to,
+        Body: params.body,
+      };
+
+      if (params.mediaUrl) {
+        requestBody.MediaUrl = params.mediaUrl;
+      }
+
+      if (params.statusCallback) {
+        requestBody.StatusCallback = params.statusCallback;
+      }
+
+      const result = await this.request('/Messages.json', 'POST', requestBody);
+
+      return {
+        success: true,
+        messageId: result.sid,
+        status: result.status,
+        to: params.to,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        to: params.to,
+      };
+    }
+  }
+
+  /**
+   * Send WhatsApp template message
+   * @see https://www.twilio.com/docs/whatsapp/tutorial/send-whatsapp-notification-messages-templates
+   */
   async sendWhatsAppTemplate(params: {
     from: string;
     to: string;
-    templateName: string;
-    templateNamespace?: string;
-    languageCode: string;
-    placeholders: string[];
-    callbackData?: string;
-  }): Promise<any> {
-    return this.request('/whatsapp/1/message/template', 'POST', {
-      from: params.from,
-      to: params.to,
-      content: {
-        templateName: params.templateName,
-        templateData: {
-          body: {
-            placeholders: params.placeholders,
-          },
-        },
-        language: params.languageCode,
-      },
-      notifyUrl: this.webhookUrl,
-      callbackData: params.callbackData,
-    });
-  }
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+    statusCallback?: string;
+  }): Promise<MessageResult> {
+    try {
+      const from = params.from.startsWith('whatsapp:') ? params.from : `whatsapp:${params.from}`;
+      const to = params.to.startsWith('whatsapp:') ? params.to : `whatsapp:${params.to}`;
 
-  // WhatsApp Media
-  async sendWhatsAppMedia(params: {
-    from: string;
-    to: string;
-    mediaUrl: string;
-    mediaType: 'image' | 'video' | 'document' | 'audio';
-    caption?: string;
-    callbackData?: string;
-  }): Promise<any> {
-    const endpoint = `/whatsapp/1/message/${params.mediaType}`;
-    const content: any = {
-      mediaUrl: params.mediaUrl,
-    };
-    if (params.caption) {
-      content.caption = params.caption;
-    }
+      const requestBody: Record<string, string> = {
+        From: from,
+        To: to,
+        ContentSid: params.contentSid,
+      };
 
-    return this.request(endpoint, 'POST', {
-      from: params.from,
-      to: params.to,
-      content,
-      notifyUrl: this.webhookUrl,
-      callbackData: params.callbackData,
-    });
-  }
-
-  // Viber
-  async sendViber(params: {
-    from: string;
-    to: string | string[];
-    text?: string;
-    mediaUrl?: string;
-    buttonText?: string;
-    buttonUrl?: string;
-    callbackData?: string;
-  }): Promise<any> {
-    const destinations = (Array.isArray(params.to) ? params.to : [params.to]);
-
-    const messages = destinations.map(to => {
-      const content: any = {};
-      if (params.text) content.text = params.text;
-      if (params.mediaUrl) {
-        content.media = { url: params.mediaUrl };
+      if (params.contentVariables) {
+        requestBody.ContentVariables = JSON.stringify(params.contentVariables);
       }
-      if (params.buttonText && params.buttonUrl) {
-        content.button = { text: params.buttonText, url: params.buttonUrl };
+
+      if (params.statusCallback) {
+        requestBody.StatusCallback = params.statusCallback;
       }
+
+      const result = await this.request('/Messages.json', 'POST', requestBody);
 
       return {
-        from: params.from,
-        to,
-        content,
-        notifyUrl: this.webhookUrl,
-        callbackData: params.callbackData,
+        success: true,
+        messageId: result.sid,
+        status: result.status,
+        to: params.to,
       };
-    });
-
-    return this.request('/viber/1/message/promotional', 'POST', { messages });
-  }
-
-  // Get account balance
-  // Endpoint: GET /account/1/balance
-  // Docs: https://www.infobip.com/docs/api/platform/account-management/get-account-balance
-  async getAccountBalance(): Promise<any> {
-    return this.request('/account/1/balance', 'GET');
-  }
-
-  // Get all purchased/owned numbers (for SMS/Voice)
-  // Endpoint: GET /numbers/1/numbers
-  // Docs: https://www.infobip.com/docs/api/platform/numbers/phone-numbers/list-purchased-numbers
-  async getOwnedNumbers(): Promise<any> {
-    try {
-      return await this.request('/numbers/1/numbers', 'GET');
-    } catch (e) {
-      // Numbers API might not be available on all accounts
-      console.log('Numbers API not available:', e);
-      return { numbers: [] };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        to: params.to,
+      };
     }
   }
 
-  // Get WhatsApp senders/business accounts
-  // Endpoint: GET /whatsapp/1/senders
-  // Docs: https://www.infobip.com/docs/api/channels/whatsapp/whatsapp-service-management
-  async getWhatsAppSenders(): Promise<any> {
+  /**
+   * Get account balance info
+   * @see https://www.twilio.com/docs/usage/api/account#read-an-account-resource
+   */
+  async getAccountInfo(): Promise<{ balance?: number; currency?: string }> {
     try {
-      return await this.request('/whatsapp/1/senders', 'GET');
-    } catch (e) {
-      console.log('WhatsApp senders API error:', e);
-      return { senders: [] };
+      const balanceResult = await this.request('/Balance.json', 'GET');
+      return {
+        balance: parseFloat(balanceResult.balance),
+        currency: balanceResult.currency,
+      };
+    } catch (error) {
+      console.error('Error getting account info:', error);
+      return {};
     }
   }
 
-  // Get WhatsApp sender quality
-  // Endpoint: GET /whatsapp/1/senders/quality
-  // Docs: https://www.infobip.com/docs/api/channels/whatsapp/whatsapp-service-management/get-whatsapp-senders-quality
-  async getWhatsAppSendersQuality(): Promise<any> {
+  /**
+   * List phone numbers (SMS capable)
+   * @see https://www.twilio.com/docs/phone-numbers/api/incomingphonenumber-resource
+   */
+  async listPhoneNumbers(): Promise<Array<{
+    phoneNumber: string;
+    friendlyName: string;
+    capabilities: { sms: boolean; voice: boolean; mms: boolean };
+  }>> {
     try {
-      return await this.request('/whatsapp/1/senders/quality', 'GET');
-    } catch (e) {
-      console.log('WhatsApp quality API error:', e);
-      return { senders: [] };
+      const result = await this.request('/IncomingPhoneNumbers.json', 'GET');
+      return (result.incoming_phone_numbers || []).map((num: any) => ({
+        phoneNumber: num.phone_number,
+        friendlyName: num.friendly_name,
+        capabilities: {
+          sms: num.capabilities?.sms || false,
+          voice: num.capabilities?.voice || false,
+          mms: num.capabilities?.mms || false,
+        },
+      }));
+    } catch (error) {
+      console.error('Error listing phone numbers:', error);
+      return [];
     }
-  }
-
-  // Get Viber senders (service info)
-  // Note: Viber sender management is typically done through the Infobip portal
-  // This attempts to fetch registered Viber senders if the API supports it
-  async getViberSenders(): Promise<any> {
-    try {
-      // Try to get Viber service info
-      return await this.request('/viber/1/senders', 'GET');
-    } catch (e) {
-      console.log('Viber senders API not available:', e);
-      return { senders: [] };
-    }
-  }
-
-  // Get WhatsApp templates for a sender
-  // Endpoint: GET /whatsapp/2/senders/{sender}/templates
-  // Docs: https://www.infobip.com/docs/api/channels/whatsapp/whatsapp-service-management
-  async getWhatsAppTemplates(sender: string): Promise<any> {
-    return this.request(`/whatsapp/2/senders/${encodeURIComponent(sender)}/templates`, 'GET');
-  }
-
-  // Get delivery reports for SMS
-  // Endpoint: GET /sms/1/reports
-  // Docs: https://www.infobip.com/docs/api/channels/sms/sms-messaging/outbound-sms/get-outbound-sms-message-delivery-reports
-  async getSmsDeliveryReports(params?: { bulkId?: string; messageId?: string; limit?: number }): Promise<any> {
-    let endpoint = '/sms/1/reports';
-    const queryParams = new URLSearchParams();
-    if (params?.bulkId) queryParams.append('bulkId', params.bulkId);
-    if (params?.messageId) queryParams.append('messageId', params.messageId);
-    if (params?.limit) queryParams.append('limit', String(params.limit));
-
-    const query = queryParams.toString();
-    if (query) endpoint += `?${query}`;
-
-    return this.request(endpoint, 'GET');
   }
 }
 
@@ -294,9 +327,12 @@ function renderTemplate(content: string, variables: Record<string, string>): str
   return rendered;
 }
 
-function extractPlaceholders(content: string): string[] {
-  const matches = content.match(/{{(\w+)}}/g) || [];
-  return matches.map(m => m.replace(/[{}]/g, ''));
+function normalizePhoneNumber(phone: string): string {
+  let normalized = phone.replace(/[^\d+]/g, '');
+  if (!normalized.startsWith('+')) {
+    normalized = '+' + normalized;
+  }
+  return normalized;
 }
 
 // =====================================================
@@ -304,19 +340,16 @@ function extractPlaceholders(content: string): string[] {
 // =====================================================
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Get user from auth header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Missing authorization header');
@@ -330,23 +363,20 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Get Infobip credentials from environment
-    const infobipApiKey = Deno.env.get('INFOBIP_API_KEY');
-    const infobipBaseUrl = Deno.env.get('INFOBIP_BASE_URL') || 'https://api.infobip.com';
-    const webhookBaseUrl = Deno.env.get('SUPABASE_URL');
-    const webhookUrl = `${webhookBaseUrl}/functions/v1/messaging-webhook`;
+    // Get Twilio credentials from environment
+    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
 
-    if (!infobipApiKey) {
-      throw new Error('Infobip API key not configured. Please set INFOBIP_API_KEY secret.');
+    if (!twilioAccountSid || !twilioAuthToken) {
+      throw new Error('Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN secrets.');
     }
 
-    const infobip = new InfobipClient(infobipApiKey, infobipBaseUrl, webhookUrl);
+    const provider = new TwilioProvider(twilioAccountSid, twilioAuthToken);
+    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/messaging-webhook`;
 
-    // Parse request body
     const requestBody = req.method === 'POST' ? await req.json() : {};
     const action = requestBody.action;
 
-    // Route handling
     switch (action) {
       // =====================================================
       // Send single message
@@ -358,170 +388,101 @@ serve(async (req) => {
           throw new Error('Channel type is required');
         }
 
-        // Get sender from channel or use default
-        let fromNumber = body.from;
-        if (!fromNumber) {
-          const { data: defaultChannel } = await supabaseClient
+        let channel: any = null;
+        if (body.from) {
+          const { data } = await supabaseClient
             .from('messaging_channels')
-            .select('sender_id')
+            .select('*')
+            .eq('sender_id', body.from)
+            .eq('channel_type', body.channel)
+            .single();
+          channel = data;
+        } else {
+          const { data } = await supabaseClient
+            .from('messaging_channels')
+            .select('*')
             .eq('channel_type', body.channel)
             .eq('is_default', true)
             .eq('is_active', true)
             .single();
-
-          if (!defaultChannel) {
-            throw new Error(`No default ${body.channel} channel configured`);
-          }
-          fromNumber = defaultChannel.sender_id;
+          channel = data;
         }
 
-        // Get template if specified
-        let content = body.content;
-        let template: any = null;
+        if (!channel) {
+          throw new Error(`No ${body.channel} channel configured. Please add a channel first.`);
+        }
 
-        if (body.templateSlug) {
-          const { data: templateData, error: templateError } = await supabaseClient
+        const fromNumber = channel.sender_id;
+        const recipients = Array.isArray(body.to) ? body.to : [body.to];
+        const results: MessageResult[] = [];
+
+        let messageContent = body.content || '';
+
+        if (body.templateId) {
+          const { data: template } = await supabaseClient
             .from('messaging_templates')
             .select('*')
-            .eq('slug', body.templateSlug)
-            .eq('is_active', true)
+            .eq('id', body.templateId)
             .single();
 
-          if (templateError || !templateData) {
-            throw new Error(`Template not found: ${body.templateSlug}`);
+          if (template) {
+            messageContent = renderTemplate(template.content, body.templateVariables || {});
+          }
+        }
+
+        for (const recipient of recipients) {
+          const to = normalizePhoneNumber(recipient);
+          let result: MessageResult;
+
+          switch (body.channel) {
+            case 'sms':
+              result = await provider.sendSms({
+                from: fromNumber,
+                to,
+                body: messageContent,
+                statusCallback: webhookUrl,
+              });
+              break;
+
+            case 'whatsapp':
+              result = await provider.sendWhatsApp({
+                from: fromNumber,
+                to,
+                body: messageContent,
+                mediaUrl: body.mediaUrl,
+                statusCallback: webhookUrl,
+              });
+              break;
+
+            default:
+              result = { success: false, error: `Unsupported channel: ${body.channel}`, to };
           }
 
-          template = templateData;
-          content = renderTemplate(template.content, body.variables || {});
-        }
+          results.push(result);
 
-        if (!content && !body.whatsappTemplateName) {
-          throw new Error('Message content is required');
-        }
-
-        const toNumbers = Array.isArray(body.to) ? body.to : [body.to];
-
-        // Check opt-outs
-        const { data: optouts } = await supabaseClient
-          .from('messaging_optouts')
-          .select('phone_number')
-          .in('phone_number', toNumbers)
-          .or(`channel_type.eq.${body.channel},channel_type.eq.all`);
-
-        const optedOutNumbers = new Set(optouts?.map(o => o.phone_number) || []);
-        const validNumbers = toNumbers.filter(n => !optedOutNumbers.has(n));
-
-        if (validNumbers.length === 0) {
-          throw new Error('All recipients have opted out');
-        }
-
-        // Create callback data for tracking
-        const callbackData = JSON.stringify({
-          channel: body.channel,
-          userId: user.id,
-          tags: body.tags,
-        });
-
-        // Send via Infobip
-        let response: any;
-
-        switch (body.channel) {
-          case 'sms':
-            response = await infobip.sendSms({
-              from: fromNumber,
-              to: validNumbers,
-              text: content!,
-              callbackData,
-            });
-            break;
-
-          case 'whatsapp':
-            // WhatsApp only supports single recipient per request
-            if (body.whatsappTemplateName) {
-              // Send pre-approved template
-              const placeholders = body.variables
-                ? Object.values(body.variables)
-                : extractPlaceholders(template?.content || '').map(p => body.variables?.[p] || '');
-
-              response = await infobip.sendWhatsAppTemplate({
-                from: fromNumber,
-                to: validNumbers[0],
-                templateName: body.whatsappTemplateName,
-                templateNamespace: body.whatsappTemplateNamespace,
-                languageCode: body.whatsappLanguageCode || 'en',
-                placeholders,
-                callbackData,
-              });
-            } else if (body.mediaUrl) {
-              response = await infobip.sendWhatsAppMedia({
-                from: fromNumber,
-                to: validNumbers[0],
-                mediaUrl: body.mediaUrl,
-                mediaType: (body.mediaType as any) || 'image',
-                caption: content,
-                callbackData,
-              });
-            } else {
-              response = await infobip.sendWhatsAppText({
-                from: fromNumber,
-                to: validNumbers[0],
-                text: content!,
-                callbackData,
-              });
-            }
-            break;
-
-          case 'viber':
-            const buttonConfig = body.buttons?.[0];
-            response = await infobip.sendViber({
-              from: fromNumber,
-              to: validNumbers,
-              text: content,
-              mediaUrl: body.mediaUrl,
-              buttonText: buttonConfig?.text,
-              buttonUrl: buttonConfig?.url,
-              callbackData,
-            });
-            break;
-        }
-
-        // Log messages
-        const messages = response.messages || [response];
-        const logEntries = [];
-
-        for (const msg of messages) {
-          const { data: logData } = await supabaseClient
-            .from('messaging_logs')
-            .insert({
+          if (result.success) {
+            await supabaseClient.from('messaging_logs').insert({
+              user_id: user.id,
+              channel_id: channel.id,
               channel_type: body.channel,
-              template_id: template?.id,
-              provider_message_id: msg.messageId,
-              bulk_id: response.bulkId,
-              from_number: fromNumber,
-              to_number: msg.to,
-              content,
-              media_url: body.mediaUrl,
-              status: msg.status?.groupName === 'PENDING' ? 'sent' : 'queued',
-              message_type: body.messageType || 'marketing',
-              sent_at: new Date().toISOString(),
-              variables: body.variables || {},
-              tags: body.tags || {},
-              callback_data: callbackData,
-              created_by: user.id,
-            })
-            .select()
-            .single();
-
-          logEntries.push(logData);
+              recipient: to,
+              content: messageContent.substring(0, 500),
+              message_type: body.messageType || 'transactional',
+              provider_message_id: result.messageId,
+              status: result.status || 'queued',
+            });
+          }
         }
+
+        const successful = results.filter(r => r.success);
+        const failed = results.filter(r => !r.success);
 
         return new Response(
           JSON.stringify({
-            success: true,
-            messageId: messages[0]?.messageId,
-            bulkId: response.bulkId,
-            logId: logEntries[0]?.id,
-            messages: logEntries,
+            success: failed.length === 0,
+            sent: successful.length,
+            failed: failed.length,
+            results,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -533,152 +494,111 @@ serve(async (req) => {
       case 'send-bulk': {
         const body: SendBulkRequest = requestBody;
 
-        if (!body.channel || !body.recipients || body.recipients.length === 0) {
-          throw new Error('Channel and recipients are required');
+        if (!body.channel) {
+          throw new Error('Channel type is required');
         }
 
-        // Get sender
-        let fromNumber = body.from;
-        if (!fromNumber) {
-          const { data: defaultChannel } = await supabaseClient
+        if (!body.recipients || body.recipients.length === 0) {
+          throw new Error('Recipients are required');
+        }
+
+        let channel: any = null;
+        if (body.from) {
+          const { data } = await supabaseClient
             .from('messaging_channels')
-            .select('sender_id')
+            .select('*')
+            .eq('sender_id', body.from)
+            .eq('channel_type', body.channel)
+            .single();
+          channel = data;
+        } else {
+          const { data } = await supabaseClient
+            .from('messaging_channels')
+            .select('*')
             .eq('channel_type', body.channel)
             .eq('is_default', true)
             .eq('is_active', true)
             .single();
-
-          if (!defaultChannel) {
-            throw new Error(`No default ${body.channel} channel configured`);
-          }
-          fromNumber = defaultChannel.sender_id;
+          channel = data;
         }
 
-        // Get template
-        let template: any = null;
-        if (body.templateSlug) {
-          const { data: templateData } = await supabaseClient
+        if (!channel) {
+          throw new Error(`No ${body.channel} channel configured`);
+        }
+
+        const fromNumber = channel.sender_id;
+        const results: MessageResult[] = [];
+
+        let baseContent = body.content || '';
+        if (body.templateId) {
+          const { data: template } = await supabaseClient
             .from('messaging_templates')
             .select('*')
-            .eq('slug', body.templateSlug)
-            .eq('is_active', true)
+            .eq('id', body.templateId)
             .single();
 
-          template = templateData;
+          if (template) {
+            baseContent = template.content;
+          }
         }
-
-        // Check opt-outs
-        const allNumbers = body.recipients.map(r => r.to);
-        const { data: optouts } = await supabaseClient
-          .from('messaging_optouts')
-          .select('phone_number')
-          .in('phone_number', allNumbers)
-          .or(`channel_type.eq.${body.channel},channel_type.eq.all`);
-
-        const optedOutNumbers = new Set(optouts?.map(o => o.phone_number) || []);
-
-        // Process recipients
-        const results: any[] = [];
-        const bulkId = crypto.randomUUID();
 
         for (const recipient of body.recipients) {
-          if (optedOutNumbers.has(recipient.to)) {
-            results.push({
-              to: recipient.to,
-              status: 'opted_out',
-              error: 'Recipient has opted out',
-            });
-            continue;
-          }
+          const to = normalizePhoneNumber(recipient.to);
+          const variables = recipient.variables || {};
+          const messageContent = renderTemplate(baseContent, variables);
 
-          const variables = { ...body.variables, ...recipient.variables };
-          const content = template
-            ? renderTemplate(template.content, variables)
-            : renderTemplate(body.content || '', variables);
+          let result: MessageResult;
 
-          try {
-            const callbackData = JSON.stringify({
-              channel: body.channel,
-              userId: user.id,
-              bulkId,
-              tags: body.tags,
-            });
-
-            let response: any;
-
-            switch (body.channel) {
-              case 'sms':
-                response = await infobip.sendSms({
-                  from: fromNumber,
-                  to: recipient.to,
-                  text: content,
-                  callbackData,
-                });
-                break;
-
-              case 'whatsapp':
-                response = await infobip.sendWhatsAppText({
-                  from: fromNumber,
-                  to: recipient.to,
-                  text: content,
-                  callbackData,
-                });
-                break;
-
-              case 'viber':
-                response = await infobip.sendViber({
-                  from: fromNumber,
-                  to: recipient.to,
-                  text: content,
-                  callbackData,
-                });
-                break;
-            }
-
-            const msg = response.messages?.[0] || response;
-
-            // Log message
-            await supabaseClient
-              .from('messaging_logs')
-              .insert({
-                channel_type: body.channel,
-                template_id: template?.id,
-                provider_message_id: msg.messageId,
-                bulk_id: bulkId,
-                from_number: fromNumber,
-                to_number: recipient.to,
-                content,
-                status: 'sent',
-                message_type: body.messageType || 'marketing',
-                sent_at: new Date().toISOString(),
-                variables,
-                tags: body.tags || {},
-                callback_data: callbackData,
-                created_by: user.id,
+          switch (body.channel) {
+            case 'sms':
+              result = await provider.sendSms({
+                from: fromNumber,
+                to,
+                body: messageContent,
+                statusCallback: webhookUrl,
               });
+              break;
 
-            results.push({
-              to: recipient.to,
-              status: 'sent',
-              messageId: msg.messageId,
-            });
-          } catch (error) {
-            results.push({
-              to: recipient.to,
-              status: 'failed',
-              error: error instanceof Error ? error.message : 'Unknown error',
+            case 'whatsapp':
+              result = await provider.sendWhatsApp({
+                from: fromNumber,
+                to,
+                body: messageContent,
+                mediaUrl: body.mediaUrl,
+                statusCallback: webhookUrl,
+              });
+              break;
+
+            default:
+              result = { success: false, error: `Unsupported channel: ${body.channel}`, to };
+          }
+
+          results.push(result);
+
+          if (result.success) {
+            await supabaseClient.from('messaging_logs').insert({
+              user_id: user.id,
+              channel_id: channel.id,
+              channel_type: body.channel,
+              recipient: to,
+              content: messageContent.substring(0, 500),
+              message_type: body.messageType || 'marketing',
+              provider_message_id: result.messageId,
+              status: result.status || 'queued',
             });
           }
+
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
+
+        const successful = results.filter(r => r.success);
+        const failed = results.filter(r => !r.success);
 
         return new Response(
           JSON.stringify({
             success: true,
-            bulkId,
-            total: body.recipients.length,
-            sent: results.filter(r => r.status === 'sent').length,
-            failed: results.filter(r => r.status === 'failed').length,
-            optedOut: results.filter(r => r.status === 'opted_out').length,
+            sent: successful.length,
+            failed: failed.length,
             results,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -686,52 +606,36 @@ serve(async (req) => {
       }
 
       // =====================================================
-      // Get channels
+      // List channels
       // =====================================================
       case 'channels': {
-        const { channelType } = requestBody;
-
-        let query = supabaseClient
+        const { data: channels, error } = await supabaseClient
           .from('messaging_channels')
           .select('*')
-          .order('is_default', { ascending: false })
-          .order('created_at', { ascending: false });
-
-        if (channelType) {
-          query = query.eq('channel_type', channelType);
-        }
-
-        const { data, error } = await query;
+          .order('channel_type', { ascending: true })
+          .order('is_default', { ascending: false });
 
         if (error) throw error;
 
         return new Response(
-          JSON.stringify({ success: true, channels: data }),
+          JSON.stringify({ channels }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       // =====================================================
-      // Get templates
+      // List templates
       // =====================================================
       case 'templates': {
-        const { channelType } = requestBody;
-
-        let query = supabaseClient
+        const { data: templates, error } = await supabaseClient
           .from('messaging_templates')
           .select('*')
-          .order('created_at', { ascending: false });
-
-        if (channelType) {
-          query = query.eq('channel_type', channelType);
-        }
-
-        const { data, error } = await query;
+          .order('name', { ascending: true });
 
         if (error) throw error;
 
         return new Response(
-          JSON.stringify({ success: true, templates: data }),
+          JSON.stringify({ templates }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -740,24 +644,27 @@ serve(async (req) => {
       // Get message logs
       // =====================================================
       case 'logs': {
-        const { channelType, status, messageType, limit = 50 } = requestBody;
+        const { limit = 50, offset = 0, channel, status } = requestBody;
 
         let query = supabaseClient
           .from('messaging_logs')
-          .select('*')
+          .select('*', { count: 'exact' })
           .order('created_at', { ascending: false })
-          .limit(limit);
+          .range(offset, offset + limit - 1);
 
-        if (channelType) query = query.eq('channel_type', channelType);
-        if (status) query = query.eq('status', status);
-        if (messageType) query = query.eq('message_type', messageType);
+        if (channel) {
+          query = query.eq('channel_type', channel);
+        }
+        if (status) {
+          query = query.eq('status', status);
+        }
 
-        const { data, error } = await query;
+        const { data: logs, count, error } = await query;
 
         if (error) throw error;
 
         return new Response(
-          JSON.stringify({ success: true, logs: data }),
+          JSON.stringify({ logs, total: count }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -766,49 +673,30 @@ serve(async (req) => {
       // Get analytics
       // =====================================================
       case 'analytics': {
-        const { channelType, dateRange } = requestBody;
+        const { startDate, endDate } = requestBody;
 
-        let query = supabaseClient.from('messaging_analytics').select('*');
+        const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const end = endDate || new Date().toISOString();
 
-        if (channelType) {
-          query = query.eq('channel_type', channelType);
+        const { data: logs } = await supabaseClient
+          .from('messaging_logs')
+          .select('status, channel_type')
+          .gte('created_at', start)
+          .lte('created_at', end);
+
+        const analytics = {
+          total: logs?.length || 0,
+          byStatus: {} as Record<string, number>,
+          byChannel: {} as Record<string, number>,
+        };
+
+        for (const log of logs || []) {
+          analytics.byStatus[log.status] = (analytics.byStatus[log.status] || 0) + 1;
+          analytics.byChannel[log.channel_type] = (analytics.byChannel[log.channel_type] || 0) + 1;
         }
-        if (dateRange?.start) {
-          query = query.gte('date', dateRange.start);
-        }
-        if (dateRange?.end) {
-          query = query.lte('date', dateRange.end);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
-        // Aggregate totals
-        const totals = (data || []).reduce(
-          (acc, row) => ({
-            totalSent: acc.totalSent + (row.total_sent || 0),
-            totalDelivered: acc.totalDelivered + (row.total_delivered || 0),
-            totalRead: acc.totalRead + (row.total_read || 0),
-            totalFailed: acc.totalFailed + (row.total_failed || 0),
-            totalCost: acc.totalCost + parseFloat(row.total_cost || 0),
-          }),
-          { totalSent: 0, totalDelivered: 0, totalRead: 0, totalFailed: 0, totalCost: 0 }
-        );
-
-        const deliveryRate = totals.totalSent > 0 ? (totals.totalDelivered / totals.totalSent) * 100 : 0;
-        const readRate = totals.totalDelivered > 0 ? (totals.totalRead / totals.totalDelivered) * 100 : 0;
-        const failureRate = totals.totalSent > 0 ? (totals.totalFailed / totals.totalSent) * 100 : 0;
 
         return new Response(
-          JSON.stringify({
-            success: true,
-            ...totals,
-            deliveryRate: parseFloat(deliveryRate.toFixed(2)),
-            readRate: parseFloat(readRate.toFixed(2)),
-            failureRate: parseFloat(failureRate.toFixed(2)),
-            dailyData: data,
-          }),
+          JSON.stringify(analytics),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -817,223 +705,258 @@ serve(async (req) => {
       // Get account balance
       // =====================================================
       case 'balance': {
-        const balance = await infobip.getAccountBalance();
+        const accountInfo = await provider.getAccountInfo();
 
         return new Response(
-          JSON.stringify({ success: true, ...balance }),
+          JSON.stringify(accountInfo),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       // =====================================================
-      // Sync senders from Infobip
+      // Sync channels from Twilio
       // =====================================================
-      case 'sync-senders': {
-        const results: any = {
-          sms: [],
-          whatsapp: [],
-          viber: [],
-        };
+      case 'sync-channels': {
+        const syncedChannels: any[] = [];
+        const errors: string[] = [];
 
-        // Fetch owned numbers (for SMS/Voice)
-        // Uses Numbers API: GET /numbers/1/numbers
         try {
-          const ownedNumbers = await infobip.getOwnedNumbers();
-          if (ownedNumbers?.numbers) {
-            results.sms = ownedNumbers.numbers
-              .filter((n: any) => n.capabilities?.includes('SMS') || n.type === 'SMS' || !n.capabilities)
-              .map((n: any) => ({
-                sender_id: n.numberKey || n.number || n.phoneNumber,
-                display_name: n.name || n.description || n.number,
-                status: n.status?.toLowerCase() || 'active',
-                country: n.country,
-                capabilities: n.capabilities,
-              }));
-          }
-        } catch (e: any) {
-          console.log('Could not fetch owned numbers:', e.message);
-        }
+          console.log('Fetching phone numbers from Twilio...');
+          const phoneNumbers = await provider.listPhoneNumbers();
+          console.log(`Found ${phoneNumbers.length} phone numbers`);
 
-        // Fetch WhatsApp senders
-        // Uses WhatsApp API: GET /whatsapp/1/senders
-        try {
-          const whatsappSenders = await infobip.getWhatsAppSenders();
-          const senderList = whatsappSenders?.senders || whatsappSenders?.results || whatsappSenders || [];
-          if (Array.isArray(senderList)) {
-            results.whatsapp = senderList.map((s: any) => ({
-              sender_id: s.sender || s.phoneNumber || s.number || s.id,
-              display_name: s.name || s.businessName || s.displayName || s.sender,
-              status: s.status?.toLowerCase() || 'active',
-              quality_rating: s.qualityRating || s.quality,
-            }));
-          }
-        } catch (e: any) {
-          console.log('Could not fetch WhatsApp senders:', e.message);
-        }
+          for (const num of phoneNumbers) {
+            try {
+              if (!num.capabilities.sms) continue;
 
-        // Fetch Viber senders
-        try {
-          const viberSenders = await infobip.getViberSenders();
-          const senderList = viberSenders?.senders || viberSenders?.results || viberSenders || [];
-          if (Array.isArray(senderList)) {
-            results.viber = senderList.map((s: any) => ({
-              sender_id: s.sender || s.senderId || s.id || s.name,
-              display_name: s.name || s.displayName || s.sender,
-              status: s.status?.toLowerCase() || 'active',
-            }));
-          }
-        } catch (e: any) {
-          console.log('Could not fetch Viber senders:', e.message);
-        }
-
-        // Optionally auto-import to database
-        const { autoImport } = requestBody;
-        if (autoImport) {
-          for (const channelType of ['sms', 'whatsapp', 'viber'] as const) {
-            for (const sender of results[channelType]) {
-              // Check if already exists
-              const { data: existing } = await supabaseClient
+              // Create SMS channel
+              const { data: existingSms } = await supabaseClient
                 .from('messaging_channels')
                 .select('id')
-                .eq('channel_type', channelType)
-                .eq('sender_id', sender.sender_id)
+                .eq('sender_id', num.phoneNumber)
+                .eq('channel_type', 'sms')
                 .single();
 
-              if (!existing) {
-                // Insert new channel
+              if (existingSms) {
                 await supabaseClient
                   .from('messaging_channels')
-                  .insert({
-                    channel_type: channelType,
-                    provider: 'infobip',
-                    sender_id: sender.sender_id,
-                    display_name: sender.display_name,
-                    is_active: sender.status === 'active' || sender.status === 'ACTIVE',
-                    is_default: false,
-                    config: { imported_from_infobip: true, quality_rating: sender.quality_rating },
-                    daily_quota: 10000,
-                    max_send_rate: channelType === 'sms' ? 100 : 30,
-                  });
+                  .update({
+                    display_name: num.friendlyName,
+                    is_active: true,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', existingSms.id);
+
+                syncedChannels.push({
+                  action: 'updated',
+                  channelType: 'sms',
+                  senderId: num.phoneNumber,
+                  displayName: num.friendlyName,
+                });
+              } else {
+                const { count } = await supabaseClient
+                  .from('messaging_channels')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('channel_type', 'sms');
+
+                const isDefault = (count || 0) === 0;
+
+                await supabaseClient.from('messaging_channels').insert({
+                  channel_type: 'sms',
+                  provider: 'twilio',
+                  sender_id: num.phoneNumber,
+                  display_name: num.friendlyName,
+                  is_active: true,
+                  is_default: isDefault,
+                  config: { capabilities: num.capabilities },
+                  daily_quota: 10000,
+                  max_send_rate: 100,
+                });
+
+                syncedChannels.push({
+                  action: 'created',
+                  channelType: 'sms',
+                  senderId: num.phoneNumber,
+                  displayName: num.friendlyName,
+                  isDefault,
+                });
               }
+
+              // Create WhatsApp channel for the same number
+              const { data: existingWa } = await supabaseClient
+                .from('messaging_channels')
+                .select('id')
+                .eq('sender_id', num.phoneNumber)
+                .eq('channel_type', 'whatsapp')
+                .single();
+
+              if (!existingWa) {
+                const { count: waCount } = await supabaseClient
+                  .from('messaging_channels')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('channel_type', 'whatsapp');
+
+                const isWaDefault = (waCount || 0) === 0;
+
+                await supabaseClient.from('messaging_channels').insert({
+                  channel_type: 'whatsapp',
+                  provider: 'twilio',
+                  sender_id: num.phoneNumber,
+                  display_name: `WhatsApp ${num.friendlyName}`,
+                  is_active: true,
+                  is_default: isWaDefault,
+                  config: {},
+                  daily_quota: 10000,
+                  max_send_rate: 100,
+                });
+
+                syncedChannels.push({
+                  action: 'created',
+                  channelType: 'whatsapp',
+                  senderId: num.phoneNumber,
+                  displayName: `WhatsApp ${num.friendlyName}`,
+                  isDefault: isWaDefault,
+                });
+              }
+            } catch (err) {
+              console.error('Error processing number:', err);
+              errors.push(`Failed to process ${num.phoneNumber}: ${err}`);
             }
           }
+        } catch (err) {
+          console.error('Error syncing channels:', err);
+          errors.push(`Twilio API error: ${err instanceof Error ? err.message : String(err)}`);
         }
+
+        const message = syncedChannels.length > 0
+          ? `Successfully synced ${syncedChannels.length} channel(s) from Twilio.`
+          : 'No phone numbers found in Twilio. Make sure you have purchased phone numbers in your Twilio account.';
 
         return new Response(
           JSON.stringify({
             success: true,
-            senders: results,
-            total: results.sms.length + results.whatsapp.length + results.viber.length,
-            imported: autoImport ? true : false,
+            synced: syncedChannels.length,
+            channels: syncedChannels,
+            message,
+            errors: errors.length > 0 ? errors : undefined,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       // =====================================================
-      // Fetch WhatsApp templates from Infobip
-      // =====================================================
-      case 'whatsapp-templates': {
-        const { sender } = requestBody;
-
-        if (!sender) {
-          throw new Error('Sender is required to fetch WhatsApp templates');
-        }
-
-        const templates = await infobip.getWhatsAppTemplates(sender);
-
-        return new Response(
-          JSON.stringify({
-            success: true,
-            templates: templates?.templates || templates?.results || [],
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // =====================================================
-      // Send test message (for campaigns)
+      // Send test message
       // =====================================================
       case 'send-test': {
-        const { campaignId, testNumber } = requestBody;
+        const { channel, testNumber, content = 'Test message from MIVAA' } = requestBody;
 
-        // Get campaign
-        const { data: campaign, error: campaignError } = await supabaseClient
-          .from('campaigns')
-          .select('*, template:messaging_templates(*), channel:messaging_channels(*)')
-          .eq('id', campaignId)
+        if (!channel || !testNumber) {
+          throw new Error('Channel and test number are required');
+        }
+
+        const { data: channelData } = await supabaseClient
+          .from('messaging_channels')
+          .select('*')
+          .eq('channel_type', channel)
+          .eq('is_default', true)
+          .eq('is_active', true)
           .single();
 
-        if (campaignError || !campaign) {
-          throw new Error('Campaign not found');
+        if (!channelData) {
+          throw new Error(`No default ${channel} channel configured`);
         }
 
-        if (!campaign.template) {
-          throw new Error('Campaign has no template assigned');
-        }
+        const fromNumber = channelData.sender_id;
+        const to = normalizePhoneNumber(testNumber);
+        let result: MessageResult;
 
-        const content = renderTemplate(campaign.template.content, {
-          name: 'Test User',
-        });
-
-        const fromNumber = campaign.channel?.sender_id;
-        if (!fromNumber) {
-          throw new Error('Campaign has no sender configured');
-        }
-
-        const callbackData = JSON.stringify({
-          channel: campaign.channel_type,
-          userId: user.id,
-          campaignId,
-          isTest: true,
-        });
-
-        let response: any;
-
-        switch (campaign.channel_type) {
+        switch (channel) {
           case 'sms':
-            response = await infobip.sendSms({
+            result = await provider.sendSms({
               from: fromNumber,
-              to: testNumber,
-              text: `[TEST] ${content}`,
-              callbackData,
+              to,
+              body: `[TEST] ${content}`,
+              statusCallback: webhookUrl,
             });
             break;
 
           case 'whatsapp':
-            response = await infobip.sendWhatsAppText({
+            result = await provider.sendWhatsApp({
               from: fromNumber,
-              to: testNumber,
-              text: `[TEST] ${content}`,
-              callbackData,
+              to,
+              body: `[TEST] ${content}`,
+              statusCallback: webhookUrl,
             });
             break;
 
-          case 'viber':
-            response = await infobip.sendViber({
-              from: fromNumber,
-              to: testNumber,
-              text: `[TEST] ${content}`,
-              callbackData,
-            });
-            break;
+          default:
+            throw new Error(`Unsupported channel: ${channel}`);
         }
 
         return new Response(
-          JSON.stringify({ success: true, messageId: response.messages?.[0]?.messageId || response.messageId }),
+          JSON.stringify({
+            success: result.success,
+            messageId: result.messageId,
+            error: result.error,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // =====================================================
+      // Get settings
+      // =====================================================
+      case 'get-settings': {
+        const { data: settings } = await supabaseClient
+          .from('messaging_settings')
+          .select('*')
+          .single();
+
+        return new Response(
+          JSON.stringify({ settings: settings || { provider: 'twilio' } }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // =====================================================
+      // Update settings
+      // =====================================================
+      case 'update-settings': {
+        const { settings } = requestBody;
+
+        const { data, error } = await supabaseClient
+          .from('messaging_settings')
+          .upsert({
+            id: settings.id || undefined,
+            ...settings,
+            provider: 'twilio',
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        return new Response(
+          JSON.stringify({ settings: data }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       default:
-        throw new Error('Invalid action');
+        throw new Error(`Unknown action: ${action}`);
     }
   } catch (error) {
-    console.error('Error:', error);
-
+    console.error('Messaging API error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
   }
 });

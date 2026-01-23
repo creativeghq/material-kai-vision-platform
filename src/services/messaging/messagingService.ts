@@ -1,8 +1,9 @@
 /**
  * Messaging Service
- * Handles SMS, WhatsApp, and Viber messaging via Infobip through Supabase Edge Functions
+ * Handles SMS and WhatsApp messaging via Twilio through Supabase Edge Functions
+ * @see https://www.twilio.com/docs/messaging/api
  *
- * IMPORTANT: Infobip credentials are stored as Supabase Secrets, NOT in environment variables
+ * IMPORTANT: Twilio credentials are stored as Supabase Secrets, NOT in environment variables
  * All messaging operations go through the messaging-api Edge Function which has access to secrets
  */
 
@@ -49,7 +50,7 @@ export class MessagingService {
       if (error.message?.includes('FunctionsRelayError')) {
         throw new Error('Messaging service unavailable. Please check edge function deployment.');
       } else if (error.message?.includes('FunctionsHttpError')) {
-        throw new Error('Messaging service error. Please check Infobip configuration.');
+        throw new Error('Messaging service error. Please check Twilio configuration.');
       }
 
       throw error;
@@ -355,7 +356,7 @@ export class MessagingService {
   }
 
   /**
-   * Get Infobip account balance
+   * Get Twilio account balance
    */
   async getAccountBalance(): Promise<{ balance: number; currency: string }> {
     try {
@@ -374,50 +375,46 @@ export class MessagingService {
   }
 
   /**
-   * Sync senders from Infobip account
-   * Fetches all registered SMS, WhatsApp, and Viber senders
+   * Sync channels from Twilio
+   * Fetches all registered phone numbers from Twilio and syncs them to the database
    */
-  async syncSendersFromInfobip(autoImport: boolean = false): Promise<{
-    senders: {
-      sms: Array<{ sender_id: string; display_name: string; status: string }>;
-      whatsapp: Array<{ sender_id: string; display_name: string; status: string; quality_rating?: string }>;
-      viber: Array<{ sender_id: string; display_name: string; status: string }>;
-    };
-    total: number;
-    imported: boolean;
+  async syncChannels(): Promise<{
+    synced: number;
+    channels: Array<{ action: string; channelType: string; senderId: string; displayName: string }>;
+    message?: string;
+    errors?: string[];
   }> {
     try {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
         body: {
-          action: 'sync-senders',
-          autoImport,
+          action: 'sync-channels',
         },
       });
 
       if (error) throw error;
       return data;
     } catch (error) {
-      console.error('Error syncing senders from Infobip:', error);
+      console.error('Error syncing channels from Twilio:', error);
       throw error;
     }
   }
 
   /**
-   * Get WhatsApp templates from Infobip for a specific sender
+   * Get WhatsApp content templates from Twilio
+   * @see https://www.twilio.com/docs/content/api
    */
-  async getWhatsAppTemplates(sender: string): Promise<any[]> {
+  async getWhatsAppTemplates(): Promise<any[]> {
     try {
       const { data, error } = await supabase.functions.invoke('messaging-api', {
         body: {
           action: 'whatsapp-templates',
-          sender,
         },
       });
 
       if (error) throw error;
       return data.templates || [];
     } catch (error) {
-      console.error('Error fetching WhatsApp templates:', error);
+      console.error('Error fetching WhatsApp templates from Twilio:', error);
       throw error;
     }
   }

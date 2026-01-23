@@ -163,12 +163,12 @@ const AdminDashboard: React.FC = () => {
         count: 'SES Integration',
       },
       {
-        title: 'Messaging (SMS/WhatsApp/Viber)',
-        description: 'Send SMS, WhatsApp, and Viber campaigns with Infobip integration',
+        title: 'Messaging (SMS/WhatsApp)',
+        description: 'Send SMS and WhatsApp campaigns with Twilio integration',
         icon: MessageSquare,
         path: '/admin/messaging',
         status: 'active',
-        count: 'Infobip',
+        count: 'Twilio',
       },
     ],
     'System Monitoring': [

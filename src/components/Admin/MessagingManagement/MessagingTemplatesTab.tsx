@@ -1,10 +1,10 @@
 /**
  * Messaging Templates Tab
- * Create and manage SMS, WhatsApp, and Viber message templates
+ * Create and manage SMS and WhatsApp message templates via Twilio
  */
 
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Phone, MessageCircle, Smartphone, Edit2, Trash2, Copy, Eye } from 'lucide-react';
+import { Plus, FileText, Phone, MessageCircle, Edit2, Trash2, Copy, Eye } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Input } from '@/components/core/ui/input';
@@ -19,7 +19,6 @@ import { messagingService, MessagingTemplate, MessagingChannelType } from '@/ser
 const channelIcons: Record<MessagingChannelType, React.ReactNode> = {
   sms: <Phone className="h-4 w-4" />,
   whatsapp: <MessageCircle className="h-4 w-4 text-green-500" />,
-  viber: <Smartphone className="h-4 w-4 text-purple-500" />,
 };
 
 const categoryColors: Record<string, string> = {
@@ -125,7 +124,7 @@ export const MessagingTemplatesTab: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold">Message Templates</h3>
             <p className="text-sm text-muted-foreground">
-              Create reusable templates for SMS, WhatsApp, and Viber
+              Create reusable templates for SMS and WhatsApp
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -137,7 +136,6 @@ export const MessagingTemplatesTab: React.FC = () => {
                 <SelectItem value="all">All Channels</SelectItem>
                 <SelectItem value="sms">SMS</SelectItem>
                 <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                <SelectItem value="viber">Viber</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={() => setShowCreateModal(true)}>
@@ -426,7 +424,6 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
                 <SelectContent>
                   <SelectItem value="sms">SMS</SelectItem>
                   <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  <SelectItem value="viber">Viber</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -478,7 +475,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, onClose, onSucc
             </p>
           </div>
 
-          {(formData.channel_type === 'whatsapp' || formData.channel_type === 'viber') && (
+          {formData.channel_type === 'whatsapp' && (
             <div className="space-y-2">
               <Label>Media URL (Optional)</Label>
               <Input

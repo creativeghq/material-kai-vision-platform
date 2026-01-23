@@ -1,9 +1,11 @@
 /**
  * Messaging Campaign Processor
- * Cron job to process scheduled messaging campaigns
+ * Cron job to process scheduled messaging campaigns via Twilio
  *
  * This function should be invoked by a scheduled job (e.g., every minute)
  * to process pending messages in messaging campaigns.
+ *
+ * @see https://www.twilio.com/docs/messaging/api
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -19,72 +21,163 @@ const BATCH_SIZE = 10; // Messages per batch
 const MAX_RETRIES = 3;
 
 // =====================================================
-// Infobip Client
+// Twilio Provider (Provider-Agnostic Interface)
 // =====================================================
 
-class InfobipClient {
-  private apiKey: string;
-  private baseUrl: string;
-  private webhookUrl: string;
+interface MessageResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+  errorCode?: string;
+}
 
-  constructor(apiKey: string, baseUrl: string, webhookUrl: string) {
-    this.apiKey = apiKey;
-    this.baseUrl = baseUrl.replace(/\/$/, '');
-    this.webhookUrl = webhookUrl;
+class TwilioProvider {
+  private accountSid: string;
+  private authToken: string;
+  private baseUrl: string;
+
+  constructor(accountSid: string, authToken: string) {
+    this.accountSid = accountSid;
+    this.authToken = authToken;
+    this.baseUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}`;
   }
 
-  private async request(endpoint: string, method: string, body?: any): Promise<any> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+  private async request(endpoint: string, method: string, body?: Record<string, string>): Promise<any> {
+    const auth = btoa(`${this.accountSid}:${this.authToken}`);
+
+    const options: RequestInit = {
       method,
       headers: {
-        'Authorization': `App ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    };
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(error.requestError?.serviceException?.text || error.message || 'Infobip API error');
+    if (body && method !== 'GET') {
+      const formData = new URLSearchParams();
+      for (const [key, value] of Object.entries(body)) {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value);
+        }
+      }
+      options.body = formData.toString();
     }
 
-    return response.json();
+    const response = await fetch(`${this.baseUrl}${endpoint}`, options);
+    const data = await response.json();
+
+    if (!response.ok) {
+      const error = data.message || data.error_message || 'Twilio API error';
+      const errorCode = data.code?.toString() || data.error_code;
+      throw new Error(`${error}${errorCode ? ` (${errorCode})` : ''}`);
+    }
+
+    return data;
   }
 
-  async sendSms(from: string, to: string, text: string, callbackData?: string): Promise<any> {
-    return this.request('/sms/2/text/advanced', 'POST', {
-      messages: [{
-        from,
-        destinations: [{ to }],
-        text,
-        notifyUrl: this.webhookUrl,
-        notifyContentType: 'application/json',
-        callbackData,
-      }],
-    });
+  async sendSms(params: {
+    from: string;
+    to: string;
+    body: string;
+    statusCallback?: string;
+  }): Promise<MessageResult> {
+    try {
+      const result = await this.request('/Messages.json', 'POST', {
+        From: params.from,
+        To: params.to,
+        Body: params.body,
+        ...(params.statusCallback && { StatusCallback: params.statusCallback }),
+      });
+
+      return {
+        success: true,
+        messageId: result.sid,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 
-  async sendWhatsAppText(from: string, to: string, text: string, callbackData?: string): Promise<any> {
-    return this.request('/whatsapp/1/message/text', 'POST', {
-      from,
-      to,
-      content: { text },
-      notifyUrl: this.webhookUrl,
-      callbackData,
-    });
+  async sendWhatsApp(params: {
+    from: string;
+    to: string;
+    body: string;
+    mediaUrl?: string;
+    statusCallback?: string;
+  }): Promise<MessageResult> {
+    try {
+      // WhatsApp numbers must be prefixed with 'whatsapp:'
+      const from = params.from.startsWith('whatsapp:') ? params.from : `whatsapp:${params.from}`;
+      const to = params.to.startsWith('whatsapp:') ? params.to : `whatsapp:${params.to}`;
+
+      const requestBody: Record<string, string> = {
+        From: from,
+        To: to,
+        Body: params.body,
+      };
+
+      if (params.mediaUrl) {
+        requestBody.MediaUrl = params.mediaUrl;
+      }
+
+      if (params.statusCallback) {
+        requestBody.StatusCallback = params.statusCallback;
+      }
+
+      const result = await this.request('/Messages.json', 'POST', requestBody);
+
+      return {
+        success: true,
+        messageId: result.sid,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 
-  async sendViber(from: string, to: string, text: string, callbackData?: string): Promise<any> {
-    return this.request('/viber/1/message/promotional', 'POST', {
-      messages: [{
-        from,
-        to,
-        content: { text },
-        notifyUrl: this.webhookUrl,
-        callbackData,
-      }],
-    });
+  async sendWhatsAppTemplate(params: {
+    from: string;
+    to: string;
+    contentSid: string;
+    contentVariables?: Record<string, string>;
+    statusCallback?: string;
+  }): Promise<MessageResult> {
+    try {
+      const from = params.from.startsWith('whatsapp:') ? params.from : `whatsapp:${params.from}`;
+      const to = params.to.startsWith('whatsapp:') ? params.to : `whatsapp:${params.to}`;
+
+      const requestBody: Record<string, string> = {
+        From: from,
+        To: to,
+        ContentSid: params.contentSid,
+      };
+
+      if (params.contentVariables) {
+        requestBody.ContentVariables = JSON.stringify(params.contentVariables);
+      }
+
+      if (params.statusCallback) {
+        requestBody.StatusCallback = params.statusCallback;
+      }
+
+      const result = await this.request('/Messages.json', 'POST', requestBody);
+
+      return {
+        success: true,
+        messageId: result.sid,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 }
 
@@ -124,16 +217,19 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get Infobip credentials
-    const infobipApiKey = Deno.env.get('INFOBIP_API_KEY');
-    const infobipBaseUrl = Deno.env.get('INFOBIP_BASE_URL') || 'https://api.infobip.com';
-    const webhookUrl = `${supabaseUrl}/functions/v1/messaging-webhook`;
+    // Get Twilio credentials
+    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
 
-    if (!infobipApiKey) {
-      throw new Error('Infobip API key not configured');
+    if (!twilioAccountSid || !twilioAuthToken) {
+      throw new Error('Twilio credentials not configured');
     }
 
-    const infobip = new InfobipClient(infobipApiKey, infobipBaseUrl, webhookUrl);
+    const twilio = new TwilioProvider(twilioAccountSid, twilioAuthToken);
+
+    // Get webhook URL for status callbacks
+    const webhookBaseUrl = Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.functions.supabase.co');
+    const statusCallbackUrl = webhookBaseUrl ? `${webhookBaseUrl}/messaging-webhook?type=status` : undefined;
 
     // =====================================================
     // Step 1: Start scheduled campaigns that are ready
@@ -144,7 +240,7 @@ serve(async (req) => {
       .from('campaigns')
       .select('id')
       .eq('status', 'scheduled')
-      .in('channel_type', ['sms', 'whatsapp', 'viber'])
+      .in('channel_type', ['sms', 'whatsapp'])
       .lte('scheduled_at', now);
 
     for (const campaign of scheduledCampaigns || []) {
@@ -172,7 +268,7 @@ serve(async (req) => {
         channel:messaging_channels(*)
       `)
       .eq('status', 'sending')
-      .in('channel_type', ['sms', 'whatsapp', 'viber']);
+      .in('channel_type', ['sms', 'whatsapp']);
 
     if (!activeCampaigns || activeCampaigns.length === 0) {
       console.log('No active messaging campaigns to process');
@@ -269,48 +365,48 @@ serve(async (req) => {
 
           const content = renderTemplate(template.content, variables);
 
-          const callbackData = JSON.stringify({
-            channel: campaign.channel_type,
-            campaignId: campaign.id,
-            recipientId: recipient.id,
-          });
-
           // Send message based on channel type
-          let response: any;
+          let result: MessageResult;
 
           switch (campaign.channel_type) {
             case 'sms':
-              response = await infobip.sendSms(
-                channel.sender_id,
-                recipient.phone_number,
-                content,
-                callbackData
-              );
+              result = await twilio.sendSms({
+                from: channel.sender_id,
+                to: recipient.phone_number,
+                body: content,
+                statusCallback: statusCallbackUrl,
+              });
               break;
 
-            case 'whatsapp':
-              response = await infobip.sendWhatsAppText(
-                channel.sender_id,
-                recipient.phone_number,
-                content,
-                callbackData
-              );
+            case 'whatsapp': {
+              // Check if using a pre-approved template (content SID)
+              if (template.whatsapp_content_sid) {
+                result = await twilio.sendWhatsAppTemplate({
+                  from: channel.sender_id,
+                  to: recipient.phone_number,
+                  contentSid: template.whatsapp_content_sid,
+                  contentVariables: variables as Record<string, string>,
+                  statusCallback: statusCallbackUrl,
+                });
+              } else {
+                result = await twilio.sendWhatsApp({
+                  from: channel.sender_id,
+                  to: recipient.phone_number,
+                  body: content,
+                  mediaUrl: template.media_url,
+                  statusCallback: statusCallbackUrl,
+                });
+              }
               break;
-
-            case 'viber':
-              response = await infobip.sendViber(
-                channel.sender_id,
-                recipient.phone_number,
-                content,
-                callbackData
-              );
-              break;
+            }
 
             default:
               throw new Error(`Unsupported channel: ${campaign.channel_type}`);
           }
 
-          const messageInfo = response.messages?.[0] || response;
+          if (!result.success) {
+            throw new Error(result.error || 'Failed to send message');
+          }
 
           // Create message log
           const { data: messageLog } = await supabase
@@ -319,8 +415,7 @@ serve(async (req) => {
               channel_type: campaign.channel_type,
               template_id: template.id,
               channel_id: channel.id,
-              provider_message_id: messageInfo.messageId,
-              bulk_id: response.bulkId,
+              provider_message_id: result.messageId,
               from_number: channel.sender_id,
               to_number: recipient.phone_number,
               content,
@@ -329,7 +424,6 @@ serve(async (req) => {
               sent_at: new Date().toISOString(),
               variables: recipient.variables || {},
               campaign_id: campaign.id,
-              callback_data: callbackData,
             })
             .select()
             .single();

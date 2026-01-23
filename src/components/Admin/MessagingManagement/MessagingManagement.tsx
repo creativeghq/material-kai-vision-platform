@@ -1,10 +1,11 @@
 /**
  * Messaging Management
- * Main dashboard for managing SMS, WhatsApp, and Viber messaging via Infobip
+ * Main dashboard for managing SMS and WhatsApp messaging via Twilio API
+ * @see https://www.twilio.com/docs/messaging/api
  */
 
 import React, { useState, useEffect } from 'react';
-import { Phone, MessageCircle, Smartphone, Send, FileText, BarChart3, Settings, Users, TestTube, Wallet } from 'lucide-react';
+import { Phone, MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Wallet } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -30,7 +31,7 @@ export const MessagingManagement: React.FC = () => {
     readRate: 0,
   });
   const [accountBalance, setAccountBalance] = useState<{ balance: number; currency: string } | null>(null);
-  const [channelCounts, setChannelCounts] = useState({ sms: 0, whatsapp: 0, viber: 0 });
+  const [channelCounts, setChannelCounts] = useState({ sms: 0, whatsapp: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -57,7 +58,7 @@ export const MessagingManagement: React.FC = () => {
       setAnalytics(analyticsData);
 
       // Count channels by type
-      const counts = { sms: 0, whatsapp: 0, viber: 0 };
+      const counts = { sms: 0, whatsapp: 0 };
       channels.forEach((ch: any) => {
         if (ch.channel_type in counts) {
           counts[ch.channel_type as keyof typeof counts]++;
@@ -92,8 +93,8 @@ export const MessagingManagement: React.FC = () => {
       {/* Global Admin Header */}
       <GlobalAdminHeader
         title="Messaging Management"
-        description="Manage SMS, WhatsApp, and Viber messaging via Infobip"
-        badge="Infobip"
+        description="Manage SMS and WhatsApp messaging via Twilio"
+        badge="Twilio"
       />
 
       {/* Main Content */}
@@ -181,7 +182,7 @@ export const MessagingManagement: React.FC = () => {
                 <p className="text-lg font-bold">{analytics.readRate.toFixed(1)}%</p>
               </div>
               <Badge variant="secondary" className="text-xs">
-                WhatsApp/Viber
+                WhatsApp
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">{analytics.totalRead.toLocaleString()} read</p>
@@ -203,7 +204,7 @@ export const MessagingManagement: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Active Channels</p>
-                <p className="text-lg font-bold">{channelCounts.sms + channelCounts.whatsapp + channelCounts.viber}</p>
+                <p className="text-lg font-bold">{channelCounts.sms + channelCounts.whatsapp}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -214,10 +215,6 @@ export const MessagingManagement: React.FC = () => {
               <Badge variant="outline" className="text-xs flex items-center gap-1 text-green-600">
                 <MessageCircle className="h-3 w-3" />
                 {channelCounts.whatsapp} WA
-              </Badge>
-              <Badge variant="outline" className="text-xs flex items-center gap-1 text-purple-600">
-                <Smartphone className="h-3 w-3" />
-                {channelCounts.viber} Viber
               </Badge>
             </div>
           </div>

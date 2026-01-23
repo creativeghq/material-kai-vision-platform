@@ -1,6 +1,6 @@
 /**
  * Notification Service
- * Unified notification system supporting email, push, webhook, SMS, WhatsApp, and Viber
+ * Unified notification system supporting email, push, webhook, SMS, and WhatsApp via Twilio
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +10,7 @@ import { messagingService } from '@/services/messaging';
 // =====================================================
 // TYPES
 // =====================================================
-export type NotificationChannel = 'email' | 'push' | 'webhook' | 'sms' | 'whatsapp' | 'viber';
+export type NotificationChannel = 'email' | 'push' | 'webhook' | 'sms' | 'whatsapp';
 export type NotificationStatus = 'pending' | 'sent' | 'delivered' | 'failed' | 'cancelled';
 
 export interface NotificationPayload {
@@ -180,9 +180,6 @@ export class NotificationService {
         case 'whatsapp':
           result = await this.sendWhatsApp(payload);
           break;
-        case 'viber':
-          result = await this.sendViber(payload);
-          break;
         default:
           throw new Error(`Unknown channel: ${channel}`);
       }
@@ -314,7 +311,7 @@ export class NotificationService {
   }
 
   /**
-   * Send SMS notification via Infobip
+   * Send SMS notification via Twilio
    */
   private async sendSms(payload: NotificationPayload): Promise<any> {
     // Get user's phone number from preferences or profile
@@ -348,7 +345,7 @@ export class NotificationService {
   }
 
   /**
-   * Send WhatsApp notification via Infobip
+   * Send WhatsApp notification via Twilio
    */
   private async sendWhatsApp(payload: NotificationPayload): Promise<any> {
     // Get user's phone number
@@ -382,40 +379,6 @@ export class NotificationService {
   }
 
   /**
-   * Send Viber notification via Infobip
-   */
-  private async sendViber(payload: NotificationPayload): Promise<any> {
-    // Get user's phone number
-    const phoneNumber = await this.getUserPhoneNumber(payload.userId);
-    if (!phoneNumber) {
-      throw new Error('User phone number not found');
-    }
-
-    // Check if user has opted out
-    const hasOptedOut = await messagingService.checkOptOut(phoneNumber, 'viber');
-    if (hasOptedOut) {
-      throw new Error('User has opted out of Viber notifications');
-    }
-
-    // Send Viber using messaging service
-    const result = await messagingService.sendMessage({
-      channel: 'viber',
-      to: phoneNumber,
-      content: `${payload.title}\n\n${payload.message}`,
-      messageType: 'notification',
-      tags: {
-        notification_type: payload.notificationType,
-        user_id: payload.userId,
-      },
-    });
-
-    return {
-      message_id: result.messageId,
-      log_id: result.logId,
-    };
-  }
-
-  /**
    * Get user's phone number from profile or preferences
    */
   private async getUserPhoneNumber(userId: string): Promise<string | null> {
@@ -435,7 +398,7 @@ export class NotificationService {
       .from('user_notification_preferences')
       .select('config')
       .eq('user_id', userId)
-      .in('channel_type', ['sms', 'whatsapp', 'viber'])
+      .in('channel_type', ['sms', 'whatsapp'])
       .not('config->phone_number', 'is', null)
       .limit(1)
       .single();
@@ -592,4 +555,3 @@ export class NotificationService {
 
 // Export singleton instance
 export const notificationService = new NotificationService();
-
