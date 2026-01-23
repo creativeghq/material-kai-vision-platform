@@ -303,34 +303,24 @@ export const contactsAPI = {
   },
 
   async deleteContact(contactId: string) {
-    console.log('[contactsAPI] deleteContact called with ID:', contactId);
-
     const {
       data: { session },
     } = await supabase.auth.getSession();
     if (!session) throw new Error('Not authenticated');
 
-    const url = `${API_BASE}/crm-contacts-api/${contactId}`;
-    console.log('[contactsAPI] DELETE request to:', url);
-
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE}/crm-contacts-api/${contactId}`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${session.access_token}`,
       },
     });
 
-    console.log('[contactsAPI] Response status:', response.status);
-
     if (!response.ok) {
       const error = await response.json();
-      console.error('[contactsAPI] Delete failed:', error);
       throw new Error(error.error || 'Failed to delete contact');
     }
 
-    const result = await response.json();
-    console.log('[contactsAPI] Delete success:', result);
-    return result;
+    return response.json();
   },
 
   // ============ User-Contact Linking ============

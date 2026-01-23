@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const method = req.method;
-    const path = url.pathname.split('/').slice(4); // Remove /functions/recommendations-api
+    const path = url.pathname.replace('/recommendations-api', '').split('/').filter(Boolean);
 
     // Get auth header
     const authHeader = req.headers.get('Authorization');

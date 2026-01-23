@@ -20,7 +20,8 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const method = req.method;
-    const path = url.pathname.split('/').slice(4); // Remove /functions/crm-contacts-api
+    // Use replace + filter for robust path parsing (same as crm-companies-api)
+    const path = url.pathname.replace('/crm-contacts-api', '').split('/').filter(Boolean);
 
     // Get auth header
     const authHeader = req.headers.get('Authorization');
@@ -185,19 +186,15 @@ Deno.serve(async (req) => {
     // DELETE /api/contacts/{id} - Delete contact
     if (method === 'DELETE' && path.length === 1 && !path[0].includes('unlink-user')) {
       const contactId = path[0];
-      console.log('[crm-contacts-api] DELETE request for contact:', contactId);
 
       // First check if contact exists
       const { data: existingContact, error: checkError } = await supabase
         .from('crm_contacts')
-        .select('id, name')
+        .select('id')
         .eq('id', contactId)
         .single();
 
-      console.log('[crm-contacts-api] Existing contact check:', { existingContact, checkError });
-
       if (checkError || !existingContact) {
-        console.log('[crm-contacts-api] Contact not found:', contactId);
         return new Response(
           JSON.stringify({ error: 'Contact not found' }),
           { status: 404, headers: corsHeaders },
@@ -205,37 +202,26 @@ Deno.serve(async (req) => {
       }
 
       // Delete relationships first
-      const { error: relError, count: relCount } = await supabase
+      await supabase
         .from('crm_contact_relationships')
         .delete()
         .eq('contact_id', contactId);
 
-      console.log('[crm-contacts-api] Deleted relationships:', { relError, relCount });
-
-      // Delete contact and return deleted row to verify
-      const { data: deletedContact, error } = await supabase
+      // Delete contact
+      const { error } = await supabase
         .from('crm_contacts')
         .delete()
-        .eq('id', contactId)
-        .select()
-        .single();
-
-      console.log('[crm-contacts-api] Delete result:', { deletedContact, error });
+        .eq('id', contactId);
 
       if (error) {
-        console.error('[crm-contacts-api] Delete error:', error);
         return new Response(
           JSON.stringify({ error: error.message }),
           { status: 400, headers: corsHeaders },
         );
       }
 
-      console.log('[crm-contacts-api] Contact deleted successfully:', contactId);
       return new Response(
-        JSON.stringify({
-          message: 'Contact deleted successfully',
-          deletedContact: deletedContact,
-        }),
+        JSON.stringify({ message: 'Contact deleted successfully' }),
         { status: 200, headers: corsHeaders },
       );
     }

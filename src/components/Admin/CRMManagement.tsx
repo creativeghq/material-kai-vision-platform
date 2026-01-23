@@ -213,29 +213,19 @@ export const CRMManagement: React.FC = () => {
   };
 
   const handleDeleteContact = async (contactId: string) => {
-    console.log('[CRM] Delete contact requested for ID:', contactId);
-
-    // Use window.confirm explicitly for better compatibility
     const confirmed = window.confirm('Are you sure you want to delete this contact?');
-    if (!confirmed) {
-      console.log('[CRM] Delete cancelled by user');
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setLoading(true);
-      console.log('[CRM] Calling deleteContact API...');
-      const result = await contactsAPI.deleteContact(contactId);
-      console.log('[CRM] Delete result:', result);
+      await contactsAPI.deleteContact(contactId);
       toast({
         title: 'Success',
         description: 'Contact deleted successfully',
       });
-      console.log('[CRM] Reloading contacts...');
       await loadContacts();
-      console.log('[CRM] Contacts reloaded');
     } catch (error) {
-      console.error('[CRM] Error deleting contact:', error);
+      console.error('Error deleting contact:', error);
       toast({
         title: 'Error',
         description:
