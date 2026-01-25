@@ -179,6 +179,73 @@ Deno.serve(async (req) => {
       );
     }
 
+    // GET /api/users/{id}/ai-usage - Get user's AI usage summary
+    if (method === 'GET' && path.length === 2 && path[1] === 'ai-usage') {
+      const userId = path[0];
+      const limit = parseInt(url.searchParams.get('limit') || '50');
+
+      // Fetch AI usage logs for this user
+      const { data: usageData, error: usageError } = await supabase
+        .from('ai_usage_logs')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (usageError) {
+        return new Response(
+          JSON.stringify({ error: usageError.message }),
+          { status: 400, headers: corsHeaders },
+        );
+      }
+
+      // Calculate totals
+      const totals = (usageData || []).reduce(
+        (acc, log) => ({
+          total_calls: acc.total_calls + 1,
+          total_input_tokens: acc.total_input_tokens + (log.input_tokens || 0),
+          total_output_tokens: acc.total_output_tokens + (log.output_tokens || 0),
+          total_raw_cost_usd: acc.total_raw_cost_usd + (parseFloat(log.raw_cost_usd) || parseFloat(log.total_cost_usd) || 0),
+          total_billed_cost_usd: acc.total_billed_cost_usd + (parseFloat(log.billed_cost_usd) || parseFloat(log.total_cost_usd) || 0),
+          total_credits_debited: acc.total_credits_debited + (parseFloat(log.credits_debited) || 0),
+        }),
+        {
+          total_calls: 0,
+          total_input_tokens: 0,
+          total_output_tokens: 0,
+          total_raw_cost_usd: 0,
+          total_billed_cost_usd: 0,
+          total_credits_debited: 0,
+        }
+      );
+
+      // Aggregate by model
+      const byModel: Record<string, { calls: number; cost: number; credits: number }> = {};
+      (usageData || []).forEach((log) => {
+        const model = log.model_name || 'unknown';
+        if (!byModel[model]) {
+          byModel[model] = { calls: 0, cost: 0, credits: 0 };
+        }
+        byModel[model].calls += 1;
+        byModel[model].cost += parseFloat(log.billed_cost_usd) || parseFloat(log.total_cost_usd) || 0;
+        byModel[model].credits += parseFloat(log.credits_debited) || 0;
+      });
+
+      return new Response(
+        JSON.stringify({
+          data: {
+            usage: usageData || [],
+            totals,
+            byModel: Object.entries(byModel).map(([model, stats]) => ({
+              model,
+              ...stats,
+            })),
+          },
+        }),
+        { status: 200, headers: corsHeaders },
+      );
+    }
+
     // PATCH /api/users/{id} - Update user
     if (method === 'PATCH' && path.length === 1) {
       const userId = path[0];

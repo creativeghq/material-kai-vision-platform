@@ -186,33 +186,32 @@ export const KnowledgeBaseManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Content */}
-        <Card className="p-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="documents" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <FileText className="h-4 w-4 mr-2" />
-                Documents
-              </TabsTrigger>
-              <TabsTrigger value="search" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </TabsTrigger>
-              <TabsTrigger value="categories" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <FolderTree className="h-4 w-4 mr-2" />
+        {/* Main Content - Tabs without Card wrapper to match platform design */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-6">
+            <TabsTrigger value="documents" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Documents
+            </TabsTrigger>
+            <TabsTrigger value="search" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              Search
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <FolderTree className="h-4 w-4" />
               Categories
             </TabsTrigger>
-            <TabsTrigger value="attachments" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Link2 className="h-4 w-4 mr-2" />
+            <TabsTrigger value="attachments" className="flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
               Product Links
             </TabsTrigger>
-            <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <BarChart3 className="h-4 w-4 mr-2" />
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
               Analytics
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="documents" className="space-y-4 mt-6">
+          <TabsContent value="documents" className="space-y-4">
             <DocumentList
               onEdit={handleEditDocument}
               onCreate={handleCreateDocument}
@@ -220,19 +219,19 @@ export const KnowledgeBaseManagement: React.FC = () => {
             />
           </TabsContent>
 
-          <TabsContent value="search" className="space-y-4 mt-6">
+          <TabsContent value="search" className="space-y-4">
             <SearchInterface />
           </TabsContent>
 
-          <TabsContent value="categories" className="space-y-4 mt-6">
+          <TabsContent value="categories" className="space-y-4">
             <CategoryManager />
           </TabsContent>
 
-          <TabsContent value="attachments" className="space-y-4 mt-6">
+          <TabsContent value="attachments" className="space-y-4">
             <ProductAttachments />
           </TabsContent>
 
-          <TabsContent value="analytics" className="space-y-4 mt-6">
+          <TabsContent value="analytics" className="space-y-4">
             <Card>
               <CardHeader>
                 <CardTitle>Search Analytics</CardTitle>
@@ -242,8 +241,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
-          </Tabs>
-        </Card>
+        </Tabs>
       </div>
 
       {/* Document Editor Modal */}

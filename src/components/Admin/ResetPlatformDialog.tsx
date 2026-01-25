@@ -92,7 +92,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
           </div>
           <AlertDialogDescription className="text-left space-y-4 pt-4">
             <p className="font-semibold text-foreground">
-              ⚠️ This action will permanently delete the following data (72 tables + storage):
+              ⚠️ This action will permanently delete the following data:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
               <li>Agent Chat (conversations, messages, uploaded files)</li>
@@ -102,14 +102,14 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>Analytics (events, quality metrics, scoring logs, recommendations)</li>
               <li>Document Entities & Relationships</li>
               <li>Relevancy Relationships (product-chunk, chunk-image, product-image)</li>
-              <li>Metadata Values & Relevancy</li>
-              <li>PDF Processing (jobs, checkpoints, progress, AI queue, image queue)</li>
-              <li>Knowledge Base (chunks, embeddings, images, documents)</li>
+              <li>PDF Processing (jobs, checkpoints, progress, queues)</li>
               <li>Products & Materials Catalog (products, visual analysis)</li>
+              <li>Document Data (chunks, embeddings, images, documents)</li>
               <li>YOLO Layout Data (layout regions, extracted tables)</li>
               <li>Processing Results & Quality Data</li>
               <li>Web Scraping (sessions, pages, temp materials)</li>
               <li>Data Import (jobs, history)</li>
+              <li>Agent Tasks</li>
               <li>Storage files (pdf-tiles, material-images, moodboard-images, 3d-renders)</li>
             </ul>
 
@@ -117,6 +117,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               ✅ The following data will be PRESERVED:
             </p>
             <ul className="list-disc list-inside space-y-1 text-sm">
+              <li><strong>Knowledge Base & Documentation</strong> (kb_docs, categories, attachments, search analytics)</li>
               <li>Users & Authentication</li>
               <li>Profiles & Workspaces</li>
               <li>CRM (contacts, companies, relationships)</li>

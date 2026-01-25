@@ -51,6 +51,9 @@ import { CreateTaskModal } from '@/components/features/tasks/CreateTaskModal';
 import type { TaskWithDetails } from '@/services/tasks';
 
 // Model pricing per 1M tokens (in USD)
+// Platform markup multiplier (50% markup for user billing)
+const MARKUP_MULTIPLIER = 1.50;
+
 const MODEL_PRICING: Record<string, { input: number; output: number }> = {
   // Claude Models
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
@@ -79,15 +82,27 @@ const MODEL_PRICING: Record<string, { input: number; output: number }> = {
 // Estimate tokens from content length (rough approximation: 4 chars = 1 token)
 const estimateTokens = (content: string): number => Math.ceil(content.length / 4);
 
-// Calculate cost based on model and tokens
-const calculateCost = (model: string, inputTokens: number, outputTokens: number): { input: number; output: number; total: number } => {
+// Calculate cost based on model and tokens (returns both raw and billed cost with markup)
+const calculateCost = (model: string, inputTokens: number, outputTokens: number): {
+  input: number;
+  output: number;
+  total: number;
+  raw: number;
+  billed: number;
+  markup: number;
+} => {
   const pricing = MODEL_PRICING[model] || { input: 3.00, output: 15.00 }; // Default to Sonnet pricing
   const inputCost = (inputTokens / 1_000_000) * pricing.input;
   const outputCost = (outputTokens / 1_000_000) * pricing.output;
+  const rawTotal = inputCost + outputCost;
+  const billedTotal = rawTotal * MARKUP_MULTIPLIER;
   return {
     input: inputCost,
     output: outputCost,
-    total: inputCost + outputCost,
+    total: rawTotal, // For backward compatibility
+    raw: rawTotal,
+    billed: billedTotal,
+    markup: MARKUP_MULTIPLIER,
   };
 };
 

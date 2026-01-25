@@ -48,13 +48,14 @@ const TABLES_TO_CLEAR = [
   'document_entities',             // Document entities (certificates, logos, specs)
 
   // Relevancy Relationships (DELETE)
+  'image_product_associations',    // Image-product associations (visual search)
   'product_chunk_relationships',   // Product-chunk relevancies
   'chunk_image_relationships',     // Chunk-image relevancies
   'product_image_relationships',   // Product-image relevancies
   'material_metadata_values',      // Material metadata values
   'material_metadata_relevancy',   // Material metadata relevancy
 
-  // PDF Processing & Knowledge Base (DELETE)
+  // PDF Processing (DELETE)
   'job_checkpoints',               // Job checkpoints (child of background_jobs)
   'job_progress',                  // Job progress tracking (child of background_jobs)
   'ai_analysis_queue',             // AI analysis queue
@@ -87,6 +88,15 @@ const TABLES_TO_CLEAR = [
   // Data Import (DELETE)
   'data_import_jobs',              // Data import jobs
   'data_import_history',           // Data import history
+
+  // ============================================================
+  // PRESERVED TABLES - Knowledge Base & Documentation (kb_* tables)
+  // These are NOT deleted during platform reset:
+  // - kb_docs                  // Knowledge Base documents
+  // - kb_categories            // KB document categories
+  // - kb_doc_attachments       // KB product links/attachments
+  // - kb_search_analytics      // KB search analytics
+  // ============================================================
 ];
 
 /**
@@ -234,12 +244,62 @@ Deno.serve(async (req) => {
     }
 
     const totalStorageDeleted = results.storage.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
-    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows, Storage: ${totalStorageDeleted} files`);
+
+    // STEP 3: Clear VECS collections (vector embeddings)
+    console.log('\n🗑️  STEP 3: Clear VECS collections');
+    results.vecs = [];
+
+    // VECS collections to clear - these store image embeddings for visual search
+    const vecsCollections = ['image_slig_embeddings'];
+    for (const collection of vecsCollections) {
+      try {
+        console.log(`   Clearing vecs.${collection}...`);
+
+        // Query VECS table directly (schema: vecs)
+        const { count, error: countError } = await supabase
+          .schema('vecs')
+          .from(collection)
+          .select('*', { count: 'exact', head: true });
+
+        if (countError) {
+          console.log(`   ⚠️ Could not count vecs.${collection}: ${countError.message}`);
+          results.vecs.push({ collection, deleted: 0, error: countError.message });
+          continue;
+        }
+
+        if (!count || count === 0) {
+          console.log(`   ✅ vecs.${collection} is already empty`);
+          results.vecs.push({ collection, deleted: 0 });
+          continue;
+        }
+
+        // Delete all rows from VECS collection
+        const { error: deleteError } = await supabase
+          .schema('vecs')
+          .from(collection)
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+
+        if (deleteError) {
+          console.error(`   ❌ Failed to clear vecs.${collection}:`, deleteError);
+          results.vecs.push({ collection, deleted: 0, error: deleteError.message });
+        } else {
+          console.log(`   ✅ Deleted ${count} rows from vecs.${collection}`);
+          results.vecs.push({ collection, deleted: count });
+        }
+      } catch (error: any) {
+        console.error(`   ❌ Error clearing vecs.${collection}:`, error);
+        results.vecs.push({ collection, deleted: 0, error: error.message });
+      }
+    }
+
+    const totalVecsDeleted = results.vecs.reduce((sum: number, r: any) => sum + (r.deleted || 0), 0);
+    console.log(`✅ Platform reset complete. Tables: ${totalDeleted} rows, Storage: ${totalStorageDeleted} files, VECS: ${totalVecsDeleted} embeddings`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        summary: `Deleted ${totalDeleted} rows from ${TABLES_TO_CLEAR.length} tables and ${totalStorageDeleted} files from storage`,
+        summary: `Deleted ${totalDeleted} rows from ${TABLES_TO_CLEAR.length} tables, ${totalStorageDeleted} files from storage, and ${totalVecsDeleted} embeddings from VECS`,
         results,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -252,4 +312,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-

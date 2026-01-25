@@ -51,6 +51,183 @@ interface UserProfile {
   };
 }
 
+interface AIUsageLog {
+  id: string;
+  operation_type: string;
+  model_name: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_cost_usd: number;
+  raw_cost_usd?: number;
+  billed_cost_usd?: number;
+  credits_debited: number;
+  created_at: string;
+}
+
+interface AIUsageTotals {
+  total_calls: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_raw_cost_usd: number;
+  total_billed_cost_usd: number;
+  total_credits_debited: number;
+}
+
+interface ModelUsage {
+  model: string;
+  calls: number;
+  cost: number;
+  credits: number;
+}
+
+const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
+  const [loading, setLoading] = useState(true);
+  const [usage, setUsage] = useState<AIUsageLog[]>([]);
+  const [totals, setTotals] = useState<AIUsageTotals | null>(null);
+  const [byModel, setByModel] = useState<ModelUsage[]>([]);
+
+  useEffect(() => {
+    const fetchAIUsage = async () => {
+      try {
+        setLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-users-api/${userId}/ai-usage`,
+          {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          setUsage(result.data.usage || []);
+          setTotals(result.data.totals || null);
+          setByModel(result.data.byModel || []);
+        }
+      } catch (error) {
+        console.error('Error fetching AI usage:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAIUsage();
+  }, [userId]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-8">
+          <div className="text-center text-muted-foreground">Loading AI usage data...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-emerald-600">
+              ${(totals?.total_billed_cost_usd || 0).toFixed(4)}
+            </div>
+            <p className="text-xs text-muted-foreground">Total AI Cost (Billed)</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold text-blue-600">
+              {(totals?.total_credits_debited || 0).toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground">Credits Used</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">{totals?.total_calls || 0}</div>
+            <p className="text-xs text-muted-foreground">Total API Calls</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-2xl font-bold">
+              {((totals?.total_input_tokens || 0) + (totals?.total_output_tokens || 0)).toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">Total Tokens</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Usage by Model */}
+      {byModel.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Usage by Model</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {byModel.map((m) => (
+                <div key={m.model} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div>
+                    <p className="font-medium text-sm">{m.model}</p>
+                    <p className="text-xs text-muted-foreground">{m.calls} calls</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-emerald-600">${m.cost.toFixed(4)}</p>
+                    <p className="text-xs text-muted-foreground">{m.credits.toFixed(2)} credits</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Usage Logs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent AI Operations</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {usage.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No AI usage recorded yet</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {usage.slice(0, 20).map((log) => (
+                <div key={log.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg text-sm">
+                  <div>
+                    <p className="font-medium">{log.operation_type}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {log.model_name} • {log.input_tokens + log.output_tokens} tokens
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-emerald-600">
+                      ${(log.billed_cost_usd || log.total_cost_usd || 0).toFixed(6)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(log.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 interface Role {
   id: string;
   name: string;
@@ -349,6 +526,10 @@ export const UserDetailPage: React.FC = () => {
               <Activity className="h-4 w-4 mr-2" />
               Activity
             </TabsTrigger>
+            <TabsTrigger value="ai-usage">
+              <FileText className="h-4 w-4 mr-2" />
+              AI Usage
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -593,6 +774,11 @@ export const UserDetailPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* AI Usage Tab */}
+          <TabsContent value="ai-usage" className="space-y-4">
+            <AIUsageTab userId={user.user_id} />
           </TabsContent>
         </Tabs>
       </div>

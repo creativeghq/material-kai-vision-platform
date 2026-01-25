@@ -38,10 +38,40 @@ interface ProductDetailModalProps {
 // Helper to extract value from {value, confidence} objects or plain values
 const extractValue = (val: unknown): string | undefined => {
   if (val === null || val === undefined) return undefined;
+
+  // Handle {value, confidence} wrapper objects
   if (typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
-    return String((val as Record<string, unknown>).value);
+    const innerValue = (val as Record<string, unknown>).value;
+
+    // If inner value is null/undefined, return undefined
+    if (innerValue === null || innerValue === undefined) return undefined;
+
+    // If inner value is an object (dictionary), format it nicely
+    if (typeof innerValue === 'object' && !Array.isArray(innerValue)) {
+      // Format as "key: value" pairs
+      const entries = Object.entries(innerValue as Record<string, unknown>);
+      if (entries.length === 0) return undefined;
+      return entries.map(([k, v]) => `${k}: ${v}`).join(', ');
+    }
+
+    // If inner value is an array, join it
+    if (Array.isArray(innerValue)) {
+      return innerValue.join(', ');
+    }
+
+    return String(innerValue);
   }
+
+  // Handle plain arrays
   if (Array.isArray(val)) return val.join(', ');
+
+  // Handle plain objects (dictionaries)
+  if (typeof val === 'object') {
+    const entries = Object.entries(val as Record<string, unknown>);
+    if (entries.length === 0) return undefined;
+    return entries.map(([k, v]) => `${k}: ${v}`).join(', ');
+  }
+
   return String(val);
 };
 
@@ -342,7 +372,41 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         const dimValue = extractValue(allData?.dimensions) ||
                         extractValue(allData?.size) ||
                         extractValue(allData?.dimension);
-        return dimValue || 'N/A';
+        if (dimValue && dimValue !== 'N/A') return dimValue;
+
+        // Smart fallback: Extract sizes from packaging keys or SKU codes
+        const extractedSizes = new Set<string>();
+
+        // Extract from packaging keys (e.g., "pique_3d_10x10", "pique_waffle_20x40")
+        const packagingKeys = Object.keys(allData?.packaging || {});
+        packagingKeys.forEach(key => {
+          const sizeMatch = key.match(/(\d+)x(\d+)/i);
+          if (sizeMatch) {
+            extractedSizes.add(`${sizeMatch[1]}×${sizeMatch[2]} cm`);
+          }
+        });
+
+        // Extract from SKU codes (e.g., "ona_mint_12x45", "pique_3d_anth_10x10")
+        const skuCodes = allData?.commercial?.sku_codes;
+        if (skuCodes) {
+          const skuObj = typeof skuCodes === 'object' && 'value' in skuCodes
+            ? skuCodes.value as Record<string, unknown>
+            : skuCodes as Record<string, unknown>;
+          if (typeof skuObj === 'object') {
+            Object.keys(skuObj).forEach(key => {
+              const sizeMatch = key.match(/(\d+)x(\d+)/i);
+              if (sizeMatch) {
+                extractedSizes.add(`${sizeMatch[1]}×${sizeMatch[2]} cm`);
+              }
+            });
+          }
+        }
+
+        if (extractedSizes.size > 0) {
+          return Array.from(extractedSizes).sort().join(', ');
+        }
+
+        return 'N/A';
       })();
   const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
   const finish = extractValue(materialPropsData?.finish) || 'N/A';

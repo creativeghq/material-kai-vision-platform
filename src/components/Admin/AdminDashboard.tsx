@@ -250,16 +250,7 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen page-container">
       {/* Header with Navigation */}
-      <div
-        className="rounded-3xl section-spacing"
-        style={{
-          background: 'var(--glass-bg)',
-          backdropFilter: 'var(--glass-blur)',
-          border: 'none',
-          boxShadow: 'var(--glass-shadow)',
-          padding: 'var(--card-padding)',
-        }}
-      >
+      <div className="section-spacing">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">

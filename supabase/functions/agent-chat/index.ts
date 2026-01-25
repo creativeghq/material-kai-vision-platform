@@ -1540,6 +1540,13 @@ async function executeAgent(
     room_type?: string;
     style?: string;
   };
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    modelName: string;
+    turnCount: number;
+  };
 }> {
   const config = AGENT_CONFIGS[agentId];
   if (!config) {
@@ -1550,6 +1557,11 @@ async function executeAgent(
   let collectedProducts: any[] = [];
   // Collect all tool results for frontend
   let collectedToolResults: any[] = [];
+
+  // Track token usage across all turns
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let turnCount = 0;
 
   // Load system prompt from database - NO FALLBACK
   // All prompts must exist in the database (managed via /admin/ai-configs)
@@ -1684,6 +1696,15 @@ async function executeAgent(
     const invokeElapsed = Date.now() - invokeStartTime;
     console.log(`✅ Claude API responded in ${invokeElapsed}ms`);
 
+    // Track token usage from response metadata
+    turnCount++;
+    const usage = response.response_metadata?.usage;
+    if (usage) {
+      totalInputTokens += usage.input_tokens || 0;
+      totalOutputTokens += usage.output_tokens || 0;
+      console.log(`📊 Turn ${turnCount} usage: ${usage.input_tokens || 0} input, ${usage.output_tokens || 0} output tokens`);
+    }
+
     // Send Claude's response via streaming (wrapped in try-catch)
     try {
       onChunk?.({
@@ -1749,11 +1770,21 @@ async function executeAgent(
         }
       }
 
+      // Log final usage stats
+      console.log(`📊 Total usage: ${totalInputTokens} input, ${totalOutputTokens} output tokens across ${turnCount} turns`);
+
       return {
         text: textContent,
         materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
         toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined,
-        generationJob: generationJob
+        generationJob: generationJob,
+        usage: {
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          totalTokens: totalInputTokens + totalOutputTokens,
+          modelName: getModelNameForAgent(agentId),
+          turnCount
+        }
       };
     }
 
@@ -2011,6 +2042,50 @@ async function saveConversation(userId: string, agentId: string, messages: any[]
 }
 
 /**
+ * Log agent usage and debit credits
+ * Uses the log_agent_usage RPC function for atomic logging + credit debit
+ */
+async function logAgentUsage(
+  userId: string,
+  workspaceId: string,
+  agentType: string,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    modelName: string;
+    turnCount: number;
+  },
+  toolsCalled: Array<{ name: string; duration_ms?: number }> = []
+) {
+  try {
+    console.log(`💰 Logging agent usage: ${usage.inputTokens} input, ${usage.outputTokens} output tokens`);
+
+    // Call the log_agent_usage RPC function which handles pricing lookup and credit debit
+    const { data, error } = await supabase.rpc('log_agent_usage', {
+      p_user_id: userId,
+      p_workspace_id: workspaceId,
+      p_agent_type: agentType,
+      p_turn_number: usage.turnCount,
+      p_model_name: usage.modelName,
+      p_input_tokens: usage.inputTokens,
+      p_output_tokens: usage.outputTokens,
+      p_tools_called: toolsCalled
+    });
+
+    if (error) {
+      console.error('❌ Error logging agent usage:', error);
+      // Don't throw - logging failures shouldn't break the agent response
+    } else if (data) {
+      console.log(`✅ Agent usage logged: $${data.billed_cost_usd?.toFixed(6) || 0} USD, ${data.credits_debited?.toFixed(4) || 0} credits`);
+    }
+  } catch (error) {
+    console.error('❌ Failed to log agent usage:', error);
+    // Don't throw - logging failures shouldn't break the agent response
+  }
+}
+
+/**
  * Main handler
  */
 serve(async (req) => {
@@ -2205,6 +2280,22 @@ serve(async (req) => {
           console.log('💾 Saving conversation...');
           await saveConversation(user.id, agentId, messages, finalResult.text);
           console.log('✅ Conversation saved');
+
+          // Log usage and debit credits (non-blocking)
+          if (finalResult.usage && finalResult.usage.totalTokens > 0) {
+            const toolsCalled = finalResult.toolResults?.map(tr => ({
+              name: tr.tool,
+              duration_ms: 0 // Could track tool execution time if needed
+            })) || [];
+
+            logAgentUsage(
+              user.id,
+              workspaceId,
+              agentId,
+              finalResult.usage,
+              toolsCalled
+            ).catch(err => console.error('❌ Background usage logging failed:', err));
+          }
 
           const modelUsed = getModelNameForAgent(agentId);
           const finalChunk = {

@@ -37,6 +37,8 @@ import {
   Download,
   Copy,
   ExternalLink,
+  Play,
+  PauseCircle,
 } from 'lucide-react';
 import {
   Dialog,
@@ -109,6 +111,10 @@ interface BackgroundJob {
   interrupted_at: string | null;
   last_heartbeat: string | null;
   error: string | null;
+  // AI cost tracking
+  total_ai_cost_usd?: number;
+  total_credits_used?: number;
+  user_id?: string;
   metadata: {
     filename?: string;
     stage?: string;
@@ -181,7 +187,7 @@ interface QueueMetrics {
   total_images_extracted: number;
 }
 
-// Global Pipeline Definition for the Monitor
+// Global Pipeline Definition for the Monitor (PDF Processing - default)
 const GLOBAL_PIPELINE_FLOW = [
   { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
   { id: 'extraction', name: 'Document Extraction', icon: FileText, checkpoint: 'pdf_extracted' },
@@ -190,6 +196,45 @@ const GLOBAL_PIPELINE_FLOW = [
   { id: 'entities', name: 'Document Entities', icon: Link, checkpoint: 'document_entities_created' },
   { id: 'quality', name: 'Quality Enhancement', icon: Activity, checkpoint: 'completed' },
 ];
+
+// XML Import Pipeline Stages
+const XML_IMPORT_PIPELINE_FLOW = [
+  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
+  { id: 'products_parsed', name: 'Products Parsed', icon: FileText, checkpoint: 'products_parsed' },
+  { id: 'images_downloaded', name: 'Images Downloaded', icon: Download, checkpoint: 'images_downloaded' },
+  { id: 'images_classified', name: 'Images Classified', icon: ImageIcon, checkpoint: 'images_classified' },
+  { id: 'clips_generated', name: 'CLIP Embeddings', icon: Zap, checkpoint: 'clips_generated' },
+  { id: 'chunks_created', name: 'Chunks Created', icon: FileText, checkpoint: 'chunks_created' },
+  { id: 'embeddings_queued', name: 'Embeddings Queued', icon: Activity, checkpoint: 'embeddings_queued' },
+  { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
+];
+
+// Web Scraping Pipeline Stages
+const WEB_SCRAPING_PIPELINE_FLOW = [
+  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
+  { id: 'pages_scraped', name: 'Pages Scraped', icon: Terminal, checkpoint: 'pages_scraped' },
+  { id: 'products_discovered', name: 'Products Discovered', icon: Package, checkpoint: 'products_discovered' },
+  { id: 'images_extracted', name: 'Images Extracted', icon: ImageIcon, checkpoint: 'images_extracted' },
+  { id: 'images_downloaded', name: 'Images Downloaded', icon: Download, checkpoint: 'images_downloaded' },
+  { id: 'images_classified', name: 'Images Classified', icon: ImageIcon, checkpoint: 'images_classified' },
+  { id: 'clips_generated', name: 'CLIP Embeddings', icon: Zap, checkpoint: 'clips_generated' },
+  { id: 'chunks_created', name: 'Chunks Created', icon: FileText, checkpoint: 'chunks_created' },
+  { id: 'embeddings_queued', name: 'Embeddings Queued', icon: Activity, checkpoint: 'embeddings_queued' },
+  { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
+];
+
+// Helper function to get pipeline stages based on job type
+const getPipelineForJobType = (jobType: string) => {
+  switch (jobType) {
+    case 'xml_import':
+      return XML_IMPORT_PIPELINE_FLOW;
+    case 'web_scraping':
+      return WEB_SCRAPING_PIPELINE_FLOW;
+    case 'pdf_processing':
+    default:
+      return GLOBAL_PIPELINE_FLOW;
+  }
+};
 
 // Enhanced Product Stages with detailed sub-steps
 const PRODUCT_STAGES = [
@@ -946,6 +991,230 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     return String(value);
   };
 
+  /**
+   * Comprehensive cleanup function that deletes ALL data related to a job
+   * This includes: products, chunks, images, relationships, embeddings, etc.
+   */
+  const deleteJobWithAllData = async (jobId: string): Promise<{ success: boolean; stats: Record<string, number> }> => {
+    const stats: Record<string, number> = {
+      products_deleted: 0,
+      chunks_deleted: 0,
+      images_deleted: 0,
+      relationships_deleted: 0,
+      checkpoints_deleted: 0,
+      processing_status_deleted: 0,
+    };
+
+    try {
+      // 1. Get job info to find document_id
+      const { data: jobData } = await supabase
+        .from('background_jobs')
+        .select('document_id, metadata')
+        .eq('id', jobId)
+        .single();
+
+      const documentId = jobData?.document_id;
+
+      // 2. Get all products associated with this job from product_processing_status
+      const { data: processingStatus } = await supabase
+        .from('product_processing_status')
+        .select('product_id')
+        .eq('job_id', jobId);
+
+      const productIds = processingStatus?.filter(p => p.product_id).map(p => p.product_id) || [];
+
+      // 3. If we have products, delete all related data for each product
+      if (productIds.length > 0) {
+        // Delete product_layout_regions
+        const { count: layoutCount } = await supabase
+          .from('product_layout_regions')
+          .delete()
+          .in('product_id', productIds)
+          .select('*', { count: 'exact', head: true });
+        stats.relationships_deleted += layoutCount || 0;
+
+        // Delete product_tables
+        await supabase
+          .from('product_tables')
+          .delete()
+          .in('product_id', productIds);
+
+        // Delete product_enrichments
+        await supabase
+          .from('product_enrichments')
+          .delete()
+          .in('product_id', productIds);
+
+        // Delete product_image_relationships
+        const { count: imgRelCount } = await supabase
+          .from('product_image_relationships')
+          .delete()
+          .in('product_id', productIds)
+          .select('*', { count: 'exact', head: true });
+        stats.relationships_deleted += imgRelCount || 0;
+
+        // Delete document_chunks for these products
+        const { count: chunkCount } = await supabase
+          .from('document_chunks')
+          .delete()
+          .in('product_id', productIds)
+          .select('*', { count: 'exact', head: true });
+        stats.chunks_deleted = chunkCount || 0;
+
+        // Get images associated with these products
+        const { data: imageData } = await supabase
+          .from('document_images')
+          .select('id')
+          .in('product_id', productIds);
+
+        const imageIds = imageData?.map(img => img.id) || [];
+
+        if (imageIds.length > 0) {
+          // Delete image relationships first
+          await supabase.from('chunk_image_relationships').delete().in('image_id', imageIds);
+          await supabase.from('image_product_associations').delete().in('image_id', imageIds);
+          await supabase.from('image_metafield_values').delete().in('image_id', imageIds);
+          await supabase.from('image_validations').delete().in('image_id', imageIds);
+
+          // Delete document_images
+          const { count: imgCount } = await supabase
+            .from('document_images')
+            .delete()
+            .in('id', imageIds)
+            .select('*', { count: 'exact', head: true });
+          stats.images_deleted = imgCount || 0;
+        }
+
+        // Delete the products themselves
+        const { count: productCount } = await supabase
+          .from('products')
+          .delete()
+          .in('id', productIds)
+          .select('*', { count: 'exact', head: true });
+        stats.products_deleted = productCount || 0;
+      }
+
+      // 4. Also delete any orphaned data by document_id if available
+      if (documentId) {
+        // Delete any remaining document_chunks by document_id
+        await supabase.from('document_chunks').delete().eq('document_id', documentId);
+
+        // Delete any remaining document_images by document_id
+        await supabase.from('document_images').delete().eq('document_id', documentId);
+
+        // Delete the document record itself
+        await supabase.from('documents').delete().eq('id', documentId);
+      }
+
+      // 5. Delete product_processing_status for this job
+      const { count: statusCount } = await supabase
+        .from('product_processing_status')
+        .delete()
+        .eq('job_id', jobId)
+        .select('*', { count: 'exact', head: true });
+      stats.processing_status_deleted = statusCount || 0;
+
+      // 6. Delete job_checkpoints
+      const { count: checkpointCount } = await supabase
+        .from('job_checkpoints')
+        .delete()
+        .eq('job_id', jobId)
+        .select('*', { count: 'exact', head: true });
+      stats.checkpoints_deleted = checkpointCount || 0;
+
+      // 7. Finally delete the job record
+      const { error: jobError } = await supabase
+        .from('background_jobs')
+        .delete()
+        .eq('id', jobId);
+
+      if (jobError) {
+        throw new Error(`Failed to delete job: ${jobError.message}`);
+      }
+
+      return { success: true, stats };
+    } catch (error) {
+      console.error('Error in deleteJobWithAllData:', error);
+      throw error;
+    }
+  };
+
+  /**
+   * Continue an interrupted job - marks it for resumption
+   */
+  const handleContinueJob = async (jobId: string) => {
+    try {
+      // Mark the job as pending so the processor can pick it up again
+      const { error } = await supabase
+        .from('background_jobs')
+        .update({
+          status: 'pending',
+          error: null,
+          interrupted_at: null,
+          // Keep the progress and metadata so it can resume
+        })
+        .eq('id', jobId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      await fetchQueueData();
+
+      if (selectedJob?.id === jobId) {
+        setSelectedJob(null);
+      }
+
+      toast.success('Job marked for continuation. It will resume processing shortly.');
+    } catch (error) {
+      console.error('Error continuing job:', error);
+      toast.error(`Failed to continue job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  /**
+   * Fail an interrupted job - marks it as failed so it can be deleted
+   */
+  const handleFailJob = async (jobId: string) => {
+    if (!confirm('Are you sure you want to mark this job as failed? You will then be able to delete it and all its associated data.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('background_jobs')
+        .update({
+          status: 'failed',
+          error: 'Manually marked as failed by administrator',
+          failed_at: new Date().toISOString(),
+        })
+        .eq('id', jobId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      await fetchQueueData();
+
+      // Update the selected job if it's the same one
+      if (selectedJob?.id === jobId) {
+        const { data: updatedJob } = await supabase
+          .from('background_jobs')
+          .select('*')
+          .eq('id', jobId)
+          .single();
+        if (updatedJob) {
+          setSelectedJob(updatedJob as BackgroundJob);
+        }
+      }
+
+      toast.success('Job marked as failed. You can now delete it.');
+    } catch (error) {
+      console.error('Error failing job:', error);
+      toast.error(`Failed to mark job as failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const handleCancelJob = async (jobId: string) => {
     if (!confirm('Are you sure you want to cancel this job? All partial data (chunks, embeddings, images, products, files) will be deleted. This action cannot be undone.')) {
       return;
@@ -953,24 +1222,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     setCancellingJob(jobId);
     try {
-      
-      const response = await fetch(`/api/jobs/${jobId}?cleanup=true`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Mark as cancelled first
+      await supabase
+        .from('background_jobs')
+        .update({
+          status: 'cancelled',
+          error: 'Job cancelled by user',
+        })
+        .eq('id', jobId);
 
-      if (!response.ok) {
-        throw new Error(`Failed to cancel job: ${response.statusText}`);
-      }
+      // Delete all related data using comprehensive cleanup
+      const { stats } = await deleteJobWithAllData(jobId);
 
-      const result = await response.json();
-
-      // Show cleanup stats if available
-      if (result.cleanup_stats) {
-        console.log('Cleanup stats:', result.cleanup_stats);
-      }
+      console.log('Cleanup stats:', stats);
 
       // Refresh the job list
       await fetchQueueData();
@@ -980,7 +1244,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         setSelectedJob(null);
       }
 
-      toast.success('Job cancelled successfully');
+      toast.success(`Job cancelled successfully. Cleaned up: ${stats.products_deleted} products, ${stats.chunks_deleted} chunks, ${stats.images_deleted} images`);
     } catch (error) {
       console.error('Error cancelling job:', error);
       logger.error('Error cancelling job', error, { jobId });
@@ -989,6 +1253,80 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       setCancellingJob(null);
     }
   };
+
+  /**
+   * Auto-cleanup completed jobs older than 30 days
+   * This only removes the job record and checkpoints, NOT all related data
+   * (products, chunks, images, etc. are preserved)
+   */
+  const cleanupOldCompletedJobs = async (daysOld: number = 30): Promise<number> => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+    const cutoffISOString = cutoffDate.toISOString();
+
+    try {
+      // Get IDs of old completed jobs
+      const { data: oldJobs, error: fetchError } = await supabase
+        .from('background_jobs')
+        .select('id')
+        .eq('status', 'completed')
+        .lt('completed_at', cutoffISOString);
+
+      if (fetchError) {
+        console.error('Error fetching old jobs:', fetchError);
+        return 0;
+      }
+
+      if (!oldJobs || oldJobs.length === 0) {
+        return 0;
+      }
+
+      const jobIds = oldJobs.map(j => j.id);
+
+      // Delete product_processing_status for these jobs
+      await supabase
+        .from('product_processing_status')
+        .delete()
+        .in('job_id', jobIds);
+
+      // Delete job_checkpoints for these jobs
+      await supabase
+        .from('job_checkpoints')
+        .delete()
+        .in('job_id', jobIds);
+
+      // Delete the job records (but NOT the related products, chunks, images, etc.)
+      const { error: deleteError } = await supabase
+        .from('background_jobs')
+        .delete()
+        .in('id', jobIds);
+
+      if (deleteError) {
+        console.error('Error deleting old jobs:', deleteError);
+        return 0;
+      }
+
+      return jobIds.length;
+    } catch (error) {
+      console.error('Error in cleanupOldCompletedJobs:', error);
+      return 0;
+    }
+  };
+
+  // Auto-cleanup old completed jobs on component mount (runs once)
+  useEffect(() => {
+    const runCleanup = async () => {
+      const cleanedCount = await cleanupOldCompletedJobs(30);
+      if (cleanedCount > 0) {
+        console.log(`Auto-cleanup: Removed ${cleanedCount} completed jobs older than 30 days`);
+        // Refresh the job list if any were cleaned
+        await fetchQueueData();
+      }
+    };
+    runCleanup();
+    // Only run once on mount - no dependencies
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClearQueue = async () => {
     // Include ALL jobs that can be cleared: pending, failed, interrupted, AND processing
@@ -1059,24 +1397,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
-      // Now delete all jobs (including the newly interrupted ones)
+      // Now delete all jobs (including the newly interrupted ones) using Supabase directly
       for (const job of jobsToClear) {
         try {
-          const response = await fetch(
-            `/api/rag/documents/jobs/${job.id}`,
-            {
-              method: 'DELETE',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            },
-          );
-
-          if (response.ok) {
-            successCount++;
-          } else {
-            failCount++;
-          }
+          // Use comprehensive cleanup function
+          await deleteJobWithAllData(job.id);
+          successCount++;
         } catch (error) {
           console.error(`Failed to delete job ${job.id}:`, error);
           logger.error(`Failed to delete job ${job.id}`, error);
@@ -1103,41 +1429,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   };
 
   const handleDeleteJobById = async () => {
-    if (!deleteJobId.trim()) {
+    const jobId = deleteJobId.trim();
+    if (!jobId) {
       toast.error('Please enter a job ID');
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete job ${deleteJobId} and ALL its associated data? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete job ${jobId}? This will delete ALL related data (products, chunks, images, etc.). This action cannot be undone.`)) {
       return;
     }
 
+    setDeletingJob(jobId);
+
     try {
-      const response = await fetch(`/api/rag/documents/jobs/${deleteJobId.trim()}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Use comprehensive cleanup function to delete ALL related data
+      const { stats } = await deleteJobWithAllData(jobId);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Failed to delete job: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      // Show success message with stats
-      const stats = result.stats || {};
-      const statsMessage = [
-        stats.chunks_deleted > 0 && `${stats.chunks_deleted} chunks`,
-        stats.embeddings_deleted > 0 && `${stats.embeddings_deleted} embeddings`,
-        stats.images_deleted > 0 && `${stats.images_deleted} images`,
-        stats.products_deleted > 0 && `${stats.products_deleted} products`,
-        stats.storage_files_deleted > 0 && `${stats.storage_files_deleted} storage files`,
-      ].filter(Boolean).join(', ');
-
-      toast.success(`Job deleted successfully! Deleted: ${statsMessage || 'Job record'}`);
+      toast.success(`Job deleted successfully! Cleaned up: ${stats.products_deleted} products, ${stats.chunks_deleted} chunks, ${stats.images_deleted} images`);
 
       // Close modal and refresh
       setShowDeleteJobModal(false);
@@ -1146,44 +1454,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     } catch (error) {
       console.error('Error deleting job:', error);
-      logger.error('Error deleting job', error, { deleteJobId });
+      logger.error('Error deleting job', error, { deleteJobId: jobId });
       toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeletingJob(null);
     }
   };
 
   const handleDeleteJob = async (jobId: string) => {
-    console.log('[AsyncJobQueueMonitor] handleDeleteJob called with jobId:', jobId);
-
-    if (!confirm('Are you sure you want to permanently delete this job and ALL its associated data (chunks, embeddings, images, products)? This action cannot be undone.')) {
-      console.log('[AsyncJobQueueMonitor] User cancelled delete confirmation');
+    if (!confirm('Are you sure you want to permanently delete this job and ALL its related data (products, chunks, images, etc.)? This action cannot be undone.')) {
       return;
     }
 
-    console.log('[AsyncJobQueueMonitor] User confirmed delete, starting deletion...');
     setDeletingJob(jobId);
 
     try {
-      // Use the API endpoint which properly deletes all related data
-      const apiUrl = `/api/rag/documents/jobs/${jobId}`;
-      console.log('[AsyncJobQueueMonitor] Calling DELETE:', apiUrl);
-
-      const response = await fetch(apiUrl, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('[AsyncJobQueueMonitor] Response status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('[AsyncJobQueueMonitor] Delete failed:', errorData);
-        throw new Error(errorData.detail || `Failed to delete job: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      console.log('[AsyncJobQueueMonitor] Delete result:', result);
+      // Use comprehensive cleanup function to delete ALL related data
+      const { stats } = await deleteJobWithAllData(jobId);
 
       // Refresh the job list
       await fetchQueueData();
@@ -1193,17 +1480,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         setSelectedJob(null);
       }
 
-      // Show success message with stats
-      const stats = result.stats || {};
-      const statsMessage = [
-        stats.chunks_deleted > 0 && `${stats.chunks_deleted} chunks`,
-        stats.embeddings_deleted > 0 && `${stats.embeddings_deleted} embeddings`,
-        stats.images_deleted > 0 && `${stats.images_deleted} images`,
-        stats.products_deleted > 0 && `${stats.products_deleted} products`,
-        stats.storage_files_deleted > 0 && `${stats.storage_files_deleted} storage files`,
-      ].filter(Boolean).join(', ');
-
-      toast.success(`Job deleted successfully!${statsMessage ? ` Deleted: ${statsMessage}` : ''}`);
+      toast.success(`Job deleted successfully! Cleaned up: ${stats.products_deleted} products, ${stats.chunks_deleted} chunks, ${stats.images_deleted} images`);
     } catch (error) {
       console.error('Error deleting job:', error);
       toast.error(`Failed to delete job: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -1587,6 +1864,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             <span className="font-medium">
                               <LiveTimer job={job} />
                             </span>
+                            {job.total_ai_cost_usd !== undefined && job.total_ai_cost_usd > 0 && (
+                              <>
+                                <span>•</span>
+                                <span className="font-semibold text-emerald-600">${job.total_ai_cost_usd.toFixed(4)}</span>
+                              </>
+                            )}
                           </div>
                           {job.metadata?.stage && (
                             <div className="text-xs text-slate-600 mt-1">
@@ -2379,6 +2662,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         })()}
                       </span>
                     </div>
+                    {/* AI Cost Summary */}
+                    {(selectedJob.total_ai_cost_usd !== undefined || selectedJob.total_credits_used !== undefined) && (
+                      <>
+                        <div className="flex items-center gap-2 border-l pl-4">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-tight">AI Cost:</span>
+                          <span className="text-[11px] font-bold text-emerald-600">
+                            ${(selectedJob.total_ai_cost_usd || 0).toFixed(4)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 border-l pl-4">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-tight">Credits:</span>
+                          <span className="text-[11px] font-bold text-blue-600">
+                            {(selectedJob.total_credits_used || 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -2451,7 +2751,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           <Activity className="h-3 w-3" />
                           Stage: {selectedJob.metadata?.stage || 'Unknown'}
                         </div>
-                        <button 
+                        <button
                           onClick={() => {
                             navigator.clipboard.writeText(selectedJob.id);
                             toast.success('Job ID copied to clipboard');
@@ -2460,6 +2760,64 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         >
                           <Copy className="h-3 w-3" />
                           Copy Job ID for logs
+                        </button>
+                      </div>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Interrupted Job Actions */}
+              {selectedJob?.status === 'interrupted' && (
+                <Alert className="mt-4 bg-amber-50 border-amber-200">
+                  <PauseCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-900">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold">Job Interrupted</span>
+                        <span className="text-[10px] font-mono opacity-70">
+                          {selectedJob.interrupted_at ? formatDate(selectedJob.interrupted_at) : 'Just now'}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium">
+                        {selectedJob.error || 'This job was interrupted and can be resumed or marked as failed.'}
+                      </p>
+                      <div className="flex items-center gap-4 text-[10px] uppercase font-bold tracking-tight text-amber-700 mb-2">
+                        <div className="flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          Stage: {selectedJob.metadata?.stage || 'Unknown'}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Progress: {selectedJob.progress || 0}%
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 pt-2 border-t border-amber-200">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => handleContinueJob(selectedJob.id)}
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Continue Job
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleFailJob(selectedJob.id)}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Mark as Failed
+                        </Button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedJob.id);
+                            toast.success('Job ID copied to clipboard');
+                          }}
+                          className="ml-auto text-[10px] uppercase font-bold tracking-tight hover:underline flex items-center gap-1 text-amber-700"
+                        >
+                          <Copy className="h-3 w-3" />
+                          Copy Job ID
                         </button>
                       </div>
                     </div>
@@ -2485,28 +2843,51 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <TabsContent value="products" className="space-y-6 mt-6">
                 {/* Pipeline Progress Overview */}
                 {(() => {
-                  // Define pipeline stages with checkpoint mapping
-                  const pipelineStages = [
-                    { id: 'warmup', name: 'AI Warmup', checkpoint: 'warmup_complete', icon: '🔥' },
-                    { id: 'initialized', name: 'Initialized', checkpoint: 'initialized', icon: '🚀' },
-                    { id: 'discovery', name: 'Product Discovery', checkpoint: 'products_detected', icon: '🔍' },
-                    { id: 'processing', name: 'Product Processing', checkpoint: null, icon: '⚙️' },
-                    { id: 'completed', name: 'Complete', checkpoint: 'completed', icon: '✅' },
-                  ];
+                  // Get job-type-specific pipeline stages
+                  const jobType = selectedJob?.job_type || 'pdf_processing';
+                  const jobSpecificPipeline = getPipelineForJobType(jobType);
+
+                  // Map pipeline to display format with icons as emojis
+                  const pipelineStages = jobSpecificPipeline.map(stage => ({
+                    id: stage.id,
+                    name: stage.name,
+                    checkpoint: stage.checkpoint,
+                    icon: stage.id === 'initialized' ? '🚀' :
+                          stage.id === 'completed' ? '✅' :
+                          stage.id.includes('image') ? '🖼️' :
+                          stage.id.includes('product') ? '📦' :
+                          stage.id.includes('chunk') ? '📄' :
+                          stage.id.includes('clip') ? '⚡' :
+                          stage.id.includes('embed') ? '🔗' :
+                          stage.id.includes('download') ? '⬇️' :
+                          stage.id.includes('scrape') ? '🌐' :
+                          stage.id.includes('discover') ? '🔍' :
+                          stage.id.includes('warmup') ? '🔥' :
+                          '⚙️'
+                  }));
 
                   // Get completed checkpoints
                   const completedCheckpoints = jobCheckpoints.map(cp => cp.stage);
 
-                  // Determine current stage based on checkpoints and job status
+                  // Determine current stage based on checkpoints, job status, and current_stage field
                   const getCurrentStage = () => {
                     if (selectedJob?.status === 'completed') return 'completed';
                     if (selectedJob?.status === 'failed') return 'failed';
                     if (completedCheckpoints.includes('completed')) return 'completed';
+
+                    // Use current_stage from background_jobs if available (for XML/Web Scraping)
+                    const currentStageFromJob = (selectedJob?.metadata as any)?.current_stage ||
+                      (selectedJob as any)?.current_stage;
+                    if (currentStageFromJob && pipelineStages.some(s => s.id === currentStageFromJob)) {
+                      return currentStageFromJob;
+                    }
+
+                    // Fallback logic for PDF processing
                     if (productProgress.some(p => p.status === 'processing')) return 'processing';
                     if (completedCheckpoints.includes('products_detected')) return 'processing';
                     if (completedCheckpoints.includes('initialized')) return 'discovery';
                     if (completedCheckpoints.includes('warmup_complete')) return 'initialized';
-                    return 'warmup';
+                    return pipelineStages[0]?.id || 'initialized';
                   };
 
                   const currentStage = getCurrentStage();

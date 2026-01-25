@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, ChevronRight, Info } from 'lucide-react';
+import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, ChevronRight, Info, Trash2, AlertTriangle, DollarSign } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -9,8 +9,10 @@ import { Label } from '@/components/core/ui/label';
 import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/core/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { AIModelPricingTab } from './AIModelPricingTab';
 
 interface Prompt {
   id: string;
@@ -80,6 +82,8 @@ export const AgentConfigsPage: React.FC = () => {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [selectedType, setSelectedType] = useState<string>('all');
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
+  const [deletingPrompt, setDeletingPrompt] = useState<Prompt | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -187,6 +191,42 @@ export const AgentConfigsPage: React.FC = () => {
     }
   };
 
+  const handleDelete = async (hardDelete: boolean = false) => {
+    if (!deletingPrompt) return;
+
+    try {
+      setDeleting(true);
+
+      if (hardDelete) {
+        // Permanently delete from database
+        const { error } = await supabase
+          .from('prompts')
+          .delete()
+          .eq('id', deletingPrompt.id);
+
+        if (error) throw error;
+        toast({ title: 'Success', description: `${deletingPrompt.name} permanently deleted` });
+      } else {
+        // Soft delete - set is_active to false
+        const { error } = await supabase
+          .from('prompts')
+          .update({ is_active: false })
+          .eq('id', deletingPrompt.id);
+
+        if (error) throw error;
+        toast({ title: 'Success', description: `${deletingPrompt.name} deactivated` });
+      }
+
+      setDeletingPrompt(null);
+      loadPrompts();
+    } catch (error) {
+      console.error('Error deleting prompt:', error);
+      toast({ title: 'Error', description: 'Failed to delete prompt', variant: 'destructive' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -237,11 +277,26 @@ export const AgentConfigsPage: React.FC = () => {
       <div className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-muted/20">
         <GlobalAdminHeader
           title="AI Configurations"
-          description="Manage all AI prompts and system configurations. Changes are tracked and versioned."
+          description="Manage all AI prompts, model pricing, and system configurations. Changes are tracked and versioned."
         />
 
+        {/* Main Tabs */}
+        <Tabs defaultValue="prompts" className="mt-6">
+          <TabsList className="mb-6">
+            <TabsTrigger value="prompts" className="flex items-center gap-2">
+              <Bot className="h-4 w-4" />
+              AI Prompts
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Model Pricing
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Prompts Tab Content */}
+          <TabsContent value="prompts">
         {/* Stats Bar */}
-        <div className="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {promptTypes.filter(t => t !== 'all').map((type) => {
             const count = prompts.filter(p => p.prompt_type === type).length;
             const TypeIcon = TYPE_ICONS[type] || Sparkles;
@@ -408,6 +463,13 @@ export const AgentConfigsPage: React.FC = () => {
                                   <History className="h-4 w-4 mr-2" />
                                   History
                                 </Button>
+                                <Button
+                                  onClick={() => setDeletingPrompt(prompt)}
+                                  variant="destructive"
+                                  size="sm"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             )}
                           </CardContent>
@@ -563,6 +625,69 @@ export const AgentConfigsPage: React.FC = () => {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={!!deletingPrompt} onOpenChange={() => setDeletingPrompt(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-red-100">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                </div>
+                <div>
+                  <DialogTitle>Delete Prompt</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete "{deletingPrompt?.name}"?
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="py-4 space-y-4">
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Type:</strong> {deletingPrompt?.prompt_type}<br />
+                  <strong>Category:</strong> {deletingPrompt?.category}<br />
+                  {deletingPrompt?.stage && <><strong>Stage:</strong> {deletingPrompt.stage}<br /></>}
+                  <strong>Version:</strong> {deletingPrompt?.version}
+                </p>
+              </div>
+
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-2"><strong>Deactivate (Soft Delete):</strong> Hides the prompt but keeps it in the database. Can be restored later.</p>
+                <p><strong>Permanently Delete:</strong> Removes the prompt from the database completely. This cannot be undone.</p>
+              </div>
+            </div>
+
+            <DialogFooter className="flex gap-2">
+              <Button variant="outline" onClick={() => setDeletingPrompt(null)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handleDelete(false)}
+                disabled={deleting}
+              >
+                {deleting ? 'Processing...' : 'Deactivate'}
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleDelete(true)}
+                disabled={deleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+          </TabsContent>
+
+          {/* Model Pricing Tab Content */}
+          <TabsContent value="pricing">
+            <AIModelPricingTab />
+          </TabsContent>
+        </Tabs>
       </div>
     </TooltipProvider>
   );
