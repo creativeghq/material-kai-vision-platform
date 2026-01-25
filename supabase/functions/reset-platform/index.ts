@@ -250,7 +250,14 @@ Deno.serve(async (req) => {
     results.vecs = [];
 
     // VECS collections to clear - these store image embeddings for visual search
-    const vecsCollections = ['image_slig_embeddings'];
+    // Includes primary visual embeddings and specialized embeddings (color, texture, style, material)
+    const vecsCollections = [
+      'image_slig_embeddings',      // Primary visual embeddings (768D)
+      'image_color_embeddings',     // Color-focused embeddings (768D)
+      'image_texture_embeddings',   // Texture pattern embeddings (768D)
+      'image_style_embeddings',     // Design style embeddings (768D)
+      'image_material_embeddings'   // Material type embeddings (768D)
+    ];
     for (const collection of vecsCollections) {
       try {
         console.log(`   Clearing vecs.${collection}...`);
