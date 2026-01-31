@@ -223,6 +223,324 @@ const checkpointer = new SupabaseCheckpointer();
 const longTermMemory = new LongTermMemory();
 
 /**
+ * LangGraph State Annotation
+ * Defines the state schema for the agent graph
+ */
+const AgentStateAnnotation = Annotation.Root({
+  messages: Annotation<BaseMessage[]>({
+    reducer: (prev, next) => [...prev, ...next],
+    default: () => [],
+  }),
+  systemPrompt: Annotation<string>({
+    reducer: (_, next) => next,
+    default: () => '',
+  }),
+  toolResults: Annotation<any[]>({
+    reducer: (prev, next) => [...prev, ...next],
+    default: () => [],
+  }),
+  collectedProducts: Annotation<any[]>({
+    reducer: (prev, next) => [...prev, ...next],
+    default: () => [],
+  }),
+  iteration: Annotation<number>({
+    reducer: (_, next) => next,
+    default: () => 0,
+  }),
+  inputTokens: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
+  outputTokens: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
+  turnCount: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
+  finalResponse: Annotation<string | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
+  generationJob: Annotation<any | null>({
+    reducer: (_, next) => next,
+    default: () => null,
+  }),
+});
+
+type AgentState = typeof AgentStateAnnotation.State;
+
+/**
+ * Create a LangGraph-based agent with StateGraph
+ * Provides checkpointing, resumable conversations, and observable execution
+ */
+function createAgentGraph(
+  model: any,
+  tools: any[],
+  onChunk?: (chunk: any) => void
+) {
+  const maxIterations = 10;
+
+  // Agent node: calls the model
+  async function agentNode(state: AgentState): Promise<Partial<AgentState>> {
+    const iteration = state.iteration + 1;
+    console.log(`🔄 Agent node - iteration ${iteration}/${maxIterations}`);
+
+    // Send iteration status
+    try {
+      onChunk?.({
+        type: 'iteration',
+        iteration,
+        maxIterations,
+        message: `Processing step ${iteration}/${maxIterations}...`
+      });
+    } catch (e) {
+      console.log('⚠️ Stream closed, continuing without streaming');
+    }
+
+    // Invoke model
+    const modelWithTools = tools.length > 0 ? model.bindTools(tools) : model;
+    const invokeStartTime = Date.now();
+
+    const response = await modelWithTools.invoke(state.messages, {
+      system: state.systemPrompt,
+    });
+
+    const invokeElapsed = Date.now() - invokeStartTime;
+    console.log(`✅ Claude API responded in ${invokeElapsed}ms`);
+
+    // Track token usage
+    const usage = response.response_metadata?.usage;
+    const inputTokens = usage?.input_tokens || 0;
+    const outputTokens = usage?.output_tokens || 0;
+
+    // Send thinking status
+    try {
+      onChunk?.({
+        type: 'assistant_thinking',
+        content: response.content,
+        hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
+      });
+    } catch (e) {}
+
+    // Check if done (no tool calls)
+    if (!response.tool_calls || response.tool_calls.length === 0) {
+      let textContent: string;
+      if (typeof response.content === 'string') {
+        textContent = response.content;
+      } else if (Array.isArray(response.content)) {
+        textContent = response.content
+          .map((block: any) => {
+            if (typeof block === 'string') return block;
+            if (block.type === 'text') return block.text;
+            return '';
+          })
+          .filter(Boolean)
+          .join('\n');
+      } else {
+        textContent = String(response.content);
+      }
+
+      return {
+        messages: [response],
+        iteration,
+        inputTokens,
+        outputTokens,
+        turnCount: 1,
+        finalResponse: textContent,
+      };
+    }
+
+    return {
+      messages: [response],
+      iteration,
+      inputTokens,
+      outputTokens,
+      turnCount: 1,
+    };
+  }
+
+  // Tools node: executes tool calls
+  async function toolsNode(state: AgentState): Promise<Partial<AgentState>> {
+    const lastMessage = state.messages[state.messages.length - 1] as any;
+    const toolCalls = lastMessage.tool_calls || [];
+
+    if (toolCalls.length === 0) {
+      return {};
+    }
+
+    console.log(`🔧 Executing ${toolCalls.length} tool call(s)`);
+
+    const toolMessages: any[] = [];
+    const newToolResults: any[] = [];
+    const newProducts: any[] = [];
+    let generationJob = null;
+
+    for (const toolCall of toolCalls) {
+      console.log(`  📞 Tool: ${toolCall.name}`);
+
+      // Send tool call status
+      try {
+        onChunk?.({
+          type: 'tool_call',
+          tool: toolCall.name,
+          args: toolCall.args,
+          message: `Calling ${toolCall.name}...`
+        });
+      } catch (e) {}
+
+      try {
+        const tool = tools.find((t: any) => t.name === toolCall.name);
+        if (!tool) {
+          throw new Error(`Tool not found: ${toolCall.name}`);
+        }
+
+        const toolStartTime = Date.now();
+        const toolResult = await tool.invoke(toolCall.args);
+        const toolElapsed = Date.now() - toolStartTime;
+        console.log(`  ✅ ${toolCall.name} completed in ${toolElapsed}ms`);
+
+        // Send tool result
+        try {
+          onChunk?.({
+            type: 'tool_result',
+            tool: toolCall.name,
+            result: toolResult,
+            message: `${toolCall.name} completed`
+          });
+        } catch (e) {}
+
+        // Parse and collect results
+        try {
+          const resultStr = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
+          const parsedResult = JSON.parse(resultStr);
+
+          newToolResults.push({
+            tool: toolCall.name,
+            result: parsedResult,
+            args: toolCall.args,
+          });
+
+          // Collect products from search
+          if (toolCall.name === 'material_search' && parsedResult.results) {
+            const products = parsedResult.results.map((r: any) => {
+              const imageUrl = r.image_url || r.thumbnail || r.metadata?.image_url;
+              return {
+                id: r.id || r.product_id || `product-${Date.now()}`,
+                sku: r.sku || r.metadata?.sku || '',
+                name: r.name || r.title || 'Unnamed Product',
+                description: r.description || r.content || '',
+                category: r.category || r.metadata?.category || 'materials',
+                type: r.type || r.metadata?.material_type || 'general',
+                status: 'active',
+                images: imageUrl ? [{ url: imageUrl, alt: r.name || 'Product', isPrimary: true }] : [],
+                metadata: {
+                  ...r.metadata,
+                  factory_name: r.factory || r.metadata?.factory || r.manufacturer,
+                  score: r.score || r.similarity_score,
+                },
+                pricing: {
+                  retail: r.price || r.metadata?.price || 0,
+                  wholesale: r.wholesale_price || 0,
+                  currency: r.currency || 'EUR',
+                },
+                stock: { quantity: r.stock || 0, status: 'available', unit: r.unit || 'piece' },
+                tags: r.tags || [],
+              };
+            });
+            newProducts.push(...products);
+          }
+
+          // Detect 3D generation job
+          if (toolCall.name === 'generate_3d' && parsedResult.success && parsedResult.async_job) {
+            generationJob = {
+              job_id: parsedResult.job_id,
+              model_count: parsedResult.model_count,
+              models: parsedResult.models,
+              prompt: toolCall.args?.prompt || '',
+              room_type: toolCall.args?.roomType,
+              style: toolCall.args?.style
+            };
+          }
+        } catch (parseError) {
+          console.warn('Could not parse tool result:', parseError);
+        }
+
+        // Create tool message for model
+        toolMessages.push({
+          role: 'tool',
+          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
+          tool_call_id: toolCall.id,
+          name: toolCall.name,
+        });
+
+      } catch (error) {
+        console.error(`❌ Tool ${toolCall.name} failed:`, error);
+
+        try {
+          onChunk?.({
+            type: 'tool_error',
+            tool: toolCall.name,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        } catch (e) {}
+
+        toolMessages.push({
+          role: 'tool',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          tool_call_id: toolCall.id,
+          name: toolCall.name,
+        });
+      }
+    }
+
+    return {
+      messages: toolMessages,
+      toolResults: newToolResults,
+      collectedProducts: newProducts,
+      generationJob: generationJob || state.generationJob,
+    };
+  }
+
+  // Routing function: decide next node
+  function shouldContinue(state: AgentState): string {
+    // Check if we have a final response
+    if (state.finalResponse !== null) {
+      console.log('✅ Agent finished - final response ready');
+      return END;
+    }
+
+    // Check max iterations
+    if (state.iteration >= maxIterations) {
+      console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
+      return END;
+    }
+
+    // Check if last message has tool calls
+    const lastMessage = state.messages[state.messages.length - 1] as any;
+    if (lastMessage?.tool_calls && lastMessage.tool_calls.length > 0) {
+      return 'tools';
+    }
+
+    return END;
+  }
+
+  // Build the graph
+  const graph = new StateGraph(AgentStateAnnotation)
+    .addNode('agent', agentNode)
+    .addNode('tools', toolsNode)
+    .addEdge(START, 'agent')
+    .addConditionalEdges('agent', shouldContinue, {
+      tools: 'tools',
+      [END]: END,
+    })
+    .addEdge('tools', 'agent');
+
+  return graph.compile();
+}
+
+/**
  * Load agent system prompt from database (prompts table)
  * NO FALLBACK - All prompts must exist in the database
  */
@@ -2851,299 +3169,96 @@ async function executeAgent(
   const modelName = getModelNameForAgent(agentId);
   console.log(`🤖 Using model: ${modelName} for agent: ${agentId}`);
 
-  // Bind tools to model if any tools are configured
-  const modelWithTools = tools.length > 0 ? selectedModel.bindTools(tools) : selectedModel;
+  // 🔷 LangGraph StateGraph-based execution with checkpointing
+  console.log('🔷 Creating LangGraph StateGraph agent...');
 
-  // Agent loop: handle tool calls iteratively
-  const maxIterations = 10;
-  let iteration = 0;
-  let currentMessages = [...messages];
+  // Generate thread ID for checkpointing (based on conversation context)
+  const threadId = `${userId}-${agentId}-${Date.now()}`;
+  console.log(`🔷 Thread ID: ${threadId}`);
 
-  while (iteration < maxIterations) {
-    iteration++;
-    console.log(`🔄 ========================================`);
-    console.log(`🔄 Agent iteration ${iteration}/${maxIterations}`);
-    console.log(`🔄 Current messages count: ${currentMessages.length}`);
-    console.log(`🔄 ========================================`);
-
-    // Send iteration status via streaming (wrapped in try-catch)
-    try {
-      onChunk?.({
-        type: 'iteration',
-        iteration,
-        maxIterations,
-        message: `Processing step ${iteration}/${maxIterations}...`
-      });
-    } catch (e) {
-      // Stream closed - continue execution but don't send chunks
-      console.log('⚠️ Stream closed, continuing without streaming');
-    }
-
-    // Invoke model with current messages
-    console.log(`🤖 Calling Claude API...`);
-    const invokeStartTime = Date.now();
-    const response = await modelWithTools.invoke(currentMessages, {
-      system: systemPrompt,
-    });
-    const invokeElapsed = Date.now() - invokeStartTime;
-    console.log(`✅ Claude API responded in ${invokeElapsed}ms`);
-
-    // Track token usage from response metadata
-    turnCount++;
-    const usage = response.response_metadata?.usage;
-    if (usage) {
-      totalInputTokens += usage.input_tokens || 0;
-      totalOutputTokens += usage.output_tokens || 0;
-      console.log(`📊 Turn ${turnCount} usage: ${usage.input_tokens || 0} input, ${usage.output_tokens || 0} output tokens`);
-    }
-
-    // Send Claude's response via streaming (wrapped in try-catch)
-    try {
-      onChunk?.({
-        type: 'assistant_thinking',
-        content: response.content,
-        hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
-      });
-    } catch (e) {
-      // Stream closed - continue
-    }
-
-    // Add assistant response to messages
-    currentMessages.push({
-      role: 'assistant',
-      content: response.content,
-      tool_calls: response.tool_calls,
-    });
-
-    // Check if model wants to call tools
-    if (!response.tool_calls || response.tool_calls.length === 0) {
-      // No tool calls - extract final text response
-      console.log('✅ Agent finished - no more tool calls');
-      console.log(`📦 Collected ${collectedProducts.length} products total`);
-
-      let textContent: string;
-      if (typeof response.content === 'string') {
-        textContent = response.content;
-      } else if (Array.isArray(response.content)) {
-        textContent = response.content
-          .map((block: any) => {
-            if (typeof block === 'string') return block;
-            if (block.type === 'text') return block.text;
-            return '';
-          })
-          .filter(Boolean)
-          .join('\n');
-      } else {
-        textContent = String(response.content);
-      }
-
-      // Detect if any tool results contain 3D generation job
-      let generationJob = null;
-
-      for (const toolResult of collectedToolResults) {
-        if (toolResult.tool === 'generate_3d') {
-          try {
-            // toolResult.result is already a parsed object, no need to JSON.parse
-            const result = toolResult.result;
-            if (result.success && result.async_job) {
-              generationJob = {
-                job_id: result.job_id,
-                model_count: result.model_count,
-                models: result.models,
-                prompt: toolResult.args?.prompt || '',
-                room_type: toolResult.args?.roomType,
-                style: toolResult.args?.style
-              };
-              console.log('✅ Detected generation job:', generationJob);
-            }
-          } catch (e) {
-            console.error('Failed to parse generate_3d result:', e);
-          }
-        }
-      }
-
-      // Log final usage stats
-      console.log(`📊 Total usage: ${totalInputTokens} input, ${totalOutputTokens} output tokens across ${turnCount} turns`);
-
-      return {
-        text: textContent,
-        materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
-        toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined,
-        generationJob: generationJob,
-        usage: {
-          inputTokens: totalInputTokens,
-          outputTokens: totalOutputTokens,
-          totalTokens: totalInputTokens + totalOutputTokens,
-          modelName: getModelNameForAgent(agentId),
-          turnCount
-        }
-      };
-    }
-
-    // Execute tool calls
-    console.log(`🔧 ========================================`);
-    console.log(`🔧 Executing ${response.tool_calls.length} tool call(s)`);
-    console.log(`🔧 ========================================`);
-
-    for (const toolCall of response.tool_calls) {
-      console.log(`  📞 Tool: ${toolCall.name}`);
-      console.log(`  📞 Args:`, JSON.stringify(toolCall.args, null, 2));
-
-      // Send tool call status via streaming (wrapped in try-catch)
-      try {
-        onChunk?.({
-          type: 'tool_call',
-          tool: toolCall.name,
-          args: toolCall.args,
-          message: `Calling ${toolCall.name}...`
-        });
-      } catch (e) {
-        // Stream closed - continue
-      }
-
-      try {
-        // Find the tool
-        const tool = tools.find((t: any) => t.name === toolCall.name);
-        if (!tool) {
-          throw new Error(`Tool not found: ${toolCall.name}`);
-        }
-
-        // Execute the tool
-        console.log(`  ⏳ Executing ${toolCall.name}...`);
-        const toolStartTime = Date.now();
-        const toolResult = await tool.invoke(toolCall.args);
-        const toolElapsed = Date.now() - toolStartTime;
-        console.log(`  ✅ ${toolCall.name} completed in ${toolElapsed}ms (${(toolElapsed / 1000).toFixed(2)}s)`);
-
-        // Send tool result via streaming (wrapped in try-catch)
-        try {
-          onChunk?.({
-            type: 'tool_result',
-            tool: toolCall.name,
-            result: toolResult,
-            message: `${toolCall.name} completed`
-          });
-        } catch (e) {
-          // Stream closed - continue
-        }
-
-        // Collect tool results for frontend
-        try {
-          const resultStr = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult);
-          const parsedResult = JSON.parse(resultStr);
-
-          // Store all tool results
-          collectedToolResults.push({
-            tool: toolCall.name,
-            result: parsedResult,
-          });
-
-          // Capture search results for materialResults
-          if (toolCall.name === 'material_search') {
-            if (parsedResult.results && Array.isArray(parsedResult.results)) {
-              // Transform search results to Product interface format for ProductStrip
-              const products = parsedResult.results.map((r: any) => {
-                const imageUrl = r.image_url || r.thumbnail || r.metadata?.image_url || r.metadata?.thumbnail;
-                return {
-                  id: r.id || r.product_id || `product-${Date.now()}-${Math.random()}`,
-                  sku: r.sku || r.metadata?.sku || '',
-                  name: r.name || r.title || r.product_name || 'Unnamed Product',
-                  description: r.description || r.content || '',
-                  category: r.category || r.metadata?.category || 'materials',
-                  type: r.type || r.metadata?.material_type || 'general',
-                  status: 'active',
-                  images: imageUrl ? [{ url: imageUrl, alt: r.name || 'Product image', isPrimary: true }] : [],
-                  metadata: {
-                    ...r.metadata,
-                    factory_name: r.factory || r.metadata?.factory || r.metadata?.factory_name || r.manufacturer,
-                    score: r.score || r.similarity_score,
-                  },
-                  pricing: {
-                    retail: r.price || r.metadata?.price || 0,
-                    wholesale: r.wholesale_price || r.metadata?.wholesale_price || 0,
-                    currency: r.currency || r.metadata?.currency || 'EUR',
-                  },
-                  stock: {
-                    quantity: r.stock || r.metadata?.stock || 0,
-                    status: 'available',
-                    unit: r.unit || r.metadata?.unit || 'piece',
-                  },
-                  tags: r.tags || r.metadata?.tags || [],
-                };
-              });
-              collectedProducts = [...collectedProducts, ...products];
-              console.log(`  📦 Collected ${products.length} products from search`);
-            }
-          }
-        } catch (parseError) {
-          console.warn('  ⚠️ Could not parse tool result:', parseError);
-        }
-
-        // Add tool result to messages
-        currentMessages.push({
-          role: 'tool',
-          content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
-          tool_call_id: toolCall.id,
-          name: toolCall.name,
-        });
-      } catch (error) {
-        console.error(`  ❌ Tool ${toolCall.name} failed:`, error);
-
-        // Send tool error via streaming (wrapped in try-catch)
-        try {
-          onChunk?.({
-            type: 'tool_error',
-            tool: toolCall.name,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            message: `${toolCall.name} failed`
-          });
-        } catch (e) {
-          // Stream closed - continue
-        }
-
-        // Add error result to messages
-        currentMessages.push({
-          role: 'tool',
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          tool_call_id: toolCall.id,
-          name: toolCall.name,
-        });
-      }
-    }
+  // Try to restore from checkpoint if available
+  const existingCheckpoint = await checkpointer.get(threadId);
+  if (existingCheckpoint) {
+    console.log('🔄 Restoring from checkpoint...');
   }
 
-  // Max iterations reached
-  console.warn(`⚠️ Agent reached max iterations (${maxIterations})`);
+  // Create the agent graph
+  const agentGraph = createAgentGraph(selectedModel, tools, onChunk);
 
-  // Detect generation job even in max iterations case
-  let generationJob = null;
-  for (const toolResult of collectedToolResults) {
-    if (toolResult.tool === 'generate_3d') {
-      try {
-        // toolResult.result is already a parsed object, no need to JSON.parse
-        const result = toolResult.result;
-        if (result.success && result.async_job) {
-          generationJob = {
-            job_id: result.job_id,
-            model_count: result.model_count,
-            models: result.models,
-            prompt: toolResult.args?.prompt || '',
-            room_type: toolResult.args?.roomType,
-            style: toolResult.args?.style
-          };
-        }
-      } catch (e) {
-        console.error('Failed to parse generate_3d result:', e);
-      }
+  // Convert messages to LangChain format
+  const langchainMessages = messages.map((msg: any) => {
+    if (msg.role === 'user') {
+      return new HumanMessage(msg.content);
+    } else if (msg.role === 'assistant') {
+      return new AIMessage(msg.content);
+    } else if (msg.role === 'system') {
+      return new SystemMessage(msg.content);
     }
-  }
+    return new HumanMessage(msg.content);
+  });
 
-  return {
-    text: 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.',
-    materialResults: collectedProducts.length > 0 ? { products: collectedProducts } : undefined,
-    toolResults: collectedToolResults.length > 0 ? collectedToolResults : undefined,
-    generationJob: generationJob
+  // Initial state
+  const initialState = {
+    messages: langchainMessages,
+    systemPrompt,
+    toolResults: [],
+    collectedProducts: [],
+    iteration: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    turnCount: 0,
+    finalResponse: null,
+    generationJob: null,
   };
+
+  try {
+    // Execute the graph
+    console.log('🚀 Executing LangGraph agent...');
+    const result = await agentGraph.invoke(initialState);
+
+    // Save checkpoint for future resume
+    await checkpointer.put(threadId, {
+      messages: result.messages,
+      toolResults: result.toolResults,
+      timestamp: new Date().toISOString(),
+    });
+    console.log('💾 Checkpoint saved');
+
+    // Log final usage stats
+    console.log(`📊 Total usage: ${result.inputTokens} input, ${result.outputTokens} output tokens across ${result.turnCount} turns`);
+
+    // Return results
+    const finalText = result.finalResponse ||
+      (result.iteration >= 10 ? 'I apologize, but I reached the maximum number of processing steps. Please try again or simplify your request.' : '');
+
+    return {
+      text: finalText,
+      materialResults: result.collectedProducts.length > 0 ? { products: result.collectedProducts } : undefined,
+      toolResults: result.toolResults.length > 0 ? result.toolResults : undefined,
+      generationJob: result.generationJob,
+      usage: {
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        totalTokens: result.inputTokens + result.outputTokens,
+        modelName: getModelNameForAgent(agentId),
+        turnCount: result.turnCount
+      }
+    };
+  } catch (graphError) {
+    console.error('❌ LangGraph execution error:', graphError);
+
+    // Fallback to error response
+    return {
+      text: `Error during agent execution: ${graphError instanceof Error ? graphError.message : 'Unknown error'}`,
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        modelName: getModelNameForAgent(agentId),
+        turnCount: 0
+      }
+    };
+  }
 }
 
 /**
