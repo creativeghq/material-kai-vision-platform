@@ -230,6 +230,18 @@ Complete documentation for Material Kai Vision Platform.
 - Agent monitoring and analytics
 - Best practices and troubleshooting
 
+**[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph implementation guide ✨ NEW
+- StateGraph-based agent execution
+- AgentStateAnnotation with reducers (append, replace, sum)
+- SupabaseCheckpointer for resumable conversations
+- LongTermMemory for cross-conversation context
+- Memory types (preference, fact, context, relationship)
+- Automatic memory extraction from conversations
+- Streaming updates and observable execution
+- Token usage tracking across iterations
+- Human-in-the-loop patterns (planned)
+- Database schema (agent_checkpoints, agent_memories)
+
 **[prompt-enhancement-system.md](prompt-enhancement-system.md)** - Dynamic prompt system ✨ NEW
 - Database-driven extraction prompts (extraction_prompts table)
 - Custom vs default prompt priority (is_custom flag)

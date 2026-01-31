@@ -359,6 +359,7 @@ Potential future agents:
 
 ## 📚 Related Documentation
 
+- **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, checkpointing, and memory
 - **[ai-models-guide.md](ai-models-guide.md)** - AI models used by agents
 - **[features-guide.md](features-guide.md)** - Platform features overview
 - **[system-architecture.md](system-architecture.md)** - System architecture
