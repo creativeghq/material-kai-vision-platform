@@ -50,8 +50,177 @@ const { ChatAnthropic } = await import('@langchain/anthropic');
 const { tool } = await import('@langchain/core/tools');
 const { z } = await import('zod');
 
+// LangGraph imports for StateGraph-based agent orchestration
+const { StateGraph, Annotation, END, START } = await import('@langchain/langgraph');
+const { ToolNode } = await import('@langchain/langgraph/prebuilt');
+const { BaseMessage, HumanMessage, AIMessage, SystemMessage } = await import('@langchain/core/messages');
+
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+/**
+ * Supabase-based Checkpointer for LangGraph
+ * Persists agent state for resumable conversations
+ */
+class SupabaseCheckpointer {
+  private tableName = 'agent_checkpoints';
+
+  async get(threadId: string): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from(this.tableName)
+        .select('checkpoint_data, created_at')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !data) return null;
+      return data.checkpoint_data;
+    } catch (error) {
+      console.error('Checkpointer get error:', error);
+      return null;
+    }
+  }
+
+  async put(threadId: string, checkpoint: any): Promise<void> {
+    try {
+      await supabase
+        .from(this.tableName)
+        .upsert({
+          thread_id: threadId,
+          checkpoint_data: checkpoint,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'thread_id' });
+    } catch (error) {
+      console.error('Checkpointer put error:', error);
+    }
+  }
+
+  async delete(threadId: string): Promise<void> {
+    try {
+      await supabase
+        .from(this.tableName)
+        .delete()
+        .eq('thread_id', threadId);
+    } catch (error) {
+      console.error('Checkpointer delete error:', error);
+    }
+  }
+}
+
+/**
+ * Long-term Memory System
+ * Stores and retrieves important facts from previous conversations
+ */
+class LongTermMemory {
+  private tableName = 'agent_memories';
+
+  /**
+   * Store a memory/fact from conversation
+   */
+  async store(userId: string, workspaceId: string, memory: {
+    content: string;
+    type: 'preference' | 'fact' | 'context' | 'relationship';
+    agentId: string;
+    conversationId?: string;
+    metadata?: Record<string, any>;
+  }): Promise<void> {
+    try {
+      await supabase
+        .from(this.tableName)
+        .insert({
+          user_id: userId,
+          workspace_id: workspaceId,
+          memory_type: memory.type,
+          content: memory.content,
+          agent_id: memory.agentId,
+          conversation_id: memory.conversationId,
+          metadata: memory.metadata || {},
+          created_at: new Date().toISOString(),
+        });
+      console.log(`📝 Stored long-term memory: ${memory.type} - ${memory.content.substring(0, 50)}...`);
+    } catch (error) {
+      console.error('Memory store error:', error);
+    }
+  }
+
+  /**
+   * Retrieve relevant memories for context
+   */
+  async retrieve(userId: string, workspaceId: string, options?: {
+    limit?: number;
+    types?: string[];
+    agentId?: string;
+  }): Promise<any[]> {
+    try {
+      let query = supabase
+        .from(this.tableName)
+        .select('*')
+        .eq('user_id', userId)
+        .eq('workspace_id', workspaceId)
+        .order('created_at', { ascending: false })
+        .limit(options?.limit || 20);
+
+      if (options?.types && options.types.length > 0) {
+        query = query.in('memory_type', options.types);
+      }
+
+      if (options?.agentId) {
+        query = query.eq('agent_id', options.agentId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Memory retrieve error:', error);
+        return [];
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Memory retrieve error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Format memories as context string for agent
+   */
+  formatForContext(memories: any[]): string {
+    if (!memories || memories.length === 0) return '';
+
+    const grouped = memories.reduce((acc: any, mem: any) => {
+      const type = mem.memory_type || 'general';
+      if (!acc[type]) acc[type] = [];
+      acc[type].push(mem.content);
+      return acc;
+    }, {});
+
+    let context = '\n## Long-Term Memory Context\n';
+
+    if (grouped.preference && grouped.preference.length > 0) {
+      context += '\n### User Preferences:\n';
+      grouped.preference.forEach((p: string) => context += `- ${p}\n`);
+    }
+
+    if (grouped.fact && grouped.fact.length > 0) {
+      context += '\n### Known Facts:\n';
+      grouped.fact.forEach((f: string) => context += `- ${f}\n`);
+    }
+
+    if (grouped.context && grouped.context.length > 0) {
+      context += '\n### Previous Context:\n';
+      grouped.context.forEach((c: string) => context += `- ${c}\n`);
+    }
+
+    return context;
+  }
+}
+
+// Initialize memory and checkpointer singletons
+const checkpointer = new SupabaseCheckpointer();
+const longTermMemory = new LongTermMemory();
 
 /**
  * Load agent system prompt from database (prompts table)
@@ -1431,6 +1600,993 @@ const createGetMetadataExtractionTool = () => {
   );
 };
 
+// ============================================================================
+// SUB-AGENT TOOLS FOR INSIGHTS AGENT
+// These tools allow the Insights Agent to delegate to specialized analysis
+// ============================================================================
+
+/**
+ * Sub-Agent Tool: Research Analysis
+ * Performs deep research and analysis on materials and industry trends
+ */
+const createResearchAnalysisTool = (workspaceId: string) => {
+  return tool(
+    async ({ query, context }) => {
+      try {
+        console.log(`🔬 Research sub-agent: "${query}"`);
+        const startTime = Date.now();
+
+        // Load research agent's system prompt from database
+        const systemPrompt = await getAgentSystemPrompt('research');
+
+        // Create a mini-agent execution with research context
+        const researchModel = new ChatAnthropic({
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.7,
+          maxTokens: 2048,
+        });
+
+        // Research agent has access to material_search
+        const searchTool = createSearchTool(workspaceId);
+        const modelWithTools = researchModel.bindTools([searchTool]);
+
+        const response = await modelWithTools.invoke([
+          { role: 'user', content: `${context ? `Context: ${context}\n\n` : ''}Research query: ${query}` }
+        ], { system: systemPrompt });
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Research sub-agent completed in ${elapsed}ms`);
+
+        // Extract text content from response
+        const textContent = typeof response.content === 'string'
+          ? response.content
+          : response.content
+              .filter((b: any) => b.type === 'text')
+              .map((b: any) => b.text)
+              .join('\n');
+
+        return JSON.stringify({
+          success: true,
+          analysis_type: 'research',
+          findings: textContent,
+          elapsed_ms: elapsed,
+        });
+      } catch (error) {
+        console.error('Research sub-agent error:', error);
+        return JSON.stringify({
+          success: false,
+          analysis_type: 'research',
+          error: error instanceof Error ? error.message : 'Research analysis failed',
+        });
+      }
+    },
+    {
+      name: 'research_analysis',
+      description: 'Perform deep research and analysis on materials, sustainability, industry trends, and technical specifications. Use for questions requiring in-depth investigation, scientific analysis, or trend research.',
+      schema: z.object({
+        query: z.string().describe('The research question or topic to investigate'),
+        context: z.string().optional().describe('Additional context for the research'),
+      }),
+    }
+  );
+};
+
+/**
+ * Sub-Agent Tool: Analytics Analysis
+ * Data analysis, performance metrics, and usage analytics
+ */
+const createAnalyticsAnalysisTool = () => {
+  return tool(
+    async ({ query, dataType, timeRange }) => {
+      try {
+        console.log(`📊 Analytics sub-agent: "${query}", type="${dataType}"`);
+        const startTime = Date.now();
+
+        // Load analytics agent's system prompt from database
+        const systemPrompt = await getAgentSystemPrompt('analytics');
+
+        const analyticsModel = new ChatAnthropic({
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.5,
+          maxTokens: 2048,
+        });
+
+        // Analytics agent doesn't have tools - pure reasoning
+        const response = await analyticsModel.invoke([
+          { role: 'user', content: `Data type: ${dataType || 'general'}\nTime range: ${timeRange || 'all'}\nAnalysis request: ${query}` }
+        ], { system: systemPrompt });
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Analytics sub-agent completed in ${elapsed}ms`);
+
+        const textContent = typeof response.content === 'string'
+          ? response.content
+          : response.content
+              .filter((b: any) => b.type === 'text')
+              .map((b: any) => b.text)
+              .join('\n');
+
+        return JSON.stringify({
+          success: true,
+          analysis_type: 'analytics',
+          insights: textContent,
+          elapsed_ms: elapsed,
+        });
+      } catch (error) {
+        console.error('Analytics sub-agent error:', error);
+        return JSON.stringify({
+          success: false,
+          analysis_type: 'analytics',
+          error: error instanceof Error ? error.message : 'Analytics analysis failed',
+        });
+      }
+    },
+    {
+      name: 'analytics_analysis',
+      description: 'Analyze data, performance metrics, usage patterns, and generate statistical insights. Use for quantitative analysis questions, KPIs, metrics interpretation, and data-driven recommendations.',
+      schema: z.object({
+        query: z.string().describe('The analytics question to answer'),
+        dataType: z.string().optional().describe('Type of data to analyze (usage, performance, sales, inventory, etc.)'),
+        timeRange: z.string().optional().describe('Time range for analysis (e.g., "last 7 days", "Q1 2025", "year-over-year")'),
+      }),
+    }
+  );
+};
+
+/**
+ * Sub-Agent Tool: Business Analysis
+ * Business intelligence, market analysis, and trend identification
+ */
+const createBusinessAnalysisTool = (workspaceId: string) => {
+  return tool(
+    async ({ query, focus }) => {
+      try {
+        console.log(`💼 Business sub-agent: "${query}", focus="${focus}"`);
+        const startTime = Date.now();
+
+        // Load business agent's system prompt from database
+        const systemPrompt = await getAgentSystemPrompt('business');
+
+        const businessModel = new ChatAnthropic({
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.7,
+          maxTokens: 2048,
+        });
+
+        // Business agent has access to material_search for market data
+        const searchTool = createSearchTool(workspaceId);
+        const modelWithTools = businessModel.bindTools([searchTool]);
+
+        const response = await modelWithTools.invoke([
+          { role: 'user', content: `Focus area: ${focus || 'general'}\nBusiness question: ${query}` }
+        ], { system: systemPrompt });
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Business sub-agent completed in ${elapsed}ms`);
+
+        const textContent = typeof response.content === 'string'
+          ? response.content
+          : response.content
+              .filter((b: any) => b.type === 'text')
+              .map((b: any) => b.text)
+              .join('\n');
+
+        return JSON.stringify({
+          success: true,
+          analysis_type: 'business',
+          recommendations: textContent,
+          elapsed_ms: elapsed,
+        });
+      } catch (error) {
+        console.error('Business sub-agent error:', error);
+        return JSON.stringify({
+          success: false,
+          analysis_type: 'business',
+          error: error instanceof Error ? error.message : 'Business analysis failed',
+        });
+      }
+    },
+    {
+      name: 'business_analysis',
+      description: 'Provide business intelligence, market analysis, competitive insights, and strategic recommendations. Use for business strategy questions, market trends, pricing, and competitive analysis.',
+      schema: z.object({
+        query: z.string().describe('The business question to analyze'),
+        focus: z.string().optional().describe('Focus area (market, competitors, strategy, pricing, operations, etc.)'),
+      }),
+    }
+  );
+};
+
+/**
+ * Sub-Agent Tool: Product Analysis
+ * Product management, catalog operations, and recommendations
+ */
+const createProductAnalysisTool = (workspaceId: string) => {
+  return tool(
+    async ({ query, productCategory }) => {
+      try {
+        console.log(`📦 Product sub-agent: "${query}", category="${productCategory}"`);
+        const startTime = Date.now();
+
+        // Load product agent's system prompt from database
+        const systemPrompt = await getAgentSystemPrompt('product');
+
+        const productModel = new ChatAnthropic({
+          model: 'claude-sonnet-4-5-20250929',
+          temperature: 0.7,
+          maxTokens: 2048,
+        });
+
+        // Product agent has access to material_search for catalog queries
+        const searchTool = createSearchTool(workspaceId);
+        const modelWithTools = productModel.bindTools([searchTool]);
+
+        const response = await modelWithTools.invoke([
+          { role: 'user', content: `Product category: ${productCategory || 'all'}\nProduct question: ${query}` }
+        ], { system: systemPrompt });
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Product sub-agent completed in ${elapsed}ms`);
+
+        const textContent = typeof response.content === 'string'
+          ? response.content
+          : response.content
+              .filter((b: any) => b.type === 'text')
+              .map((b: any) => b.text)
+              .join('\n');
+
+        return JSON.stringify({
+          success: true,
+          analysis_type: 'product',
+          analysis: textContent,
+          elapsed_ms: elapsed,
+        });
+      } catch (error) {
+        console.error('Product sub-agent error:', error);
+        return JSON.stringify({
+          success: false,
+          analysis_type: 'product',
+          error: error instanceof Error ? error.message : 'Product analysis failed',
+        });
+      }
+    },
+    {
+      name: 'product_analysis',
+      description: 'Analyze products, catalog data, recommendations, and product lifecycle. Use for product-related questions, comparisons, specifications, and recommendations.',
+      schema: z.object({
+        query: z.string().describe('The product question to analyze'),
+        productCategory: z.string().optional().describe('Product category to focus on (tiles, flooring, surfaces, etc.)'),
+      }),
+    }
+  );
+};
+
+// ============================================================================
+// B2B RESEARCH TOOLS FOR INSIGHTS AGENT
+// These tools enable manufacturer discovery, verification, and CRM integration
+// ============================================================================
+
+/**
+ * B2B Research Tool: Manufacturer Search
+ * Uses Perplexity API for AI-powered web research to find B2B manufacturers
+ */
+const createB2BManufacturerSearchTool = (onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ country, category, language, limit = 10 }) => {
+      try {
+        console.log(`🔍 B2B Manufacturer Search: country="${country}", category="${category}", language="${language}"`);
+        const startTime = Date.now();
+
+        // Send progress update
+        onProgress?.(`Searching for ${category} manufacturers in ${country}...`);
+
+        const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+        if (!PERPLEXITY_API_KEY) {
+          return JSON.stringify({
+            success: false,
+            error: 'PERPLEXITY_API_KEY not configured. Please add it to Supabase secrets.',
+          });
+        }
+
+        // Build a research query optimized for B2B manufacturer discovery
+        const languageMap: Record<string, string> = {
+          pl: 'Polish',
+          tr: 'Turkish',
+          ro: 'Romanian',
+          bg: 'Bulgarian',
+          cs: 'Czech',
+          de: 'German',
+          uk: 'Ukrainian',
+          hu: 'Hungarian',
+          sr: 'Serbian',
+          sl: 'Slovenian',
+          mk: 'Macedonian',
+          bs: 'Bosnian',
+          hr: 'Croatian',
+          sk: 'Slovak',
+        };
+
+        const languageName = language ? languageMap[language] || language : 'English';
+
+        const query = `Find B2B manufacturers of ${category} in ${country}.
+I need actual manufacturing companies (not distributors or retailers) that:
+- Have their own production facilities
+- Offer wholesale/B2B sales
+- Preferably offer OEM/private label services
+- Export capabilities preferred
+
+For each manufacturer found, provide:
+- Company name
+- Website URL
+- City/location
+- Main products they manufacture
+- Any indicators they are actual manufacturers (factory, production facility, etc.)
+
+Search in ${languageName} language sources for better coverage of local manufacturers.
+Return up to ${limit} manufacturers.`;
+
+        // Add timeout to prevent hanging (60 seconds for AI search)
+        const TIMEOUT_MS = 60000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        let response;
+        try {
+          response = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'sonar',
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are a B2B research assistant specialized in finding manufacturing companies. Always verify companies are actual manufacturers, not distributors or retailers. Provide structured data with company names, websites, locations, and products.',
+                },
+                {
+                  role: 'user',
+                  content: query,
+                },
+              ],
+              temperature: 0.2,
+              max_tokens: 4096,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            return JSON.stringify({
+              success: false,
+              error: `Perplexity API timeout after ${TIMEOUT_MS / 1000} seconds. Try a simpler query.`,
+            });
+          }
+          throw fetchError;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Perplexity API error: ${response.status} - ${errorText}`);
+          return JSON.stringify({
+            success: false,
+            error: `Perplexity API error: ${response.status}`,
+          });
+        }
+
+        const data = await response.json();
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ B2B search completed in ${elapsed}ms`);
+
+        // Extract the response content
+        const content = data.choices?.[0]?.message?.content || '';
+        const citations = data.citations || [];
+
+        return JSON.stringify({
+          success: true,
+          search_results: content,
+          citations: citations,
+          query_params: { country, category, language, limit },
+          elapsed_ms: elapsed,
+          source: 'perplexity',
+        });
+      } catch (error) {
+        console.error('B2B manufacturer search error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'B2B manufacturer search failed',
+        });
+      }
+    },
+    {
+      name: 'b2b_manufacturer_search',
+      description: 'Search for B2B manufacturers in a specific country and product category. Uses AI-powered web research to find actual manufacturing companies (not distributors). Supports native language searches for better coverage.',
+      schema: z.object({
+        country: z.string().describe('Country to search in (e.g., "Poland", "Turkey", "Romania")'),
+        category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "LED mirrors")'),
+        language: z.string().optional().describe('Language code for native searches (e.g., "pl", "tr", "ro", "bg")'),
+        limit: z.number().optional().default(10).describe('Maximum number of manufacturers to find'),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: Company Website Scrape
+ * Uses Firecrawl API to extract structured information from company websites
+ */
+const createCompanyWebsiteScrapeTool = (onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ url, extract }) => {
+      try {
+        console.log(`🌐 Scraping company website: ${url}`);
+        const startTime = Date.now();
+
+        // Send progress update
+        onProgress?.(`Scraping website: ${url}...`);
+
+        const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+        if (!FIRECRAWL_API_KEY) {
+          return JSON.stringify({
+            success: false,
+            error: 'FIRECRAWL_API_KEY not configured. Please add it to Supabase secrets.',
+          });
+        }
+
+        // Scrape the website using Firecrawl with timeout (30 seconds)
+        const TIMEOUT_MS = 30000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        let response;
+        try {
+          response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: url,
+              formats: ['markdown'],
+              onlyMainContent: true,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            return JSON.stringify({
+              success: false,
+              error: `Website scrape timeout after ${TIMEOUT_MS / 1000} seconds. The site may be slow or blocking scrapers.`,
+            });
+          }
+          throw fetchError;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Firecrawl API error: ${response.status} - ${errorText}`);
+          return JSON.stringify({
+            success: false,
+            error: `Firecrawl API error: ${response.status}`,
+          });
+        }
+
+        const data = await response.json();
+        const scrapeElapsed = Date.now() - startTime;
+        console.log(`✅ Website scrape completed in ${scrapeElapsed}ms`);
+
+        const markdown = data.data?.markdown || '';
+        const metadata = data.data?.metadata || {};
+
+        // If no content was scraped, return early with metadata only
+        if (!markdown || markdown.length < 100) {
+          return JSON.stringify({
+            success: true,
+            url: url,
+            company_data: { error: 'Could not extract meaningful content from website' },
+            page_title: metadata.title || '',
+            page_description: metadata.description || '',
+            elapsed_ms: scrapeElapsed,
+          });
+        }
+
+        // Use Claude to extract structured company information from the scraped content
+        const extractSections = extract || ['about', 'products', 'contact', 'certifications'];
+
+        // Send progress update for analysis phase
+        onProgress?.(`Analyzing website content...`);
+
+        let companyData;
+        try {
+          const analysisModel = new ChatAnthropic({
+            model: 'claude-sonnet-4-5-20250929',
+            temperature: 0.3,
+            maxTokens: 2048,
+          });
+
+          const analysisPrompt = `Analyze this company website content and extract the following information:
+
+Sections to extract: ${extractSections.join(', ')}
+
+Website content:
+${markdown.substring(0, 15000)}
+
+Please extract and structure the information as JSON with these fields:
+- company_name: string
+- about: string (company description, history, founding year if found)
+- products: array of strings (specific products they manufacture)
+- contact: object with address, phone, email if found
+- certifications: array of strings (ISO, quality certifications)
+- is_manufacturer: boolean (true if they clearly manufacture products, false if just distributor/retailer)
+- is_b2b: boolean (true if they offer wholesale/B2B services)
+- manufacturing_indicators: array of strings (words/phrases that indicate manufacturing capability)
+- confidence: number 0-1 (how confident are you this is a B2B manufacturer)
+
+Return ONLY valid JSON, no markdown formatting.`;
+
+          const analysisResponse = await analysisModel.invoke([
+            { role: 'user', content: analysisPrompt }
+          ]);
+
+          const analysisText = typeof analysisResponse.content === 'string'
+            ? analysisResponse.content
+            : analysisResponse.content
+                .filter((b: any) => b.type === 'text')
+                .map((b: any) => b.text)
+                .join('\n');
+
+          // Try to parse the JSON response
+          try {
+            // Remove any markdown code blocks if present
+            const jsonStr = analysisText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            companyData = JSON.parse(jsonStr);
+          } catch {
+            companyData = { raw_analysis: analysisText };
+          }
+        } catch (analysisError) {
+          console.error('Claude analysis error:', analysisError);
+          // Return scraped data even if analysis fails
+          companyData = {
+            error: 'Analysis failed but website was scraped',
+            raw_markdown_preview: markdown.substring(0, 2000)
+          };
+        }
+
+        const totalElapsed = Date.now() - startTime;
+        return JSON.stringify({
+          success: true,
+          url: url,
+          company_data: companyData,
+          page_title: metadata.title || '',
+          page_description: metadata.description || '',
+          elapsed_ms: totalElapsed,
+        });
+      } catch (error) {
+        console.error('Company website scrape error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Website scrape failed',
+        });
+      }
+    },
+    {
+      name: 'company_website_scrape',
+      description: 'Scrape a company website to extract structured information about the company, products, contact details, and verify if they are a B2B manufacturer.',
+      schema: z.object({
+        url: z.string().describe('Company website URL to scrape'),
+        extract: z.array(z.string()).optional().describe('Sections to extract: about, products, contact, certifications'),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: Company Enrichment
+ * Uses Apollo.io API to get structured company data from B2B databases
+ */
+const createCompanyEnrichmentTool = (onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ company_name, domain, country }) => {
+      try {
+        console.log(`🏢 Enriching company: ${company_name}, domain=${domain}`);
+        const startTime = Date.now();
+
+        // Send progress update
+        onProgress?.(`Enriching company data for ${company_name}...`);
+
+        const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY');
+        if (!APOLLO_API_KEY) {
+          return JSON.stringify({
+            success: false,
+            error: 'APOLLO_API_KEY not configured. Please add it to Supabase secrets.',
+          });
+        }
+
+        // Search for the company in Apollo.io with timeout (20 seconds)
+        const TIMEOUT_MS = 20000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        let response;
+        try {
+          response = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache',
+              'X-Api-Key': APOLLO_API_KEY,
+            },
+            body: JSON.stringify({
+              q_organization_name: company_name,
+              organization_locations: country ? [country] : undefined,
+              organization_domains: domain ? [domain] : undefined,
+              page: 1,
+              per_page: 5,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            return JSON.stringify({
+              success: false,
+              error: `Apollo API timeout after ${TIMEOUT_MS / 1000} seconds.`,
+            });
+          }
+          throw fetchError;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Apollo API error: ${response.status} - ${errorText}`);
+          return JSON.stringify({
+            success: false,
+            error: `Apollo API error: ${response.status}`,
+          });
+        }
+
+        const data = await response.json();
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Company enrichment completed in ${elapsed}ms`);
+
+        const companies = data.organizations || [];
+
+        if (companies.length === 0) {
+          return JSON.stringify({
+            success: true,
+            found: false,
+            message: 'No matching company found in Apollo database',
+            query: { company_name, domain, country },
+          });
+        }
+
+        // Return the best match
+        const company = companies[0];
+
+        return JSON.stringify({
+          success: true,
+          found: true,
+          company: {
+            name: company.name,
+            domain: company.primary_domain,
+            industry: company.industry,
+            employee_count: company.estimated_num_employees,
+            employee_range: company.organization_estimated_num_employees,
+            founded_year: company.founded_year,
+            linkedin_url: company.linkedin_url,
+            headquarters: {
+              city: company.city,
+              state: company.state,
+              country: company.country,
+            },
+            phone: company.phone,
+            technologies: company.technologies || [],
+            keywords: company.keywords || [],
+            annual_revenue: company.annual_revenue,
+            total_funding: company.total_funding,
+          },
+          total_matches: companies.length,
+          elapsed_ms: elapsed,
+          source: 'apollo.io',
+        });
+      } catch (error) {
+        console.error('Company enrichment error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Company enrichment failed',
+        });
+      }
+    },
+    {
+      name: 'company_enrichment',
+      description: 'Get structured company data from B2B databases including employee count, founding year, industry, LinkedIn URL, and headquarters location.',
+      schema: z.object({
+        company_name: z.string().describe('Company name to search for'),
+        domain: z.string().optional().describe('Company website domain (e.g., "paradyz.com")'),
+        country: z.string().optional().describe('Country to filter results'),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: Contact Discovery
+ * Uses Hunter.io API to find decision-maker email addresses
+ */
+const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ domain, roles }) => {
+      try {
+        console.log(`📧 Discovering contacts for domain: ${domain}`);
+        const startTime = Date.now();
+
+        // Send progress update
+        onProgress?.(`Finding contacts for ${domain}...`);
+
+        const HUNTER_API_KEY = Deno.env.get('HUNTER_API_KEY');
+        if (!HUNTER_API_KEY) {
+          return JSON.stringify({
+            success: false,
+            error: 'HUNTER_API_KEY not configured. Please add it to Supabase secrets.',
+          });
+        }
+
+        // Search for contacts using Hunter.io domain search with timeout (20 seconds)
+        const TIMEOUT_MS = 20000;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        const searchUrl = new URL('https://api.hunter.io/v2/domain-search');
+        searchUrl.searchParams.set('domain', domain);
+        searchUrl.searchParams.set('api_key', HUNTER_API_KEY);
+        searchUrl.searchParams.set('limit', '10');
+
+        let response;
+        try {
+          response = await fetch(searchUrl.toString(), {
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            return JSON.stringify({
+              success: false,
+              error: `Hunter API timeout after ${TIMEOUT_MS / 1000} seconds.`,
+            });
+          }
+          throw fetchError;
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`❌ Hunter API error: ${response.status} - ${errorText}`);
+          return JSON.stringify({
+            success: false,
+            error: `Hunter API error: ${response.status}`,
+          });
+        }
+
+        const data = await response.json();
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Contact discovery completed in ${elapsed}ms`);
+
+        const emails = data.data?.emails || [];
+        const organization = data.data?.organization || '';
+        const pattern = data.data?.pattern || '';
+
+        // Filter and prioritize contacts based on requested roles
+        const priorityRoles = roles || ['export', 'sales', 'director', 'manager', 'owner', 'ceo', 'founder'];
+
+        const scoredContacts = emails.map((email: any) => {
+          const position = (email.position || '').toLowerCase();
+          let roleScore = 0;
+
+          for (let i = 0; i < priorityRoles.length; i++) {
+            if (position.includes(priorityRoles[i].toLowerCase())) {
+              roleScore = priorityRoles.length - i; // Higher score for earlier roles in priority list
+              break;
+            }
+          }
+
+          return {
+            name: `${email.first_name || ''} ${email.last_name || ''}`.trim(),
+            email: email.value,
+            position: email.position || '',
+            department: email.department || '',
+            linkedin: email.linkedin || '',
+            confidence: email.confidence || 0,
+            email_verified: email.verification?.status === 'valid',
+            role_score: roleScore,
+            source: 'hunter.io',
+          };
+        });
+
+        // Sort by role score (descending), then by confidence (descending)
+        scoredContacts.sort((a: any, b: any) => {
+          if (b.role_score !== a.role_score) return b.role_score - a.role_score;
+          return b.confidence - a.confidence;
+        });
+
+        return JSON.stringify({
+          success: true,
+          domain: domain,
+          organization: organization,
+          email_pattern: pattern,
+          contacts: scoredContacts.slice(0, 10),
+          total_found: emails.length,
+          elapsed_ms: elapsed,
+          source: 'hunter.io',
+        });
+      } catch (error) {
+        console.error('Contact discovery error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Contact discovery failed',
+        });
+      }
+    },
+    {
+      name: 'contact_discovery',
+      description: 'Find decision-maker email addresses for a company domain. Prioritizes contacts based on specified roles like export managers, sales directors, owners.',
+      schema: z.object({
+        domain: z.string().describe('Company website domain (e.g., "paradyz.com")'),
+        roles: z.array(z.string()).optional().describe('Priority roles to find (e.g., ["export", "sales", "director"])'),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: Save to CRM
+ * Saves researched company and contacts to the CRM database
+ */
+const createSaveToCRMTool = (userId: string, onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ company, contacts }) => {
+      try {
+        console.log(`💾 Saving to CRM: ${company.name}`);
+        const startTime = Date.now();
+
+        // Send progress update
+        onProgress?.(`Saving ${company.name} to CRM...`);
+
+        // First, create or update the company
+        const { data: companyData, error: companyError } = await supabase
+          .from('crm_companies')
+          .insert({
+            name: company.name,
+            website: company.website,
+            email: company.email,
+            phone: company.phone,
+            industry: company.industry,
+            employee_count: company.employee_count,
+            address: company.address,
+            city: company.city,
+            country: company.country,
+            linkedin: company.linkedin,
+            description: company.description,
+            notes: company.notes,
+            created_by: userId,
+          })
+          .select('id')
+          .single();
+
+        if (companyError) {
+          console.error('Error creating company:', companyError);
+          return JSON.stringify({
+            success: false,
+            error: `Failed to create company: ${companyError.message}`,
+          });
+        }
+
+        const companyId = companyData.id;
+        const contactIds: string[] = [];
+
+        // Create contacts and link them to the company
+        if (contacts && contacts.length > 0) {
+          for (const contact of contacts) {
+            // Create the contact
+            const { data: contactData, error: contactError } = await supabase
+              .from('crm_contacts')
+              .insert({
+                name: contact.name,
+                email: contact.email,
+                phone: contact.phone,
+                mobile: contact.mobile,
+                position: contact.position,
+                department: contact.department,
+                linkedin: contact.linkedin,
+                company: company.name,
+                country: company.country,
+                city: company.city,
+                lead_source: 'B2B Research Agent',
+                status: 'new',  // Using correct column name
+                notes: contact.notes,
+                created_by: userId,
+              })
+              .select('id')
+              .single();
+
+            if (contactError) {
+              console.error('Error creating contact:', contactError);
+              continue;
+            }
+
+            contactIds.push(contactData.id);
+
+            // Link contact to company
+            await supabase
+              .from('crm_company_contacts')
+              .insert({
+                company_id: companyId,
+                contact_id: contactData.id,
+                role: contact.position,
+                is_primary: contact.is_primary || false,
+                notes: `Added via B2B Research Agent`,
+              });
+          }
+        }
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Saved to CRM in ${elapsed}ms: company=${companyId}, contacts=${contactIds.length}`);
+
+        return JSON.stringify({
+          success: true,
+          company_id: companyId,
+          contact_ids: contactIds,
+          company_name: company.name,
+          contacts_created: contactIds.length,
+          elapsed_ms: elapsed,
+        });
+      } catch (error) {
+        console.error('Save to CRM error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to save to CRM',
+        });
+      }
+    },
+    {
+      name: 'save_to_crm',
+      description: 'Save a researched company and its contacts to the CRM database. Use this after the user confirms they want to save a manufacturer.',
+      schema: z.object({
+        company: z.object({
+          name: z.string().describe('Company name'),
+          website: z.string().optional().describe('Company website URL'),
+          email: z.string().optional().describe('Company email'),
+          phone: z.string().optional().describe('Company phone'),
+          industry: z.string().optional().describe('Industry'),
+          employee_count: z.string().optional().describe('Employee count range'),
+          address: z.string().optional().describe('Street address'),
+          city: z.string().optional().describe('City'),
+          country: z.string().optional().describe('Country'),
+          linkedin: z.string().optional().describe('LinkedIn URL'),
+          description: z.string().optional().describe('Company description'),
+          notes: z.string().optional().describe('Additional notes'),
+        }).describe('Company information to save'),
+        contacts: z.array(z.object({
+          name: z.string().describe('Contact full name'),
+          email: z.string().optional().describe('Contact email'),
+          phone: z.string().optional().describe('Contact phone'),
+          mobile: z.string().optional().describe('Contact mobile'),
+          position: z.string().optional().describe('Job position/title'),
+          department: z.string().optional().describe('Department'),
+          linkedin: z.string().optional().describe('LinkedIn profile URL'),
+          notes: z.string().optional().describe('Notes about the contact'),
+          is_primary: z.boolean().optional().describe('Is this the primary contact'),
+        })).optional().describe('Contacts to save and link to the company'),
+      }),
+    }
+  );
+};
+
 /**
  * Agent Configurations with RBAC
  */
@@ -1454,45 +2610,20 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: ['material_search', 'image_analysis'],
     // systemPrompt loaded from database
   },
-  research: {
-    id: 'research',
-    name: 'Research Agent',
-    description: 'Deep research and analysis',
+  insights: {
+    id: 'insights',
+    name: 'Insights Agent',
+    description: 'Unified intelligence combining research, analytics, business, and product analysis with B2B research capabilities',
     allowedRoles: ['admin', 'owner'],
-    tools: ['material_search'],
+    tools: [
+      // Sub-agent orchestration tools
+      'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis', 'material_search',
+      // B2B Research tools
+      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'save_to_crm'
+    ],
     // systemPrompt loaded from database
-  },
-  analytics: {
-    id: 'analytics',
-    name: 'Analytics Agent',
-    description: 'Data analysis and insights',
-    allowedRoles: ['admin', 'owner'],
-    tools: [],
-    // systemPrompt loaded from database
-  },
-  business: {
-    id: 'business',
-    name: 'Business Agent',
-    description: 'Business intelligence',
-    allowedRoles: ['admin', 'owner'],
-    tools: ['material_search'],
-    // systemPrompt loaded from database
-  },
-  product: {
-    id: 'product',
-    name: 'Product Agent',
-    description: 'Product management',
-    allowedRoles: ['admin', 'owner'],
-    tools: ['material_search'],
-    // systemPrompt loaded from database
-  },
-  admin: {
-    id: 'admin',
-    name: 'Admin Agent',
-    description: 'Administrative tasks',
-    allowedRoles: ['owner'],
-    tools: [],
-    // systemPrompt loaded from database
+    // NOTE: This agent orchestrates sub-agents for specialized analysis tasks
+    // NOTE: B2B research tools enable manufacturer discovery and CRM integration
   },
   demo: {
     id: 'demo',
@@ -1574,6 +2705,23 @@ async function executeAgent(
     throw new Error(`Failed to load agent configuration: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 
+  // 🧠 Long-term Memory: Retrieve relevant memories for context
+  try {
+    const memories = await longTermMemory.retrieve(userId, workspaceId, {
+      limit: 10,
+      agentId: agentId,
+    });
+
+    if (memories.length > 0) {
+      const memoryContext = longTermMemory.formatForContext(memories);
+      systemPrompt = systemPrompt + memoryContext;
+      console.log(`🧠 Added ${memories.length} long-term memories to context`);
+    }
+  } catch (memError) {
+    console.warn('⚠️ Could not load long-term memories:', memError);
+    // Continue without memories - not critical
+  }
+
   // Special handling for Demo Agent - return structured command
   if (agentId === 'demo') {
     const lowerInput = userInput.toLowerCase();
@@ -1652,6 +2800,50 @@ async function executeAgent(
   }
   if (config.tools.includes('estimate_cost')) {
     tools.push(createCostEstimationTool(workspaceId));
+  }
+
+  // Sub-agent tools for Insights Agent orchestration
+  if (config.tools.includes('research_analysis')) {
+    tools.push(createResearchAnalysisTool(workspaceId));
+  }
+  if (config.tools.includes('analytics_analysis')) {
+    tools.push(createAnalyticsAnalysisTool());
+  }
+  if (config.tools.includes('business_analysis')) {
+    tools.push(createBusinessAnalysisTool(workspaceId));
+  }
+  if (config.tools.includes('product_analysis')) {
+    tools.push(createProductAnalysisTool(workspaceId));
+  }
+
+  // B2B Research tools for Insights Agent
+  // Create progress callback wrapper for streaming updates during long operations
+  const sendProgress = (status: string) => {
+    try {
+      onChunk?.({
+        type: 'tool_progress',
+        status,
+        timestamp: Date.now(),
+      });
+    } catch {
+      // Stream may be closed, ignore
+    }
+  };
+
+  if (config.tools.includes('b2b_manufacturer_search')) {
+    tools.push(createB2BManufacturerSearchTool(sendProgress));
+  }
+  if (config.tools.includes('company_website_scrape')) {
+    tools.push(createCompanyWebsiteScrapeTool(sendProgress));
+  }
+  if (config.tools.includes('company_enrichment')) {
+    tools.push(createCompanyEnrichmentTool(sendProgress));
+  }
+  if (config.tools.includes('contact_discovery')) {
+    tools.push(createContactDiscoveryTool(sendProgress));
+  }
+  if (config.tools.includes('save_to_crm')) {
+    tools.push(createSaveToCRMTool(userId, sendProgress));
   }
 
   // Select model based on agent type (Haiku for search, Sonnet for complex tasks)
@@ -2042,6 +3234,105 @@ async function saveConversation(userId: string, agentId: string, messages: any[]
 }
 
 /**
+ * Extract and store important memories from conversation
+ * Identifies preferences, facts, and context for long-term memory
+ */
+async function extractAndStoreMemories(
+  userId: string,
+  workspaceId: string,
+  agentId: string,
+  userInput: string,
+  agentResponse: string,
+  toolResults?: any[]
+) {
+  try {
+    // Extract preferences from user input
+    const preferencePatterns = [
+      /i (?:prefer|like|want|love|enjoy|need) (.+?)(?:\.|,|$)/gi,
+      /my (?:favorite|preferred|usual) (?:is|are) (.+?)(?:\.|,|$)/gi,
+      /i'm (?:looking for|interested in) (.+?)(?:\.|,|$)/gi,
+    ];
+
+    for (const pattern of preferencePatterns) {
+      const matches = userInput.matchAll(pattern);
+      for (const match of matches) {
+        if (match[1] && match[1].length > 5 && match[1].length < 200) {
+          await longTermMemory.store(userId, workspaceId, {
+            content: `User prefers: ${match[1].trim()}`,
+            type: 'preference',
+            agentId,
+            metadata: { source: 'user_input', extractedFrom: match[0] },
+          });
+        }
+      }
+    }
+
+    // Extract facts from successful tool results
+    if (toolResults && toolResults.length > 0) {
+      for (const toolResult of toolResults) {
+        // Store material search context
+        if (toolResult.tool === 'material_search' && toolResult.result?.success) {
+          const searchQuery = toolResult.result?.query || '';
+          const resultCount = toolResult.result?.results?.length || 0;
+          if (searchQuery && resultCount > 0) {
+            await longTermMemory.store(userId, workspaceId, {
+              content: `User searched for "${searchQuery}" and found ${resultCount} materials`,
+              type: 'context',
+              agentId,
+              metadata: { tool: 'material_search', resultCount },
+            });
+          }
+        }
+
+        // Store 3D generation context
+        if (toolResult.tool === 'generate_3d' && toolResult.result?.success) {
+          const roomType = toolResult.result?.room_type || 'room';
+          const style = toolResult.result?.style || '';
+          await longTermMemory.store(userId, workspaceId, {
+            content: `User generated 3D design for ${roomType}${style ? ` in ${style} style` : ''}`,
+            type: 'context',
+            agentId,
+            metadata: { tool: 'generate_3d', roomType, style },
+          });
+        }
+
+        // Store company/contact research context
+        if (toolResult.tool === 'company_enrichment' && toolResult.result?.found) {
+          const companyName = toolResult.result?.company?.name || '';
+          if (companyName) {
+            await longTermMemory.store(userId, workspaceId, {
+              content: `User researched company: ${companyName}`,
+              type: 'relationship',
+              agentId,
+              metadata: { tool: 'company_enrichment', companyName },
+            });
+          }
+        }
+
+        // Store CRM saves
+        if (toolResult.tool === 'save_to_crm' && toolResult.result?.success) {
+          const companyName = toolResult.result?.company_name || '';
+          const contactCount = toolResult.result?.contacts_created || 0;
+          if (companyName) {
+            await longTermMemory.store(userId, workspaceId, {
+              content: `User saved ${companyName} to CRM with ${contactCount} contacts`,
+              type: 'relationship',
+              agentId,
+              metadata: { tool: 'save_to_crm', companyName, contactCount },
+            });
+          }
+        }
+      }
+    }
+
+    console.log('🧠 Memory extraction completed');
+  } catch (error) {
+    console.error('Memory extraction error:', error);
+    // Non-critical - don't throw
+  }
+}
+
+/**
  * Log agent usage and debit credits
  * Uses the log_agent_usage RPC function for atomic logging + credit debit
  */
@@ -2280,6 +3571,10 @@ serve(async (req) => {
           console.log('💾 Saving conversation...');
           await saveConversation(user.id, agentId, messages, finalResult.text);
           console.log('✅ Conversation saved');
+
+          // 🧠 Extract and store memories from conversation (non-blocking)
+          extractAndStoreMemories(user.id, workspaceId, agentId, userInput, finalResult.text, finalResult.toolResults)
+            .catch(err => console.warn('⚠️ Memory extraction failed:', err));
 
           // Log usage and debit credits (non-blocking)
           if (finalResult.usage && finalResult.usage.totalTokens > 0) {

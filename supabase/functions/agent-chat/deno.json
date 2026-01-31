@@ -2,6 +2,8 @@
   "imports": {
     "@langchain/anthropic": "npm:@langchain/anthropic",
     "@langchain/core/tools": "npm:@langchain/core/tools",
+    "@langchain/core/messages": "npm:@langchain/core/messages",
+    "@langchain/langgraph": "npm:@langchain/langgraph",
     "zod": "npm:zod",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "http/": "https://deno.land/std@0.168.0/http/"
