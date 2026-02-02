@@ -1,19 +1,19 @@
 /**
  * Email API Edge Function
  * Handles email sending, domain management, and analytics
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SESClient, SendEmailCommand, VerifyDomainIdentityCommand, GetIdentityVerificationAttributesCommand, ListIdentitiesCommand } from 'npm:@aws-sdk/client-ses@3';
 import { SESv2Client, GetAccountCommand } from 'npm:@aws-sdk/client-sesv2@3';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
 import { renderReactEmailTemplate, renderTemplateWithVariables, generatePlainTextFromReactEmail } from '../_shared/react-email-renderer.ts';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 interface SendEmailRequest {
   to: string | string[];
@@ -35,7 +35,7 @@ interface VerifyDomainRequest {
   domain: string;
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -48,19 +48,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Get user from auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
+      throw new Error(auth.error || 'Unauthorized');
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (userError || !user) {
-      throw new Error('Unauthorized');
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     // Initialize SES clients
     const sesClient = new SESClient({

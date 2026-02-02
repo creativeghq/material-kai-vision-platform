@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -10,6 +11,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 /**
  * CRM Contacts API
  * Handles CRM contact management: create, list, update, delete
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access, no role check
+ * - User JWT (Authorization header): Requires admin/manager/factory role
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -23,46 +28,22 @@ Deno.serve(async (req) => {
     // Use replace + filter for robust path parsing (same as crm-companies-api)
     const path = url.pathname.replace('/crm-contacts-api', '').split('/').filter(Boolean);
 
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Authenticate request
+    const auth = await authenticate(req, {
+      allowedRoles: ['admin', 'manager', 'factory'],
+    });
+
+    // Secret key bypasses role check
+    if (!auth.success && !isAdminAccess(auth)) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: corsHeaders },
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
+        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Verify user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders },
-      );
-    }
-
-    // Check if user has CRM access (Manager, Factory, Admin)
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('role_id')
-      .eq('user_id', user.id)
-      .single();
-
-    const { data: allowedRoles } = await supabase
-      .from('roles')
-      .select('id')
-      .in('name', ['admin', 'manager', 'factory']);
-
-    const allowedRoleIds = allowedRoles?.map(r => r.id) || [];
-
-    if (!userProfile || !allowedRoleIds.includes(userProfile.role_id)) {
-      return new Response(
-        JSON.stringify({ error: 'CRM access required' }),
-        { status: 403, headers: corsHeaders },
-      );
-    }
+    // For user context operations, use auth.userId (null for secret key access)
+    const user = auth.user;
+    const userId = auth.userId;
 
     // POST /api/contacts - Create contact
     if (method === 'POST' && path.length === 0) {
@@ -84,7 +65,7 @@ Deno.serve(async (req) => {
           phone,
           company,
           notes,
-          created_by: user.id,
+          created_by: userId || 'system',
         })
         .select();
 
@@ -262,7 +243,7 @@ Deno.serve(async (req) => {
         .update({
           user_id: userId,
           linked_at: new Date().toISOString(),
-          linked_by: user.id,
+          linked_by: userId || 'system',
         })
         .eq('id', contactId)
         .select();
@@ -292,7 +273,7 @@ Deno.serve(async (req) => {
         .update({
           user_id: null,
           linked_at: null,
-          linked_by: user.id, // Track who unlinked
+          linked_by: userId || 'system', // Track who unlinked
         })
         .eq('id', contactId)
         .select();
@@ -407,7 +388,7 @@ Deno.serve(async (req) => {
             .update({
               user_id: userId,
               linked_at: new Date().toISOString(),
-              linked_by: user.id,
+              linked_by: userId || 'system',
             })
             .eq('id', contactId)
             .select();

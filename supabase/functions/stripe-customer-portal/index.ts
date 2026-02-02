@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'https://esm.sh/stripe@14.10.0';
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -15,6 +16,10 @@ const stripe = new Stripe(stripeSecretKey, {
 /**
  * Stripe Customer Portal Session Creator
  * Creates Stripe Customer Portal sessions for subscription management
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -23,25 +28,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
         { status: 401, headers: corsHeaders }
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Verify user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders }
-      );
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     const body = await req.json();
     const { returnUrl } = body;
@@ -50,7 +48,7 @@ Deno.serve(async (req) => {
     const { data: profile } = await supabase
       .from('user_profiles')
       .select('stripe_customer_id')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (!profile?.stripe_customer_id) {

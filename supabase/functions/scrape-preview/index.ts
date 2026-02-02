@@ -1,10 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 interface ScrapePreviewRequest {
   url: string;
@@ -77,17 +73,15 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Get auth info
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header found');
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
+      throw new Error(auth.error || 'Authentication failed');
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      throw new Error('Authentication failed');
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     // Use Firecrawl v2 with dynamic prompts and schema
     const result = await scrapePreviewWithFirecrawl(url, options);

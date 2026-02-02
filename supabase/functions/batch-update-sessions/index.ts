@@ -1,16 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 interface BatchUpdateRequest {
   sessionIds: string[];
   fieldMappings: any;
 }
 
+/**
+ * Batch Update Sessions API
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
+ */
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -28,12 +31,15 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) throw new Error('No authorization header');
+    // Authenticate request
+    const auth = await authenticate(req);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('Authentication failed');
+    if (!auth.success) {
+      throw new Error(auth.error || 'Authentication failed');
+    }
+
+    const user = auth.user;
+    const userId = auth.userId;
 
     const { sessionIds, fieldMappings }: BatchUpdateRequest = await req.json();
 

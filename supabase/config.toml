@@ -55,6 +55,10 @@ verify_jwt = false
 [functions.messaging-processor]
 verify_jwt = false
 
+# Agent chat with extended timeout for B2B research (multiple API calls)
+[functions.agent-chat]
+verify_jwt = false
+
 [auth]
 # JWT secret key for token signing and verification
 jwt_secret = "Kj9mN2pQ8rT5vY7wE3uI6oP1aS4dF8gH2kL9nM6qR3tY5vX8zA1bC4eG7jK0mP9s"

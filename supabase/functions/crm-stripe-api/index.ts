@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -11,6 +12,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 /**
  * CRM Stripe API
  * Handles subscription and credit purchase operations
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -23,25 +28,18 @@ Deno.serve(async (req) => {
     const method = req.method;
     const path = url.pathname.replace('/crm-stripe-api', '').split('/').filter(Boolean);
 
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
         { status: 401, headers: corsHeaders },
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Verify user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders },
-      );
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     // POST /api/subscriptions/create-checkout - Create checkout session
     if (method === 'POST' && path[0] === 'subscriptions' && path[1] === 'create-checkout') {
@@ -73,7 +71,7 @@ Deno.serve(async (req) => {
       const { data: stripeCustomer } = await supabase
         .from('stripe_customers')
         .select('stripe_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       // TODO: Create Stripe checkout session
@@ -139,7 +137,7 @@ Deno.serve(async (req) => {
           current_period_end,
           subscription_plans(name, price, description)
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
@@ -162,7 +160,7 @@ Deno.serve(async (req) => {
       const { data, error } = await supabase
         .from('user_credits')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (error) {

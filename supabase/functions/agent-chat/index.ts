@@ -37,8 +37,8 @@ console.log('🔑 Environment variables loaded:', {
 console.log('✅ process.env polyfill set up for npm packages');
 
 // NOW import dependencies (after polyfill is set up)
-import { serve } from 'http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 // Import types only to avoid side effects
 import type { ChatAnthropic } from '@langchain/anthropic';
@@ -3514,21 +3514,20 @@ serve(async (req) => {
 
     console.log(`📨 Received request for agent: ${agentId}, messages: ${messages.length}`);
 
-    // Get user from auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
+      throw new Error(auth.error || 'Unauthorized');
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const user = auth.user;
+    const userId = auth.userId;
 
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    // Check agent access
-    const { allowed, role } = await checkAgentAccess(user.id, agentId);
+    // Check agent access (skip for secret key access)
+    const { allowed, role } = isAdminAccess(auth)
+      ? { allowed: true, role: 'admin' }
+      : await checkAgentAccess(userId!, agentId);
     if (!allowed) {
       return new Response(
         JSON.stringify({
@@ -3542,7 +3541,7 @@ serve(async (req) => {
     }
 
     // Get workspace ID
-    const workspaceId = await getUserWorkspaceId(user.id);
+    const workspaceId = await getUserWorkspaceId(userId!);
     if (!workspaceId) {
       throw new Error('No workspace found for user');
     }
@@ -3563,7 +3562,7 @@ serve(async (req) => {
     console.log('🚀 Creating ReadableStream for agent execution...');
     console.log('📋 Agent:', agentId);
     console.log('📋 Workspace:', workspaceId);
-    console.log('📋 User:', user.id);
+    console.log('📋 User:', userId);
     console.log('📋 Message count:', messages.length);
     console.log('📋 User input:', userInput.substring(0, 100) + (userInput.length > 100 ? '...' : ''));
 
@@ -3647,7 +3646,7 @@ serve(async (req) => {
             finalResult = await executeAgent(
               agentId,
               workspaceId,
-              user.id,
+              userId,
               userInput,
               anthropicMessages,
               // Streaming callback with safe enqueue
@@ -3684,11 +3683,11 @@ serve(async (req) => {
 
           // Save conversation
           console.log('💾 Saving conversation...');
-          await saveConversation(user.id, agentId, messages, finalResult.text);
+          await saveConversation(userId, agentId, messages, finalResult.text);
           console.log('✅ Conversation saved');
 
           // 🧠 Extract and store memories from conversation (non-blocking)
-          extractAndStoreMemories(user.id, workspaceId, agentId, userInput, finalResult.text, finalResult.toolResults)
+          extractAndStoreMemories(userId, workspaceId, agentId, userInput, finalResult.text, finalResult.toolResults)
             .catch(err => console.warn('⚠️ Memory extraction failed:', err));
 
           // Log usage and debit credits (non-blocking)
@@ -3699,7 +3698,7 @@ serve(async (req) => {
             })) || [];
 
             logAgentUsage(
-              user.id,
+              userId,
               workspaceId,
               agentId,
               finalResult.usage,

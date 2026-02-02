@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -10,6 +11,10 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 /**
  * CRM Users API
  * Handles user management operations: list, get, update, delete
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): Requires admin role
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -22,45 +27,21 @@ Deno.serve(async (req) => {
     const method = req.method;
     const path = url.pathname.replace('/crm-users-api', '').split('/').filter(Boolean);
 
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Authenticate request - admin only
+    const auth = await authenticate(req, {
+      allowedRoles: ['admin'],
+    });
+
+    // Secret key bypasses role check
+    if (!auth.success && !isAdminAccess(auth)) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: corsHeaders },
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
+        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Verify user is admin
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders },
-      );
-    }
-
-    // Check if user is admin
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('role_id')
-      .eq('user_id', user.id)
-      .single();
-
-    const { data: adminRole } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', 'admin')
-      .single();
-
-    if (!userProfile || userProfile.role_id !== adminRole?.id) {
-      return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
-        { status: 403, headers: corsHeaders },
-      );
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     // GET /api/users - List all users
     if (method === 'GET' && path.length === 0) {

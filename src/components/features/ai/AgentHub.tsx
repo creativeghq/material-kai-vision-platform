@@ -23,18 +23,19 @@ import {
   ThumbsUp,
   ThumbsDown,
   Trash2,
+  Lightbulb,
 } from 'lucide-react';
 import { logger } from '@/config';
 
 import { Button } from '@/components/core/ui/button';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/core/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { agentChatHistoryService, ChatConversation } from '@/services/agents/agentChatHistoryService';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
@@ -63,7 +64,7 @@ interface AgentDefinition {
 const AGENTS: AgentDefinition[] = [
   {
     id: 'search',
-    name: 'Search Agent',
+    name: 'Search',
     description: 'Material search and discovery',
     icon: Search,
     color: 'text-blue-500',
@@ -71,67 +72,30 @@ const AGENTS: AgentDefinition[] = [
     available: true,
   },
   {
-    id: 'research',
-    name: 'Research Agent',
-    description: 'Deep research and analysis',
-    icon: Bot,
-    color: 'text-purple-500',
+    id: 'insights',
+    name: 'Insights',
+    description: 'Research, analytics, business & product intelligence',
+    icon: Lightbulb,
+    color: 'text-amber-500',
     requiredRole: 'admin',
     available: true,
   },
   {
-    id: 'analytics',
-    name: 'Analytics Agent',
-    description: 'Data analysis and insights',
-    icon: BarChart3,
-    color: 'text-green-500',
-    requiredRole: 'admin',
-    available: true,
-  },
-  {
-    id: 'business',
-    name: 'Business Agent',
-    description: 'Business intelligence',
-    icon: Briefcase,
-    color: 'text-orange-500',
-    requiredRole: 'admin',
-    available: true,
-  },
-  {
-    id: 'product',
-    name: 'Product Agent',
-    description: 'Product management',
-    icon: Package,
-    color: 'text-pink-500',
-    requiredRole: 'admin',
-    available: true,
-  },
-  {
-    id: 'admin',
-    name: 'Admin Agent',
-    description: 'System administration',
-    icon: Settings,
-    color: 'text-red-500',
-    requiredRole: 'owner',
+    id: 'interior-designer',
+    name: 'Interior',
+    description: 'AI-powered interior design with 3D generation',
+    icon: Sparkles,
+    color: 'text-violet-500',
+    requiredRole: 'member',
     available: true,
   },
   {
     id: 'demo',
-    name: 'Demo Agent',
+    name: 'Demo',
     description: 'Platform showcase demos',
     icon: Package,
     color: 'text-cyan-500',
     requiredRole: 'admin',
-    available: true,
-  },
-  // REMOVED: 'pdf-processor' agent - PDF processing moved to /admin/data-import page
-  {
-    id: 'interior-designer',
-    name: 'Interior Agent',
-    description: 'AI-powered interior design with 3D generation and material matching',
-    icon: Sparkles,
-    color: 'text-violet-500',
-    requiredRole: 'member',
     available: true,
   },
 ];
@@ -1125,39 +1089,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             </div>
           </div>
 
-          {/* Admin Controls */}
-          {(userRole === 'admin' || userRole === 'owner') && (
-            <div className="flex items-center gap-3">
-              {/* Agent Selection */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">Agent:</label>
-                <Select value={selectedAgent} onValueChange={setSelectedAgent}>
-                  <SelectTrigger className="w-[180px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableAgents.map((agent) => {
-                      const Icon = agent.icon;
-                      return (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          <div className="flex items-center gap-2">
-                            <Icon className={`h-4 w-4 ${agent.color}`} />
-                            <span>{agent.name}</span>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-
-
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Settings className="h-4 w-4" />
-              </Button>
+          {/* Agent Icon Selector - Available to all users */}
+          <TooltipProvider delayDuration={200}>
+            <div className="flex items-center gap-1.5 p-1 rounded-full bg-white/10 backdrop-blur-sm">
+              {availableAgents.map((agent) => {
+                const Icon = agent.icon;
+                const isActive = selectedAgent === agent.id;
+                return (
+                  <Tooltip key={agent.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setSelectedAgent(agent.id)}
+                        className={cn(
+                          'p-2.5 rounded-full transition-all duration-200 ease-out',
+                          isActive
+                            ? 'bg-primary text-primary-foreground shadow-lg scale-110 ring-2 ring-primary/30'
+                            : 'hover:bg-white/20 text-muted-foreground hover:text-foreground hover:scale-105'
+                        )}
+                      >
+                        <Icon className={cn('h-5 w-5', isActive && agent.color)} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[200px]">
+                      <p className="font-semibold">{agent.name}</p>
+                      <p className="text-xs text-muted-foreground">{agent.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
             </div>
-          )}
+          </TooltipProvider>
         </div>
 
         {/* Messages Area */}

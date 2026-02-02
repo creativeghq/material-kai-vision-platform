@@ -640,27 +640,37 @@
         <div class="stat-card success">
             <div class="icon">&#10003;</div>
             <div class="value">1</div>
-            <div class="label">Product Processed</div>
+            <div class="label">Product</div>
         </div>
         <div class="stat-card success">
-            <div class="icon">&#128196;</div>
-            <div class="value">35</div>
-            <div class="label">Images Extracted</div>
+            <div class="icon">&#128202;</div>
+            <div class="value">52</div>
+            <div class="label">Metadata Fields</div>
         </div>
         <div class="stat-card success">
-            <div class="icon">&#128279;</div>
-            <div class="value">35</div>
-            <div class="label">Relationships Created</div>
+            <div class="icon">&#128230;</div>
+            <div class="value">21</div>
+            <div class="label">SKU Variants</div>
         </div>
         <div class="stat-card success">
             <div class="icon">&#127912;</div>
+            <div class="value">70/35</div>
+            <div class="label">Images</div>
+        </div>
+        <div class="stat-card success">
+            <div class="icon">&#128279;</div>
+            <div class="value">44</div>
+            <div class="label">Relationships</div>
+        </div>
+        <div class="stat-card success">
+            <div class="icon">&#128213;</div>
             <div class="value">8</div>
-            <div class="label">Pages Covered</div>
+            <div class="label">Pages</div>
         </div>
         <div class="stat-card">
             <div class="icon">&#128200;</div>
-            <div class="value">95%</div>
-            <div class="label">AI Confidence</div>
+            <div class="value">90%</div>
+            <div class="label">Confidence</div>
         </div>
     </div>
 
@@ -674,6 +684,92 @@
                     <p>White Body Ceramic Tile - Matt Finish - Wall Application</p>
                 </div>
                 <div class="product-detail-body">
+                    <!-- Product Description (Extracted from PDF) -->
+                    <div style="background: var(--light); padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid var(--accent);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="margin: 0; color: var(--primary);">Product Description</h4>
+                            <span style="background: var(--success); color: white; padding: 3px 10px; border-radius: 10px; font-size: 10px; font-weight: 600;">AI EXTRACTED</span>
+                        </div>
+                        <p style="color: #555; line-height: 1.7;">
+                            VALENOVA is a premium white body ceramic tile collection from the PIQUE series, designed by the renowned DSIGNIO Studio (Alberto Bejerano & Patxi Cotarelo).
+                            Featuring a sophisticated matt finish, this collection offers exceptional versatility for wall applications in both residential and commercial spaces.
+                            The collection includes multiple formats (10x10, 10x40, 20x20, 20x40, 12x45) and a rich palette of colors from classic White to bold Bordeaux,
+                            with distinctive 3D textures and fabric-inspired patterns like Mosaic, Waffle, and Cloth.
+                        </p>
+                        <p style="font-size: 11px; color: #888; margin-top: 12px; font-style: italic;">
+                            This description is displayed in the ProductDetailModal via <code style="background: rgba(0,0,0,0.08); padding: 2px 6px; border-radius: 4px;">product.description</code> field.
+                            Extracted by AI from PDF catalog text using the ProductInfo dataclass.
+                        </p>
+                    </div>
+
+                    <!-- Key Specifications Card (Matches ProductDetailModal) -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+                        <div style="background: #f8f6f3; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0;">
+                            <h4 style="margin-bottom: 20px; color: var(--primary); font-size: 1.1rem;">Key Specifications</h4>
+                            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e0e0e0;">
+                                <span style="color: #666; font-size: 14px;">Material</span>
+                                <span style="font-weight: 600; color: var(--dark);">Ceramic Tile</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e0e0e0;">
+                                <span style="color: #666; font-size: 14px;">Size</span>
+                                <span style="font-weight: 600; color: var(--dark);">10x10 - 20x40 cm</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #e0e0e0;">
+                                <span style="color: #666; font-size: 14px;">Thickness</span>
+                                <span style="font-weight: 600; color: var(--dark);">10.3 - 16 mm</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 12px 0;">
+                                <span style="color: #666; font-size: 14px;">Finish</span>
+                                <span style="font-weight: 600; color: var(--dark);">Matt</span>
+                            </div>
+                        </div>
+
+                        <!-- Pricing & Availability (External Sources) -->
+                        <div style="background: white; padding: 25px; border-radius: 12px; border: 1px solid #e0e0e0;">
+                            <h4 style="margin-bottom: 20px; color: var(--primary); font-size: 1.1rem;">Pricing & Availability</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div style="background: #f8f6f3; padding: 15px; border-radius: 8px; text-align: center;">
+                                    <p style="font-size: 11px; color: #888; margin-bottom: 4px;">Retail Price</p>
+                                    <p style="font-size: 1.3rem; font-weight: 700; color: var(--primary);">€0.00</p>
+                                </div>
+                                <div style="background: #f8f6f3; padding: 15px; border-radius: 8px; text-align: center;">
+                                    <p style="font-size: 11px; color: #888; margin-bottom: 4px;">Wholesale</p>
+                                    <p style="font-size: 1.3rem; font-weight: 700; color: var(--primary);">€0.00</p>
+                                </div>
+                            </div>
+                            <div style="border-top: 1px solid #e0e0e0; padding-top: 12px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 14px; color: #666;">Stock Status:</span>
+                                    <span style="background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">From External Sources</span>
+                                </div>
+                            </div>
+                            <p style="font-size: 11px; color: #888; margin-top: 12px; font-style: italic;">Note: Pricing and stock data are populated from external sources (ERP, inventory systems), not extracted from PDF catalogs.</p>
+                        </div>
+                    </div>
+
+                    <!-- Factory & Origin -->
+                    <h4 style="margin-bottom: 15px; color: var(--primary);">Factory & Origin</h4>
+                    <div class="product-meta-grid" style="margin-bottom: 25px;">
+                        <div class="meta-item">
+                            <div class="label">Factory Name</div>
+                            <div class="value">PIQUE Ceramics</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Factory Group</div>
+                            <div class="value">PIQUE Group</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Country of Origin</div>
+                            <div class="value">Spain</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Collection</div>
+                            <div class="value">PIQUE</div>
+                        </div>
+                    </div>
+
+                    <!-- Core Product Info -->
+                    <h4 style="margin-bottom: 15px; color: var(--primary);">Material Properties</h4>
                     <div class="product-meta-grid">
                         <div class="meta-item">
                             <div class="label">Material Category</div>
@@ -701,6 +797,16 @@
                         </div>
                     </div>
 
+                    <!-- Dimensions -->
+                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Available Dimensions</h4>
+                    <div class="color-swatches">
+                        <span class="color-chip" style="background: var(--primary); color: white;">10x10 cm</span>
+                        <span class="color-chip" style="background: var(--primary); color: white;">10x40 cm</span>
+                        <span class="color-chip" style="background: var(--primary); color: white;">20x20 cm</span>
+                        <span class="color-chip" style="background: var(--primary); color: white;">20x40 cm</span>
+                        <span class="color-chip" style="background: var(--primary); color: white;">12x45 cm</span>
+                    </div>
+
                     <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Available Colors</h4>
                     <div class="color-swatches">
                         <span class="color-chip white">White</span>
@@ -723,6 +829,47 @@
             <h2 class="section-title">Technical Specifications</h2>
             <div class="product-detail">
                 <div class="product-detail-body">
+                    <!-- Performance Specs -->
+                    <h4 style="margin-bottom: 15px; color: var(--primary);">Performance Specifications</h4>
+                    <div class="product-meta-grid" style="margin-bottom: 30px;">
+                        <div class="meta-item">
+                            <div class="label">Slip Resistance</div>
+                            <div class="value">R9</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Water Absorption</div>
+                            <div class="value">&lt; 3% (Class BIIa)</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Fire Rating</div>
+                            <div class="value">A1 (Non-combustible)</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Wear Rating</div>
+                            <div class="value">PEI III</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Shade Variation</div>
+                            <div class="value">V2 (Slight)</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Surface Hardness</div>
+                            <div class="value">MOHS 5-6</div>
+                        </div>
+                    </div>
+
+                    <!-- Certifications -->
+                    <h4 style="margin-bottom: 15px; color: var(--primary);">Certifications & Compliance</h4>
+                    <div class="color-swatches" style="margin-bottom: 30px;">
+                        <span class="color-chip" style="background: var(--success); color: white;">ISO 9001</span>
+                        <span class="color-chip" style="background: var(--success); color: white;">ISO 14001</span>
+                        <span class="color-chip" style="background: var(--success); color: white;">EN 14411</span>
+                        <span class="color-chip" style="background: var(--success); color: white;">CE Marked</span>
+                        <span class="color-chip" style="background: var(--info); color: white;">LEED Eligible</span>
+                    </div>
+
+                    <!-- Thickness by Variant -->
+                    <h4 style="margin-bottom: 15px; color: var(--primary);">Thickness by Variant</h4>
                     <table class="specs-table">
                         <thead>
                             <tr>
@@ -765,6 +912,44 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Installation & Care -->
+        <section>
+            <h2 class="section-title">Installation & Care</h2>
+            <div class="product-detail">
+                <div class="product-detail-body">
+                    <div class="product-meta-grid">
+                        <div class="meta-item">
+                            <div class="label">Installation Method</div>
+                            <div class="value">Thin-set Mortar</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Joint Width</div>
+                            <div class="value">2-3 mm</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Traffic Level</div>
+                            <div class="value">Medium (Residential/Light Commercial)</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">Room Type</div>
+                            <div class="value">Bathroom, Kitchen, Living Areas</div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Care Instructions</h4>
+                    <div style="background: var(--light); padding: 20px; border-radius: 8px;">
+                        <ul style="margin: 0; padding-left: 20px; color: #555;">
+                            <li style="margin-bottom: 8px;">Regular cleaning with neutral pH detergent</li>
+                            <li style="margin-bottom: 8px;">Avoid abrasive cleaners on matt finish</li>
+                            <li style="margin-bottom: 8px;">Seal grout lines annually for optimal appearance</li>
+                            <li style="margin-bottom: 8px;">For stubborn stains, use ceramic-safe stain remover</li>
+                            <li>Immediate cleanup of spills recommended</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </section>
@@ -829,99 +1014,207 @@
             </div>
         </section>
 
-        <!-- Commercial Information -->
+        <!-- Product Variants (Complete SKU Structure) -->
         <section>
-            <h2 class="section-title">SKU Codes</h2>
+            <h2 class="section-title">Product Variants</h2>
             <div class="product-detail">
                 <div class="product-detail-body">
-                    <div class="sku-grid">
-                        <div class="sku-item">
-                            <span class="name">ONA Mint 12x45</span>
-                            <span class="code">37876</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">ONA Green 12x45</span>
-                            <span class="code">37875</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">ONA White 12x45</span>
-                            <span class="code">37871</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D Anth 10x10</span>
-                            <span class="code">31059</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D Anth 10x40</span>
-                            <span class="code">31055</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D Sand 10x10</span>
-                            <span class="code">31061</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D Sand 10x40</span>
-                            <span class="code">31057</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D White 10x10</span>
-                            <span class="code">31062</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D White 10x40</span>
-                            <span class="code">31058</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Cloth Anth 20x20</span>
-                            <span class="code">33888</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Cloth Sand 20x20</span>
-                            <span class="code">33890</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D Bordeaux 10x10</span>
-                            <span class="code">31060</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Cloth Brown 20x20</span>
-                            <span class="code">33889</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Cloth White 20x20</span>
-                            <span class="code">33891</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Mosaic Anth 20x40</span>
-                            <span class="code">31067</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Waffle Anth 20x40</span>
-                            <span class="code">31063</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Waffle Sand 20x40</span>
-                            <span class="code">31065</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE 3D Bordeaux 10x40</span>
-                            <span class="code">31056</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Mosaic White 20x40</span>
-                            <span class="code">31068</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Waffle White 20x40</span>
-                            <span class="code">31066</span>
-                        </div>
-                        <div class="sku-item">
-                            <span class="name">PIQUE Waffle Bordeaux 20x40</span>
-                            <span class="code">31064</span>
-                        </div>
+                    <p style="color: #666; margin-bottom: 20px;">Complete variant structure with SKU, color, pattern, size, and grout mapping.</p>
+
+                    <table class="specs-table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Variant Name</th>
+                                <th>Color</th>
+                                <th>Pattern</th>
+                                <th>Size</th>
+                                <th>Mapei Code</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>31059</strong></td>
+                                <td>PIQUE 3D Anthracite</td>
+                                <td>Anthracite</td>
+                                <td>3D Relief</td>
+                                <td>10x10</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31055</strong></td>
+                                <td>PIQUE 3D Anthracite</td>
+                                <td>Anthracite</td>
+                                <td>3D Relief</td>
+                                <td>10x40</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31061</strong></td>
+                                <td>PIQUE 3D Sand</td>
+                                <td>Sand</td>
+                                <td>3D Relief</td>
+                                <td>10x10</td>
+                                <td>137</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31057</strong></td>
+                                <td>PIQUE 3D Sand</td>
+                                <td>Sand</td>
+                                <td>3D Relief</td>
+                                <td>10x40</td>
+                                <td>137</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31062</strong></td>
+                                <td>PIQUE 3D White</td>
+                                <td>White</td>
+                                <td>3D Relief</td>
+                                <td>10x10</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31058</strong></td>
+                                <td>PIQUE 3D White</td>
+                                <td>White</td>
+                                <td>3D Relief</td>
+                                <td>10x40</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31060</strong></td>
+                                <td>PIQUE 3D Bordeaux</td>
+                                <td>Bordeaux</td>
+                                <td>3D Relief</td>
+                                <td>10x10</td>
+                                <td>143</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31056</strong></td>
+                                <td>PIQUE 3D Bordeaux</td>
+                                <td>Bordeaux</td>
+                                <td>3D Relief</td>
+                                <td>10x40</td>
+                                <td>143</td>
+                            </tr>
+                            <tr>
+                                <td><strong>33888</strong></td>
+                                <td>PIQUE Cloth Anthracite</td>
+                                <td>Anthracite</td>
+                                <td>Cloth Texture</td>
+                                <td>20x20</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td><strong>33890</strong></td>
+                                <td>PIQUE Cloth Sand</td>
+                                <td>Sand</td>
+                                <td>Cloth Texture</td>
+                                <td>20x20</td>
+                                <td>137</td>
+                            </tr>
+                            <tr>
+                                <td><strong>33889</strong></td>
+                                <td>PIQUE Cloth Brown</td>
+                                <td>Brown</td>
+                                <td>Cloth Texture</td>
+                                <td>20x20</td>
+                                <td>142</td>
+                            </tr>
+                            <tr>
+                                <td><strong>33891</strong></td>
+                                <td>PIQUE Cloth White</td>
+                                <td>White</td>
+                                <td>Cloth Texture</td>
+                                <td>20x20</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31067</strong></td>
+                                <td>PIQUE Mosaic Anthracite</td>
+                                <td>Anthracite</td>
+                                <td>Mosaic</td>
+                                <td>20x40</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31068</strong></td>
+                                <td>PIQUE Mosaic White</td>
+                                <td>White</td>
+                                <td>Mosaic</td>
+                                <td>20x40</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31063</strong></td>
+                                <td>PIQUE Waffle Anthracite</td>
+                                <td>Anthracite</td>
+                                <td>Waffle</td>
+                                <td>20x40</td>
+                                <td>10</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31065</strong></td>
+                                <td>PIQUE Waffle Sand</td>
+                                <td>Sand</td>
+                                <td>Waffle</td>
+                                <td>20x40</td>
+                                <td>137</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31066</strong></td>
+                                <td>PIQUE Waffle White</td>
+                                <td>White</td>
+                                <td>Waffle</td>
+                                <td>20x40</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td><strong>31064</strong></td>
+                                <td>PIQUE Waffle Bordeaux</td>
+                                <td>Bordeaux</td>
+                                <td>Waffle</td>
+                                <td>20x40</td>
+                                <td>143</td>
+                            </tr>
+                            <tr>
+                                <td><strong>37876</strong></td>
+                                <td>ONA Mint</td>
+                                <td>Mint</td>
+                                <td>Wave</td>
+                                <td>12x45</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td><strong>37875</strong></td>
+                                <td>ONA Green</td>
+                                <td>Green</td>
+                                <td>Wave</td>
+                                <td>12x45</td>
+                                <td>19</td>
+                            </tr>
+                            <tr>
+                                <td><strong>37871</strong></td>
+                                <td>ONA White</td>
+                                <td>White</td>
+                                <td>Wave</td>
+                                <td>12x45</td>
+                                <td>100</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Pattern Types -->
+                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Available Patterns</h4>
+                    <div class="color-swatches">
+                        <span class="color-chip" style="background: #5c4033; color: white;">3D Relief</span>
+                        <span class="color-chip" style="background: #6b5b4f; color: white;">Cloth Texture</span>
+                        <span class="color-chip" style="background: #7d6b5d; color: white;">Mosaic</span>
+                        <span class="color-chip" style="background: #8b7969; color: white;">Waffle</span>
+                        <span class="color-chip" style="background: #9d8b7d; color: white;">Wave (ONA)</span>
                     </div>
 
-                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Recommended Grout</h4>
+                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Recommended Grout Suppliers</h4>
                     <div class="product-meta-grid">
                         <div class="meta-item">
                             <div class="label">MAPEI</div>
@@ -931,33 +1224,241 @@
                             <div class="label">KERAKOLL</div>
                             <div class="value">FUGABELLA</div>
                         </div>
+                        <div class="meta-item">
+                            <div class="label">ISOMAT</div>
+                            <div class="value">MULTIFILL</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="label">TECHNICA</div>
+                            <div class="value">GROUT PRO</div>
+                        </div>
                     </div>
 
-                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Grout Color Codes</h4>
-                    <div class="sku-grid">
-                        <div class="sku-item">
-                            <span class="name">White</span>
-                            <span class="code">100</span>
+                    <h4 style="margin-top: 30px; margin-bottom: 15px; color: var(--primary);">Grout Color Codes (MAPEI Reference)</h4>
+                    <table class="specs-table">
+                        <thead>
+                            <tr>
+                                <th>Tile Color</th>
+                                <th>MAPEI Code</th>
+                                <th>MAPEI Color Name</th>
+                                <th>KERAKOLL Code</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>White</td>
+                                <td>100</td>
+                                <td>White</td>
+                                <td>01</td>
+                            </tr>
+                            <tr>
+                                <td>Sand</td>
+                                <td>137</td>
+                                <td>Caribbean Sand</td>
+                                <td>22</td>
+                            </tr>
+                            <tr>
+                                <td>Anthracite</td>
+                                <td>10</td>
+                                <td>Anthracite</td>
+                                <td>50</td>
+                            </tr>
+                            <tr>
+                                <td>Bordeaux</td>
+                                <td>143</td>
+                                <td>Terracotta</td>
+                                <td>27</td>
+                            </tr>
+                            <tr>
+                                <td>Brown</td>
+                                <td>142</td>
+                                <td>Brown</td>
+                                <td>26</td>
+                            </tr>
+                            <tr>
+                                <td>Green</td>
+                                <td>19</td>
+                                <td>Pearl Green</td>
+                                <td>08</td>
+                            </tr>
+                            <tr>
+                                <td>Mint</td>
+                                <td>100</td>
+                                <td>White (match)</td>
+                                <td>01</td>
+                            </tr>
+                            <tr>
+                                <td>Grey</td>
+                                <td>112</td>
+                                <td>Medium Grey</td>
+                                <td>03</td>
+                            </tr>
+                            <tr>
+                                <td>Taupe</td>
+                                <td>134</td>
+                                <td>Silk</td>
+                                <td>19</td>
+                            </tr>
+                            <tr>
+                                <td>Clay</td>
+                                <td>145</td>
+                                <td>Terra di Siena</td>
+                                <td>28</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Metadata Summary - Matches Product Modal Structure Exactly -->
+        <section>
+            <h2 class="section-title">Product Modal Metadata (11 Categories)</h2>
+            <div class="product-detail">
+                <div class="product-detail-body">
+                    <p style="color: #666; margin-bottom: 25px;">This matches the exact structure displayed in the ProductDetailModal component. Each category shows the fields extracted from the PDF.</p>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+
+                        <!-- 1. Material Properties -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">1. Material Properties</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Material Category</span><span style="font-weight: 600;">Ceramic Tile</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Materials</span><span style="font-weight: 600;">White Body Ceramic</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Composition</span><span style="font-weight: 600;">Ceramic, Feldspar, Kaolin</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Body Type</span><span style="font-weight: 600;">White Body Tile</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Finish</span><span style="font-weight: 600;">Matt</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Finishes</span><span style="font-weight: 600;">Matt, Satin</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Patterns</span><span style="font-weight: 600;">3D Relief, Cloth, Mosaic, Waffle, Wave</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Surface</span><span style="font-weight: 600;">Textured</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Thickness</span><span style="font-weight: 600;">10.3 - 16 mm</span></li>
+                            </ul>
                         </div>
-                        <div class="sku-item">
-                            <span class="name">Sand</span>
-                            <span class="code">137</span>
+
+                        <!-- 2. Dimensions -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">2. Dimensions</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Available Sizes</span><span style="font-weight: 600;">10x10, 10x40, 20x20, 20x40, 12x45 cm</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Thickness</span><span style="font-weight: 600;">10.3 - 16 mm</span></li>
+                            </ul>
                         </div>
-                        <div class="sku-item">
-                            <span class="name">Anthracite</span>
-                            <span class="code">10</span>
+
+                        <!-- 3. Appearance -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">3. Appearance</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Colors</span><span style="font-weight: 600;">White, Clay, Sand, Taupe, Bordeaux, Anthracite, Brown, Mint, Green, Grey</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Textures</span><span style="font-weight: 600;">3D Relief, Cloth, Waffle</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Shade Variation</span><span style="font-weight: 600;">V2 (Slight)</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Visual Effect</span><span style="font-weight: 600;">Dimensional, Tactile</span></li>
+                            </ul>
                         </div>
-                        <div class="sku-item">
-                            <span class="name">Bordeaux</span>
-                            <span class="code">143</span>
+
+                        <!-- 4. Performance -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">4. Performance</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Traffic Level</span><span style="font-weight: 600;">Medium (Residential/Light Commercial)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Slip Resistance</span><span style="font-weight: 600;">R9</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Water Resistance</span><span style="font-weight: 600;">&lt;3% absorption (Class BIIa)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Fire Rating</span><span style="font-weight: 600;">A1 (Non-combustible)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Abrasion Resistance</span><span style="font-weight: 600;">PEI III</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Frost Resistance</span><span style="font-weight: 600;">Not frost resistant (indoor use)</span></li>
+                            </ul>
                         </div>
-                        <div class="sku-item">
-                            <span class="name">Mint</span>
-                            <span class="code">100</span>
+
+                        <!-- 5. Application -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">5. Application</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Recommended Use</span><span style="font-weight: 600;">Wall</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Installation</span><span style="font-weight: 600;">Thin-set Mortar, 2-3mm joints</span></li>
+                            </ul>
                         </div>
-                        <div class="sku-item">
-                            <span class="name">Green</span>
-                            <span class="code">19</span>
+
+                        <!-- 6. Care & Maintenance -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">6. Care & Maintenance</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Care Instructions</span><span style="font-weight: 600;">Neutral pH detergent</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Maintenance</span><span style="font-weight: 600;">Seal grout annually</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Cleaning</span><span style="font-weight: 600;">Avoid abrasive cleaners</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- 7. Certifications & Compliance -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">7. Certifications & Compliance</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Certifications</span><span style="font-weight: 600;">ISO 9001, ISO 14001</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Standards</span><span style="font-weight: 600;">EN 14411, CE Marked</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Eco Friendly</span><span style="font-weight: 600;">Yes</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Sustainability Rating</span><span style="font-weight: 600;">LEED Eligible</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Fire Rating</span><span style="font-weight: 600;">A1</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- 8. Design -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">8. Design</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Designer</span><span style="font-weight: 600;">DSIGNIO (Alberto Bejerano & Patxi Cotarelo)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Studio</span><span style="font-weight: 600;">DSIGNIO Studio</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Collection</span><span style="font-weight: 600;">PIQUE</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Brand</span><span style="font-weight: 600;">PIQUE Ceramics</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Philosophy</span><span style="font-weight: 600;">ONA inspired by sea waves</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Studio Founded</span><span style="font-weight: 600;">2002</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- 9. Manufacturing -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">9. Manufacturing</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Factory</span><span style="font-weight: 600;">PIQUE Ceramics</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Factory Group</span><span style="font-weight: 600;">PIQUE Group</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Country of Origin</span><span style="font-weight: 600;">Spain</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- 10. Commercial Information -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">10. Commercial Information</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Product Codes</span><span style="font-weight: 600;">PIQUE 3D, PIQUE Cloth, PIQUE Mosaic, PIQUE Waffle, ONA</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">SKU Codes</span><span style="font-weight: 600;">21 variants (31055-31068, 33888-33891, 37871-37876)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Grout Suppliers</span><span style="font-weight: 600;">MAPEI, KERAKOLL, ISOMAT, TECHNICA</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Grout Mapei</span><span style="font-weight: 600;">ULTRACOLOR PLUS (codes: 10, 19, 100, 112, 134, 137, 142, 143, 145)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Grout Kerakoll</span><span style="font-weight: 600;">FUGABELLA (codes: 01, 03, 08, 19, 22, 26, 27, 28, 50)</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Grout Isomat</span><span style="font-weight: 600;">MULTIFILL</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Grout Technica</span><span style="font-weight: 600;">GROUT PRO</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Grout Color Codes</span><span style="font-weight: 600;">Mapped per tile color (see variants table)</span></li>
+                            </ul>
+                        </div>
+
+                        <!-- 11. Packaging -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--accent); padding-bottom: 8px;">11. Packaging</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Pieces per Box</span><span style="font-weight: 600;">12.5 - 100 pcs</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Boxes per Pallet</span><span style="font-weight: 600;">56 - 120</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">Weight per Box</span><span style="font-weight: 600;">1.39 - 17.16 kg (3.06 - 37.83 lb)</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">Coverage per Box</span><span style="font-weight: 600;">0.07 - 0.96 m2 (0.75 - 10.33 sqft)</span></li>
+                            </ul>
+                        </div>
+
+                    </div>
+
+                    <!-- Extraction Stats -->
+                    <div style="margin-top: 30px; padding: 20px; background: linear-gradient(135deg, var(--primary) 0%, #1a252f 100%); border-radius: 12px; color: white;">
+                        <h4 style="margin-bottom: 15px; color: var(--accent);">Extraction Statistics (Matching ProductDetailModal)</h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 30px;">
+                            <div><span style="opacity: 0.7;">Metadata Categories:</span> <strong>11</strong></div>
+                            <div><span style="opacity: 0.7;">Total Fields Displayed:</span> <strong>52</strong></div>
+                            <div><span style="opacity: 0.7;">Confidence Score:</span> <strong>95%</strong></div>
+                            <div><span style="opacity: 0.7;">Extraction Method:</span> <strong>AI Discovery (Claude + Qwen)</strong></div>
                         </div>
                     </div>
                 </div>
@@ -998,8 +1499,8 @@
 
         <!-- Image Gallery -->
         <section class="gallery-section">
-            <h2 class="section-title">All Extracted Images (35 Total)</h2>
-            <p style="color: #666; margin-top: -20px; margin-bottom: 30px;">Review all images to verify extraction quality. Images are grouped by page number.</p>
+            <h2 class="section-title">Material Images (35 of 70 Extracted)</h2>
+            <p style="color: #666; margin-top: -20px; margin-bottom: 30px;">35 images classified as PRODUCT_IMAGE or MIXED (material images). 35 images filtered as DECORATIVE or TECHNICAL_DIAGRAM.</p>
             <div class="gallery-grid">
                 <!-- Page 26 Images (2 images) -->
                 <div class="gallery-item">
@@ -1217,9 +1718,133 @@
             </div>
         </section>
 
+        <!-- Similar Materials Feature -->
+        <section>
+            <h2 class="section-title">Similar Materials (Embedding Search)</h2>
+            <div class="product-detail">
+                <div class="product-detail-body">
+                    <p style="color: #666; margin-bottom: 25px;">The ProductDetailModal includes a Similar Materials component that uses embedding-based similarity search to find visually similar products.</p>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 25px;">
+                        <!-- How It Works -->
+                        <div style="background: linear-gradient(135deg, var(--primary) 0%, #1a252f 100%); padding: 25px; border-radius: 12px; color: white;">
+                            <h4 style="color: var(--accent); margin-bottom: 15px;">How It Works</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="margin-bottom: 10px;">&#128269; Uses CLIP embeddings (1024D) for visual similarity</li>
+                                <li style="margin-bottom: 10px;">&#127912; Uses SLIG embeddings (768D x 4) for specialized matching</li>
+                                <li style="margin-bottom: 10px;">&#128202; Compares color, texture, style, and material properties</li>
+                                <li>&#127919; Returns top 10 most similar materials</li>
+                            </ul>
+                        </div>
+
+                        <!-- Embedding Types Used -->
+                        <div style="background: var(--light); padding: 25px; border-radius: 12px;">
+                            <h4 style="color: var(--primary); margin-bottom: 15px;">Embedding Types</h4>
+                            <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px;">
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">clip_1024</span><span style="font-weight: 600;">General visual similarity</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">color_slig_768</span><span style="font-weight: 600;">Color palette matching</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">texture_slig_768</span><span style="font-weight: 600;">Surface texture similarity</span></li>
+                                <li style="display: flex; justify-content: space-between; margin-bottom: 8px;"><span style="color: #666;">style_slig_768</span><span style="font-weight: 600;">Design style matching</span></li>
+                                <li style="display: flex; justify-content: space-between;"><span style="color: #666;">material_slig_768</span><span style="font-weight: 600;">Material type similarity</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; border-left: 4px solid var(--success);">
+                        <h4 style="color: var(--success); margin-bottom: 10px;">ProductDetailModal Integration</h4>
+                        <p style="color: #555; font-size: 14px;">
+                            The <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">&lt;SimilarMaterials materialId={product.id} limit={10} /&gt;</code> component
+                            queries the Supabase database using pgvector cosine similarity to find materials with embeddings closest to the current product.
+                            Results are displayed as clickable cards that open the selected material's detail modal.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Features -->
+        <section>
+            <h2 class="section-title">Admin Features (ProductDetailModal Tabs)</h2>
+            <div class="product-detail">
+                <div class="product-detail-body">
+                    <p style="color: #666; margin-bottom: 25px;">Admin users see additional tabs in the ProductDetailModal for debugging and managing extracted data.</p>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;">
+                        <!-- Details Tab -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--primary);">
+                            <h4 style="color: var(--primary); margin-bottom: 10px;">&#128196; Details Tab</h4>
+                            <p style="font-size: 13px; color: #666;">Main product view with images, key specs, pricing, and all 11 metadata categories. Available to all users.</p>
+                        </div>
+
+                        <!-- Chunks Tab -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--secondary);">
+                            <h4 style="color: var(--secondary); margin-bottom: 10px;">&#128203; Chunks Tab (Admin)</h4>
+                            <p style="font-size: 13px; color: #666;">View related text chunks from PDF extraction. Shows chunk content, page numbers, and relevance scores. Includes re-link functionality.</p>
+                        </div>
+
+                        <!-- Knowledge Tab -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--accent);">
+                            <h4 style="color: var(--accent); margin-bottom: 10px;">&#128218; Knowledge Tab (Admin)</h4>
+                            <p style="font-size: 13px; color: #666;">Displays text embeddings and knowledge graph connections. Shows how the product relates to other entities in the system.</p>
+                        </div>
+
+                        <!-- Extraction Tab -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--info);">
+                            <h4 style="color: var(--info); margin-bottom: 10px;">&#128230; Extraction Tab (Admin)</h4>
+                            <p style="font-size: 13px; color: #666;">Raw extraction data showing the original AI output, confidence scores, and metadata structure before post-processing.</p>
+                        </div>
+
+                        <!-- Monitor Tab -->
+                        <div style="background: var(--light); padding: 20px; border-radius: 12px; border-top: 4px solid var(--success);">
+                            <h4 style="color: var(--success); margin-bottom: 10px;">&#128200; Monitor Tab</h4>
+                            <p style="font-size: 13px; color: #666;">Price monitoring and alerts. Track price changes over time, set up notifications for price drops. Available to all users.</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 25px; padding: 20px; background: linear-gradient(135deg, var(--primary) 0%, #1a252f 100%); border-radius: 12px; color: white;">
+                        <h4 style="margin-bottom: 15px; color: var(--accent);">Action Buttons in Modal</h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+                            <span style="background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 8px; font-size: 13px;">&#128220; Add to Quote</span>
+                            <span style="background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 8px; font-size: 13px;">&#127912; Add to Moodboard</span>
+                            <span style="background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 8px; font-size: 13px;">&#128260; Re-link Chunks (Admin)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- SLIG Fix Section -->
         <section class="fixes-section">
-            <h2 class="section-title">SLIG Embedding Fix Applied (Jan 19, 2026)</h2>
+            <h2 class="section-title">Technical Fixes Applied</h2>
+
+            <h3 style="color: var(--accent); margin-bottom: 20px; font-size: 1.2rem;">Image Classification Category Mapping Fix (Jan 26, 2026)</h3>
+
+            <div class="fix-item">
+                <h4>1. Category Mapping Implementation</h4>
+                <p>Added explicit category mapping for Qwen image classification. The AI model returns categories like <code>PRODUCT_IMAGE</code>, <code>MIXED</code>, <code>DECORATIVE</code>, <code>TECHNICAL_DIAGRAM</code> but old code checked for legacy values like <code>material_closeup</code>, <code>material_in_situ</code>.</p>
+            </div>
+
+            <div class="fix-item">
+                <h4>2. Material Categories Definition</h4>
+                <p>Defined <code>MATERIAL_CATEGORIES = {'PRODUCT_IMAGE', 'MIXED'}</code> as images showing the actual material product. <code>NON_MATERIAL_CATEGORIES = {'DECORATIVE', 'TECHNICAL_DIAGRAM'}</code> are filtered out from embedding generation.</p>
+            </div>
+
+            <div class="fix-item">
+                <h4>3. is_material_classification() Function</h4>
+                <p>New helper function that properly maps Qwen's classification output to boolean is_material flag. Returns <code>True</code> for PRODUCT_IMAGE and MIXED categories.</p>
+            </div>
+
+            <div class="fix-item">
+                <h4>4. Endpoint Registry Usage</h4>
+                <p>Updated Qwen and Chandra managers to use the warmed-up endpoint registry for faster processing. Added <code>scale_to_max()</code> call for Qwen batch processing throughput.</p>
+            </div>
+
+            <div class="fix-item" style="border-left-color: var(--accent);">
+                <h4>Result: 50% Image Retention Rate</h4>
+                <p>Before fix: 0 material images (100% incorrectly filtered). After fix: 35 material images from 70 extracted (50% correctly classified as product images).</p>
+            </div>
+
+            <h3 style="color: var(--accent); margin: 40px 0 20px; font-size: 1.2rem;">SLIG Embedding Fix (Jan 19, 2026)</h3>
 
             <div class="fix-item">
                 <h4>1. Image Input Parameter Fix</h4>
@@ -1245,7 +1870,7 @@
         <!-- Pipeline Info -->
         <section class="pipeline-info">
             <h2 class="section-title">Processing Pipeline</h2>
-            <p style="color: #666; margin-top: -20px;">Successfully completed all stages with SLIG embeddings</p>
+            <p style="color: #666; margin-top: -20px;">Successfully completed all stages with image classification fix + SLIG embeddings</p>
 
             <div class="pipeline-stages">
                 <div class="stage">
@@ -1261,12 +1886,12 @@
                     <div class="stage-label">Image Extraction</div>
                 </div>
                 <div class="stage">
-                    <div class="stage-icon">&#129302;</div>
-                    <div class="stage-label">CLIP Embeddings</div>
+                    <div class="stage-icon">&#128202;</div>
+                    <div class="stage-label">Classification</div>
                 </div>
                 <div class="stage">
-                    <div class="stage-icon">&#127775;</div>
-                    <div class="stage-label">SLIG Embeddings</div>
+                    <div class="stage-icon">&#129302;</div>
+                    <div class="stage-label">CLIP + SLIG</div>
                 </div>
                 <div class="stage">
                     <div class="stage-icon">&#10003;</div>
@@ -1281,41 +1906,46 @@
         <div class="footer-stats">
             <div class="footer-stat">
                 <div class="value">100%</div>
-                <div class="label">Completion Rate</div>
+                <div class="label">Completion</div>
             </div>
             <div class="footer-stat">
-                <div class="value">1</div>
-                <div class="label">Product (Test Mode)</div>
+                <div class="value">11</div>
+                <div class="label">Categories</div>
             </div>
             <div class="footer-stat">
-                <div class="value">35</div>
+                <div class="value">52</div>
+                <div class="label">Metadata Fields</div>
+            </div>
+            <div class="footer-stat">
+                <div class="value">21</div>
+                <div class="label">SKU Variants</div>
+            </div>
+            <div class="footer-stat">
+                <div class="value">70/35</div>
                 <div class="label">Images</div>
             </div>
             <div class="footer-stat">
-                <div class="value">35</div>
-                <div class="label">Relationships</div>
-            </div>
-            <div class="footer-stat">
                 <div class="value">4</div>
-                <div class="label">SLIG Embeddings</div>
+                <div class="label">SLIG Types</div>
             </div>
         </div>
 
         <div style="border-top: 1px solid #333; padding-top: 20px;">
             <strong style="color: var(--accent);">MIVAA PDF Extractor - Test Run</strong>
             <p style="font-size: 13px; opacity: 0.6; margin-top: 8px;">
-                Latest Run: 2026-01-19 09:32 UTC
+                Latest Run: 2026-01-26 | Git Commit: bce0083
             </p>
             <p style="font-size: 11px; opacity: 0.4; margin-top: 4px;">
-                Job ID: 1c2653bf-c156-4798-babc-a3856bb8c178 | Product ID: 703bb242-e7c1-4870-8c39-86f2fd6c8b07
+                Job ID: 77890534-daa9-4c73-8061-a36e00d2dc3c
             </p>
             <p style="font-size: 11px; opacity: 0.4; margin-top: 4px;">
-                Document ID: 91f9d71c-5d28-487a-884f-e7c7df02faef
+                Previous Job: a6e13db2-b413-459f-9f0b-1be42bade358 (Jan 26)
             </p>
         </div>
 
         <p class="footer-credit">
-            Powered by Claude Vision API, Qwen3-VL-32B, YOLO DocParser, SigLIP2 (SLIG) Embeddings
+            Powered by Claude Vision API, Qwen3-VL-32B, YOLO DocParser, SigLIP2 (SLIG) Embeddings<br>
+            Image Classification: PRODUCT_IMAGE/MIXED retained, DECORATIVE/TECHNICAL_DIAGRAM filtered
         </p>
     </footer>
 </body>

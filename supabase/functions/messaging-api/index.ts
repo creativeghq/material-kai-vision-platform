@@ -5,15 +5,15 @@
  *
  * @see https://www.twilio.com/docs/messaging
  * @see https://www.twilio.com/docs/whatsapp
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 // =====================================================
 // Types
@@ -339,7 +339,7 @@ function normalizePhoneNumber(phone: string): string {
 // Main Handler
 // =====================================================
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -350,18 +350,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
+      throw new Error(auth.error || 'Unauthorized');
     }
 
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (userError || !user) {
-      throw new Error('Unauthorized');
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     // Get Twilio credentials from environment
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');

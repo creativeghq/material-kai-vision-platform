@@ -106,6 +106,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
               <li>Products & Materials Catalog (products, visual analysis)</li>
               <li>Document Data (chunks, embeddings, images, documents)</li>
               <li>YOLO Layout Data (layout regions, extracted tables)</li>
+              <li>VECS Vector Collections (visual, color, texture, style, material embeddings)</li>
               <li>Processing Results & Quality Data</li>
               <li>Web Scraping (sessions, pages, temp materials)</li>
               <li>Data Import (jobs, history)</li>

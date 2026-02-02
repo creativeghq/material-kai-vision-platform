@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -110,40 +111,21 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Authenticate request - requires admin or manager role
+    // Secret key bypasses role check
+    const auth = await authenticate(req, {
+      allowedRoles: ['admin', 'manager'],
+    });
+
+    if (!auth.success && !isAdminAccess(auth)) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
+        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Verify user is authenticated and is admin
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    // Check if user is admin (level 5) or manager (level 4+)
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('role_id, roles(name, level)')
-      .eq('user_id', user.id)
-      .single();
-
-    // Check if user has admin or manager role (level >= 4)
-    if (!userProfile || !userProfile.roles || userProfile.roles.level < 4) {
-      return new Response(
-        JSON.stringify({ error: 'Admin or Manager access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     const body = await req.json();
     if (!body.confirm) {

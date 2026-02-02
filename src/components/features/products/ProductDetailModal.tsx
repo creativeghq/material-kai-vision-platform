@@ -446,14 +446,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Traffic Level': extractValue(applicationData?.traffic_level),
     'Slip Resistance': extractValue(materialPropsData?.slip_resistance) || extractValue(performanceData?.slip_resistance),
     'Water Resistance': extractValue(materialPropsData?.water_resistance) || extractValue(performanceData?.water_resistance),
+    'Water Absorption': extractValue(performanceData?.water_absorption) || extractValue(materialPropsData?.water_absorption),
     'Fire Rating': extractValue(materialPropsData?.fire_rating) || extractValue(performanceData?.fire_rating),
     'Abrasion Resistance': extractValue(performanceData?.abrasion_resistance),
+    'Wear Rating': extractValue(performanceData?.wear_rating) || extractValue(materialPropsData?.wear_rating),
+    'Surface Hardness': extractValue(performanceData?.surface_hardness) || extractValue(materialPropsData?.surface_hardness),
     'Frost Resistance': extractValue(performanceData?.frost_resistance),
   };
 
   const application = {
     'Recommended Use': extractValue(applicationData?.recommended_use) || extractValue(allData?.applications),
-    'Installation': extractValue(applicationData?.installation),
+    'Installation Method': extractValue(applicationData?.installation_method) || extractValue(applicationData?.installation),
+    'Joint Width': extractValue(applicationData?.joint_width) || extractValue(allData?.joint_width),
+    'Room Type': extractValue(applicationData?.room_type) || extractValue(applicationData?.suitable_rooms) || extractValue(allData?.room_type),
   };
 
   const design = {
@@ -496,9 +501,120 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const packaging = {
     'Pieces per Box': extractValue(packagingData?.pieces_per_box),
     'Boxes per Pallet': extractValue(packagingData?.boxes_per_pallet),
-    'Weight per Box': extractValue(packagingData?.weight_per_box),
-    'Coverage per Box': extractValue(packagingData?.coverage_per_box),
+    'Weight per Box (kg)': extractValue(packagingData?.weight_per_box) || extractValue(packagingData?.weight_kg),
+    'Weight per Box (lb)': extractValue(packagingData?.weight_per_box_lb) || extractValue(packagingData?.weight_lb),
+    'Coverage per Box (m²)': extractValue(packagingData?.coverage_per_box) || extractValue(packagingData?.coverage_m2),
+    'Coverage per Box (sqft)': extractValue(packagingData?.coverage_per_box_sqft) || extractValue(packagingData?.coverage_sqft),
   };
+
+  // Extract product variants from SKU codes and commercial data
+  const extractVariants = (): Array<{
+    sku: string;
+    name: string;
+    color: string;
+    pattern: string;
+    size: string;
+    groutCode: string;
+  }> => {
+    const variants: Array<{
+      sku: string;
+      name: string;
+      color: string;
+      pattern: string;
+      size: string;
+      groutCode: string;
+    }> = [];
+
+    // Try to get variants from sku_codes object
+    const skuCodes = commercialData?.sku_codes;
+    if (skuCodes) {
+      const skuObj = typeof skuCodes === 'object' && 'value' in skuCodes
+        ? skuCodes.value as Record<string, unknown>
+        : skuCodes as Record<string, unknown>;
+
+      if (typeof skuObj === 'object' && skuObj !== null) {
+        Object.entries(skuObj).forEach(([key, value]) => {
+          // Parse variant info from key (e.g., "pique_3d_anth_10x10" or "ona_mint_12x45")
+          const parts = key.toLowerCase().split('_');
+
+          // Extract size (look for pattern like "10x10", "20x40")
+          const sizeMatch = key.match(/(\d+)x(\d+)/i);
+          const size = sizeMatch ? `${sizeMatch[1]}x${sizeMatch[2]}` : '';
+
+          // Extract color (common colors to look for)
+          const colorKeywords = ['white', 'clay', 'sand', 'taupe', 'bordeaux', 'anthracite', 'anth', 'brown', 'mint', 'green', 'grey', 'gray'];
+          let color = '';
+          for (const colorKey of colorKeywords) {
+            if (parts.includes(colorKey)) {
+              color = colorKey === 'anth' ? 'Anthracite' : colorKey.charAt(0).toUpperCase() + colorKey.slice(1);
+              break;
+            }
+          }
+
+          // Extract pattern
+          const patternKeywords = ['3d', 'cloth', 'mosaic', 'waffle', 'wave'];
+          let pattern = '';
+          for (const patternKey of patternKeywords) {
+            if (parts.includes(patternKey)) {
+              pattern = patternKey === '3d' ? '3D Relief' : patternKey.charAt(0).toUpperCase() + patternKey.slice(1);
+              break;
+            }
+          }
+
+          // Build variant name
+          const productName = parts.filter(p =>
+            !colorKeywords.includes(p) &&
+            !patternKeywords.includes(p) &&
+            !p.match(/\d+x\d+/)
+          ).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+
+          const variantName = [productName, pattern, color].filter(Boolean).join(' ').trim();
+
+          // Get grout code from commercial data if available
+          let groutCode = '';
+          const groutMapei = commercialData?.grout_mapei;
+          if (groutMapei && typeof groutMapei === 'object' && 'value' in groutMapei) {
+            const groutObj = groutMapei.value as Record<string, unknown>;
+            if (typeof groutObj === 'object' && groutObj !== null) {
+              // Try to match by color
+              const colorLower = color.toLowerCase();
+              if (groutObj[colorLower]) {
+                groutCode = String(groutObj[colorLower]);
+              }
+            }
+          }
+
+          variants.push({
+            sku: String(value),
+            name: variantName || key,
+            color: color || '-',
+            pattern: pattern || '-',
+            size: size || '-',
+            groutCode: groutCode || '-',
+          });
+        });
+      }
+    }
+
+    // Also try to get from variants array if exists
+    const variantsArray = allData?.variants || commercialData?.variants;
+    if (Array.isArray(variantsArray)) {
+      variantsArray.forEach((v: any) => {
+        variants.push({
+          sku: extractValue(v.sku) || extractValue(v.sku_code) || '-',
+          name: extractValue(v.name) || extractValue(v.variant_name) || '-',
+          color: extractValue(v.color) || '-',
+          pattern: extractValue(v.pattern) || '-',
+          size: extractValue(v.size) || extractValue(v.dimensions) || '-',
+          groutCode: extractValue(v.grout_code) || extractValue(v.mapei_code) || '-',
+        });
+      });
+    }
+
+    return variants;
+  };
+
+  const productVariants = extractVariants();
 
   // Extract compliance data
   const complianceData = allData?.compliance || {};
@@ -582,6 +698,75 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </p>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  // Helper function to render product variants table
+  const renderVariantsTable = () => {
+    if (productVariants.length === 0) return null;
+
+    return (
+      <Card className="bg-white border-gray-200">
+        <CardHeader className="bg-gray-50 border-b border-gray-200 py-3">
+          <CardTitle className="text-base font-bold text-gray-900">
+            Product Variants ({productVariants.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">SKU</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Variant Name</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Color</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Pattern</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Size</th>
+                  <th className="text-left py-3 px-4 font-semibold text-gray-700 bg-gray-50">Mapei Code</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productVariants.map((variant, index) => (
+                  <tr
+                    key={`${variant.sku}-${index}`}
+                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                      index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'
+                    }`}
+                  >
+                    <td className="py-3 px-4 font-mono font-bold text-gray-900">{variant.sku}</td>
+                    <td className="py-3 px-4 text-gray-800">{variant.name}</td>
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="w-3 h-3 rounded-full border border-gray-300"
+                          style={{
+                            backgroundColor:
+                              variant.color.toLowerCase() === 'white' ? '#f5f5f5' :
+                              variant.color.toLowerCase() === 'anthracite' ? '#424242' :
+                              variant.color.toLowerCase() === 'sand' ? '#c2b280' :
+                              variant.color.toLowerCase() === 'bordeaux' ? '#800020' :
+                              variant.color.toLowerCase() === 'brown' ? '#795548' :
+                              variant.color.toLowerCase() === 'mint' ? '#98ff98' :
+                              variant.color.toLowerCase() === 'green' ? '#4caf50' :
+                              variant.color.toLowerCase() === 'grey' || variant.color.toLowerCase() === 'gray' ? '#9e9e9e' :
+                              variant.color.toLowerCase() === 'taupe' ? '#8b8589' :
+                              variant.color.toLowerCase() === 'clay' ? '#b5651d' :
+                              '#e0e0e0'
+                          }}
+                        />
+                        {variant.color}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-gray-700">{variant.pattern}</td>
+                    <td className="py-3 px-4 text-gray-700">{variant.size}</td>
+                    <td className="py-3 px-4 font-mono text-gray-600">{variant.groutCode}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
@@ -838,6 +1023,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {renderMetadataCategory('Manufacturing', manufacturing)}
           {renderMetadataCategory('Commercial Information', commercial)}
           {renderMetadataCategory('Packaging', packaging)}
+          {renderVariantsTable()}
         </div>
 
         {/* Similar Materials Section */}

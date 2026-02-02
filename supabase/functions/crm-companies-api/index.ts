@@ -1,37 +1,42 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
-serve(async (req) => {
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+/**
+ * CRM Companies API
+ * Handles company management: create, list, update, delete
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): Requires admin/manager/factory role
+ */
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      },
-    );
+    // Authenticate request
+    const auth = await authenticate(req, {
+      allowedRoles: ['admin', 'manager', 'factory'],
+    });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    // Secret key bypasses role check
+    if (!auth.success && !isAdminAccess(auth)) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders },
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
+        { status: auth.error?.includes('Required roles') ? 403 : 401, headers: corsHeaders },
       );
     }
+
+    const user = auth.user;
+    const userId = auth.userId;
 
     const url = new URL(req.url);
     const path = url.pathname.replace('/crm-companies-api', '').split('/').filter(Boolean);

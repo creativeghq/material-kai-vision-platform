@@ -1,17 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 interface SessionManagerRequest {
   sessionId: string;
   action: 'start' | 'pause' | 'resume' | 'stop';
 }
 
+/**
+ * Scrape Session Manager
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
+ */
 Deno.serve(async (req) => {
   console.log(`Session manager called - Method: ${req.method}`);
 
@@ -50,17 +53,15 @@ Deno.serve(async (req) => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Get auth info
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header found');
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
+      throw new Error(auth.error || 'Authentication failed');
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      throw new Error('Authentication failed');
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     switch (action) {
       case 'start':

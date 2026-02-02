@@ -1,10 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
-};
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 interface PriceMonitoringRequest {
   action: 'start_monitoring' | 'stop_monitoring' | 'check_now' | 'get_status';
@@ -23,6 +19,13 @@ interface CompetitorSource {
   is_active: boolean;
 }
 
+/**
+ * Price Monitoring API
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
+ */
 Deno.serve(async (req) => {
   console.log(`Price monitoring function called - Method: ${req.method}`);
 
@@ -32,12 +35,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
-
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -48,13 +45,15 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Get user from JWT
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
-    
-    if (userError || !user) {
-      throw new Error('Invalid authentication token');
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
+      throw new Error(auth.error || 'Authentication failed');
     }
+
+    const user = auth.user;
+    const userId = auth.userId;
 
     // Parse request body
     const body: PriceMonitoringRequest = await req.json();
@@ -65,16 +64,16 @@ Deno.serve(async (req) => {
     // Route to appropriate handler
     switch (action) {
       case 'start_monitoring':
-        return await startMonitoring(supabase, user.id, productId, monitoringSettings);
+        return await startMonitoring(supabase, userId, productId, monitoringSettings);
       
       case 'stop_monitoring':
-        return await stopMonitoring(supabase, user.id, productId);
+        return await stopMonitoring(supabase, userId, productId);
       
       case 'check_now':
-        return await checkNow(supabase, user.id, productId);
+        return await checkNow(supabase, userId, productId);
       
       case 'get_status':
-        return await getStatus(supabase, user.id, productId);
+        return await getStatus(supabase, userId, productId);
       
       default:
         throw new Error(`Unknown action: ${action}`);

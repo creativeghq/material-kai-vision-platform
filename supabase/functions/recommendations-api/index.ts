@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -10,13 +11,17 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 /**
  * Recommendations API
  * Handles collaborative filtering recommendations and interaction tracking
- * 
+ *
  * Endpoints:
  * - POST /track-interaction - Track user interaction with material
  * - GET /for-user/{user_id} - Get recommendations for user
  * - GET /similar-materials/{material_id} - Get similar materials
  * - GET /analytics/{workspace_id} - Get recommendation analytics
  * - DELETE /cache - Invalidate recommendation cache
+ *
+ * Authentication:
+ * - Secret key (apikey header): Full admin access
+ * - User JWT (Authorization header): User-specific operations
  */
 Deno.serve(async (req) => {
   // Handle CORS
@@ -29,25 +34,18 @@ Deno.serve(async (req) => {
     const method = req.method;
     const path = url.pathname.replace('/recommendations-api', '').split('/').filter(Boolean);
 
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Authenticate request
+    const auth = await authenticate(req);
+
+    if (!auth.success) {
       return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
+        JSON.stringify({ error: auth.error || 'Unauthorized' }),
         { status: 401, headers: corsHeaders },
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
-
-    // Verify user
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: corsHeaders },
-      );
-    }
+    const user = auth.user;
+    const userId = auth.userId;
 
     // ========================================================================
     // POST /track-interaction - Track user interaction with material
