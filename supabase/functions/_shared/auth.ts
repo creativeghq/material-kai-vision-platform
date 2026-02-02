@@ -2,19 +2,12 @@ import { createClient, SupabaseClient, User } from '@supabase/supabase-js';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
-// New API key format support (optional - set in Supabase dashboard > Project Settings > API)
-const supabaseSecretKey = Deno.env.get('SUPABASE_SECRET_KEY') || '';
-const supabasePublishableKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || '';
-
-// Supabase provides these keys automatically:
-// - SUPABASE_SERVICE_ROLE_KEY = legacy secret key (elevated privileges, bypasses RLS)
-// - SUPABASE_ANON_KEY = legacy publishable/anon key (low privileges, respects RLS)
-//
-// New key format (optional):
-// - SUPABASE_SECRET_KEY = new format secret key (sb_secret_...)
-// - SUPABASE_PUBLISHABLE_KEY = new format publishable key (sb_publishable_...)
+// New API key format (set in Supabase dashboard > Project Settings > Edge Functions > Secrets)
+// API_SECRET_KEY = sb_secret_... (for server-to-server admin access)
+// API_PUBLISHABLE_KEY = sb_publishable_... (for client access)
+const supabaseSecretKey = Deno.env.get('API_SECRET_KEY') || '';
+const supabasePublishableKey = Deno.env.get('API_PUBLISHABLE_KEY') || '';
 
 export type AuthLevel = 'secret' | 'user' | 'anon' | 'none';
 
@@ -67,14 +60,10 @@ export async function authenticate(
   const apiKey = req.headers.get('apikey') || req.headers.get('x-api-key');
   const authHeader = req.headers.get('Authorization');
 
-  // Check for secret/service role key (full admin access)
+  // Check for secret key (full admin access, bypasses RLS)
   if (apiKey) {
-    // Service role key = secret key (provided by Supabase, bypasses RLS)
-    // Supports both legacy JWT format and new sb_secret_... format
-    const isSecretKey =
-      apiKey === supabaseServiceKey ||
-      (supabaseSecretKey && apiKey === supabaseSecretKey) ||
-      apiKey.startsWith('sb_secret_');
+    // Secret key check - must match configured SUPABASE_SECRET_KEY
+    const isSecretKey = supabaseSecretKey && apiKey === supabaseSecretKey;
 
     if (isSecretKey) {
       return {
@@ -87,12 +76,9 @@ export async function authenticate(
       };
     }
 
-    // Check for publishable/anon key (client access)
-    // Supports both new format (sb_publishable_...) and legacy JWT format
-    const isPublishableKey =
-      apiKey === supabaseAnonKey ||
-      (supabasePublishableKey && apiKey === supabasePublishableKey) ||
-      apiKey.startsWith('sb_publishable_');
+    // Check for publishable key (client access)
+    // Must match configured SUPABASE_PUBLISHABLE_KEY
+    const isPublishableKey = supabasePublishableKey && apiKey === supabasePublishableKey;
 
     if (isPublishableKey) {
       // Publishable key is valid, now check for user JWT if required
@@ -125,7 +111,7 @@ export async function authenticate(
           user: null,
           userId: null,
           error: null,
-          supabase: createClient(supabaseUrl, supabaseAnonKey),
+          supabase: adminClient, // Use admin client for anon access (RLS will still apply based on no user context)
         };
       }
 
@@ -140,36 +126,10 @@ export async function authenticate(
     }
   }
 
-  // Fall back to Authorization header only (legacy behavior)
+  // Fall back to Authorization header only (user JWT)
   if (authHeader) {
     const token = authHeader.replace('Bearer ', '');
-
-    // Check if it's actually an anon key being used as Bearer token (legacy pattern)
-    if (token === supabaseAnonKey) {
-      if (requireUser) {
-        return {
-          success: false,
-          level: 'none',
-          user: null,
-          userId: null,
-          error: 'User authentication required',
-          supabase: adminClient,
-        };
-      }
-
-      if (allowAnon) {
-        return {
-          success: true,
-          level: 'anon',
-          user: null,
-          userId: null,
-          error: null,
-          supabase: createClient(supabaseUrl, supabaseAnonKey),
-        };
-      }
-    }
-
-    // Try to validate as user token
+    // Validate as user token
     return await validateUserToken(adminClient, token, allowedRoles);
   }
 
