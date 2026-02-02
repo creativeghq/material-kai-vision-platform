@@ -4,10 +4,17 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
+// New API key format support (optional - set in Supabase dashboard > Project Settings > API)
+const supabaseSecretKey = Deno.env.get('SUPABASE_SECRET_KEY') || '';
+const supabasePublishableKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY') || '';
+
 // Supabase provides these keys automatically:
-// - SUPABASE_SERVICE_ROLE_KEY = secret key (elevated privileges, bypasses RLS)
-// - SUPABASE_ANON_KEY = publishable/anon key (low privileges, respects RLS)
-// No need to generate custom keys!
+// - SUPABASE_SERVICE_ROLE_KEY = legacy secret key (elevated privileges, bypasses RLS)
+// - SUPABASE_ANON_KEY = legacy publishable/anon key (low privileges, respects RLS)
+//
+// New key format (optional):
+// - SUPABASE_SECRET_KEY = new format secret key (sb_secret_...)
+// - SUPABASE_PUBLISHABLE_KEY = new format publishable key (sb_publishable_...)
 
 export type AuthLevel = 'secret' | 'user' | 'anon' | 'none';
 
@@ -63,7 +70,13 @@ export async function authenticate(
   // Check for secret/service role key (full admin access)
   if (apiKey) {
     // Service role key = secret key (provided by Supabase, bypasses RLS)
-    if (apiKey === supabaseServiceKey) {
+    // Supports both legacy JWT format and new sb_secret_... format
+    const isSecretKey =
+      apiKey === supabaseServiceKey ||
+      (supabaseSecretKey && apiKey === supabaseSecretKey) ||
+      apiKey.startsWith('sb_secret_');
+
+    if (isSecretKey) {
       return {
         success: true,
         level: 'secret',
@@ -76,7 +89,10 @@ export async function authenticate(
 
     // Check for publishable/anon key (client access)
     // Supports both new format (sb_publishable_...) and legacy JWT format
-    const isPublishableKey = apiKey === supabaseAnonKey || apiKey.startsWith('sb_publishable_');
+    const isPublishableKey =
+      apiKey === supabaseAnonKey ||
+      (supabasePublishableKey && apiKey === supabasePublishableKey) ||
+      apiKey.startsWith('sb_publishable_');
 
     if (isPublishableKey) {
       // Publishable key is valid, now check for user JWT if required
