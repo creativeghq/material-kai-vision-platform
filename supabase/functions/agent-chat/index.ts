@@ -53,8 +53,10 @@ const { tool } = await import('@langchain/core/tools');
 const { z } = await import('zod');
 
 // LangGraph imports for StateGraph-based agent orchestration
-const { StateGraph, Annotation, END, START } = await import('@langchain/langgraph');
-const { ToolNode } = await import('@langchain/langgraph/prebuilt');
+const langgraph = await import('@langchain/langgraph');
+const { StateGraph, Annotation, END, START } = langgraph;
+// ToolNode from prebuilt - try main package first, fallback to prebuilt
+const { ToolNode } = await import('@langchain/langgraph/prebuilt').catch(() => langgraph);
 const { BaseMessage, HumanMessage, AIMessage, SystemMessage } = await import('@langchain/core/messages');
 
 // Initialize Supabase client
