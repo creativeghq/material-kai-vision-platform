@@ -39,6 +39,7 @@ console.log('✅ process.env polyfill set up for npm packages');
 // NOW import dependencies (after polyfill is set up)
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
 
 // We use dynamic imports for libraries that might access process.env at top-level
 // This ensures the polyfill runs BEFORE these modules are loaded
