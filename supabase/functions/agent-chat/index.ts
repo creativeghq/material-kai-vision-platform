@@ -1,6 +1,6 @@
 /**
- * Agent Chat - DIAGNOSTIC VERSION 3
- * Testing LangChain Anthropic import
+ * Agent Chat - DIAGNOSTIC VERSION 4
+ * Testing LangGraph import
  */
 
 const corsHeaders = {
@@ -9,7 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 };
 
-console.log('🚀 Agent-chat v3 starting...');
+console.log('🚀 Agent-chat v4 starting...');
 
 // Test environment variables
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
@@ -29,18 +29,25 @@ console.log('📋 Environment check:', {
   hasSupabaseKey: !!SUPABASE_SERVICE_ROLE_KEY,
 });
 
-// Test Supabase import
+// Test imports
 console.log('📦 Importing Supabase client...');
 const { createClient } = await import('npm:@supabase/supabase-js@2');
 console.log('✅ Supabase client imported');
 
-// Test LangChain Anthropic import - use pinned version
 console.log('📦 Importing LangChain Anthropic...');
 const { ChatAnthropic } = await import('npm:@langchain/anthropic@0.3.0');
 console.log('✅ LangChain Anthropic imported');
 
+console.log('📦 Importing LangGraph...');
+const { StateGraph, Annotation, END, START } = await import('npm:@langchain/langgraph@0.2.0');
+console.log('✅ LangGraph imported');
+
+console.log('📦 Importing LangChain core messages...');
+const { BaseMessage, HumanMessage, AIMessage } = await import('npm:@langchain/core@0.3.0/messages');
+console.log('✅ LangChain core messages imported');
+
 const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
-console.log('✅ Supabase client initialized');
+console.log('✅ All imports successful');
 
 Deno.serve(async (req) => {
   console.log('📥 Request received:', req.method, req.url);
@@ -51,7 +58,7 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({
     status: 'ok',
-    message: 'LangChain Anthropic test working!',
+    message: 'LangGraph + all imports working!',
     diagnostics: {
       hasAnthropicKey: !!ANTHROPIC_API_KEY,
       hasSupabaseUrl: !!SUPABASE_URL,
