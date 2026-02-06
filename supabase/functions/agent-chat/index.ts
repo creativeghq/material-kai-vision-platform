@@ -39,6 +39,7 @@ console.log('✅ process.env polyfill set up for npm packages');
 // NOW import dependencies (after polyfill is set up)
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getSkillsForAgent, getSkillContent } from '../_skills/index.ts';
 
 // Import types only to avoid side effects
 import type { ChatAnthropic } from '@langchain/anthropic';
@@ -57,6 +58,45 @@ const { BaseMessage, HumanMessage, AIMessage, SystemMessage } = await import('@l
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+/**
+ * Supported countries for B2B research
+ * These are the primary markets for manufacturer discovery
+ */
+const SUPPORTED_COUNTRIES = [
+  // Baltic & Nordic
+  { code: 'LT', name: 'Lithuania', language: 'lt' },
+  { code: 'LV', name: 'Latvia', language: 'lv' },
+  { code: 'EE', name: 'Estonia', language: 'et' },
+  { code: 'FI', name: 'Finland', language: 'fi' },
+  { code: 'DK', name: 'Denmark', language: 'da' },
+  // Central & Eastern Europe
+  { code: 'PL', name: 'Poland', language: 'pl' },
+  { code: 'CZ', name: 'Czech Republic', language: 'cs' },
+  { code: 'SK', name: 'Slovakia', language: 'sk' },
+  { code: 'HU', name: 'Hungary', language: 'hu' },
+  { code: 'RO', name: 'Romania', language: 'ro' },
+  { code: 'BG', name: 'Bulgaria', language: 'bg' },
+  { code: 'UA', name: 'Ukraine', language: 'uk' },
+  // Balkans
+  { code: 'TR', name: 'Turkey', language: 'tr' },
+  { code: 'RS', name: 'Serbia', language: 'sr' },
+  { code: 'HR', name: 'Croatia', language: 'hr' },
+  { code: 'SI', name: 'Slovenia', language: 'sl' },
+  { code: 'BA', name: 'Bosnia and Herzegovina', language: 'bs' },
+  { code: 'MK', name: 'North Macedonia', language: 'mk' },
+  { code: 'AL', name: 'Albania', language: 'sq' },
+  // Western & Southern Europe
+  { code: 'DE', name: 'Germany', language: 'de' },
+  { code: 'NL', name: 'Netherlands', language: 'nl' },
+  { code: 'GB', name: 'United Kingdom', language: 'en' },
+  { code: 'ES', name: 'Spain', language: 'es' },
+  { code: 'IT', name: 'Italy', language: 'it' },
+  { code: 'GR', name: 'Greece', language: 'el' },
+] as const;
+
+const SUPPORTED_COUNTRY_NAMES = SUPPORTED_COUNTRIES.map(c => c.name);
+const SUPPORTED_LANGUAGE_CODES = SUPPORTED_COUNTRIES.map(c => c.language);
 
 /**
  * Supabase-based Checkpointer for LangGraph
@@ -2208,25 +2248,56 @@ const createB2BManufacturerSearchTool = (onProgress?: (status: string) => void) 
 
         // Build a research query optimized for B2B manufacturer discovery
         const languageMap: Record<string, string> = {
+          // Baltic & Nordic
+          lt: 'Lithuanian',
+          lv: 'Latvian',
+          et: 'Estonian',
+          fi: 'Finnish',
+          da: 'Danish',
+          // Central & Eastern Europe
           pl: 'Polish',
-          tr: 'Turkish',
+          cs: 'Czech',
+          sk: 'Slovak',
+          hu: 'Hungarian',
           ro: 'Romanian',
           bg: 'Bulgarian',
-          cs: 'Czech',
-          de: 'German',
           uk: 'Ukrainian',
-          hu: 'Hungarian',
+          // Balkans
+          tr: 'Turkish',
           sr: 'Serbian',
-          sl: 'Slovenian',
-          mk: 'Macedonian',
-          bs: 'Bosnian',
           hr: 'Croatian',
-          sk: 'Slovak',
+          sl: 'Slovenian',
+          bs: 'Bosnian',
+          mk: 'Macedonian',
+          sq: 'Albanian',
+          // Western & Southern Europe
+          de: 'German',
+          nl: 'Dutch',
+          en: 'English',
+          es: 'Spanish',
+          it: 'Italian',
+          el: 'Greek',
         };
 
         const languageName = language ? languageMap[language] || language : 'English';
 
         const query = `Find B2B manufacturers of ${category} in ${country}.
+
+IMPORTANT: Perform searches in BOTH English AND ${languageName} to get comprehensive coverage:
+
+1. ENGLISH SEARCH:
+   - Search "${category} manufacturer ${country}"
+   - Search "${category} producer ${country}"
+   - Search "${category} factory ${country}"
+
+2. NATIVE ${languageName.toUpperCase()} SEARCH:
+   - Translate "${category}" to ${languageName} and search with those terms
+   - Use local industry terminology (e.g., "producent", "výrobce", "üretici", "производител", "gamintojas", etc.)
+   - Search ${languageName}-language websites, directories, and B2B portals
+   - Many local manufacturers only have websites in ${languageName}
+
+Combine results from BOTH searches to maximize coverage.
+
 I need actual manufacturing companies (not distributors or retailers) that:
 - Have their own production facilities
 - Offer wholesale/B2B sales
@@ -2240,8 +2311,7 @@ For each manufacturer found, provide:
 - Main products they manufacture
 - Any indicators they are actual manufacturers (factory, production facility, etc.)
 
-Search in ${languageName} language sources for better coverage of local manufacturers.
-Return up to ${limit} manufacturers.`;
+Return up to ${limit} manufacturers, combining results from both English and ${languageName} searches.`;
 
         // Add timeout to prevent hanging (60 seconds for AI search)
         const TIMEOUT_MS = 60000;
@@ -2261,7 +2331,7 @@ Return up to ${limit} manufacturers.`;
               messages: [
                 {
                   role: 'system',
-                  content: 'You are a B2B research assistant specialized in finding manufacturing companies. Always verify companies are actual manufacturers, not distributors or retailers. Provide structured data with company names, websites, locations, and products.',
+                  content: 'You are a B2B research assistant specialized in finding manufacturing companies in Central/Eastern Europe and the Balkans. CRITICAL: Always search in BOTH English AND the native language of the target country to maximize coverage. First search in English, then translate product categories and search in the local language. Many local manufacturers only have websites in their native language, while others target international markets with English sites. Combine results from both searches. Always verify companies are actual manufacturers, not distributors or retailers. Provide structured data with company names, websites, locations, and products.',
                 },
                 {
                   role: 'user',
@@ -2320,11 +2390,11 @@ Return up to ${limit} manufacturers.`;
     },
     {
       name: 'b2b_manufacturer_search',
-      description: 'Search for B2B manufacturers in a specific country and product category. Uses AI-powered web research to find actual manufacturing companies (not distributors). Supports native language searches for better coverage.',
+      description: `Search for B2B manufacturers in a specific country and product category. Uses AI-powered web research to find actual manufacturing companies (not distributors). Supports native language searches for better coverage. Supported countries: ${SUPPORTED_COUNTRY_NAMES.join(', ')}.`,
       schema: z.object({
-        country: z.string().describe('Country to search in (e.g., "Poland", "Turkey", "Romania")'),
+        country: z.enum(SUPPORTED_COUNTRY_NAMES as unknown as [string, ...string[]]).describe(`Country to search in. Supported: ${SUPPORTED_COUNTRY_NAMES.join(', ')}`),
         category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "LED mirrors")'),
-        language: z.string().optional().describe('Language code for native searches (e.g., "pl", "tr", "ro", "bg")'),
+        language: z.enum(SUPPORTED_LANGUAGE_CODES as unknown as [string, ...string[]]).optional().describe(`Language code for native searches. Supported: ${SUPPORTED_LANGUAGE_CODES.join(', ')}`),
         limit: z.number().optional().default(10).describe('Maximum number of manufacturers to find'),
       }),
     }
@@ -2906,6 +2976,42 @@ const createSaveToCRMTool = (userId: string, onProgress?: (status: string) => vo
 };
 
 /**
+ * Create Load Skill Tool - Progressive disclosure pattern
+ * Loads specialized knowledge from skills directory on demand
+ */
+const createLoadSkillTool = (agentId: string) => {
+  const availableSkills = getSkillsForAgent(agentId);
+  const skillList = availableSkills
+    .map(s => `- ${s.slug}: ${s.description}`)
+    .join('\n');
+
+  // If no skills available for this agent, return null
+  if (availableSkills.length === 0) {
+    return null;
+  }
+
+  return tool(
+    async ({ skillSlug }: { skillSlug: string }) => {
+      console.log(`🎯 Loading skill: ${skillSlug} for agent: ${agentId}`);
+      const content = getSkillContent(skillSlug);
+      if (!content) {
+        const availableSlugs = availableSkills.map(s => s.slug).join(', ');
+        return `Skill "${skillSlug}" not found. Available skills: ${availableSlugs}`;
+      }
+      console.log(`✅ Skill loaded: ${skillSlug} (${content.length} chars)`);
+      return content;
+    },
+    {
+      name: 'load_skill',
+      description: `Load specialized knowledge for a specific domain. Use this when you need expert guidance on a topic.\n\nAvailable skills:\n${skillList}`,
+      schema: z.object({
+        skillSlug: z.string().describe('The skill slug to load (e.g., "material-sourcing")'),
+      }),
+    }
+  );
+};
+
+/**
  * Agent Configurations with RBAC
  */
 interface AgentConfig {
@@ -3162,6 +3268,13 @@ async function executeAgent(
   }
   if (config.tools.includes('save_to_crm')) {
     tools.push(createSaveToCRMTool(userId, sendProgress));
+  }
+
+  // Skills tool - available for all agents that have skills configured
+  const loadSkillTool = createLoadSkillTool(agentId);
+  if (loadSkillTool) {
+    console.log(`🎯 Skills tool enabled for ${agentId}`);
+    tools.push(loadSkillTool);
   }
 
   // Select model based on agent type (Haiku for search, Sonnet for complex tasks)

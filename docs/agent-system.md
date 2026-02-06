@@ -6,19 +6,21 @@ Complete guide to the AI Agent system with database-driven prompts and configura
 
 ## Overview
 
-The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js and Anthropic Claude models. Agents are specialized AI assistants that help users with specific tasks like PDF processing, search, and product information.
+The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js, LangGraph, and Anthropic Claude models. Agents are specialized AI assistants that help users with specific tasks like material search, B2B research, interior design, and product discovery.
 
 **Key Features**:
+- LangGraph StateGraph-based execution with checkpointing
 - Database-driven system prompts (no code deployment needed)
 - Admin UI for prompt management
 - Real-time prompt updates
-- Fallback to default prompts
 - Role-based access control
 - Tool orchestration with LangChain.js
+- Long-term memory for cross-conversation context
+- Skills system for domain-specific knowledge injection
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Components
 
@@ -33,389 +35,316 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 ┌─────────────────────────────────────────────────────────────┐
 │              Supabase Edge Functions (Deno)                 │
 │  - agent-chat/index.ts                                      │
+│  - _skills/ (domain knowledge)                              │
 │  - Loads prompts from database                              │
-│  - LangChain.js tool orchestration                          │
-│  - Claude Sonnet 4.5 model                                  │
+│  - LangGraph StateGraph orchestration                       │
+│  - Claude Sonnet 4.5 / Haiku 4.5 models                    │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │              Database (PostgreSQL/Supabase)                 │
 │  - prompts table (unified for all AI prompts)              │
-│  - Stores: agent prompts, extraction prompts, templates    │
+│  - agent_checkpoints (conversation state)                   │
+│  - agent_memories (long-term memory)                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Database Schema
-
-**Table: `prompts`** (Unified table for all AI prompts)
-
-Agent prompts are stored with:
-- `prompt_type` = 'agent'
-- `category` = agent type (pdf-processor, search, product, interior-designer)
-- `system_prompt` = conversational system message
-- `status` = 'active'
-- `is_active` = true
-```
-
-**Current Agents**:
-
-| Agent Type | Name | Status | Prompt Length | Purpose |
-|------------|------|--------|---------------|---------|
-| pdf-processor | PDF Processing Agent | active | 8,997 chars | Orchestrate PDF processing pipeline |
-| search | Search Agent | active | 198 chars | Help users search materials |
-| product | Product Agent | active | 158 chars | Provide product information |
-
 ---
 
-## 🎯 Agent Types
+## Agent Types
 
-### 1. PDF Processing Agent
+### 1. Search Agent
 
-**Agent Type**: `pdf-processor`  
-**Access**: Admin only  
-**Model**: Claude Sonnet 4.5
-
-**Purpose**: Orchestrate the complete PDF processing pipeline with intelligent monitoring, diagnostics, and recovery.
-
-**Key Capabilities**:
-- Job recovery and continuity checking
-- Pre-upload validation (check for existing jobs)
-- Real-time progress monitoring
-- Error handling and diagnostics
-- Server health checks
-- Sentry error querying
-
-**Available Tools**:
-1. `uploadPDF` - Upload PDF and start processing
-2. `checkJobStatus` - Poll job progress
-3. `queryDatabase` - Direct database access
-4. `checkServerHealth` - SSH server diagnostics
-5. `querySentry` - Error tracking
-
-**Workflow**:
-1. Pre-upload check (MANDATORY)
-2. Upload phase
-3. Monitoring phase (poll every 10s)
-4. Completion phase (generate report)
-5. Failure phase (diagnostics and recovery)
-
-### 2. Search Agent
-
-**Agent Type**: `search`  
-**Access**: All users  
-**Model**: Claude Sonnet 4.5
+**Agent ID**: `search`
+**Access**: All users (viewer, member, admin, owner)
+**Model**: Claude Haiku 4.5 (fast responses)
 
 **Purpose**: Help users find materials using multi-modal search capabilities.
 
+**Available Tools**:
+- `material_search` - RAG-powered semantic search via MIVAA API
+- `image_analysis` - Material recognition, visual search, product identification
+
 **Key Capabilities**:
-- Semantic search
-- Vector search
-- Image-based search
-- Hybrid search strategies
+- Semantic search with multi-vector strategy
+- Image-based material identification
+- Product recommendations
 
-### 3. Product Agent
+### 2. Insights Agent
 
-**Agent Type**: `product`  
-**Access**: All users  
+**Agent ID**: `insights`
+**Access**: Admin, Owner only
+**Model**: Claude Sonnet 4.5 (complex reasoning)
+
+**Purpose**: Unified intelligence for research, analytics, business analysis, and B2B manufacturer discovery.
+
+**Available Tools**:
+
+**Sub-agent Orchestration:**
+- `research_analysis` - Market research and trends
+- `analytics_analysis` - Data analysis and insights
+- `business_analysis` - Business intelligence
+- `product_analysis` - Product comparison and analysis
+- `material_search` - Material discovery
+
+**B2B Research Tools:**
+- `b2b_manufacturer_search` - Find manufacturers via Perplexity AI
+- `company_website_scrape` - Scrape company websites via Firecrawl
+- `company_enrichment` - Enrich company data via Apollo.io
+- `contact_discovery` - Find contacts via Hunter.io
+- `save_to_crm` - Save companies/contacts to CRM
+
+### 3. Interior Designer Agent
+
+**Agent ID**: `interior-designer`
+**Access**: All users (viewer, member, admin, owner)
 **Model**: Claude Sonnet 4.5
 
-**Purpose**: Provide detailed product information and recommendations.
+**Purpose**: AI-powered interior design with spatial analysis and material matching.
 
-**Key Capabilities**:
-- Product details lookup
-- Metadata explanation
-- Related products
-- Material recommendations
+**Available Tools**:
+- `material_search` - Material discovery (only when user explicitly asks)
+- `image_analysis` - Room and material analysis
+- `spaceformer_analysis` - Room layout and spatial analysis
+- `generate_3d` - Trigger async 3D interior design generation
+
+**Special Behavior**: Material search is only injected when user message contains keywords like "find materials", "search for materials", etc.
+
+### 4. Demo Agent
+
+**Agent ID**: `demo`
+**Access**: Admin, Owner only
+**Model**: N/A (returns hardcoded demo data)
+
+**Purpose**: Platform showcase with pre-defined demo responses.
 
 ---
 
-## 🔧 Admin UI - Agent Configurations
+## B2B Research System
+
+### Supported Countries (25 Markets)
+
+The B2B manufacturer search supports the following markets:
+
+| Region | Countries |
+|--------|-----------|
+| **Baltic & Nordic** | Lithuania (LT), Latvia (LV), Estonia (EE), Finland (FI), Denmark (DK) |
+| **Central & Eastern Europe** | Poland (PL), Czech Republic (CZ), Slovakia (SK), Hungary (HU), Romania (RO), Bulgaria (BG), Ukraine (UA) |
+| **Balkans** | Turkey (TR), Serbia (RS), Croatia (HR), Slovenia (SI), Bosnia and Herzegovina (BA), North Macedonia (MK), Albania (AL) |
+| **Western & Southern Europe** | Germany (DE), Netherlands (NL), United Kingdom (GB), Spain (ES), Italy (IT), Greece (GR) |
+
+### Dual-Language Search
+
+The B2B search performs searches in **both English AND native language** for comprehensive coverage:
+
+1. **English Search**: `"ceramic tiles manufacturer Poland"`
+2. **Native Language Search**: `"producent płytek ceramicznych Polska"`
+
+This ensures discovery of:
+- International-facing manufacturers (English websites)
+- Local-only manufacturers (native language websites only)
+
+### Required API Keys
+
+| Variable | Service | Purpose |
+|----------|---------|---------|
+| `PERPLEXITY_API_KEY` | Perplexity AI | B2B manufacturer search |
+| `FIRECRAWL_API_KEY` | Firecrawl | Website scraping |
+| `APOLLO_API_KEY` | Apollo.io | Company enrichment |
+| `HUNTER_API_KEY` | Hunter.io | Contact discovery |
+
+---
+
+## Skills System
+
+Skills provide domain-specific knowledge that agents can load on-demand using progressive disclosure.
+
+### Structure
+
+```
+supabase/functions/
+├── _skills/
+│   ├── types.ts              # Type definitions
+│   ├── index.ts              # Skills loader
+│   └── [skill-slug]/
+│       └── SKILL.md          # Skill definition
+```
+
+### SKILL.md Format
+
+```markdown
+---
+name: Skill Name
+slug: skill-slug
+description: Brief description for agent selection
+agents: [search, insights]    # Which agents can use this skill
+tags: [tag1, tag2]
+---
+
+## Context
+Domain expertise content...
+
+## Instructions
+How to apply this knowledge...
+```
+
+### When to Use Skills
+
+Skills are for **proprietary knowledge** that:
+1. Claude doesn't know (your pricing rules, supplier tiers, business logic)
+2. Isn't needed for every query (otherwise → system prompt)
+
+### Adding New Skills
+
+1. Create `_skills/[slug]/SKILL.md`
+2. Add import in `_skills/index.ts`:
+```typescript
+import newSkill from './new-skill/SKILL.md' with { type: 'text' };
+
+const SKILL_FILES = {
+  'new-skill': newSkill,
+};
+```
+
+---
+
+## Environment Variables
+
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Claude API key |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MIVAA_GATEWAY_URL` | `https://v1api.materialshub.gr` | MIVAA API endpoint |
+| `PERPLEXITY_API_KEY` | - | B2B search (Insights agent) |
+| `FIRECRAWL_API_KEY` | - | Website scraping |
+| `APOLLO_API_KEY` | - | Company enrichment |
+| `HUNTER_API_KEY` | - | Contact discovery |
+| `SENTRY_AUTH_TOKEN` | - | Error tracking |
+
+---
+
+## Admin UI - Agent Configurations
 
 ### Location
 `/admin/agent-configs`
 
 ### Features
 
-**Table View**:
-- Agent name and description
-- Agent type (code format)
-- Status badge (active/inactive/development)
-- Version number
-- Prompt length (character count)
-- Last updated timestamp
-- Edit button
-
-**Edit Modal**:
-- Large textarea for prompt editing
+- View all configured agents
+- Edit system prompts (stored in database)
 - Real-time character count
-- Agent metadata display
-- Save/Cancel buttons
-- Validation
-
-**Stats Cards**:
-- Total agents
-- Active agents
-- Configured prompts (>100 chars)
-
-**Actions**:
-- Refresh data
-- Edit prompts
-- Save changes (updates database)
+- Status management (active/inactive)
+- Changes take effect immediately
 
 ### Usage
 
 1. Navigate to Admin Dashboard → AI & Intelligence → Agent Configurations
-2. Click "Edit" button on any agent
-3. Modify the system prompt in the textarea
+2. Click "Edit" on any agent
+3. Modify the system prompt
 4. Click "Save Changes"
-5. Changes take effect immediately on next agent execution
+5. Changes apply on next agent execution
 
 ---
 
-## 💻 Technical Implementation
+## API Reference
 
-### Edge Function (agent-chat/index.ts)
+### Endpoint
+`POST /functions/v1/agent-chat`
 
-**Load Prompt from Database**:
-```typescript
-async function getAgentSystemPrompt(agentType: string): Promise<string> {
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('system_prompt')
-    .eq('prompt_type', 'agent')
-    .eq('category', agentType)
-    .eq('is_active', true)
-    .eq('status', 'active')
-    .single();
-
-  if (error || !data?.system_prompt) {
-    return getDefaultPrompt(agentType);
-  }
-
-  return data.system_prompt;
+### Request
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Find marble tiles" }
+  ],
+  "agentId": "search"
 }
 ```
 
-**Execute Agent**:
-```typescript
-async function executeAgent(agentId: string, userInput: string) {
-  const config = AGENT_CONFIGS[agentId];
-  
-  // Load prompt from database
-  const systemPrompt = config.systemPrompt || 
-                       await getAgentSystemPrompt(agentId);
-  
-  // Invoke model with tools
-  const response = await modelWithTools.invoke(messages, {
-    system: systemPrompt,
-  });
-  
-  return response;
-}
-```
-
-### Admin UI Component
-
-**Load Agents**:
-```typescript
-const loadAgents = async () => {
-  const { data, error } = await supabase
-    .from('prompts')
-    .select('*')
-    .eq('prompt_type', 'agent')
-    .eq('is_active', true)
-    .order('category');
-
-  setAgents(data || []);
-};
-```
-
-**Update Prompt**:
-```typescript
-const handleSave = async () => {
-  const { error } = await supabase
-    .from('material_agents')
-    .update({
-      system_prompt: editedPrompt,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', editingAgent.id);
-
-  if (!error) {
-    toast({ title: 'Success', description: 'Prompt updated' });
-    await loadAgents();
-  }
-};
+### Response (Server-Sent Events)
+```json
+{ "type": "iteration", "iteration": 1, "maxIterations": 10 }
+{ "type": "tool_call", "tool": "material_search", "args": {...} }
+{ "type": "tool_result", "tool": "material_search", "result": {...} }
+{ "type": "final_response", "text": "...", "materialResults": {...} }
 ```
 
 ---
 
-## 🔐 Security & Access Control
+## Security & Access Control
 
 ### Role-Based Access
 
-**Agent Execution**:
-- PDF Processing Agent: Admin/Owner only
-- Search Agent: All authenticated users
-- Product Agent: All authenticated users
-
-**Admin UI**:
-- Agent Configurations page: Admin only (protected by AdminGuard)
-- Prompt editing: Admin only
-- View agents: Admin only
+| Agent | Roles |
+|-------|-------|
+| Search | viewer, member, admin, owner |
+| Insights | admin, owner |
+| Interior Designer | viewer, member, admin, owner |
+| Demo | admin, owner |
 
 ### Authentication
 
-All agent requests require:
+All requests require:
 1. Valid Supabase session
 2. Workspace membership
-3. Appropriate role (for restricted agents)
+3. Appropriate role for restricted agents
 
 ---
 
-## 📊 Monitoring & Analytics
+## Monitoring & Logging
+
+### Token Usage Tracking
+- Accumulated across all agent iterations
+- Logged via `log_agent_usage()` RPC
+- Integrates with pricing table for cost calculation
 
 ### Metrics Tracked
-
 - Agent invocations per type
 - Average response time
+- Token usage (input/output)
+- Tool execution counts
 - Error rates
-- Token usage
-- Cost per agent type
-
-### Logging
-
-All agent interactions logged with:
-- User ID
-- Workspace ID
-- Agent type
-- Input/output
-- Timestamp
-- Duration
-- Errors
 
 ---
 
-## 🚀 Best Practices
+## Related Documentation
 
-### Prompt Engineering
-
-**Do**:
-- ✅ Be specific about agent role and capabilities
-- ✅ Include clear workflow steps
-- ✅ Provide example responses
-- ✅ Define error handling procedures
-- ✅ Use consistent formatting
-
-**Don't**:
-- ❌ Make prompts too generic
-- ❌ Include outdated information
-- ❌ Forget to test changes
-- ❌ Remove critical instructions
-- ❌ Exceed reasonable length (>10,000 chars)
-
-### Prompt Updates
-
-1. **Test First**: Test prompt changes in development
-2. **Incremental**: Make small, incremental changes
-3. **Document**: Document why changes were made
-4. **Monitor**: Monitor agent performance after updates
-5. **Rollback**: Keep previous versions for rollback
-
-### Performance
-
-- Keep prompts focused and concise
-- Use tools efficiently (avoid redundant calls)
-- Implement proper error handling
-- Cache frequently used data
-- Monitor token usage
+- **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, checkpointing, memory
+- **[api/agent-chat-api.md](api/agent-chat-api.md)** - Full API reference
+- **[ai-models-guide.md](ai-models-guide.md)** - Model configurations
 
 ---
 
-## 🔄 Future Enhancements
-
-### Planned Features
-
-1. **Version History**: Track prompt changes over time
-2. **A/B Testing**: Test different prompts with same agent
-3. **Prompt Templates**: Pre-built templates for common patterns
-4. **Analytics Dashboard**: Agent performance metrics
-5. **Prompt Validation**: Automatic validation of prompt quality
-6. **Export/Import**: Backup and restore prompts
-7. **Multi-Language**: Support for multiple languages
-8. **Custom Tools**: Allow admins to add custom tools
-
-### Additional Agents
-
-Potential future agents:
-- Research Agent (market research, trends)
-- Analytics Agent (data analysis, insights)
-- Business Agent (quotes, orders, invoicing)
-- Admin Agent (system management)
-- Demo Agent (product demonstrations)
-
----
-
-## 📚 Related Documentation
-
-- **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, checkpointing, and memory
-- **[ai-models-guide.md](ai-models-guide.md)** - AI models used by agents
-- **[features-guide.md](features-guide.md)** - Platform features overview
-- **[system-architecture.md](system-architecture.md)** - System architecture
-- **[api-endpoints.md](api-endpoints.md)** - API reference
-
----
-
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Agent Not Responding
-
-**Symptoms**: Agent doesn't respond or times out
-
-**Solutions**:
 1. Check Edge Function logs in Supabase
-2. Verify agent status is 'active'
-3. Check system_prompt is not null
-4. Verify API keys are configured
-5. Check rate limits
+2. Verify agent status is 'active' in database
+3. Check API keys are configured
+4. Review rate limits
 
-### Prompt Not Updating
+### B2B Search Failing
+1. Verify `PERPLEXITY_API_KEY` is set
+2. Check country is in supported list
+3. Review Perplexity API quota
 
-**Symptoms**: Changes to prompt don't take effect
-
-**Solutions**:
-1. Verify save was successful (check toast notification)
-2. Check updated_at timestamp changed
-3. Clear browser cache
-4. Restart Edge Function (if self-hosted)
-5. Check database connection
-
-### Permission Denied
-
-**Symptoms**: User can't access agent or admin UI
-
-**Solutions**:
-1. Verify user has admin role
-2. Check workspace membership
-3. Verify AdminGuard is working
-4. Check Supabase RLS policies
-5. Review authentication logs
+### Skills Not Loading
+1. Verify SKILL.md has correct frontmatter
+2. Check `agents` array includes the agent ID
+3. Verify import in `_skills/index.ts`
 
 ---
 
-## 📞 Support
-
-For agent-related issues:
-- Check Edge Function logs: Supabase Dashboard → Edge Functions
-- Review agent prompts: `/admin/agent-configs`
-- Monitor errors: Sentry dashboard
-- Contact: support@materialkaivision.com
-
----
-
-**Last Updated**: November 21, 2025
-**Version**: 1.0.0
+**Last Updated**: February 3, 2026
+**Version**: 2.0.0
 **Status**: Production
 **Maintainer**: Development Team
-

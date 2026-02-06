@@ -239,6 +239,17 @@ SLIG_NAMESPACE=basiliskan
 
 **Required for PDF Processing Agent and other Edge Functions**
 
+#### **API Authentication Keys (New System)**
+
+| Secret Name | Type | Where Set | Description | Example/Format |
+|------------|------|-----------|-------------|----------------|
+| `API_SECRET_KEY` | **Secret** | Supabase Dashboard | Secret key for server-to-server admin access | `sb_secret_xxxxxxxxxxxxxxxxxxxx` |
+| `API_PUBLISHABLE_KEY` | **Secret** | Supabase Dashboard | Publishable key for client access | `sb_publishable_xxxxxxxxxxxxxxxxxxxx` |
+
+> **Note:** These replace the legacy anon/service_role keys for external API access. Get them from Supabase Dashboard > Project Settings > API > API Keys.
+
+#### **Core Secrets**
+
 | Secret Name | Type | Where Set | Description | Example/Format |
 |------------|------|-----------|-------------|----------------|
 | `ANTHROPIC_API_KEY` | **Secret** | Supabase Dashboard | Claude API key for agent chat | `sk-ant-xxxxxxxxxxxxxxxx` |
@@ -259,6 +270,29 @@ SLIG_NAMESPACE=basiliskan
 | `AWS_SECRET_ACCESS_KEY` | **Secret** | Supabase Dashboard | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 | `TWILIO_ACCOUNT_SID` | **Secret** | Supabase Dashboard | Twilio Account SID for SMS/WhatsApp | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 | `TWILIO_AUTH_TOKEN` | **Secret** | Supabase Dashboard | Twilio Auth Token for authentication | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+
+#### **Agent Chat & AI Research Secrets**
+
+| Secret Name | Type | Where Set | Description | Example/Format |
+|------------|------|-----------|-------------|----------------|
+| `PERPLEXITY_API_KEY` | **Secret** | Supabase Dashboard | Perplexity AI for web research | `pplx-xxxxxxxxxxxxxxxx` |
+| `APOLLO_API_KEY` | **Secret** | Supabase Dashboard | Apollo.io for company/contact enrichment | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `HUNTER_API_KEY` | **Secret** | Supabase Dashboard | Hunter.io for email finding | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+
+#### **Push Notifications (Web Push)**
+
+| Secret Name | Type | Where Set | Description | Example/Format |
+|------------|------|-----------|-------------|----------------|
+| `VAPID_PUBLIC_KEY` | Public | Supabase Dashboard | VAPID public key for web push | `BNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VAPID_PRIVATE_KEY` | **Secret** | Supabase Dashboard | VAPID private key for web push | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VAPID_SUBJECT` | Public | Supabase Dashboard | VAPID subject (email) | `mailto:admin@materialkai.com` |
+
+#### **Cron Jobs**
+
+| Secret Name | Type | Where Set | Description | Example/Format |
+|------------|------|-----------|-------------|----------------|
+| `CRON_SECRET` | **Secret** | Supabase Dashboard | Secret for authenticating cron job requests | `your-secure-cron-secret` |
+| `PYTHON_BACKEND_URL` | Public | Supabase Dashboard | MIVAA Python backend URL | `https://v1api.materialshub.gr` |
 
 > **Note:** Default sender email and name are now configured through the Admin Panel at `/admin/email` → Email Settings, not as environment variables.
 
