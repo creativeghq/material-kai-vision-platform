@@ -39,7 +39,7 @@ console.log('✅ process.env polyfill set up for npm packages');
 // NOW import dependencies (after polyfill is set up)
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
-import { getSkillsForAgent, getSkillContent } from '../_shared/skills/index.ts';
+import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
 
 // Import types only to avoid side effects
 import type { ChatAnthropic } from '@langchain/anthropic';

@@ -5,7 +5,7 @@
  * using progressive disclosure - metadata loads first, full content on demand.
  */
 
-import type { Skill, SkillMetadata } from './types.ts';
+import type { Skill, SkillMetadata } from './skills-types.ts';
 
 // Import skill files as raw text
 // Each skill is a separate import to enable tree-shaking
