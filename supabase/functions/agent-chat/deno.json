@@ -4,7 +4,6 @@
     "@langchain/core/tools": "npm:@langchain/core@0.3.0/tools",
     "@langchain/core/messages": "npm:@langchain/core@0.3.0/messages",
     "@langchain/langgraph": "npm:@langchain/langgraph@0.2.0",
-    "@langchain/langgraph/prebuilt": "npm:@langchain/langgraph@0.2.0/prebuilt",
     "zod": "npm:zod@3.23.0",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "http/": "https://deno.land/std@0.168.0/http/"
