@@ -1,3 +1,10 @@
 {
-  "imports": {}
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "@langchain/anthropic": "npm:@langchain/anthropic@0.3.0",
+    "@langchain/core/tools": "npm:@langchain/core@0.3.0/tools",
+    "@langchain/core/messages": "npm:@langchain/core@0.3.0/messages",
+    "@langchain/langgraph": "npm:@langchain/langgraph@0.2.0",
+    "zod": "npm:zod@3.23.0"
+  }
 }
