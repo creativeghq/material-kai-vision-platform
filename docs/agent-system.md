@@ -92,7 +92,8 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 - `b2b_manufacturer_search` - Find manufacturers via Perplexity AI
 - `company_website_scrape` - Scrape company websites via Firecrawl
 - `company_enrichment` - Enrich company data via Apollo.io
-- `contact_discovery` - Find contacts via Hunter.io
+- `contact_discovery` - Find contacts via Hunter.io domain search or find a specific person's email (Hunter Email Finder + Apollo.io People Match fallback). All discovered emails are validated with ZeroBounce.
+- `email_validate` - Validate email addresses on demand via ZeroBounce (single or batch up to 10). Returns status: valid, invalid, catch-all, spamtrap, abuse, do_not_mail, unknown.
 - `save_to_crm` - Save companies/contacts to CRM
 
 ### 3. Interior Designer Agent
@@ -151,8 +152,9 @@ This ensures discovery of:
 |----------|---------|---------|
 | `PERPLEXITY_API_KEY` | Perplexity AI | B2B manufacturer search |
 | `FIRECRAWL_API_KEY` | Firecrawl | Website scraping |
-| `APOLLO_API_KEY` | Apollo.io | Company enrichment |
-| `HUNTER_API_KEY` | Hunter.io | Contact discovery |
+| `APOLLO_API_KEY` | Apollo.io | Company enrichment + person email finder fallback |
+| `HUNTER_API_KEY` | Hunter.io | Domain search + person email finder |
+| `ZEROBOUNCE_API_KEY` | ZeroBounce | Email validation (all discovered emails) |
 
 ---
 
@@ -226,8 +228,9 @@ const SKILL_FILES = {
 | `MIVAA_GATEWAY_URL` | `https://v1api.materialshub.gr` | MIVAA API endpoint |
 | `PERPLEXITY_API_KEY` | - | B2B search (Insights agent) |
 | `FIRECRAWL_API_KEY` | - | Website scraping |
-| `APOLLO_API_KEY` | - | Company enrichment |
-| `HUNTER_API_KEY` | - | Contact discovery |
+| `APOLLO_API_KEY` | - | Company enrichment + email finder fallback |
+| `HUNTER_API_KEY` | - | Domain search + person email finder |
+| `ZEROBOUNCE_API_KEY` | - | Email validation (all discovered emails) |
 | `SENTRY_AUTH_TOKEN` | - | Error tracking |
 
 ---

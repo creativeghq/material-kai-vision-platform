@@ -73,6 +73,8 @@ The platform includes a complete monitoring and analytics system that tracks:
 - Top search queries
 - Search success rate
 - Query patterns and trends
+- **Weight profile distribution** — tracks which dynamic weight profiles are selected (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced)
+- **Dynamic weights per query** — `search_query_tracking` table stores `weight_profile`, `dynamic_weights` (JSONB), and `weight_profile_source` (default, query_understanding, manual_override)
 
 **API Usage**:
 - Total API calls

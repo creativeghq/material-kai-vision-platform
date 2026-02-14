@@ -106,22 +106,33 @@ Complete documentation for Material Kai Vision Platform.
 - Complete API reference and usage examples
 - Best practices and troubleshooting
 
-**[search-strategies.md](search-strategies.md)** - Complete search system guide
+**[vr-world-generation.md](vr-world-generation.md)** - VR World generation with WorldLabs Marble
+- WorldLabs Marble API integration (mini + plus models)
+- Spark.js Gaussian Splat renderer (code-split, ~496KB)
+- Orbit + First-person (WASD) navigation with toggle
+- 3 quality levels (100k/500k/full SPZ)
+- Credit-based pricing (50 mini, 200 plus) with refund on failure
+- Edge function orchestration (upload → generate → poll → store)
+- WorldViewer component with adaptive status polling
+- Integrated into agent chat via DesignCanvas "Generate VR" button
+
+**[search-strategies.md](search-strategies.md)** - Complete search system guide ✨ UPDATED
 - 6 search strategies (100% implemented)
 - Semantic, Vector, Multi-Vector, Hybrid, Material, Image
 - All strategies combined mode
+- **Query-adaptive weight profiles** — 7 profiles dynamically selected per query
 - Database schema and indexes
 - Performance metrics and benchmarks
 - Usage examples and best practices
 
 **[image-relevancy-and-search.md](image-relevancy-and-search.md)** - Image search & multi-vector architecture ✨ UPDATED
-- **6-embedding fusion system** (text, visual, color, texture, style, material)
+- **7-embedding fusion system** (text, visual, understanding, color, texture, style, material)
 - True async parallel execution with asyncio.gather() and thread pools
 - 300-500ms search performance (3-4x faster than sequential)
-- Intelligent weighting (20% text, 20% visual, 15% each specialized)
+- **Dynamic weighting** — adapts per query (e.g., color queries → Color 30%, spec queries → Understanding 40%)
 - Specialized endpoints for individual embedding searches
 - Complete technical implementation details
-- Search response format with individual scores
+- Search response format with individual scores and weight_profile
 
 **[comprehensive-metadata-fields-guide.md](comprehensive-metadata-fields-guide.md)** - Comprehensive metadata fields guide ✨ NEW
 - 200+ metadata fields across 9 categories
@@ -222,7 +233,9 @@ Complete documentation for Material Kai Vision Platform.
 
 **[agent-system.md](agent-system.md)** - AI Agent system architecture
 - Database-driven agent prompts
-- 3 specialized agents (PDF Processor, Search, Product)
+- 4 specialized agents (Search, Insights, Interior Designer, Demo)
+- B2B research tools: manufacturer search, company enrichment, contact discovery, email validation
+- Email finder: Hunter.io + Apollo.io fallback, ZeroBounce validation on all discovered emails
 - Admin UI for prompt management (/admin/agent-configs)
 - LangChain.js tool orchestration
 - Real-time prompt updates (no deployment needed)
@@ -407,7 +420,7 @@ Complete documentation for Material Kai Vision Platform.
 - **8** AI models across 4 providers
 - **14** processing pipeline stages
 - **114** API endpoints (14 categories)
-- **6** embedding types
+- **7** embedding types with dynamic weight profiles
 - **200+** metafield types
 - **95%+** product detection accuracy
 - **85%+** search relevance
@@ -468,16 +481,19 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: January 18, 2026
-**Version**: 3.0.0
+**Last Updated**: February 12, 2026
+**Version**: 3.1.0
 **Status**: Production
 **Maintainer**: Development Team
 
 **Recent Changes:**
+- ✨ **NEW**: Query-Adaptive Weight Profiles - Dynamic 7-vector search weights selected per query intent (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced)
+- ✨ **NEW**: Frontend Code Splitting - React.lazy() on 60+ routes, main chunk reduced from 2,754KB to 221KB (-92%)
 - ✨ **NEW**: Web Scraping Integration - Complete Firecrawl integration with AI product discovery
 - ✨ **NEW**: Spaceformer Spatial Analysis - AI-powered room layout optimization
 - ✨ **NEW**: Price Monitoring System - Competitive price tracking with alerts
 - ✨ **NEW**: Saved Searches Deduplication - AI-powered search management
+- ✨ **NEW**: VR World Generation - WorldLabs Marble + Spark.js 3D viewer integration
 - ✨ **NEW**: Interior Design Generation - 14 AI models for interior design
 - ✨ **NEW**: Internal Credit System - Credit-based billing for AI operations
 - ✨ Updated API endpoint count to 150+ across 16 categories

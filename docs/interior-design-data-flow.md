@@ -220,5 +220,15 @@ WHERE id = 'job-uuid'
 | - | - | `metadata.models_results` |
 | `job_id` | `job_id` | `id` |
 
+## 🌐 Next Step: VR World Generation
+
+After the design images are rendered, users can click **"Generate VR"** on any image in the DesignCanvas to create an explorable 3D Gaussian Splat world via WorldLabs Marble API. The VR world appears as a new message in the agent chat with an embedded Spark.js viewer.
+
+**Flow:** DesignCanvas "Generate VR" → `generate-vr-world` Edge Function → WorldLabs API → `vr_worlds` table → WorldViewer (Spark.js)
+
+**Full documentation:** [vr-world-generation.md](vr-world-generation.md)
+
+---
+
 ## ✅ All Systems Aligned!
 

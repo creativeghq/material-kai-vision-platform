@@ -23,17 +23,17 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         components={{
           // Headings
           h1: ({ children }) => (
-            <h1 className="text-xl font-bold mt-4 mb-2 text-foreground">{children}</h1>
+            <h1 className="text-xl font-bold mt-4 mb-2 text-gray-900 dark:text-gray-100">{children}</h1>
           ),
           h2: ({ children }) => (
-            <h2 className="text-lg font-semibold mt-3 mb-2 text-foreground">{children}</h2>
+            <h2 className="text-lg font-semibold mt-3 mb-2 text-gray-900 dark:text-gray-100">{children}</h2>
           ),
           h3: ({ children }) => (
-            <h3 className="text-base font-semibold mt-2 mb-1 text-foreground">{children}</h3>
+            <h3 className="text-base font-semibold mt-2 mb-1 text-gray-900 dark:text-gray-100">{children}</h3>
           ),
           // Paragraphs
           p: ({ children }) => (
-            <p className="mb-2 text-sm leading-relaxed text-foreground/90">{children}</p>
+            <p className="mb-2 text-sm leading-relaxed text-gray-800 dark:text-gray-200">{children}</p>
           ),
           // Lists
           ul: ({ children }) => (
@@ -43,14 +43,14 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>
           ),
           li: ({ children }) => (
-            <li className="text-sm text-foreground/90">{children}</li>
+            <li className="text-sm text-gray-800 dark:text-gray-200">{children}</li>
           ),
           // Bold and italic
           strong: ({ children }) => (
-            <strong className="font-semibold text-foreground">{children}</strong>
+            <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
           ),
           em: ({ children }) => (
-            <em className="italic text-foreground/80">{children}</em>
+            <em className="italic text-gray-700 dark:text-gray-300">{children}</em>
           ),
           // Code
           code: ({ children, className }) => {

@@ -27,14 +27,51 @@ interface Design3DModalProps {
   onClose: () => void;
 }
 
+// Helper to extract string value from potential {value, confidence} wrapper
+const extractStringValue = (val: unknown): string => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
+    const innerValue = (val as Record<string, unknown>).value;
+    return typeof innerValue === 'string' ? innerValue : String(innerValue ?? '');
+  }
+  return typeof val === 'string' ? val : String(val);
+};
+
+// Normalize material data to match Product interface expected by ProductDetailModal
+const normalizeMaterial = (material: any) => ({
+  id: material.id || crypto.randomUUID(),
+  name: extractStringValue(material.name),
+  description: extractStringValue(material.description),
+  sku: material.sku || material.id?.substring(0, 8) || 'N/A',
+  category: material.category || material.type || 'other',
+  type: material.type || material.category || 'other',
+  status: material.status || 'active',
+  images: material.images || [],
+  metadata: material.metadata || {},
+  properties: material.properties || {},
+  specifications: material.specifications || {},
+  tags: material.tags || [],
+  pricing: material.pricing || {
+    retail: 0,
+    wholesale: 0,
+    currency: 'EUR',
+  },
+  stock: material.stock || {
+    quantity: 0,
+    status: 'Unknown',
+    unit: 'pcs',
+  },
+});
+
 const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose }) => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
   if (!design) return null;
 
-  const handleProductClick = (product: any) => {
-    setSelectedProduct(product);
+  const handleProductClick = (material: any) => {
+    // Normalize the material data before setting it
+    setSelectedProduct(normalizeMaterial(material));
     setIsProductModalOpen(true);
   };
 
@@ -131,10 +168,10 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose }
 
                     {/* Material Info */}
                     <h4 className="font-semibold text-gray-900 text-sm mb-1 line-clamp-2">
-                      {material.name}
+                      {extractStringValue(material.name)}
                     </h4>
                     <p className="text-xs text-gray-600 mb-2 line-clamp-2">
-                      {material.description}
+                      {extractStringValue(material.description)}
                     </p>
 
                     {/* Material Type Badge */}
@@ -146,7 +183,7 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose }
                         color: categoryColors[material.category] || categoryColors[material.type],
                       }}
                     >
-                      {material.type || material.category}
+                      {extractStringValue(material.type) || extractStringValue(material.category) || 'Material'}
                     </Badge>
                   </button>
                 ))}

@@ -21,6 +21,8 @@ import {
   X,
   Home,
   Search,
+  Globe,
+  Loader2,
 } from 'lucide-react';
 
 interface ModelResult {
@@ -67,6 +69,8 @@ interface DesignCanvasProps {
   onMaterialClick?: (materialId: string) => void;
   onViewAllMaterials?: () => void;
   onFindMaterials?: (imageUrl: string) => void; // NEW: Callback to trigger material search
+  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  vrGenerating?: boolean;
 }
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
@@ -82,6 +86,8 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   onMaterialClick,
   onFindMaterials,
   onViewAllMaterials,
+  onGenerateVR,
+  vrGenerating,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
@@ -231,6 +237,32 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
               {/* Action Buttons */}
               <div className="absolute top-4 right-4 flex gap-2 z-10">
+                {/* Generate VR Button */}
+                {onGenerateVR && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!vrGenerating) {
+                        onGenerateVR(images[currentImageIndex], {
+                          prompt: parsedRequest?.enhanced_prompt,
+                          roomType: parsedRequest?.room_type,
+                          style: parsedRequest?.style,
+                        });
+                      }
+                    }}
+                    disabled={vrGenerating}
+                    className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white rounded-lg transition-colors shadow-lg"
+                    title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                  >
+                    {vrGenerating ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Globe className="w-5 h-5" />
+                    )}
+                    <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
+                  </button>
+                )}
+
                 {/* Find Materials Button */}
                 {onFindMaterials && (
                   <button

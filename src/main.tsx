@@ -15,11 +15,11 @@ Sentry.init({
   // Setting this option to true will send default PII data to Sentry
   // For example, automatic IP address collection on events
   sendDefaultPii: true,
-  // Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring
   tracePropagationTargets: ['localhost', /^https:\/\/materialshub\.gr/, /^https:\/\/.*\.materialshub\.gr/],
-  tracesSampleRate: 1.0,
-  // Set profiles_sample_rate to 1.0 to profile 100% of sampled transactions
-  profilesSampleRate: 1.0,
+  // Production: sample 10% of transactions to reduce overhead (~50-100ms per page)
+  // Development: keep 100% for full visibility
+  tracesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0,
+  profilesSampleRate: import.meta.env.MODE === 'production' ? 0.1 : 1.0,
   // Capture Replay for 10% of all sessions,
   // plus for 100% of sessions with an error
   replaysSessionSampleRate: 0.1,

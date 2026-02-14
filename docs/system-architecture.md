@@ -117,9 +117,9 @@ Frontend (Vercel)
 - Type definitions
 
 **embeddings**
-- Vector storage (pgvector)
-- 6 types: text, visual, color, texture, application, semantic
-- Similarity indexes
+- Vector storage (pgvector 0.8.0, halfvec float16 — 50% storage savings)
+- 7 types: text, visual, understanding, color, texture, style, material
+- HNSW + IVFFlat similarity indexes (halfvec_cosine_ops)
 - Chunk/image references
 
 **background_jobs**
@@ -258,11 +258,17 @@ USING (workspace_id = auth.uid());
 
 **OpenAI**:
 - GPT-4o (Alternative discovery)
-- text-embedding-3-small (Text embeddings)
-- CLIP (5 embedding types)
+- text-embedding-3-small (Text embeddings, 1024D)
+
+**Voyage AI**:
+- voyage-3.5 (Text + understanding embeddings, 1024D)
+
+**SigLIP2 (SLIG)**:
+- Visual embeddings (768D) via HuggingFace Cloud Endpoint
+- 5 collections: visual, color, texture, style, material
 
 **Together AI**:
-- Qwen3-VL 17B Vision (Image analysis, OCR)
+- Qwen3-VL 17B Vision (Image analysis, OCR → feeds understanding embeddings)
 
 **Direct Vector DB RAG**:
 - Claude 4.5 + Multi-Vector Search (Document retrieval, synthesis)
@@ -298,7 +304,7 @@ USING (workspace_id = auth.uid());
 - Embedding caching
 
 **Indexing**:
-- pgvector indexes for similarity search
+- pgvector halfvec indexes for similarity search (HNSW + IVFFlat)
 - Full-text search indexes
 - Composite indexes
 
@@ -340,15 +346,22 @@ USING (workspace_id = auth.uid());
    ↓
 2. Frontend calls MIVAA search API
    ↓
-3. MIVAA generates query embedding
+3. Query Understanding (GPT-4o-mini)
+   → Extracts: colors, finish, dimensions, pattern, style, material_type
+   → Selects weight profile (e.g., "color_finish", "specification", "balanced")
    ↓
-4. pgvector similarity search
+4. Dynamic weight profile applied to 7-vector fusion
+   → 7 profiles: product_name, color_finish, specification,
+     texture_pattern, style_aesthetic, material_search, balanced
    ↓
-5. Results ranked and filtered
+5. Parallel embedding search (asyncio.gather)
+   → Text + Visual + Understanding + Color + Texture + Style + Material
    ↓
-6. Results returned to frontend
+6. Weighted score fusion using selected profile
    ↓
-7. Frontend displays results
+7. Metadata filtering + soft boosts
+   ↓
+8. Results returned to frontend (with weight_profile in metadata)
 ```
 
 ---

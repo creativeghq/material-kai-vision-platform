@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
@@ -506,6 +507,15 @@ Deno.serve(async (req) => {
     callPythonAPI(supabase, jobId, workspace_id, authHeader).catch((error) => {
       console.error(`Error calling Python API for job ${jobId}:`, error);
     });
+
+    // Emit flow event (fire-and-forget)
+    emitFlowEvent('product_added', {
+      job_id: jobId,
+      source: 'xml_import',
+      total_products: products.length,
+      category,
+      source_name: source_name || 'xml_upload',
+    }).catch(() => {});
 
     return new Response(
       JSON.stringify({

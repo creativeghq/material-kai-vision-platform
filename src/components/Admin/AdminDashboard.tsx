@@ -18,6 +18,7 @@ import {
   ScrollText,
   Mail,
   MessageSquare,
+  Workflow,
 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
@@ -169,6 +170,14 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/messaging',
         status: 'active',
         count: 'Twilio',
+      },
+      {
+        title: 'Flows',
+        description: 'Build visual workflow automations with triggers, conditions, and actions',
+        icon: Workflow,
+        path: '/admin/flows',
+        status: 'active',
+        count: 'Visual Builder',
       },
     ],
     'System Monitoring': [

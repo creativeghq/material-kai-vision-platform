@@ -266,6 +266,39 @@ print(f"Success: {result['clip_embeddings_generated']}/{result['images_saved']}"
 print(f"Failed: {len(result['failed_images'])}")
 ```
 
+## Understanding Embeddings (Qwen → Voyage AI)
+
+### Overview
+
+Understanding embeddings capture the structured knowledge from Qwen3-VL's vision analysis. Rather than embedding the raw image pixels (which SLIG does), understanding embeddings embed the **semantic description** of what was detected: material types, colors, textures, dimensions, finishes, and OCR text.
+
+### How It Works
+
+1. **Qwen3-VL Analysis** → Produces structured JSON (`vision_analysis`) with material type, colors, textures, properties, OCR text
+2. **JSON → Text Conversion** → Converts structured fields into descriptive text (e.g., "Material: porcelain tile. Colors: white, grey. Texture: matte. Dimensions: 60x120cm.")
+3. **Voyage AI Embedding** → Embeds the text via `voyage-3.5` with `input_type="document"` → 1024D vector
+4. **VECS Storage** → Stored in `image_understanding_embeddings` collection (1024D, HNSW index)
+
+### Search Flow
+
+1. **Query** → Embedded via Voyage AI with `input_type="query"` → 1024D vector
+2. **VECS Search** → Similarity search against understanding collection
+3. **Score Fusion** → Combined with 6 other embedding scores using weighted fusion
+
+### Pipeline Integration
+
+- **Background Processor** (Phase 2): Generates understanding embedding after Qwen analysis
+- **CLIP Job Service**: Generates understanding embedding for images with existing vision_analysis
+- **Regeneration Endpoint**: Includes understanding in embedding regeneration
+- **Backfill Script**: `scripts/backfill_understanding_embeddings.py` for existing images
+
+### Benefits
+
+- **Spec-based search**: Find "porcelain tile 60x120cm" or "R10 slip rating" through semantic matching
+- **OCR-aware**: Text detected in images is included in the embedding
+- **Property-aware**: Material properties, dimensions, finishes are all searchable
+- **Complements SLIG**: SLIG captures visual appearance; understanding captures semantic knowledge
+
 ## Future Enhancements
 
 1. **Parallel Batch Processing** - Process multiple batches concurrently

@@ -103,10 +103,11 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
   const loadImageEmbeddings = async (imageId: string) => {
     try {
-      // Load all embeddings from document_images table
+      // Load embedding indicators from document_images table
+      // Specialized embeddings (color, texture, style, material) are in VECS collections
       const { data: imageData, error: imageError } = await supabase
         .from('document_images')
-        .select('multimodal_fusion_embedding_2688, visual_clip_embedding_512, color_embedding_256, texture_embedding_256, application_embedding_512')
+        .select('visual_clip_embedding_512, vision_analysis')
         .eq('id', imageId)
         .single();
 
@@ -118,48 +119,42 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
 
       const embeddings = [];
 
-      // Add multimodal fusion embedding (2688D)
-      if (imageData?.multimodal_fusion_embedding_2688) {
-        embeddings.push({
-          embedding_type: 'Multimodal Fusion',
-          model_name: 'SigLIP-SO400M-14-384',
-          vector_dimensions: 2688,
-        });
-      }
-
-      // Add CLIP visual embedding (512D)
+      // Visual SLIG embedding (768D stored in visual_clip_embedding_512 column)
       if (imageData?.visual_clip_embedding_512) {
         embeddings.push({
-          embedding_type: 'Visual CLIP',
-          model_name: 'clip-vit-base-patch32',
-          vector_dimensions: 512,
+          embedding_type: 'Visual (SLIG)',
+          model_name: 'SigLIP2-SO400M',
+          vector_dimensions: 768,
+        });
+        // SLIG also generates 4 specialized embeddings in VECS collections
+        embeddings.push({
+          embedding_type: 'Color (SLIG)',
+          model_name: 'SigLIP2-SO400M',
+          vector_dimensions: 1152,
+        });
+        embeddings.push({
+          embedding_type: 'Texture (SLIG)',
+          model_name: 'SigLIP2-SO400M',
+          vector_dimensions: 1152,
+        });
+        embeddings.push({
+          embedding_type: 'Style (SLIG)',
+          model_name: 'SigLIP2-SO400M',
+          vector_dimensions: 1152,
+        });
+        embeddings.push({
+          embedding_type: 'Material (SLIG)',
+          model_name: 'SigLIP2-SO400M',
+          vector_dimensions: 1152,
         });
       }
 
-      // Add color embedding (256D)
-      if (imageData?.color_embedding_256) {
+      // Understanding embedding (1024D via Voyage AI from vision_analysis)
+      if (imageData?.vision_analysis) {
         embeddings.push({
-          embedding_type: 'Color',
-          model_name: 'clip-vit-base-patch32',
-          vector_dimensions: 256,
-        });
-      }
-
-      // Add texture embedding (256D)
-      if (imageData?.texture_embedding_256) {
-        embeddings.push({
-          embedding_type: 'Texture',
-          model_name: 'clip-vit-base-patch32',
-          vector_dimensions: 256,
-        });
-      }
-
-      // Add application embedding (512D)
-      if (imageData?.application_embedding_512) {
-        embeddings.push({
-          embedding_type: 'Application',
-          model_name: 'clip-vit-base-patch32',
-          vector_dimensions: 512,
+          embedding_type: 'Understanding',
+          model_name: 'Voyage AI 3.5',
+          vector_dimensions: 1024,
         });
       }
 

@@ -13,6 +13,7 @@ interface SearchResult {
   category?: string;
   relevanceScore: number;
   semanticScore?: number;
+  understandingScore?: number;
   qualityMetrics?: {
     precision?: number;
     recall?: number;
@@ -85,6 +86,7 @@ serve(async (req) => {
       category: result.category,
       relevanceScore: result.relevanceScore,
       semanticScore: result.semanticScore,
+      understandingScore: result.understandingScore,
       qualityMetrics: result.qualityMetrics,
     }));
 

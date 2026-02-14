@@ -49,8 +49,10 @@ import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
+import { WorldViewer } from './WorldViewer';
+import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
 
-// Agent definitions with RBAC
+// Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
   name: string;
@@ -59,6 +61,7 @@ interface AgentDefinition {
   color: string;
   requiredRole: 'viewer' | 'member' | 'admin' | 'owner';
   available: boolean;
+  defaultModel: string; // Default AI model for this agent
 }
 
 const AGENTS: AgentDefinition[] = [
@@ -70,6 +73,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
+    defaultModel: 'anthropic/claude-haiku-4-5-20251001', // Fast, cost-effective for search
   },
   {
     id: 'insights',
@@ -79,6 +83,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-amber-500',
     requiredRole: 'admin',
     available: true,
+    defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Balanced for analysis
   },
   {
     id: 'interior-designer',
@@ -88,6 +93,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
+    defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Creative tasks need better model
   },
   {
     id: 'demo',
@@ -97,6 +103,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-cyan-500',
     requiredRole: 'admin',
     available: true,
+    defaultModel: 'anthropic/claude-haiku-4-5-20251001', // Demo doesn't need expensive model
   },
 ];
 
@@ -168,6 +175,19 @@ interface Message {
     room_type?: string;
     style?: string;
   }; // Async 3D generation job info for progressive loading
+  worldData?: {
+    vrWorldId: string;
+    status: 'pending' | 'uploading' | 'generating' | 'completed' | 'failed';
+    splatUrl100k?: string;
+    splatUrl500k?: string;
+    splatUrlFull?: string;
+    colliderGlbUrl?: string;
+    panoramaUrl?: string;
+    thumbnailUrl?: string;
+    caption?: string;
+    sourceImageUrl?: string;
+    prompt?: string;
+  }; // VR world data from WorldLabs Marble
 }
 
 interface AgentHubProps {
@@ -183,7 +203,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 }) => {
   const { toast } = useToast();
   const [selectedAgent, setSelectedAgent] = useState<string>('search');
-  const [selectedModel, setSelectedModel] = useState<string>('anthropic/claude-sonnet-4-20250514');
+  // Initialize with search agent's default model
+  const [selectedModel, setSelectedModel] = useState<string>(
+    AGENTS.find(a => a.id === 'search')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929'
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
   const [input, setInput] = useState('');
@@ -197,9 +220,20 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [messageRatings, setMessageRatings] = useState<Record<string, 'up' | 'down' | null>>({});
+
+  // Real reasoning steps from agent (Jarvis-style)
+  const [reasoningSteps, setReasoningSteps] = useState<{
+    type: 'thinking' | 'tool_call' | 'tool_result' | 'iteration';
+    message: string;
+    timestamp: number;
+    tool?: string;
+  }[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // REMOVED: pdfInputRef - PDF processing moved to /admin/data-import page
+
+  // Track previous agent to detect actual agent switches
+  const previousAgentRef = useRef<string | null>(null);
 
   // Material Modal State
   const [showMaterialModal, setShowMaterialModal] = useState(false);
@@ -249,27 +283,66 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   useEffect(() => {
     if (!userId) return;
 
+    // Check if this is an actual agent switch (not initial load)
+    const isAgentSwitch = previousAgentRef.current !== null && previousAgentRef.current !== selectedAgent;
+    previousAgentRef.current = selectedAgent;
+
+    // Track if this effect is still active (for cleanup)
+    let isActive = true;
+
     const loadConversations = async () => {
       const convos = await agentChatHistoryService.getUserConversations(userId, selectedAgent);
 
-      // Clean up empty conversations (0 messages)
-      const emptyConvos = convos.filter(c => c.messageCount === 0);
+      // Clean up empty conversations (0 messages) - but only if they're old (>30 seconds)
+      // This prevents deleting a just-created conversation before messages are saved
+      const now = Date.now();
+      const emptyConvos = convos.filter(c => {
+        if (c.messageCount > 0) return false;
+        const createdAt = new Date(c.createdAt || c.lastMessageAt).getTime();
+        const ageMs = now - createdAt;
+        return ageMs > 30000; // Only delete if older than 30 seconds
+      });
       for (const emptyConvo of emptyConvos) {
         await agentChatHistoryService.deleteConversation(emptyConvo.id);
       }
 
-      // Filter out empty conversations from the list
-      const nonEmptyConvos = convos.filter(c => c.messageCount > 0);
-      setConversations(nonEmptyConvos);
+      // Only update state if effect is still active
+      if (!isActive) return;
 
-      // IMPORTANT: Reset current conversation when switching agents
-      // This prevents using a conversation ID from a different agent
-      setCurrentConversationId(null);
-      setMessages([]);
+      // Filter out empty conversations and deduplicate by ID
+      const nonEmptyConvos = convos.filter(c => c.messageCount > 0);
+      const uniqueConvos = nonEmptyConvos.reduce((acc, conv) => {
+        if (!acc.some(c => c.id === conv.id)) {
+          acc.push(conv);
+        }
+        return acc;
+      }, [] as typeof nonEmptyConvos);
+
+      setConversations(uniqueConvos);
+
+      // ONLY reset conversation when actually switching agents, not on initial load
+      // This prevents race condition where user starts chatting before effect completes
+      if (isAgentSwitch) {
+        setCurrentConversationId(null);
+        setMessages([]);
+      }
     };
 
     loadConversations();
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isActive = false;
+    };
   }, [userId, selectedAgent]);
+
+  // Update model when agent changes to use agent's default model
+  useEffect(() => {
+    const agent = AGENTS.find(a => a.id === selectedAgent);
+    if (agent?.defaultModel) {
+      setSelectedModel(agent.defaultModel);
+    }
+  }, [selectedAgent]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -296,6 +369,94 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Format elapsed time as seconds with 1 decimal
   const formatElapsedTime = (ms: number) => {
     return (ms / 1000).toFixed(1) + 's';
+  };
+
+  /**
+   * Transform raw reasoning data into Jarvis-style witty messages
+   * Personality: Dry wit, subtle humor, calm, measured, professional
+   */
+  const toJarvisStyle = (
+    type: 'thinking' | 'tool_call' | 'tool_result' | 'iteration',
+    data: { tool?: string; content?: string; result?: any; iteration?: number }
+  ): string => {
+    // Tool-specific Jarvis commentary
+    const toolMessages: Record<string, string[]> = {
+      material_search: [
+        'Scouring the material database. One moment while I work my magic.',
+        'Searching through rather a lot of materials for you, sir.',
+        'Running material analysis. The things I do for interior design.',
+      ],
+      vector_search: [
+        'Consulting the semantic archives. Fascinating stuff, really.',
+        'Performing vector analysis. It\'s more exciting than it sounds.',
+        'Semantic search initiated. Mathematics meets materials.',
+      ],
+      get_product_details: [
+        'Fetching product specifications. Every detail matters.',
+        'Pulling up the particulars. I do love a thorough dossier.',
+        'Gathering product intelligence. Consider it done.',
+      ],
+      analyze_image: [
+        'Examining the visual data. I see what you\'re going for.',
+        'Processing imagery. My visual acuity is rather exceptional.',
+        'Analyzing your reference. Excellent taste, if I may say.',
+      ],
+      generate_3d: [
+        'Generating 3D visualization. This is the fun part.',
+        'Rendering your vision. Stand by for something rather nice.',
+        'Creating dimensional imagery. Art and algorithms in harmony.',
+      ],
+      spatial_analysis: [
+        'Analyzing spatial configuration. Architecture is poetry, really.',
+        'Calculating dimensional relationships. Geometry at its finest.',
+        'Evaluating the spatial dynamics. Every room tells a story.',
+      ],
+    };
+
+    // Generic thinking messages
+    const thinkingMessages = [
+      'Processing your request. This shouldn\'t take long.',
+      'Analyzing the parameters. Bear with me.',
+      'Running calculations. The elegant kind.',
+      'Thinking this through. Properly, of course.',
+      'Considering the possibilities. There are several good ones.',
+    ];
+
+    // Iteration messages
+    const iterationMessages = [
+      'Making progress. Steady as she goes.',
+      'Refining the approach. Precision matters.',
+      'Working through the details. Almost there.',
+      'Iterating thoughtfully. Quality takes time.',
+    ];
+
+    // Tool result messages
+    const resultMessages = [
+      'Results acquired. Rather satisfying, actually.',
+      'Data retrieved successfully. As expected.',
+      'Information secured. Shall we proceed?',
+      'Analysis complete. The numbers look promising.',
+    ];
+
+    const pickRandom = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+
+    switch (type) {
+      case 'tool_call':
+        if (data.tool && toolMessages[data.tool]) {
+          return pickRandom(toolMessages[data.tool]);
+        }
+        return `Executing ${data.tool || 'operation'}. One moment.`;
+
+      case 'tool_result':
+        return pickRandom(resultMessages);
+
+      case 'iteration':
+        return pickRandom(iterationMessages);
+
+      case 'thinking':
+      default:
+        return data.content || pickRandom(thinkingMessages);
+    }
   };
 
   // Handle message rating
@@ -345,6 +506,62 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     );
   });
 
+  // Handle VR world generation from DesignCanvas
+  const handleGenerateVR = useCallback(async (
+    imageUrl: string,
+    context: { prompt?: string; roomType?: string; style?: string },
+    sourceMessage: Message,
+  ) => {
+    try {
+      // Trigger VR generation via edge function
+      const { vrWorldId } = await vrWorldService.generateVRWorld({
+        sourceImageUrl: imageUrl,
+        prompt: context.prompt || `Interior design: ${context.roomType || 'room'} in ${context.style || 'modern'} style`,
+        roomType: context.roomType,
+        style: context.style,
+      });
+
+      // Add a new assistant message with the WorldViewer
+      const vrMessage: Message = {
+        id: `vr-${Date.now()}`,
+        role: 'assistant',
+        content: `Generating an explorable VR world from your design. This takes about 30-45 seconds...`,
+        timestamp: new Date(),
+        agentId: 'interior-designer',
+        worldData: {
+          vrWorldId,
+          status: 'generating',
+          sourceImageUrl: imageUrl,
+          prompt: context.prompt,
+        },
+      };
+
+      setMessages((prev) => [...prev, vrMessage]);
+
+      // Save to DB
+      if (currentConversationId) {
+        await agentChatHistoryService.saveMessage({
+          conversationId: currentConversationId,
+          role: 'assistant',
+          content: vrMessage.content,
+          metadata: { worldData: vrMessage.worldData },
+        });
+      }
+
+      toast({
+        title: 'VR World Generation Started',
+        description: `Creating 3D world (${VR_CREDIT_COSTS['marble-0.1-mini']} credits). You can continue chatting.`,
+      });
+    } catch (error: any) {
+      console.error('VR generation error:', error);
+      toast({
+        title: 'VR Generation Failed',
+        description: error.message || 'Failed to start VR world generation',
+        variant: 'destructive',
+      });
+    }
+  }, [currentConversationId, toast]);
+
   const handleSendMessage = useCallback(async () => {
     console.log('🎯 handleSendMessage CALLED');
     console.log('Input:', input);
@@ -371,6 +588,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const userInput = input;
     setInput('');
     setIsLoading(true);
+    setReasoningSteps([]); // Clear reasoning steps for new message
     console.log('✅ State updated, starting try block');
 
     try {
@@ -391,7 +609,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         if (conversation) {
           conversationId = conversation.id;
           setCurrentConversationId(conversationId);
-          setConversations((prev) => [conversation, ...prev]);
+          // Add to conversations list, ensuring no duplicates
+          setConversations((prev) => {
+            // Check if conversation already exists (prevent duplicates)
+            if (prev.some(c => c.id === conversation.id)) {
+              return prev;
+            }
+            return [conversation, ...prev];
+          });
         }
       }
 
@@ -523,6 +748,66 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               const chunk = JSON.parse(line);
               chunkCount++;
               console.log(`Chunk #${chunkCount}:`, chunk.type);
+
+              // Capture reasoning steps for Jarvis-style display
+              if (chunk.type === 'status') {
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'iteration',
+                    message: 'Systems online. Beginning analysis.',
+                    timestamp: Date.now(),
+                  },
+                ]);
+              } else if (chunk.type === 'iteration') {
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'iteration',
+                    message: toJarvisStyle('iteration', { iteration: chunk.iteration }),
+                    timestamp: Date.now(),
+                  },
+                ]);
+              } else if (chunk.type === 'assistant_thinking') {
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'thinking',
+                    message: toJarvisStyle('thinking', { content: chunk.content }),
+                    timestamp: Date.now(),
+                  },
+                ]);
+              } else if (chunk.type === 'tool_call') {
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'tool_call',
+                    message: toJarvisStyle('tool_call', { tool: chunk.tool }),
+                    timestamp: Date.now(),
+                    tool: chunk.tool,
+                  },
+                ]);
+              } else if (chunk.type === 'tool_result') {
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'tool_result',
+                    message: toJarvisStyle('tool_result', { tool: chunk.tool, result: chunk.result }),
+                    timestamp: Date.now(),
+                    tool: chunk.tool,
+                  },
+                ]);
+              } else if (chunk.type === 'tool_error') {
+                setReasoningSteps((prev) => [
+                  ...prev,
+                  {
+                    type: 'tool_result',
+                    message: `Hmm, a minor setback with ${chunk.tool}. Adapting approach.`,
+                    timestamp: Date.now(),
+                    tool: chunk.tool,
+                  },
+                ]);
+              }
 
               // Handle generation_job_created - IMMEDIATE response
               if (chunk.type === 'generation_job_created') {
@@ -850,6 +1135,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           materialData: msg.metadata?.materialData as any | undefined,
           designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
           generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
+          worldData: msg.metadata?.worldData as any | undefined, // Restore VR world data
         })),
       );
     },
@@ -1160,10 +1446,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     </div>
                   )}
                   <div
-                    className={`${message.demoData || message.materialData || message.designData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
-                      message.role === 'user' 
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' 
-                        : 'glass-panel bg-white/60 border-white/40'
+                    className={`${message.demoData || message.materialData || message.designData || message.worldData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                        : 'bg-white/80 dark:bg-gray-800/80 border border-white/40 dark:border-gray-700/40 text-gray-900 dark:text-gray-100 backdrop-blur-sm shadow-sm'
                     }`}
                   >
                     {message.demoData ? (
@@ -1197,6 +1483,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                           parsedRequest={message.designData.parsedRequest}
                           qualityAssessment={message.designData.qualityAssessment}
                           processingTimeMs={message.designData.processingTimeMs}
+                          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                           onMaterialClick={(materialId) => {
                             console.log('Material clicked:', materialId);
                             // Could open material details modal or navigate
@@ -1244,6 +1531,30 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                             </div>
                           </div>
                         )}
+                      </div>
+                    ) : message.worldData ? (
+                      <div className="space-y-4">
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <WorldViewer
+                          vrWorldId={message.worldData.vrWorldId}
+                          initialStatus={message.worldData.status}
+                          splatUrls={{
+                            draft: message.worldData.splatUrl100k,
+                            standard: message.worldData.splatUrl500k,
+                            full: message.worldData.splatUrlFull,
+                          }}
+                          colliderUrl={message.worldData.colliderGlbUrl}
+                          caption={message.worldData.caption}
+                          onRetry={() => {
+                            if (message.worldData?.sourceImageUrl) {
+                              handleGenerateVR(
+                                message.worldData.sourceImageUrl,
+                                { prompt: message.worldData.prompt },
+                                message,
+                              );
+                            }
+                          }}
+                        />
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -1349,11 +1660,36 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         </span>
                       </div>
                       
-                      {/* Simulated Reasoning Trace */}
-                      <ul className="space-y-2 text-sm text-muted-foreground/80 border-l-2 border-primary/20 pl-4 ml-1">
-                        <li className="animate-fade-in">Analyzing material specifications...</li>
-                        {elapsedTime > 1500 && <li className="animate-fade-in">Cross-referencing sustainability scores...</li>}
-                        {elapsedTime > 3000 && <li className="animate-fade-in">Optimizing for lead times and regional availability...</li>}
+                      {/* Real Reasoning Steps - Jarvis Style */}
+                      <ul className="space-y-2 text-sm border-l-2 border-primary/20 pl-4 ml-1">
+                        {reasoningSteps.length === 0 ? (
+                          // Initial message while waiting for first step
+                          <li className="animate-fade-in text-muted-foreground/80 italic">
+                            Standing by. Processing your request...
+                          </li>
+                        ) : (
+                          // Real reasoning steps with Jarvis personality
+                          reasoningSteps.slice(-5).map((step, idx) => (
+                            <li
+                              key={`${step.timestamp}-${idx}`}
+                              className={cn(
+                                'animate-fade-in flex items-start gap-2',
+                                step.type === 'tool_call' && 'text-blue-600 dark:text-blue-400',
+                                step.type === 'tool_result' && 'text-green-600 dark:text-green-400',
+                                step.type === 'thinking' && 'text-amber-600 dark:text-amber-400 italic',
+                                step.type === 'iteration' && 'text-muted-foreground/80'
+                              )}
+                            >
+                              <span className="flex-shrink-0 mt-0.5">
+                                {step.type === 'tool_call' && '⚙️'}
+                                {step.type === 'tool_result' && '✓'}
+                                {step.type === 'thinking' && '💭'}
+                                {step.type === 'iteration' && '→'}
+                              </span>
+                              <span>{step.message}</span>
+                            </li>
+                          ))
+                        )}
                       </ul>
                     </div>
                   </div>

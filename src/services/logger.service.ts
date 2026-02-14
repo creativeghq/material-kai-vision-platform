@@ -324,8 +324,9 @@ class LoggerService {
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       };
 
-      // Send to backend (non-blocking)
-      fetch('/api/admin/logs/frontend', {
+      // Send to MIVAA backend (non-blocking)
+      const backendUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
+      fetch(`${backendUrl}/api/admin/logs/frontend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

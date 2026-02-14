@@ -41,10 +41,18 @@ MIVAA Python API (v1api.materialshub.gr)
 Required environment variables in Supabase:
 
 ```bash
+# Core
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ANTHROPIC_API_KEY=your-anthropic-api-key
 MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
+
+# B2B Research (Insights Agent)
+PERPLEXITY_API_KEY=your-perplexity-key      # Manufacturer search
+FIRECRAWL_API_KEY=your-firecrawl-key        # Website scraping
+APOLLO_API_KEY=your-apollo-key              # Company enrichment + email finder fallback
+HUNTER_API_KEY=your-hunter-key              # Domain search + person email finder
+ZEROBOUNCE_API_KEY=your-zerobounce-key      # Email validation (all discovered emails)
 ```
 
 ## Deployment
@@ -72,6 +80,13 @@ supabase link --project-ref bgbavxtjlbvgplozizxu
 ```bash
 supabase secrets set ANTHROPIC_API_KEY=your-key-here
 supabase secrets set MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
+
+# B2B Research tools (Insights Agent)
+supabase secrets set PERPLEXITY_API_KEY=your-key-here
+supabase secrets set FIRECRAWL_API_KEY=your-key-here
+supabase secrets set APOLLO_API_KEY=your-key-here
+supabase secrets set HUNTER_API_KEY=your-key-here
+supabase secrets set ZEROBOUNCE_API_KEY=your-key-here
 ```
 
 ### 5. Deploy the function

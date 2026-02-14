@@ -366,15 +366,16 @@ export class MivaaApiClient {
    * Multi-vector search - THE ONLY search method used in the platform
    * Uses consolidated /api/rag/search endpoint with strategy="multi_vector"
    *
-   * Combines 6 specialized CLIP embeddings with intelligent weighting:
-   * - text_embedding_1536 (20%) - Semantic understanding
-   * - visual_clip_embedding_512 (20%) - Visual similarity
-   * - color_clip_embedding_512 (15%) - Color palette matching
-   * - texture_clip_embedding_512 (15%) - Texture pattern matching
-   * - style_clip_embedding_512 (15%) - Design style matching
-   * - material_clip_embedding_512 (15%) - Material type matching
+   * 7-vector fusion search with intelligent weighting:
+   * - Text (15%) - Voyage AI 1024D semantic understanding
+   * - Visual (15%) - SLIG 768D visual similarity
+   * - Understanding (20%) - Voyage AI 1024D from Qwen3-VL vision analysis
+   * - Color (12.5%) - SLIG 1152D color palette matching
+   * - Texture (12.5%) - SLIG 1152D texture pattern matching
+   * - Style (12.5%) - SLIG 1152D design style matching
+   * - Material (12.5%) - SLIG 1152D material type matching
    *
-   * This replaces ALL previous search methods (semantic, visual, hybrid, material, etc.)
+   * All vectors stored as halfvec (float16) for 50% storage savings.
    */
   async searchMultiVector(payload: {
     query: string;

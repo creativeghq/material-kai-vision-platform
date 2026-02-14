@@ -234,6 +234,24 @@ serve(async (req) => {
         });
       }
 
+      case 'get-vapid-key': {
+        const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY');
+        if (!vapidPublicKey) {
+          return new Response(
+            JSON.stringify({ configured: false }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        return new Response(
+          JSON.stringify({ configured: true, publicKey: vapidPublicKey }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: 'Invalid action' }),

@@ -1,0 +1,68 @@
+export interface QuotePDFRequest {
+  quote_id: string;
+  regenerate?: boolean;
+}
+
+export interface QuotePDFResponse {
+  success: boolean;
+  quote_number?: string;
+  pdf_url?: string;
+  pdf_storage_path?: string;
+  error?: string;
+}
+
+export interface QuoteData {
+  id: string;
+  user_id: string;
+  workspace_id?: string;
+  name?: string;
+  quote_number?: string;
+  status: string;
+  notes?: string;
+  subtotal: number;
+  vat_rate: number;
+  vat_amount: number;
+  grand_total: number;
+  currency: string;
+  expires_at: string;
+  created_at: string;
+  items: QuoteItemData[];
+  client: ClientData;
+}
+
+export interface QuoteItemData {
+  id: string;
+  product_name: string;
+  sku: string | null;
+  selected_size: string | null;
+  selected_color: string | null;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  line_total: number;
+  notes: string | null;
+}
+
+export interface ClientData {
+  contact_name: string | null;
+  company_name: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  postal_code: string | null;
+  country: string | null;
+  vat_number: string | null;
+}
+
+export interface TemplateConfig {
+  cover_image_path: string;
+  backcover_image_path: string;
+  items_background_path: string;
+  company_name: string;
+  company_address: string;
+  company_phone: string;
+  company_email: string;
+  company_vat: string;
+  vat_rate_default: number;
+}

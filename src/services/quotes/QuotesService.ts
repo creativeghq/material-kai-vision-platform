@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 // =====================================================
 // INTERFACES
@@ -20,6 +21,16 @@ export interface Quote {
   created_at: string;
   updated_at: string;
   submitted_at?: string;
+  // PDF & pricing fields
+  quote_number?: string;
+  pdf_storage_path?: string;
+  pdf_generated_at?: string;
+  pdf_generation_status?: 'pending' | 'generating' | 'completed' | 'failed' | null;
+  subtotal?: number;
+  vat_rate?: number;
+  vat_amount?: number;
+  grand_total?: number;
+  currency?: string;
 }
 
 export interface QuoteItem {
@@ -32,6 +43,9 @@ export interface QuoteItem {
   added_at: string;
   selected_size?: string;
   selected_color?: string;
+  // Pricing fields
+  unit_price?: number;
+  line_total?: number;
 }
 
 export interface QuoteWithItems extends Quote {
@@ -155,6 +169,14 @@ export class QuotesService {
       .single();
 
     if (error) throw error;
+
+    flowEventService.emit('quote_requested', {
+      quote_id: quote.id,
+      user_id: user.id,
+      name: quote.name,
+      status: quote.status,
+    });
+
     return quote;
   }
 
@@ -302,6 +324,19 @@ export class QuotesService {
       .single();
 
     if (error) throw error;
+
+    if (data.status === 'accepted') {
+      flowEventService.emit('quote_approved', {
+        quote_id: quote.id,
+        user_id: quote.user_id,
+      });
+    } else if (data.status === 'rejected') {
+      flowEventService.emit('quote_rejected', {
+        quote_id: quote.id,
+        user_id: quote.user_id,
+      });
+    }
+
     return quote;
   }
 
@@ -344,6 +379,14 @@ export class QuotesService {
       .single();
 
     if (error) throw error;
+
+    flowEventService.emit('product_added_to_quote', {
+      quote_id: data.quote_id,
+      product_id: data.product_id,
+      quantity: data.quantity || 1,
+      added_from: data.added_from || 'manual',
+    });
+
     return item;
   }
 

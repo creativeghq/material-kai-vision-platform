@@ -57,24 +57,45 @@ The platform uses two advanced AI systems working together:
 
 ### Multi-Vector Search Architecture
 
-The platform uses a sophisticated **6-embedding fusion system** that combines multiple AI models in parallel for maximum search accuracy:
+The platform uses a sophisticated **7-embedding fusion system** that combines multiple AI models in parallel for maximum search accuracy:
 
-**Embedding Types & Weights:**
-- **Text Embedding (20%)** - Semantic understanding from product names, descriptions, and metadata
-- **Visual Embedding (20%)** - General visual similarity using SigLIP 1152D embeddings
-- **Color Embedding (15%)** - Specialized color palette matching
-- **Texture Embedding (15%)** - Surface pattern and texture recognition
-- **Style Embedding (15%)** - Design aesthetic and style matching
-- **Material Embedding (15%)** - Material type and category classification
+**Embedding Types & Default Weights (Balanced Profile):**
+- **Text Embedding (15%)** - Semantic understanding from product names, descriptions, and metadata
+- **Visual Embedding (15%)** - General visual similarity using SigLIP 768D embeddings
+- **Understanding Embedding (20%)** - Spec-based search from Qwen3-VL analysis via Voyage AI (1024D)
+- **Color Embedding (12.5%)** - Specialized color palette matching
+- **Texture Embedding (12.5%)** - Surface pattern and texture recognition
+- **Style Embedding (12.5%)** - Design aesthetic and style matching
+- **Material Embedding (12.5%)** - Material type and category classification
+
+> **Note:** These are the default "balanced" weights. The system dynamically adjusts weights per-query using **Query-Adaptive Weight Profiles** — see below.
 
 **How It Works:**
 
-1. **Query Processing** - Your search query is converted into a visual embedding
-2. **Parallel Search** - All 5 visual embedding collections are searched simultaneously using async processing
-3. **Text Scoring** - Keyword matching is performed on product metadata in parallel
-4. **Score Fusion** - Results from all 6 embeddings are combined with intelligent weighting
-5. **Metadata Filtering** - Your filters are applied as soft boosts to improve relevance
-6. **Final Ranking** - Products are sorted by combined score and returned
+1. **Query Understanding** - GPT-4o-mini parses the query into structured fields (colors, finish, dimensions, pattern, style, etc.)
+2. **Weight Profile Selection** - `_select_weight_profile()` picks optimal weights based on detected fields (e.g., color queries upweight color embedding to 30%)
+3. **Query Processing** - Your search query is converted into visual and understanding embeddings
+4. **Parallel Search** - All 6 embedding collections are searched simultaneously using async processing
+5. **Text Scoring** - Keyword matching is performed on product metadata in parallel
+6. **Score Fusion** - Results from all 7 embeddings are combined using the selected weight profile
+7. **Metadata Filtering** - Your filters are applied as soft boosts to improve relevance
+8. **Final Ranking** - Products are sorted by combined score and returned
+
+**Query-Adaptive Weight Profiles:**
+
+The system selects from 7 weight profiles based on query intent:
+
+| Profile | When Selected | Key Emphasis |
+|---------|--------------|--------------|
+| `product_name` | Brand or product name detected | Text 40% |
+| `color_finish` | Color or finish terms present | Color 30% |
+| `specification` | Dimensions detected (e.g., 60x120cm) | Understanding 40% |
+| `texture_pattern` | Pattern terms present | Texture 30% |
+| `style_aesthetic` | Style or application terms | Style 25% |
+| `material_search` | Explicit material type | Material 25% |
+| `balanced` | No specific signal (default) | Even distribution |
+
+Profile selection is tracked in `search_query_tracking` for analytics.
 
 **Performance:**
 - Typical search time: 300-500ms
@@ -152,7 +173,7 @@ The platform uses advanced AI to ensure accurate results:
 The image search system is designed for speed and accuracy:
 
 - **Fast Search** - Multi-vector search returns results in 300-500ms
-- **Parallel Processing** - All 5 visual embeddings searched simultaneously
+- **Parallel Processing** - All 6 embedding collections searched simultaneously
 - **Efficient Storage** - Images are optimized and cached for quick loading
 - **Scalable** - Handles thousands of images without slowing down
 - **Reliable** - Built on enterprise-grade infrastructure
@@ -165,21 +186,23 @@ The multi-vector search uses advanced async programming to achieve maximum perfo
 
 **Architecture:**
 ```
-Query → Generate Embedding → Search 5 Collections in Parallel
-                              ├─ Visual (SigLIP 1152D)
-                              ├─ Color (CLIP 512D)
-                              ├─ Texture (CLIP 512D)
-                              ├─ Style (CLIP 512D)
-                              └─ Material (CLIP 512D)
-                              ↓
-                         Combine Scores → Apply Filters → Return Results
+Query → Generate Embeddings → Search 6 Collections in Parallel
+                               ├─ Visual (SigLIP 768D)
+                               ├─ Understanding (Voyage AI 1024D)
+                               ├─ Color (SigLIP 768D)
+                               ├─ Texture (SigLIP 768D)
+                               ├─ Style (SigLIP 768D)
+                               └─ Material (SigLIP 768D)
+                               ↓
+                          Combine Scores → Apply Filters → Return Results
 ```
 
 **Key Technologies:**
 - **asyncio.gather()** - Executes all searches simultaneously
 - **asyncio.to_thread()** - Runs blocking VECS queries in thread pool
 - **VECS (pgvector)** - Vector similarity search on PostgreSQL
-- **SigLIP & CLIP** - State-of-the-art vision-language models
+- **SigLIP2** - State-of-the-art vision-language model (768D visual embeddings)
+- **Voyage AI** - Text embedding model for understanding embeddings (1024D)
 
 **Performance Benefits:**
 - 3-4x faster than sequential execution
@@ -214,6 +237,7 @@ The multi-vector search returns detailed scoring information:
     "score": 0.87,
     "text_score": 0.85,
     "visual_score": 0.92,
+    "understanding_score": 0.94,
     "color_score": 0.88,
     "texture_score": 0.81,
     "style_score": 0.79,
@@ -222,7 +246,7 @@ The multi-vector search returns detailed scoring information:
   }],
   "total_results": 10,
   "processing_time": 0.345,
-  "embeddings_used": ["text", "visual", "color", "texture", "style", "material"]
+  "embeddings_used": ["text", "visual", "understanding", "color", "texture", "style", "material"]
 }
 ```
 

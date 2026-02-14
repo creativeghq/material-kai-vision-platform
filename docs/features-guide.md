@@ -54,9 +54,10 @@ POST /api/v1/pdf/upload
 - Precision: 88%+
 
 **3. Multi-Vector Search** ✅
-- Combines 3 embeddings: text (40%), visual (30%), multimodal (30%)
-- Text + visual understanding
-- Weighted cosine similarity
+- 7-vector fusion: text, visual, understanding, color, texture, style, material
+- Understanding embeddings enable spec-based search (dimensions, finishes, properties)
+- **Query-adaptive weight profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected based on query intent
+- GPT-4o-mini parses query → selects optimal weights → adjusts fusion scoring per search
 - Response time: <200ms
 - Best for: Complex queries
 
@@ -539,6 +540,45 @@ POST /api/images/upload-and-analyze
 - Upsells management
 - Timeline management
 - Expiration tracking
+
+---
+
+### 17. VR World Generation
+
+**Purpose**: Generate explorable 3D worlds from interior design images using WorldLabs Marble API
+
+**Status:** ✅ Complete (Production Ready)
+
+**Key Features**:
+- ✅ One-click "Generate VR" on any interior design image
+- ✅ 3D Gaussian Splat rendering via Spark.js
+- ✅ Orbit controls (drag to rotate, scroll to zoom)
+- ✅ First-person navigation (WASD + mouse look + Shift for speed)
+- ✅ Navigation mode toggle (Orbit / Walk)
+- ✅ 3 quality levels (Draft 100k, Standard 500k, Full)
+- ✅ Fullscreen mode
+- ✅ Adaptive status polling with loading animations
+- ✅ Credit-based pricing with refund on failure
+- ✅ Persists across chat sessions
+
+**Models**:
+- `marble-0.1-mini`: 50 credits, ~30-45 seconds
+- `marble-0.1-plus`: 200 credits, ~5 minutes
+
+**Output Assets**:
+- SPZ files (3 quality levels — Gaussian Splats)
+- Collider GLB (collision mesh for navigation)
+- Panorama image (360 render)
+- Thumbnail (preview)
+- AI-generated caption
+
+**Components**:
+- Edge Function: `generate-vr-world`
+- Frontend: `WorldViewer.tsx` (Spark.js renderer)
+- Service: `vrWorldService.ts`
+- Database: `vr_worlds` table
+
+**Documentation**: [vr-world-generation.md](vr-world-generation.md)
 
 ---
 

@@ -75,6 +75,17 @@ const extractValue = (val: unknown): string | undefined => {
   return String(val);
 };
 
+// Safe string extraction for direct JSX rendering (prevents React error #310)
+const safeString = (val: unknown, fallback = ''): string => {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
+    const innerValue = (val as Record<string, unknown>).value;
+    return innerValue != null ? String(innerValue) : fallback;
+  }
+  if (typeof val === 'object') return fallback;
+  return String(val);
+};
+
 // Get category-specific color theme
 const getCategoryTheme = (category: MaterialCategory): { primary: string; secondary: string } => {
   const themes: Record<MaterialCategory, { primary: string; secondary: string }> = {
@@ -222,7 +233,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             document_chunks (
               id,
               content,
-              page_number,
+              metadata,
               chunk_index
             )
           `)
@@ -230,7 +241,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           .order('relevance_score', { ascending: false });
 
         if (chunkError) {
-          console.error('[ProductDetailModal] Error loading chunks:', chunkError);
+          console.error('[ProductDetailModal] Error loading chunks:', JSON.stringify(chunkError));
           setChunks([]);
         } else if (chunkRelations && chunkRelations.length > 0) {
           const loadedChunks = chunkRelations
@@ -238,7 +249,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             .map(rel => ({
               id: rel.document_chunks.id,
               content: rel.document_chunks.content,
-              page_number: rel.document_chunks.page_number,
+              page_number: rel.document_chunks.metadata?.page_number ?? null,
               chunk_index: rel.document_chunks.chunk_index,
               relevance_score: rel.relevance_score,
             }));
@@ -793,12 +804,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
               </div>
               <DialogTitle className="text-3xl font-bold text-gray-900 mb-1">
-                {product.name}
+                {safeString(product.name, 'Unnamed Product')}
               </DialogTitle>
               <div className="flex items-center gap-3 text-sm text-gray-600">
                 {collection && <span className="font-medium">{collection}</span>}
                 <span className="text-gray-400">•</span>
-                <span>SKU: {product.sku}</span>
+                <span>SKU: {safeString(product.sku, 'N/A')}</span>
               </div>
             </div>
             <Badge
@@ -810,11 +821,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 border: '1px solid',
               }}
             >
-              {product.status}
+              {safeString(product.status, 'active')}
             </Badge>
           </div>
           <DialogDescription className="text-base text-gray-700 mt-3">
-            {product.description}
+            {safeString(product.description)}
           </DialogDescription>
         </DialogHeader>
 
@@ -974,14 +985,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <span className="text-sm font-medium text-gray-700">In Stock:</span>
                     <Badge
                       className={`text-sm px-3 py-1 ${
-                        product.stock.status === 'High'
+                        product.stock?.status === 'High'
                           ? 'bg-green-100 text-green-800 border-green-300'
-                          : product.stock.status === 'Medium'
+                          : product.stock?.status === 'Medium'
                             ? 'bg-yellow-100 text-yellow-800 border-yellow-300'
                             : 'bg-red-100 text-red-800 border-red-300'
                       }`}
                     >
-                      {product.stock.quantity} {product.stock.unit}
+                      {product.stock?.quantity ?? 0} {product.stock?.unit ?? 'pcs'}
                     </Badge>
                   </div>
                 </div>

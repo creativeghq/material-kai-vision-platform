@@ -9,6 +9,7 @@
 
 import { mivaaApi } from './mivaaApiClient';
 import { ErrorHandler } from '../utils/errorHandler';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 // ==================== TYPE DEFINITIONS ====================
 
@@ -16,8 +17,8 @@ import { ErrorHandler } from '../utils/errorHandler';
  * Search strategy for the platform
  *
  * ONLY 'multi_vector' is supported and used throughout the platform.
- * This is the default and only search method, combining 6 specialized CLIP embeddings
- * (text 20%, visual 20%, color 15%, texture 15%, style 15%, material 15%)
+ * This is the default and only search method, combining 7-vector fusion embeddings
+ * (text 15%, visual 15%, understanding 20%, color 12.5%, texture 12.5%, style 12.5%, material 12.5%)
  * + JSONB metadata filtering + query understanding support.
  */
 export type SearchStrategy = 'multi_vector';
@@ -70,6 +71,7 @@ export interface SearchResult {
   similarity_score: number;
   combined_score: number;
   keyword_score?: number;
+  understanding_score?: number;
 
   // Context
   page_number: number;
@@ -178,10 +180,15 @@ export class UnifiedSearchService {
         throw new Error(response.error || 'Search failed');
       }
 
-      return {
-        success: true,
-        ...response.data,
-      };
+      const result = { success: true, ...response.data };
+
+      flowEventService.emit('search_executed', {
+        query: request.query,
+        result_count: result.total_results ?? result.results?.length ?? 0,
+        search_type: request.strategy || 'multi_vector',
+      });
+
+      return result;
     } catch (error) {
       const searchError = ErrorHandler.handleError(error, {
         query: request.query,
@@ -205,7 +212,7 @@ export class UnifiedSearchService {
 
   /**
    * 🎯 Multi-Vector Search - The ONLY search method used in the platform
-   * Combines 6 specialized CLIP embeddings + metadata filtering + query understanding (enabled by default)
+   * Combines 7-vector fusion embeddings + metadata filtering + query understanding (enabled by default)
    *
    * This method replaces all previous search methods (semantic, visual, hybrid, material, etc.)
    * All search functionality now uses multi_vector strategy exclusively.

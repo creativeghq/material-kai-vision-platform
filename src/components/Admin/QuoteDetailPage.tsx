@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, Clock, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Tag, Timer, Download, RefreshCw, Save } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Textarea } from '@/components/core/ui/textarea';
 import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline } from '@/services/quotes/QuotesService';
+import { quotesService, QuoteWithItems, StatusTag, Upsell, QuoteUpsell, TimelineStep, QuoteTimeline, QuoteItemWithProduct } from '@/services/quotes/QuotesService';
+import { quotePDFService } from '@/services/quotes/QuotePDFService';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { QuoteItemsList } from '@/components/business/quotes/QuoteItemsList';
 import { AddProductsSheet } from '@/components/business/quotes/AddProductsSheet';
@@ -57,6 +58,15 @@ export const QuoteDetailPage: React.FC = () => {
   // Add Products Sheet state
   const [isAddProductsOpen, setIsAddProductsOpen] = useState(false);
 
+  // Pricing state
+  const [itemPrices, setItemPrices] = useState<Record<string, string>>({});
+  const [vatRate, setVatRate] = useState<string>('24');
+  const [savingPrices, setSavingPrices] = useState(false);
+
+  // PDF generation state
+  const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [downloadingPDF, setDownloadingPDF] = useState(false);
+
   useEffect(() => {
     if (id) {
       loadQuoteDetails();
@@ -74,6 +84,19 @@ export const QuoteDetailPage: React.FC = () => {
       setLoading(true);
       const data = await quotesService.getQuote(id);
       setQuote(data);
+      // Initialize pricing state from loaded data
+      if (data?.items) {
+        const prices: Record<string, string> = {};
+        data.items.forEach((item: QuoteItemWithProduct) => {
+          if (item.unit_price !== null && item.unit_price !== undefined) {
+            prices[item.id] = String(item.unit_price);
+          }
+        });
+        setItemPrices(prices);
+      }
+      if (data?.vat_rate) {
+        setVatRate(String(data.vat_rate));
+      }
     } catch (error) {
       console.error('Error loading quote:', error);
       toast({
@@ -295,6 +318,86 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
+  // Pricing helpers
+  const getItemLineTotal = (itemId: string, quantity: number): number => {
+    const price = parseFloat(itemPrices[itemId] || '0');
+    return price * quantity;
+  };
+
+  const pricingSubtotal = (quote?.items || []).reduce((sum, item) => {
+    return sum + getItemLineTotal(item.id, item.quantity);
+  }, 0);
+
+  const pricingVatRate = parseFloat(vatRate) || 0;
+  const pricingVatAmount = pricingSubtotal * (pricingVatRate / 100);
+  const pricingGrandTotal = pricingSubtotal + pricingVatAmount;
+
+  const allItemsHavePrices = (quote?.items || []).length > 0 &&
+    (quote?.items || []).every(item => {
+      const price = parseFloat(itemPrices[item.id] || '');
+      return !isNaN(price) && price > 0;
+    });
+
+  const handleSavePrices = async () => {
+    if (!quote?.id || !quote.items) return;
+    try {
+      setSavingPrices(true);
+      const items = quote.items.map(item => ({
+        id: item.id,
+        unit_price: parseFloat(itemPrices[item.id] || '0'),
+        line_total: getItemLineTotal(item.id, item.quantity),
+      }));
+      const result = await quotePDFService.saveItemPrices(quote.id, items, pricingVatRate);
+      if (result.success) {
+        toast({ title: 'Prices saved', description: 'Item prices and totals updated.' });
+        await loadQuoteDetails();
+      } else {
+        toast({ title: 'Error', description: result.error || 'Failed to save prices', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error saving prices:', error);
+      toast({ title: 'Error', description: 'Failed to save prices', variant: 'destructive' });
+    } finally {
+      setSavingPrices(false);
+    }
+  };
+
+  const handleGeneratePDF = async () => {
+    if (!quote?.id) return;
+    try {
+      setGeneratingPDF(true);
+      const regenerate = !!quote.pdf_storage_path;
+      const result = await quotePDFService.generatePDF(quote.id, regenerate);
+      if (result.success) {
+        toast({ title: 'PDF Generated', description: `Quote ${result.quote_number || ''} PDF is ready.` });
+        await loadQuoteDetails();
+      } else {
+        toast({ title: 'PDF Generation Failed', description: result.error || 'Unknown error', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({ title: 'Error', description: 'Failed to generate PDF', variant: 'destructive' });
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!quote?.id) return;
+    try {
+      setDownloadingPDF(true);
+      const downloaded = await quotePDFService.downloadPDF(quote.id);
+      if (!downloaded) {
+        toast({ title: 'Error', description: 'PDF not available. Generate it first.', variant: 'destructive' });
+      }
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast({ title: 'Error', description: 'Failed to download PDF', variant: 'destructive' });
+    } finally {
+      setDownloadingPDF(false);
+    }
+  };
+
   const handleStatusTagChange = async (tagId: string) => {
     if (!quote) return;
 
@@ -389,6 +492,42 @@ export const QuoteDetailPage: React.FC = () => {
           </Button>
 
           <div className="flex items-center gap-3">
+            {/* PDF Actions */}
+            {quote.pdf_storage_path && quote.pdf_generation_status === 'completed' && (
+              <>
+                {quote.quote_number && (
+                  <Badge variant="outline" className="font-mono">{quote.quote_number}</Badge>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadPDF}
+                  disabled={downloadingPDF}
+                >
+                  {downloadingPDF ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-1" />
+                  )}
+                  Download PDF
+                </Button>
+              </>
+            )}
+            <Button
+              size="sm"
+              onClick={handleGeneratePDF}
+              disabled={generatingPDF || !allItemsHavePrices}
+              title={!allItemsHavePrices ? 'Set prices for all items first' : undefined}
+            >
+              {generatingPDF ? (
+                <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Generating...</>
+              ) : quote.pdf_storage_path ? (
+                <><RefreshCw className="h-4 w-4 mr-1" /> Regenerate PDF</>
+              ) : (
+                <><FileText className="h-4 w-4 mr-1" /> Generate PDF</>
+              )}
+            </Button>
+
             {/* Quote Status Badge */}
             <Badge className={`border ${getStatusColor(quote.status)}`}>
               {quote.status}
@@ -616,12 +755,16 @@ export const QuoteDetailPage: React.FC = () => {
           </div>
         )}
 
-        {/* Tabs - Reduced to 4 tabs (removed Overview) */}
+        {/* Tabs */}
         <Tabs defaultValue="items" className="w-full">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="items" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Boxes className="h-4 w-4" />
               Items ({itemCount})
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <DollarSign className="h-4 w-4" />
+              Pricing
             </TabsTrigger>
             <TabsTrigger value="extras" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Gift className="h-4 w-4" />
@@ -654,6 +797,118 @@ export const QuoteDetailPage: React.FC = () => {
               }}
               editable={quote.status !== 'accepted' && quote.status !== 'rejected'}
             />
+          </TabsContent>
+
+          {/* Pricing Tab */}
+          <TabsContent value="pricing" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Set Item Prices
+                </CardTitle>
+                <CardDescription>
+                  Set a unit price for each item. Line totals and the grand total are calculated automatically.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(quote.items || []).length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">No items in this quote.</p>
+                ) : (
+                  <>
+                    {/* Pricing Table */}
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-muted/50">
+                            <th className="text-left text-xs font-medium text-muted-foreground p-3">Product</th>
+                            <th className="text-left text-xs font-medium text-muted-foreground p-3 w-20">Qty</th>
+                            <th className="text-left text-xs font-medium text-muted-foreground p-3 w-32">Unit Price</th>
+                            <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Line Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(quote.items || []).map((item, idx) => {
+                            const lineTotal = getItemLineTotal(item.id, item.quantity);
+                            return (
+                              <tr key={item.id} className={idx % 2 === 1 ? 'bg-muted/20' : ''}>
+                                <td className="p-3">
+                                  <div className="font-medium text-sm">{item.product?.name || 'Unknown'}</div>
+                                  {item.selected_size && (
+                                    <span className="text-xs text-muted-foreground">{item.selected_size}</span>
+                                  )}
+                                  {item.selected_color && (
+                                    <span className="text-xs text-muted-foreground ml-2">{item.selected_color}</span>
+                                  )}
+                                </td>
+                                <td className="p-3 text-sm">{item.quantity}</td>
+                                <td className="p-3">
+                                  <div className="relative">
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">€</span>
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="0.00"
+                                      className="pl-6 h-8 w-28"
+                                      value={itemPrices[item.id] || ''}
+                                      onChange={(e) => setItemPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="p-3 text-right text-sm font-semibold">
+                                  €{lineTotal.toFixed(2)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Totals Summary */}
+                    <div className="mt-6 flex justify-end">
+                      <div className="w-72 space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Subtotal</span>
+                          <span className="font-medium">€{pricingSubtotal.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">VAT</span>
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              className="h-7 w-16 text-center text-xs"
+                              value={vatRate}
+                              onChange={(e) => setVatRate(e.target.value)}
+                            />
+                            <span className="text-muted-foreground text-xs">%</span>
+                          </div>
+                          <span className="font-medium">€{pricingVatAmount.toFixed(2)}</span>
+                        </div>
+                        <div className="border-t pt-3 flex justify-between">
+                          <span className="font-semibold">Grand Total</span>
+                          <span className="font-bold text-lg">€{pricingGrandTotal.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="mt-6 flex justify-end">
+                      <Button onClick={handleSavePrices} disabled={savingPrices}>
+                        {savingPrices ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+                        ) : (
+                          <><Save className="h-4 w-4 mr-2" /> Save Prices</>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Extras Tab */}

@@ -40,6 +40,7 @@ console.log('✅ process.env polyfill set up for npm packages');
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 import { getSkillsForAgent, getSkillContent } from '../_shared/skills-loader.ts';
+import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 // We use dynamic imports for libraries that might access process.env at top-level
 // This ensures the polyfill runs BEFORE these modules are loaded
@@ -689,6 +690,118 @@ const createSearchTool = (workspaceId: string) => {
       schema: z.object({
         query: z.string().describe('Search query - be specific and detailed'),
         limit: z.number().default(10).describe('Maximum number of results to return'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Knowledge Base Search
+ * Searches Knowledge Base for articles, guides, and documentation
+ * Returns relevant articles if found, helping the agent answer user questions
+ */
+const createKnowledgeBaseSearchTool = (workspaceId: string) => {
+  return tool(
+    async ({ query, searchTypes = ['chunks', 'products'], topK = 5 }) => {
+      try {
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+
+        console.log(`📚 Knowledge Base search: query="${query}", workspace="${workspaceId}"`);
+        const startTime = Date.now();
+
+        // Add timeout to prevent edge function from hanging
+        const TIMEOUT_MS = 60000; // 1 minute for KB search
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          const response = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search/knowledge-base`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query,
+              workspace_id: workspaceId,
+              search_types: searchTypes,
+              top_k: topK,
+              similarity_threshold: 0.6, // Lower threshold to catch more relevant articles
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ Knowledge Base API responded in ${elapsed}ms`);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Knowledge Base API error: ${response.status} - ${errorText}`);
+            throw new Error(`Knowledge Base API error: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+
+          // Format results for the agent
+          const results = {
+            found: false,
+            totalResults: data.total_results || 0,
+            articles: [] as any[],
+            products: [] as any[],
+          };
+
+          // Process chunks as articles/documentation
+          if (data.chunks && data.chunks.length > 0) {
+            results.found = true;
+            results.articles = data.chunks.map((chunk: any) => ({
+              content: chunk.content || chunk.text,
+              documentTitle: chunk.document_title || chunk.metadata?.title || 'Knowledge Base Article',
+              category: chunk.category || chunk.metadata?.category || 'general',
+              relevanceScore: chunk.relevance_score || chunk.similarity_score || 0,
+            }));
+          }
+
+          // Include product information if relevant
+          if (data.products && data.products.length > 0) {
+            results.found = true;
+            results.products = data.products.map((product: any) => ({
+              name: product.name,
+              description: product.description,
+              metadata: product.metadata,
+              relevanceScore: product.relevance_score || 0,
+            }));
+          }
+
+          console.log(`✅ Knowledge Base search returned ${results.totalResults} results (${results.articles.length} articles, ${results.products.length} products)`);
+          return JSON.stringify(results);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            const elapsed = Date.now() - startTime;
+            console.error(`⏱️ Knowledge Base API timeout after ${elapsed}ms`);
+            return JSON.stringify({
+              found: false,
+              error: 'Knowledge Base search timeout. Proceeding with general knowledge.',
+              timeout: true,
+            });
+          }
+          throw fetchError;
+        }
+      } catch (error) {
+        console.error('Knowledge Base search error:', error);
+        return JSON.stringify({
+          found: false,
+          error: error instanceof Error ? error.message : 'Knowledge Base search failed',
+        });
+      }
+    },
+    {
+      name: 'knowledge_base_search',
+      description: 'Search the Knowledge Base for articles, guides, installation instructions, and documentation. Use this FIRST when users ask how-to questions, troubleshooting, or general information queries. If articles are found, use them to provide accurate answers. If no articles are found, proceed to answer using your general knowledge.',
+      schema: z.object({
+        query: z.string().describe('Search query - describe what information the user is looking for'),
+        searchTypes: z.array(z.string()).default(['chunks', 'products']).describe('Types to search: chunks (articles/text), products'),
+        topK: z.number().default(5).describe('Maximum number of results to return'),
       }),
     }
   );
@@ -2631,17 +2744,216 @@ const createCompanyEnrichmentTool = (onProgress?: (status: string) => void) => {
 };
 
 /**
+ * ZeroBounce Email Validation Helper
+ * Validates a single email address and returns detailed status
+ */
+async function validateEmailWithZeroBounce(
+  email: string,
+  onProgress?: (status: string) => void
+): Promise<{
+  validated: boolean;
+  status?: string;
+  sub_status?: string;
+  free_email?: boolean;
+  mx_found?: string;
+  firstname?: string;
+  lastname?: string;
+  domain?: string;
+  error?: string;
+}> {
+  const ZEROBOUNCE_API_KEY = Deno.env.get('ZEROBOUNCE_API_KEY');
+  if (!ZEROBOUNCE_API_KEY) {
+    return { validated: false, error: 'ZEROBOUNCE_API_KEY not configured' };
+  }
+
+  try {
+    onProgress?.(`Validating ${email}...`);
+
+    const validateUrl = new URL('https://api.zerobounce.net/v2/validate');
+    validateUrl.searchParams.set('api_key', ZEROBOUNCE_API_KEY);
+    validateUrl.searchParams.set('email', email);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(validateUrl.toString(), {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return { validated: false, error: `ZeroBounce API error: ${response.status}` };
+    }
+
+    const data = await response.json();
+    return {
+      validated: true,
+      status: data.status,
+      sub_status: data.sub_status,
+      free_email: data.free_email,
+      mx_found: data.mx_found,
+      firstname: data.firstname,
+      lastname: data.lastname,
+      domain: data.domain,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { validated: false, error: 'ZeroBounce validation timeout' };
+    }
+    return { validated: false, error: error instanceof Error ? error.message : 'Validation failed' };
+  }
+}
+
+/**
  * B2B Research Tool: Contact Discovery
- * Uses Hunter.io API to find decision-maker email addresses
+ * Uses Hunter.io Email Finder + domain search, Apollo.io fallback, and ZeroBounce validation
  */
 const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
   return tool(
-    async ({ domain, roles }) => {
+    async ({ domain, roles, first_name, last_name, full_name, company_name }) => {
       try {
-        console.log(`📧 Discovering contacts for domain: ${domain}`);
         const startTime = Date.now();
+        const isPersonSearch = !!(first_name || last_name || full_name);
 
-        // Send progress update
+        // ── Person-specific email finding ──────────────────────────────
+        if (isPersonSearch) {
+          const personLabel = full_name || `${first_name || ''} ${last_name || ''}`.trim();
+          console.log(`📧 Finding email for person: ${personLabel} at ${domain || company_name}`);
+          onProgress?.(`Finding email for ${personLabel}...`);
+
+          let foundEmail: string | null = null;
+          let confidence = 0;
+          let position = '';
+          let source = '';
+          let fallbackUsed = false;
+
+          // Step 1: Try Hunter.io Email Finder
+          const HUNTER_API_KEY = Deno.env.get('HUNTER_API_KEY');
+          if (HUNTER_API_KEY) {
+            onProgress?.(`Searching Hunter.io for ${personLabel}...`);
+            const finderUrl = new URL('https://api.hunter.io/v2/email-finder');
+            finderUrl.searchParams.set('api_key', HUNTER_API_KEY);
+            if (domain) finderUrl.searchParams.set('domain', domain);
+            if (company_name && !domain) finderUrl.searchParams.set('company', company_name);
+            if (first_name) finderUrl.searchParams.set('first_name', first_name);
+            if (last_name) finderUrl.searchParams.set('last_name', last_name);
+            if (full_name && !first_name && !last_name) finderUrl.searchParams.set('full_name', full_name);
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+            try {
+              const response = await fetch(finderUrl.toString(), { signal: controller.signal });
+              clearTimeout(timeoutId);
+
+              if (response.ok) {
+                const data = await response.json();
+                const result = data.data;
+                if (result?.email) {
+                  foundEmail = result.email;
+                  confidence = result.score || 0;
+                  position = result.position || '';
+                  source = 'hunter.io';
+                  console.log(`✅ Hunter Email Finder: ${foundEmail} (confidence: ${confidence})`);
+                }
+              } else {
+                console.warn(`⚠️ Hunter Email Finder error: ${response.status}`);
+              }
+            } catch (fetchError) {
+              clearTimeout(timeoutId);
+              console.warn(`⚠️ Hunter Email Finder failed:`, fetchError instanceof Error ? fetchError.message : fetchError);
+            }
+          }
+
+          // Step 2: Fallback to Apollo.io People Match if Hunter failed or low confidence
+          if (!foundEmail || confidence < 50) {
+            const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY');
+            if (APOLLO_API_KEY) {
+              onProgress?.(`Trying Apollo.io for ${personLabel}...`);
+              fallbackUsed = true;
+
+              const apolloBody: Record<string, string> = {};
+              if (first_name) apolloBody.first_name = first_name;
+              if (last_name) apolloBody.last_name = last_name;
+              if (full_name && !first_name && !last_name) apolloBody.name = full_name;
+              if (domain) apolloBody.domain = domain;
+              if (company_name) apolloBody.organization_name = company_name;
+
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+              try {
+                const response = await fetch('https://api.apollo.io/api/v1/people/match', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'X-Api-Key': APOLLO_API_KEY,
+                  },
+                  body: JSON.stringify(apolloBody),
+                  signal: controller.signal,
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                  const data = await response.json();
+                  const person = data.person;
+                  if (person?.email) {
+                    foundEmail = person.email;
+                    confidence = person.email_status === 'verified' ? 95 : 60;
+                    position = person.title || position;
+                    source = 'apollo.io';
+                    console.log(`✅ Apollo People Match: ${foundEmail} (status: ${person.email_status})`);
+                  }
+                } else {
+                  console.warn(`⚠️ Apollo People Match error: ${response.status}`);
+                }
+              } catch (fetchError) {
+                clearTimeout(timeoutId);
+                console.warn(`⚠️ Apollo People Match failed:`, fetchError instanceof Error ? fetchError.message : fetchError);
+              }
+            }
+          }
+
+          if (!foundEmail) {
+            const elapsed = Date.now() - startTime;
+            return JSON.stringify({
+              success: true,
+              found: false,
+              message: `No email found for ${personLabel}`,
+              fallback_used: fallbackUsed,
+              elapsed_ms: elapsed,
+            });
+          }
+
+          // Step 3: Validate with ZeroBounce
+          onProgress?.(`Validating ${foundEmail} with ZeroBounce...`);
+          const validation = await validateEmailWithZeroBounce(foundEmail, onProgress);
+
+          const elapsed = Date.now() - startTime;
+          console.log(`✅ Person email discovery completed in ${elapsed}ms`);
+
+          return JSON.stringify({
+            success: true,
+            found: true,
+            email: foundEmail,
+            first_name: first_name || full_name?.split(' ')[0] || '',
+            last_name: last_name || full_name?.split(' ').slice(1).join(' ') || '',
+            position,
+            confidence,
+            source,
+            fallback_used: fallbackUsed,
+            validation: validation.validated ? {
+              status: validation.status,
+              sub_status: validation.sub_status,
+              free_email: validation.free_email,
+              mx_found: validation.mx_found,
+            } : { status: 'unverified', error: validation.error },
+            elapsed_ms: elapsed,
+          });
+        }
+
+        // ── Domain search (existing behavior, enhanced with validation) ──
+        console.log(`📧 Discovering contacts for domain: ${domain}`);
         onProgress?.(`Finding contacts for ${domain}...`);
 
         const HUNTER_API_KEY = Deno.env.get('HUNTER_API_KEY');
@@ -2652,7 +2964,6 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
           });
         }
 
-        // Search for contacts using Hunter.io domain search with timeout (20 seconds)
         const TIMEOUT_MS = 20000;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -2689,14 +3000,10 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
         }
 
         const data = await response.json();
-        const elapsed = Date.now() - startTime;
-        console.log(`✅ Contact discovery completed in ${elapsed}ms`);
-
         const emails = data.data?.emails || [];
         const organization = data.data?.organization || '';
         const pattern = data.data?.pattern || '';
 
-        // Filter and prioritize contacts based on requested roles
         const priorityRoles = roles || ['export', 'sales', 'director', 'manager', 'owner', 'ceo', 'founder'];
 
         const scoredContacts = emails.map((email: any) => {
@@ -2705,7 +3012,7 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
 
           for (let i = 0; i < priorityRoles.length; i++) {
             if (position.includes(priorityRoles[i].toLowerCase())) {
-              roleScore = priorityRoles.length - i; // Higher score for earlier roles in priority list
+              roleScore = priorityRoles.length - i;
               break;
             }
           }
@@ -2723,19 +3030,41 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
           };
         });
 
-        // Sort by role score (descending), then by confidence (descending)
         scoredContacts.sort((a: any, b: any) => {
           if (b.role_score !== a.role_score) return b.role_score - a.role_score;
           return b.confidence - a.confidence;
         });
 
+        // Validate top 5 contacts with ZeroBounce
+        const topContacts = scoredContacts.slice(0, 10);
+        const MAX_VALIDATIONS = 5;
+        onProgress?.(`Validating top ${Math.min(MAX_VALIDATIONS, topContacts.length)} emails with ZeroBounce...`);
+
+        let validatedCount = 0;
+        for (let i = 0; i < topContacts.length && validatedCount < MAX_VALIDATIONS; i++) {
+          if (topContacts[i].email) {
+            const validation = await validateEmailWithZeroBounce(topContacts[i].email);
+            topContacts[i].validation = validation.validated ? {
+              status: validation.status,
+              sub_status: validation.sub_status,
+              free_email: validation.free_email,
+              mx_found: validation.mx_found,
+            } : { status: 'unverified', error: validation.error };
+            validatedCount++;
+          }
+        }
+
+        const elapsed = Date.now() - startTime;
+        console.log(`✅ Contact discovery completed in ${elapsed}ms`);
+
         return JSON.stringify({
           success: true,
-          domain: domain,
-          organization: organization,
+          domain,
+          organization,
           email_pattern: pattern,
-          contacts: scoredContacts.slice(0, 10),
+          contacts: topContacts,
           total_found: emails.length,
+          validated_count: validatedCount,
           elapsed_ms: elapsed,
           source: 'hunter.io',
         });
@@ -2749,10 +3078,83 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
     },
     {
       name: 'contact_discovery',
-      description: 'Find decision-maker email addresses for a company domain. Prioritizes contacts based on specified roles like export managers, sales directors, owners.',
+      description: 'Find email addresses for a company domain or a specific person. Can search all contacts at a domain, or find a specific person\'s email by name. Falls back to Apollo.io if Hunter.io has low confidence. Validates all discovered emails with ZeroBounce.',
       schema: z.object({
-        domain: z.string().describe('Company website domain (e.g., "paradyz.com")'),
-        roles: z.array(z.string()).optional().describe('Priority roles to find (e.g., ["export", "sales", "director"])'),
+        domain: z.string().optional().describe('Company website domain (e.g., "paradyz.com")'),
+        roles: z.array(z.string()).optional().describe('Priority roles to find in domain search (e.g., ["export", "sales", "director"])'),
+        first_name: z.string().optional().describe('First name of the specific person to find'),
+        last_name: z.string().optional().describe('Last name of the specific person to find'),
+        full_name: z.string().optional().describe('Full name of the person (alternative to first_name + last_name)'),
+        company_name: z.string().optional().describe('Company name (used when domain is not available)'),
+      }),
+    }
+  );
+};
+
+/**
+ * B2B Research Tool: Email Validation
+ * Uses ZeroBounce API to validate email addresses on demand
+ */
+const createEmailValidateTool = (onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ email, emails }) => {
+      try {
+        const emailsToValidate = emails || (email ? [email] : []);
+        if (emailsToValidate.length === 0) {
+          return JSON.stringify({ success: false, error: 'No email(s) provided' });
+        }
+
+        // Cap at 10 to avoid excessive API usage
+        const capped = emailsToValidate.slice(0, 10);
+        console.log(`✉️ Validating ${capped.length} email(s) with ZeroBounce`);
+        const startTime = Date.now();
+
+        const ZEROBOUNCE_API_KEY = Deno.env.get('ZEROBOUNCE_API_KEY');
+        if (!ZEROBOUNCE_API_KEY) {
+          return JSON.stringify({
+            success: false,
+            error: 'ZEROBOUNCE_API_KEY not configured. Please add it to Supabase secrets.',
+          });
+        }
+
+        onProgress?.(`Validating ${capped.length} email(s)...`);
+
+        const results = [];
+        for (const addr of capped) {
+          const validation = await validateEmailWithZeroBounce(addr);
+          results.push({
+            email: addr,
+            ...validation,
+          });
+        }
+
+        const elapsed = Date.now() - startTime;
+        const validCount = results.filter((r) => r.status === 'valid').length;
+        const invalidCount = results.filter((r) => r.status === 'invalid').length;
+        console.log(`✅ Email validation completed in ${elapsed}ms: ${validCount} valid, ${invalidCount} invalid`);
+
+        return JSON.stringify({
+          success: true,
+          results,
+          total: results.length,
+          valid_count: validCount,
+          invalid_count: invalidCount,
+          elapsed_ms: elapsed,
+        });
+      } catch (error) {
+        console.error('Email validation error:', error);
+        return JSON.stringify({
+          success: false,
+          error: error instanceof Error ? error.message : 'Email validation failed',
+        });
+      }
+    },
+    {
+      name: 'email_validate',
+      description: 'Validate email addresses using ZeroBounce. Returns detailed status: valid, invalid, catch-all, spamtrap, abuse, do_not_mail, or unknown. Use this to verify emails before outreach.',
+      schema: z.object({
+        email: z.string().optional().describe('Single email address to validate'),
+        emails: z.array(z.string()).optional().describe('Array of email addresses to validate (max 10)'),
       }),
     }
   );
@@ -2922,7 +3324,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Search Agent',
     description: 'Material search and discovery',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis'],
+    tools: ['knowledge_base_search', 'material_search', 'image_analysis'],
     // systemPrompt loaded from database
   },
   insights: {
@@ -2934,7 +3336,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Sub-agent orchestration tools
       'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis', 'material_search',
       // B2B Research tools
-      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'save_to_crm'
+      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'
     ],
     // systemPrompt loaded from database
     // NOTE: This agent orchestrates sub-agents for specialized analysis tasks
@@ -3069,6 +3471,12 @@ async function executeAgent(
   console.log(`🔍 Should enable material search: ${shouldEnableMaterialSearch}`);
   console.log(`🛠️ Agent tools config: ${JSON.stringify(config.tools)}`);
 
+  // Knowledge Base search - always add first for Search Agent to check KB before answering
+  if (config.tools.includes('knowledge_base_search')) {
+    console.log(`📚 Knowledge Base search enabled for ${agentId}`);
+    tools.push(createKnowledgeBaseSearchTool(workspaceId));
+  }
+
   if (config.tools.includes('material_search')) {
     // For Interior Designer: Only add tool if user explicitly asks
     if (agentId === 'interior-designer') {
@@ -3156,6 +3564,9 @@ async function executeAgent(
   }
   if (config.tools.includes('contact_discovery')) {
     tools.push(createContactDiscoveryTool(sendProgress));
+  }
+  if (config.tools.includes('email_validate')) {
+    tools.push(createEmailValidateTool(sendProgress));
   }
   if (config.tools.includes('save_to_crm')) {
     tools.push(createSaveToCRMTool(userId, sendProgress));
@@ -3686,6 +4097,36 @@ Deno.serve(async (req) => {
           // 🧠 Extract and store memories from conversation (non-blocking)
           extractAndStoreMemories(userId, workspaceId, agentId, userInput, finalResult.text, finalResult.toolResults)
             .catch(err => console.warn('⚠️ Memory extraction failed:', err));
+
+          // 🔄 Emit flow events based on tool results (fire-and-forget)
+          if (finalResult.toolResults?.length) {
+            for (const tr of finalResult.toolResults) {
+              if (tr.tool === 'material_search' && tr.result?.results?.length) {
+                emitFlowEvent('agent_search_completed', {
+                  query: tr.args?.query || userInput,
+                  result_count: tr.result.results.length,
+                  agent_id: agentId,
+                  user_id: userId,
+                }).catch(() => {});
+                emitFlowEvent('search_executed', {
+                  query: tr.args?.query || userInput,
+                  result_count: tr.result.results.length,
+                  search_type: 'agent',
+                  agent_id: agentId,
+                  user_id: userId,
+                }).catch(() => {});
+              }
+              if (tr.tool === 'image_analysis' && tr.result?.success) {
+                emitFlowEvent('agent_image_analyzed', {
+                  image_url: tr.args?.imageUrl,
+                  analysis_type: tr.args?.analysisType,
+                  category: tr.result.materials?.[0]?.category,
+                  agent_id: agentId,
+                  user_id: userId,
+                }).catch(() => {});
+              }
+            }
+          }
 
           // Log usage and debit credits (non-blocking)
           if (finalResult.usage && finalResult.usage.totalTokens > 0) {

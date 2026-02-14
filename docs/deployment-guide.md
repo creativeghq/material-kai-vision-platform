@@ -16,33 +16,45 @@
 
 ### **GitHub Secrets**
 
-| Secret Name | Type | Where Used | Description | Example/Format |
-|------------|------|------------|-------------|----------------|
-| `GH_TOKEN` | **Secret** | GitHub Actions | Personal access token for deployments | `ghp_xxxxxxxxxxxxxxxxxxxx` |
-| `VERCEL_TOKEN` | **Secret** | GitHub Actions | Vercel deployment token | `xxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `VERCEL_ORG_ID` | Public | GitHub Actions | Vercel organization ID | `team_xxxxxxxxxxxxxxxx` |
-| `VERCEL_PROJECT_ID` | Public | GitHub Actions | Vercel project ID | `prj_xxxxxxxxxxxxxxxx` |
-| `SSH_PRIVATE_KEY` | **Secret** | GitHub Actions | SSH key for server deployment | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `SSH_HOST` | Public | GitHub Actions | Server hostname | `v1api.materialshub.gr` |
-| `SSH_USER` | Public | GitHub Actions | SSH username | `root` or `deploy` |
+Set these in **GitHub repo > Settings > Secrets and variables > Actions**.
+
+| Secret Name | Type | Used By Workflow | Description | Example/Format |
+|------------|------|------------------|-------------|----------------|
+| `SUPABASE_ACCESS_TOKEN` | **Secret** | `deploy.yml`, `update-supabase-types.yml` | Supabase CLI access token for deploying edge functions and generating types | `sbp_xxxxxxxxxxxxxxxx` |
+| `SUPABASE_PROJECT_ID` | **Secret** | `deploy.yml`, `update-supabase-types.yml` | Supabase project reference ID | `bgbavxtjlbvgplozizxu` |
+| `VERCEL_TOKEN` | **Secret** | `deploy.yml` | Vercel deployment token | `xxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VERCEL_ORG_ID` | Public | `deploy.yml` | Vercel organization ID | `team_xxxxxxxxxxxxxxxx` |
+| `VERCEL_PROJECT_ID` | Public | `deploy.yml` | Vercel project ID | `prj_xxxxxxxxxxxxxxxx` |
+| `GH_TOKEN` | **Secret** | `ai-changelog-update.yml`, `deploy-docs.yml` | GitHub personal access token (cross-repo access) | `ghp_xxxxxxxxxxxxxxxxxxxx` |
+| `OPENAI_API_KEY` | **Secret** | `ai-changelog-update.yml` | OpenAI API key for AI-powered changelog analysis | `sk-proj-xxxxxxxxxxxxxxxx` |
+| `SSH_PRIVATE_KEY` | **Secret** | Backend deployment (manual/orchestrated) | SSH key for MIVAA server deployment | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `SSH_HOST` | Public | Backend deployment (manual/orchestrated) | Server hostname | `v1api.materialshub.gr` |
+| `SSH_USER` | Public | Backend deployment (manual/orchestrated) | SSH username | `root` or `deploy` |
 
 ### **Vercel Environment Variables**
 
-| Secret Name | Type | Environment | Description | Example/Format |
+Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` prefixed vars are exposed to the frontend at build time via `import.meta.env.VITE_*`.
+
+> **Important**: Variable names must match exactly as listed below (with `VITE_` prefix). The frontend code reads them via `import.meta.env.VITE_SUPABASE_URL`, not `import.meta.env.SUPABASE_URL`.
+
+| Variable Name | Type | Environment | Description | Example/Format |
 |------------|------|-------------|-------------|----------------|
-| `SUPABASE_URL` | Public | Production, Preview | Supabase project URL | `https://bgbavxtjlbvgplozizxu.supabase.co` |
-| `SUPABASE_ANON_KEY` | Public | Production, Preview | Supabase anonymous key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Secret** | Production | Service role key for Edge Functions | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `MIVAA_GATEWAY_URL` | Public | Production, Preview | MIVAA API endpoint | `https://v1api.materialshub.gr` |
-| `MIVAA_API_KEY` | **Secret** | Production | MIVAA JWT token | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `VITE_OPENAI_API_KEY` | **Secret** | Production | OpenAI API key | `sk-proj-xxxxxxxxxxxxxxxx` |
-| `VITE_ANTHROPIC_API_KEY` | **Secret** | Production | Anthropic API key | `sk-ant-xxxxxxxxxxxxxxxx` |
-| `VITE_REPLICATE_API_TOKEN` | **Secret** | Production | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Public | Production, Preview | Stripe publishable key | `pk_test_...` or `pk_live_...` |
+| `VITE_SUPABASE_URL` | Public | Production, Preview | Supabase project URL | `https://bgbavxtjlbvgplozizxu.supabase.co` |
+| `VITE_SUPABASE_ANON_KEY` | Public | Production, Preview | Supabase anonymous/publishable key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `VITE_MIVAA_API_URL` | Public | Production, Preview | MIVAA Python backend URL (PDF processing, AI metrics, images) | `https://v1api.materialshub.gr` |
+| `VITE_MIVAA_SERVICE_URL` | Public | Production, Preview | MIVAA service URL (PDF upload progress) | `https://v1api.materialshub.gr` |
+| `VITE_MIVAA_GATEWAY_URL` | Public | Production, Preview | MIVAA gateway URL (admin temp file cleanup) | `https://v1api.materialshub.gr` |
+| `VITE_WS_URL` | Public | Production, Preview | WebSocket URL for real-time features | `wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1` |
 | `VITE_STRIPE_PRO_PRICE_ID` | Public | Production, Preview | Stripe price ID for Pro subscription | `price_...` |
 | `VITE_STRIPE_ENTERPRISE_PRICE_ID` | Public | Production, Preview | Stripe price ID for Enterprise subscription | `price_...` |
+| `VITE_STRIPE_CREDITS_100_PRICE_ID` | Public | Production, Preview | Stripe price ID for 100-credit pack | `price_...` |
+| `VITE_STRIPE_CREDITS_500_PRICE_ID` | Public | Production, Preview | Stripe price ID for 500-credit pack | `price_...` |
+| `VITE_STRIPE_CREDITS_1000_PRICE_ID` | Public | Production, Preview | Stripe price ID for 1000-credit pack | `price_...` |
+| `VITE_STRIPE_CREDITS_5000_PRICE_ID` | Public | Production, Preview | Stripe price ID for 5000-credit pack | `price_...` |
 | `NODE_ENV` | Public | Production | Node environment | `production` |
 | `VITE_DEBUG` | Public | Production, Preview | Debug mode | `false` (production), `true` (preview) |
+
+> **Source**: These variables are type-defined in [`src/vite-env.d.ts`](../src/vite-env.d.ts) and consumed throughout `src/services/` and `src/components/`.
 
 ### **Backend/MIVAA Service Secrets**
 
@@ -250,49 +262,62 @@ SLIG_NAMESPACE=basiliskan
 
 #### **Core Secrets**
 
-| Secret Name | Type | Where Set | Description | Example/Format |
-|------------|------|-----------|-------------|----------------|
-| `ANTHROPIC_API_KEY` | **Secret** | Supabase Dashboard | Claude API key for agent chat | `sk-ant-xxxxxxxxxxxxxxxx` |
-| `VOYAGE_API_KEY` | **Secret** | Supabase Dashboard | Voyage AI API key for embeddings | `pa-xxxxxxxxxxxxxxxx` |
-| `FIRECRAWL_API_KEY` | **Secret** | Supabase Dashboard | Firecrawl API for price monitoring cron | `fc-xxxxxxxxxxxxxxxx` |
-| `MIVAA_SERVICE_URL` | Public | Supabase Dashboard | MIVAA API endpoint | `https://v1api.materialshub.gr` |
-| `MIVAA_API_KEY` | **Secret** | Supabase Dashboard | MIVAA API authentication (optional) | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `SSH_HOST` | Public | Supabase Dashboard | Server hostname for health checks | `v1api.materialshub.gr` |
-| `SSH_USER` | Public | Supabase Dashboard | SSH username for server monitoring | `root` or `deploy` |
-| `SSH_PRIVATE_KEY` | **Secret** | Supabase Dashboard | SSH private key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `SENTRY_AUTH_TOKEN` | **Secret** | Supabase Dashboard | Sentry API token for error queries | `sntrys_xxxxxxxxxxxxxxxx` |
-| `STRIPE_SECRET_KEY` | **Secret** | Supabase Dashboard | Stripe secret key for payments | `sk_test_...` or `sk_live_...` |
-| `STRIPE_WEBHOOK_SECRET` | **Secret** | Supabase Dashboard | Stripe webhook signing secret | `whsec_...` |
-| `STRIPE_PRO_PRICE_ID` | Public | Supabase Dashboard | Stripe price ID for Pro subscription | `price_...` |
-| `STRIPE_ENTERPRISE_PRICE_ID` | Public | Supabase Dashboard | Stripe price ID for Enterprise subscription | `price_...` |
-| `AWS_REGION` | Public | Supabase Dashboard | AWS region for SES | `us-east-1` |
-| `AWS_ACCESS_KEY_ID` | **Secret** | Supabase Dashboard | AWS IAM access key for SES | `AKIAXXXXXXXXXXXXXXXX` |
-| `AWS_SECRET_ACCESS_KEY` | **Secret** | Supabase Dashboard | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TWILIO_ACCOUNT_SID` | **Secret** | Supabase Dashboard | Twilio Account SID for SMS/WhatsApp | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TWILIO_AUTH_TOKEN` | **Secret** | Supabase Dashboard | Twilio Auth Token for authentication | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `ANTHROPIC_API_KEY` | **Secret** | `agent-chat`, `ai-rerank`, `suggest-fields`, `xml-import-orchestrator` | Claude API key | `sk-ant-xxxxxxxxxxxxxxxx` |
+| `FIRECRAWL_API_KEY` | **Secret** | `scrape-single-page`, `scrape-preview`, `suggest-fields`, `price-monitoring`, `agent-chat` | Firecrawl web scraping API | `fc-xxxxxxxxxxxxxxxx` |
+| `STRIPE_SECRET_KEY` | **Secret** | `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`, `stripe-webhooks` | Stripe secret key for payments | `sk_test_...` or `sk_live_...` |
+| `STRIPE_WEBHOOK_SECRET` | **Secret** | `stripe-webhooks` | Stripe webhook signing secret | `whsec_...` |
+| `STRIPE_PRO_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Pro subscription | `price_...` |
+| `STRIPE_ENTERPRISE_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Enterprise subscription | `price_...` |
+| `MIVAA_GATEWAY_URL` | Public | `agent-chat`, `_shared/embedding-utils.ts` | MIVAA gateway URL (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
+| `MIVAA_SERVICE_URL` | Public | `agent-chat`, `scrape-session-manager` | MIVAA service URL (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
+| `MIVAA_API_KEY` | **Secret** | `scrape-session-manager`, `agent-chat`, `_shared/config.ts`, `_shared/embedding-utils.ts` | MIVAA API authentication | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `SENTRY_AUTH_TOKEN` | **Secret** | `_shared/sentry.ts` | Sentry API token for error queries | `sntrys_xxxxxxxxxxxxxxxx` |
+
+#### **Email & Messaging Secrets**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `AWS_REGION` | Public | `email-api` | AWS region for SES (default: `us-east-1`) | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | **Secret** | `email-api` | AWS IAM access key for SES | `AKIAXXXXXXXXXXXXXXXX` |
+| `AWS_SECRET_ACCESS_KEY` | **Secret** | `email-api` | AWS IAM secret key for SES | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `SES_CONFIGURATION_SET_NAME` | Public | `email-api` | AWS SES configuration set for tracking | `materialkai-ses-config` |
+| `TWILIO_ACCOUNT_SID` | **Secret** | `messaging-processor`, `messaging-api` | Twilio Account SID for SMS/WhatsApp | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `TWILIO_AUTH_TOKEN` | **Secret** | `messaging-processor`, `messaging-api` | Twilio Auth Token for authentication | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
 
 #### **Agent Chat & AI Research Secrets**
 
-| Secret Name | Type | Where Set | Description | Example/Format |
-|------------|------|-----------|-------------|----------------|
-| `PERPLEXITY_API_KEY` | **Secret** | Supabase Dashboard | Perplexity AI for web research | `pplx-xxxxxxxxxxxxxxxx` |
-| `APOLLO_API_KEY` | **Secret** | Supabase Dashboard | Apollo.io for company/contact enrichment | `xxxxxxxxxxxxxxxxxxxxxxxx` |
-| `HUNTER_API_KEY` | **Secret** | Supabase Dashboard | Hunter.io for email finding | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `PERPLEXITY_API_KEY` | **Secret** | `agent-chat` | Perplexity AI for web research | `pplx-xxxxxxxxxxxxxxxx` |
+| `APOLLO_API_KEY` | **Secret** | `agent-chat` | Apollo.io for company/contact enrichment + email finder fallback | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `HUNTER_API_KEY` | **Secret** | `agent-chat` | Hunter.io for domain search + person email finder | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `ZEROBOUNCE_API_KEY` | **Secret** | `agent-chat` | ZeroBounce for email validation (all discovered emails) | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+
+#### **VR World Generation**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `WORLDLABS_API_KEY` | **Secret** | `generate-vr-world` | WorldLabs Marble API key for 3D Gaussian Splat world generation | `wl_xxxxxxxxxxxxxxxx` |
 
 #### **Push Notifications (Web Push)**
 
-| Secret Name | Type | Where Set | Description | Example/Format |
-|------------|------|-----------|-------------|----------------|
-| `VAPID_PUBLIC_KEY` | Public | Supabase Dashboard | VAPID public key for web push | `BNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `VAPID_PRIVATE_KEY` | **Secret** | Supabase Dashboard | VAPID private key for web push | `xxxxxxxxxxxxxxxxxxxxxxxx` |
-| `VAPID_SUBJECT` | Public | Supabase Dashboard | VAPID subject (email) | `mailto:admin@materialkai.com` |
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `VAPID_PUBLIC_KEY` | Public | `notification-dispatcher` | VAPID public key for web push | `BNxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VAPID_PRIVATE_KEY` | **Secret** | `notification-dispatcher` | VAPID private key for web push | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+| `VAPID_SUBJECT` | Public | `notification-dispatcher` | VAPID subject email (default: `mailto:admin@materialkai.com`) | `mailto:admin@materialkai.com` |
 
-#### **Cron Jobs**
+> **Generate VAPID keys**: Run `npx web-push generate-vapid-keys` to create a new key pair.
 
-| Secret Name | Type | Where Set | Description | Example/Format |
-|------------|------|-----------|-------------|----------------|
-| `CRON_SECRET` | **Secret** | Supabase Dashboard | Secret for authenticating cron job requests | `your-secure-cron-secret` |
-| `PYTHON_BACKEND_URL` | Public | Supabase Dashboard | MIVAA Python backend URL | `https://v1api.materialshub.gr` |
+#### **Cron Jobs & Backend URLs**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `CRON_SECRET` | **Secret** | `price-monitoring-cron` | Secret for authenticating cron job requests | `your-secure-cron-secret` |
+| `PYTHON_BACKEND_URL` | Public | `price-monitoring-cron` | MIVAA Python backend URL | `https://v1api.materialshub.gr` |
+| `PYTHON_API_URL` | Public | `xml-import-orchestrator` | Python API URL for XML imports (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
 
 > **Note:** Default sender email and name are now configured through the Admin Panel at `/admin/email` → Email Settings, not as environment variables.
 
@@ -391,11 +416,14 @@ STRIPE_ENTERPRISE_PRICE_ID=price_...
 
 **Go to:** https://vercel.com/creativeghq/material-kai-vision-platform/settings/environment-variables
 
-Add these 3 variables (select **ALL** environments: Production, Preview, Development):
+Add these variables (select **ALL** environments: Production, Preview, Development):
 ```
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 VITE_STRIPE_PRO_PRICE_ID=price_...
 VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_100_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_500_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_1000_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_5000_PRICE_ID=price_...
 ```
 
 ### **Step 6: Test the Integration**
@@ -477,21 +505,25 @@ graph TB
 NODE_ENV=production
 VITE_DEBUG=false
 
-# Supabase
-SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-SUPABASE_ANON_KEY=your_production_anon_key
+# Supabase (must have VITE_ prefix for Vite to expose to frontend)
+VITE_SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
+VITE_SUPABASE_ANON_KEY=your_production_anon_key
 
-# Services
-MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
-MIVAA_API_KEY=your_production_mivaa_jwt_token
+# MIVAA Services
+VITE_MIVAA_API_URL=https://v1api.materialshub.gr
+VITE_MIVAA_SERVICE_URL=https://v1api.materialshub.gr
+VITE_MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
 
-# External APIs
-VITE_OPENAI_API_KEY=your_production_openai_key
-VITE_HUGGINGFACE_API_KEY=your_production_hf_key
-VITE_REPLICATE_API_TOKEN=your_production_replicate_token
+# WebSocket
+VITE_WS_URL=wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1
 
-# Security
-VITE_ALLOWED_ORIGINS=https://your-domain.com
+# Stripe Price IDs
+VITE_STRIPE_PRO_PRICE_ID=price_...
+VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_100_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_500_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_1000_PRICE_ID=price_...
+VITE_STRIPE_CREDITS_5000_PRICE_ID=price_...
 ```
 
 #### MIVAA Service (Set in Deployment Platform)
@@ -579,11 +611,19 @@ LOG_FILE=/var/log/mivaa/app.log
 
 2. **Configure Environment Variables**:
    ```bash
-   # Set production environment variables
-   vercel env add SUPABASE_URL production
-   vercel env add SUPABASE_ANON_KEY production
+   # Set production environment variables (must match VITE_ prefix)
+   vercel env add VITE_SUPABASE_URL production
+   vercel env add VITE_SUPABASE_ANON_KEY production
+   vercel env add VITE_MIVAA_API_URL production
    vercel env add VITE_MIVAA_SERVICE_URL production
-   # ... add all required variables
+   vercel env add VITE_MIVAA_GATEWAY_URL production
+   vercel env add VITE_WS_URL production
+   vercel env add VITE_STRIPE_PRO_PRICE_ID production
+   vercel env add VITE_STRIPE_ENTERPRISE_PRICE_ID production
+   vercel env add VITE_STRIPE_CREDITS_100_PRICE_ID production
+   vercel env add VITE_STRIPE_CREDITS_500_PRICE_ID production
+   vercel env add VITE_STRIPE_CREDITS_1000_PRICE_ID production
+   vercel env add VITE_STRIPE_CREDITS_5000_PRICE_ID production
    ```
 
 3. **Deploy**:
@@ -915,14 +955,45 @@ All deployment results are displayed on the main GitHub Action page with:
 
 ### 🔧 Workflow Configuration
 
-#### **Required Secrets**
-Set these in GitHub repository secrets:
+#### **Required Secrets by Workflow**
+
+**`deploy.yml`** (Frontend & Supabase Functions deployment):
+```bash
+# Supabase CLI (deploy edge functions + generate types)
+SUPABASE_ACCESS_TOKEN=sbp_your_token_here
+SUPABASE_PROJECT_ID=bgbavxtjlbvgplozizxu
+
+# Vercel (deploy frontend)
+VERCEL_TOKEN=your_vercel_token
+VERCEL_ORG_ID=team_your_org_id
+VERCEL_PROJECT_ID=prj_your_project_id
+```
+
+**`ai-changelog-update.yml`** (AI-powered changelog on PR merge):
+```bash
+GH_TOKEN=ghp_your_github_pat
+OPENAI_API_KEY=sk-proj-your_openai_key
+```
+
+**`deploy-docs.yml`** (Deploy docs to GitHub Pages):
+```bash
+GH_TOKEN=ghp_your_github_pat  # Same as above, needs cross-repo access
+```
+
+**`update-supabase-types.yml`** (Auto-generate TypeScript types):
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_your_token_here  # Same as deploy.yml
+SUPABASE_PROJECT_ID=bgbavxtjlbvgplozizxu  # Same as deploy.yml
+```
+
+**Backend Server Deployment** (manual SSH or orchestrated):
 ```bash
 # Server Access
 SSH_PRIVATE_KEY=your_ssh_private_key
-DEPLOY_HOST=165.227.31.109
+SSH_HOST=165.227.31.109
+SSH_USER=root
 
-# Application Environment
+# Application Environment (set on server via systemd)
 SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
 SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
@@ -940,28 +1011,12 @@ SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
 SLIG_ENDPOINT_TOKEN=hf_your_token_here
 SLIG_ENDPOINT_NAME=mh-siglip2
 SLIG_NAMESPACE=basiliskan
-MATERIAL_KAI_API_URL=https://v1api.materialshub.gr
-MATERIAL_KAI_API_KEY=your_api_key
-SENTRY_DSN=your_sentry_dsn
 
-# Price Monitoring (Required for price tracking features)
+# Price Monitoring
 FIRECRAWL_API_KEY=fc-your-firecrawl-key
 
-# Visual Embeddings (Optional - for GPU-accelerated remote embeddings)
-VISUAL_EMBEDDING_MODE=remote  # 'local' (default) or 'remote'
-VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384  # Optional: upgrade to v2
-HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384
-HUGGINGFACE_BATCH_SIZE=10
-HUGGINGFACE_TIMEOUT=60
-HUGGINGFACE_MAX_RETRIES=3
-
-# 4-Layer Image Extraction - Vision AI (Optional, Layer 3)
-# NOTE: Uses existing ANTHROPIC_API_KEY or OPENAI_API_KEY
-VISION_GUIDED_ENABLED=false  # Set to true to enable Vision AI Layer 3
-VISION_GUIDED_PROVIDER=anthropic  # anthropic or openai
-VISION_GUIDED_MODEL=claude-sonnet-4-5-20250929  # Model for vision analysis
-VISION_GUIDED_CONFIDENCE_THRESHOLD=0.8  # Minimum confidence for vision crops (0.0-1.0)
-VISION_GUIDED_FALLBACK_TO_PYMUPDF=true  # Fallback to Layers 1+2 if Vision AI fails
+# Monitoring
+SENTRY_DSN=your_sentry_dsn
 ```
 
 #### **Deployment Process**

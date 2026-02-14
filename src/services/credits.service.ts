@@ -187,6 +187,23 @@ export const creditsAPI = {
       'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
     };
 
+    // Flat-rate pricing for non-token-based services (in credits)
+    const flatRatePricing: Record<string, number> = {
+      'worldlabs-marble-mini': 50,   // $0.50 per VR world generation (draft)
+      'worldlabs-marble-plus': 200,  // $2.00 per VR world generation (high quality)
+    };
+
+    // Check for flat-rate model first
+    if (flatRatePricing[modelName]) {
+      const credits = flatRatePricing[modelName];
+      return {
+        inputCost: credits / 100,
+        outputCost: 0,
+        totalCost: credits / 100,
+        credits,
+      };
+    }
+
     const modelPricing = pricing[modelName] || pricing['gpt-4o-mini'];
 
     const inputCost = (inputTokens / 1_000_000) * modelPricing.input;

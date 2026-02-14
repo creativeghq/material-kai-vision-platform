@@ -1,0 +1,1037 @@
+/**
+ * Flow Engine Edge Function
+ *
+ * Executes workflow automations by walking the xyflow graph definition.
+ * Actions:
+ * - execute-flow: Run a flow with trigger data
+ * - test-flow: Dry-run (actions resolve templates but don't fire)
+ * - trigger-event: Auto-dispatch from DB triggers (Phase 4)
+ */
+
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { corsHeaders } from '../_shared/cors.ts';
+import { authenticate } from '../_shared/auth.ts';
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// =====================================================
+// TYPES
+// =====================================================
+
+interface FlowNode {
+  id: string;
+  type: 'triggerNode' | 'conditionNode' | 'actionNode';
+  position: { x: number; y: number };
+  data: {
+    label: string;
+    description?: string;
+    category: 'trigger' | 'condition' | 'action';
+    triggerType?: string;
+    conditionType?: string;
+    actionType?: string;
+    config: Record<string, unknown>;
+  };
+}
+
+interface FlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  label?: string;
+}
+
+interface FlowGraph {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  viewport: { x: number; y: number; zoom: number };
+}
+
+interface ExecutionContext {
+  trigger: { data: Record<string, unknown> };
+  [nodeId: string]: unknown;
+}
+
+// =====================================================
+// TEMPLATE RESOLVER
+// =====================================================
+
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  return path.split('.').reduce<unknown>((current, key) => {
+    if (current && typeof current === 'object' && key in (current as Record<string, unknown>)) {
+      return (current as Record<string, unknown>)[key];
+    }
+    return undefined;
+  }, obj);
+}
+
+function resolveTemplate(template: string, context: Record<string, unknown>): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, path: string) => {
+    const value = getNestedValue(context, path.trim());
+    return value !== undefined ? String(value) : match;
+  });
+}
+
+function resolveAllTemplates(
+  config: Record<string, unknown>,
+  context: Record<string, unknown>,
+): Record<string, unknown> {
+  const resolved: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(config)) {
+    if (typeof value === 'string') {
+      resolved[key] = resolveTemplate(value, context);
+    } else {
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
+// =====================================================
+// CONDITION EVALUATOR
+// =====================================================
+
+function evaluateComparison(
+  fieldValue: unknown,
+  operator: string,
+  testValue: unknown,
+): boolean {
+  const a = String(fieldValue ?? '');
+  const b = String(testValue ?? '');
+
+  switch (operator) {
+    case 'equals': return a === b;
+    case 'not_equals': return a !== b;
+    case 'contains': return a.includes(b);
+    case 'not_contains': return !a.includes(b);
+    case 'starts_with': return a.startsWith(b);
+    case 'ends_with': return a.endsWith(b);
+    case 'gt': return Number(a) > Number(b);
+    case 'gte': return Number(a) >= Number(b);
+    case 'lt': return Number(a) < Number(b);
+    case 'lte': return Number(a) <= Number(b);
+    case 'is_empty': return a === '' || a === 'undefined' || a === 'null';
+    case 'is_not_empty': return a !== '' && a !== 'undefined' && a !== 'null';
+    default: return false;
+  }
+}
+
+function executeCondition(
+  node: FlowNode,
+  context: ExecutionContext,
+): { output: Record<string, unknown>; branch: string } {
+  const { conditionType, config } = node.data;
+
+  switch (conditionType) {
+    case 'if_else': {
+      const { field, operator, value } = config as { field: string; operator: string; value: string };
+      const fieldValue = getNestedValue(context as unknown as Record<string, unknown>, resolveTemplate(field, context as unknown as Record<string, unknown>));
+      const testValue = resolveTemplate(String(value), context as unknown as Record<string, unknown>);
+      const result = evaluateComparison(fieldValue, operator, testValue);
+      return { output: { result, fieldValue, testValue }, branch: result ? 'true' : 'false' };
+    }
+
+    case 'switch': {
+      const { field, cases } = config as { field: string; cases: Array<{ value: string; label: string }> };
+      const fieldValue = String(getNestedValue(context as unknown as Record<string, unknown>, resolveTemplate(field, context as unknown as Record<string, unknown>)) ?? '');
+      const matchedCase = (cases || []).findIndex((c: { value: string }) => c.value === fieldValue);
+      if (matchedCase >= 0) {
+        return { output: { matchedCase, fieldValue }, branch: `case_${matchedCase}` };
+      }
+      return { output: { matchedCase: -1, fieldValue }, branch: 'default' };
+    }
+
+    case 'filter': {
+      const { conditions, logic } = config as {
+        conditions: Array<{ field: string; operator: string; value: string }>;
+        logic: 'and' | 'or';
+      };
+      const results = (conditions || []).map((cond) => {
+        const fv = getNestedValue(context as unknown as Record<string, unknown>, resolveTemplate(cond.field, context as unknown as Record<string, unknown>));
+        return evaluateComparison(fv, cond.operator, resolveTemplate(cond.value, context as unknown as Record<string, unknown>));
+      });
+      const passed = logic === 'and' ? results.every(Boolean) : results.some(Boolean);
+      return { output: { passed, results }, branch: passed ? 'output' : '__stop__' };
+    }
+
+    case 'delay': {
+      const { duration, unit } = config as { duration: number; unit: string };
+      const ms = duration * ({ seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 }[unit] || 60000);
+      // In edge functions we cap delay at 30 seconds to avoid timeout
+      const cappedMs = Math.min(ms, 30000);
+      return { output: { delayed: true, requested_ms: ms, actual_ms: cappedMs }, branch: 'output' };
+    }
+
+    default:
+      return { output: {}, branch: 'output' };
+  }
+}
+
+// =====================================================
+// ACTION EXECUTORS
+// =====================================================
+
+async function executeAction(
+  supabase: SupabaseClient,
+  node: FlowNode,
+  context: ExecutionContext,
+  isTestRun: boolean,
+): Promise<{ output: Record<string, unknown> }> {
+  const { actionType, config } = node.data;
+  const resolved = resolveAllTemplates(
+    config as Record<string, unknown>,
+    context as unknown as Record<string, unknown>,
+  );
+
+  // In test mode, return resolved config without executing
+  if (isTestRun) {
+    return {
+      output: {
+        test_mode: true,
+        action: actionType,
+        resolved_config: resolved,
+      },
+    };
+  }
+
+  switch (actionType) {
+    case 'send_sms': {
+      const { data, error } = await supabase.functions.invoke('messaging-api', {
+        body: {
+          action: 'send',
+          channel: 'sms',
+          to: resolved.to,
+          content: resolved.message,
+          channelId: resolved.channel_id || undefined,
+        },
+      });
+      if (error) throw new Error(`SMS failed: ${error.message}`);
+      return { output: { sent: true, ...(data || {}) } };
+    }
+
+    case 'send_email': {
+      const { data, error } = await supabase.functions.invoke('email-api', {
+        body: {
+          action: 'send',
+          to: resolved.to,
+          from: resolved.from || undefined,
+          subject: resolved.subject,
+          html: resolved.body,
+          template_id: resolved.template_id || undefined,
+        },
+      });
+      if (error) throw new Error(`Email failed: ${error.message}`);
+      return { output: { sent: true, ...(data || {}) } };
+    }
+
+    case 'http_request': {
+      const method = String(resolved.method || 'POST');
+      const timeoutMs = Number(resolved.timeout_ms) || 30000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (config.headers && typeof config.headers === 'object') {
+          Object.assign(headers, config.headers);
+        }
+
+        const response = await fetch(String(resolved.url), {
+          method,
+          headers,
+          body: method !== 'GET' ? String(resolved.body || '{}') : undefined,
+          signal: controller.signal,
+        });
+
+        let body: unknown;
+        try {
+          body = await response.json();
+        } catch {
+          body = await response.text();
+        }
+
+        return {
+          output: { status: response.status, ok: response.ok, body },
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    case 'create_notification': {
+      const { error } = await supabase.from('notifications').insert({
+        user_id: resolved.user_id,
+        title: resolved.title,
+        body: resolved.body,
+        type: resolved.type || 'info',
+        read: false,
+      });
+      if (error) throw new Error(`Notification failed: ${error.message}`);
+      return { output: { created: true } };
+    }
+
+    case 'send_quote': {
+      // Invoke quote PDF generation and send
+      const { data, error } = await supabase.functions.invoke('generate-quote-pdf', {
+        body: {
+          quote_id: resolved.quote_id,
+          send_email: resolved.send_email,
+          send_sms: resolved.send_sms,
+        },
+      });
+      if (error) throw new Error(`Quote send failed: ${error.message}`);
+      return { output: { sent: true, ...(data || {}) } };
+    }
+
+    case 'build_quote': {
+      const { data, error } = await supabase.from('quotes').insert({
+        user_id: resolved.user_id,
+        name: resolved.name || 'Auto-generated Quote',
+        status: 'draft',
+      }).select().single();
+      if (error) throw new Error(`Build quote failed: ${error.message}`);
+      return { output: { quote_id: data.id, created: true } };
+    }
+
+    case 'send_agent_message': {
+      // Determine conversation ID
+      let conversationId = String(resolved.conversation_id || '');
+      if (resolved.use_active_conversation && resolved.target_user_id) {
+        // Find most recent conversation for the target user
+        const { data: convos } = await supabase
+          .from('agent_chat_conversations')
+          .select('id')
+          .eq('user_id', resolved.target_user_id)
+          .order('last_message_at', { ascending: false })
+          .limit(1);
+        conversationId = convos?.[0]?.id || '';
+      }
+      if (!conversationId) throw new Error('No conversation found');
+
+      // Insert message
+      const { error: msgError } = await supabase.from('agent_chat_messages').insert({
+        conversation_id: conversationId,
+        role: resolved.role || 'user',
+        content: resolved.message,
+        metadata: { source: 'flow_engine', flow_injected: true },
+      });
+      if (msgError) throw new Error(`Agent message failed: ${msgError.message}`);
+
+      // Update conversation timestamp
+      await supabase
+        .from('agent_chat_conversations')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', conversationId);
+
+      return { output: { sent: true, conversation_id: conversationId } };
+    }
+
+    case 'create_moodboard': {
+      const { data, error } = await supabase.from('moodboards').insert({
+        user_id: resolved.user_id,
+        title: resolved.title || 'Untitled Moodboard',
+        description: resolved.description || '',
+        is_public: resolved.is_public ?? false,
+      }).select().single();
+      if (error) throw new Error(`Create moodboard failed: ${error.message}`);
+      return { output: { moodboard_id: data.id, created: true } };
+    }
+
+    case 'add_to_moodboard': {
+      // Calculate next position
+      const { data: existing } = await supabase
+        .from('moodboard_items')
+        .select('position')
+        .eq('moodboard_id', resolved.moodboard_id)
+        .order('position', { ascending: false })
+        .limit(1);
+      const nextPosition = (existing?.[0]?.position ?? -1) + 1;
+
+      const { error } = await supabase.from('moodboard_items').insert({
+        moodboard_id: resolved.moodboard_id,
+        product_id: resolved.product_id,
+        notes: resolved.notes || '',
+        position: nextPosition,
+      });
+      if (error) throw new Error(`Add to moodboard failed: ${error.message}`);
+      return { output: { added: true, position: nextPosition } };
+    }
+
+    case 'perplexity_search': {
+      const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
+      if (!PERPLEXITY_API_KEY) throw new Error('PERPLEXITY_API_KEY not configured');
+
+      const country = String(resolved.country || '');
+      const category = String(resolved.category || '');
+      const language = String(resolved.language || '');
+      const limit = Number(resolved.limit) || 10;
+
+      if (!country || !category) throw new Error('Country and category are required');
+
+      const languageHint = language ? ` Search in ${language} language for better local results.` : '';
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60000);
+
+      try {
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'sonar',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a B2B research assistant specialized in finding manufacturing companies. Return results as JSON array with fields: name, website, location, products, contact_info.',
+              },
+              {
+                role: 'user',
+                content: `Find up to ${limit} B2B manufacturers of ${category} in ${country}.${languageHint} Return structured results.`,
+              },
+            ],
+            temperature: 0.2,
+            max_tokens: 4096,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Perplexity API error ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        const citations = data.citations || [];
+
+        return {
+          output: {
+            success: true,
+            search_results: content,
+            citations,
+            query: { country, category, language, limit },
+          },
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    case 'firecrawl_scrape': {
+      const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+      if (!FIRECRAWL_API_KEY) throw new Error('FIRECRAWL_API_KEY not configured');
+
+      const url = String(resolved.url || '');
+      if (!url) throw new Error('URL is required');
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 30000);
+
+      try {
+        const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            url,
+            formats: ['markdown'],
+            onlyMainContent: true,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Firecrawl API error ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        const markdown = data.data?.markdown || '';
+        const metadata = data.data?.metadata || {};
+
+        return {
+          output: {
+            success: true,
+            url,
+            content: markdown.slice(0, 10000),
+            title: metadata.title || '',
+            description: metadata.description || '',
+          },
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    case 'apollo_enrich': {
+      const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY');
+      if (!APOLLO_API_KEY) throw new Error('APOLLO_API_KEY not configured');
+
+      const companyName = String(resolved.company_name || '');
+      if (!companyName) throw new Error('Company name is required');
+
+      const body: Record<string, unknown> = {
+        q_organization_name: companyName,
+        page: 1,
+        per_page: 5,
+      };
+      if (resolved.country) {
+        body.organization_locations = [String(resolved.country)];
+      }
+      if (resolved.domain) {
+        body.organization_domains = [String(resolved.domain)];
+      }
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+
+      try {
+        const response = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': APOLLO_API_KEY,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`Apollo API error ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+        const org = data.organizations?.[0] || data.accounts?.[0];
+
+        if (!org) {
+          return { output: { success: true, found: false, company_name: companyName } };
+        }
+
+        return {
+          output: {
+            success: true,
+            found: true,
+            company: {
+              name: org.name,
+              domain: org.primary_domain || org.website_url,
+              industry: org.industry,
+              employee_count: org.estimated_num_employees,
+              founded_year: org.founded_year,
+              linkedin_url: org.linkedin_url,
+              headquarters: {
+                city: org.city,
+                state: org.state,
+                country: org.country,
+              },
+              phone: org.phone,
+              keywords: org.keywords || [],
+              annual_revenue: org.annual_revenue_printed,
+            },
+          },
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    case 'hunter_find_contacts': {
+      const HUNTER_API_KEY = Deno.env.get('HUNTER_API_KEY');
+      if (!HUNTER_API_KEY) throw new Error('HUNTER_API_KEY not configured');
+
+      const domain = String(resolved.domain || '');
+      const companyName = String(resolved.company_name || '');
+      const firstName = String(resolved.first_name || '');
+      const lastName = String(resolved.last_name || '');
+
+      if (!domain && !companyName) throw new Error('Domain or company name is required');
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+
+      try {
+        // Person-specific search
+        if (firstName || lastName) {
+          const params = new URLSearchParams({ api_key: HUNTER_API_KEY });
+          if (domain) params.set('domain', domain);
+          if (companyName) params.set('company', companyName);
+          if (firstName) params.set('first_name', firstName);
+          if (lastName) params.set('last_name', lastName);
+
+          const response = await fetch(
+            `https://api.hunter.io/v2/email-finder?${params}`,
+            { signal: controller.signal },
+          );
+          const data = await response.json();
+
+          return {
+            output: {
+              success: true,
+              mode: 'person',
+              email: data.data?.email || null,
+              score: data.data?.score || 0,
+              position: data.data?.position || '',
+            },
+          };
+        }
+
+        // Domain-wide search
+        const params = new URLSearchParams({
+          api_key: HUNTER_API_KEY,
+          domain: domain || companyName,
+          limit: '10',
+        });
+
+        const response = await fetch(
+          `https://api.hunter.io/v2/domain-search?${params}`,
+          { signal: controller.signal },
+        );
+        const data = await response.json();
+        const emails = (data.data?.emails || []).map((e: Record<string, unknown>) => ({
+          name: `${e.first_name || ''} ${e.last_name || ''}`.trim(),
+          email: e.value,
+          position: e.position,
+          department: e.department,
+          confidence: e.confidence,
+        }));
+
+        // Sort by role priority if roles specified
+        const rolesStr = String(resolved.roles || '');
+        if (rolesStr && emails.length > 0) {
+          const priorityRoles = rolesStr.split(',').map((r: string) => r.trim().toLowerCase());
+          emails.sort((a: { position?: string }, b: { position?: string }) => {
+            const aIdx = priorityRoles.findIndex((r: string) => (a.position || '').toLowerCase().includes(r));
+            const bIdx = priorityRoles.findIndex((r: string) => (b.position || '').toLowerCase().includes(r));
+            const aScore = aIdx >= 0 ? aIdx : 999;
+            const bScore = bIdx >= 0 ? bIdx : 999;
+            return aScore - bScore;
+          });
+        }
+
+        return {
+          output: {
+            success: true,
+            mode: 'domain',
+            organization: data.data?.organization || '',
+            pattern: data.data?.pattern || '',
+            contacts: emails,
+            total: emails.length,
+          },
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    case 'zerobounce_validate': {
+      const ZEROBOUNCE_API_KEY = Deno.env.get('ZEROBOUNCE_API_KEY');
+      if (!ZEROBOUNCE_API_KEY) throw new Error('ZEROBOUNCE_API_KEY not configured');
+
+      const email = String(resolved.email || '');
+      if (!email) throw new Error('Email is required');
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+
+      try {
+        const params = new URLSearchParams({
+          api_key: ZEROBOUNCE_API_KEY,
+          email,
+        });
+
+        const response = await fetch(
+          `https://api.zerobounce.net/v2/validate?${params}`,
+          { signal: controller.signal },
+        );
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`ZeroBounce API error ${response.status}: ${errText}`);
+        }
+
+        const data = await response.json();
+
+        return {
+          output: {
+            success: true,
+            email,
+            status: data.status || 'unknown',
+            sub_status: data.sub_status || '',
+            valid: data.status === 'valid',
+            free_email: data.free_email === 'true' || data.free_email === true,
+            mx_found: data.mx_found === 'true' || data.mx_found === true,
+            firstname: data.firstname || '',
+            lastname: data.lastname || '',
+          },
+        };
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    default:
+      return { output: { skipped: true, reason: `Unknown action type: ${actionType}` } };
+  }
+}
+
+// =====================================================
+// GRAPH WALKER (BFS)
+// =====================================================
+
+async function executeFlowGraph(
+  supabase: SupabaseClient,
+  graph: FlowGraph,
+  runId: string,
+  triggerData: Record<string, unknown>,
+  isTestRun: boolean,
+): Promise<void> {
+  const { nodes, edges } = graph;
+  const context: ExecutionContext = { trigger: { data: triggerData } };
+
+  // Find the trigger node
+  const triggerNode = nodes.find((n) => n.type === 'triggerNode');
+  if (!triggerNode) throw new Error('No trigger node found in flow');
+
+  // BFS queue
+  const queue: Array<{ nodeId: string; incomingBranch: string | null }> = [
+    { nodeId: triggerNode.id, incomingBranch: null },
+  ];
+  const visited = new Set<string>();
+  let executionOrder = 0;
+
+  while (queue.length > 0) {
+    const { nodeId } = queue.shift()!;
+    if (visited.has(nodeId)) continue;
+    visited.add(nodeId);
+
+    const node = nodes.find((n) => n.id === nodeId);
+    if (!node) continue;
+
+    const stepStartTime = Date.now();
+
+    // Create step record
+    const { data: step, error: stepError } = await supabase
+      .from('flow_run_steps')
+      .insert({
+        flow_run_id: runId,
+        node_id: node.id,
+        node_type: node.data.category,
+        node_label: node.data.label,
+        node_config: node.data.config,
+        status: 'running',
+        input_data: node.type === 'triggerNode' ? triggerData : {},
+        execution_order: executionOrder++,
+        started_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (stepError) {
+      console.error('Failed to create step:', stepError);
+      continue;
+    }
+
+    try {
+      let output: Record<string, unknown> = {};
+      let branch: string | undefined;
+
+      if (node.type === 'triggerNode') {
+        output = { ...triggerData };
+      } else if (node.type === 'conditionNode') {
+        const result = executeCondition(node, context);
+        output = result.output;
+        branch = result.branch;
+
+        // If filter says stop, mark as skipped and don't continue
+        if (branch === '__stop__') {
+          await supabase
+            .from('flow_run_steps')
+            .update({
+              status: 'skipped',
+              output_data: output,
+              branch_taken: 'filtered_out',
+              completed_at: new Date().toISOString(),
+              duration_ms: Date.now() - stepStartTime,
+            })
+            .eq('id', step.id);
+          continue;
+        }
+      } else if (node.type === 'actionNode') {
+        const result = await executeAction(supabase, node, context, isTestRun);
+        output = result.output;
+      }
+
+      // Store output in context
+      context[nodeId] = output;
+
+      // Update step as completed
+      await supabase
+        .from('flow_run_steps')
+        .update({
+          status: 'completed',
+          output_data: output,
+          branch_taken: branch || null,
+          completed_at: new Date().toISOString(),
+          duration_ms: Date.now() - stepStartTime,
+        })
+        .eq('id', step.id);
+
+      // Determine next nodes
+      if (node.type === 'conditionNode' && branch) {
+        // For conditions, only follow the taken branch
+        const branchEdges = edges.filter(
+          (e) => e.source === nodeId && e.sourceHandle === branch,
+        );
+        for (const edge of branchEdges) {
+          queue.push({ nodeId: edge.target, incomingBranch: branch });
+        }
+      } else {
+        // For triggers/actions, follow all outgoing edges
+        const outEdges = edges.filter((e) => e.source === nodeId);
+        for (const edge of outEdges) {
+          queue.push({ nodeId: edge.target, incomingBranch: null });
+        }
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Update step as failed
+      await supabase
+        .from('flow_run_steps')
+        .update({
+          status: 'failed',
+          error_message: errorMessage,
+          completed_at: new Date().toISOString(),
+          duration_ms: Date.now() - stepStartTime,
+        })
+        .eq('id', step.id);
+
+      // Update run as failed
+      await supabase
+        .from('flow_runs')
+        .update({
+          status: 'failed',
+          error_message: errorMessage,
+          error_node_id: nodeId,
+          completed_at: new Date().toISOString(),
+          duration_ms: Date.now() - stepStartTime,
+        })
+        .eq('id', runId);
+
+      throw error;
+    }
+  }
+}
+
+// =====================================================
+// REQUEST HANDLERS
+// =====================================================
+
+async function handleExecuteFlow(
+  supabase: SupabaseClient,
+  body: { flow_id: string; trigger_data?: Record<string, unknown> },
+  isTestRun: boolean,
+  initiatedBy: string,
+): Promise<Response> {
+  const { flow_id, trigger_data = {} } = body;
+
+  // Load the flow
+  const { data: flow, error: flowError } = await supabase
+    .from('flows')
+    .select('*')
+    .eq('id', flow_id)
+    .single();
+
+  if (flowError || !flow) {
+    return jsonResponse({ success: false, error: 'Flow not found' }, 404);
+  }
+
+  if (!isTestRun && flow.status !== 'active' && flow.status !== 'draft') {
+    return jsonResponse({
+      success: false,
+      error: `Flow is ${flow.status} and cannot be executed`,
+    }, 400);
+  }
+
+  const graph = flow.graph_definition as FlowGraph;
+  if (!graph.nodes || graph.nodes.length === 0) {
+    return jsonResponse({ success: false, error: 'Flow has no nodes' }, 400);
+  }
+
+  const runStartTime = Date.now();
+
+  // Create run record
+  const { data: run, error: runError } = await supabase
+    .from('flow_runs')
+    .insert({
+      flow_id,
+      flow_version: flow.version,
+      status: 'running',
+      trigger_type: flow.trigger_type,
+      trigger_event_data: trigger_data,
+      initiated_by: initiatedBy,
+      is_test_run: isTestRun,
+      started_at: new Date().toISOString(),
+    })
+    .select()
+    .single();
+
+  if (runError) {
+    return jsonResponse({ success: false, error: `Failed to create run: ${runError.message}` }, 500);
+  }
+
+  try {
+    // Execute the graph
+    await executeFlowGraph(supabase, graph, run.id, trigger_data, isTestRun);
+
+    // Update run as completed
+    const durationMs = Date.now() - runStartTime;
+    await supabase
+      .from('flow_runs')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        duration_ms: durationMs,
+      })
+      .eq('id', run.id);
+
+    // Update flow stats
+    await supabase
+      .from('flows')
+      .update({
+        last_run_at: new Date().toISOString(),
+        run_count: flow.run_count + 1,
+      })
+      .eq('id', flow_id);
+
+    // Return the run with steps
+    const { data: steps } = await supabase
+      .from('flow_run_steps')
+      .select('*')
+      .eq('flow_run_id', run.id)
+      .order('execution_order', { ascending: true });
+
+    return jsonResponse({
+      success: true,
+      data: {
+        ...run,
+        status: 'completed',
+        duration_ms: durationMs,
+        steps: steps || [],
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const durationMs = Date.now() - runStartTime;
+
+    // Run may already be marked as failed by the graph walker
+    await supabase
+      .from('flow_runs')
+      .update({
+        status: 'failed',
+        error_message: errorMessage,
+        completed_at: new Date().toISOString(),
+        duration_ms: durationMs,
+      })
+      .eq('id', run.id);
+
+    return jsonResponse({
+      success: false,
+      error: errorMessage,
+      data: { run_id: run.id },
+    }, 500);
+  }
+}
+
+async function handleTriggerEvent(
+  supabase: SupabaseClient,
+  body: { event_type: string; data: Record<string, unknown> },
+): Promise<Response> {
+  const { event_type, data } = body;
+
+  // Find all active flows with matching trigger type
+  const { data: flows, error } = await supabase
+    .from('flows')
+    .select('id')
+    .eq('trigger_type', event_type)
+    .eq('status', 'active');
+
+  if (error) {
+    return jsonResponse({ success: false, error: error.message }, 500);
+  }
+
+  if (!flows || flows.length === 0) {
+    return jsonResponse({ success: true, data: { triggered: 0 } });
+  }
+
+  // Execute each matching flow
+  const results = await Promise.allSettled(
+    flows.map((flow) =>
+      handleExecuteFlow(supabase, { flow_id: flow.id, trigger_data: data }, false, 'system')
+    ),
+  );
+
+  const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+  const failed = results.filter((r) => r.status === 'rejected').length;
+
+  return jsonResponse({
+    success: true,
+    data: { triggered: flows.length, succeeded, failed },
+  });
+}
+
+// =====================================================
+// MAIN HANDLER
+// =====================================================
+
+function jsonResponse(body: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
+
+Deno.serve(async (req) => {
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  try {
+    const auth = await authenticate(req);
+    if (!auth.success) {
+      return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
+    }
+
+    const { action, ...body } = await req.json();
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    switch (action) {
+      case 'execute-flow':
+        if (!auth.userId) return jsonResponse({ success: false, error: 'User auth required' }, 401);
+        return handleExecuteFlow(supabase, body, false, auth.userId);
+
+      case 'test-flow':
+        if (!auth.userId) return jsonResponse({ success: false, error: 'User auth required' }, 401);
+        return handleExecuteFlow(supabase, body, true, auth.userId);
+
+      case 'trigger-event':
+        // Allow both server-to-server (secret) and authenticated user calls
+        return handleTriggerEvent(supabase, body);
+
+      default:
+        return jsonResponse({ success: false, error: `Unknown action: ${action}` }, 400);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Flow engine error:', message);
+    return jsonResponse({ success: false, error: message }, 500);
+  }
+});

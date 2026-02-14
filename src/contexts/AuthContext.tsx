@@ -6,6 +6,7 @@ type AuthError = any;
 
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 interface AuthContextType {
   user: User | null;
@@ -96,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           title: 'Check your email',
           description: "We've sent you a confirmation link.",
         });
+        flowEventService.emit('user_signup', { email, display_name: displayName });
       }
 
       return { error };
@@ -129,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           title: 'Welcome back',
           description: "You've been signed in successfully.",
         });
+        flowEventService.emit('user_login', { email });
       }
 
       return { error };

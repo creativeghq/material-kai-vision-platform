@@ -20,11 +20,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   onClose,
 }) => {
+  // Helper to extract string value from potential {value, confidence} wrapper
+  const extractStringValue = (val: unknown): string => {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'object' && 'value' in (val as Record<string, unknown>)) {
+      const innerValue = (val as Record<string, unknown>).value;
+      return typeof innerValue === 'string' ? innerValue : String(innerValue ?? '');
+    }
+    return typeof val === 'string' ? val : String(val);
+  };
+
   // Convert admin product to unified Product format
   const unifiedProduct = {
     id: product.id,
-    name: product.name,
-    description: product.description || '',
+    name: extractStringValue(product.name),
+    description: extractStringValue(product.description),
     category: product.metadata?.material_category || 'Uncategorized',
     type: product.metadata?.material_category || 'other',
     status: 'active',

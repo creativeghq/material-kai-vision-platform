@@ -12,12 +12,24 @@ When you search for materials, the platform analyzes your query in multiple ways
 
 - **Semantic Understanding** - Understands the meaning and context of your search
 - **Visual Similarity** - Finds materials that look similar
+- **Vision Understanding** - Matches against detailed AI analysis of material properties, dimensions, finishes, and specifications
 - **Color Matching** - Identifies materials with matching color palettes
 - **Texture Recognition** - Finds materials with similar surface patterns
 - **Style Matching** - Discovers materials with similar design aesthetics
 - **Material Type** - Filters by specific material categories
 
-All these dimensions are combined intelligently to give you the most relevant results.
+All 7 dimensions are combined intelligently to give you the most relevant results.
+
+### Specification-Based Search
+
+The Understanding embedding enables searching by technical specifications:
+
+- "Porcelain tile 60x120cm matt finish"
+- "R10 slip rating bathroom floor"
+- "Fire-rated fabric Class 1"
+- "3mm thickness vinyl plank"
+
+This works because the platform embeds Qwen3-VL's structured analysis of each image (material type, dimensions, finishes, properties) via Voyage AI.
 
 ### Natural Language Search
 
@@ -125,6 +137,44 @@ The system automatically understands complex queries:
 - **Automatic Filter Extraction** - Identifies properties mentioned in your search
 - **Context Awareness** - Understands relationships between terms
 - **Intent Recognition** - Determines what you're really looking for
+
+### Query-Adaptive Weight Profiles
+
+The 7-vector fusion search dynamically adjusts embedding weights based on what the query is about. Instead of using fixed weights for every search, the system analyzes the parsed query fields and selects the optimal weight profile.
+
+**How It Works:**
+
+1. GPT-4o-mini parses the natural language query into structured fields (colors, finish, material_type, dimensions, pattern, style, designer, collection)
+2. `_select_weight_profile()` examines which fields are present and selects the best profile
+3. The selected weights are applied to the 7-vector fusion scoring
+
+**Available Profiles:**
+
+| Profile | Trigger | Text | Visual | Understanding | Color | Texture | Style | Material |
+|---------|---------|------|--------|---------------|-------|---------|-------|----------|
+| **product_name** | Product name or brand detected | 40% | 25% | 15% | 5% | 5% | 5% | 5% |
+| **color_finish** | Colors or finish terms present | 10% | 20% | 15% | 30% | 5% | 15% | 5% |
+| **specification** | Dimensions detected (e.g., 60x120cm) | 25% | 10% | 40% | 5% | 5% | 5% | 10% |
+| **texture_pattern** | Pattern terms present | 10% | 25% | 15% | 5% | 30% | 10% | 5% |
+| **style_aesthetic** | Style or application terms | 10% | 25% | 15% | 10% | 10% | 25% | 5% |
+| **material_search** | Explicit material type | 15% | 15% | 25% | 5% | 10% | 5% | 25% |
+| **balanced** | No specific signal (default) | 15% | 15% | 20% | 12.5% | 12.5% | 12.5% | 12.5% |
+
+**Selection Priority:** dimensions → colors/finish → pattern → material → style/application → balanced
+
+**Examples:**
+- `"MAISON by ONSET"` → **product_name** (text weight 40%, find by name)
+- `"matte beige tiles"` → **color_finish** (color weight 30%, match the beige)
+- `"60x120cm porcelain R10"` → **specification** (understanding weight 40%, match specs)
+- `"wood grain pattern ceramic"` → **texture_pattern** (texture weight 30%, match the grain)
+- `"minimalist bathroom design"` → **style_aesthetic** (style weight 25%, match the aesthetic)
+
+**Monitoring:**
+- Weight profile selection is logged in `ai_call_logs` for every query
+- `search_query_tracking` table records `weight_profile`, `dynamic_weights`, and `weight_profile_source`
+- Admin monitoring dashboards show which profiles are being selected
+
+**Implementation:** `unified_search_service.py` → `WEIGHT_PROFILES` dict + `_select_weight_profile()` method
 
 ### Result Diversity
 

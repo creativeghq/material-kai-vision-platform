@@ -46,16 +46,28 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            // Vendor libraries
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-ui': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+            // Core framework — loaded on every page
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            // UI primitives — loaded on every page (shared across all routes)
+            'vendor-ui': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tooltip', '@radix-ui/react-popover', '@radix-ui/react-tabs', '@radix-ui/react-select'],
+            // 3D rendering — only loaded when WorldViewer/SVBRDF routes are visited
             'vendor-3d': ['three', '@react-three/fiber', '@react-three/drei'],
-            'vendor-ml': ['onnxruntime-web', 'onnxruntime-common'],
-            'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge'],
+            // Charts — only loaded on admin monitoring/analytics routes
+            'vendor-charts': ['recharts'],
+            // Supabase client — shared but separable
+            'vendor-supabase': ['@supabase/supabase-js'],
+            // Sentry — monitoring, can load independently
+            'vendor-sentry': ['@sentry/react'],
+            // Data layer
+            'vendor-query': ['@tanstack/react-query', '@tanstack/query-core'],
+            // Flow builder — only loaded on /admin/flows route
+            'vendor-xyflow': ['@xyflow/react'],
+            // Utility libraries
+            'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge', 'zod', 'zustand', 'immer'],
           },
         },
       },
-      chunkSizeWarningLimit: 1000, // Increase warning limit to 1MB
+      chunkSizeWarningLimit: 1000,
     },
   };
 });

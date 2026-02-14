@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { MoodBoard, MoodBoardItem } from '@/types/materials';
+import { flowEventService } from '@/services/flows/flowEventService';
 
 export interface CreateMoodBoardData {
   title: string;
@@ -88,6 +89,12 @@ class MoodBoardAPI {
 
     if (error) throw error;
 
+    flowEventService.emit('moodboard_created', {
+      moodboard_id: result.id,
+      title: result.title,
+      user_id: user.id,
+    });
+
     return {
       id: result.id,
       userId: result.user_id,
@@ -113,6 +120,14 @@ class MoodBoardAPI {
       .single();
 
     if (error) throw error;
+
+    if (data.is_public === true) {
+      flowEventService.emit('moodboard_shared', {
+        moodboard_id: result.id,
+        title: result.title,
+        shared_by: result.user_id,
+      });
+    }
 
     return {
       id: result.id,
@@ -241,6 +256,12 @@ class MoodBoardAPI {
         thumbnail_url = imgData?.image_url || null;
       }
     }
+
+    flowEventService.emit('moodboard_item_added', {
+      moodboard_id: itemData.moodboard_id,
+      item_id: result.id,
+      product_id: itemData.material_id,
+    });
 
     // Transform to include thumbnail_url
     return {

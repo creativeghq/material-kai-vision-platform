@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Phone, MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Wallet } from 'lucide-react';
+import { Phone, MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Wallet, Bell } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -16,6 +16,7 @@ import { MessagingLogsTab } from './MessagingLogsTab';
 import { MessagingAnalyticsTab } from './MessagingAnalyticsTab';
 import { MessagingCampaignsTab } from './MessagingCampaignsTab';
 import { MessagingOptoutsTab } from './MessagingOptoutsTab';
+import { PushNotificationsTab } from './PushNotificationsTab';
 import { messagingService } from '@/services/messaging';
 import { useToast } from '@/hooks/use-toast';
 
@@ -93,8 +94,8 @@ export const MessagingManagement: React.FC = () => {
       {/* Global Admin Header */}
       <GlobalAdminHeader
         title="Messaging Management"
-        description="Manage SMS and WhatsApp messaging via Twilio"
-        badge="Twilio"
+        description="Manage SMS, WhatsApp, and Push Notifications"
+        badge="Multi-Channel"
       />
 
       {/* Main Content */}
@@ -247,6 +248,10 @@ export const MessagingManagement: React.FC = () => {
               <Users className="h-4 w-4 mr-2" />
               Opt-outs
             </TabsTrigger>
+            <TabsTrigger value="push" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Bell className="h-4 w-4 mr-2" />
+              Push Notifications
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="channels" className="space-y-4">
@@ -271,6 +276,10 @@ export const MessagingManagement: React.FC = () => {
 
           <TabsContent value="optouts" className="space-y-4">
             <MessagingOptoutsTab />
+          </TabsContent>
+
+          <TabsContent value="push" className="space-y-4">
+            <PushNotificationsTab />
           </TabsContent>
         </Tabs>
       </div>
