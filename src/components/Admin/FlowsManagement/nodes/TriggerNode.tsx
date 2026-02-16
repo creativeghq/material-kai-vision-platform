@@ -1,9 +1,9 @@
 import React, { memo } from 'react';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import {
-  Zap, Globe, UserPlus, Clock, FileText, Image, Hand,
-  LogIn, CheckCircle2, XCircle, ClipboardCheck,
-  FileCheck, Package, Search, Box, Orbit,
+  Zap, Globe, UserPlus, Clock, FileText, Hand,
+  LogIn, CheckCircle2, XCircle,
+  Search, Box, Orbit,
   SearchCheck, ScanEye, PackagePlus,
   LayoutGrid, ImagePlus, Share2,
 } from 'lucide-react';
@@ -18,10 +18,6 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   quote_requested: FileText,
   quote_approved: CheckCircle2,
   quote_rejected: XCircle,
-  contract_created: ClipboardCheck,
-  image_uploaded: Image,
-  document_processed: FileCheck,
-  product_added: Package,
   search_executed: Search,
   model_3d_created: Box,
   vr_world_created: Orbit,

@@ -34,6 +34,21 @@ verify_jwt = false
 [functions.scrape-session-manager]
 verify_jwt = false
 
+[functions.seo-research]
+verify_jwt = false
+
+[functions.seo-plan]
+verify_jwt = false
+
+[functions.seo-write]
+verify_jwt = false
+
+[functions.seo-analyze]
+verify_jwt = false
+
+[functions.seo-pipeline]
+verify_jwt = false
+
 [functions.scrape-single-page]
 verify_jwt = false
 
@@ -57,6 +72,84 @@ verify_jwt = false
 
 # Agent chat with extended timeout for B2B research (multiple API calls)
 [functions.agent-chat]
+verify_jwt = false
+
+[functions.ai-pricing-updater]
+verify_jwt = false
+
+[functions.ai-rerank]
+verify_jwt = false
+
+[functions.auto-recovery-cron]
+verify_jwt = false
+
+[functions.batch-update-sessions]
+verify_jwt = false
+
+[functions.campaign-processor]
+verify_jwt = false
+
+[functions.email-api]
+verify_jwt = false
+
+[functions.email-webhook]
+verify_jwt = false
+
+[functions.email-webhooks]
+verify_jwt = false
+
+[functions.field-templates]
+verify_jwt = false
+
+[functions.flow-engine]
+verify_jwt = false
+
+[functions.flow-scheduler-cron]
+verify_jwt = false
+
+[functions.flow-webhook]
+verify_jwt = false
+
+[functions.generate-quote-pdf]
+verify_jwt = false
+
+[functions.generate-vr-world]
+verify_jwt = false
+
+[functions.job-cleanup-cron]
+verify_jwt = false
+
+[functions.notification-dispatcher]
+verify_jwt = false
+
+[functions.price-monitoring]
+verify_jwt = false
+
+[functions.price-monitoring-cron]
+verify_jwt = false
+
+[functions.quotes-api]
+verify_jwt = false
+
+[functions.recommendations-api]
+verify_jwt = false
+
+[functions.scrape-preview]
+verify_jwt = false
+
+[functions.ses-webhook]
+verify_jwt = false
+
+[functions.stripe-checkout]
+verify_jwt = false
+
+[functions.stripe-customer-portal]
+verify_jwt = false
+
+[functions.stripe-webhooks]
+verify_jwt = false
+
+[functions.suggest-fields]
 verify_jwt = false
 
 [auth]

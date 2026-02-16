@@ -1,6 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { generateWithClaude } from '../_shared/ai-client.ts';
 
 interface SuggestFieldsRequest {
   url: string;
@@ -69,62 +71,23 @@ Deno.serve(async (req) => {
       pageContent = data.data?.markdown || '';
     }
 
-    // Use Claude to analyze and suggest fields
-    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!anthropicKey) throw new Error('Anthropic API key not configured');
+    // Load prompt from database (editable via /admin/ai-configs)
+    const fieldSuggesterPrompt = await getToolPrompt(supabase, 'field_suggester');
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 2000,
-        messages: [
-          {
-            role: 'user',
-            content: `Analyze this webpage content and suggest relevant fields for data extraction.
+    // Use Claude to analyze and suggest fields (via unified AI SDK client)
+    const prompt = `${fieldSuggesterPrompt}
 
 URL: ${url}
 
 Page Content (first 3000 chars):
-${pageContent.substring(0, 3000)}
+${pageContent.substring(0, 3000)}`;
 
-Based on the content, suggest 5-10 fields that would be useful to extract. For each field, provide:
-- name: snake_case field name
-- label: Human-readable label
-- type: one of (text, number, array, object, boolean)
-- description: What this field represents and how to extract it
-- required: whether this field should be required
-
-Return ONLY a JSON array of field objects, no other text.
-
-Example format:
-[
-  {
-    "name": "product_name",
-    "label": "Product Name",
-    "type": "text",
-    "description": "The name or title of the product",
-    "required": true
-  }
-]`,
-          },
-        ],
-      }),
+    const aiResult = await generateWithClaude(prompt, {
+      maxTokens: 2000,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
-    }
+    const responseText = aiResult.text;
 
-    const message = await response.json();
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
-    
     // Extract JSON from response
     const jsonMatch = responseText.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
@@ -157,4 +120,3 @@ Example format:
     );
   }
 });
-

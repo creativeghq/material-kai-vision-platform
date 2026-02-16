@@ -752,16 +752,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       return (
         <div className="space-y-3">
           <div className="text-xs text-muted-foreground">
-            AI-powered B2B manufacturer search via Perplexity. Results include company names, websites, and contact info.
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs">Country</Label>
-            <Input
-              value={cfg.country || ''}
-              onChange={(e) => onChange({ ...cfg, country: e.target.value })}
-              placeholder="e.g., Poland, Turkey, Romania"
-              className="h-8 text-sm"
-            />
+            AI-powered B2B manufacturer search across 30 markets in 5 regions. Native language searches performed automatically. ~0.75 credits per region.
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Product Category</Label>
@@ -773,26 +764,48 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Language Code (optional)</Label>
+            <Label className="text-xs">Region (optional)</Label>
+            <Select
+              value={cfg.region || ''}
+              onValueChange={(val) => onChange({ ...cfg, region: val || undefined, country: val ? undefined : cfg.country })}
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="All Markets (30 countries)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Markets (30 countries)</SelectItem>
+                <SelectItem value="cee">Central & Eastern Europe</SelectItem>
+                <SelectItem value="balkans">Balkans & Turkey</SelectItem>
+                <SelectItem value="baltic_nordic">Baltic & Nordic</SelectItem>
+                <SelectItem value="western_southern">Western & Southern Europe</SelectItem>
+                <SelectItem value="global">Global Manufacturing Hubs</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              Leave empty to search all 30 markets in parallel
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Country (optional)</Label>
             <Input
-              value={cfg.language || ''}
-              onChange={(e) => onChange({ ...cfg, language: e.target.value })}
-              placeholder="e.g., pl, tr, ro, bg"
+              value={cfg.country || ''}
+              onChange={(e) => onChange({ ...cfg, country: e.target.value, region: e.target.value ? undefined : cfg.region })}
+              placeholder="Leave empty for all markets"
               className="h-8 text-sm"
             />
             <p className="text-[10px] text-muted-foreground">
-              Native language for better local results
+              Overrides region. Use for single-country search (~0.75 credits).
             </p>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Max Results</Label>
             <Input
               type="number"
-              value={cfg.limit ?? 10}
-              onChange={(e) => onChange({ ...cfg, limit: parseInt(e.target.value) || 10 })}
+              value={cfg.limit ?? 30}
+              onChange={(e) => onChange({ ...cfg, limit: parseInt(e.target.value) || 30 })}
               className="h-8 text-sm"
               min={1}
-              max={25}
+              max={50}
             />
           </div>
         </div>

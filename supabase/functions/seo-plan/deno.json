@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "ai": "npm:ai@6",
+    "@ai-sdk/google": "npm:@ai-sdk/google@3",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "zod": "npm:zod@3"
+  }
+}

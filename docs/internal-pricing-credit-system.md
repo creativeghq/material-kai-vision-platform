@@ -195,6 +195,21 @@ All pricing is centralized in `app/config/ai_pricing.py`:
 - Each model includes `last_verified` date and `source` URL
 - Prices should be updated when providers change rates
 
+## Credit Purchase Volume Discounts
+
+Users can purchase credits for any dollar amount ($1–$500). Larger purchases unlock better rates:
+
+| Tier | Spend | Rate | Credits per $1 | Discount |
+|------|-------|------|-----------------|----------|
+| Standard | $1–$9.99 | $0.010/credit | 100 | 0% |
+| Silver | $10–$44.99 | $0.009/credit | ~111 | 10% |
+| Gold | $45–$79.99 | $0.008/credit | 125 | 20% |
+| Platinum | $80+ | $0.007/credit | ~143 | 30% |
+
+Pricing logic: `src/services/stripe.service.ts` → `calculateCreditsForAmount()`
+
+Stripe setup: A single "Material KAI Credits" product (`STRIPE_CREDITS_PRODUCT_ID`) is reused for all purchases. Prices are set dynamically at checkout via `price_data`.
+
 ## Notes
 - Platform credits are always rounded up to nearest integer
 - Firecrawl pricing is estimated and should be adjusted based on actual plan

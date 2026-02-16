@@ -1,9 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { captureException, captureMessage } from '../_shared/sentry.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
 
 interface XMLImportRequest {
   workspace_id: string;
@@ -109,16 +109,10 @@ function detectXMLFields(xmlContent: string): Map<string, string[]> {
  */
 async function suggestFieldMappings(
   fieldSamples: Map<string, string[]>,
-  anthropicApiKey: string
+  anthropicApiKey: string,
+  supabase: SupabaseClient,
 ): Promise<Map<string, { mapping: string; confidence: number }>> {
   const suggestions = new Map<string, { mapping: string; confidence: number }>();
-
-  // Our target schema fields
-  const targetFields = [
-    'name', 'description', 'factory_name', 'factory_group_name',
-    'material_category', 'price', 'color', 'colors', 'dimensions',
-    'size', 'designer', 'collection', 'finish', 'material', 'image', 'images'
-  ];
 
   // Build prompt for Claude
   const fieldsInfo = Array.from(fieldSamples.entries()).map(([field, samples]) => ({
@@ -126,40 +120,13 @@ async function suggestFieldMappings(
     sample_values: samples
   }));
 
-  const prompt = `You are an expert at mapping XML product data fields to a standardized schema.
+  // Load prompt from database (editable via /admin/ai-configs)
+  const systemPrompt = await getToolPrompt(supabase, 'xml_field_mapper');
 
-Target Schema Fields:
-- name (required): Product name/title
-- factory_name (required): Manufacturer/supplier/factory name
-- material_category (required): Material type (tiles, flooring, wallpaper, etc.)
-- description: Product description
-- factory_group_name: Factory group or brand
-- price: Product price
-- color/colors: Color information
-- dimensions/size: Product dimensions
-- designer: Designer name
-- collection: Collection name
-- finish: Surface finish
-- material: Material composition
-- image/images: Image URLs
+  const prompt = `${systemPrompt}
 
 XML Fields Found:
-${JSON.stringify(fieldsInfo, null, 2)}
-
-For each XML field, suggest the best matching target field. Return ONLY a JSON object with this structure:
-{
-  "xml_field_name": {
-    "mapping": "target_field_name",
-    "confidence": 0.95
-  }
-}
-
-Rules:
-1. confidence should be 0.0-1.0 (1.0 = certain match)
-2. Only map to target fields listed above
-3. Use "metadata" for fields that don't match any target field
-4. Consider field names AND sample values
-5. Be conservative with confidence scores`;
+${JSON.stringify(fieldsInfo, null, 2)}`;
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -379,7 +346,7 @@ Deno.serve(async (req) => {
       let aiSuggestions: Map<string, { mapping: string; confidence: number }>;
       if (anthropicApiKey) {
         console.log('Using Claude AI for field mapping suggestions');
-        aiSuggestions = await suggestFieldMappings(fieldSamples, anthropicApiKey);
+        aiSuggestions = await suggestFieldMappings(fieldSamples, anthropicApiKey, supabase);
       } else {
         console.log('Using fallback rule-based mapping');
         aiSuggestions = fallbackMappings(fieldSamples);
@@ -507,15 +474,6 @@ Deno.serve(async (req) => {
     callPythonAPI(supabase, jobId, workspace_id, authHeader).catch((error) => {
       console.error(`Error calling Python API for job ${jobId}:`, error);
     });
-
-    // Emit flow event (fire-and-forget)
-    emitFlowEvent('product_added', {
-      job_id: jobId,
-      source: 'xml_import',
-      total_products: products.length,
-      category,
-      source_name: source_name || 'xml_upload',
-    }).catch(() => {});
 
     return new Response(
       JSON.stringify({

@@ -124,23 +124,40 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 
 ## B2B Research System
 
-### Supported Countries (25 Markets)
+### Supported Countries (30 Markets)
 
-The B2B manufacturer search supports the following markets:
+The B2B manufacturer search supports 30 markets across 5 regions with native-language search optimization:
 
 | Region | Countries |
 |--------|-----------|
-| **Baltic & Nordic** | Lithuania (LT), Latvia (LV), Estonia (EE), Finland (FI), Denmark (DK) |
 | **Central & Eastern Europe** | Poland (PL), Czech Republic (CZ), Slovakia (SK), Hungary (HU), Romania (RO), Bulgaria (BG), Ukraine (UA) |
-| **Balkans** | Turkey (TR), Serbia (RS), Croatia (HR), Slovenia (SI), Bosnia and Herzegovina (BA), North Macedonia (MK), Albania (AL) |
-| **Western & Southern Europe** | Germany (DE), Netherlands (NL), United Kingdom (GB), Spain (ES), Italy (IT), Greece (GR) |
+| **Balkans & Turkey** | Turkey (TR), Serbia (RS), Croatia (HR), Slovenia (SI), Bosnia and Herzegovina (BA), North Macedonia (MK), Albania (AL), Greece (GR) |
+| **Baltic & Nordic** | Lithuania (LT), Latvia (LV), Estonia (EE), Finland (FI), Denmark (DK) |
+| **Western & Southern Europe** | Germany (DE), Netherlands (NL), France (FR), Spain (ES), Italy (IT), Portugal (PT), United Kingdom (GB) |
+| **Global Manufacturing Hubs** | China (CN), India (IN), Morocco (AR) |
+
+### Global Multi-Region Search
+
+By default, the B2B manufacturer search searches **all 30 markets in parallel** across 5 regional batches. Each batch makes one Perplexity API call covering all countries in that region.
+
+**Search modes:**
+- **All markets** (default) — 5 parallel Perplexity calls, ~3.75 credits
+- **Single region** — 1 call targeting a specific region, ~0.75 credits
+- **Single country** — 1 call targeting one country, ~0.75 credits
+
+**How it works:**
+1. Credit balance is pre-checked before any API calls
+2. Regional queries are built with all country names + native language hints
+3. All 5 regions are searched in parallel via `Promise.allSettled`
+4. Results are aggregated, citations deduplicated, and a region summary returned
+5. Credits are only debited for successful responses
 
 ### Dual-Language Search
 
-The B2B search performs searches in **both English AND native language** for comprehensive coverage:
+Each regional query includes native language search terms automatically. For example, a search for "ceramic tiles" in the CEE region includes:
 
-1. **English Search**: `"ceramic tiles manufacturer Poland"`
-2. **Native Language Search**: `"producent płytek ceramicznych Polska"`
+- English: `"ceramic tiles manufacturer Poland, Czech Republic, Slovakia..."`
+- Native hints: `"płytki ceramiczne" (Polish), "keramické dlaždice" (Czech), etc.`
 
 This ensures discovery of:
 - International-facing manufacturers (English websites)

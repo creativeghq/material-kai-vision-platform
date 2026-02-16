@@ -84,11 +84,8 @@ Deno.serve(async (req) => {
         line_items: [
           {
             price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `${credits} Credits`,
-                description: `Purchase ${credits} credits for AI operations`,
-              },
+              currency: 'eur',
+              product: Deno.env.get('STRIPE_CREDITS_PRODUCT_ID') || '',
               unit_amount: Math.round(price * 100), // Convert to cents
             },
             quantity: 1,

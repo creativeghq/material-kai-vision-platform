@@ -8,7 +8,6 @@ import {
   Utils,
   ValidationSchemas,
 } from '../_shared/config.ts';
-import { emitFlowEvent } from '../_shared/flow-events.ts';
 
 interface BatchProcessRequest {
   documents: Array<{
@@ -603,15 +602,6 @@ async function processBatchAsync(
       .eq('id', batchId);
 
     console.log(`Batch processing completed: ${batchId}, processed: ${processedCount}, failed: ${failedCount}`);
-
-    // Emit flow event (fire-and-forget)
-    emitFlowEvent('document_processed', {
-      batch_id: batchId,
-      total_documents: documents.length,
-      processed_documents: processedCount,
-      failed_documents: failedCount,
-      status: finalStatus,
-    }).catch(() => {});
 
     // Send webhook notification if configured
     if (options.notifyOnComplete && options.webhookUrl) {

@@ -1,23 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Coins, ShoppingCart, TrendingUp, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Coins, ShoppingCart, TrendingUp, Loader2, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Progress } from '@/components/core/ui/progress';
+import { Input } from '@/components/core/ui/input';
+import { Slider } from '@/components/core/ui/slider';
+import { Badge } from '@/components/core/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { CreditsService } from '@/services/credits.service';
-import { StripeService } from '@/services/stripe.service';
+import { StripeService, calculateCreditsForAmount } from '@/services/stripe.service';
+import { CreditsCalculator } from './CreditsCalculator';
 
 const creditsService = new CreditsService();
 const stripeService = new StripeService();
 
-interface CreditPackage {
-  id: string;
-  name: string;
-  credits: number;
-  price: number;
-  bonus: number;
-}
+const QUICK_AMOUNTS = [10, 25, 50, 100];
+const MIN_AMOUNT = 1;
+const MAX_AMOUNT = 500;
 
 export const CreditsTab: React.FC = () => {
   const { user } = useAuth();
@@ -25,8 +25,9 @@ export const CreditsTab: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(0);
   const [monthlyAllowance, setMonthlyAllowance] = useState(100);
+  const [amount, setAmount] = useState(25);
 
-  const packages: CreditPackage[] = stripeService.getCreditPackages();
+  const quote = useMemo(() => calculateCreditsForAmount(amount), [amount]);
 
   useEffect(() => {
     loadBalance();
@@ -36,26 +37,23 @@ export const CreditsTab: React.FC = () => {
     if (!user) return;
 
     try {
-      const { balance: currentBalance, error } = await creditsService.getBalance();
-      if (error) throw new Error(error);
-      setBalance(currentBalance || 0);
+      const result = await creditsService.getBalance();
+      setBalance(result.balance || 0);
     } catch (error) {
       console.error('Error loading balance:', error);
     }
   };
 
-  const handleBuyCredits = async (pkg: CreditPackage) => {
+  const handleBuyCredits = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const { url, error } = await stripeService.createCreditCheckoutSession(
-        pkg.credits,
-        pkg.price,
-        user.email || '',
+      const { url } = await stripeService.createCreditCheckoutSession(
+        quote.credits,
+        amount,
       );
 
-      if (error) throw new Error(error);
       if (url) window.location.href = url;
     } catch (error) {
       console.error('Error creating checkout session:', error);
@@ -69,12 +67,25 @@ export const CreditsTab: React.FC = () => {
     }
   };
 
+  const handleAmountInput = (value: string) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return;
+    setAmount(Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, Math.round(num))));
+  };
+
+  const handleAddToPurchase = (credits: number) => {
+    // Convert credits to EUR amount: at standard rate, 1 credit = €0.01
+    const eurAmount = Math.ceil(credits * 0.01);
+    setAmount(Math.min(MAX_AMOUNT, Math.max(MIN_AMOUNT, eurAmount)));
+    document.getElementById('buy-credits-card')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const usagePercentage = (balance / monthlyAllowance) * 100;
 
   return (
     <div className="space-y-6">
       {/* Current Balance */}
-      <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 shadow-lg rounded-2xl">
+      <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-primary" />
@@ -102,57 +113,100 @@ export const CreditsTab: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Credit Packages */}
-      <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <ShoppingCart className="h-5 w-5" />
-          Buy More Credits
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {packages.map((pkg) => (
-            <Card
-              key={pkg.id}
-              className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg rounded-2xl hover:shadow-xl transition-shadow"
-            >
-              <CardHeader>
-                <CardTitle>{pkg.name}</CardTitle>
-                <CardDescription>
-                  <span className="text-3xl font-bold">${pkg.price}</span>
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Credits</span>
-                    <span className="font-semibold">{pkg.credits}</span>
-                  </div>
-                  {pkg.bonus > 0 && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Bonus</span>
-                      <span className="font-semibold text-green-600">+{pkg.bonus}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-sm font-semibold">Total</span>
-                    <span className="font-bold text-primary">{pkg.credits + pkg.bonus} credits</span>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => handleBuyCredits(pkg)}
-                  disabled={loading}
-                  className="w-full"
-                >
-                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Buy Now
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      {/* Credits Calculator */}
+      <CreditsCalculator onAddToPurchase={handleAddToPurchase} />
+
+      {/* Buy Credits */}
+      <Card className="rounded-2xl" id="buy-credits-card">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5" />
+            Buy Credits
+          </CardTitle>
+          <CardDescription>Choose any amount — bigger purchases get better rates</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Quick Select */}
+          <div className="flex gap-2 flex-wrap">
+            {QUICK_AMOUNTS.map((qa) => (
+              <Button
+                key={qa}
+                variant={amount === qa ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setAmount(qa)}
+              >
+                €{qa}
+              </Button>
+            ))}
+          </div>
+
+          {/* Amount Input + Slider */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-lg font-semibold text-muted-foreground">€</span>
+              <Input
+                type="number"
+                min={MIN_AMOUNT}
+                max={MAX_AMOUNT}
+                value={amount}
+                onChange={(e) => handleAmountInput(e.target.value)}
+                className="text-2xl font-bold h-12 w-32"
+              />
+              <span className="text-sm text-muted-foreground">EUR</span>
+            </div>
+            <Slider
+              value={[amount]}
+              onValueChange={([v]) => setAmount(v)}
+              min={MIN_AMOUNT}
+              max={MAX_AMOUNT}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>€{MIN_AMOUNT}</span>
+              <span>€{MAX_AMOUNT}</span>
+            </div>
+          </div>
+
+          {/* Live Quote */}
+          <div className="rounded-xl bg-muted/50 border border-border p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">You get</span>
+              <span className="text-2xl font-bold text-primary">
+                {quote.credits.toLocaleString()} credits
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Rate</span>
+              <span className="text-sm font-medium">€{quote.ratePerCredit.toFixed(4)}/credit</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Tier</span>
+              <Badge variant={quote.discount > 0 ? 'default' : 'secondary'}>
+                <Zap className="h-3 w-3 mr-1" />
+                {quote.tierName}{quote.discount > 0 ? ` (${quote.discount}% off)` : ''}
+              </Badge>
+            </div>
+            {quote.nextTier && (
+              <p className="text-xs text-muted-foreground border-t border-border pt-2">
+                Spend €{quote.nextTier.minAmount}+ to unlock {quote.nextTier.name} tier ({quote.nextTier.discount}% off)
+              </p>
+            )}
+          </div>
+
+          {/* Buy Button */}
+          <Button
+            onClick={handleBuyCredits}
+            disabled={loading || amount < MIN_AMOUNT}
+          >
+            {loading ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : null}
+            Buy {quote.credits.toLocaleString()} Credits for €{amount}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Credit Usage Info */}
-      <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg rounded-2xl">
+      <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
@@ -160,9 +214,8 @@ export const CreditsTab: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>• Credits are used for AI operations like PDF processing, agent chat, and material search</p>
           <p>• Different AI models have different costs based on token usage</p>
-          <p>• 1 credit = $0.01 USD</p>
+          <p>• Volume discounts: Silver (5% off at €10+), Gold (10% off at €45+), Platinum (15% off at €80+)</p>
           <p>• Unused credits roll over to the next month</p>
           <p>• Subscription credits are granted monthly, purchased credits never expire</p>
         </CardContent>
@@ -170,4 +223,3 @@ export const CreditsTab: React.FC = () => {
     </div>
   );
 };
-

@@ -8,10 +8,6 @@ interface ImportMetaEnv {
   readonly VITE_WS_URL: string;
   readonly VITE_STRIPE_PRO_PRICE_ID: string;
   readonly VITE_STRIPE_ENTERPRISE_PRICE_ID: string;
-  readonly VITE_STRIPE_CREDITS_100_PRICE_ID: string;
-  readonly VITE_STRIPE_CREDITS_500_PRICE_ID: string;
-  readonly VITE_STRIPE_CREDITS_1000_PRICE_ID: string;
-  readonly VITE_STRIPE_CREDITS_5000_PRICE_ID: string;
 }
 
 interface ImportMeta {

@@ -1,10 +1,16 @@
-import { serve } from 'http/server.ts';
-import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
+import { generateWithClaude } from '../_shared/ai-client.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') || '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+);
 
 interface SearchResult {
   id: string;
@@ -41,7 +47,7 @@ interface ReRankResponse {
   };
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -62,20 +68,7 @@ serve(async (req) => {
       );
     }
 
-    // Get API key from Supabase secrets (server-side only, never exposed to client)
-    const apiKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!apiKey) {
-      console.error('❌ ANTHROPIC_API_KEY not configured in Supabase secrets');
-      return new Response(
-        JSON.stringify({ error: 'AI service not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     console.log(`🤖 AI Re-ranking request: query="${query}", results=${results.length}, model=${model}`);
-
-    // Initialize Anthropic client
-    const anthropic = new Anthropic({ apiKey });
 
     // Prepare results context for Claude
     const resultsContext = results.map((result, index) => ({
@@ -90,17 +83,17 @@ serve(async (req) => {
       qualityMetrics: result.qualityMetrics,
     }));
 
-    // Create prompt for Claude
-    const prompt = `You are an expert search relevance analyzer. Analyze these search results for the query: "${query}"
+    // Load prompt from database (editable via /admin/ai-configs)
+    const systemPrompt = await getToolPrompt(supabase, 'ai_rerank');
+
+    // Build full prompt with runtime data
+    const prompt = `${systemPrompt}
+
+Query: "${query}"
 
 Results to analyze:
 ${JSON.stringify(resultsContext, null, 2)}
-
-Your task:
-1. Deeply understand the user's search intent
-2. Evaluate each result's relevance, quality, and usefulness
-3. Re-rank results from most to least relevant
-${includeExplanations ? '4. Provide a brief explanation for each result\'s ranking' : ''}
+${includeExplanations ? '\nInclude a brief explanation for each result\'s ranking.' : ''}
 
 Response format:
 {
@@ -108,26 +101,20 @@ Response format:
   ${includeExplanations ? '"explanations": { "0": "explanation for result 0", "1": "explanation for result 1", ... }' : ''}
 }`;
 
-    // Call Claude Sonnet
-    const response = await anthropic.messages.create({
-      model: model === 'claude-sonnet-4-5' ? 'claude-sonnet-4-5-20250929' : 'claude-haiku-4-5-20251001',
-      max_tokens: 4096,
+    // Map model selection to full model ID
+    const modelId = model === 'claude-sonnet-4-5'
+      ? 'claude-sonnet-4-5-20250929'
+      : 'claude-haiku-4-5-20251001';
+
+    // Call Claude via unified AI SDK client
+    const aiResult = await generateWithClaude(prompt, {
+      model: modelId,
+      maxTokens: 4096,
       temperature: 0.1,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
     });
 
     // Parse response
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-
-    const parsed = JSON.parse(content.text);
+    const parsed = JSON.parse(aiResult.text);
     const rankedIndices = parsed.rankedIndices || [];
     const explanations = parsed.explanations || {};
 
@@ -138,9 +125,8 @@ Response format:
       .filter(Boolean); // Remove any invalid indices
 
     // Calculate cost (approximate)
-    const inputTokens = response.usage.input_tokens;
-    const outputTokens = response.usage.output_tokens;
-    const costPerMToken = model === 'claude-sonnet-4-5' ? 3.0 : 1.0; // $3/1M for Sonnet, $1/1M for Haiku
+    const { inputTokens, outputTokens } = aiResult.usage;
+    const costPerMToken = model === 'claude-sonnet-4-5' ? 3.0 : 1.0;
     const cost = ((inputTokens + outputTokens) / 1_000_000) * costPerMToken;
 
     const processingTimeMs = Date.now() - startTime;
@@ -165,10 +151,10 @@ Response format:
     );
   } catch (error) {
     console.error('❌ AI Re-ranking error:', error);
-    
+
     return new Response(
-      JSON.stringify({ 
-        error: 'AI re-ranking failed', 
+      JSON.stringify({
+        error: 'AI re-ranking failed',
         details: error.message,
         processingTimeMs: Date.now() - startTime,
       }),
@@ -176,4 +162,3 @@ Response format:
     );
   }
 });
-

@@ -189,7 +189,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
           document_chunks!inner(
             id,
             chunk_text,
-            page_number
+            metadata
           )
         `)
         .eq('image_id', image.id);
@@ -927,7 +927,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter, 
                                   {rel.document_chunks?.chunk_text?.substring(0, 150)}...
                                 </p>
                                 <span className="text-xs text-muted-foreground">
-                                  Page {rel.document_chunks?.page_number}
+                                  Page {rel.document_chunks?.metadata?.page_number}
                                 </span>
                               </div>
                             ))}

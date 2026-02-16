@@ -128,12 +128,20 @@ export class BrowserApiIntegrationService {
       });
 
       if (error) {
+        // Detect insufficient credits (402) from mivaa-gateway or other edge functions
+        const errorMsg = error.message || '';
+        const isInsufficientCredits =
+          errorMsg.includes('Insufficient credits') ||
+          (error as any)?.context?.status === 402;
+
         return {
           success: false,
           error: {
-            message: error.message || 'Supabase function call failed',
-            code: 'SUPABASE_ERROR',
-            retryable: true,
+            message: isInsufficientCredits
+              ? 'Insufficient credits. Please purchase more credits to continue.'
+              : errorMsg || 'Supabase function call failed',
+            code: isInsufficientCredits ? 'INSUFFICIENT_CREDITS' : 'SUPABASE_ERROR',
+            retryable: !isInsufficientCredits,
           },
           metadata: {
             apiType: 'supabase',
@@ -182,7 +190,7 @@ export class BrowserApiIntegrationService {
       const base64Image = await this.fileToBase64(imageFile);
 
       return this.callSupabaseFunction('mivaa-gateway', {
-        action: 'together_analyze_image',
+        action: 'material_recognition',
         payload: {
           image_data: base64Image,
           analysis_type: 'material_analysis',

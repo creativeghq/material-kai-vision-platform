@@ -11,43 +11,47 @@
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// AI Pricing Configuration (matches Python version)
+// AI Pricing Configuration (synced with ai_model_pricing DB table and ai_pricing.py)
+// Last synced: 2026-02-15
 const AI_PRICING = {
-  // Anthropic Claude Models
+  // Anthropic Claude Models (per 1M tokens)
   claude: {
-    'claude-haiku-4-5': { input: 0.80, output: 4.00 },
-    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+    'claude-haiku-4-5': { input: 1.00, output: 5.00 },
+    'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
+    'claude-4-5-haiku-20251001': { input: 1.00, output: 5.00 },
     'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
+    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
     'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-    'claude-opus-4-5': { input: 15.00, output: 75.00 },
+    'claude-opus-4-5': { input: 5.00, output: 25.00 },
   },
-  // OpenAI GPT Models
+  // OpenAI GPT Models (per 1M tokens)
   gpt: {
     'gpt-5': { input: 5.00, output: 15.00 },
     'gpt-4o': { input: 2.50, output: 10.00 },
     'gpt-4o-mini': { input: 0.15, output: 0.60 },
-    'gpt-4-turbo': { input: 10.00, output: 30.00 },
   },
-  // OpenAI Embeddings
+  // OpenAI Embeddings (per 1M tokens)
   embeddings: {
     'text-embedding-3-small': { input: 0.02, output: 0.00 },
     'text-embedding-3-large': { input: 0.13, output: 0.00 },
     'text-embedding-ada-002': { input: 0.10, output: 0.00 },
   },
-  // Voyage AI Embeddings
+  // Voyage AI Embeddings (per 1M tokens)
   voyage: {
+    'voyage-3.5': { input: 0.06, output: 0.00 },
+    'voyage-3.5-lite': { input: 0.02, output: 0.00 },
     'voyage-3': { input: 0.06, output: 0.00 },
     'voyage-3-lite': { input: 0.02, output: 0.00 },
     'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
   },
-  // Qwen Vision Models (HuggingFace Endpoint - 32B only)
+  // Qwen Vision Models (time-based on HuggingFace, token pricing here is approximate)
   qwen: {
     'qwen3-vl-32b': { input: 0.40, output: 0.40 },
     'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
   },
   // Vision Models
   vision: {
-    'clip': { input: 0.00, output: 0.00 }, // Free
+    'clip': { input: 0.00, output: 0.00 }, // Free (open-source)
   },
 };
 
@@ -255,9 +259,9 @@ export class AICallLogger {
   }
 
   /**
-   * Log TogetherAI (Qwen) API call
+   * Log Qwen (HuggingFace) API call
    */
-  async logTogetherCall(
+  async logQwenCall(
     task: string,
     model: string,
     response: any,

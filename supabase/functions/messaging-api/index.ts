@@ -13,6 +13,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
 
 // =====================================================
@@ -468,6 +469,9 @@ Deno.serve(async (req) => {
               provider_message_id: result.messageId,
               status: result.status || 'queued',
             });
+            // Debit credits for Twilio message
+            const serviceName = body.channel === 'whatsapp' ? 'twilio-whatsapp' : 'twilio-sms';
+            await debitExternalServiceCredits(supabaseClient, user.id, serviceName, `messaging_${body.channel}`, 1, { to, message_id: result.messageId });
           }
         }
 
@@ -590,6 +594,12 @@ Deno.serve(async (req) => {
 
         const successful = results.filter(r => r.success);
         const failed = results.filter(r => !r.success);
+
+        // Debit credits for all successful bulk messages
+        if (successful.length > 0) {
+          const serviceName = body.channel === 'whatsapp' ? 'twilio-whatsapp' : 'twilio-sms';
+          await debitExternalServiceCredits(supabaseClient, user.id, serviceName, `messaging_bulk_${body.channel}`, successful.length, { total_sent: successful.length });
+        }
 
         return new Response(
           JSON.stringify({

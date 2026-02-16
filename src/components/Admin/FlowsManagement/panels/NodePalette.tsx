@@ -1,10 +1,10 @@
 import React from 'react';
 import {
-  Hand, Clock, Globe, UserPlus, FileText, Image,
+  Hand, Clock, Globe, UserPlus, FileText,
   GitBranch, ArrowLeftRight, Filter, Timer,
   MessageSquare, Mail, PlusCircle, Bell,
-  LogIn, CheckCircle2, XCircle, ClipboardCheck,
-  FileCheck, Package, Search, Box, Orbit,
+  LogIn, CheckCircle2, XCircle,
+  Search, Box, Orbit,
   FlaskConical, Repeat, CircleStop,
   Smartphone, Send, UserCog, Tag, StickyNote,
   UserPen, PackageCheck, ScrollText, Zap,
@@ -23,11 +23,11 @@ import { triggerPaletteItems, conditionPaletteItems, actionPaletteItems, groupBy
 import type { NodePaletteItem } from '@/services/flows/types';
 
 const iconMap: Record<string, React.ElementType> = {
-  Hand, Clock, Globe, UserPlus, FileText, Image,
+  Hand, Clock, Globe, UserPlus, FileText,
   GitBranch, ArrowLeftRight, Filter, Timer,
   MessageSquare, Mail, PlusCircle, Bell,
-  LogIn, CheckCircle2, XCircle, ClipboardCheck,
-  FileCheck, Package, Search, Box, Orbit,
+  LogIn, CheckCircle2, XCircle,
+  Search, Box, Orbit,
   FlaskConical, Repeat, CircleStop,
   Smartphone, Send, UserCog, Tag, StickyNote,
   UserPen, PackageCheck, ScrollText, Zap,

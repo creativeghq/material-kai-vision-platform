@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
 
 interface ScrapePreviewRequest {
   url: string;
@@ -153,6 +154,10 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
     },
   };
 
+  // Load extraction prompts from database (editable via /admin/ai-configs)
+  const dbExtractionPrompt = options.prompt || await getToolPrompt(supabase, 'material_extractor');
+  const dbExtractionSystemPrompt = options.systemPrompt || await getToolPrompt(supabase, 'extraction_system');
+
   // Build v2 API request with structured extraction
   const requestBody: any = {
     url: url,
@@ -171,8 +176,8 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
           },
         },
       },
-      prompt: options.prompt || `Extract material/product information from this page. Return all materials found.`,
-      systemPrompt: options.systemPrompt || 'You are a precise data extraction assistant. Focus on accuracy and structured output.',
+      prompt: dbExtractionPrompt,
+      systemPrompt: dbExtractionSystemPrompt,
     },
   };
 

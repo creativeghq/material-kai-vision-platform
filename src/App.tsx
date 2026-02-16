@@ -61,7 +61,6 @@ const ExtractionPromptsPage = lazy(() => import('./components/Admin/ExtractionPr
 const AdminPanel = lazy(() => import('./components/Admin/AdminPanel').then(m => ({ default: m.AdminPanel })));
 const ApiGatewayAdmin = lazy(() => import('./components/Admin/ApiGatewayAdmin').then(m => ({ default: m.ApiGatewayAdmin })));
 const AITestingPanel = lazy(() => import('./components/Admin/AITestingPanel').then(m => ({ default: m.AITestingPanel })));
-const AIMonitoringDashboard = lazy(() => import('./components/Admin/AIMonitoringDashboard').then(m => ({ default: m.AIMonitoringDashboard })));
 const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
 const SystemPerformance = lazy(() => import('./components/Admin/SystemPerformance').then(m => ({ default: m.SystemPerformance })));
 const MaterialSuggestionsPanel = lazy(() => import('./components/Admin/MaterialSuggestionsPanel').then(m => ({ default: m.MaterialSuggestionsPanel })));
@@ -140,7 +139,9 @@ const App = () => (
                   element={
                     <PageErrorBoundary name="User Profile">
                       <AuthGuard>
-                        <UserProfilePage />
+                        <Layout>
+                          <UserProfilePage />
+                        </Layout>
                       </AuthGuard>
                     </PageErrorBoundary>
                   }
@@ -347,18 +348,6 @@ const App = () => (
                       <AdminGuard>
                         <Layout>
                           <ApiGatewayAdmin />
-                        </Layout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/ai-monitoring"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <Layout>
-                          <AIMonitoringDashboard />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

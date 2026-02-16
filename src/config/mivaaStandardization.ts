@@ -104,9 +104,6 @@ export const MIVAA_ACTION_MAP: Record<
   // PDF Processing - Use valid mivaa-gateway actions
   rag_upload: { path: '/api/rag/documents/upload', method: 'POST' },
 
-  // Material Recognition - Use valid mivaa-gateway actions
-  together_analyze_image: { path: '/api/together-ai/analyze-image', method: 'POST' },
-
   // Embeddings
   generate_embedding: { path: '/api/embeddings/generate', method: 'POST' },
   generate_batch_embeddings: { path: '/api/embeddings/batch', method: 'POST' },

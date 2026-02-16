@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Bell, Settings, User, Sparkles, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, User, Sparkles, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/core/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/core/ui/avatar';
 import { SemanticSearchInput } from '@/components/features/search/SemanticSearchInput';
 import UnifiedProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +31,19 @@ export const Header: React.FC<HeaderProps> = ({
   const { toast } = useToast();
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('user_profiles')
+      .select('avatar_url')
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.avatar_url) setAvatarUrl(data.avatar_url);
+      });
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -254,14 +267,12 @@ export const Header: React.FC<HeaderProps> = ({
           <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-white/10">
             <Bell className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10 hover:bg-white/10">
-            <Settings className="w-5 h-5" />
-          </Button>
           {user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-white/10">
                   <Avatar className="h-10 w-10 border-2 border-white/20">
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile" />}
                     <AvatarFallback className="text-foreground font-semibold" style={{ background: 'var(--mocha-color)' }}>
                       {user.email ? getInitials(user.email) : 'U'}
                     </AvatarFallback>

@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
 
 interface ScrapePageRequest {
   pageUrl: string;
@@ -219,6 +220,10 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
 
   // Add structured extraction with dynamic schema (v2 feature)
   if (options.useStructuredExtraction !== false) {
+    // Load extraction prompts from database (editable via /admin/ai-configs)
+    const dbExtractionPrompt = options.prompt || await getToolPrompt(supabase, 'single_page_extractor');
+    const dbExtractionSystemPrompt = options.systemPrompt || await getToolPrompt(supabase, 'extraction_system');
+
     requestBody.extract = {
       schema: {
         type: 'object',
@@ -229,16 +234,8 @@ async function scrapeWithFirecrawl(url: string, options: any): Promise<{ materia
           },
         },
       },
-      prompt: options.prompt || `Extract material information from this page. Look for:
-- Material name (required)
-- Price (if available)
-- Description
-- Images
-- Properties like dimensions, color, finish
-- Category (tiles, stone, wood, etc.)
-- Supplier or manufacturer
-Return all materials found on the page in the materials array.`,
-      systemPrompt: options.systemPrompt || 'You are a precise data extraction assistant. Focus on accuracy and structured output.',
+      prompt: dbExtractionPrompt,
+      systemPrompt: dbExtractionSystemPrompt,
     };
   }
 

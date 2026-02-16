@@ -30,20 +30,31 @@ interface UsageLog {
 export const UsageHistoryTab: React.FC = () => {
   const { user } = useAuth();
   const [usageLogs, setUsageLogs] = useState<UsageLog[]>([]);
+  const [balance, setBalance] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadUsageLogs();
+    loadBalance();
   }, [user]);
+
+  const loadBalance = async () => {
+    if (!user) return;
+    try {
+      const result = await creditsService.getBalance();
+      setBalance(result.balance || 0);
+    } catch (error) {
+      console.error('Error loading balance:', error);
+    }
+  };
 
   const loadUsageLogs = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      const { logs, error } = await creditsService.getUsageLogs();
-      if (error) throw new Error(error);
-      setUsageLogs(logs || []);
+      const { data } = await creditsService.getUsageLogs();
+      setUsageLogs(data || []);
     } catch (error) {
       console.error('Error loading usage logs:', error);
     } finally {
@@ -77,45 +88,49 @@ export const UsageHistoryTab: React.FC = () => {
   };
 
   const totalCreditsUsed = usageLogs.reduce((sum, log) => sum + log.credits_debited, 0);
-  const totalTokens = usageLogs.reduce(
-    (sum, log) => sum + log.input_tokens + log.output_tokens,
-    0,
-  );
+  const avgPerOperation = usageLogs.length > 0 ? totalCreditsUsed / usageLogs.length : 0;
 
   return (
     <div className="space-y-6">
       {/* Usage Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 shadow-lg rounded-2xl">
+        <Card className="rounded-2xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-blue-900">Total Operations</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Operations</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-blue-900">{usageLogs.length}</p>
+            <p className="text-3xl font-bold">{usageLogs.length}</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 shadow-lg rounded-2xl">
+        <Card className="rounded-2xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-purple-900">Credits Used</CardTitle>
+            <CardTitle className="text-sm font-medium">Credits Used</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-purple-900">{totalCreditsUsed.toFixed(2)}</p>
+            <p className="text-3xl font-bold text-primary">
+              {totalCreditsUsed.toFixed(2)}
+              <span className="text-lg font-normal text-muted-foreground"> / {(balance + totalCreditsUsed).toFixed(2)}</span>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {balance.toFixed(2)} credits remaining
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 shadow-lg rounded-2xl">
+        <Card className="rounded-2xl">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-green-900">Total Tokens</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg per Operation</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-green-900">{totalTokens.toLocaleString()}</p>
+            <p className="text-3xl font-bold">{avgPerOperation.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mt-1">credits/operation</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Usage Logs Table */}
-      <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg rounded-2xl">
+      <Card className="rounded-2xl">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />

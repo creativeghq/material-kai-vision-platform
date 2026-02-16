@@ -1,7 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const API_BASE = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
-
 /**
  * Credits Service
  * Handles all credit-related operations: balance checks, transactions, usage logs
@@ -161,14 +159,15 @@ export const creditsAPI = {
     inputTokens: number,
     outputTokens: number,
   ): { inputCost: number; outputCost: number; totalCost: number; credits: number } {
-    // Model pricing per 1M tokens (in USD)
+    // Model pricing per 1M tokens (in USD) - synced with ai_model_pricing DB table
+    // Last synced: 2026-02-15
     const pricing: Record<string, { input: number; output: number }> = {
       // Claude Models
-      'claude-sonnet-4.5': { input: 3.00, output: 15.00 },
-      'claude-haiku-4.5': { input: 0.80, output: 4.00 },
-      'claude-opus-4.5': { input: 15.00, output: 75.00 },
+      'claude-sonnet-4-5': { input: 3.00, output: 15.00 },
+      'claude-haiku-4-5': { input: 1.00, output: 5.00 },
+      'claude-opus-4-5': { input: 5.00, output: 25.00 },
       'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00 },
-      'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
+      'claude-3-5-haiku-20241022': { input: 1.00, output: 5.00 },
 
       // OpenAI Models
       'gpt-5': { input: 5.00, output: 15.00 },
@@ -178,6 +177,8 @@ export const creditsAPI = {
       'text-embedding-3-large': { input: 0.13, output: 0.00 },
 
       // Voyage AI Embeddings
+      'voyage-3.5': { input: 0.06, output: 0.00 },
+      'voyage-3.5-lite': { input: 0.02, output: 0.00 },
       'voyage-3': { input: 0.06, output: 0.00 },
       'voyage-3-lite': { input: 0.02, output: 0.00 },
       'voyage-large-2-instruct': { input: 0.12, output: 0.00 },
@@ -187,10 +188,10 @@ export const creditsAPI = {
       'Qwen/Qwen3-VL-32B-Instruct': { input: 0.40, output: 0.40 },
     };
 
-    // Flat-rate pricing for non-token-based services (in credits)
+    // Flat-rate pricing for non-token-based services (in credits, includes 1.50x markup)
     const flatRatePricing: Record<string, number> = {
-      'worldlabs-marble-mini': 50,   // $0.50 per VR world generation (draft)
-      'worldlabs-marble-plus': 200,  // $2.00 per VR world generation (high quality)
+      'worldlabs-marble-mini': 75,   // $0.50 raw × 1.50 markup = $0.75 → 75 credits
+      'worldlabs-marble-plus': 300,  // $2.00 raw × 1.50 markup = $3.00 → 300 credits
     };
 
     // Check for flat-rate model first

@@ -21,10 +21,13 @@ const worldlabsApiKey = Deno.env.get('WORLDLABS_API_KEY') || '';
 
 const WORLDLABS_BASE_URL = 'https://api.worldlabs.ai/marble/v1';
 
-// Credit costs per model
+// Credit costs per model (raw cost × 1.50 markup × 100 credits/$)
+// marble-0.1-mini: $0.50 raw × 1.50 = $0.75 billed → 75 credits
+// marble-0.1-plus: $2.00 raw × 1.50 = $3.00 billed → 300 credits
+const MARKUP_MULTIPLIER = 1.50;
 const CREDIT_COSTS: Record<string, number> = {
-  'marble-0.1-mini': 50,   // $0.50
-  'marble-0.1-plus': 200,  // $2.00
+  'marble-0.1-mini': 75,   // $0.50 raw × 1.50 markup = $0.75
+  'marble-0.1-plus': 300,  // $2.00 raw × 1.50 markup = $3.00
 };
 
 // Max polling duration (3 minutes for mini, 7 minutes for plus)

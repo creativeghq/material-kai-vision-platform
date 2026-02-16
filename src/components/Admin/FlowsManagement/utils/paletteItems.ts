@@ -36,27 +36,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'quote_rejected', group: 'Quotes',
     label: 'Quote Rejected', description: 'Quote is rejected', icon: 'XCircle', color: 'emerald',
     defaultData: { label: 'Quote Rejected', category: 'trigger', triggerType: 'quote_rejected', config: {} } as TriggerNodeData },
-  { type: 'triggerNode', category: 'trigger', subType: 'contract_created', group: 'Quotes',
-    label: 'Contract Created', description: 'New contract is created', icon: 'ClipboardCheck', color: 'emerald',
-    defaultData: { label: 'Contract Created', category: 'trigger', triggerType: 'contract_created', config: {} } as TriggerNodeData },
-
-  // ── Materials ──
-  { type: 'triggerNode', category: 'trigger', subType: 'image_uploaded', group: 'Materials',
-    label: 'Image Uploaded', description: 'New image is processed', icon: 'Image', color: 'emerald',
-    defaultData: { label: 'Image Uploaded', category: 'trigger', triggerType: 'image_uploaded', config: {} } as TriggerNodeData },
-  { type: 'triggerNode', category: 'trigger', subType: 'document_processed', group: 'Materials',
-    label: 'Doc Processed', description: 'PDF/document extraction done', icon: 'FileCheck', color: 'emerald',
-    defaultData: { label: 'Doc Processed', category: 'trigger', triggerType: 'document_processed', config: {} } as TriggerNodeData },
-  { type: 'triggerNode', category: 'trigger', subType: 'product_added', group: 'Materials',
-    label: 'Product Added', description: 'New product is added', icon: 'Package', color: 'emerald',
-    defaultData: { label: 'Product Added', category: 'trigger', triggerType: 'product_added', config: {} } as TriggerNodeData },
-
   // ── AI & 3D ──
   { type: 'triggerNode', category: 'trigger', subType: 'search_executed', group: 'AI & 3D',
     label: 'Search Executed', description: 'Agent search performed', icon: 'Search', color: 'emerald',
     defaultData: { label: 'Search Executed', category: 'trigger', triggerType: 'search_executed', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'model_3d_created', group: 'AI & 3D',
-    label: '3D Model Created', description: '3D model generated', icon: 'Box', color: 'emerald',
+    label: '3D Model Created', description: '3D model generated via agent', icon: 'Box', color: 'emerald',
     defaultData: { label: '3D Model Created', category: 'trigger', triggerType: 'model_3d_created', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'vr_world_created', group: 'AI & 3D',
     label: 'VR World Created', description: 'VR world generated', icon: 'Orbit', color: 'emerald',
@@ -181,8 +166,8 @@ export const paletteItems: NodePaletteItem[] = [
 
   // ── B2B Research ──
   { type: 'actionNode', category: 'action', subType: 'perplexity_search', group: 'B2B Research',
-    label: 'Manufacturer Search', description: 'AI-powered B2B manufacturer search', icon: 'Compass', color: 'blue',
-    defaultData: { label: 'Manufacturer Search', category: 'action', actionType: 'perplexity_search', config: { country: '', category: '', limit: 10 } } as ActionNodeData },
+    label: 'Manufacturer Search', description: 'Search 30 markets for B2B manufacturers', icon: 'Compass', color: 'blue',
+    defaultData: { label: 'Manufacturer Search', category: 'action', actionType: 'perplexity_search', config: { category: '', limit: 30 } } as ActionNodeData },
   { type: 'actionNode', category: 'action', subType: 'firecrawl_scrape', group: 'B2B Research',
     label: 'Scrape Website', description: 'Extract company info from website', icon: 'FileSearch', color: 'blue',
     defaultData: { label: 'Scrape Website', category: 'action', actionType: 'firecrawl_scrape', config: { url: '' } } as ActionNodeData },

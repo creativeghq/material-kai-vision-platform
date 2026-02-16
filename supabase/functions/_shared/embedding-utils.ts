@@ -1,3 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getToolPrompt } from './prompt-utils.ts';
+
 /**
  * Shared MIVAA Embedding Utilities for Supabase Functions
  *
@@ -287,7 +290,7 @@ export function validateEmbedding(embedding: number[]): boolean {
 }
 
 /**
- * Generate semantic analysis for images using MIVAA TogetherAI/Qwen Vision
+ * Generate semantic analysis for images using MIVAA Qwen Vision
  *
  * @param imageData - Base64 image data or image URL
  * @param analysisType - Type of analysis to perform
@@ -296,18 +299,18 @@ export function validateEmbedding(embedding: number[]): boolean {
 export async function generateSemanticAnalysis(
   imageData: string,
   analysisType: string = 'material_identification',
+  supabase?: SupabaseClient,
 ): Promise<string> {
   if (!MIVAA_CONFIG.apiKey) {
     throw new Error('MIVAA_API_KEY environment variable is required');
   }
 
-  const prompt = `Analyze this material image and provide a concise semantic description focusing on:
-  - Material type and classification
-  - Visual appearance and surface characteristics
-  - Color, texture, and pattern properties
-  - Potential use cases and applications
-  
-  Provide a clear, searchable description in 2-3 sentences.`;
+  if (!supabase) {
+    throw new Error('Supabase client is required for loading prompt from database');
+  }
+
+  // Load prompt from database (editable via /admin/ai-configs)
+  const prompt = await getToolPrompt(supabase, 'semantic_analysis');
 
   let lastError: Error | null = null;
 

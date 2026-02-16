@@ -22,9 +22,21 @@ import {
   DollarSign,
   Crown,
   Image,
-  ListTodo,
+  Globe,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
@@ -45,10 +57,6 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from './UnifiedProcessingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
-import { KanbanBoard } from '@/components/features/tasks/KanbanBoard';
-import { TaskDetailPanel } from '@/components/features/tasks/TaskDetailPanel';
-import { CreateTaskModal } from '@/components/features/tasks/CreateTaskModal';
-import type { TaskWithDetails } from '@/services/tasks';
 
 // Model pricing per 1M tokens (in USD)
 // Platform markup multiplier (50% markup for user billing)
@@ -266,6 +274,45 @@ interface ModelUsage {
   success_rate: number;
 }
 
+interface ExternalServiceUsageData {
+  summary: {
+    total_credits: number;
+    total_cost_usd: number;
+    total_operations: number;
+  };
+  by_service: Array<{
+    service: string;
+    operations: number;
+    credits: number;
+    cost_usd: number;
+  }>;
+  by_user: Array<{
+    user_id: string;
+    total_credits: number;
+    operations: number;
+  }>;
+  timeline: Array<{
+    date: string;
+    credits: number;
+    operations: number;
+  }>;
+  time_period: string;
+}
+
+const EXT_SERVICE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
+
+const EXT_SERVICE_LABELS: Record<string, string> = {
+  'perplexity-sonar': 'Perplexity',
+  'apollo-enrich': 'Apollo Enrich',
+  'apollo-people-match': 'Apollo People',
+  'hunter-email-finder': 'Hunter Email',
+  'hunter-domain-search': 'Hunter Domain',
+  'zerobounce-validate': 'ZeroBounce',
+  'firecrawl-scrape': 'Firecrawl',
+  'twilio-sms': 'Twilio SMS',
+  'twilio-whatsapp': 'Twilio WhatsApp',
+};
+
 export const OperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -301,36 +348,11 @@ export const OperationsDashboard: React.FC = () => {
     scraping: { total: 0, completed: 0, failed: 0, processing: 0, totalPages: 0 },
   });
   const [loading, setLoading] = useState(true);
+  const [extServiceData, setExtServiceData] = useState<ExternalServiceUsageData | null>(null);
+  const [extServicePeriod, setExtServicePeriod] = useState('7d');
+  const [extServiceLoading, setExtServiceLoading] = useState(false);
   const { toast } = useToast();
 
-  // Task management state
-  const [selectedTask, setSelectedTask] = useState<TaskWithDetails | null>(null);
-  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
-  const [isTaskDetailModalOpen, setIsTaskDetailModalOpen] = useState(false);
-
-  const handleTaskClick = (task: TaskWithDetails) => {
-    setSelectedTask(task);
-    setIsTaskDetailModalOpen(true);
-  };
-
-  const handleCreateTask = () => {
-    setIsCreateTaskModalOpen(true);
-  };
-
-  const handleCloseTaskDetailModal = () => {
-    setIsTaskDetailModalOpen(false);
-    setSelectedTask(null);
-  };
-
-  const handleCloseCreateTaskModal = () => {
-    setIsCreateTaskModalOpen(false);
-  };
-
-  const handleTaskCreated = () => {
-    // Refresh the kanban board by triggering a re-render
-    // The KanbanBoard component will reload its data
-    setIsCreateTaskModalOpen(false);
-  };
 
   const fetchAnalyticsData = useCallback(async () => {
     try {
@@ -791,6 +813,27 @@ export const OperationsDashboard: React.FC = () => {
     fetchAnalyticsData();
   }, [fetchAnalyticsData]);
 
+  const fetchExtServiceUsage = useCallback(async (period: string) => {
+    try {
+      setExtServiceLoading(true);
+      const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'http://localhost:8000';
+      const response = await fetch(
+        `${apiUrl}/api/v1/ai-metrics/external-service-usage?time_period=${period}`,
+      );
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data: ExternalServiceUsageData = await response.json();
+      setExtServiceData(data);
+    } catch (err) {
+      console.error('Failed to fetch external service usage:', err);
+    } finally {
+      setExtServiceLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchExtServiceUsage(extServicePeriod);
+  }, [extServicePeriod, fetchExtServiceUsage]);
+
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return 'text-green-600';
     if (status >= 400 && status < 500) return 'text-yellow-600';
@@ -855,7 +898,7 @@ export const OperationsDashboard: React.FC = () => {
       {/* Main Content */}
       <div className="p-6 space-y-6">
         <Tabs defaultValue="system-health" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="system-health">
               <Activity className="h-4 w-4 mr-2" />
               System Health
@@ -872,17 +915,9 @@ export const OperationsDashboard: React.FC = () => {
               <MessageSquare className="h-4 w-4 mr-2" />
               Agent Chat
             </TabsTrigger>
-            <TabsTrigger value="subscriptions">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Subscriptions
-            </TabsTrigger>
-            <TabsTrigger value="api-usage">
-              <Zap className="h-4 w-4 mr-2" />
-              API Usage
-            </TabsTrigger>
-            <TabsTrigger value="tasks">
-              <ListTodo className="h-4 w-4 mr-2" />
-              Tasks
+            <TabsTrigger value="services-billing">
+              <Globe className="h-4 w-4 mr-2" />
+              Services & Billing
             </TabsTrigger>
           </TabsList>
 
@@ -1054,12 +1089,79 @@ export const OperationsDashboard: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* API Request Logs (merged from API Usage tab) */}
+            {apiUsage.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Zap className="h-5 w-5" />
+                    API Request Logs
+                  </CardTitle>
+                  <CardDescription>Recent raw API endpoint requests and response codes</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Endpoint</TableHead>
+                        <TableHead>Method</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Response Time</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {apiUsage.slice(0, 15).map((log) => (
+                        <TableRow key={log.id}>
+                          <TableCell className="font-mono text-sm max-w-xs truncate">
+                            {log.endpoint}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className="border border-gray-300 bg-white text-gray-700">
+                              {log.method}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className={getStatusColor(log.status_code)}>
+                              {log.status_code}
+                            </span>
+                          </TableCell>
+                          <TableCell>{log.response_time_ms || 0}ms</TableCell>
+                          <TableCell>
+                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                              {log.api_key_id
+                                ? log.api_key_id.slice(0, 8) + '...'
+                                : 'Anonymous'}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            {log.created_at
+                              ? new Date(log.created_at).toLocaleString()
+                              : 'N/A'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          {/* Subscriptions & Credits Tab */}
-          <TabsContent value="subscriptions" className="space-y-4">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
+          {/* Services & Billing Tab (merged from External Services + Subscriptions) */}
+          <TabsContent value="services-billing" className="space-y-6">
+            {/* Subscription Overview */}
+            <div>
+              <h2 className="text-2xl font-bold text-foreground mb-1">Services & Billing</h2>
+              <p className="text-muted-foreground text-sm">
+                Subscription revenue, user credit balances, and external service usage across Twilio, Apollo, Hunter, ZeroBounce, Perplexity, and Firecrawl.
+              </p>
+            </div>
+
+            {/* Subscription Summary Cards */}
+            <div className="grid gap-4 md:grid-cols-4">
               <div className="dashboard-card">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
@@ -1069,7 +1171,7 @@ export const OperationsDashboard: React.FC = () => {
                     <div className="text-sm text-muted-foreground font-medium">Pro Subscribers</div>
                     <div className="text-2xl font-bold text-foreground">{subscriptionStats.proUsers}</div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of users
+                      {subscriptionStats.totalUsers > 0 ? ((subscriptionStats.proUsers / subscriptionStats.totalUsers) * 100).toFixed(1) : 0}% of {subscriptionStats.totalUsers} users
                     </div>
                   </div>
                 </div>
@@ -1082,9 +1184,7 @@ export const OperationsDashboard: React.FC = () => {
                   <div>
                     <div className="text-sm text-muted-foreground font-medium">Monthly Revenue</div>
                     <div className="text-2xl font-bold text-foreground">${subscriptionStats.totalRevenue}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      From Pro subscriptions
-                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">From Pro subscriptions</div>
                   </div>
                 </div>
               </div>
@@ -1094,36 +1194,53 @@ export const OperationsDashboard: React.FC = () => {
                     <Zap className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                   </div>
                   <div>
-                    <div className="text-sm text-muted-foreground font-medium">Credits Used</div>
-                    <div className="text-2xl font-bold text-foreground">{subscriptionStats.totalCreditsUsed.toFixed(2)}</div>
+                    <div className="text-sm text-muted-foreground font-medium">AI Credits Used</div>
+                    <div className="text-2xl font-bold text-foreground">{subscriptionStats.totalCreditsUsed.toFixed(1)}</div>
+                    <div className="text-xs text-muted-foreground mt-1">Across all users</div>
+                  </div>
+                </div>
+              </div>
+              <div className="dashboard-card">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                    <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground font-medium">Ext. Service Credits</div>
+                    <div className="text-2xl font-bold text-foreground">
+                      {extServiceData?.summary.total_credits.toFixed(1) || '0.0'}
+                    </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Across all users
+                      {extServiceData?.summary.total_operations || 0} operations
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* User Profiles Table */}
+            {/* User Subscriptions Table */}
             <Card>
               <CardHeader>
-                <CardTitle>User Subscriptions</CardTitle>
-                <CardDescription>All users with subscription and credit information</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  User Subscriptions & Credit Balances
+                </CardTitle>
+                <CardDescription>All users with subscription tier, status, and current credit balance</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Subscription</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Credits Balance</TableHead>
-                      <TableHead>Joined</TableHead>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Email</TableHead>
+                      <TableHead className="font-semibold">Subscription</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="text-right font-semibold">Credits Balance</TableHead>
+                      <TableHead className="font-semibold">Joined</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {userProfiles.slice(0, 20).map((profile) => (
-                      <TableRow key={profile.id}>
+                      <TableRow key={profile.id} className="hover:bg-gray-50">
                         <TableCell className="font-medium">{profile.email}</TableCell>
                         <TableCell>
                           <Badge
@@ -1143,7 +1260,7 @@ export const OperationsDashboard: React.FC = () => {
                             {profile.subscription_status || 'inactive'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-mono font-semibold">
                           {(profile.credits_balance || 0).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-sm text-gray-500">
@@ -1160,7 +1277,313 @@ export const OperationsDashboard: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* External Service Usage Section */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">External Service Usage</h3>
+              <div className="flex items-center gap-2">
+                {(['1h', '24h', '7d', '30d'] as const).map((period) => (
+                  <Button
+                    key={period}
+                    variant={extServicePeriod === period ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setExtServicePeriod(period)}
+                  >
+                    {period}
+                  </Button>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fetchExtServiceUsage(extServicePeriod)}
+                  disabled={extServiceLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${extServiceLoading ? 'animate-spin' : ''}`} />
+                </Button>
+              </div>
+            </div>
+
+            {extServiceLoading && !extServiceData ? (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+                Loading external service data...
+              </div>
+            ) : !extServiceData || extServiceData.summary.total_operations === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                  <Globe className="h-12 w-12 mb-4 opacity-30" />
+                  <p className="text-lg font-medium">No external service usage yet</p>
+                  <p className="text-sm">Usage data will appear here once B2B tools, messaging, or web scraping services are used.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Summary Cards */}
+                <div className="grid gap-4 md:grid-cols-4">
+                  <div className="dashboard-card">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                        <CreditCard className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground font-medium">Total Credits</div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {extServiceData.summary.total_credits.toFixed(1)}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          ${extServiceData.summary.total_cost_usd.toFixed(4)} billed
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dashboard-card">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                        <Activity className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground font-medium">Total Operations</div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {extServiceData.summary.total_operations.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {extServiceData.by_service.length} services active
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dashboard-card">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                        <TrendingUp className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground font-medium">Most Used Service</div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {extServiceData.by_service[0]
+                            ? (EXT_SERVICE_LABELS[extServiceData.by_service[0].service] || extServiceData.by_service[0].service)
+                            : 'N/A'}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {extServiceData.by_service[0]?.operations || 0} operations
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="dashboard-card">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg" style={{ backgroundColor: 'hsl(var(--primary) / 0.1)' }}>
+                        <Users className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground font-medium">Top User</div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {extServiceData.by_user[0]
+                            ? `${extServiceData.by_user[0].total_credits.toFixed(1)} cr`
+                            : 'N/A'}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {extServiceData.by_user[0]?.operations || 0} operations
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* Cost Breakdown Pie Chart */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <DollarSign className="h-4 w-4" />
+                        Credit Breakdown by Service
+                      </CardTitle>
+                      <CardDescription>Distribution of credits consumed per service</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <PieChart>
+                          <Pie
+                            data={extServiceData.by_service.map((s) => ({
+                              ...s,
+                              label: EXT_SERVICE_LABELS[s.service] || s.service,
+                            }))}
+                            dataKey="credits"
+                            nameKey="label"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            label={({ label, percent }) =>
+                              `${label} (${(percent * 100).toFixed(0)}%)`
+                            }
+                          >
+                            {extServiceData.by_service.map((_, index) => (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={EXT_SERVICE_COLORS[index % EXT_SERVICE_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            formatter={(value: number) => [`${value.toFixed(2)} credits`, 'Credits']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Timeline Bar Chart */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <BarChart3 className="h-4 w-4" />
+                        Daily Usage Timeline
+                      </CardTitle>
+                      <CardDescription>Credits consumed and operations per day</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={280}>
+                        <BarChart data={extServiceData.timeline}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(d: string) => d.slice(5)}
+                            fontSize={12}
+                          />
+                          <YAxis yAxisId="left" fontSize={12} />
+                          <YAxis yAxisId="right" orientation="right" fontSize={12} />
+                          <Tooltip
+                            formatter={(value: number, name: string) => [
+                              name === 'credits' ? `${value.toFixed(2)} cr` : value,
+                              name === 'credits' ? 'Credits' : 'Operations',
+                            ]}
+                            labelFormatter={(label: string) => `Date: ${label}`}
+                          />
+                          <Bar yAxisId="left" dataKey="credits" fill="#0088FE" name="credits" radius={[4, 4, 0, 0]} />
+                          <Bar yAxisId="right" dataKey="operations" fill="#00C49F" name="operations" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Per-Service Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Globe className="h-4 w-4" />
+                      Per-Service Breakdown
+                    </CardTitle>
+                    <CardDescription>Detailed usage and cost metrics per external service</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-gray-50">
+                          <TableHead className="font-semibold">Service</TableHead>
+                          <TableHead className="text-right font-semibold">Operations</TableHead>
+                          <TableHead className="text-right font-semibold">Credits</TableHead>
+                          <TableHead className="text-right font-semibold">Cost (USD)</TableHead>
+                          <TableHead className="text-right font-semibold">Avg Credits/Op</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {extServiceData.by_service.map((svc) => (
+                          <TableRow key={svc.service} className="hover:bg-gray-50">
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <Globe className="h-4 w-4 text-blue-600" />
+                                <span>{EXT_SERVICE_LABELS[svc.service] || svc.service}</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {svc.service}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {svc.operations.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm font-semibold text-blue-600">
+                              {svc.credits.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              ${svc.cost_usd.toFixed(4)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm text-gray-600">
+                              {svc.operations > 0
+                                ? (svc.credits / svc.operations).toFixed(3)
+                                : '0.000'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                {/* Per-User Table */}
+                {extServiceData.by_user.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Users className="h-4 w-4" />
+                        Top Users by External Service Credits
+                      </CardTitle>
+                      <CardDescription>Top 20 users by credit consumption on external services</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50">
+                            <TableHead className="font-semibold">User ID</TableHead>
+                            <TableHead className="text-right font-semibold">Operations</TableHead>
+                            <TableHead className="text-right font-semibold">Credits Used</TableHead>
+                            <TableHead className="text-right font-semibold">Share</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {extServiceData.by_user.map((user) => (
+                            <TableRow key={user.user_id} className="hover:bg-gray-50">
+                              <TableCell className="font-mono text-sm">
+                                {user.user_id.slice(0, 8)}...
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {user.operations.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm font-semibold text-blue-600">
+                                {user.total_credits.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Progress
+                                    value={
+                                      extServiceData.summary.total_credits > 0
+                                        ? (user.total_credits / extServiceData.summary.total_credits) * 100
+                                        : 0
+                                    }
+                                    className="w-16 h-2"
+                                  />
+                                  <span className="text-xs text-muted-foreground w-10 text-right">
+                                    {extServiceData.summary.total_credits > 0
+                                      ? ((user.total_credits / extServiceData.summary.total_credits) * 100).toFixed(0)
+                                      : 0}%
+                                  </span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
           </TabsContent>
+
 
           {/* AI Performance Tab - Consolidated AI Models, Interior Design, Quality Metrics */}
           <TabsContent value="ai-performance" className="space-y-6">
@@ -1538,60 +1961,6 @@ export const OperationsDashboard: React.FC = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="api-usage" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>API Usage Logs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Endpoint</TableHead>
-                      <TableHead>Method</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Response Time</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {apiUsage.slice(0, 15).map((log) => (
-                      <TableRow key={log.id}>
-                        <TableCell className="font-mono text-sm max-w-xs truncate">
-                          {log.endpoint}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className="border border-gray-300 bg-white text-gray-700">
-                            {log.method}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <span className={getStatusColor(log.status_code)}>
-                            {log.status_code}
-                          </span>
-                        </TableCell>
-                        <TableCell>{log.response_time_ms || 0}ms</TableCell>
-                        <TableCell>
-                          <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
-                            {log.api_key_id
-                              ? log.api_key_id.slice(0, 8) + '...'
-                              : 'Anonymous'}
-                          </code>
-                        </TableCell>
-                        <TableCell>
-                          {log.created_at
-                            ? new Date(log.created_at).toLocaleString()
-                            : 'N/A'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Data Processing Tab - PDF, XML, Scraping */}
           <TabsContent value="data-processing" className="space-y-6">
             {/* Page Header */}
@@ -1853,31 +2222,9 @@ export const OperationsDashboard: React.FC = () => {
             </div>
           </TabsContent>
 
-          {/* Tasks Tab */}
-          <TabsContent value="tasks" className="space-y-4">
-            <div className="h-[calc(100vh-20rem)]">
-              <KanbanBoard
-                onTaskClick={handleTaskClick}
-                onCreateTask={handleCreateTask}
-              />
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
 
-      {/* Task Detail Panel (Sliding from right) */}
-      <TaskDetailPanel
-        task={selectedTask}
-        isOpen={isTaskDetailModalOpen}
-        onClose={handleCloseTaskDetailModal}
-      />
-
-      {/* Create Task Modal */}
-      <CreateTaskModal
-        isOpen={isCreateTaskModalOpen}
-        onClose={handleCloseCreateTaskModal}
-        onTaskCreated={handleTaskCreated}
-      />
     </div>
   );
 };

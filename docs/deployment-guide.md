@@ -47,10 +47,6 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `VITE_WS_URL` | Public | Production, Preview | WebSocket URL for real-time features | `wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1` |
 | `VITE_STRIPE_PRO_PRICE_ID` | Public | Production, Preview | Stripe price ID for Pro subscription | `price_...` |
 | `VITE_STRIPE_ENTERPRISE_PRICE_ID` | Public | Production, Preview | Stripe price ID for Enterprise subscription | `price_...` |
-| `VITE_STRIPE_CREDITS_100_PRICE_ID` | Public | Production, Preview | Stripe price ID for 100-credit pack | `price_...` |
-| `VITE_STRIPE_CREDITS_500_PRICE_ID` | Public | Production, Preview | Stripe price ID for 500-credit pack | `price_...` |
-| `VITE_STRIPE_CREDITS_1000_PRICE_ID` | Public | Production, Preview | Stripe price ID for 1000-credit pack | `price_...` |
-| `VITE_STRIPE_CREDITS_5000_PRICE_ID` | Public | Production, Preview | Stripe price ID for 5000-credit pack | `price_...` |
 | `NODE_ENV` | Public | Production | Node environment | `production` |
 | `VITE_DEBUG` | Public | Production, Preview | Debug mode | `false` (production), `true` (preview) |
 
@@ -105,8 +101,10 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | Service | Secret Name | Where Used | How to Get | Pricing |
 |---------|------------|------------|------------|---------|
 | **OpenAI** | `OPENAI_API_KEY` | Frontend, Backend | https://platform.openai.com/api-keys | Pay-per-use |
-| **Anthropic** | `ANTHROPIC_API_KEY` | Backend | https://console.anthropic.com/ | Pay-per-use |
+| **Anthropic** | `ANTHROPIC_API_KEY` | Backend, Edge Functions | https://console.anthropic.com/ | Pay-per-use |
+| **Google Gemini** | `GOOGLE_GENERATIVE_AI_API_KEY` | Edge Functions (SEO pipeline) | https://aistudio.google.com/apikey | Pay-per-use |
 | **Voyage AI** | `VOYAGE_API_KEY` | Backend | https://dash.voyageai.com/ → API Keys | Pay-per-use ($0.06/1M tokens) |
+| **DataForSEO** | `DATAFORSEO_LOGIN`, `DATAFORSEO_PASSWORD` | Edge Functions (SEO pipeline) | https://app.dataforseo.com/ → API Settings | Pay-per-task |
 | **Replicate** | `REPLICATE_API_TOKEN` | Frontend, Backend | https://replicate.com/account/api-tokens | Pay-per-use |
 | **HuggingFace** | `QWEN_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_TOKEN` | Backend | https://huggingface.co/settings/tokens | Inference Endpoints (auto-pause enabled) |
 
@@ -268,6 +266,7 @@ SLIG_NAMESPACE=basiliskan
 | `FIRECRAWL_API_KEY` | **Secret** | `scrape-single-page`, `scrape-preview`, `suggest-fields`, `price-monitoring`, `agent-chat` | Firecrawl web scraping API | `fc-xxxxxxxxxxxxxxxx` |
 | `STRIPE_SECRET_KEY` | **Secret** | `crm-stripe-api`, `stripe-checkout`, `stripe-customer-portal`, `stripe-webhooks` | Stripe secret key for payments | `sk_test_...` or `sk_live_...` |
 | `STRIPE_WEBHOOK_SECRET` | **Secret** | `stripe-webhooks` | Stripe webhook signing secret | `whsec_...` |
+| `STRIPE_CREDITS_PRODUCT_ID` | **Secret** | `stripe-checkout` | Stripe product ID for credit purchases (single reusable product) | `prod_...` |
 | `STRIPE_PRO_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Pro subscription | `price_...` |
 | `STRIPE_ENTERPRISE_PRICE_ID` | Public | `stripe-webhooks` | Stripe price ID for Enterprise subscription | `price_...` |
 | `MIVAA_GATEWAY_URL` | Public | `agent-chat`, `_shared/embedding-utils.ts` | MIVAA gateway URL (default: `https://v1api.materialshub.gr`) | `https://v1api.materialshub.gr` |
@@ -294,6 +293,31 @@ SLIG_NAMESPACE=basiliskan
 | `APOLLO_API_KEY` | **Secret** | `agent-chat` | Apollo.io for company/contact enrichment + email finder fallback | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `HUNTER_API_KEY` | **Secret** | `agent-chat` | Hunter.io for domain search + person email finder | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `ZEROBOUNCE_API_KEY` | **Secret** | `agent-chat` | ZeroBounce for email validation (all discovered emails) | `xxxxxxxxxxxxxxxxxxxxxxxx` |
+
+#### **SEO Article Pipeline**
+
+| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
+|------------|------|----------------------|-------------|----------------|
+| `DATAFORSEO_LOGIN` | **Secret** | `seo-research` | DataForSEO API login (email) for keyword research, SERP analysis, content analysis | `your@email.com` |
+| `DATAFORSEO_PASSWORD` | **Secret** | `seo-research` | DataForSEO API password | `xxxxxxxxxxxxxxxx` |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | **Secret** | `seo-plan`, `seo-analyze` | Google Gemini API key for article planning (structured output) and content analysis/auto-fix | `AIzaSyxxxxxxxxxxxxxxxx` |
+
+> **Note:** The SEO pipeline also uses `ANTHROPIC_API_KEY` (already listed under Core Secrets above) for article writing via Claude Sonnet. `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-provided to all edge functions.
+
+**How to get these keys:**
+
+| Service | How to Get | Pricing |
+|---------|------------|---------|
+| **DataForSEO** | https://app.dataforseo.com/ → API Settings | Pay-per-task (~$0.05-0.15 per keyword research) |
+| **Google Gemini** | https://aistudio.google.com/apikey | Pay-per-use (Gemini 3 Flash Preview — $0.50/$3 per 1M tokens) |
+
+**SEO Pipeline Credit Costs** (1 credit = $0.01, 50% markup on raw API cost):
+- Research: 18 credits (DataForSEO: 5 API calls ~$0.117 raw)
+- Planning: 2 credits (Gemini 3 Flash: ~3K in/3K out ~$0.01 raw)
+- Writing: 20 credits (Claude Sonnet 4.5: ~4K in/8K out ~$0.13 raw)
+- Analysis: 2 credits (Gemini 3 Flash: ~6K in/3K out ~$0.01 raw, GEO scoring is regex-free)
+- Auto-fix: 5 credits per iteration (Gemini 3 Flash: ~10K in/8K out ~$0.03 raw)
+- **Total per article: 42 credits (no fix) — 57 credits (max 3 fixes)**
 
 #### **VR World Generation**
 
@@ -408,6 +432,7 @@ Add these 4 secrets:
 ```
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_CREDITS_PRODUCT_ID=prod_...
 STRIPE_PRO_PRICE_ID=price_...
 STRIPE_ENTERPRISE_PRICE_ID=price_...
 ```
@@ -420,10 +445,6 @@ Add these variables (select **ALL** environments: Production, Preview, Developme
 ```
 VITE_STRIPE_PRO_PRICE_ID=price_...
 VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_100_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_500_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_1000_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_5000_PRICE_ID=price_...
 ```
 
 ### **Step 6: Test the Integration**
@@ -520,10 +541,6 @@ VITE_WS_URL=wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1
 # Stripe Price IDs
 VITE_STRIPE_PRO_PRICE_ID=price_...
 VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_100_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_500_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_1000_PRICE_ID=price_...
-VITE_STRIPE_CREDITS_5000_PRICE_ID=price_...
 ```
 
 #### MIVAA Service (Set in Deployment Platform)
@@ -620,10 +637,6 @@ LOG_FILE=/var/log/mivaa/app.log
    vercel env add VITE_WS_URL production
    vercel env add VITE_STRIPE_PRO_PRICE_ID production
    vercel env add VITE_STRIPE_ENTERPRISE_PRICE_ID production
-   vercel env add VITE_STRIPE_CREDITS_100_PRICE_ID production
-   vercel env add VITE_STRIPE_CREDITS_500_PRICE_ID production
-   vercel env add VITE_STRIPE_CREDITS_1000_PRICE_ID production
-   vercel env add VITE_STRIPE_CREDITS_5000_PRICE_ID production
    ```
 
 3. **Deploy**:

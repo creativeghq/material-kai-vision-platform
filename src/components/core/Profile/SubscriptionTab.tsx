@@ -10,15 +10,6 @@ import { StripeService } from '@/services/stripe.service';
 
 const stripeService = new StripeService();
 
-interface SubscriptionTier {
-  id: string;
-  name: string;
-  price: number;
-  credits: number;
-  features: string[];
-  priceId: string;
-}
-
 export const SubscriptionTab: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -27,24 +18,7 @@ export const SubscriptionTab: React.FC = () => {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string>('');
   const [periodEnd, setPeriodEnd] = useState<string>('');
 
-  const tiers: SubscriptionTier[] = [
-    {
-      id: 'free',
-      name: 'Free',
-      price: 0,
-      credits: 100,
-      features: ['100 credits per month', 'Basic AI features', 'Community support'],
-      priceId: '',
-    },
-    {
-      id: 'pro',
-      name: 'Pro',
-      price: 29,
-      credits: 1000,
-      features: ['1000 credits per month', 'Advanced AI features', 'Priority support', 'Early access to new features'],
-      priceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || '',
-    },
-  ];
+  const tiers = stripeService.getSubscriptionTiers();
 
   useEffect(() => {
     loadSubscriptionData();
@@ -57,8 +31,8 @@ export const SubscriptionTab: React.FC = () => {
       const { data, error } = await supabase
         .from('user_profiles')
         .select('subscription_tier, subscription_status, subscription_current_period_end')
-        .eq('id', user.id)
-        .single();
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (error) throw error;
 
@@ -72,17 +46,15 @@ export const SubscriptionTab: React.FC = () => {
     }
   };
 
-  const handleSubscribe = async (tier: SubscriptionTier) => {
+  const handleSubscribe = async (tier: ReturnType<typeof stripeService.getSubscriptionTiers>[number]) => {
     if (!user || !tier.priceId) return;
 
     setLoading(true);
     try {
-      const { url, error } = await stripeService.createSubscriptionCheckoutSession(
+      const { url } = await stripeService.createSubscriptionCheckoutSession(
         tier.priceId,
-        user.email || '',
       );
 
-      if (error) throw new Error(error);
       if (url) window.location.href = url;
     } catch (error) {
       console.error('Error creating checkout session:', error);
@@ -101,15 +73,24 @@ export const SubscriptionTab: React.FC = () => {
 
     setLoading(true);
     try {
-      const { url, error } = await stripeService.createCustomerPortalSession();
-
-      if (error) throw new Error(error);
-      if (url) window.location.href = url;
+      const response = await stripeService.createCustomerPortalSession();
+      if (response?.url && response.url.startsWith('https://')) {
+        window.location.href = response.url;
+      } else {
+        toast({
+          title: 'Unable to open portal',
+          description: 'Subscription management is not available yet. Please contact support.',
+          variant: 'destructive',
+        });
+      }
     } catch (error) {
       console.error('Error opening customer portal:', error);
+      const message = error instanceof Error ? error.message : 'Failed to open subscription management.';
       toast({
         title: 'Error',
-        description: 'Failed to open subscription management. Please try again.',
+        description: message.includes('No Stripe customer')
+          ? 'No active subscription found. Subscribe to a plan first.'
+          : `${message} Please try again.`,
         variant: 'destructive',
       });
     } finally {
@@ -121,7 +102,7 @@ export const SubscriptionTab: React.FC = () => {
     <div className="space-y-6">
       {/* Current Subscription */}
       {currentTier !== 'free' && (
-        <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg rounded-2xl">
+        <Card className="rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-primary" />
@@ -132,9 +113,9 @@ export const SubscriptionTab: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold capitalize">{currentTier} Plan</p>
-                <p className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
                   Status: <Badge variant={subscriptionStatus === 'active' ? 'default' : 'secondary'}>{subscriptionStatus}</Badge>
-                </p>
+                </span>
                 {periodEnd && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Renews on: {new Date(periodEnd).toLocaleDateString()}
@@ -155,22 +136,25 @@ export const SubscriptionTab: React.FC = () => {
         {tiers.map((tier) => (
           <Card
             key={tier.id}
-            className={`bg-white/80 backdrop-blur-sm border-white/20 shadow-lg rounded-2xl ${
+            className={`rounded-2xl ${
               tier.id === currentTier ? 'ring-2 ring-primary' : ''
             }`}
           >
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 {tier.name}
-                {tier.id === currentTier && <Badge>Current</Badge>}
+                <div className="flex gap-1">
+                  {'popular' in tier && tier.popular && <Badge variant="secondary">Popular</Badge>}
+                  {tier.id === currentTier && <Badge>Current</Badge>}
+                </div>
               </CardTitle>
               <CardDescription>
-                <span className="text-3xl font-bold">${tier.price}</span>
+                <span className="text-3xl font-bold">{tier.currency === 'EUR' ? '€' : '$'}{tier.price}</span>
                 {tier.price > 0 && <span className="text-muted-foreground">/month</span>}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm font-semibold text-primary">{tier.credits} credits/month</p>
+              <p className="text-sm font-semibold text-primary">{tier.monthlyCredits.toLocaleString()} credits/month</p>
               <ul className="space-y-2">
                 {tier.features.map((feature, index) => (
                   <li key={index} className="flex items-start gap-2 text-sm">
@@ -186,7 +170,20 @@ export const SubscriptionTab: React.FC = () => {
                   className="w-full"
                 >
                   {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                  Subscribe to {tier.name}
+                  {tier.price < (tiers.find(t => t.id === currentTier)?.price ?? 0)
+                    ? `Downgrade to ${tier.name}`
+                    : `Subscribe to ${tier.name}`}
+                </Button>
+              )}
+              {tier.id === 'free' && currentTier !== 'free' && (
+                <Button
+                  onClick={handleManageSubscription}
+                  disabled={loading}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                  Cancel Subscription
                 </Button>
               )}
             </CardContent>

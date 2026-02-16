@@ -1,4 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { getMivaaActionCost } from '../_shared/mivaa-pricing.ts';
 
 // Environment variables
 // Try to use local API first (for server environment), fall back to external domain
@@ -6,6 +9,8 @@ const MIVAA_LOCAL_URL = Deno.env.get('MIVAA_LOCAL_URL') || 'http://127.0.0.1:800
 const MIVAA_EXTERNAL_URL = 'https://v1api.materialshub.gr';
 const MIVAA_SERVICE_URL = Deno.env.get('MIVAA_SERVICE_URL') || MIVAA_EXTERNAL_URL;
 const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || 'your-mivaa-api-key';
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // CORS headers
 const corsHeaders = {
@@ -145,11 +150,6 @@ const MIVAA_ENDPOINTS = {
   'anthropic_validate_image': { path: '/api/anthropic/images/validate', method: 'POST' },  // Validate image with Claude
   'anthropic_enrich_product': { path: '/api/anthropic/products/enrich', method: 'POST' },  // Enrich product with Claude
   'anthropic_test': { path: '/api/anthropic/test/claude-integration', method: 'POST' },  // Test Claude integration
-
-  // ==================== TOGETHER AI (QWEN) ====================
-  'together_analyze_image': { path: '/api/together-ai/analyze-image', method: 'POST' },  // Analyze image with Qwen Vision
-  'together_health': { path: '/api/together-ai/health', method: 'GET' },  // Together AI health
-  'together_models': { path: '/api/together-ai/models', method: 'GET' },  // List available models
 
   // ==================== MONITORING ====================
   'monitoring_supabase_status': { path: '/api/monitoring/supabase-status', method: 'GET' },  // Supabase status
@@ -409,6 +409,76 @@ serve(async (req) => {
     console.log(`🚀 MIVAA Gateway Request: ${action}`, payload);
     console.log(`📋 MIVAA Service URL: ${MIVAA_SERVICE_URL}`);
     console.log(`🔑 MIVAA API Key configured: ${!!Deno.env.get('MIVAA_API_KEY')}`);
+
+    // --- CREDIT BILLING MIDDLEWARE ---
+    let pricing = getMivaaActionCost(action);
+
+    if (pricing) {
+      // Special case: visual search costs more than text search
+      if (action === 'rag_search' && payload &&
+          (payload.image_url || payload.strategy === 'visual' || payload.image_base64)) {
+        pricing = { creditCost: 1, operationType: 'visual_search', description: 'Visual RAG search' };
+      }
+
+      // Authenticate user for billable actions
+      const auth = await authenticate(req);
+      const isAdmin = isAdminAccess(req);
+
+      if (!isAdmin && (!auth.success || !auth.userId)) {
+        return new Response(
+          JSON.stringify({ error: 'Authentication required for this action', action }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // Skip billing for admin/service-key access
+      if (!isAdmin && auth.userId) {
+        const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+        const { data: debitData, error: debitError } = await supabaseAdmin.rpc('debit_user_credits', {
+          p_user_id: auth.userId,
+          p_amount: pricing.creditCost,
+          p_operation_type: pricing.operationType,
+          p_description: pricing.description,
+          p_metadata: { action, gateway: 'mivaa' },
+        });
+
+        if (debitError) {
+          console.error(`[mivaa-gateway] Credit debit error for action ${action}:`, debitError);
+          return new Response(
+            JSON.stringify({ error: 'Insufficient credits', message: debitError.message, required_credits: pricing.creditCost, action }),
+            { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        const result = Array.isArray(debitData) ? debitData[0] : debitData;
+        if (result && !result.success) {
+          console.warn(`[mivaa-gateway] Insufficient credits for user ${auth.userId}: ${result.error_message}`);
+          return new Response(
+            JSON.stringify({ error: 'Insufficient credits', message: result.error_message || 'Not enough credits', required_credits: pricing.creditCost, action }),
+            { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+
+        console.log(`[mivaa-gateway] Debited ${pricing.creditCost} credits from user ${auth.userId} for: ${action}`);
+
+        // Log to ai_usage_logs (non-blocking)
+        supabaseAdmin.from('ai_usage_logs').insert({
+          user_id: auth.userId,
+          operation_type: pricing.operationType,
+          model_name: `mivaa-${action}`,
+          input_tokens: 0,
+          output_tokens: 0,
+          input_cost_usd: 0,
+          output_cost_usd: 0,
+          total_cost_usd: pricing.creditCost * 0.01,
+          credits_debited: pricing.creditCost,
+          metadata: { action, gateway: 'mivaa' },
+        }).then(({ error }) => {
+          if (error) console.error('[mivaa-gateway] Usage log insert error:', error);
+        });
+      }
+    }
 
     // Validate action
     if (!action || !MIVAA_ENDPOINTS[action]) {

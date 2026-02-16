@@ -16,7 +16,6 @@ import type {
   ScheduledTriggerConfig,
   UserSignupTriggerConfig,
   QuoteRequestedTriggerConfig,
-  ImageUploadedTriggerConfig,
   AgentSearchCompletedTriggerConfig,
   ProductAddedToQuoteTriggerConfig,
   MoodboardItemAddedTriggerConfig,
@@ -227,42 +226,6 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
         </div>
       );
 
-    case 'contract_created':
-      return (
-        <div className="text-xs text-muted-foreground">
-          Fires when a new contract is created. Available data: contract ID, quote ID, parties.
-        </div>
-      );
-
-    case 'image_uploaded':
-      return (
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs">Filter by Category (optional)</Label>
-            <Input
-              value={(config as ImageUploadedTriggerConfig).filter_category || ''}
-              onChange={(e) => onChange({ ...config, filter_category: e.target.value })}
-              placeholder="e.g., material"
-              className="h-8 text-sm"
-            />
-          </div>
-        </div>
-      );
-
-    case 'document_processed':
-      return (
-        <div className="text-xs text-muted-foreground">
-          Fires when a PDF/document extraction completes. Available data: document ID, page count, extracted products.
-        </div>
-      );
-
-    case 'product_added':
-      return (
-        <div className="text-xs text-muted-foreground">
-          Fires when a new product is added to the catalog. Available data: product ID, name, category, manufacturer.
-        </div>
-      );
-
     case 'search_executed':
       return (
         <div className="text-xs text-muted-foreground">
@@ -273,7 +236,7 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
     case 'model_3d_created':
       return (
         <div className="text-xs text-muted-foreground">
-          Fires when a 3D model is generated. Available data: model ID, source image, generation params.
+          Fires when an AI agent generates a 3D model. Available data: job_id, model_count, prompt, user_id.
         </div>
       );
 

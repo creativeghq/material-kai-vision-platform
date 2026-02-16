@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, ChevronRight, Info, Trash2, AlertTriangle, DollarSign } from 'lucide-react';
+import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -49,6 +49,7 @@ const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   template: Layers,
   search: SearchIcon,
   classification: Cpu,
+  tool: Wrench,
 };
 
 // Type-specific colors
@@ -58,6 +59,7 @@ const TYPE_COLORS: Record<string, string> = {
   template: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
   search: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
   classification: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
+  tool: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
 };
 
 // Stage badge colors
@@ -115,7 +117,7 @@ export const AgentConfigsPage: React.FC = () => {
 
   const handleEdit = (prompt: Prompt) => {
     setEditingPrompt(prompt);
-    const textToEdit = prompt.prompt_type === 'agent'
+    const textToEdit = (prompt.prompt_type === 'agent' || prompt.prompt_type === 'tool')
       ? (prompt.system_prompt || prompt.prompt_text)
       : (prompt.prompt_text || prompt.system_prompt);
     setEditedText(textToEdit);
@@ -155,15 +157,15 @@ export const AgentConfigsPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const isAgentPrompt = editingPrompt.prompt_type === 'agent';
+      const usesSystemPrompt = editingPrompt.prompt_type === 'agent' || editingPrompt.prompt_type === 'tool';
 
       // Save to history
       await supabase.from('prompt_history').insert({
         prompt_id: editingPrompt.id,
         old_prompt_text: editingPrompt.prompt_text,
-        new_prompt_text: isAgentPrompt ? editingPrompt.prompt_text : editedText,
+        new_prompt_text: usesSystemPrompt ? editingPrompt.prompt_text : editedText,
         old_system_prompt: editingPrompt.system_prompt,
-        new_system_prompt: isAgentPrompt ? editedText : editingPrompt.system_prompt,
+        new_system_prompt: usesSystemPrompt ? editedText : editingPrompt.system_prompt,
         old_configuration: editingPrompt.configuration,
         new_configuration: editingPrompt.configuration,
         change_reason: changeReason,
@@ -171,7 +173,7 @@ export const AgentConfigsPage: React.FC = () => {
       });
 
       // Update prompt
-      const updateData = isAgentPrompt
+      const updateData = usesSystemPrompt
         ? { system_prompt: editedText, description: editedDescription }
         : { prompt_text: editedText, description: editedDescription };
 
@@ -245,7 +247,7 @@ export const AgentConfigsPage: React.FC = () => {
   };
 
   const getPromptLength = (prompt: Prompt) => {
-    const text = prompt.prompt_type === 'agent'
+    const text = (prompt.prompt_type === 'agent' || prompt.prompt_type === 'tool')
       ? (prompt.system_prompt || prompt.prompt_text)
       : (prompt.prompt_text || prompt.system_prompt);
     return text?.length || 0;
@@ -499,7 +501,7 @@ export const AgentConfigsPage: React.FC = () => {
                 <div>
                   <DialogTitle>{editingPrompt?.name}</DialogTitle>
                   <DialogDescription>
-                    {editingPrompt?.prompt_type === 'agent' ? 'System Prompt' : 'Extraction Prompt'} •
+                    {(editingPrompt?.prompt_type === 'agent' || editingPrompt?.prompt_type === 'tool') ? 'System Prompt' : 'Extraction Prompt'} •
                     Category: {editingPrompt?.category} •
                     {editingPrompt?.stage && ` Stage: ${editingPrompt.stage} •`}
                     Version {editingPrompt?.version}
@@ -531,7 +533,7 @@ export const AgentConfigsPage: React.FC = () => {
               <div>
                 <Label htmlFor="prompt" className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  {editingPrompt?.prompt_type === 'agent' ? 'System Prompt' : 'Prompt Text'}
+                  {(editingPrompt?.prompt_type === 'agent' || editingPrompt?.prompt_type === 'tool') ? 'System Prompt' : 'Prompt Text'}
                 </Label>
                 <Textarea
                   id="prompt"

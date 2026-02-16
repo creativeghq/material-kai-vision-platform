@@ -17,6 +17,10 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
+import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
+import { SUPPORTED_MARKETS, ALL_MARKETS, findMarketByCountry, getRegionById, buildRegionalQuery, buildSingleCountryQuery } from '../_shared/b2b-markets.ts';
+import { getToolPrompt } from '../_shared/prompt-utils.ts';
+
 if (!ANTHROPIC_API_KEY) {
   throw new Error('ANTHROPIC_API_KEY must be set');
 }
@@ -807,88 +811,6 @@ const createKnowledgeBaseSearchTool = (workspaceId: string) => {
   );
 };
 
-/**
- * LangChain Tool: Image Analysis using MIVAA API
- */
-const createImageAnalysisTool = (workspaceId: string) => {
-  return tool(
-    async ({ imageUrl, analysisType = 'material_recognition' }) => {
-      try {
-        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-
-        console.log(`🖼️ Image analysis: type="${analysisType}"`);
-        const startTime = Date.now();
-
-        // Add timeout to prevent edge function from hanging
-        const TIMEOUT_MS = 180000; // 3 minutes (image analysis is usually faster)
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-        try {
-          const response = await fetch(`${MIVAA_GATEWAY_URL}/api/together-ai/analyze-image`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              image_url: imageUrl,
-              analysis_type: analysisType,
-              workspace_id: workspaceId,
-            }),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-          const elapsed = Date.now() - startTime;
-          console.log(`⏱️ Image analysis API responded in ${elapsed}ms`);
-
-          if (!response.ok) {
-            throw new Error(`Image analysis failed: ${response.statusText}`);
-          }
-
-          const data = await response.json();
-
-          return JSON.stringify({
-            success: true,
-            analysis: data.analysis || {},
-            materials: data.materials || [],
-          });
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-
-          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            const elapsed = Date.now() - startTime;
-            console.error(`⏱️ Image analysis timeout after ${elapsed}ms (limit: ${TIMEOUT_MS}ms)`);
-            return JSON.stringify({
-              success: false,
-              error: `Image analysis timeout - took longer than ${TIMEOUT_MS / 1000} seconds. Please try again with a smaller image.`,
-              timeout: true,
-            });
-          }
-          throw fetchError;
-        }
-      } catch (error) {
-        console.error('Image analysis tool error:', error);
-        return JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : 'Image analysis failed',
-        });
-      }
-    },
-    {
-      name: 'image_analysis',
-      description: 'Analyze material images to identify products, materials, and properties',
-      schema: z.object({
-        imageUrl: z.string().describe('Image URL or base64 data'),
-        analysisType: z
-          .enum(['material_recognition', 'visual_search', 'product_identification'])
-          .default('material_recognition')
-          .describe('Type of image analysis'),
-      }),
-    }
-  );
-};
 
 /**
  * LangChain Tool: Spaceformer Spatial Analysis
@@ -2296,17 +2218,62 @@ const createProductAnalysisTool = (workspaceId: string) => {
 
 /**
  * B2B Research Tool: Manufacturer Search
- * Uses Perplexity API for AI-powered web research to find B2B manufacturers
+ * Uses Perplexity API for AI-powered web research to find B2B manufacturers.
+ * Searches all 30 supported markets by default (5 regional batches in parallel),
+ * or a specific country/region when provided.
  */
-const createB2BManufacturerSearchTool = (onProgress?: (status: string) => void) => {
-  return tool(
-    async ({ country, category, language, limit = 10 }) => {
-      try {
-        console.log(`🔍 B2B Manufacturer Search: country="${country}", category="${category}", language="${language}"`);
-        const startTime = Date.now();
+const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void) => {
+  // Helper: single Perplexity API call
+  const fetchPerplexity = async (query: string, apiKey: string, systemPrompt: string): Promise<{ content: string; citations: string[] } | null> => {
+    const TIMEOUT_MS = 60000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-        // Send progress update
-        onProgress?.(`Searching for ${category} manufacturers in ${country}...`);
+    try {
+      const response = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'sonar',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: query },
+          ],
+          temperature: 0.2,
+          max_tokens: 8192,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Perplexity API error: ${response.status} - ${errorText}`);
+        return null;
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      const citations = data.citations || [];
+      return content ? { content, citations } : null;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error('Perplexity API timeout after 60s');
+      } else {
+        console.error('Perplexity API fetch error:', fetchError);
+      }
+      return null;
+    }
+  };
+
+  return tool(
+    async ({ country, region, category, limit = 30 }) => {
+      try {
+        const startTime = Date.now();
 
         const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
         if (!PERPLEXITY_API_KEY) {
@@ -2316,107 +2283,172 @@ const createB2BManufacturerSearchTool = (onProgress?: (status: string) => void) 
           });
         }
 
-        // Build a research query optimized for B2B manufacturer discovery
-        const languageMap: Record<string, string> = {
-          pl: 'Polish',
-          tr: 'Turkish',
-          ro: 'Romanian',
-          bg: 'Bulgarian',
-          cs: 'Czech',
-          de: 'German',
-          uk: 'Ukrainian',
-          hu: 'Hungarian',
-          sr: 'Serbian',
-          sl: 'Slovenian',
-          mk: 'Macedonian',
-          bs: 'Bosnian',
-          hr: 'Croatian',
-          sk: 'Slovak',
-        };
+        // Load system prompt from database (editable via /admin/ai-configs)
+        const b2bSystemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
 
-        const languageName = language ? languageMap[language] || language : 'English';
+        // Determine search scope
+        let regionsToSearch: typeof SUPPORTED_MARKETS;
+        let searchMode: string;
 
-        const query = `Find B2B manufacturers of ${category} in ${country}.
-I need actual manufacturing companies (not distributors or retailers) that:
-- Have their own production facilities
-- Offer wholesale/B2B sales
-- Preferably offer OEM/private label services
-- Export capabilities preferred
+        if (country) {
+          // Single country mode
+          const market = findMarketByCountry(country);
+          if (market) {
+            searchMode = `single_country:${market.country}`;
+            const query = buildSingleCountryQuery(market, category, limit);
+            console.log(`🔍 B2B Search: ${category} in ${market.country}`);
+            onProgress?.(`Searching for ${category} manufacturers in ${market.country}...`);
 
-For each manufacturer found, provide:
-- Company name
-- Website URL
-- City/location
-- Main products they manufacture
-- Any indicators they are actual manufacturers (factory, production facility, etc.)
+            // Pre-check credits (1 query)
+            const creditCheck = await checkCreditBalance(supabase, userId, 'perplexity-sonar', 1);
+            if (!creditCheck.sufficient) {
+              return JSON.stringify({
+                success: false,
+                error: `Insufficient credits. Required: ${creditCheck.required_credits.toFixed(2)}, Balance: ${creditCheck.balance.toFixed(2)}. Please purchase more credits.`,
+              });
+            }
 
-Search in ${languageName} language sources for better coverage of local manufacturers.
-Return up to ${limit} manufacturers.`;
+            const result = await fetchPerplexity(query, PERPLEXITY_API_KEY, b2bSystemPrompt);
+            const elapsed = Date.now() - startTime;
 
-        // Add timeout to prevent hanging (60 seconds for AI search)
-        const TIMEOUT_MS = 60000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+            if (!result) {
+              return JSON.stringify({ success: false, error: 'Search returned no results. Try a different query.' });
+            }
 
-        let response;
-        try {
-          response = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${PERPLEXITY_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'sonar',
-              messages: [
-                {
-                  role: 'system',
-                  content: 'You are a B2B research assistant specialized in finding manufacturing companies. Always verify companies are actual manufacturers, not distributors or retailers. Provide structured data with company names, websites, locations, and products.',
-                },
-                {
-                  role: 'user',
-                  content: query,
-                },
-              ],
-              temperature: 0.2,
-              max_tokens: 4096,
-            }),
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            // Only debit on successful response
+            await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', 1, {
+              category, country: market.country, search_mode: 'single_country', source: 'agent',
+            });
+
             return JSON.stringify({
-              success: false,
-              error: `Perplexity API timeout after ${TIMEOUT_MS / 1000} seconds. Try a simpler query.`,
+              success: true,
+              search_results: result.content,
+              citations: result.citations,
+              query_params: { country: market.country, category, limit },
+              search_mode: 'single_country',
+              regions_searched: 1,
+              elapsed_ms: elapsed,
+              source: 'perplexity',
             });
           }
-          throw fetchError;
-        }
+          // Country not found in supported markets — still search it as a custom query
+          searchMode = `custom_country:${country}`;
+          const query = `Find B2B manufacturers of ${category} in ${country}.\nI need actual manufacturing companies (not distributors or retailers) with their own production facilities.\nFor each manufacturer, provide: Company name, Website URL, City/location, Main products, Manufacturing indicators.\nReturn up to ${limit} manufacturers.`;
+          console.log(`🔍 B2B Search (custom): ${category} in ${country}`);
+          onProgress?.(`Searching for ${category} manufacturers in ${country}...`);
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ Perplexity API error: ${response.status} - ${errorText}`);
+          const creditCheck = await checkCreditBalance(supabase, userId, 'perplexity-sonar', 1);
+          if (!creditCheck.sufficient) {
+            return JSON.stringify({
+              success: false,
+              error: `Insufficient credits. Required: ${creditCheck.required_credits.toFixed(2)}, Balance: ${creditCheck.balance.toFixed(2)}.`,
+            });
+          }
+
+          const result = await fetchPerplexity(query, PERPLEXITY_API_KEY, b2bSystemPrompt);
+          const elapsed = Date.now() - startTime;
+
+          if (result) {
+            await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', 1, {
+              category, country, search_mode: 'custom_country', source: 'agent',
+            });
+          }
+
           return JSON.stringify({
-            success: false,
-            error: `Perplexity API error: ${response.status}`,
+            success: !!result,
+            search_results: result?.content || 'No results found.',
+            citations: result?.citations || [],
+            query_params: { country, category, limit },
+            search_mode: 'custom_country',
+            elapsed_ms: elapsed,
+            source: 'perplexity',
           });
         }
 
-        const data = await response.json();
-        const elapsed = Date.now() - startTime;
-        console.log(`✅ B2B search completed in ${elapsed}ms`);
+        // Region or global mode
+        if (region) {
+          const targetRegion = getRegionById(region);
+          if (targetRegion) {
+            regionsToSearch = [targetRegion];
+          } else {
+            regionsToSearch = [...SUPPORTED_MARKETS];
+          }
+        } else {
+          regionsToSearch = [...SUPPORTED_MARKETS];
+        }
 
-        // Extract the response content
-        const content = data.choices?.[0]?.message?.content || '';
-        const citations = data.citations || [];
+        searchMode = regionsToSearch.length === 1 ? `region:${regionsToSearch[0].id}` : 'all_markets';
+        const totalQueries = regionsToSearch.length;
+        const limitPerRegion = Math.ceil(limit / totalQueries);
+
+        console.log(`🔍 B2B Global Search: ${category} across ${totalQueries} regions (${ALL_MARKETS.length} markets)`);
+        onProgress?.(`Starting global manufacturer search for "${category}" across ${ALL_MARKETS.length} markets (${totalQueries} regions)...`);
+
+        // Pre-check credits for all planned queries
+        const creditCheck = await checkCreditBalance(supabase, userId, 'perplexity-sonar', totalQueries);
+        if (!creditCheck.sufficient) {
+          return JSON.stringify({
+            success: false,
+            error: `Insufficient credits for global search. Required: ${creditCheck.required_credits.toFixed(2)} credits (${totalQueries} regions), Balance: ${creditCheck.balance.toFixed(2)}. Try searching a specific country instead.`,
+          });
+        }
+
+        // Run regional searches in parallel
+        const regionPromises = regionsToSearch.map(async (regionConfig) => {
+          onProgress?.(`Searching ${regionConfig.name} (${regionConfig.markets.map(m => m.country).join(', ')})...`);
+          const query = buildRegionalQuery(regionConfig, category, limitPerRegion);
+          const result = await fetchPerplexity(query, PERPLEXITY_API_KEY, b2bSystemPrompt);
+          if (result) {
+            onProgress?.(`✓ ${regionConfig.name} complete`);
+          }
+          return { region: regionConfig, result };
+        });
+
+        const results = await Promise.allSettled(regionPromises);
+
+        // Aggregate results
+        const allContent: string[] = [];
+        const allCitations: string[] = [];
+        const regionSummary: { region: string; success: boolean }[] = [];
+        let successCount = 0;
+
+        for (const settled of results) {
+          if (settled.status === 'fulfilled') {
+            const { region: reg, result } = settled.value;
+            if (result) {
+              allContent.push(`\n## ${reg.name}\n${result.content}`);
+              allCitations.push(...result.citations);
+              regionSummary.push({ region: reg.name, success: true });
+              successCount++;
+            } else {
+              regionSummary.push({ region: reg.name, success: false });
+            }
+          } else {
+            regionSummary.push({ region: 'Unknown', success: false });
+          }
+        }
+
+        const elapsed = Date.now() - startTime;
+        const failedCount = totalQueries - successCount;
+
+        onProgress?.(`Global search complete: ${successCount}/${totalQueries} regions returned results (${elapsed}ms)`);
+
+        // Only debit for successful queries
+        if (successCount > 0) {
+          await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', successCount, {
+            category, search_mode: searchMode, regions_searched: successCount, total_regions: totalQueries, source: 'agent',
+          });
+        }
 
         return JSON.stringify({
-          success: true,
-          search_results: content,
-          citations: citations,
-          query_params: { country, category, language, limit },
+          success: successCount > 0,
+          search_results: allContent.join('\n') || 'No results found across any region.',
+          citations: [...new Set(allCitations)],
+          query_params: { category, limit, search_mode: searchMode },
+          search_mode: searchMode,
+          regions_searched: successCount,
+          regions_failed: failedCount,
+          region_summary: regionSummary,
           elapsed_ms: elapsed,
           source: 'perplexity',
         });
@@ -2430,12 +2462,12 @@ Return up to ${limit} manufacturers.`;
     },
     {
       name: 'b2b_manufacturer_search',
-      description: 'Search for B2B manufacturers in a specific country and product category. Uses AI-powered web research to find actual manufacturing companies (not distributors). Supports native language searches for better coverage.',
+      description: 'Search for B2B manufacturers across 30 supported markets or a specific country. When no country is specified, searches ALL markets in 5 regional batches (Central/Eastern Europe, Balkans & Turkey, Baltic & Nordic, Western & Southern Europe, Global Manufacturing Hubs) in parallel. Native language searches are performed automatically for each market. Costs ~0.75 credits per region (~3.75 for all markets, ~0.75 for single country).',
       schema: z.object({
-        country: z.string().describe('Country to search in (e.g., "Poland", "Turkey", "Romania")'),
-        category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "LED mirrors")'),
-        language: z.string().optional().describe('Language code for native searches (e.g., "pl", "tr", "ro", "bg")'),
-        limit: z.number().optional().default(10).describe('Maximum number of manufacturers to find'),
+        country: z.string().optional().describe('Specific country to search (e.g., "Poland", "Turkey"). Omit to search ALL 30 markets.'),
+        region: z.string().optional().describe('Specific region: "cee", "balkans", "baltic_nordic", "western_southern", "global". Ignored if country is provided.'),
+        category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
+        limit: z.number().optional().default(30).describe('Max total manufacturers to find. Default: 30'),
       }),
     }
   );
@@ -2445,7 +2477,7 @@ Return up to ${limit} manufacturers.`;
  * B2B Research Tool: Company Website Scrape
  * Uses Firecrawl API to extract structured information from company websites
  */
-const createCompanyWebsiteScrapeTool = (onProgress?: (status: string) => void) => {
+const createCompanyWebsiteScrapeTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ url, extract }) => {
       try {
@@ -2511,6 +2543,9 @@ const createCompanyWebsiteScrapeTool = (onProgress?: (status: string) => void) =
         const markdown = data.data?.markdown || '';
         const metadata = data.data?.metadata || {};
 
+        // Debit credits for Firecrawl scrape
+        await debitExternalServiceCredits(supabase, userId, 'firecrawl-scrape', 'company_website_scrape', 1, { url });
+
         // If no content was scraped, return early with metadata only
         if (!markdown || markdown.length < 100) {
           return JSON.stringify({
@@ -2537,25 +2572,15 @@ const createCompanyWebsiteScrapeTool = (onProgress?: (status: string) => void) =
             maxTokens: 2048,
           });
 
-          const analysisPrompt = `Analyze this company website content and extract the following information:
+          // Load prompt from database (editable via /admin/ai-configs)
+          const scraperPrompt = await getToolPrompt(supabase, 'company_website_scraper');
+
+          const analysisPrompt = `${scraperPrompt}
 
 Sections to extract: ${extractSections.join(', ')}
 
 Website content:
-${markdown.substring(0, 15000)}
-
-Please extract and structure the information as JSON with these fields:
-- company_name: string
-- about: string (company description, history, founding year if found)
-- products: array of strings (specific products they manufacture)
-- contact: object with address, phone, email if found
-- certifications: array of strings (ISO, quality certifications)
-- is_manufacturer: boolean (true if they clearly manufacture products, false if just distributor/retailer)
-- is_b2b: boolean (true if they offer wholesale/B2B services)
-- manufacturing_indicators: array of strings (words/phrases that indicate manufacturing capability)
-- confidence: number 0-1 (how confident are you this is a B2B manufacturer)
-
-Return ONLY valid JSON, no markdown formatting.`;
+${markdown.substring(0, 15000)}`;
 
           const analysisResponse = await analysisModel.invoke([
             { role: 'user', content: analysisPrompt }
@@ -2617,7 +2642,7 @@ Return ONLY valid JSON, no markdown formatting.`;
  * B2B Research Tool: Company Enrichment
  * Uses Apollo.io API to get structured company data from B2B databases
  */
-const createCompanyEnrichmentTool = (onProgress?: (status: string) => void) => {
+const createCompanyEnrichmentTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ company_name, domain, country }) => {
       try {
@@ -2684,6 +2709,9 @@ const createCompanyEnrichmentTool = (onProgress?: (status: string) => void) => {
         console.log(`✅ Company enrichment completed in ${elapsed}ms`);
 
         const companies = data.organizations || [];
+
+        // Debit credits for Apollo enrichment (charged even if no results)
+        await debitExternalServiceCredits(supabase, userId, 'apollo-enrich', 'company_enrichment', 1, { company_name, domain });
 
         if (companies.length === 0) {
           return JSON.stringify({
@@ -2808,7 +2836,7 @@ async function validateEmailWithZeroBounce(
  * B2B Research Tool: Contact Discovery
  * Uses Hunter.io Email Finder + domain search, Apollo.io fallback, and ZeroBounce validation
  */
-const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
+const createContactDiscoveryTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ domain, roles, first_name, last_name, full_name, company_name }) => {
       try {
@@ -2855,6 +2883,8 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
                   position = result.position || '';
                   source = 'hunter.io';
                   console.log(`✅ Hunter Email Finder: ${foundEmail} (confidence: ${confidence})`);
+                  // Debit credits for Hunter email-finder
+                  await debitExternalServiceCredits(supabase, userId, 'hunter-email-finder', 'contact_discovery', 1, { domain, person: personLabel });
                 }
               } else {
                 console.warn(`⚠️ Hunter Email Finder error: ${response.status}`);
@@ -2903,6 +2933,8 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
                     position = person.title || position;
                     source = 'apollo.io';
                     console.log(`✅ Apollo People Match: ${foundEmail} (status: ${person.email_status})`);
+                    // Debit credits for Apollo people-match fallback
+                    await debitExternalServiceCredits(supabase, userId, 'apollo-people-match', 'contact_discovery', 1, { domain, person: personLabel });
                   }
                 } else {
                   console.warn(`⚠️ Apollo People Match error: ${response.status}`);
@@ -2928,6 +2960,10 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
           // Step 3: Validate with ZeroBounce
           onProgress?.(`Validating ${foundEmail} with ZeroBounce...`);
           const validation = await validateEmailWithZeroBounce(foundEmail, onProgress);
+          // Debit credits for ZeroBounce validation
+          if (validation.validated) {
+            await debitExternalServiceCredits(supabase, userId, 'zerobounce-validate', 'contact_discovery', 1, { email: foundEmail });
+          }
 
           const elapsed = Date.now() - startTime;
           console.log(`✅ Person email discovery completed in ${elapsed}ms`);
@@ -3004,6 +3040,9 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
         const organization = data.data?.organization || '';
         const pattern = data.data?.pattern || '';
 
+        // Debit credits for Hunter domain-search
+        await debitExternalServiceCredits(supabase, userId, 'hunter-domain-search', 'contact_discovery', 1, { domain });
+
         const priorityRoles = roles || ['export', 'sales', 'director', 'manager', 'owner', 'ceo', 'founder'];
 
         const scoredContacts = emails.map((email: any) => {
@@ -3053,6 +3092,10 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
             validatedCount++;
           }
         }
+        // Debit credits for all ZeroBounce validations in batch
+        if (validatedCount > 0) {
+          await debitExternalServiceCredits(supabase, userId, 'zerobounce-validate', 'contact_discovery', validatedCount, { domain });
+        }
 
         const elapsed = Date.now() - startTime;
         console.log(`✅ Contact discovery completed in ${elapsed}ms`);
@@ -3095,7 +3138,7 @@ const createContactDiscoveryTool = (onProgress?: (status: string) => void) => {
  * B2B Research Tool: Email Validation
  * Uses ZeroBounce API to validate email addresses on demand
  */
-const createEmailValidateTool = (onProgress?: (status: string) => void) => {
+const createEmailValidateTool = (userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ email, emails }) => {
       try {
@@ -3132,6 +3175,11 @@ const createEmailValidateTool = (onProgress?: (status: string) => void) => {
         const validCount = results.filter((r) => r.status === 'valid').length;
         const invalidCount = results.filter((r) => r.status === 'invalid').length;
         console.log(`✅ Email validation completed in ${elapsed}ms: ${validCount} valid, ${invalidCount} invalid`);
+
+        // Debit credits for all ZeroBounce validations
+        if (results.length > 0) {
+          await debitExternalServiceCredits(supabase, userId, 'zerobounce-validate', 'email_validate', results.length, { email_count: results.length });
+        }
 
         return JSON.stringify({
           success: true,
@@ -3304,6 +3352,313 @@ const createSaveToCRMTool = (userId: string, onProgress?: (status: string) => vo
   );
 };
 
+// ═══════════════════════════════════════════════════════════════
+// SEO Article Pipeline Tools
+// ═══════════════════════════════════════════════════════════════
+
+/** Helper to call SEO edge functions from agent tools */
+async function callSEOFunction(functionName: string, body: any, timeoutMs = 120_000): Promise<any> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/${functionName}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return await response.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      return { success: false, error: `${functionName} timed out after ${timeoutMs / 1000}s` };
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * SEO Tool: Keyword Research
+ * Calls seo-research edge function → DataForSEO API
+ */
+const createSEOKeywordResearchTool = (userId: string, onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ topic, target_keyword, language_code, location_code }) => {
+      try {
+        console.log(`🔍 SEO keyword research: "${target_keyword}" (topic: ${topic})`);
+        onProgress?.(`Researching keywords for "${target_keyword}"...`);
+
+        const result = await callSEOFunction('seo-research', {
+          topic,
+          target_keyword,
+          language_code: language_code || 'en',
+          location_code: location_code || 2840,
+          user_id: userId,
+        }, 60_000);
+
+        if (!result.success) {
+          return JSON.stringify({ success: false, error: result.error || 'Keyword research failed' });
+        }
+
+        onProgress?.(`Found ${result.data?.research?.totalKeywords || 0} keywords for "${target_keyword}"`);
+
+        return JSON.stringify({
+          success: true,
+          research_id: result.data?.research_id,
+          summary: {
+            total_keywords: result.data?.research?.totalKeywords || 0,
+            total_volume: result.data?.research?.totalAddressableVolume || 0,
+            clusters: result.data?.research?.clusters?.length || 0,
+            top_keywords: result.data?.research?.keywords?.slice(0, 10)?.map((k: any) => ({
+              keyword: k.keyword,
+              volume: k.searchVolume,
+              difficulty: k.difficulty,
+              opportunity: k.opportunityScore,
+            })),
+            paa_questions: result.data?.research?.paaQuestions?.slice(0, 5),
+            competitors: result.data?.research?.competitors?.slice(0, 5)?.map((c: any) => ({
+              url: c.url,
+              title: c.title,
+              position: c.position,
+            })),
+          },
+        });
+      } catch (error: any) {
+        console.error('SEO keyword research error:', error);
+        return JSON.stringify({ success: false, error: error.message });
+      }
+    },
+    {
+      name: 'seo_keyword_research',
+      description: 'Research keywords for SEO article writing. Uses DataForSEO to find keyword volumes, difficulty, related keywords, People Also Ask questions, and SERP competitors. Always run this first before planning or writing an article.',
+      schema: z.object({
+        topic: z.string().describe('The broad topic or niche (e.g. "sustainable building materials")'),
+        target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
+        language_code: z.string().optional().describe('Language code, defaults to "en"'),
+        location_code: z.number().optional().describe('DataForSEO location code, defaults to 2840 (US)'),
+      }),
+    }
+  );
+};
+
+/**
+ * SEO Tool: Article Planner
+ * Calls seo-plan edge function → Gemini structured output
+ */
+const createSEOArticlePlannerTool = (userId: string, onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ topic, target_keyword, keyword_research, content_brief }) => {
+      try {
+        console.log(`📋 SEO article planning: "${target_keyword}"`);
+        onProgress?.(`Planning article structure for "${target_keyword}"...`);
+
+        const result = await callSEOFunction('seo-plan', {
+          topic,
+          target_keyword,
+          keyword_research,
+          content_brief,
+          user_id: userId,
+        }, 60_000);
+
+        if (!result.success) {
+          return JSON.stringify({ success: false, error: result.error || 'Article planning failed' });
+        }
+
+        onProgress?.(`Article plan created: "${result.data?.plan?.metaTitle || target_keyword}"`);
+
+        return JSON.stringify({
+          success: true,
+          plan: result.data?.plan,
+        });
+      } catch (error: any) {
+        console.error('SEO article planning error:', error);
+        return JSON.stringify({ success: false, error: error.message });
+      }
+    },
+    {
+      name: 'seo_article_planner',
+      description: 'Create a detailed article plan/outline from keyword research data. Uses Gemini to generate structured article plan with headings, sections, meta tags, and keyword targets. Requires keyword research data from seo_keyword_research tool.',
+      schema: z.object({
+        topic: z.string().describe('The article topic'),
+        target_keyword: z.string().describe('Primary target keyword'),
+        keyword_research: z.any().describe('Full keyword research result from seo_keyword_research tool'),
+        content_brief: z.any().optional().describe('Optional content brief with brand voice, audience, and business context'),
+      }),
+    }
+  );
+};
+
+/**
+ * SEO Tool: Article Writer
+ * Calls seo-write edge function → Claude Sonnet
+ */
+const createSEOArticleWriterTool = (userId: string, onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ article_plan, content_brief }) => {
+      try {
+        console.log(`✍️ SEO article writing: "${article_plan?.metaTitle || 'article'}"`);
+        onProgress?.('Writing article with Claude Sonnet...');
+
+        const result = await callSEOFunction('seo-write', {
+          article_plan,
+          content_brief,
+          user_id: userId,
+        }, 120_000);
+
+        if (!result.success) {
+          return JSON.stringify({ success: false, error: result.error || 'Article writing failed' });
+        }
+
+        onProgress?.(`Article written: ${result.data?.word_count || 0} words`);
+
+        return JSON.stringify({
+          success: true,
+          markdown_content: result.data?.markdown_content,
+          word_count: result.data?.word_count,
+        });
+      } catch (error: any) {
+        console.error('SEO article writing error:', error);
+        return JSON.stringify({ success: false, error: error.message });
+      }
+    },
+    {
+      name: 'seo_article_writer',
+      description: 'Write a full SEO article from an article plan. Uses Claude Sonnet to generate high-quality long-form content following the plan structure. Requires an article plan from seo_article_planner tool.',
+      schema: z.object({
+        article_plan: z.any().describe('Full article plan from seo_article_planner tool'),
+        content_brief: z.any().optional().describe('Optional content brief with brand voice and audience details'),
+      }),
+    }
+  );
+};
+
+/**
+ * SEO Tool: Content Analyzer
+ * Calls seo-analyze edge function → scoring + optional auto-fix
+ */
+const createSEOContentAnalyzerTool = (userId: string, onProgress?: (status: string) => void) => {
+  return tool(
+    async ({ content_markdown, article_plan, content_brief, auto_fix, max_iterations }) => {
+      try {
+        console.log('📊 SEO content analysis starting...');
+        onProgress?.('Analyzing article content for SEO quality...');
+
+        const result = await callSEOFunction('seo-analyze', {
+          content_markdown,
+          article_plan,
+          content_brief,
+          auto_fix: auto_fix ?? false,
+          max_iterations: max_iterations ?? 2,
+          user_id: userId,
+        }, 180_000);
+
+        if (!result.success) {
+          return JSON.stringify({ success: false, error: result.error || 'Content analysis failed' });
+        }
+
+        const analysis = result.data?.analysis;
+        onProgress?.(`Analysis complete: score ${analysis?.overallScore || 0}/100`);
+
+        return JSON.stringify({
+          success: true,
+          overall_score: analysis?.overallScore,
+          seo_score: analysis?.seoScore,
+          readability_score: analysis?.readabilityScore,
+          issues_count: analysis?.fixes?.length || 0,
+          critical_issues: analysis?.fixes?.filter((f: any) => f.severity === 'critical')?.length || 0,
+          fixes: analysis?.fixes?.slice(0, 10),
+          improved_content: result.data?.improved_content,
+          iterations: result.data?.iterations || 0,
+        });
+      } catch (error: any) {
+        console.error('SEO content analysis error:', error);
+        return JSON.stringify({ success: false, error: error.message });
+      }
+    },
+    {
+      name: 'seo_content_analyzer',
+      description: 'Analyze SEO article content for quality, keyword optimization, readability, and SEO best practices. Scores content 0-100 and identifies issues. Can auto-fix content if score is below 70. Requires article content and plan.',
+      schema: z.object({
+        content_markdown: z.string().describe('The article content in markdown format'),
+        article_plan: z.any().describe('The article plan used to write the content'),
+        content_brief: z.any().optional().describe('Optional content brief'),
+        auto_fix: z.boolean().optional().describe('Auto-fix content if score is below 70 (default: false)'),
+        max_iterations: z.number().optional().describe('Max fix iterations (default: 2, max: 3)'),
+      }),
+    }
+  );
+};
+
+/**
+ * SEO Tool: Full Pipeline (Async)
+ * Calls seo-pipeline edge function → runs all stages, returns article_id immediately
+ * Emits article_generation_started chunk for frontend polling
+ */
+const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) => {
+  return tool(
+    async ({ topic, target_keyword, content_brief, auto_fix, max_fix_iterations, content_type }) => {
+      try {
+        console.log(`🚀 SEO pipeline starting: "${target_keyword}"`);
+
+        const result = await callSEOFunction('seo-pipeline', {
+          topic,
+          target_keyword,
+          content_brief,
+          auto_fix: auto_fix ?? true,
+          max_fix_iterations: max_fix_iterations ?? 2,
+          content_type: content_type || 'guide',
+          user_id: userId,
+        }, 300_000); // 5 min timeout for full pipeline
+
+        if (!result.success) {
+          return JSON.stringify({ success: false, error: result.error || 'Pipeline failed' });
+        }
+
+        const articleId = result.data?.article_id;
+
+        // Emit chunk for frontend to start polling
+        try {
+          onChunk?.({
+            type: 'article_generation_started',
+            article_id: articleId,
+            topic: topic,
+            target_keyword: target_keyword,
+            estimated_time_seconds: 120,
+          });
+        } catch (e) {
+          console.error('Failed to send article_generation_started chunk:', e);
+        }
+
+        return JSON.stringify({
+          success: true,
+          article_id: articleId,
+          message: `SEO article pipeline started for "${target_keyword}". The article is being generated in the background — you can track progress in the viewer above.`,
+        });
+      } catch (error: any) {
+        console.error('SEO pipeline error:', error);
+        return JSON.stringify({ success: false, error: error.message });
+      }
+    },
+    {
+      name: 'create_seo_article',
+      description: 'Run the full SEO article pipeline: keyword research → planning → writing → analysis with auto-fix. This is an async operation — it creates an article record and processes in the background. Use this when the user wants a complete SEO article generated end-to-end. For individual steps, use the specific tools instead.',
+      schema: z.object({
+        topic: z.string().describe('The broad topic or niche (e.g. "sustainable architecture")'),
+        target_keyword: z.string().describe('The primary keyword to target (e.g. "recycled concrete aggregates")'),
+        content_brief: z.any().optional().describe('Optional content brief with audience, brand voice, business context'),
+        auto_fix: z.boolean().optional().describe('Auto-fix content if quality score is below 70 (default: true)'),
+        max_fix_iterations: z.number().optional().describe('Max auto-fix iterations (default: 2)'),
+        content_type: z.string().optional().describe('Article type: guide, listicle, comparison, how-to, case-study (default: guide)'),
+      }),
+    }
+  );
+};
+
 /**
  * Agent Configurations with RBAC
  */
@@ -3324,7 +3679,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Search Agent',
     description: 'Material search and discovery',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['knowledge_base_search', 'material_search', 'image_analysis'],
+    tools: ['knowledge_base_search', 'material_search'],
     // systemPrompt loaded from database
   },
   insights: {
@@ -3355,10 +3710,20 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'image_analysis', 'spaceformer_analysis', 'generate_3d'],
+    tools: ['material_search', 'spaceformer_analysis', 'generate_3d'],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
+  },
+  seo: {
+    id: 'seo',
+    name: 'SEO Content Agent',
+    description: 'AI-powered SEO article generation with keyword research, planning, writing, and analysis',
+    allowedRoles: ['admin', 'owner'],
+    tools: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
+    // systemPrompt loaded from database
+    // NOTE: create_seo_article runs the full async pipeline (research → plan → write → analyze)
+    // NOTE: Individual tools allow step-by-step control for advanced users
   },
 };
 
@@ -3493,9 +3858,6 @@ async function executeAgent(
     }
   }
 
-  if (config.tools.includes('image_analysis')) {
-    tools.push(createImageAnalysisTool(workspaceId));
-  }
   // REMOVED: PDF processing tools - moved to /admin/data-import page
   // - uploadPDF
   // - checkJobStatus
@@ -3554,22 +3916,39 @@ async function executeAgent(
   };
 
   if (config.tools.includes('b2b_manufacturer_search')) {
-    tools.push(createB2BManufacturerSearchTool(sendProgress));
+    tools.push(createB2BManufacturerSearchTool(userId, sendProgress));
   }
   if (config.tools.includes('company_website_scrape')) {
-    tools.push(createCompanyWebsiteScrapeTool(sendProgress));
+    tools.push(createCompanyWebsiteScrapeTool(userId, sendProgress));
   }
   if (config.tools.includes('company_enrichment')) {
-    tools.push(createCompanyEnrichmentTool(sendProgress));
+    tools.push(createCompanyEnrichmentTool(userId, sendProgress));
   }
   if (config.tools.includes('contact_discovery')) {
-    tools.push(createContactDiscoveryTool(sendProgress));
+    tools.push(createContactDiscoveryTool(userId, sendProgress));
   }
   if (config.tools.includes('email_validate')) {
-    tools.push(createEmailValidateTool(sendProgress));
+    tools.push(createEmailValidateTool(userId, sendProgress));
   }
   if (config.tools.includes('save_to_crm')) {
     tools.push(createSaveToCRMTool(userId, sendProgress));
+  }
+
+  // SEO Article Pipeline tools
+  if (config.tools.includes('seo_keyword_research')) {
+    tools.push(createSEOKeywordResearchTool(userId, sendProgress));
+  }
+  if (config.tools.includes('seo_article_planner')) {
+    tools.push(createSEOArticlePlannerTool(userId, sendProgress));
+  }
+  if (config.tools.includes('seo_article_writer')) {
+    tools.push(createSEOArticleWriterTool(userId, sendProgress));
+  }
+  if (config.tools.includes('seo_content_analyzer')) {
+    tools.push(createSEOContentAnalyzerTool(userId, sendProgress));
+  }
+  if (config.tools.includes('create_seo_article')) {
+    tools.push(createSEOPipelineTool(userId, onChunk));
   }
 
   // Select model based on agent type (Haiku for search, Sonnet for complex tasks)
@@ -3856,8 +4235,9 @@ async function extractAndStoreMemories(
 }
 
 /**
- * Log agent usage and debit credits
+ * Log agent usage and debit credits with retry
  * Uses the log_agent_usage RPC function for atomic logging + credit debit
+ * Retries up to 3 times on failure to prevent free usage from RPC errors
  */
 async function logAgentUsage(
   userId: string,
@@ -3872,30 +4252,46 @@ async function logAgentUsage(
   },
   toolsCalled: Array<{ name: string; duration_ms?: number }> = []
 ) {
-  try {
-    console.log(`💰 Logging agent usage: ${usage.inputTokens} input, ${usage.outputTokens} output tokens`);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
 
-    // Call the log_agent_usage RPC function which handles pricing lookup and credit debit
-    const { data, error } = await supabase.rpc('log_agent_usage', {
-      p_user_id: userId,
-      p_workspace_id: workspaceId,
-      p_agent_type: agentType,
-      p_turn_number: usage.turnCount,
-      p_model_name: usage.modelName,
-      p_input_tokens: usage.inputTokens,
-      p_output_tokens: usage.outputTokens,
-      p_tools_called: toolsCalled
-    });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`💰 Logging agent usage (attempt ${attempt}/${MAX_RETRIES}): ${usage.inputTokens} input, ${usage.outputTokens} output tokens`);
 
-    if (error) {
-      console.error('❌ Error logging agent usage:', error);
-      // Don't throw - logging failures shouldn't break the agent response
-    } else if (data) {
-      console.log(`✅ Agent usage logged: $${data.billed_cost_usd?.toFixed(6) || 0} USD, ${data.credits_debited?.toFixed(4) || 0} credits`);
+      const { data, error } = await supabase.rpc('log_agent_usage', {
+        p_user_id: userId,
+        p_workspace_id: workspaceId,
+        p_agent_type: agentType,
+        p_turn_number: usage.turnCount,
+        p_model_name: usage.modelName,
+        p_input_tokens: usage.inputTokens,
+        p_output_tokens: usage.outputTokens,
+        p_tools_called: toolsCalled
+      });
+
+      if (error) {
+        console.error(`❌ Error logging agent usage (attempt ${attempt}):`, error);
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        console.error('❌ All retry attempts exhausted for agent usage logging');
+        return;
+      }
+
+      if (data) {
+        console.log(`✅ Agent usage logged: $${data.billed_cost_usd?.toFixed(6) || 0} USD, ${data.credits_debited?.toFixed(4) || 0} credits (model: ${data.model_matched || usage.modelName})`);
+      }
+      return; // Success - exit retry loop
+    } catch (error) {
+      console.error(`❌ Failed to log agent usage (attempt ${attempt}):`, error);
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+        continue;
+      }
+      console.error('❌ All retry attempts exhausted for agent usage logging');
     }
-  } catch (error) {
-    console.error('❌ Failed to log agent usage:', error);
-    // Don't throw - logging failures shouldn't break the agent response
   }
 }
 
@@ -4116,11 +4512,11 @@ Deno.serve(async (req) => {
                   user_id: userId,
                 }).catch(() => {});
               }
-              if (tr.tool === 'image_analysis' && tr.result?.success) {
-                emitFlowEvent('agent_image_analyzed', {
-                  image_url: tr.args?.imageUrl,
-                  analysis_type: tr.args?.analysisType,
-                  category: tr.result.materials?.[0]?.category,
+              if (tr.tool === 'generate_3d' && tr.result?.success) {
+                emitFlowEvent('model_3d_created', {
+                  job_id: tr.result.job_id,
+                  model_count: tr.result.model_count,
+                  prompt: tr.args?.prompt,
                   agent_id: agentId,
                   user_id: userId,
                 }).catch(() => {});

@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-const API_BASE = import.meta.env.VITE_SUPABASE_URL + '/functions/v1';
+const API_BASE = process.env.SUPABASE_URL + '/functions/v1';
 
 /**
  * Stripe Service
@@ -14,19 +14,46 @@ export interface CheckoutSessionParams {
   metadata?: Record<string, string>;
 }
 
-export interface CreditPackage {
-  id: string;
-  name: string;
+export interface CreditQuote {
   credits: number;
-  price: number;
-  priceId: string;
-  popular?: boolean;
+  ratePerCredit: number;
+  discount: number;
+  tierName: string;
+  nextTier: { name: string; minAmount: number; discount: number } | null;
+}
+
+// Credit purchase tiers: price per credit decreases with volume
+// Break-even floor is ~$0.00667/credit (raw cost at 1.50x markup)
+// All tiers maintain ≥20% margin over break-even after Stripe fees
+const CREDIT_TIERS = [
+  { minAmount: 80, ratePerCredit: 0.0085, discount: 15, name: 'Platinum' },
+  { minAmount: 45, ratePerCredit: 0.009, discount: 10, name: 'Gold' },
+  { minAmount: 10, ratePerCredit: 0.0095, discount: 5, name: 'Silver' },
+  { minAmount: 1, ratePerCredit: 0.01, discount: 0, name: 'Standard' },
+] as const;
+
+export function calculateCreditsForAmount(dollarAmount: number): CreditQuote {
+  const amount = Math.max(1, dollarAmount);
+  const tierIndex = CREDIT_TIERS.findIndex((t) => amount >= t.minAmount);
+  const tier = CREDIT_TIERS[tierIndex >= 0 ? tierIndex : CREDIT_TIERS.length - 1];
+  const nextTier = tierIndex > 0 ? CREDIT_TIERS[tierIndex - 1] : null;
+
+  return {
+    credits: Math.floor(amount / tier.ratePerCredit),
+    ratePerCredit: tier.ratePerCredit,
+    discount: tier.discount,
+    tierName: tier.name,
+    nextTier: nextTier
+      ? { name: nextTier.name, minAmount: nextTier.minAmount, discount: nextTier.discount }
+      : null,
+  };
 }
 
 export interface SubscriptionTier {
   id: string;
   name: string;
   price: number;
+  currency: string;
   priceId: string;
   monthlyCredits: number;
   features: string[];
@@ -38,7 +65,6 @@ export const stripeAPI = {
    * Create Stripe Checkout session for credit purchase
    */
   async createCreditCheckoutSession(
-    creditPackageId: string,
     credits: number,
     price: number,
   ): Promise<{ url: string }> {
@@ -53,7 +79,6 @@ export const stripeAPI = {
       },
       body: JSON.stringify({
         type: 'credit_purchase',
-        priceId: creditPackageId,
         credits,
         price,
         successUrl: `${window.location.origin}/profile?tab=credits&success=true`,
@@ -128,43 +153,6 @@ export const stripeAPI = {
   },
 
   /**
-   * Get available credit packages
-   */
-  getCreditPackages(): CreditPackage[] {
-    return [
-      {
-        id: 'credits_100',
-        name: '100 Credits',
-        credits: 100,
-        price: 10,
-        priceId: import.meta.env.VITE_STRIPE_CREDITS_100_PRICE_ID || '',
-      },
-      {
-        id: 'credits_500',
-        name: '500 Credits',
-        credits: 500,
-        price: 45,
-        priceId: import.meta.env.VITE_STRIPE_CREDITS_500_PRICE_ID || '',
-        popular: true,
-      },
-      {
-        id: 'credits_1000',
-        name: '1,000 Credits',
-        credits: 1000,
-        price: 80,
-        priceId: import.meta.env.VITE_STRIPE_CREDITS_1000_PRICE_ID || '',
-      },
-      {
-        id: 'credits_5000',
-        name: '5,000 Credits',
-        credits: 5000,
-        price: 350,
-        priceId: import.meta.env.VITE_STRIPE_CREDITS_5000_PRICE_ID || '',
-      },
-    ];
-  },
-
-  /**
    * Get available subscription tiers
    */
   getSubscriptionTiers(): SubscriptionTier[] {
@@ -173,6 +161,7 @@ export const stripeAPI = {
         id: 'free',
         name: 'Free',
         price: 0,
+        currency: 'EUR',
         priceId: '',
         monthlyCredits: 100,
         features: [
@@ -185,7 +174,8 @@ export const stripeAPI = {
       {
         id: 'pro',
         name: 'Pro',
-        price: 29,
+        price: 25,
+        currency: 'EUR',
         priceId: import.meta.env.VITE_STRIPE_PRO_PRICE_ID || '',
         monthlyCredits: 1000,
         features: [
@@ -200,7 +190,8 @@ export const stripeAPI = {
       {
         id: 'enterprise',
         name: 'Enterprise',
-        price: 99,
+        price: 500,
+        currency: 'EUR',
         priceId: import.meta.env.VITE_STRIPE_ENTERPRISE_PRICE_ID || '',
         monthlyCredits: 5000,
         features: [
@@ -220,8 +211,8 @@ export const stripeAPI = {
  * StripeService class wrapper for compatibility
  */
 export class StripeService {
-  async createCreditCheckoutSession(creditPackageId: string, credits: number, price: number) {
-    return stripeAPI.createCreditCheckoutSession(creditPackageId, credits, price);
+  async createCreditCheckoutSession(credits: number, price: number) {
+    return stripeAPI.createCreditCheckoutSession(credits, price);
   }
 
   async createSubscriptionCheckoutSession(priceId: string) {
@@ -230,10 +221,6 @@ export class StripeService {
 
   async createCustomerPortalSession() {
     return stripeAPI.createCustomerPortalSession();
-  }
-
-  getCreditPackages() {
-    return stripeAPI.getCreditPackages();
   }
 
   getSubscriptionTiers() {

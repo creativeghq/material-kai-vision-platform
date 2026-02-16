@@ -17,10 +17,6 @@ export type TriggerType =
   | 'quote_requested'
   | 'quote_approved'
   | 'quote_rejected'
-  | 'contract_created'
-  | 'image_uploaded'
-  | 'document_processed'
-  | 'product_added'
   | 'search_executed'
   | 'model_3d_created'
   | 'vr_world_created'
@@ -59,22 +55,6 @@ export interface QuoteRequestedTriggerConfig {
 export interface QuoteApprovedTriggerConfig {}
 export interface QuoteRejectedTriggerConfig {}
 
-export interface ContractCreatedTriggerConfig {
-  filter_type?: string;
-}
-
-export interface ImageUploadedTriggerConfig {
-  filter_category?: string;
-}
-
-export interface DocumentProcessedTriggerConfig {
-  filter_type?: string;
-}
-
-export interface ProductAddedTriggerConfig {
-  filter_category?: string;
-}
-
 export interface SearchExecutedTriggerConfig {
   filter_agent?: string;
 }
@@ -111,10 +91,6 @@ export type TriggerConfigMap = {
   quote_requested: QuoteRequestedTriggerConfig;
   quote_approved: QuoteApprovedTriggerConfig;
   quote_rejected: QuoteRejectedTriggerConfig;
-  contract_created: ContractCreatedTriggerConfig;
-  image_uploaded: ImageUploadedTriggerConfig;
-  document_processed: DocumentProcessedTriggerConfig;
-  product_added: ProductAddedTriggerConfig;
   search_executed: SearchExecutedTriggerConfig;
   model_3d_created: Model3DCreatedTriggerConfig;
   vr_world_created: VRWorldCreatedTriggerConfig;
@@ -335,9 +311,9 @@ export interface AddToMoodboardConfig {
 }
 
 export interface PerplexitySearchConfig {
-  country: string;
   category: string;
-  language?: string;
+  country?: string;
+  region?: string;
   limit?: number;
 }
 

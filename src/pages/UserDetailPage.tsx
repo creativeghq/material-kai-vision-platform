@@ -103,10 +103,13 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
         );
 
         if (response.ok) {
-          const result = await response.json();
-          setUsage(result.data.usage || []);
-          setTotals(result.data.totals || null);
-          setByModel(result.data.byModel || []);
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const result = await response.json();
+            setUsage(result.data?.usage || []);
+            setTotals(result.data?.totals || null);
+            setByModel(result.data?.byModel || []);
+          }
         }
       } catch (error) {
         console.error('Error fetching AI usage:', error);

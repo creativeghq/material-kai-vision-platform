@@ -40,8 +40,7 @@ export const BillingHistoryTab: React.FC = () => {
 
     setLoading(true);
     try {
-      const { transactions: data, error } = await creditsService.getTransactions();
-      if (error) throw new Error(error);
+      const { data } = await creditsService.getTransactions();
       setTransactions(data || []);
     } catch (error) {
       console.error('Error loading transactions:', error);
@@ -71,7 +70,7 @@ export const BillingHistoryTab: React.FC = () => {
   };
 
   return (
-    <Card className="bg-white/80 backdrop-blur-sm border-white/20 shadow-lg rounded-2xl">
+    <Card className="rounded-2xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Receipt className="h-5 w-5 text-primary" />
@@ -122,10 +121,10 @@ export const BillingHistoryTab: React.FC = () => {
                       }`}
                     >
                       {transaction.transaction_type === 'credit' ? '+' : '-'}
-                      {Math.abs(transaction.amount).toFixed(2)}
+                      {Math.abs(transaction.amount ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
-                      {transaction.balance_after.toFixed(2)}
+                      {(transaction.balance_after ?? 0).toFixed(2)}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button variant="ghost" size="sm">

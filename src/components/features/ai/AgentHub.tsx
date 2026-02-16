@@ -24,6 +24,7 @@ import {
   ThumbsDown,
   Trash2,
   Lightbulb,
+  FileText,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -47,6 +48,7 @@ import { PromptLibrary } from './PromptLibrary';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
+import SEOArticleViewer from './SEOArticleViewer';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
 import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 import { WorldViewer } from './WorldViewer';
@@ -94,6 +96,16 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'member',
     available: true,
     defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Creative tasks need better model
+  },
+  {
+    id: 'seo',
+    name: 'SEO',
+    description: 'AI-powered SEO article generation',
+    icon: FileText,
+    color: 'text-emerald-500',
+    requiredRole: 'admin',
+    available: true,
+    defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Quality writing needs Sonnet
   },
   {
     id: 'demo',
@@ -188,6 +200,11 @@ interface Message {
     sourceImageUrl?: string;
     prompt?: string;
   }; // VR world data from WorldLabs Marble
+  articleData?: {
+    article_id: string;
+    topic: string;
+    target_keyword: string;
+  }; // SEO article pipeline data for SEOArticleViewer
 }
 
 interface AgentHubProps {
@@ -869,6 +886,48 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     style: chunk.style,
                   },
                 };
+              // Handle article_generation_started - SEO pipeline async
+              } else if (chunk.type === 'article_generation_started') {
+                logger.info(`SEO article pipeline started: ${chunk.article_id}`, {
+                  service: 'AgentHub',
+                  metadata: { article_id: chunk.article_id, target_keyword: chunk.target_keyword },
+                });
+
+                const articleMessage: Message = {
+                  id: `msg-article-${Date.now()}`,
+                  role: 'assistant',
+                  content: `Starting SEO article generation for "${chunk.target_keyword}"...`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  articleData: {
+                    article_id: chunk.article_id,
+                    topic: chunk.topic,
+                    target_keyword: chunk.target_keyword,
+                  },
+                };
+
+                setMessages((prev) => [...prev, articleMessage]);
+
+                if (conversationId) {
+                  await agentChatHistoryService.saveMessage({
+                    conversationId,
+                    role: 'assistant',
+                    content: articleMessage.content,
+                    metadata: {
+                      agentId: selectedAgent,
+                      model: selectedModel,
+                      articleData: articleMessage.articleData,
+                    },
+                  });
+                }
+
+                finalResult = {
+                  type: 'final_result',
+                  text: `Started SEO article pipeline for "${chunk.target_keyword}".`,
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                };
               } else if (chunk.type === 'final_result') {
                 finalResult = chunk;
               } else if (chunk.type === 'tool_error') {
@@ -1136,6 +1195,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           designData: msg.metadata?.designData as any | undefined, // Restore design data with spatial analysis
           generation_job: msg.metadata?.generation_job as any | undefined, // Restore generation job info for async 3D generation
           worldData: msg.metadata?.worldData as any | undefined, // Restore VR world data
+          articleData: msg.metadata?.articleData as any | undefined, // Restore SEO article data
         })),
       );
     },
@@ -1586,6 +1646,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               }}
                             />
                           </div>
+                        )}
+
+                        {/* Show SEOArticleViewer for async SEO article pipeline */}
+                        {message.role === 'assistant' && message.articleData && (
+                          <SEOArticleViewer articleId={message.articleData.article_id} />
                         )}
                       </div>
                     )}

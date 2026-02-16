@@ -123,17 +123,24 @@ export const Sidebar: React.FC = () => {
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                className={`h-16 rounded-2xl transition-all duration-300 ${isExpanded ? 'w-full justify-start px-3' : 'w-14 px-0'} text-sidebar-foreground hover:bg-white/40 border border-transparent hover:border-white/20 group`}
+                className={`h-16 rounded-2xl transition-all duration-300 ${isExpanded ? 'w-full justify-start px-3' : 'w-14 px-0'} text-sidebar-foreground hover:bg-white/40 border border-transparent hover:border-white/20 group ${
+                  isActive('/profile')
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
+                    : ''
+                }`}
+                asChild
               >
-                <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner group-hover:bg-primary/25 transition-colors">
-                  <User className="w-5 h-5 text-primary" />
-                </div>
-                {isExpanded && (
-                  <div className="ml-4 text-left">
-                    <p className="text-sm font-light text-foreground tracking-tight">Profile</p>
-                    <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-light">Settings</p>
+                <Link to="/profile">
+                  <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner group-hover:bg-primary/25 transition-colors">
+                    <User className="w-5 h-5 text-primary" />
                   </div>
-                )}
+                  {isExpanded && (
+                    <div className="ml-4 text-left">
+                      <p className="text-sm font-light text-foreground tracking-tight">Profile</p>
+                      <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-light">Settings</p>
+                    </div>
+                  )}
+                </Link>
               </Button>
             </TooltipTrigger>
             {!isExpanded && (
