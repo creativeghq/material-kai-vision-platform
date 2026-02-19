@@ -603,17 +603,17 @@ try {
 
 // Model selection based on agent type
 function getModelForAgent(agentId: string): ChatAnthropic {
-  // Search agent uses fast Haiku model
-  if (agentId === 'search') {
+  // Demo uses Haiku for cost efficiency
+  if (agentId === 'demo') {
     return modelHaiku;
   }
-  // All other agents use Sonnet for complex reasoning
+  // KAI, Interior, and all other agents use Sonnet for complex reasoning
   return modelSonnet;
 }
 
 // Get model name for logging/tracking
 function getModelNameForAgent(agentId: string): string {
-  if (agentId === 'search') {
+  if (agentId === 'demo') {
     return 'claude-3-5-haiku-20241022';
   }
   return 'claude-sonnet-4-5-20250929';
@@ -694,6 +694,88 @@ const createSearchTool = (workspaceId: string) => {
       schema: z.object({
         query: z.string().describe('Search query - be specific and detailed'),
         limit: z.number().default(10).describe('Maximum number of results to return'),
+      }),
+    }
+  );
+};
+
+/**
+ * LangChain Tool: Visual Search using MIVAA API
+ * Sends user-attached images to MIVAA's image similarity endpoint (CLIP/SigLIP embeddings)
+ * Only created when images are actually attached to the request
+ */
+const createVisualSearchTool = (workspaceId: string, images: string[]) => {
+  return tool(
+    async ({ query }) => {
+      try {
+        // Use the first attached image
+        const imageDataUrl = images[0];
+        if (!imageDataUrl) {
+          return JSON.stringify({ error: 'No image provided by user' });
+        }
+
+        // Strip data URL prefix to get raw base64
+        const base64Data = imageDataUrl.split(',')[1];
+        if (!base64Data) {
+          return JSON.stringify({ error: 'Invalid image data format' });
+        }
+
+        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+        const url = new URL(`${MIVAA_GATEWAY_URL}/api/rag/search`);
+        url.searchParams.set('strategy', 'image');
+
+        console.log(`🖼️ Visual search: query="${query || ''}", workspace="${workspaceId}", image_size=${base64Data.length} chars`);
+        const startTime = Date.now();
+
+        const TIMEOUT_MS = 300000; // 5 minutes
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+        try {
+          const response = await fetch(url.toString(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: query || '',
+              workspace_id: workspaceId,
+              image_base64: base64Data,
+              top_k: 10,
+            }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          console.log(`⏱️ Visual search API responded in ${elapsed}ms`);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`❌ Visual search API error: ${response.status} - ${errorText}`);
+            throw new Error(`Visual search API error: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log(`✅ Visual search returned ${data.results?.length || 0} results`);
+          return JSON.stringify(data);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+            return JSON.stringify({ error: 'Visual search timeout', timeout: true });
+          }
+          throw fetchError;
+        }
+      } catch (error) {
+        console.error('Visual search error:', error);
+        return JSON.stringify({
+          error: error instanceof Error ? error.message : 'Visual search failed',
+        });
+      }
+    },
+    {
+      name: 'visual_search',
+      description: 'Search for visually similar materials using the user\'s uploaded image. Uses CLIP/SigLIP embeddings to find products matching the visual appearance, color, texture, and style of the image. Use this when the user attaches an image and wants to find similar materials, match colors, or identify products.',
+      schema: z.object({
+        query: z.string().default('').describe('Optional text description to refine visual search results'),
       }),
     }
   );
@@ -3673,29 +3755,26 @@ interface AgentConfig {
 
 // AGENT_CONFIGS: All systemPrompts are loaded from the database via getAgentSystemPrompt()
 // No hardcoded prompts - managed via /admin/ai-configs
+// Search + Insights + SEO merged into unified KAI agent
 const AGENT_CONFIGS: Record<string, AgentConfig> = {
-  search: {
-    id: 'search',
-    name: 'Search Agent',
-    description: 'Material search and discovery',
+  kai: {
+    id: 'kai',
+    name: 'KAI Agent',
+    description: 'Material intelligence — search, insights, research, analytics, SEO, and B2B',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['knowledge_base_search', 'material_search'],
-    // systemPrompt loaded from database
-  },
-  insights: {
-    id: 'insights',
-    name: 'Insights Agent',
-    description: 'Unified intelligence combining research, analytics, business, and product analysis with B2B research capabilities',
-    allowedRoles: ['admin', 'owner'],
     tools: [
-      // Sub-agent orchestration tools
-      'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis', 'material_search',
-      // B2B Research tools
-      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment', 'contact_discovery', 'email_validate', 'save_to_crm'
+      // Core tools (all users)
+      'knowledge_base_search', 'material_search', 'visual_search',
+      // Sub-agent orchestration (admin/owner only — gated at injection time)
+      'research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis',
+      // B2B Research (admin/owner only)
+      'b2b_manufacturer_search', 'company_website_scrape', 'company_enrichment',
+      'contact_discovery', 'email_validate', 'save_to_crm',
+      // SEO (admin/owner only)
+      'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
+      'seo_article_writer', 'seo_content_analyzer',
     ],
-    // systemPrompt loaded from database
-    // NOTE: This agent orchestrates sub-agents for specialized analysis tasks
-    // NOTE: B2B research tools enable manufacturer discovery and CRM integration
+    // systemPrompt loaded from database (key: 'kai')
   },
   demo: {
     id: 'demo',
@@ -3715,15 +3794,27 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
   },
-  seo: {
-    id: 'seo',
-    name: 'SEO Content Agent',
-    description: 'AI-powered SEO article generation with keyword research, planning, writing, and analysis',
+  // Legacy aliases — old frontends sending 'search', 'insights', or 'seo' route to KAI
+  search: {
+    id: 'kai',
+    name: 'KAI Agent',
+    description: 'Legacy alias → KAI',
+    allowedRoles: ['viewer', 'member', 'admin', 'owner'],
+    tools: [],
+  },
+  insights: {
+    id: 'kai',
+    name: 'KAI Agent',
+    description: 'Legacy alias → KAI',
     allowedRoles: ['admin', 'owner'],
-    tools: ['create_seo_article', 'seo_keyword_research', 'seo_article_planner', 'seo_article_writer', 'seo_content_analyzer'],
-    // systemPrompt loaded from database
-    // NOTE: create_seo_article runs the full async pipeline (research → plan → write → analyze)
-    // NOTE: Individual tools allow step-by-step control for advanced users
+    tools: [],
+  },
+  seo: {
+    id: 'kai',
+    name: 'KAI Agent',
+    description: 'Legacy alias → KAI',
+    allowedRoles: ['admin', 'owner'],
+    tools: [],
   },
 };
 
@@ -3739,7 +3830,8 @@ async function executeAgent(
   userId: string,
   userInput: string,
   messages: any[],
-  // REMOVED: pdfFile parameter - pdf-processor agent removed
+  images: string[], // User-attached images as data URLs
+  userRole: string, // User's workspace role for RBAC tool gating
   onChunk?: (chunk: any) => void
 ): Promise<{
   text: string;
@@ -3761,9 +3853,16 @@ async function executeAgent(
     turnCount: number;
   };
 }> {
-  const config = AGENT_CONFIGS[agentId];
+  let config = AGENT_CONFIGS[agentId];
   if (!config) {
     throw new Error(`Unknown agent: ${agentId}`);
+  }
+
+  // Resolve legacy aliases (search/insights/seo → kai)
+  if (config.id !== agentId) {
+    console.log(`🔄 Legacy alias: ${agentId} → ${config.id}`);
+    agentId = config.id;
+    config = AGENT_CONFIGS[agentId];
   }
 
   // Collect material results from search tool calls
@@ -3822,29 +3921,30 @@ async function executeAgent(
     }
   }
 
-  // Bind tools based on agent configuration
+  // Bind tools based on agent configuration with RBAC gating
   const tools: any[] = [];
+  const isAdmin = userRole === 'admin' || userRole === 'owner';
 
-  // DYNAMIC TOOL INJECTION: Only add material_search if user explicitly asks for it
-  console.log(`🔧 Tool injection starting for agent: ${agentId}`);
+  console.log(`🔧 Tool injection starting for agent: ${agentId}, role: ${userRole}, isAdmin: ${isAdmin}`);
   console.log(`📝 User input: "${userInput}"`);
-
-  const userInputLower = userInput.toLowerCase();
-  const materialSearchKeywords = ['find materials', 'search for materials', 'show me products', 'what materials', 'matching materials', 'search materials'];
-  const shouldEnableMaterialSearch = materialSearchKeywords.some(keyword => userInputLower.includes(keyword));
-
-  console.log(`🔍 Should enable material search: ${shouldEnableMaterialSearch}`);
   console.log(`🛠️ Agent tools config: ${JSON.stringify(config.tools)}`);
+  console.log(`🖼️ Attached images: ${images.length}`);
 
-  // Knowledge Base search - always add first for Search Agent to check KB before answering
+  // --- Core tools (all users) ---
+
+  // Knowledge Base search - always add first so agent checks KB before answering
   if (config.tools.includes('knowledge_base_search')) {
     console.log(`📚 Knowledge Base search enabled for ${agentId}`);
     tools.push(createKnowledgeBaseSearchTool(workspaceId));
   }
 
+  // Material search (text-based 7-vector fusion)
   if (config.tools.includes('material_search')) {
-    // For Interior Designer: Only add tool if user explicitly asks
+    // For Interior Designer: Only add tool if user explicitly asks for materials
     if (agentId === 'interior-designer') {
+      const userInputLower = userInput.toLowerCase();
+      const materialSearchKeywords = ['find materials', 'search for materials', 'show me products', 'what materials', 'matching materials', 'search materials'];
+      const shouldEnableMaterialSearch = materialSearchKeywords.some(keyword => userInputLower.includes(keyword));
       if (shouldEnableMaterialSearch) {
         console.log('✅ Material search enabled for Interior Designer (user explicitly asked)');
         tools.push(createSearchTool(workspaceId));
@@ -3852,56 +3952,29 @@ async function executeAgent(
         console.log('⏭️ Material search disabled for Interior Designer (user did not ask for materials)');
       }
     } else {
-      // For other agents: Always add the tool
-      console.log(`✅ Material search enabled for ${agentId} (always available)`);
+      // For KAI and other agents: Always available (LLM decides when to use)
+      console.log(`✅ Material search enabled for ${agentId}`);
       tools.push(createSearchTool(workspaceId));
     }
   }
 
-  // REMOVED: PDF processing tools - moved to /admin/data-import page
-  // - uploadPDF
-  // - checkJobStatus
-  // - getStageDetails
-  // - getRelationshipCounts
-  // - getDocumentEntities
-  // - getMetadataExtraction
-  if (config.tools.includes('queryDatabase')) {
-    tools.push(createQueryDatabaseTool());
+  // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
+  if (config.tools.includes('visual_search') && images.length > 0) {
+    console.log(`🖼️ Visual search enabled for ${agentId} (${images.length} image(s) attached)`);
+    tools.push(createVisualSearchTool(workspaceId, images));
   }
-  if (config.tools.includes('checkServerHealth')) {
-    tools.push(createCheckServerHealthTool());
-  }
-  if (config.tools.includes('querySentry')) {
-    tools.push(createQuerySentryTool());
-  }
+
+  // --- Interior Designer tools ---
   if (config.tools.includes('spaceformer_analysis')) {
     tools.push(createSpaceformerTool(workspaceId));
   }
-  // Interior design generation with streaming progress
   if (config.tools.includes('generate_3d')) {
     tools.push(create3DGenerationTool(userId, workspaceId, onChunk));
-    // Also add status check tool when generation is available
     tools.push(createGenerationStatusTool());
   }
-  if (config.tools.includes('estimate_cost')) {
-    tools.push(createCostEstimationTool(workspaceId));
-  }
 
-  // Sub-agent tools for Insights Agent orchestration
-  if (config.tools.includes('research_analysis')) {
-    tools.push(createResearchAnalysisTool(workspaceId));
-  }
-  if (config.tools.includes('analytics_analysis')) {
-    tools.push(createAnalyticsAnalysisTool());
-  }
-  if (config.tools.includes('business_analysis')) {
-    tools.push(createBusinessAnalysisTool(workspaceId));
-  }
-  if (config.tools.includes('product_analysis')) {
-    tools.push(createProductAnalysisTool(workspaceId));
-  }
+  // --- Admin-only tools (gated by RBAC) ---
 
-  // B2B Research tools for Insights Agent
   // Create progress callback wrapper for streaming updates during long operations
   const sendProgress = (status: string) => {
     try {
@@ -3915,43 +3988,76 @@ async function executeAgent(
     }
   };
 
-  if (config.tools.includes('b2b_manufacturer_search')) {
-    tools.push(createB2BManufacturerSearchTool(userId, sendProgress));
-  }
-  if (config.tools.includes('company_website_scrape')) {
-    tools.push(createCompanyWebsiteScrapeTool(userId, sendProgress));
-  }
-  if (config.tools.includes('company_enrichment')) {
-    tools.push(createCompanyEnrichmentTool(userId, sendProgress));
-  }
-  if (config.tools.includes('contact_discovery')) {
-    tools.push(createContactDiscoveryTool(userId, sendProgress));
-  }
-  if (config.tools.includes('email_validate')) {
-    tools.push(createEmailValidateTool(userId, sendProgress));
-  }
-  if (config.tools.includes('save_to_crm')) {
-    tools.push(createSaveToCRMTool(userId, sendProgress));
+  if (isAdmin) {
+    // Sub-agent orchestration tools
+    if (config.tools.includes('research_analysis')) {
+      tools.push(createResearchAnalysisTool(workspaceId));
+    }
+    if (config.tools.includes('analytics_analysis')) {
+      tools.push(createAnalyticsAnalysisTool());
+    }
+    if (config.tools.includes('business_analysis')) {
+      tools.push(createBusinessAnalysisTool(workspaceId));
+    }
+    if (config.tools.includes('product_analysis')) {
+      tools.push(createProductAnalysisTool(workspaceId));
+    }
+
+    // B2B Research tools
+    if (config.tools.includes('b2b_manufacturer_search')) {
+      tools.push(createB2BManufacturerSearchTool(userId, sendProgress));
+    }
+    if (config.tools.includes('company_website_scrape')) {
+      tools.push(createCompanyWebsiteScrapeTool(userId, sendProgress));
+    }
+    if (config.tools.includes('company_enrichment')) {
+      tools.push(createCompanyEnrichmentTool(userId, sendProgress));
+    }
+    if (config.tools.includes('contact_discovery')) {
+      tools.push(createContactDiscoveryTool(userId, sendProgress));
+    }
+    if (config.tools.includes('email_validate')) {
+      tools.push(createEmailValidateTool(userId, sendProgress));
+    }
+    if (config.tools.includes('save_to_crm')) {
+      tools.push(createSaveToCRMTool(userId, sendProgress));
+    }
+
+    // SEO Article Pipeline tools
+    if (config.tools.includes('seo_keyword_research')) {
+      tools.push(createSEOKeywordResearchTool(userId, sendProgress));
+    }
+    if (config.tools.includes('seo_article_planner')) {
+      tools.push(createSEOArticlePlannerTool(userId, sendProgress));
+    }
+    if (config.tools.includes('seo_article_writer')) {
+      tools.push(createSEOArticleWriterTool(userId, sendProgress));
+    }
+    if (config.tools.includes('seo_content_analyzer')) {
+      tools.push(createSEOContentAnalyzerTool(userId, sendProgress));
+    }
+    if (config.tools.includes('create_seo_article')) {
+      tools.push(createSEOPipelineTool(userId, onChunk));
+    }
   }
 
-  // SEO Article Pipeline tools
-  if (config.tools.includes('seo_keyword_research')) {
-    tools.push(createSEOKeywordResearchTool(userId, sendProgress));
+  // --- Legacy/utility tools ---
+  if (config.tools.includes('queryDatabase')) {
+    tools.push(createQueryDatabaseTool());
   }
-  if (config.tools.includes('seo_article_planner')) {
-    tools.push(createSEOArticlePlannerTool(userId, sendProgress));
+  if (config.tools.includes('checkServerHealth')) {
+    tools.push(createCheckServerHealthTool());
   }
-  if (config.tools.includes('seo_article_writer')) {
-    tools.push(createSEOArticleWriterTool(userId, sendProgress));
+  if (config.tools.includes('querySentry')) {
+    tools.push(createQuerySentryTool());
   }
-  if (config.tools.includes('seo_content_analyzer')) {
-    tools.push(createSEOContentAnalyzerTool(userId, sendProgress));
-  }
-  if (config.tools.includes('create_seo_article')) {
-    tools.push(createSEOPipelineTool(userId, onChunk));
+  if (config.tools.includes('estimate_cost')) {
+    tools.push(createCostEstimationTool(workspaceId));
   }
 
-  // Select model based on agent type (Haiku for search, Sonnet for complex tasks)
+  console.log(`🔧 Total tools injected: ${tools.length} (${tools.map(t => t.name).join(', ')})`);
+
+  // Select model based on agent type
   const selectedModel = getModelForAgent(agentId);
   const modelName = getModelNameForAgent(agentId);
   console.log(`🤖 Using model: ${modelName} for agent: ${agentId}`);
@@ -3972,9 +4078,25 @@ async function executeAgent(
   // Create the agent graph
   const agentGraph = createAgentGraph(selectedModel, tools, onChunk);
 
-  // Convert messages to LangChain format
-  const langchainMessages = messages.map((msg: any) => {
+  // Convert messages to LangChain format, with multimodal support for images
+  const lastUserMsgIndex = messages.reduce((last: number, msg: any, i: number) =>
+    msg.role === 'user' ? i : last, -1);
+
+  const langchainMessages = messages.map((msg: any, idx: number) => {
     if (msg.role === 'user') {
+      // For the last user message, attach images as multimodal content blocks
+      if (idx === lastUserMsgIndex && images.length > 0) {
+        const content: any[] = [{ type: 'text', text: msg.content || '' }];
+        for (const img of images) {
+          // img is a data URL like "data:image/jpeg;base64,/9j/4AAQ..."
+          content.push({
+            type: 'image_url',
+            image_url: { url: img },
+          });
+        }
+        console.log(`🖼️ Multimodal message: ${content.length - 1} image(s) attached to last user message`);
+        return new HumanMessage({ content });
+      }
       return new HumanMessage(msg.content);
     } else if (msg.role === 'assistant') {
       return new AIMessage(msg.content);
@@ -4311,8 +4433,8 @@ Deno.serve(async (req) => {
     console.log('🎯 Handler started - parsing request body...');
 
     // Get request body
-    const { messages = [], agentId = 'search' } = await req.json();
-    // REMOVED: pdfFile - pdf-processor agent removed, use /admin/data-import instead
+    const { messages = [], agentId = 'kai', images = [] } = await req.json();
+    // images: string[] — user-attached images as data URLs (data:image/jpeg;base64,...)
 
     console.log('✅ Request body parsed successfully');
 
@@ -4453,6 +4575,8 @@ Deno.serve(async (req) => {
               userId,
               userInput,
               anthropicMessages,
+              images, // User-attached images as data URLs
+              role as string, // User's workspace role for RBAC tool gating
               // Streaming callback with safe enqueue
               (chunk: any) => {
                 if (!streamClosed) {

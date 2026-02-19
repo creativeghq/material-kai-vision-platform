@@ -7,8 +7,6 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Bot,
   Search,
-  BarChart3,
-  Briefcase,
   Package,
   Settings,
   Send,
@@ -23,8 +21,6 @@ import {
   ThumbsUp,
   ThumbsDown,
   Trash2,
-  Lightbulb,
-  FileText,
 } from 'lucide-react';
 import { logger } from '@/config';
 
@@ -68,24 +64,14 @@ interface AgentDefinition {
 
 const AGENTS: AgentDefinition[] = [
   {
-    id: 'search',
-    name: 'Search',
-    description: 'Material search and discovery',
-    icon: Search,
+    id: 'kai',
+    name: 'KAI',
+    description: 'Material intelligence — search, insights, research & content',
+    icon: Bot,
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-haiku-4-5-20251001', // Fast, cost-effective for search
-  },
-  {
-    id: 'insights',
-    name: 'Insights',
-    description: 'Research, analytics, business & product intelligence',
-    icon: Lightbulb,
-    color: 'text-amber-500',
-    requiredRole: 'admin',
-    available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Balanced for analysis
+    defaultModel: 'anthropic/claude-sonnet-4-5-20250929',
   },
   {
     id: 'interior-designer',
@@ -95,17 +81,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Creative tasks need better model
-  },
-  {
-    id: 'seo',
-    name: 'SEO',
-    description: 'AI-powered SEO article generation',
-    icon: FileText,
-    color: 'text-emerald-500',
-    requiredRole: 'admin',
-    available: true,
-    defaultModel: 'anthropic/claude-sonnet-4-5-20250929', // Quality writing needs Sonnet
+    defaultModel: 'anthropic/claude-sonnet-4-5-20250929',
   },
   {
     id: 'demo',
@@ -115,7 +91,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-cyan-500',
     requiredRole: 'admin',
     available: true,
-    defaultModel: 'anthropic/claude-haiku-4-5-20251001', // Demo doesn't need expensive model
+    defaultModel: 'anthropic/claude-haiku-4-5-20251001',
   },
 ];
 
@@ -219,10 +195,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   onMaterialSelect,
 }) => {
   const { toast } = useToast();
-  const [selectedAgent, setSelectedAgent] = useState<string>('search');
-  // Initialize with search agent's default model
+  const [selectedAgent, setSelectedAgent] = useState<string>('kai');
+  // Initialize with KAI agent's default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'search')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929'
+    AGENTS.find(a => a.id === 'kai')?.defaultModel || 'anthropic/claude-sonnet-4-5-20250929'
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeGenerationJobs, setActiveGenerationJobs] = useState<Map<string, any>>(new Map());
@@ -648,7 +624,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Check cache for similar queries (only for search-type queries without images)
       const workspaceId = session.user?.user_metadata?.workspace_id;
-      const canUseCache = attachedImages.length === 0 && selectedAgent === 'search';
+      const canUseCache = attachedImages.length === 0 && selectedAgent === 'kai';
       let data: any = null;
 
       if (canUseCache) {

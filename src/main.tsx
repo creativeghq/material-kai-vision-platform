@@ -69,6 +69,9 @@ Sentry.init({
     // ResizeObserver errors (harmless)
     'ResizeObserver loop limit exceeded',
     'ResizeObserver loop completed with undelivered notifications',
+    // Vite HMR transient errors (dev only, not actionable)
+    /\[vite\] Failed to reload/,
+    'Failed to fetch dynamically imported module',
   ],
 });
 
