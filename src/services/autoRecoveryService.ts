@@ -8,9 +8,9 @@
  * - After 3 failures: Mark as failed and alert admin
  */
 
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { stuckJobDetector, StuckJob } from './stuckJobDetector';
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from '@sentry/react';
 
 export interface RecoveryResult {
   jobId: string;
@@ -31,7 +31,7 @@ export interface RecoveryReport {
 }
 
 export class AutoRecoveryService {
-  private supabase = createClient();
+  private supabase = supabase;
 
   /**
    * Run auto-recovery for all stuck jobs

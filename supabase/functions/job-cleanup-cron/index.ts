@@ -64,6 +64,7 @@ serve(async (req) => {
       .delete()
       .in('status', ['completed', 'failed'])
       .or(`completed_at.lt.${fiveDaysAgo},failed_at.lt.${fiveDaysAgo}`)
+      .limit(1000)
       .select('id');
 
     if (!bgError && bgJobs) {
@@ -80,6 +81,7 @@ serve(async (req) => {
       .delete()
       .in('status', ['completed', 'failed'])
       .lt('updated_at', fiveDaysAgo)
+      .limit(1000)
       .select('id');
 
     if (!scrapingError && scrapingSessions) {
@@ -97,6 +99,7 @@ serve(async (req) => {
       .in('status', ['completed', 'failed'])
       .eq('is_scheduled', false) // Don't delete scheduled jobs
       .lt('updated_at', fiveDaysAgo)
+      .limit(1000)
       .select('id');
 
     if (!importError && importJobs) {
@@ -112,6 +115,7 @@ serve(async (req) => {
       .from('job_checkpoints')
       .delete()
       .lt('created_at', sevenDaysAgo)
+      .limit(1000)
       .select('id');
 
     if (!checkpointError && checkpoints) {
@@ -127,6 +131,7 @@ serve(async (req) => {
       .from('data_import_history')
       .delete()
       .lt('created_at', thirtyDaysAgo)
+      .limit(1000)
       .select('id');
 
     if (!historyError && importHistory) {

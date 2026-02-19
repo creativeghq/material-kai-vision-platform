@@ -14,8 +14,8 @@
 import { supabase } from '@/integrations/supabase/client';
 import { RetryHelper } from '@/utils/retryHelper';
 
-// MIVAA API Configuration - use environment variable directly
-const MIVAA_API_URL = process.env.MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
+// MIVAA API Configuration - use Vite environment variable
+const MIVAA_API_URL = import.meta.env.VITE_MIVAA_GATEWAY_URL || 'https://v1api.materialshub.gr';
 
 /**
  * MIVAA API Response Types

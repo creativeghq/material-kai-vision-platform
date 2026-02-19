@@ -68,8 +68,10 @@ serve(async (req) => {
 
     for (const job of scheduledJobs as ScheduledJob[]) {
       try {
-        // Fetch XML from source URL
-        const xmlResponse = await fetch(job.source_url);
+        // Fetch XML from source URL (30s timeout)
+        const fetchController = new AbortController();
+        const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000);
+        const xmlResponse = await fetch(job.source_url, { signal: fetchController.signal }).finally(() => clearTimeout(fetchTimeout));
         if (!xmlResponse.ok) {
           throw new Error(`Failed to fetch XML: ${xmlResponse.statusText}`);
         }

@@ -183,6 +183,8 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
 
   console.log('Making Firecrawl v2 preview request to:', url);
 
+  const fetchController = new AbortController();
+  const fetchTimeout = setTimeout(() => fetchController.abort(), 60_000); // 60s for Firecrawl
   const response = await fetch('https://api.firecrawl.dev/v2/scrape', {
     method: 'POST',
     headers: {
@@ -190,7 +192,8 @@ async function scrapePreviewWithFirecrawl(url: string, options: any): Promise<{ 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(requestBody),
-  });
+    signal: fetchController.signal,
+  }).finally(() => clearTimeout(fetchTimeout));
 
   if (!response.ok) {
     const errorText = await response.text();

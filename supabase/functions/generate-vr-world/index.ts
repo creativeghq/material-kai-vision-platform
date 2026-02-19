@@ -194,18 +194,22 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[generate-vr-world] Error:', error);
 
-    // Update record as failed
+    // Update record as failed and refund credits
     if (vrWorldId) {
-      await supabase
-        .from('vr_worlds')
-        .update({
-          status: 'failed',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', vrWorldId);
+      try {
+        await supabase
+          .from('vr_worlds')
+          .update({
+            status: 'failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', vrWorldId);
+      } catch (updateError) {
+        console.error('[generate-vr-world] Failed to update status:', updateError);
+      }
 
-      // Refund credits
+      // Refund credits (always runs even if status update fails)
       try {
         const { data: vrRecord } = await supabase
           .from('vr_worlds')

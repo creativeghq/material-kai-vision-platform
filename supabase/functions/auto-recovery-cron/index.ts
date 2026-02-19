@@ -113,7 +113,8 @@ async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
     .select('*')
     .eq('status', 'processing')
     .eq('job_type', 'product_discovery_upload')
-    .lt('last_heartbeat', tenMinutesAgo);
+    .lt('last_heartbeat', tenMinutesAgo)
+    .limit(100);
 
   if (error) {
     console.error('[AutoRecoveryCron] Error detecting stuck PDF jobs:', error);
@@ -139,7 +140,8 @@ async function detectStuckScrapingJobs(supabase: any): Promise<StuckJob[]> {
     .from('scraping_sessions')
     .select('*')
     .eq('status', 'processing')
-    .lt('last_heartbeat_at', fiveMinutesAgo);
+    .lt('last_heartbeat_at', fiveMinutesAgo)
+    .limit(100);
 
   if (error) {
     console.error('[AutoRecoveryCron] Error detecting stuck scraping jobs:', error);
@@ -166,7 +168,8 @@ async function detectStuckXmlJobs(supabase: any): Promise<StuckJob[]> {
     .select('*')
     .eq('status', 'processing')
     .eq('job_type', 'xml_import')
-    .lt('created_at', thirtyMinutesAgo);
+    .lt('created_at', thirtyMinutesAgo)
+    .limit(100);
 
   if (error) {
     console.error('[AutoRecoveryCron] Error detecting stuck XML jobs:', error);

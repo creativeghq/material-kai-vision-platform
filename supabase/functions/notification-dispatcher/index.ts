@@ -58,6 +58,8 @@ async function sendPushNotifications(
       try {
         // Use web-push library (would need to be imported)
         // For now, we'll use fetch directly to the push service
+        const pushController = new AbortController();
+        const pushTimeout = setTimeout(() => pushController.abort(), 15_000);
         const response = await fetch(sub.endpoint, {
           method: 'POST',
           headers: {
@@ -73,7 +75,8 @@ async function sendPushNotifications(
               data: notification.data,
             },
           }),
-        });
+          signal: pushController.signal,
+        }).finally(() => clearTimeout(pushTimeout));
 
         if (!response.ok) {
           throw new Error(`Push failed: ${response.status} ${response.statusText}`);
@@ -149,11 +152,14 @@ async function sendWebhooks(
             headers['X-Webhook-Signature'] = `sha256=${signature}`;
           }
 
+          const whController = new AbortController();
+          const whTimeout = setTimeout(() => whController.abort(), 15_000);
           const response = await fetch(webhook.url, {
             method: 'POST',
             headers,
             body: JSON.stringify(payload),
-          });
+            signal: whController.signal,
+          }).finally(() => clearTimeout(whTimeout));
 
           if (!response.ok) {
             throw new Error(`Webhook failed: ${response.status} ${response.statusText}`);

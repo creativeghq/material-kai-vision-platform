@@ -32,7 +32,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/core/ui/alert-dialog';
 
-import { useToast } from '../../hooks/useToast';
+import { useToast } from '@/hooks/use-toast';
 
 // Types for job management
 export interface JobItem {

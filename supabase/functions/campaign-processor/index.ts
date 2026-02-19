@@ -13,7 +13,8 @@ serve(async (req) => {
   try {
     // Verify this is a cron request
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.includes(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '')) {
+    const expectedKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    if (!authHeader || authHeader !== `Bearer ${expectedKey}`) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },

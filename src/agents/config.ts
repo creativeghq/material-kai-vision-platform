@@ -29,22 +29,14 @@ export interface AgentAccessConfig {
  * These must match the AGENT_CONFIGS in supabase/functions/agent-chat/index.ts
  */
 export const agentAccessControl: Record<string, AgentAccessConfig> = {
-  search: {
-    id: 'search',
-    name: 'Search Agent',
-    description: 'RAG-powered knowledge base search for materials and products',
+  kai: {
+    id: 'kai',
+    name: 'KAI Agent',
+    description: 'Material intelligence — search, insights, research, analytics, SEO, and B2B',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     isDefault: true,
-    icon: 'Search',
+    icon: 'Bot',
     color: 'text-blue-500',
-  },
-  insights: {
-    id: 'insights',
-    name: 'Insights Agent',
-    description: 'Unified intelligence combining research, analytics, business, and product analysis',
-    allowedRoles: ['admin', 'owner'],
-    icon: 'Lightbulb',
-    color: 'text-amber-500',
   },
   'interior-designer': {
     id: 'interior-designer',

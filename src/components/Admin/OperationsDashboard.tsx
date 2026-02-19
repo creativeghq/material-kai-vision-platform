@@ -1041,7 +1041,7 @@ export const OperationsDashboard: React.FC = () => {
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">
-                              {chat.metadata?.agentId || 'search'}
+                              {chat.metadata?.agentId || 'kai'}
                             </Badge>
                           </TableCell>
                           <TableCell>

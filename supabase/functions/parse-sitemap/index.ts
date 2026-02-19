@@ -36,12 +36,15 @@ serve(async (req) => {
 
     console.log(`Parsing sitemap: ${sitemapUrl}`);
 
-    // Fetch the sitemap directly from the server
+    // Fetch the sitemap directly from the server (30s timeout)
+    const fetchController = new AbortController();
+    const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000);
     const response = await fetch(sitemapUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Material-Scraper/1.0)',
       },
-    });
+      signal: fetchController.signal,
+    }).finally(() => clearTimeout(fetchTimeout));
 
     if (!response.ok) {
       throw new Error(`Failed to fetch sitemap: ${response.status} ${response.statusText}`);
