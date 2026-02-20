@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Palette, FileText } from 'lucide-react';
+import { Plus, Palette, FileText, Trash2, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import {
@@ -19,6 +19,12 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/core/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import {
   moodboardAPI,
@@ -254,92 +260,106 @@ export const MoodBoardPage = () => {
           {moodboards.map((board) => (
             <DashboardCard
               key={board.id}
-              className={`group cursor-pointer ${
-                viewMode === 'list' ? 'flex flex-row' : ''
-              }`}
+              className="cursor-pointer overflow-hidden p-0"
               hover={true}
             >
+              {/* Material Preview Grid */}
               <div
-                className={viewMode === 'list' ? 'flex-1' : ''}
+                className="h-36 grid grid-cols-2 grid-rows-2 gap-px bg-border overflow-hidden"
                 onClick={() => navigate(`/moodboard/${board.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    navigate(`/moodboard/${board.id}`);
-                  }
-                }}
                 role="button"
                 tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/moodboard/${board.id}`); }}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="truncate">{board.title}</CardTitle>
-                      {board.description && (
-                        <CardDescription className="mt-1 line-clamp-2">
-                          {board.description}
-                        </CardDescription>
-                      )}
+                {(() => {
+                  const previews = (board.items || []).filter(i => i.material?.thumbnail_url).slice(0, 4);
+                  if (previews.length === 0) {
+                    return (
+                      <div className="col-span-2 row-span-2 flex items-center justify-center bg-gradient-to-br from-primary/10 to-muted">
+                        <Palette className="h-10 w-10 text-primary/30" />
+                      </div>
+                    );
+                  }
+                  return previews.map((item, idx) => (
+                    <div key={item.id} className={`overflow-hidden bg-muted ${previews.length === 1 ? 'col-span-2 row-span-2' : previews.length === 2 ? 'row-span-2' : ''}`}>
+                      <img
+                        src={item.material!.thumbnail_url}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
                     </div>
-                    <div className="flex gap-1 ml-2">
-                      {board.isPublic ? (
-                        <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-100 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
-                          Public
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full border border-gray-300 px-2.5 py-0.5 text-xs font-semibold text-gray-700">
-                          Private
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{board.items?.length || 0} materials</span>
-                    <span>
-                      {new Date(board.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
+                  ));
+                })()}
+              </div>
 
-                  <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      className="flex-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCreateProposal(board.id, board.title);
-                      }}
-                      disabled={!board.items || board.items.length === 0 || creatingProposal === board.id}
-                      style={{
-                        backgroundColor: 'hsl(var(--primary))',
-                        color: 'white',
-                      }}
-                    >
-                      {creatingProposal === board.id ? (
-                        <>Creating...</>
-                      ) : (
-                        <>
-                          <FileText className="h-4 w-4 mr-2" />
-                          Create Proposal
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteMoodBoard(board.id, board.title);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.stopPropagation();
-                          handleDeleteMoodBoard(board.id, board.title);
-                        }
-                      }}
-                    >
-                      Delete
-                    </Button>
+              {/* Card Body */}
+              <div
+                className="p-4 pb-2"
+                onClick={() => navigate(`/moodboard/${board.id}`)}
+                role="button"
+                tabIndex={-1}
+                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/moodboard/${board.id}`); }}
+              >
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <h3 className="font-semibold text-sm truncate flex-1">{board.title}</h3>
+                  <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full border font-medium ${
+                    board.isPublic
+                      ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400'
+                      : 'bg-muted border-border text-muted-foreground'
+                  }`}>
+                    {board.isPublic ? 'Public' : 'Private'}
+                  </span>
+                </div>
+                {board.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-1 mb-1">{board.description}</p>
+                )}
+                <p className="text-xs text-muted-foreground">{board.items?.length || 0} materials</p>
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex items-center justify-between px-4 py-2 border-t border-border">
+                <span className="text-xs text-muted-foreground">
+                  {new Date(board.createdAt).toLocaleDateString()}
+                </span>
+                <TooltipProvider>
+                  <div className="flex gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCreateProposal(board.id, board.title);
+                          }}
+                          disabled={!board.items || board.items.length === 0 || creatingProposal === board.id}
+                        >
+                          {creatingProposal === board.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <FileText className="h-4 w-4" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Create Proposal</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMoodBoard(board.id, board.title);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Delete</TooltipContent>
+                    </Tooltip>
                   </div>
-                </CardContent>
+                </TooltipProvider>
               </div>
             </DashboardCard>
           ))}

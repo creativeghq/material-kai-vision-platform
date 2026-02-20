@@ -609,6 +609,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       // Create or get conversation
       let conversationId = currentConversationId;
+      let newConversation: ChatConversation | null = null;
       if (!conversationId) {
         const conversation = await agentChatHistoryService.createConversation({
           title: userInput.slice(0, 50) + (userInput.length > 50 ? '...' : ''),
@@ -618,14 +619,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         if (conversation) {
           conversationId = conversation.id;
           setCurrentConversationId(conversationId);
-          // Add to conversations list, ensuring no duplicates
-          setConversations((prev) => {
-            // Check if conversation already exists (prevent duplicates)
-            if (prev.some(c => c.id === conversation.id)) {
-              return prev;
-            }
-            return [conversation, ...prev];
-          });
+          newConversation = conversation;
         }
       }
 
@@ -636,6 +630,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           role: 'user',
           content: userInput,
         });
+        // Add to sidebar only after message is saved (messageCount > 0 in DB)
+        // This prevents empty conversations from appearing in history on page load
+        if (newConversation) {
+          setConversations((prev) => {
+            if (prev.some(c => c.id === newConversation!.id)) return prev;
+            return [newConversation!, ...prev];
+          });
+        }
       }
 
       // Check cache for similar queries (only for search-type queries without images)

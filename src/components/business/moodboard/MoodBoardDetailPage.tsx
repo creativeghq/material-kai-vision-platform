@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Upload, Trash2, Edit, Loader2, Plus } from 'lucide-react';
+import { ArrowLeft, Search, Upload, Trash2, Edit, Loader2, Plus, FileText } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/core/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import type { MoodBoard, MoodBoardItem } from '@/types/materials';
@@ -11,6 +17,7 @@ import { DashboardCard } from '@/components/core/DesignSystem/DashboardCard';
 import { ProductDetailModal } from '@/components/features/products/ProductDetailModal';
 import type { Product } from '@/components/features/products/types';
 import { RecommendationsService } from '@/services/recommendationsService';
+import { quotesService } from '@/services/quotes/QuotesService';
 
 export const MoodBoardDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +30,7 @@ export const MoodBoardDetailPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [creatingProposal, setCreatingProposal] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -51,6 +59,51 @@ export const MoodBoardDetailPage: React.FC = () => {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteMoodboard = async () => {
+    if (!moodboard) return;
+    if (!confirm(`Are you sure you want to delete "${moodboard.title}"?`)) return;
+    try {
+      await moodboardAPI.deleteMoodBoard(moodboard.id);
+      toast({ title: 'Deleted', description: `"${moodboard.title}" has been deleted` });
+      navigate('/moodboard');
+    } catch (error) {
+      console.error('Error deleting moodboard:', error);
+      toast({ title: 'Error', description: 'Failed to delete moodboard', variant: 'destructive' });
+    }
+  };
+
+  const handleCreateProposal = async () => {
+    if (!moodboard || items.length === 0) {
+      toast({ title: 'Error', description: 'Cannot create proposal from an empty moodboard', variant: 'destructive' });
+      return;
+    }
+    setCreatingProposal(true);
+    try {
+      const quote = await quotesService.createQuote({
+        name: `Proposal from ${moodboard.title}`,
+        notes: `Created from moodboard: ${moodboard.title}`,
+      });
+      for (const item of items) {
+        if (item.material_id) {
+          await quotesService.addItem({
+            quote_id: quote.id,
+            product_id: item.material_id,
+            quantity: 1,
+            notes: item.notes || '',
+            added_from: 'moodboard',
+          });
+        }
+      }
+      toast({ title: 'Proposal Created', description: `Quote created with ${items.length} items` });
+      navigate(`/quotes?quote=${quote.id}`);
+    } catch (error) {
+      console.error('Error creating proposal:', error);
+      toast({ title: 'Error', description: 'Failed to create proposal', variant: 'destructive' });
+    } finally {
+      setCreatingProposal(false);
     }
   };
 
@@ -138,11 +191,38 @@ export const MoodBoardDetailPage: React.FC = () => {
               <p className="text-muted-foreground">{moodboard.description}</p>
             )}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon">
-              <Edit className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="flex gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCreateProposal}
+                    disabled={creatingProposal || items.length === 0}
+                  >
+                    {creatingProposal
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : <FileText className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Create Proposal</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={handleDeleteMoodboard}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete Moodboard</TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
       </div>
 

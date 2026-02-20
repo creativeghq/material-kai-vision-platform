@@ -159,7 +159,7 @@ Deno.serve(async (req) => {
       .from('vr_worlds')
       .update({
         world_id: world.id,
-        caption: world.caption || null,
+        caption: assets.caption || world.caption || null,
         splat_url_100k: assets.splat100k,
         splat_url_500k: assets.splat500k,
         splat_url_full: assets.splatFull,
@@ -272,8 +272,9 @@ async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }>
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      filename,
-      content_type: contentType,
+      file_name: filename,
+      kind: 'image',
+      extension: ext,
     }),
   });
 
@@ -283,17 +284,20 @@ async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }>
   }
 
   const prepareData = await prepareResponse.json();
-  const { media_asset_id, upload_url } = prepareData;
+  const mediaAssetId = prepareData.media_asset?.id;
+  const uploadUrl = prepareData.upload_info?.upload_url;
+  const requiredHeaders = prepareData.upload_info?.required_headers || {};
 
-  if (!upload_url || !media_asset_id) {
-    throw new Error('WorldLabs prepare-upload returned no upload_url or media_asset_id');
+  if (!uploadUrl || !mediaAssetId) {
+    throw new Error(`WorldLabs prepare-upload returned no upload_url or media_asset.id. Response: ${JSON.stringify(prepareData)}`);
   }
 
   // Upload the image to the signed URL
-  const uploadResponse = await fetch(upload_url, {
-    method: 'PUT',
+  const uploadResponse = await fetch(uploadUrl, {
+    method: prepareData.upload_info?.upload_method || 'PUT',
     headers: {
       'Content-Type': contentType,
+      ...requiredHeaders,
     },
     body: imageBlob,
   });
@@ -303,7 +307,7 @@ async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }>
     throw new Error(`WorldLabs image upload failed (${uploadResponse.status}): ${errText}`);
   }
 
-  return { id: media_asset_id };
+  return { id: mediaAssetId };
 }
 
 async function startWorldGeneration(
@@ -324,15 +328,14 @@ async function startWorldGeneration(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      display_name: prompt.length > 60 ? prompt.substring(0, 57) + '...' : prompt,
       world_prompt: {
         type: 'image',
-        sources: [
-          {
-            type: 'media_asset',
-            media_asset_id: mediaAssetId,
-          },
-        ],
-        text: prompt,
+        image_prompt: {
+          source: 'media_asset',
+          media_asset_id: mediaAssetId,
+        },
+        text_prompt: prompt,
       },
       model: modelMap[model] || 'Marble 0.1-mini',
     }),
@@ -414,7 +417,9 @@ async function fetchWorld(worldId: string): Promise<any> {
     throw new Error(`WorldLabs fetch world failed (${response.status}): ${errText}`);
   }
 
-  return await response.json();
+  // GET /worlds/{id} wraps the world in { "world": {...} }
+  const data = await response.json();
+  return data.world ?? data;
 }
 
 function extractAssetUrls(world: any): {
@@ -424,36 +429,18 @@ function extractAssetUrls(world: any): {
   colliderGlb?: string;
   panorama?: string;
   thumbnail?: string;
+  caption?: string;
 } {
-  const assets: any = {};
-
-  // WorldLabs returns assets in the world object
-  // Exact structure may vary - handle both flat and nested
-  if (world.assets) {
-    for (const asset of world.assets) {
-      const kind = asset.kind || asset.type || '';
-      const url = asset.url || asset.download_url;
-
-      if (kind.includes('splat') || kind.includes('spz')) {
-        if (kind.includes('100k')) assets.splat100k = url;
-        else if (kind.includes('500k')) assets.splat500k = url;
-        else assets.splatFull = url;
-      } else if (kind.includes('collider') || kind.includes('glb')) {
-        assets.colliderGlb = url;
-      } else if (kind.includes('panorama') || kind.includes('pano')) {
-        assets.panorama = url;
-      } else if (kind.includes('thumbnail') || kind.includes('thumb')) {
-        assets.thumbnail = url;
-      }
-    }
-  }
-
-  // Fallback: check direct properties
-  if (!assets.splatFull && world.splat_url) assets.splatFull = world.splat_url;
-  if (!assets.thumbnail && world.thumbnail_url) assets.thumbnail = world.thumbnail_url;
-  if (!assets.panorama && world.panorama_url) assets.panorama = world.panorama_url;
-
-  return assets;
+  const a = world.assets || {};
+  return {
+    splat100k:  a.splats?.spz_urls?.['100k'],
+    splat500k:  a.splats?.spz_urls?.['500k'],
+    splatFull:  a.splats?.spz_urls?.['full_res'],
+    colliderGlb: a.mesh?.collider_mesh_url,
+    panorama:   a.imagery?.pano_url,
+    thumbnail:  a.thumbnail_url,
+    caption:    a.caption,
+  };
 }
 
 function jsonResponse(body: any, status = 200): Response {

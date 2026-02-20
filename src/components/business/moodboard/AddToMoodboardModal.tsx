@@ -61,11 +61,23 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
     }
   };
 
+  const isValidUUID = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const handleAddToExisting = async () => {
     if (!selectedMoodboardId) {
       toast({
         title: 'Error',
         description: 'Please select a moodboard',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isValidUUID(productId)) {
+      toast({
+        title: 'Cannot Add Product',
+        description: 'Demo products cannot be added to moodboards',
         variant: 'destructive',
       });
       return;
@@ -99,6 +111,15 @@ export const AddToMoodboardModal: React.FC<AddToMoodboardModalProps> = ({
       toast({
         title: 'Error',
         description: 'Please enter a moodboard title',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!isValidUUID(productId)) {
+      toast({
+        title: 'Cannot Add Product',
+        description: 'Demo products cannot be added to moodboards',
         variant: 'destructive',
       });
       return;

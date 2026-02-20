@@ -24,25 +24,79 @@ export interface AddMoodBoardItemData {
 }
 
 class MoodBoardAPI {
-  // Get all moodboards for the current user
+  // Get all moodboards for the current user, with preview images for each
   async getUserMoodBoards(): Promise<MoodBoard[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
     const { data, error } = await supabase
       .from('moodboards')
-      .select('*')
+      .select(`
+        *,
+        moodboard_items(id, material_id, position, notes, added_at)
+      `)
+      .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
     if (error) throw error;
 
-    return data.map((board: any) => ({
-      id: board.id,
-      userId: board.user_id,
-      title: board.title,
-      description: board.description,
-      isPublic: board.is_public,
-      items: [], // Will be loaded separately when needed
-      createdAt: new Date(board.created_at),
-      updatedAt: new Date(board.updated_at),
-    }));
+    // Batch fetch preview images for the first 4 items of each moodboard
+    const allProductIds = new Set<string>();
+    for (const board of data || []) {
+      for (const item of (board.moodboard_items || []).slice(0, 4)) {
+        if (item.material_id) allProductIds.add(item.material_id);
+      }
+    }
+
+    const productImageMap: Record<string, string> = {};
+    if (allProductIds.size > 0) {
+      const { data: imageRelations } = await supabase
+        .from('product_image_relationships')
+        .select('product_id, image:document_images(image_url)')
+        .in('product_id', [...allProductIds])
+        .order('relevance_score', { ascending: false });
+
+      if (imageRelations) {
+        for (const rel of imageRelations) {
+          const imgData = rel.image as any;
+          if (!productImageMap[rel.product_id] && imgData?.image_url) {
+            productImageMap[rel.product_id] = imgData.image_url;
+          }
+        }
+      }
+    }
+
+    return (data || []).map((board: any) => {
+      const rawItems: Array<{ id: string; material_id: string; position: number; notes?: string; added_at: string }> =
+        (board.moodboard_items || []).sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0));
+
+      const items: MoodBoardItem[] = rawItems.map(item => ({
+        id: item.id,
+        moodboard_id: board.id,
+        material_id: item.material_id,
+        notes: item.notes,
+        position: item.position ?? 0,
+        added_at: item.added_at,
+        material: {
+          id: item.material_id,
+          name: '',
+          category: '',
+          thumbnail_url: productImageMap[item.material_id] || undefined,
+          properties: {},
+        },
+      }));
+
+      return {
+        id: board.id,
+        userId: board.user_id,
+        title: board.title,
+        description: board.description,
+        isPublic: board.is_public,
+        items,
+        createdAt: new Date(board.created_at),
+        updatedAt: new Date(board.updated_at),
+      };
+    });
   }
 
   // Get a specific moodboard by ID
