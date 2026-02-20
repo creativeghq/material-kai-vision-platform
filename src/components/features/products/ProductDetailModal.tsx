@@ -212,17 +212,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       if (!product?.id || !isAdmin || !isOpen) return;
 
       try {
-        // Embeddings are stored in separate tables/VECS, not in products table
-        // Skip embedding status check for now - these columns don't exist in products table
-        setEmbeddings({
-          text_embedding_1024: false,
-          visual_clip_embedding_512: false,
-          multimodal_fusion_embedding_2048: false,
-          color_embedding_256: false,
-          texture_embedding_256: false,
-          application_embedding_512: false,
-        });
-
         // Load chunks from chunk_product_relationships table
         const { data: chunkRelations, error: chunkError } = await supabase
           .from('chunk_product_relationships')
@@ -273,6 +262,43 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         setRelevanceCounts({
           chunks: chunkCount || 0,
           images: imageCount || 0,
+        });
+
+        // ── Embedding status (7-vector suite) ──────────────────────────────
+        // Text: exists whenever chunks were created (embedded together via Voyage AI)
+        const hasText = (chunkCount ?? 0) > 0;
+
+        // Visual SLIG + Phase 2: use get_product_embedding_status RPC.
+        // The Python backend sets has_slig_embedding / has_understanding_embedding /
+        // has_color_slig / has_texture_slig / has_style_slig / has_material_slig on
+        // document_images immediately after each successful VECS write — 100% accurate.
+        let hasVisualSlig = false;
+        let hasUnderstanding = false;
+        let hasColorSlig = false;
+        let hasTextureSlig = false;
+        let hasStyleSlig = false;
+        let hasMaterialSlig = false;
+
+        const { data: embStatus } = await supabase
+          .rpc('get_product_embedding_status', { p_product_id: product.id });
+
+        if (embStatus) {
+          hasVisualSlig    = (embStatus.has_slig_embedding ?? 0) > 0;
+          hasUnderstanding = (embStatus.has_understanding ?? 0) > 0;
+          hasColorSlig     = (embStatus.has_color_slig ?? 0) > 0;
+          hasTextureSlig   = (embStatus.has_texture_slig ?? 0) > 0;
+          hasStyleSlig     = (embStatus.has_style_slig ?? 0) > 0;
+          hasMaterialSlig  = (embStatus.has_material_slig ?? 0) > 0;
+        }
+
+        setEmbeddings({
+          'Text 1024D (Voyage)':          hasText,
+          'Visual SLIG 768D':             hasVisualSlig,
+          'Understanding 1024D (Voyage)': hasUnderstanding,
+          'Color SLIG 768D':              hasColorSlig,
+          'Texture SLIG 768D':            hasTextureSlig,
+          'Style SLIG 768D':              hasStyleSlig,
+          'Material SLIG 768D':           hasMaterialSlig,
         });
       } catch (error) {
         console.error('[ProductDetailModal] Failed to load admin data:', error);
@@ -1145,22 +1171,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Extraction Metadata</h3>
 
-            {/* Embeddings Summary */}
+            {/* Embeddings Summary — 7-vector suite */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Embeddings Attached</CardTitle>
+                <CardTitle className="text-base">7-Vector Embeddings</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {Object.entries(embeddings).map(([key, value]) => (
                     <div key={key} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                      <span className="text-sm font-medium">{key.replace(/_/g, ' ')}</span>
+                      <span className="text-sm font-medium">{key}</span>
                       <Badge variant={value ? 'default' : 'outline'}>
                         {value ? '✓' : '✗'}
                       </Badge>
                     </div>
                   ))}
                 </div>
+                {Object.values(embeddings).some(v => !v) && (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    ✗ = Phase 2 not yet run. Understanding + SLIG specialized embeddings are generated asynchronously after upload.
+                  </p>
+                )}
               </CardContent>
             </Card>
 
