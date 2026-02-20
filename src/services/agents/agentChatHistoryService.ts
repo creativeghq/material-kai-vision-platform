@@ -78,6 +78,9 @@ export class AgentChatHistoryService {
     }
   }
 
+  // Legacy agent IDs that were merged into 'kai'
+  private static readonly KAI_ALIASES = ['kai', 'search', 'insights', 'seo'];
+
   /**
    * Get user's conversations
    */
@@ -92,7 +95,9 @@ export class AgentChatHistoryService {
         .order('created_at', { ascending: false });
 
       if (agentId) {
-        query = query.eq('agent_id', agentId);
+        // 'kai' also covers legacy agent IDs that were merged into it
+        const ids = agentId === 'kai' ? AgentChatHistoryService.KAI_ALIASES : [agentId];
+        query = query.in('agent_id', ids);
       }
 
       const { data, error } = await query;

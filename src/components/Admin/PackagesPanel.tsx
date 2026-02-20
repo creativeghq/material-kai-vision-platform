@@ -37,56 +37,28 @@ import {
 } from '@/components/core/ui/select';
 
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Call MIVAA Gateway directly using fetch to avoid CORS issues
+ * Call MIVAA Gateway via the existing Supabase client (handles auth automatically).
  */
 async function callMivaaGatewayDirect(
   action: string,
   payload: any,
 ): Promise<any> {
-  const supabaseUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
-  const supabaseKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+  const { data, error } = await supabase.functions.invoke('mivaa-gateway', {
+    body: { action, payload },
+  });
 
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase configuration not found. Please check your environment variables.');
+  if (error) {
+    throw new Error(`MIVAA gateway request failed: ${error.message || 'Unknown error'}`);
   }
 
-  const url = `${supabaseUrl}/functions/v1/mivaa-gateway`;
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        action,
-        payload,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `MIVAA gateway request failed: HTTP ${response.status} ${response.statusText}`,
-      );
-    }
-
-    const data = await response.json();
-
-    // Check for application-level errors
-    if (!data.success && data.error) {
-      throw new Error(
-        `MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`,
-      );
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Direct MIVAA gateway call failed:', error);
-    throw error;
+  if (data && !data.success && data.error) {
+    throw new Error(`MIVAA gateway request failed: ${data.error.message || 'Unknown error'}`);
   }
+
+  return data;
 }
 
 // Package definitions

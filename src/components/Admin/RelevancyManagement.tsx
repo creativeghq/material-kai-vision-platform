@@ -6,9 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Filter,
   Search,
   Trash2,
@@ -57,19 +55,24 @@ interface ChunkProductRelationship {
   product_id: string;
   chunk_content: string;
   product_name: string;
-  relationship_type: 'source' | 'related' | 'component' | 'alternative';
+  relationship_type: string;
   relevance_score: number;
   created_at: string;
 }
 
+// image_product_associations has real per-component scores — no relationship_type column
 interface ProductImageRelationship {
   id: string;
   product_id: string;
   image_id: string;
   product_name: string;
   image_url: string;
-  relationship_type: 'depicts' | 'illustrates' | 'variant' | 'related';
-  relevance_score: number;
+  overall_score: number;
+  confidence: number;
+  spatial_score: number;
+  caption_score: number;
+  clip_score: number;
+  reasoning: string;
   created_at: string;
 }
 
@@ -79,13 +82,12 @@ interface ChunkImageRelationship {
   image_id: string;
   chunk_content: string;
   image_url: string;
-  relationship_type: 'illustrates' | 'depicts' | 'related' | 'example';
+  relationship_type: string;
   relevance_score: number;
   created_at: string;
 }
 
 export const RelevancyManagement: React.FC = () => {
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   // State
@@ -104,7 +106,7 @@ export const RelevancyManagement: React.FC = () => {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const itemsPerPage = 20;
 
   // Statistics
   const [stats, setStats] = useState({
@@ -113,35 +115,54 @@ export const RelevancyManagement: React.FC = () => {
     chunkImage: { total: 0, avgScore: 0 },
   });
 
-  // Load relationships
+  // On mount: load all three in parallel to populate stats cards and tab counts
+  useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      await Promise.all([
+        loadChunkProductRelationships('0.0', 'all'),
+        loadProductImageRelationships('0.0'),
+        loadChunkImageRelationships('0.0', 'all'),
+      ]).catch(err => {
+        console.error('Error during initial load:', err);
+        toast({ title: 'Error', description: 'Failed to load relationships', variant: 'destructive' });
+      });
+      setLoading(false);
+    };
+    loadAll();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // On filter/tab change: reload only the active tab and reset pagination
   useEffect(() => {
     loadRelationships();
+    setCurrentPage(1);
   }, [activeTab, minScore, relationshipType]);
+
+  // Reset page on search change too
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const loadRelationships = async () => {
     try {
       setLoading(true);
-
       if (activeTab === 'chunk-product') {
-        await loadChunkProductRelationships();
+        await loadChunkProductRelationships(minScore, relationshipType);
       } else if (activeTab === 'product-image') {
-        await loadProductImageRelationships();
+        await loadProductImageRelationships(minScore);
       } else {
-        await loadChunkImageRelationships();
+        await loadChunkImageRelationships(minScore, relationshipType);
       }
     } catch (error) {
       console.error('Error loading relationships:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load relationships',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to load relationships', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   };
 
-  const loadChunkProductRelationships = async () => {
+  const loadChunkProductRelationships = async (score: string, relType: string) => {
     let query = supabase
       .from('chunk_product_relationships')
       .select(`
@@ -154,87 +175,81 @@ export const RelevancyManagement: React.FC = () => {
         document_chunks!inner(content),
         products!inner(name)
       `)
-      .gte('relevance_score', parseFloat(minScore))
+      .gte('relevance_score', parseFloat(score))
       .order('relevance_score', { ascending: false })
       .limit(1000);
 
-    if (relationshipType !== 'all') {
-      query = query.eq('relationship_type', relationshipType);
+    if (relType !== 'all') {
+      query = query.eq('relationship_type', relType);
     }
 
     const { data, error } = await query;
-
     if (error) throw error;
 
-    const formatted = (data || []).map((item: any) => ({
+    const formatted: ChunkProductRelationship[] = (data || []).map((item: any) => ({
       id: item.id,
       chunk_id: item.chunk_id,
       product_id: item.product_id,
       chunk_content: item.document_chunks?.content || '',
       product_name: item.products?.name || '',
       relationship_type: item.relationship_type,
-      relevance_score: item.relevance_score,
+      relevance_score: item.relevance_score ?? 0,
       created_at: item.created_at,
     }));
 
     setChunkProductRels(formatted);
 
-    // Calculate stats
-    const avgScore = formatted.reduce((sum: number, r: ChunkProductRelationship) => sum + r.relevance_score, 0) / (formatted.length || 1);
-    setStats((prev) => ({
-      ...prev,
-      chunkProduct: { total: formatted.length, avgScore },
-    }));
+    const avgScore = formatted.reduce((sum, r) => sum + r.relevance_score, 0) / (formatted.length || 1);
+    setStats(prev => ({ ...prev, chunkProduct: { total: formatted.length, avgScore } }));
   };
 
-  const loadProductImageRelationships = async () => {
-    // ✅ UPDATED: Use image_product_associations table
-    let query = supabase
+  const loadProductImageRelationships = async (score: string) => {
+    // image_product_associations columns: overall_score, spatial_score, caption_score,
+    // clip_score, confidence, reasoning — there is NO relevance_score or relationship_type
+    const { data, error } = await supabase
       .from('image_product_associations')
       .select(`
         id,
         product_id,
         image_id,
-        reasoning,
         overall_score,
+        confidence,
+        spatial_score,
+        caption_score,
+        clip_score,
+        reasoning,
         created_at,
         products!inner(name),
         document_images!inner(image_url)
       `)
-      .gte('relevance_score', parseFloat(minScore))
-      .order('relevance_score', { ascending: false })
+      .gte('overall_score', parseFloat(score))
+      .order('overall_score', { ascending: false })
       .limit(1000);
-
-    if (relationshipType !== 'all') {
-      query = query.eq('relationship_type', relationshipType);
-    }
-
-    const { data, error } = await query;
 
     if (error) throw error;
 
-    const formatted = (data || []).map((item: any) => ({
+    const formatted: ProductImageRelationship[] = (data || []).map((item: any) => ({
       id: item.id,
       product_id: item.product_id,
       image_id: item.image_id,
       product_name: item.products?.name || '',
       image_url: item.document_images?.image_url || '',
-      relationship_type: item.relationship_type,
-      relevance_score: item.relevance_score,
+      overall_score: item.overall_score ?? 0,
+      confidence: item.confidence ?? 0,
+      spatial_score: item.spatial_score ?? 0,
+      caption_score: item.caption_score ?? 0,
+      clip_score: item.clip_score ?? 0,
+      reasoning: item.reasoning || '',
       created_at: item.created_at,
     }));
 
     setProductImageRels(formatted);
 
-    // Calculate stats
-    const avgScore = formatted.reduce((sum: number, r: ProductImageRelationship) => sum + r.relevance_score, 0) / (formatted.length || 1);
-    setStats((prev) => ({
-      ...prev,
-      productImage: { total: formatted.length, avgScore },
-    }));
+    const avgScore = formatted.reduce((sum, r) => sum + r.overall_score, 0) / (formatted.length || 1);
+    setStats(prev => ({ ...prev, productImage: { total: formatted.length, avgScore } }));
   };
 
-  const loadChunkImageRelationships = async () => {
+  const loadChunkImageRelationships = async (score: string, relType: string) => {
     let query = supabase
       .from('chunk_image_relationships')
       .select(`
@@ -247,40 +262,34 @@ export const RelevancyManagement: React.FC = () => {
         document_chunks!inner(content),
         document_images!inner(image_url)
       `)
-      .gte('relevance_score', parseFloat(minScore))
+      .gte('relevance_score', parseFloat(score))
       .order('relevance_score', { ascending: false })
       .limit(1000);
 
-    if (relationshipType !== 'all') {
-      query = query.eq('relationship_type', relationshipType);
+    if (relType !== 'all') {
+      query = query.eq('relationship_type', relType);
     }
 
     const { data, error } = await query;
-
     if (error) throw error;
 
-    const formatted = (data || []).map((item: any) => ({
+    const formatted: ChunkImageRelationship[] = (data || []).map((item: any) => ({
       id: item.id,
       chunk_id: item.chunk_id,
       image_id: item.image_id,
       chunk_content: item.document_chunks?.content || '',
       image_url: item.document_images?.image_url || '',
       relationship_type: item.relationship_type,
-      relevance_score: item.relevance_score,
+      relevance_score: item.relevance_score ?? 0,
       created_at: item.created_at,
     }));
 
     setChunkImageRels(formatted);
 
-    // Calculate stats
-    const avgScore = formatted.reduce((sum: number, r: ChunkImageRelationship) => sum + r.relevance_score, 0) / (formatted.length || 1);
-    setStats((prev) => ({
-      ...prev,
-      chunkImage: { total: formatted.length, avgScore },
-    }));
+    const avgScore = formatted.reduce((sum, r) => sum + r.relevance_score, 0) / (formatted.length || 1);
+    setStats(prev => ({ ...prev, chunkImage: { total: formatted.length, avgScore } }));
   };
 
-  // Get relevance badge
   const getRelevanceBadge = (score: number) => {
     if (score >= 0.8) {
       return <Badge className="bg-green-100 text-green-800 border-green-300">High ({(score * 100).toFixed(0)}%)</Badge>;
@@ -291,8 +300,8 @@ export const RelevancyManagement: React.FC = () => {
     }
   };
 
-  // Get relationship type badge
-  const getRelTypeBadge = (type: string) => {
+  const getRelTypeBadge = (type: string | null | undefined) => {
+    if (!type) return <Badge className="bg-gray-50 text-gray-500 border-gray-200">Unknown</Badge>;
     const colors: Record<string, string> = {
       source: 'bg-blue-50 text-blue-700 border-blue-200',
       depicts: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -311,70 +320,56 @@ export const RelevancyManagement: React.FC = () => {
     );
   };
 
-  // Handle view details
   const handleViewDetails = (rel: any) => {
     setSelectedRel(rel);
     setIsDetailDialogOpen(true);
   };
 
-  // Handle delete
   const handleDelete = async (id: string, table: string) => {
-    if (!confirm('Are you sure you want to delete this relationship?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this relationship?')) return;
 
     try {
       const { error } = await supabase.from(table).delete().eq('id', id);
-
       if (error) throw error;
 
-      toast({
-        title: 'Success',
-        description: 'Relationship deleted successfully',
-      });
+      toast({ title: 'Success', description: 'Relationship deleted successfully' });
       loadRelationships();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to delete relationship',
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: 'Failed to delete relationship', variant: 'destructive' });
     }
   };
 
-  // Filter data by search
   const filterBySearch = (items: any[]) => {
     if (!searchQuery) return items;
-    const query = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase();
 
     return items.filter((item) => {
-      if ('chunk_content' in item && item.chunk_content.toLowerCase().includes(query)) return true;
-      if ('product_name' in item && item.product_name.toLowerCase().includes(query)) return true;
-      if ('relationship_type' in item && item.relationship_type.toLowerCase().includes(query)) return true;
+      if ('chunk_content' in item && item.chunk_content.toLowerCase().includes(q)) return true;
+      if ('product_name' in item && item.product_name.toLowerCase().includes(q)) return true;
+      if ('relationship_type' in item && item.relationship_type?.toLowerCase().includes(q)) return true;
+      if ('reasoning' in item && item.reasoning?.toLowerCase().includes(q)) return true;
       return false;
     });
   };
 
-  // Get current data based on active tab
   const getCurrentData = () => {
     switch (activeTab) {
-      case 'chunk-product':
-        return filterBySearch(chunkProductRels);
-      case 'product-image':
-        return filterBySearch(productImageRels);
-      case 'chunk-image':
-        return filterBySearch(chunkImageRels);
-      default:
-        return [];
+      case 'chunk-product': return filterBySearch(chunkProductRels);
+      case 'product-image': return filterBySearch(productImageRels);
+      case 'chunk-image':   return filterBySearch(chunkImageRels);
+      default:              return [];
     }
   };
 
   const currentData = getCurrentData();
+  const totalPages = Math.ceil(currentData.length / itemsPerPage);
   const paginatedData = currentData.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
-  const totalPages = Math.ceil(currentData.length / itemsPerPage);
+
+  // image_product_associations has no relationship_type column — hide filter for that tab
+  const showRelTypeFilter = activeTab !== 'product-image';
 
   return (
     <div className="min-h-screen">
@@ -384,7 +379,6 @@ export const RelevancyManagement: React.FC = () => {
         badge="Admin"
       />
 
-      {/* Main Content */}
       <div className="p-6 space-y-6">
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -459,48 +453,45 @@ export const RelevancyManagement: React.FC = () => {
                 </Select>
               </div>
 
-              <div>
-                <Label>Relationship Type</Label>
-                <Select value={relationshipType} onValueChange={setRelationshipType}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {activeTab === 'chunk-product' && (
-                      <>
-                        <SelectItem value="source">Source</SelectItem>
-                        <SelectItem value="related">Related</SelectItem>
-                        <SelectItem value="component">Component</SelectItem>
-                        <SelectItem value="alternative">Alternative</SelectItem>
-                      </>
-                    )}
-                    {activeTab === 'product-image' && (
-                      <>
-                        <SelectItem value="depicts">Depicts</SelectItem>
-                        <SelectItem value="illustrates">Illustrates</SelectItem>
-                        <SelectItem value="variant">Variant</SelectItem>
-                        <SelectItem value="related">Related</SelectItem>
-                      </>
-                    )}
-                    {activeTab === 'chunk-image' && (
-                      <>
-                        <SelectItem value="illustrates">Illustrates</SelectItem>
-                        <SelectItem value="depicts">Depicts</SelectItem>
-                        <SelectItem value="related">Related</SelectItem>
-                        <SelectItem value="example">Example</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Relationship type filter — not applicable to product-image tab */}
+              {showRelTypeFilter ? (
+                <div>
+                  <Label>Relationship Type</Label>
+                  <Select value={relationshipType} onValueChange={setRelationshipType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      {activeTab === 'chunk-product' && (
+                        <>
+                          <SelectItem value="source">Source</SelectItem>
+                          <SelectItem value="related">Related</SelectItem>
+                          <SelectItem value="component">Component</SelectItem>
+                          <SelectItem value="alternative">Alternative</SelectItem>
+                        </>
+                      )}
+                      {activeTab === 'chunk-image' && (
+                        <>
+                          <SelectItem value="illustrates">Illustrates</SelectItem>
+                          <SelectItem value="depicts">Depicts</SelectItem>
+                          <SelectItem value="related">Related</SelectItem>
+                          <SelectItem value="example">Example</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div /> /* spacer — keeps search in third column */
+              )}
 
               <div>
                 <Label>Search</Label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Search content or names..."
+                    placeholder="Search content, product, or reasoning..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-10"
@@ -521,15 +512,15 @@ export const RelevancyManagement: React.FC = () => {
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="chunk-product">
                   <FileText className="h-4 w-4 mr-2" />
-                  Chunk → Product ({stats.chunkProduct.total})
+                  Chunk → Product
                 </TabsTrigger>
                 <TabsTrigger value="product-image">
                   <ImageIcon className="h-4 w-4 mr-2" />
-                  Product → Image ({stats.productImage.total})
+                  Product → Image
                 </TabsTrigger>
                 <TabsTrigger value="chunk-image">
                   <Link2 className="h-4 w-4 mr-2" />
-                  Chunk → Image ({stats.chunkImage.total})
+                  Chunk → Image
                 </TabsTrigger>
               </TabsList>
 
@@ -540,49 +531,39 @@ export const RelevancyManagement: React.FC = () => {
                 ) : paginatedData.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No relationships found</div>
                 ) : (
-                  <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Chunk Content</TableHead>
-                          <TableHead>Product</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Relevance</TableHead>
-                          <TableHead>Actions</TableHead>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Chunk Content</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Relevance</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(paginatedData as ChunkProductRelationship[]).map((rel) => (
+                        <TableRow key={rel.id}>
+                          <TableCell className="max-w-md">
+                            <div className="truncate text-sm">{rel.chunk_content}</div>
+                          </TableCell>
+                          <TableCell className="font-medium">{rel.product_name}</TableCell>
+                          <TableCell>{getRelTypeBadge(rel.relationship_type)}</TableCell>
+                          <TableCell>{getRelevanceBadge(rel.relevance_score)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleViewDetails(rel)}>
+                                <BarChart3 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(rel.id, 'chunk_product_relationships')}>
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedData.map((rel: ChunkProductRelationship) => (
-                          <TableRow key={rel.id}>
-                            <TableCell className="max-w-md">
-                              <div className="truncate text-sm">{rel.chunk_content}</div>
-                            </TableCell>
-                            <TableCell className="font-medium">{rel.product_name}</TableCell>
-                            <TableCell>{getRelTypeBadge(rel.relationship_type)}</TableCell>
-                            <TableCell>{getRelevanceBadge(rel.relevance_score)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleViewDetails(rel)}
-                                >
-                                  <BarChart3 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(rel.id, 'chunk_product_relationships')}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-600" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </TabsContent>
 
@@ -593,53 +574,47 @@ export const RelevancyManagement: React.FC = () => {
                 ) : paginatedData.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No relationships found</div>
                 ) : (
-                  <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>Image</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Relevance</TableHead>
-                          <TableHead>Actions</TableHead>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Image</TableHead>
+                        <TableHead>Confidence</TableHead>
+                        <TableHead>Overall Score</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(paginatedData as ProductImageRelationship[]).map((rel) => (
+                        <TableRow key={rel.id}>
+                          <TableCell className="font-medium">{rel.product_name}</TableCell>
+                          <TableCell>
+                            <img
+                              src={rel.image_url}
+                              alt="Product"
+                              className="h-12 w-12 object-cover rounded"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm font-medium">
+                              {(rel.confidence * 100).toFixed(1)}%
+                            </span>
+                          </TableCell>
+                          <TableCell>{getRelevanceBadge(rel.overall_score)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleViewDetails(rel)}>
+                                <BarChart3 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(rel.id, 'image_product_associations')}>
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedData.map((rel: ProductImageRelationship) => (
-                          <TableRow key={rel.id}>
-                            <TableCell className="font-medium">{rel.product_name}</TableCell>
-                            <TableCell>
-                              <img
-                                src={rel.image_url}
-                                alt="Product"
-                                className="h-12 w-12 object-cover rounded"
-                              />
-                            </TableCell>
-                            <TableCell>{getRelTypeBadge(rel.relationship_type)}</TableCell>
-                            <TableCell>{getRelevanceBadge(rel.relevance_score)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleViewDetails(rel)}
-                                >
-                                  <BarChart3 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(rel.id, 'image_product_associations')}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-600" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </TabsContent>
 
@@ -650,55 +625,45 @@ export const RelevancyManagement: React.FC = () => {
                 ) : paginatedData.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">No relationships found</div>
                 ) : (
-                  <>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Chunk Content</TableHead>
-                          <TableHead>Image</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Relevance</TableHead>
-                          <TableHead>Actions</TableHead>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Chunk Content</TableHead>
+                        <TableHead>Image</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Relevance</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(paginatedData as ChunkImageRelationship[]).map((rel) => (
+                        <TableRow key={rel.id}>
+                          <TableCell className="max-w-md">
+                            <div className="truncate text-sm">{rel.chunk_content}</div>
+                          </TableCell>
+                          <TableCell>
+                            <img
+                              src={rel.image_url}
+                              alt="Chunk"
+                              className="h-12 w-12 object-cover rounded"
+                            />
+                          </TableCell>
+                          <TableCell>{getRelTypeBadge(rel.relationship_type)}</TableCell>
+                          <TableCell>{getRelevanceBadge(rel.relevance_score)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleViewDetails(rel)}>
+                                <BarChart3 className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(rel.id, 'chunk_image_relationships')}>
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedData.map((rel: ChunkImageRelationship) => (
-                          <TableRow key={rel.id}>
-                            <TableCell className="max-w-md">
-                              <div className="truncate text-sm">{rel.chunk_content}</div>
-                            </TableCell>
-                            <TableCell>
-                              <img
-                                src={rel.image_url}
-                                alt="Chunk"
-                                className="h-12 w-12 object-cover rounded"
-                              />
-                            </TableCell>
-                            <TableCell>{getRelTypeBadge(rel.relationship_type)}</TableCell>
-                            <TableCell>{getRelevanceBadge(rel.relevance_score)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleViewDetails(rel)}
-                                >
-                                  <BarChart3 className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(rel.id, 'chunk_image_relationships')}
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-600" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </TabsContent>
             </Tabs>
@@ -713,7 +678,7 @@ export const RelevancyManagement: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
                   >
                     Previous
@@ -721,7 +686,7 @@ export const RelevancyManagement: React.FC = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
                   >
                     Next
@@ -741,21 +706,27 @@ export const RelevancyManagement: React.FC = () => {
           </DialogHeader>
           {selectedRel && (
             <div className="space-y-4">
+              {/* Overall score — uses overall_score for product-image, relevance_score for others */}
               <div>
-                <Label>Overall Relevance Score</Label>
+                <Label>Overall Score</Label>
                 <div className="flex items-center gap-4 mt-2">
-                  <Progress value={selectedRel.relevance_score * 100} className="flex-1" />
+                  <Progress
+                    value={(selectedRel.overall_score ?? selectedRel.relevance_score ?? 0) * 100}
+                    className="flex-1"
+                  />
                   <span className="text-lg font-bold">
-                    {(selectedRel.relevance_score * 100).toFixed(1)}%
+                    {((selectedRel.overall_score ?? selectedRel.relevance_score ?? 0) * 100).toFixed(1)}%
                   </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Relationship Type</Label>
-                  <div className="mt-2">{getRelTypeBadge(selectedRel.relationship_type)}</div>
-                </div>
+                {'relationship_type' in selectedRel && selectedRel.relationship_type && (
+                  <div>
+                    <Label>Relationship Type</Label>
+                    <div className="mt-2">{getRelTypeBadge(selectedRel.relationship_type)}</div>
+                  </div>
+                )}
                 <div>
                   <Label>Created</Label>
                   <div className="mt-2 text-sm text-gray-600">
@@ -764,63 +735,56 @@ export const RelevancyManagement: React.FC = () => {
                 </div>
               </div>
 
-              {activeTab === 'chunk-product' && (
-                <div className="space-y-2">
-                  <Label>Scoring Algorithm Components</Label>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Page Proximity (40%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.4 * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Embedding Similarity (30%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.3 * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Mention Score (30%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.3 * 100).toFixed(0)}%</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
+              {/* Product → Image: real per-component scores are stored in the DB */}
               {activeTab === 'product-image' && (
                 <div className="space-y-2">
-                  <Label>Scoring Algorithm Components</Label>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Page Overlap (40%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.4 * 100).toFixed(0)}%</span>
+                  <Label>Score Components</Label>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-3 text-sm">
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span>Spatial Score</span>
+                        <span className="font-medium">{(selectedRel.spatial_score * 100).toFixed(1)}%</span>
+                      </div>
+                      <Progress value={selectedRel.spatial_score * 100} />
                     </div>
-                    <div className="flex justify-between">
-                      <span>Visual Similarity (40%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.4 * 100).toFixed(0)}%</span>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span>Caption Score</span>
+                        <span className="font-medium">{(selectedRel.caption_score * 100).toFixed(1)}%</span>
+                      </div>
+                      <Progress value={selectedRel.caption_score * 100} />
                     </div>
-                    <div className="flex justify-between">
-                      <span>Detection Score (20%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.2 * 100).toFixed(0)}%</span>
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span>CLIP Score</span>
+                        <span className="font-medium">{(selectedRel.clip_score * 100).toFixed(1)}%</span>
+                      </div>
+                      <Progress value={selectedRel.clip_score * 100} />
+                    </div>
+                    <div className="border-t pt-2 flex justify-between">
+                      <span>Confidence</span>
+                      <span className="font-medium">{(selectedRel.confidence * 100).toFixed(1)}%</span>
                     </div>
                   </div>
+                  {selectedRel.reasoning && (
+                    <div>
+                      <Label>Reasoning</Label>
+                      <p className="text-sm text-gray-600 mt-1 bg-gray-50 p-3 rounded leading-relaxed">
+                        {selectedRel.reasoning}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {activeTab === 'chunk-image' && (
+              {/* Chunk → Product / Chunk → Image: no component scores stored in DB */}
+              {activeTab !== 'product-image' && (
                 <div className="space-y-2">
-                  <Label>Scoring Algorithm Components</Label>
-                  <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Same Page (50%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.5 * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Visual-Text Similarity (30%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.3 * 100).toFixed(0)}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Spatial Proximity (20%)</span>
-                      <span className="font-medium">~{(selectedRel.relevance_score * 0.2 * 100).toFixed(0)}%</span>
-                    </div>
-                  </div>
+                  <Label>Score Components</Label>
+                  <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded">
+                    Per-component scores are not stored for this relationship type.
+                    Only the overall relevance score is available.
+                  </p>
                 </div>
               )}
             </div>
@@ -835,4 +799,3 @@ export const RelevancyManagement: React.FC = () => {
     </div>
   );
 };
-

@@ -118,11 +118,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [relevanceCounts, setRelevanceCounts] = useState({ chunks: 0, images: 0 });
   const [isRelinking, setIsRelinking] = useState(false);
 
-  if (!product) return null;
-
-  const materialCategory = getMaterialCategory(product);
-  const theme = getCategoryTheme(materialCategory);
-  const effectiveColor = categoryColor || theme.primary;
+  // All hooks must be declared before any conditional return (Rules of Hooks)
 
   // Check if user is admin
   useEffect(() => {
@@ -307,6 +303,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
     loadAdminData();
   }, [product?.id, isAdmin, isOpen]);
+
+  // AI grout suggestions — must be a hook so it lives before the conditional return
+  const groutRecommendations = React.useMemo(() => {
+    if (!product) return generateGroutRecommendations({});
+    const data = {
+      ...product.metadata,
+      ...product.properties,
+      ...product.specifications,
+    };
+    return generateGroutRecommendations(data || {});
+  }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!product) return null;
+
+  const materialCategory = getMaterialCategory(product);
+  const theme = getCategoryTheme(materialCategory);
+  const effectiveColor = categoryColor || theme.primary;
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) =>
@@ -514,11 +527,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Factory Group': extractValue(allData?.factory_group_name) || undefined,
     'Country of Origin': origin || undefined,
   };
-
-  // Generate AI grout suggestions if not present
-  const groutRecommendations = React.useMemo(() => {
-    return generateGroutRecommendations(allData || {});
-  }, [allData]);
 
   const commercial = {
     'Product Codes': extractValue(commercialData?.product_codes),

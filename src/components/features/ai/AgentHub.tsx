@@ -46,7 +46,6 @@ import { ProductStrip } from './ProductStrip';
 import { ProgressiveImageGrid } from './ProgressiveImageGrid';
 import SEOArticleViewer from './SEOArticleViewer';
 import { getCachedResponse, cacheResponse } from '@/services/agents/agentChatCache';
-import { MaterialAgent3DGenerationAPI } from '@/services/materialAgent3DGenerationAPI';
 import { WorldViewer } from './WorldViewer';
 import { vrWorldService, VR_CREDIT_COSTS } from '@/services/vrWorldService';
 
@@ -448,7 +447,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       case 'thinking':
       default:
-        return data.content || pickRandom(thinkingMessages);
+        // Guard: content must be a string (edge function could send a raw Claude content block)
+        if (typeof data.content === 'string' && data.content) return data.content;
+        return pickRandom(thinkingMessages);
     }
   };
 
@@ -1004,57 +1005,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         title: data.materialResults.title || 'Material Results',
       } : undefined;
 
-      // Generate 3D design + SpaceFormer analysis for Interior Designer Agent
-      // IMPORTANT: Only generate if backend didn't already create a generation job
-      let designData: Message['designData'] = undefined;
-      if (selectedAgent === 'interior-designer' && !data.generation_job) {
-        try {
-          // Check if the user's message or agent's response contains design-related keywords
-          const designKeywords = ['design', 'interior', 'room', 'space', 'layout', 'furniture', 'decor', 'modern', 'minimalist', 'bedroom', 'living room', 'kitchen', 'bathroom'];
-          const combinedText = `${userInput} ${cleanedText}`.toLowerCase();
-          const containsDesignContent = designKeywords.some(keyword => combinedText.includes(keyword));
-
-          if (containsDesignContent) {
-            console.log('🎨 Triggering 3D generation + SpaceFormer analysis for Interior Designer...');
-
-            // Extract room type and style from user input (simple keyword matching)
-            const roomTypes = ['bedroom', 'living room', 'kitchen', 'bathroom', 'office', 'dining room'];
-            const styles = ['modern', 'minimalist', 'industrial', 'scandinavian', 'traditional', 'contemporary'];
-
-            const detectedRoomType = roomTypes.find(type => combinedText.includes(type)) || 'general';
-            const detectedStyle = styles.find(style => combinedText.includes(style)) || 'modern';
-
-            const generationResult = await MaterialAgent3DGenerationAPI.generate3D({
-              prompt: userInput,
-              room_type: detectedRoomType,
-              style: detectedStyle,
-              specific_materials: [],
-              enable_spatial_analysis: true, // Enable SpaceFormer analysis
-            });
-
-            if (generationResult.success) {
-              designData = {
-                images: generationResult.image_urls,
-                modelResults: generationResult.model_results, // Per-model results with attribution
-                totalModels: generationResult.total_models,
-                successfulModels: generationResult.successful_models,
-                spatialAnalysis: generationResult.spatial_analysis, // SpaceFormer analysis included!
-                matchedMaterials: generationResult.matched_materials,
-                parsedRequest: generationResult.parsed_request,
-                qualityAssessment: generationResult.quality_assessment,
-                processingTimeMs: generationResult.processing_time_ms,
-              };
-              console.log(`✅ Multi-model generation completed: ${generationResult.successful_models}/${generationResult.total_models} models succeeded`);
-              console.log('📊 Design data with model results:', designData);
-            }
-          }
-        } catch (generationError) {
-          console.warn('⚠️ 3D generation failed (non-critical):', generationError);
-          // Continue without design data - don't fail the entire message
-        }
-      } else if (selectedAgent === 'interior-designer' && data.generation_job) {
-        console.log('✅ Backend already created generation job, skipping frontend generation');
-      }
+      // Interior Designer: 3D generation is handled entirely by the agent-chat edge function
+      // via the generate_3d tool → MIVAA /api/interior → async job → generation_job_created chunk.
+      // The frontend receives data.generation_job when a job was created.
+      const designData: Message['designData'] = undefined;
 
       // Add assistant response to messages
       const assistantMessage: Message = {

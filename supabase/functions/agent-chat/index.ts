@@ -16,6 +16,7 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { SUPPORTED_MARKETS, ALL_MARKETS, findMarketByCountry, getRegionById, buildRegionalQuery, buildSingleCountryQuery } from '../_shared/b2b-markets.ts';
@@ -317,11 +318,24 @@ function createAgentGraph(
     const inputTokens = usage?.input_tokens || 0;
     const outputTokens = usage?.output_tokens || 0;
 
-    // Send thinking status
+    // Send thinking status — extract plain text from Claude API content (may be string or content-block array)
     try {
+      let thinkingText: string;
+      if (typeof response.content === 'string') {
+        thinkingText = response.content;
+      } else if (Array.isArray(response.content)) {
+        thinkingText = response.content
+          .filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('\n');
+      } else if (response.content && typeof response.content === 'object' && 'text' in (response.content as any)) {
+        thinkingText = (response.content as any).text;
+      } else {
+        thinkingText = '';
+      }
       onChunk?.({
         type: 'assistant_thinking',
-        content: response.content,
+        content: thinkingText,
         hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0)
       });
     } catch (e) {}
@@ -918,12 +932,14 @@ const createSpaceformerTool = (workspaceId: string) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...(MIVAA_API_KEY ? { 'Authorization': `Bearer ${MIVAA_API_KEY}` } : {}),
             },
             body: JSON.stringify({
               image_url: imageUrl,
               room_type: roomType,
               analysis_type: analysisType,
               workspace_id: workspaceId,
+              user_id: userId,
             }),
             signal: controller.signal,
           });
