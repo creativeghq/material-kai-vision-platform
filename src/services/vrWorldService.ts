@@ -39,10 +39,10 @@ export interface GenerateVRParams {
   model?: string;
 }
 
-// Credit costs (must match edge function)
+// Credit costs — must match CREDIT_COSTS in generate-vr-world edge function
 export const VR_CREDIT_COSTS: Record<string, number> = {
-  'marble-0.1-mini': 50,
-  'marble-0.1-plus': 200,
+  'marble-0.1-mini': 75,
+  'marble-0.1-plus': 300,
 };
 
 export const vrWorldService = {
@@ -62,7 +62,19 @@ export const vrWorldService = {
       },
     });
 
-    if (error) throw new Error(error.message || 'Failed to generate VR world');
+    if (error) {
+      // FunctionsHttpError exposes the raw Response via .context — extract the real error body
+      const httpError = error as any;
+      if (httpError?.context) {
+        try {
+          const body = await httpError.context.json();
+          throw new Error(body?.error || error.message);
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message !== error.message) throw parseErr;
+        }
+      }
+      throw new Error(error.message || 'Failed to generate VR world');
+    }
     if (!data?.success) throw new Error(data?.error || 'Failed to generate VR world');
 
     return { vrWorldId: data.data.id };

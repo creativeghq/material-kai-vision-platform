@@ -265,7 +265,7 @@ async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }>
   const filename = `design-image.${ext}`;
 
   // Prepare upload with WorldLabs
-  const prepareResponse = await fetch(`${WORLDLABS_BASE_URL}/media-assets:prepare-upload`, {
+  const prepareResponse = await fetch(`${WORLDLABS_BASE_URL}/media-assets:prepare_upload`, {
     method: 'POST',
     headers: {
       'WLT-Api-Key': worldlabsApiKey,
