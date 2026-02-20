@@ -7,7 +7,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { X, Package } from 'lucide-react';
+import { X, Package, Globe, Loader2 } from 'lucide-react';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 
 interface Design3DModalProps {
@@ -25,6 +25,8 @@ interface Design3DModalProps {
   } | null;
   isOpen: boolean;
   onClose: () => void;
+  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  vrGenerating?: boolean;
 }
 
 // Helper to extract string value from potential {value, confidence} wrapper
@@ -63,7 +65,7 @@ const normalizeMaterial = (material: any) => ({
   },
 });
 
-const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose }) => {
+const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, onGenerateVR, vrGenerating }) => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
@@ -134,6 +136,32 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose }
                     alt={design.image.alt}
                     className="w-full h-full object-cover"
                   />
+                  {/* VR Button */}
+                  {onGenerateVR && (
+                    <div className="absolute top-4 right-4 z-10">
+                      <button
+                        onClick={() => {
+                          if (!vrGenerating) {
+                            onGenerateVR(design.image.url, {
+                              roomType: design.room_type,
+                              style: design.style,
+                              prompt: design.description,
+                            });
+                          }
+                        }}
+                        disabled={vrGenerating}
+                        className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white rounded-lg transition-colors shadow-lg"
+                        title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                      >
+                        {vrGenerating ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Globe className="w-5 h-5" />
+                        )}
+                        <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

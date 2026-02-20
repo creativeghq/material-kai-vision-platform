@@ -52,34 +52,20 @@ export const vrWorldService = {
    * The frontend polls the vr_worlds table for status updates.
    */
   async generateVRWorld(params: GenerateVRParams): Promise<{ vrWorldId: string }> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('Not authenticated');
-
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-
-    const response = await fetch(`${supabaseUrl}/functions/v1/generate-vr-world`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify({
+    const { data, error } = await supabase.functions.invoke('generate-vr-world', {
+      body: {
         source_image_url: params.sourceImageUrl,
         prompt: params.prompt,
         room_type: params.roomType,
         style: params.style,
         model: params.model || 'marble-0.1-mini',
-      }),
+      },
     });
 
-    const result = await response.json();
+    if (error) throw new Error(error.message || 'Failed to generate VR world');
+    if (!data?.success) throw new Error(data?.error || 'Failed to generate VR world');
 
-    if (!response.ok || !result.success) {
-      throw new Error(result.error || 'Failed to generate VR world');
-    }
-
-    return { vrWorldId: result.data.id };
+    return { vrWorldId: data.data.id };
   },
 
   /**

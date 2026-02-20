@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Search, Layers, Ruler, Home, Package, ShoppingCart } from 'lucide-react';
+import { Loader2, ZoomIn, Search, Layers, Ruler, Home, Package, ShoppingCart, Globe } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -24,6 +24,8 @@ interface ProgressiveImageGridProps {
   modelCount: number;
   models: Array<{ id: string; name: string; provider: string }>;
   onImageClick?: (imageUrl: string, modelName: string) => void;
+  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  vrGenerating?: boolean;
 }
 
 export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
@@ -31,14 +33,15 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   modelCount,
   models,
   onImageClick,
+  onGenerateVR,
+  vrGenerating,
 }) => {
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<'processing' | 'completed' | 'failed'>('processing');
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
-  const [imageTransform, setImageTransform] = useState({ scale: 1, rotate: 0, brightness: 100 });
-  const [spaceformerAnalysis, setSpaceformerAnalysis] = useState<any>(null);
+const [spaceformerAnalysis, setSpaceformerAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [matchedProducts, setMatchedProducts] = useState<MatchedProduct[]>([]);
@@ -153,7 +156,6 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   const handleImageClick = async (result: ModelResult) => {
     if (result.status === 'completed' && result.image_urls[0]) {
       setSelectedImage({ url: result.image_urls[0], name: result.model_name });
-      setImageTransform({ scale: 1, rotate: 0, brightness: 100 });
       setSpaceformerAnalysis(null);
       setAnalysisError(null);
       setMatchedProducts([]);
@@ -336,75 +338,43 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
             {/* Image Tab */}
             <TabsContent value="image" className="space-y-4">
-              {/* Image with transforms */}
               <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
                 {selectedImage && (
-                  <img
-                    src={selectedImage.url}
-                    alt={selectedImage.name}
-                    className="w-full h-full object-contain transition-all duration-300"
-                    style={{
-                      transform: `scale(${imageTransform.scale}) rotate(${imageTransform.rotate}deg)`,
-                      filter: `brightness(${imageTransform.brightness}%)`,
-                    }}
-                  />
+                  <>
+                    <img
+                      src={selectedImage.url}
+                      alt={selectedImage.name}
+                      className="w-full h-full object-contain"
+                    />
+                    {/* VR Button */}
+                    {onGenerateVR && (
+                      <div className="absolute top-4 right-4 z-10">
+                        <button
+                          onClick={() => {
+                            if (!vrGenerating) {
+                              onGenerateVR(selectedImage.url, {
+                                roomType: spaceformerAnalysis?.room_type,
+                                prompt: selectedImage.name,
+                              });
+                            }
+                          }}
+                          disabled={vrGenerating}
+                          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white rounded-lg transition-colors shadow-lg"
+                          title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                        >
+                          {vrGenerating ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Globe className="w-5 h-5" />
+                          )}
+                          <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              {/* Transform Controls */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium">Scale</label>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2"
-                    step="0.1"
-                    value={imageTransform.scale}
-                    onChange={(e) => setImageTransform(prev => ({ ...prev, scale: parseFloat(e.target.value) }))}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-gray-500">{imageTransform.scale}x</span>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Rotate</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="360"
-                    step="15"
-                    value={imageTransform.rotate}
-                    onChange={(e) => setImageTransform(prev => ({ ...prev, rotate: parseInt(e.target.value) }))}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-gray-500">{imageTransform.rotate}°</span>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium">Brightness</label>
-                  <input
-                    type="range"
-                    min="50"
-                    max="150"
-                    step="10"
-                    value={imageTransform.brightness}
-                    onChange={(e) => setImageTransform(prev => ({ ...prev, brightness: parseInt(e.target.value) }))}
-                    className="w-full"
-                  />
-                  <span className="text-xs text-gray-500">{imageTransform.brightness}%</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setImageTransform({ scale: 1, rotate: 0, brightness: 100 })}
-                >
-                  Reset
-                </Button>
-              </div>
             </TabsContent>
 
             {/* Spatial Analysis Tab */}

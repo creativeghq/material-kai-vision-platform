@@ -189,6 +189,21 @@ interface AgentHubProps {
 
 
 
+// Normalize Claude content — can be string, {type,text} object, or [{type,text}] array
+const normalizeContent = (content: unknown): string => {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b: any) => b?.type === 'text')
+      .map((b: any) => b.text ?? '')
+      .join('');
+  }
+  if (content && typeof content === 'object' && (content as any).type === 'text') {
+    return (content as any).text ?? '';
+  }
+  return String(content ?? '');
+};
+
 export const AgentHub: React.FC<AgentHubProps> = ({
   userRole = 'member',
   onMaterialSelect,
@@ -1444,12 +1459,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   >
                     {message.demoData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                        <DemoAgentResults result={message.demoData} />
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
+                        <DemoAgentResults
+                          result={message.demoData}
+                          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                        />
                       </div>
                     ) : message.materialData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
                         {/* Display real materials using DemoAgentResults format */}
                         <DemoAgentResults
                           result={{
@@ -1461,7 +1479,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.designData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
                         {/* Display design results with DesignCanvas */}
                         <DesignCanvas
                           images={message.designData.images}
@@ -1524,7 +1542,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       </div>
                     ) : message.worldData ? (
                       <div className="space-y-4">
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">{normalizeContent(message.content)}</p>
                         <WorldViewer
                           vrWorldId={message.worldData.vrWorldId}
                           initialStatus={message.worldData.status}
@@ -1550,9 +1568,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       <div className="space-y-2">
                         {/* Render markdown content for assistant messages */}
                         {message.role === 'assistant' ? (
-                          <MarkdownRenderer content={message.content} className="text-sm" />
+                          <MarkdownRenderer content={normalizeContent(message.content)} className="text-sm" />
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap text-foreground">{message.content}</p>
+                          <p className="text-sm whitespace-pre-wrap text-foreground">{normalizeContent(message.content)}</p>
                         )}
 
                         {/* Show ProductStrip for messages with material data */}
@@ -1572,8 +1590,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                               models={message.generation_job.models}
                               onImageClick={(url, name) => {
                                 console.log('🖼️ Image clicked:', url, name);
-                                // TODO: Open modal or add to mood board
                               }}
+                              onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                             />
                           </div>
                         )}

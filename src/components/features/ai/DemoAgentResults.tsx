@@ -14,6 +14,8 @@ import { Badge } from '@/components/core/ui/badge';
 interface DemoAgentResultsProps {
   result: any;
   categoryColors?: Record<string, string>;
+  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
+  vrGenerating?: boolean;
 }
 
 const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
@@ -28,6 +30,8 @@ const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
 export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   result,
   categoryColors = DEFAULT_CATEGORY_COLORS,
+  onGenerateVR,
+  vrGenerating,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -144,6 +148,8 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           design={selected3DDesign}
           isOpen={is3DModalOpen}
           onClose={handle3DModalClose}
+          onGenerateVR={onGenerateVR}
+          vrGenerating={vrGenerating}
         />
       </>
     );
