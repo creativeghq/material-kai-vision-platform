@@ -233,7 +233,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
           id="pdf-upload"
         />
         <label htmlFor="pdf-upload">
-          <Button variant="outline" className="mt-2 bg-white hover:bg-gray-50" asChild>
+          <Button variant="outline" className="mt-2 bg-white hover:bg-primary/10 hover:text-[#3e192a]" asChild>
             <span>Browse Files</span>
           </Button>
         </label>

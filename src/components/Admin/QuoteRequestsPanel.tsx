@@ -128,7 +128,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
               </tr>
             ) : (
               requests.map((request) => (
-                <tr key={request.id} className="border-b hover:bg-gray-50">
+                <tr key={request.id} className="border-b hover:bg-primary/10 hover:text-[#3e192a]">
                   <td className="p-3 font-mono text-sm">
                     {request.id.slice(0, 8)}
                   </td>
@@ -173,7 +173,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
           onClick={() => setPage(Math.max(0, page - 1))}
           onKeyDown={(e) => e.key === 'Enter' && setPage(Math.max(0, page - 1))}
           disabled={page === 0}
-          className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-primary/10 hover:text-[#3e192a]"
         >
           Previous
         </button>
@@ -182,7 +182,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
           onClick={() => setPage(page + 1)}
           onKeyDown={(e) => e.key === 'Enter' && setPage(page + 1)}
           disabled={requests.length < pageSize}
-          className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-primary/10 hover:text-[#3e192a]"
         >
           Next
         </button>
@@ -191,7 +191,7 @@ export const QuoteRequestsPanel: React.FC<QuoteRequestsPanelProps> = ({
       <button
         onClick={loadRequests}
         onKeyDown={(e) => e.key === 'Enter' && loadRequests()}
-        className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+        className="mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-primary/10 hover:text-[#3e192a] font-medium"
       >
         Refresh
       </button>

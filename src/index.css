@@ -135,7 +135,7 @@ All colors MUST be HSL.
     --foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
     /* Page container - Subtle off-white for depth */
-    --page-background: 0 0% 98%;  /* #FAFAFA - Very light gray */
+    --page-background: 40 25% 96%;  /* Unified with --background */
 
     /* Content sections/cards - White with transparency (glass effect) */
     --card: 0 0% 100%;  /* #FFFFFF - White cards */
@@ -144,9 +144,9 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;  /* #FFFFFF - White popover */
     --popover-foreground: 0 0% 15%;  /* #262626 - Dark gray text */
 
-    /* Primary - Soft sage green #c6d0bc */
-    --primary: 95 20% 77%;  /* #c6d0bc - Soft sage green */
-    --primary-foreground: 0 0% 20%;  /* Dark text on sage */
+    /* Primary - Deep Plum / Burgundy #330 43% 17% */
+    --primary: 330 43% 17%;
+    --primary-foreground: 0 0% 100%;  /* White text on plum */
 
     /* Secondary - Light gray (Notion-like) */
     --secondary: 0 0% 96%;  /* #F5F5F5 - Very light gray */
@@ -167,15 +167,15 @@ All colors MUST be HSL.
     /* Borders - Very subtle light gray (Notion-like, soft) */
     --border: 0 0% 90%;  /* #E5E5E5 - Very light border */
     --input: 0 0% 90%;  /* #E5E5E5 - Input border */
-    --ring: 95 20% 77%;  /* #c6d0bc - Focus ring (sage green) */
+    --ring: 330 43% 17%;  /* Focus ring (primary plum) */
 
     --radius: 0.5rem;  /* 8px - Slightly rounded corners (Notion-like) */
 
     /* Sidebar - Clean white (Notion light) */
-    --sidebar-background: 0 0% 98%;  /* #FAFAFA - Very light gray */
+    --sidebar-background: 40 25% 96%;  /* Unified with --background */
     --sidebar-foreground: 0 0% 40%;  /* #666666 - Medium gray text */
-    --sidebar-accent: 95 20% 77%;  /* #c6d0bc - Sage green for active items */
-    --sidebar-accent-foreground: 0 0% 20%;  /* Dark text on sage */
+    --sidebar-accent: 330 43% 17%;  /* Primary plum for active items */
+    --sidebar-accent-foreground: 0 0% 100%;  /* White text on plum */
     --sidebar-border: 0 0% 93%;  /* #EDEDED - Very subtle border */
 
     /* Hero section background - Clean white */

@@ -28,7 +28,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
             <Button
               onClick={() => navigate('/')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/')}
-              className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
+              className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] flex items-center gap-2"
             >
               <Brain className="h-4 w-4" />
               Back to Main
@@ -36,7 +36,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
             <Button
               onClick={() => navigate('/admin')}
               onKeyDown={(e) => e.key === 'Enter' && navigate('/admin')}
-              className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
+              className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] flex items-center gap-2"
             >
               <Activity className="h-4 w-4" />
               Back to Admin

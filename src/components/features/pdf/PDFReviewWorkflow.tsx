@@ -390,7 +390,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                   selectAllApproved();
                 }
               }}
-              className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
+              className="border border-gray-300 bg-white text-gray-700 hover:bg-primary/10 hover:text-[#3e192a] text-sm px-3 py-1.5"
             >
               Select All Approved
             </Button>
@@ -528,7 +528,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                     <div className="flex justify-between items-center pt-2">
                       <div className="flex gap-2">
                         <Button
-                          className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
+                          className="border border-gray-300 bg-white text-gray-700 hover:bg-primary/10 hover:text-[#3e192a] text-sm px-3 py-1.5"
                           onClick={() =>
                             updateTileReview(tile.id, {
                               reviewed: true,
@@ -548,7 +548,7 @@ export const PDFReviewWorkflow: React.FC<PDFReviewWorkflowProps> = ({
                           Approve
                         </Button>
                         <Button
-                          className="border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-sm px-3 py-1.5"
+                          className="border border-gray-300 bg-white text-gray-700 hover:bg-primary/10 hover:text-[#3e192a] text-sm px-3 py-1.5"
                           onClick={() =>
                             updateTileReview(tile.id, {
                               reviewed: true,

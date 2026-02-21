@@ -210,7 +210,7 @@ const XMLImportTab: React.FC = () => {
                   </p>
                 </div>
                 {!selectedFile && (
-                  <Button variant="outline" className="mt-2 bg-white hover:bg-gray-50">
+                  <Button variant="outline" className="mt-2 bg-white hover:bg-primary/10 hover:text-[#3e192a]">
                     <Upload className="h-4 w-4 mr-2" />
                     Select File
                   </Button>

@@ -602,7 +602,7 @@ export const AITestingPanel: React.FC = () => {
                       {getSampleImageUrls().map((url, i) => (
                         <Button
                           key={i}
-                          className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
+                          className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] mr-2 mb-1 text-xs"
                           onClick={() => setTestImageUrl(url)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -798,7 +798,7 @@ export const AITestingPanel: React.FC = () => {
                         .map((url, i) => (
                           <Button
                             key={i}
-                            className="px-2 py-1 text-sm border border-gray-300 hover:bg-gray-50 mr-2 mb-1 text-xs"
+                            className="px-2 py-1 text-sm border border-gray-300 hover:bg-primary/10 hover:text-[#3e192a] mr-2 mb-1 text-xs"
                             onClick={() => setMultiModalTestImage(url)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {

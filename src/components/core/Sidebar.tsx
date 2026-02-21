@@ -45,7 +45,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside
-      className={`min-h-screen flex flex-col py-8 transition-all duration-500 m-4 rounded-[2.5rem] glass-panel bg-white/40 border-white/20 shadow-2xl ${
+      className={`min-h-screen flex flex-col py-8 transition-all duration-500 m-4 rounded-[2.5rem] glass-panel shadow-2xl ${
         isExpanded ? 'w-72' : 'w-24'
       }`}
     >
