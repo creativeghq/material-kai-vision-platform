@@ -9,12 +9,6 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    optimizeDeps: {
-      // Force pre-bundle @sparkjsdev/spark so its `import * as THREE from "three"`
-      // resolves correctly through Vite's module graph. Without this, the dynamic
-      // import() serves the raw ESM which can't resolve bare specifiers in-browser.
-      include: ['@sparkjsdev/spark'],
-    },
     server: {
       port: 8080,
       host: true,
@@ -30,6 +24,9 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       },
+      // Ensure only one instance of three.js is used across all modules
+      // (prevents @sparkjsdev/spark from getting a separate THREE instance)
+      dedupe: ['three'],
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
@@ -57,7 +54,7 @@ export default defineConfig(({ mode }) => {
             // UI primitives — loaded on every page (shared across all routes)
             'vendor-ui': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tooltip', '@radix-ui/react-popover', '@radix-ui/react-tabs', '@radix-ui/react-select'],
             // 3D rendering — only loaded when WorldViewer/SVBRDF routes are visited
-            'vendor-3d': ['three', '@react-three/fiber', '@react-three/drei'],
+            'vendor-3d': ['three', '@react-three/fiber', '@react-three/drei', '@sparkjsdev/spark'],
             // Charts — only loaded on admin monitoring/analytics routes
             'vendor-charts': ['recharts'],
             // Supabase client — shared but separable

@@ -8,6 +8,10 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { WebGLRenderer, Scene, PerspectiveCamera, Clock } from 'three';
+// Static import ensures @sparkjsdev/spark shares the SAME Three.js module instance
+// as the rest of the app — dynamic import() creates a separate chunk with its own
+// THREE, causing instanceof checks to fail and constructors to appear as undefined.
+import { SplatMesh, SparkControls } from '@sparkjsdev/spark';
 import {
   Maximize2,
   Minimize2,
@@ -149,108 +153,99 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
     let disposed = false;
     setSplatLoading(true);
 
-    const initScene = async () => {
-      try {
-        // Import Spark.js — SplatMesh auto-creates SparkRenderer via its embedded
-        // detection mesh (onBeforeRender → scene.add(new SparkRenderer({renderer})))
-        const { SplatMesh, SparkControls } = await import('@sparkjsdev/spark');
+    try {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) return;
 
-        if (disposed) return;
+      const w = container.clientWidth || 600;
+      const h = container.clientHeight || 450;
 
-        const canvas = canvasRef.current;
-        const container = containerRef.current;
-        if (!canvas || !container) return;
+      // Create renderer
+      // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
+      const renderer = new WebGLRenderer({ canvas, antialias: false });
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        const w = container.clientWidth || 600;
-        const h = container.clientHeight || 450;
+      // Create scene and camera
+      // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
+      const scene = new Scene();
+      // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
+      const camera = new PerspectiveCamera(60, w / h, 0.1, 1000);
+      // Start inside the world at eye level — Marble scenes are centered at origin
+      camera.position.set(0, 1.6, 0);
 
-        // Create renderer
-        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
-        const renderer = new WebGLRenderer({ canvas, antialias: false });
-        renderer.setSize(w, h);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      // Create controls
+      const controls = new SparkControls({ canvas });
 
-        // Create scene and camera
-        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
-        const scene = new Scene();
-        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
-        const camera = new PerspectiveCamera(60, w / h, 0.1, 1000);
-        // Start inside the world at eye level — Marble scenes are centered at origin
-        camera.position.set(0, 1.6, 0);
-
-        // Create controls
-        const controls = new SparkControls({ canvas });
-
-        // Load splat mesh — SparkRenderer is auto-created by SplatMesh's detection mesh
-        const splatMesh = new SplatMesh({
-          url,
-          onLoad: () => {
-            if (!disposed) {
-              setSplatLoading(false);
-              setIsSceneReady(true);
-            }
-          },
-        });
-        scene.add(splatMesh);
-
-        // Catch silent load failures (SplatMesh.initialized rejects on fetch/parse errors)
-        splatMesh.initialized.catch((err: unknown) => {
+      // Load splat mesh — SplatMesh auto-creates SparkRenderer via its embedded
+      // detection mesh (onBeforeRender → scene.add(new SparkRenderer({renderer})))
+      const splatMesh = new SplatMesh({
+        url,
+        onLoad: () => {
           if (!disposed) {
-            const msg = err instanceof Error ? err.message : 'Failed to load 3D world data';
-            console.error('[WorldViewer] SplatMesh load error:', err);
+            setSplatLoading(false);
+            setIsSceneReady(true);
+          }
+        },
+      });
+      scene.add(splatMesh);
+
+      // Catch silent load failures (SplatMesh.initialized rejects on fetch/parse errors)
+      splatMesh.initialized.catch((err: unknown) => {
+        if (!disposed) {
+          const msg = err instanceof Error ? err.message : 'Failed to load 3D world data';
+          console.error('[WorldViewer] SplatMesh load error:', err);
+          setSplatLoading(false);
+          setLoadError(msg);
+        }
+      });
+
+      // Store references for cleanup and mode switching
+      // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
+      sceneRef.current = { renderer, scene, camera, controls, splatMesh, clock: new Clock() };
+
+      // Animation loop — wrap in try/catch to surface render errors visibly
+      renderer.setAnimationLoop(() => {
+        if (disposed) {
+          renderer.setAnimationLoop(null);
+          return;
+        }
+        if (!isVisibleRef.current) return;
+        try {
+          controls.update(camera);
+          renderer.render(scene, camera);
+        } catch (renderErr) {
+          const msg = renderErr instanceof Error ? renderErr.message : 'Render error';
+          console.error('[WorldViewer] Render loop error:', renderErr);
+          renderer.setAnimationLoop(null);
+          if (!disposed) {
             setSplatLoading(false);
             setLoadError(msg);
           }
-        });
+        }
+      });
 
-        // Store references for cleanup and mode switching
-        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
-        sceneRef.current = { renderer, scene, camera, controls, splatMesh, clock: new Clock() };
+      // Handle resize
+      const handleResize = () => {
+        if (disposed || !container) return;
+        const rw = container.clientWidth;
+        const rh = container.clientHeight;
+        renderer.setSize(rw, rh);
+        camera.aspect = rw / rh;
+        camera.updateProjectionMatrix();
+      };
 
-        // Animation loop — wrap in try/catch to surface render errors visibly
-        renderer.setAnimationLoop(() => {
-          if (disposed) {
-            renderer.setAnimationLoop(null);
-            return;
-          }
-          if (!isVisibleRef.current) return;
-          try {
-            controls.update(camera);
-            renderer.render(scene, camera);
-          } catch (renderErr) {
-            const msg = renderErr instanceof Error ? renderErr.message : 'Render error';
-            console.error('[WorldViewer] Render loop error:', renderErr);
-            renderer.setAnimationLoop(null);
-            if (!disposed) {
-              setSplatLoading(false);
-              setLoadError(msg);
-            }
-          }
-        });
+      const resizeObserver = new ResizeObserver(handleResize);
+      resizeObserver.observe(container);
+      sceneRef.current.resizeObserver = resizeObserver;
 
-        // Handle resize
-        const handleResize = () => {
-          if (disposed || !container) return;
-          const rw = container.clientWidth;
-          const rh = container.clientHeight;
-          renderer.setSize(rw, rh);
-          camera.aspect = rw / rh;
-          camera.updateProjectionMatrix();
-        };
-
-        const resizeObserver = new ResizeObserver(handleResize);
-        resizeObserver.observe(container);
-        sceneRef.current.resizeObserver = resizeObserver;
-
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Scene initialization failed';
-        console.error('[WorldViewer] Scene init error:', err);
-        setSplatLoading(false);
-        setLoadError(msg);
-      }
-    };
-
-    initScene();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Scene initialization failed';
+      console.error('[WorldViewer] Scene init error:', err);
+      setSplatLoading(false);
+      setLoadError(msg);
+    }
 
     return () => {
       disposed = true;
