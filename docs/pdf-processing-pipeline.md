@@ -77,50 +77,53 @@
 │   - Create product record in database                         │
 │   - Generate UUID (product_id)                                │
 │   - Store metadata JSONB (factory, specs, etc.)               │
+│   - Consolidate visual metadata from associated images        │
 │                                                                 │
 │ Database: products                                             │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
+        ┌─────────────────────────────────────┐
+        │  END OF PRODUCT LOOP — ALL PRODUCTS │
+        └─────────────────────────────────────┘
+                              ↓
 ┌─────────────────────────────────────────────────────────────────┐
-│ STAGE 4.5: YOLO Layout Detection + Table Extraction (50-65%)   │
-│ Tools: YOLOLayoutDetector + TableExtractor (Camelot)          │
-│ Process: Detect layout regions + Extract tables               │
-│ Output: Layout regions + Structured tables                     │
+│ STAGE 4.5: Cross-Product Field Propagation (68-72%)            │
+│ File: app/api/pdf_processing/stage_4_products.py              │
+│ Process: Share common catalog-level fields across siblings    │
+│ Progress: 70 → 72%   Monitor stage: "field_propagation"       │
 │                                                                 │
-│ 🎯 YOLO LAYOUT DETECTION (ENABLED BY DEFAULT):                │
-│   - Runs AFTER product creation (needs product_id)            │
-│   - Detects 6 region types per page:                          │
-│     • TEXT regions (body text, paragraphs)                    │
-│     • IMAGE regions (product images, diagrams)                │
-│     • TABLE regions (specs, dimensions)                       │
-│     • TITLE regions (headers, section titles)                 │
-│     • CAPTION regions (image captions, labels)                │
-│     • FORMULA regions (mathematical expressions)              │
-│   - Stores bounding boxes with confidence scores              │
-│   - Preserves reading order for proper sequencing            │
+│ 🔄 FIELDS PROPAGATED (first non-empty sibling wins):          │
+│   Top-level:                                                   │
+│     - factory_name / factory_group_name                       │
+│     - country_of_origin / origin                              │
+│     - material_category (upload override always wins)         │
+│     - manufacturing_location / process / country              │
+│     - available_sizes  ← shared across catalog siblings       │
+│   Nested (material_properties):                               │
+│     - thickness, body_type, composition                       │
 │                                                                 │
-│ 📊 TABLE EXTRACTION (AUTOMATIC):                               │
-│   - Triggered when TABLE regions detected                     │
-│   - Camelot extracts structured data (lattice + stream)       │
-│   - Headers, rows, columns preserved                          │
-│   - Multiple formats: JSON, CSV, Markdown                     │
-│   - Linked to product via product_id                          │
+│ ⚠️ Only fills EMPTY fields — existing values never overwritten │
+│ DB sync: tracker._sync_to_database("field_propagation")       │
+│ Timeout: 2 min (DB reads/writes only, no AI calls)            │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STAGE 4.6: Dimension Extraction from Text Chunks (72-76%)      │
+│ File: app/api/pdf_processing/stage_4_products.py              │
+│ Process: Regex scan of extracted text for sizes/thickness     │
+│ Progress: 74 → 76%   Monitor stage: "dimension_extraction"    │
 │                                                                 │
-│ 🔧 CONFIGURATION:                                              │
-│   - YOLO_ENABLED=true (default, always enabled)               │
-│   - YOLO_CONFIDENCE_THRESHOLD=0.5 (adjustable)                │
-│   - YOLO_DEVICE=cpu (or 'cuda' for GPU acceleration)          │
-│   - Model: yolo-docparser (Hugging Face)                      │
+│ 📐 WHAT IT DOES (no AI calls — pure regex):                   │
+│   1. Merges all document_chunks.content for this document     │
+│   2. Extracts size patterns: WxH cm (5–300 cm sanity check)   │
+│   3. Extracts thickness near keywords (thickness/spessore/    │
+│      épaisseur/Stärke) or bare "X.Ymm" fallback              │
+│   4. Fills products still missing these fields after 4.5      │
+│      - available_sizes: list of found sizes                   │
+│      - material_properties.thickness: {value, confidence:     │
+│        0.65, source: "document_text"}                         │
 │                                                                 │
-│ 💾 DATABASE STORAGE:                                           │
-│   - product_layout_regions: All detected regions              │
-│   - product_tables: Extracted table data                      │
-│   - Both linked via product_id foreign key                    │
-│                                                                 │
-│ ⚡ PERFORMANCE:                                                │
-│   - CPU: ~8-15 seconds per page                               │
-│   - GPU: ~2-5 seconds per page (3-5x faster)                  │
-│   - Graceful degradation: Pipeline continues if YOLO fails    │
+│ Timeout: 2 min                                                 │
 └─────────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -682,6 +685,109 @@ NOVA is a contemporary porcelain tile...
 - Product record in database
 - All entities linked to product
 - Ready for embedding generation
+
+---
+
+### Stage 4.5: Cross-Product Field Propagation (68-72%)
+
+**File**: `app/api/pdf_processing/stage_4_products.py`
+**Function**: `propagate_common_fields_to_products()`
+**Monitor stage**: `field_propagation`
+**Timeout**: 2 min (DB reads/writes only — no AI calls)
+
+**Purpose**: After all products are created, fill empty metadata fields by borrowing values from sibling products in the same document. Catalog-level attributes (factory, origin, available sizes, etc.) are typically the same for every product in a catalog — this stage enforces that uniformity without overwriting any values that were already extracted.
+
+**Process**:
+1. Fetch all products for the document
+2. For each propagatable field, find the first sibling that has a non-empty value
+3. Write that value to every sibling that still has it empty
+4. Update `progress_monitor` and `tracker` before and after
+
+**Fields Propagated (first non-empty sibling wins)**:
+
+*Top-level metadata fields:*
+- `factory_name`, `factory_group_name`
+- `country_of_origin`, `origin`
+- `material_category` *(upload category always wins over propagated value)*
+- `manufacturing_location`, `manufacturing_process`, `manufacturing_country`
+- `available_sizes` — list of sizes shared across the catalog
+
+*Nested fields (under `material_properties`):*
+- `thickness` — propagated with `{value, confidence: 0.75, source: "sibling_product"}`
+- `body_type` — e.g., `"porcelain"`, `"ceramic"`
+- `composition` — material composition string
+
+**Safety rule**: Only empty/null/empty-list/empty-dict fields are touched. Existing values are **never overwritten**.
+
+**Returns**:
+```python
+{
+    "products_updated": 6,
+    "total_products": 8,
+    "fields_propagated": ["factory_name", "available_sizes", "material_properties.thickness"],
+    "source": "stage_4_5_propagation"
+}
+```
+
+---
+
+### Stage 4.6: Dimension Extraction from Text Chunks (72-76%)
+
+**File**: `app/api/pdf_processing/stage_4_products.py`
+**Function**: `extract_dimensions_from_document_chunks()`
+**Monitor stage**: `dimension_extraction`
+**Timeout**: 2 min (pure regex — no AI calls)
+
+**Purpose**: After Stage 4.5 sibling propagation, some products may still have empty `available_sizes` or `material_properties.thickness`. This stage merges all text chunks for the document and runs regex patterns to extract dimensions and thickness values, filling the remaining gaps.
+
+**Process**:
+1. Fetch all `document_chunks.content` for the document, merge into one text blob
+2. Run size regex: `(\d+)[xX×](\d+)\s*(?:cm|CM)` with sanity check (5–300 cm per axis)
+3. Run thickness regex: near keywords (`thickness|spessore|épaisseur|Stärke`) or bare `X.Ymm` pattern
+4. For each product still missing `available_sizes` → insert found sizes
+5. For each product still missing `material_properties.thickness` → insert `{value, confidence: 0.65, source: "document_text"}`
+
+**Coverage**: This stage acts as a safety net — even if Stage 0 AI extraction and Stage 4.5 sibling propagation both missed a dimension, the raw text almost always contains it somewhere.
+
+**Returns**:
+```python
+{
+    "products_updated": 2,
+    "sizes_found": ["30×60 cm", "60×120 cm"],
+    "thickness_found": "8.5mm",
+    "source": "document_text"
+}
+```
+
+---
+
+### Phase 2: Background Image Dimension Extraction
+
+**File**: `app/services/images/background_image_processor.py`
+**Method**: `_extract_dimensions_from_image_text()`
+**Called from**: `_enrich_product_metadata_from_spec_image()` (when image is NOT a spec table)
+
+**Purpose**: As part of the asynchronous Phase 2 image pipeline (Qwen vision analysis), if an image contains readable text (labels, overlaid specs, captions), this method extracts size and thickness data from Qwen's `raw_qwen_output` and fills products that are still missing these fields.
+
+**When it runs**: Phase 2 background processor — after the main pipeline completes. Does not block pipeline completion.
+
+**Logic**:
+- If `keyword_hits >= 3` → image is a spec table → handled by `_enrich_product_metadata_from_spec_image()`
+- If `keyword_hits < 3` → image is a product photo with possible text overlay → runs `_extract_dimensions_from_image_text()`
+
+**Regex patterns applied** (same as Stage 4.6 but on Qwen's OCR output):
+- Size: `(\d+)[xX×](\d+)\s*(?:cm|CM|mm|MM)?`
+- Thickness: near keywords or bare `X.Ymm` pattern
+
+**Confidence**: `0.70`, **source**: `"image_text"`
+
+**Three-Layer Coverage Summary**:
+
+| Layer | Stage | Source | Confidence | AI? |
+|-------|-------|--------|-----------|-----|
+| Sibling propagation | 4.5 | Sibling product DB | 0.75 | No |
+| Text chunk regex | 4.6 | document_chunks text | 0.65 | No |
+| Image OCR regex | Phase 2 | Qwen raw_qwen_output | 0.70 | Yes (Qwen) |
 
 ---
 
@@ -1357,7 +1463,7 @@ The YOLO Layout-Aware Chunking system uses detected layout regions to create int
 
 ### How It Works
 
-**Stage 4.5 (YOLO Detection)** → **Stage 2 (Layout-Aware Chunking)**
+**Stage 1 (YOLO Detection)** → **Stage 2 (Layout-Aware Chunking)**
 
 1. **YOLO detects layout regions** (Stage 4.5)
    - Stores regions in `product_layout_regions` table
@@ -1709,13 +1815,13 @@ YOLO_BATCH_SIZE=4  # GPU batch size
 
 ---
 
-**Last Updated**: January 8, 2026
-**Pipeline Version**: Product-Centric Architecture with YOLO Layout Detection & Table Extraction
+**Last Updated**: February 20, 2026
+**Pipeline Version**: Product-Centric Architecture with YOLO Layout Detection, Table Extraction & Cross-Product Field Propagation
 **Status**: Production
 
 **Major Features**:
-- ✅ **Product-Centric Architecture**: Process each product individually (Stages 1-5)
-- ✅ **YOLO Layout Detection**: Intelligent region detection (Stage 4.5)
+- ✅ **Product-Centric Architecture**: Process each product individually (Stages 1-4)
+- ✅ **YOLO Layout Detection**: Intelligent region detection (Stage 1)
   - 6 region types: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA
   - Enabled by default (`YOLO_ENABLED=true`)
   - Stores regions in `product_layout_regions` table
@@ -1732,6 +1838,21 @@ YOLO_BATCH_SIZE=4  # GPU batch size
   - Falls back to semantic chunking if no regions
 - ✅ **Entity Linking**: All entities linked via product_id foreign key
 - ✅ **Product API**: Includes tables in product response
+- ✅ **Cross-Product Field Propagation (Stage 4.5)**: Catalog-level fields shared across siblings
+  - factory_name, country_of_origin, manufacturing info
+  - available_sizes propagated catalog-wide
+  - material_properties.thickness, body_type, composition
+  - Only fills empty fields — existing values never overwritten
+  - Monitored via `field_propagation` stage, 2-min timeout
+- ✅ **Dimension Extraction from Text (Stage 4.6)**: Pure-regex fallback for sizes & thickness
+  - Merges all document text chunks
+  - Regex patterns for WxH cm sizes and Xmm thickness
+  - Fills products still missing data after Stage 4.5
+  - No AI calls, confidence 0.65, source: "document_text"
+- ✅ **Image OCR Dimension Extraction (Phase 2)**: Regex on Qwen vision output
+  - Runs in background after pipeline completion
+  - Catches dimensions from product photo text overlays
+  - Confidence 0.70, source: "image_text"
 - ✅ **URL-Based Architecture**: All image processing uses Supabase URLs (zero disk usage)
 - ✅ **Streaming Batch Extraction**: Extract 2-3 pages at a time, upload immediately, delete local files
 - ✅ **On-Demand Downloads**: Download from URLs to RAM, process, delete immediately

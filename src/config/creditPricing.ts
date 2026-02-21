@@ -39,17 +39,9 @@ export const ACTION_CATEGORIES: ActionCategory[] = [
 export const ACTION_PRICING: ActionPricingEntry[] = [
   // AI Agent Chat
   {
-    id: 'chat_simple',
-    label: 'Simple queries',
-    description: 'Quick search & lookup (Haiku)',
-    creditsPerAction: 1,
-    unit: 'message',
-    category: 'agent_chat',
-  },
-  {
-    id: 'chat_complex',
-    label: 'Complex queries',
-    description: 'Research & deep analysis (Sonnet)',
+    id: 'chat_message',
+    label: 'AI chat message',
+    description: 'Per message — billed at Sonnet rate (highest)',
     creditsPerAction: 4,
     unit: 'message',
     category: 'agent_chat',
@@ -107,26 +99,10 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
 
   // Interior Design
   {
-    id: 'interior_remodel',
-    label: 'Interior remodel',
-    description: 'AI room transformation',
+    id: 'interior_generation',
+    label: 'Interior generation',
+    description: 'AI room transformation or concept — billed at highest rate',
     creditsPerAction: 3,
-    unit: 'image',
-    category: 'interior_design',
-  },
-  {
-    id: 'interior_concept',
-    label: 'Quick interior concept',
-    description: 'Fast concept generation',
-    creditsPerAction: 2.25,
-    unit: 'image',
-    category: 'interior_design',
-  },
-  {
-    id: 'interior_architect',
-    label: 'Architectural render',
-    description: 'Detailed architectural design',
-    creditsPerAction: 2.7,
     unit: 'image',
     category: 'interior_design',
   },
@@ -167,17 +143,9 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
 
   // Visual & Material Search
   {
-    id: 'search_text',
-    label: 'Text semantic search',
-    description: 'Query-based material search',
-    creditsPerAction: 0.5,
-    unit: 'search',
-    category: 'visual_search',
-  },
-  {
-    id: 'search_visual',
-    label: 'Image-based search',
-    description: 'Visual similarity matching',
+    id: 'search_query',
+    label: 'Material search',
+    description: 'Text or image-based — billed at image search rate (highest)',
     creditsPerAction: 1,
     unit: 'search',
     category: 'visual_search',
@@ -185,17 +153,9 @@ export const ACTION_PRICING: ActionPricingEntry[] = [
 
   // VR Generation
   {
-    id: 'vr_mini',
-    label: 'VR World (Draft)',
-    description: '~30-45 second generation',
-    creditsPerAction: 75,
-    unit: 'world',
-    category: 'vr_generation',
-  },
-  {
-    id: 'vr_plus',
-    label: 'VR World (High Quality)',
-    description: '~5 minute generation',
+    id: 'vr_world',
+    label: 'VR World generation',
+    description: 'Draft to high quality — billed at full quality rate (highest)',
     creditsPerAction: 300,
     unit: 'world',
     category: 'vr_generation',

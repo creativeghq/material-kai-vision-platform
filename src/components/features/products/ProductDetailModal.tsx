@@ -398,6 +398,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const applicationData = allData?.application || {};
   const dimensionsData = allData?.dimensions || [];
 
+  // Product name uppercased for matching against product-keyed metadata dicts
+  const productNameUpper = (typeof product.name === 'string' ? product.name : '').toUpperCase().trim();
+  // Accent-stripped normalised form (e.g. "PIQUÉ" → "PIQUE") used for all key comparisons
+  const normalizeMatch = (s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+  const productNameNorm = normalizeMatch(productNameUpper);
+
   const factory = extractValue(allData?.factory_name) || extractValue(allData?.factory_group_name) || 'Unknown Factory';
   const origin = extractValue(allData?.origin) || extractValue(allData?.country_of_origin) || '';
   const collection = extractValue(designData?.collection) || extractValue(allData?.collection) || '';
@@ -428,29 +435,44 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         extractValue(allData?.dimension);
         if (dimValue && dimValue !== 'N/A') return dimValue;
 
-        // Smart fallback: Extract sizes from packaging keys or SKU codes
+        // Priority: use product_lines[productName].sizes if available (catalog products)
+        const productLines = allData?.product_lines;
+        if (productLines && typeof productLines === 'object') {
+          const lineKey = Object.keys(productLines).find(k =>
+            normalizeMatch(k) === productNameNorm ||
+            normalizeMatch(k).includes(productNameNorm)
+          );
+          if (lineKey) {
+            const lineData = (productLines as Record<string, unknown>)[lineKey] as Record<string, unknown>;
+            const lineSizes = lineData?.sizes;
+            const lineSizesVal = (lineSizes && typeof lineSizes === 'object' && 'value' in (lineSizes as Record<string, unknown>))
+              ? (lineSizes as Record<string, unknown>).value
+              : lineSizes;
+            if (Array.isArray(lineSizesVal) && lineSizesVal.length > 0) {
+              return (lineSizesVal as string[]).join(', ');
+            }
+          }
+        }
+
+        // Smart fallback: Extract sizes from SKU codes, filtered to THIS product only
         const extractedSizes = new Set<string>();
 
-        // Extract from packaging keys (e.g., "pique_3d_10x10", "pique_waffle_20x40")
-        const packagingKeys = Object.keys(allData?.packaging || {});
-        packagingKeys.forEach(key => {
-          const sizeMatch = key.match(/(\d+)x(\d+)/i);
-          if (sizeMatch) {
-            extractedSizes.add(`${sizeMatch[1]}×${sizeMatch[2]} cm`);
-          }
-        });
-
-        // Extract from SKU codes (e.g., "ona_mint_12x45", "pique_3d_anth_10x10")
+        // Extract from SKU codes — only keys that belong to this product
         const skuCodes = allData?.commercial?.sku_codes;
         if (skuCodes) {
           const skuObj = typeof skuCodes === 'object' && 'value' in skuCodes
             ? skuCodes.value as Record<string, unknown>
             : skuCodes as Record<string, unknown>;
           if (typeof skuObj === 'object') {
+            const normSkuProduct = productNameUpper.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
             Object.keys(skuObj).forEach(key => {
-              const sizeMatch = key.match(/(\d+)x(\d+)/i);
-              if (sizeMatch) {
-                extractedSizes.add(`${sizeMatch[1]}×${sizeMatch[2]} cm`);
+              // Only extract from keys whose first segment exactly matches this product name
+              const keyBase = key.split('_')[0].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+              if (keyBase === normSkuProduct) {
+                const sizeMatch = key.match(/(\d+)[Xx](\d+)/);
+                if (sizeMatch) {
+                  extractedSizes.add(`${sizeMatch[1]}×${sizeMatch[2]} cm`);
+                }
               }
             });
           }
@@ -462,7 +484,47 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
         return 'N/A';
       })();
-  const thickness = extractValue(materialPropsData?.thickness) || 'N/A';
+  // Smart thickness extraction — returns ONLY this product's thickness, or undefined
+  const thickness = (() => {
+    const thData = materialPropsData?.thickness;
+    if (!thData) return undefined;
+    // Unwrap {value, confidence} wrapper
+    const thVal = (typeof thData === 'object' && !Array.isArray(thData) && 'value' in (thData as Record<string, unknown>))
+      ? (thData as Record<string, unknown>).value
+      : thData;
+    if (!thVal) return undefined;
+    // Simple string — belongs to this product
+    if (typeof thVal === 'string') return thVal || undefined;
+    if (typeof thVal === 'number') return String(thVal);
+    // Array of per-product-line objects: [{product, thickness_mm, thickness_inch}, ...]
+    if (Array.isArray(thVal)) {
+      const arr = thVal as Array<Record<string, string>>;
+      const match = arr.find(t =>
+        t.product && (
+          normalizeMatch(t.product) === productNameNorm ||
+          normalizeMatch(t.product).includes(productNameNorm)
+        )
+      );
+      if (match) {
+        const inch = match.thickness_inch && match.thickness_inch !== 'Not specified' ? ` (${match.thickness_inch}")` : '';
+        return `${match.thickness_mm}mm${inch}`;
+      }
+      // No match for this product — leave empty
+      return undefined;
+    }
+    // Plain object: try common patterns like {mm: "10", inch: "0.4"} or {thickness_mm: "10"}
+    if (typeof thVal === 'object' && thVal !== null) {
+      const obj = thVal as Record<string, unknown>;
+      const mm = obj.mm || obj.thickness_mm;
+      if (mm) {
+        const inch = (obj.inch || obj.thickness_inch) && String(obj.inch || obj.thickness_inch) !== 'Not specified'
+          ? ` (${obj.inch || obj.thickness_inch}")` : '';
+        return `${mm}mm${inch}`;
+      }
+      return undefined; // Unknown object shape — leave empty
+    }
+    return undefined;
+  })();
   const finish = extractValue(materialPropsData?.finish) || 'N/A';
   const material = extractValue(allData?.material_category) || product.type || 'N/A';
 
@@ -485,12 +547,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const dimensions = {
-    'Available Sizes': size,
-    'Thickness': thickness !== 'N/A' ? thickness : undefined,
+    'Available Sizes': size !== 'N/A' ? size : undefined,
+    'Thickness': thickness,
+  };
+
+  // Smart color extraction — prefers product-specific available_colors, then tries to match by name
+  const extractProductColors = (): string | undefined => {
+    // available_colors is a simple per-product array (most reliable for individual product rows)
+    const avColors = allData?.available_colors;
+    if (Array.isArray(avColors) && avColors.length > 0) {
+      return (avColors as string[]).map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ');
+    }
+    const colData = appearanceData?.colors;
+    const colVal = (colData && typeof colData === 'object' && 'value' in (colData as Record<string, unknown>))
+      ? (colData as Record<string, unknown>).value
+      : colData;
+    if (!colVal) return undefined;
+    if (Array.isArray(colVal)) return (colVal as unknown[]).map(String).join(', ');
+    if (typeof colVal === 'object' && colVal !== null) {
+      const entries = Object.entries(colVal as Record<string, unknown>);
+      // Try to find key matching this product
+      const match = entries.find(([k]) => {
+        const kn = normalizeMatch(k);
+        return kn === productNameNorm || kn.includes(productNameNorm);
+      });
+      if (match) {
+        const v = match[1];
+        return Array.isArray(v) ? (v as unknown[]).map(String).join(', ') : String(v);
+      }
+      // No match for this product — leave empty
+      return undefined;
+    }
+    return String(colVal);
   };
 
   const appearance = {
-    'Colors': extractValue(appearanceData?.colors) || extractValue(allData?.colors),
+    'Colors': extractProductColors() || extractValue(allData?.colors),
     'Textures': extractValue(allData?.textures),
     'Shade Variation': extractValue(appearanceData?.shade_variation),
     'Visual Effect': extractValue(appearanceData?.visual_effect),
@@ -532,6 +624,45 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Country of Origin': origin || undefined,
   };
 
+  // Extract a value that may be keyed by product/variant names — returns undefined if no match for this product
+  const extractProductValue = (val: unknown): string | undefined => {
+    if (!val) return undefined;
+    const inner = (typeof val === 'object' && !Array.isArray(val) && 'value' in (val as Record<string, unknown>))
+      ? (val as Record<string, unknown>).value
+      : val;
+    if (!inner) return undefined;
+    if (typeof inner === 'string') return inner || undefined;
+    if (typeof inner === 'number') return String(inner);
+    if (Array.isArray(inner)) return (inner as unknown[]).map(String).join(', ');
+    if (typeof inner === 'object' && inner !== null) {
+      const entries = Object.entries(inner as Record<string, unknown>);
+      // Check if keys are product/variant name-like (contain letters, not just digits)
+      const hasNameKeys = entries.some(([k]) => /[A-Za-zÀ-ú]/.test(k));
+      if (hasNameKeys) {
+        // Filter to entries whose key matches this product
+        const matches = entries.filter(([k]) => {
+          const kn = normalizeMatch(k);
+          return kn === productNameNorm || kn.includes(productNameNorm);
+        });
+        if (matches.length > 0) {
+          return matches.map(([k, v]) => {
+            if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+              // Nested object e.g. {kg: "1.39", lb: "3.06"}
+              const inner2 = Object.entries(v as Record<string, unknown>)
+                .map(([ik, iv]) => `${iv} ${ik}`).join(' / ');
+              return `${k}: ${inner2}`;
+            }
+            return `${k}: ${Array.isArray(v) ? (v as unknown[]).join(', ') : v}`;
+          }).join(', ');
+        }
+        return undefined; // Keyed dict but no match — leave empty
+      }
+      // Non-name keys (e.g., SKU numbers) — show all as plain text
+      return entries.map(([k, v]) => `${k}: ${v}`).join(', ');
+    }
+    return undefined;
+  };
+
   const commercial = {
     'Product Codes': extractValue(commercialData?.product_codes),
     'SKU Codes': extractValue(commercialData?.sku_codes),
@@ -544,16 +675,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       (groutRecommendations.isomat ? `${formatGroutSuggestion(groutRecommendations.isomat)} (AI Suggested)` : undefined),
     'Grout Technica': extractValue(commercialData?.grout_technica) ||
       (groutRecommendations.technica ? `${formatGroutSuggestion(groutRecommendations.technica)} (AI Suggested)` : undefined),
-    'Grout Color Codes': extractValue(commercialData?.grout_color_codes),
+    'Grout Color Codes': extractProductValue(commercialData?.grout_color_codes),
   };
 
   const packaging = {
-    'Pieces per Box': extractValue(packagingData?.pieces_per_box),
-    'Boxes per Pallet': extractValue(packagingData?.boxes_per_pallet),
-    'Weight per Box (kg)': extractValue(packagingData?.weight_per_box) || extractValue(packagingData?.weight_kg),
-    'Weight per Box (lb)': extractValue(packagingData?.weight_per_box_lb) || extractValue(packagingData?.weight_lb),
-    'Coverage per Box (m²)': extractValue(packagingData?.coverage_per_box) || extractValue(packagingData?.coverage_m2),
-    'Coverage per Box (sqft)': extractValue(packagingData?.coverage_per_box_sqft) || extractValue(packagingData?.coverage_sqft),
+    'Pieces per Box': extractProductValue(packagingData?.pieces_per_box),
+    'Boxes per Pallet': extractProductValue(packagingData?.boxes_per_pallet),
+    'Weight per Box (kg)': extractProductValue(packagingData?.weight_per_box) || extractValue(packagingData?.weight_kg),
+    'Weight per Box (lb)': extractProductValue(packagingData?.weight_per_box_lb) || extractValue(packagingData?.weight_lb),
+    'Coverage per Box (m²)': extractProductValue(packagingData?.coverage_per_box) || extractValue(packagingData?.coverage_m2),
+    'Coverage per Box (sqft)': extractProductValue(packagingData?.coverage_per_box_sqft) || extractValue(packagingData?.coverage_sqft),
   };
 
   // Extract product variants from SKU codes and commercial data
@@ -582,7 +713,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         : skuCodes as Record<string, unknown>;
 
       if (typeof skuObj === 'object' && skuObj !== null) {
+        // Helper: strip accents and uppercase for accent-insensitive comparison
+        const normalizeForMatch = (s: string) =>
+          s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+        const normProductName = normalizeForMatch(productNameUpper);
+
         Object.entries(skuObj).forEach(([key, value]) => {
+          // Only include SKU variants that belong to THIS product.
+          // The first underscore-delimited segment of the key identifies the product/variant
+          // (e.g. "ona_mint_12x45" → "ONA", "pique_3d_anth_10x10" → "PIQUE").
+          const keyBase = normalizeForMatch(key.split('_')[0]);
+          if (keyBase !== normProductName) return; // skip other products' variants
+
           // Parse variant info from key (e.g., "pique_3d_anth_10x10" or "ona_mint_12x45")
           const parts = key.toLowerCase().split('_');
 
@@ -739,14 +881,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         </CardHeader>
         <CardContent className="pt-4">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {filteredData.map(([key, value]) => (
-              <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{key}</p>
-                <p className="text-sm font-bold text-gray-900">
-                  {renderValue(value)}
-                </p>
-              </div>
-            ))}
+            {filteredData.map(([key, value]) => {
+              const str = renderValue(value);
+              const parts = str.split(', ').filter(p => p.trim());
+              return (
+                <div key={key} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{key}</p>
+                  {parts.length >= 3 ? (
+                    <ul className="space-y-0.5 mt-1">
+                      {parts.map((part, i) => (
+                        <li key={i} className="text-sm font-semibold text-gray-900 flex items-start gap-1.5">
+                          <span className="mt-2 w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
+                          {part.trim()}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm font-bold text-gray-900">{str}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
@@ -981,9 +1136,20 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <span className="text-sm font-medium text-gray-600">Material</span>
                   <span className="text-sm font-semibold text-gray-900">{material}</span>
                 </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                <div className="py-2 border-b border-gray-200">
                   <span className="text-sm font-medium text-gray-600">Size</span>
-                  <span className="text-sm font-semibold text-gray-900">{size}</span>
+                  {size === 'N/A' ? (
+                    <span className="block text-sm font-semibold text-gray-900 mt-1">N/A</span>
+                  ) : (
+                    <ul className="mt-1 space-y-0.5">
+                      {size.split(', ').map((s, i) => (
+                        <li key={i} className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-gray-400 flex-shrink-0" />
+                          {s.trim()}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-200">
                   <span className="text-sm font-medium text-gray-600">Thickness</span>
@@ -1127,7 +1293,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </CardHeader>
                     <CardContent>
                       <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                        {chunk.chunk_text}
+                        {chunk.content}
                       </p>
                     </CardContent>
                   </Card>

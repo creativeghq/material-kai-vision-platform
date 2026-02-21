@@ -71,7 +71,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
         .from('document_chunks')
         .select(`
           id,
-          chunk_text,
+          content,
           text_embedding,
           created_at,
           document_id,
@@ -95,7 +95,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
         embedding_dimension: 1024,
         created_at: chunk.created_at,
         source_id: chunk.id,
-        source_text: chunk.chunk_text?.substring(0, 200) + '...',
+        source_text: chunk.content?.substring(0, 200) + '...',
         workspace_id: workspaceId,
         embedding: chunk.text_embedding,
         chunk_id: chunk.id,

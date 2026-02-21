@@ -177,10 +177,18 @@ export class MivaaApiClient {
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            // FastAPI returns {detail: string|array}; others use error/message
+            const detail =
+              typeof errorData.detail === 'string'
+                ? errorData.detail
+                : Array.isArray(errorData.detail)
+                  ? errorData.detail.map((d: any) => d.msg || String(d)).join(', ')
+                  : null;
             const error = new Error(
-              errorData.error ||
+              detail ||
+                errorData.error ||
                 errorData.message ||
-                `HTTP ${response.status}: ${response.statusText}`,
+                `HTTP ${response.status}: ${response.statusText || response.status}`,
             );
             (error as any).status = response.status;
             throw error;
@@ -240,10 +248,18 @@ export class MivaaApiClient {
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            // FastAPI returns {detail: string|array}; others use error/message
+            const detail =
+              typeof errorData.detail === 'string'
+                ? errorData.detail
+                : Array.isArray(errorData.detail)
+                  ? errorData.detail.map((d: any) => d.msg || String(d)).join(', ')
+                  : null;
             const error = new Error(
-              errorData.error ||
+              detail ||
+                errorData.error ||
                 errorData.message ||
-                `HTTP ${response.status}: ${response.statusText}`,
+                `HTTP ${response.status}: ${response.statusText || response.status}`,
             );
             (error as any).status = response.status;
             throw error;

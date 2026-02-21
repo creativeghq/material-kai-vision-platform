@@ -191,7 +191,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                       </TableCell>
                       <TableCell>{getSourceBadge(chunk.source_type)}</TableCell>
                       <TableCell>
-                        {chunk.embedding ? (
+                        {chunk.text_embedding ? (
                           <Badge className="bg-green-100 text-green-700">Yes</Badge>
                         ) : (
                           <Badge variant="secondary">No</Badge>
@@ -242,14 +242,14 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter, 
                 <h4 className="font-semibold mb-2">Page Number</h4>
                 <Badge>{selectedChunk.page_number || 'N/A'}</Badge>
               </div>
-              {selectedChunk.embedding && (
+              {selectedChunk.text_embedding && (
                 <div>
                   <h4 className="font-semibold mb-2">Embedding</h4>
                   <p className="text-xs text-muted-foreground">
-                    Vector dimension: {selectedChunk.embedding.length}
+                    Vector dimension: {selectedChunk.text_embedding.length}
                   </p>
                   <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto mt-2">
-                    {JSON.stringify(selectedChunk.embedding.slice(0, 10), null, 2)}... (truncated)
+                    {JSON.stringify(selectedChunk.text_embedding.slice(0, 10), null, 2)}... (truncated)
                   </pre>
                 </div>
               )}
