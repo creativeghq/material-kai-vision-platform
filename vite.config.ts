@@ -91,17 +91,17 @@ export default defineConfig(({ mode }) => {
               '@radix-ui/react-popover': 'vendor-ui',
               '@radix-ui/react-tabs': 'vendor-ui',
               '@radix-ui/react-select': 'vendor-ui',
-              // Charts
-              'recharts': 'vendor-charts',
+              // Charts — co-bundle with react to guarantee forwardRef is initialized before recharts reads it
+              'recharts': 'vendor-react',
               // Supabase
               '@supabase/supabase-js': 'vendor-supabase',
-              // Sentry
-              '@sentry/react': 'vendor-sentry',
+              // Sentry — depends on React, co-bundle to avoid forwardRef init order issues
+              '@sentry/react': 'vendor-react',
               // Data layer
               '@tanstack/react-query': 'vendor-query',
               '@tanstack/query-core': 'vendor-query',
-              // Flow builder
-              '@xyflow/react': 'vendor-xyflow',
+              // Flow builder — depends on React, co-bundle
+              '@xyflow/react': 'vendor-react',
               // Utility libraries
               'date-fns': 'vendor-utils',
               'clsx': 'vendor-utils',

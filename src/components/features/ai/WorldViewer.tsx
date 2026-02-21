@@ -160,16 +160,13 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
     const renderer = new WebGLRenderer({ canvas });
-    // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
     const scene = new Scene();
-    // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
     const camera = new PerspectiveCamera(65, canvas.clientWidth / canvas.clientHeight, 0.01, 1000);
     scene.add(camera);
 
     // SparkRenderer added to scene (official pattern — NOT camera.add)
-    // @ts-expect-error spark types
+    // @ts-expect-error spark types not fully typed
     const spark = new SparkRenderer({ renderer });
     scene.add(spark);
 
@@ -188,7 +185,6 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
     const resizeObserver = new ResizeObserver(resizeToContainer);
     resizeObserver.observe(container);
 
-    // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
     sceneRef.current = { renderer, scene, camera, spark, controls };
 
     // Animation loop — matches official example exactly
@@ -205,12 +201,10 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       .then((packedSplats: any) => {
         if (disposed) return;
         const splatMesh = new SplatMesh({ packedSplats });
-        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
         splatMesh.quaternion.set(1, 0, 0, 0); // identity rotation
         scene.add(splatMesh);
         // Position camera at world origin (official default)
         camera.position.set(0, 0, 0);
-        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
         camera.quaternion.set(0, 0, 0, 1);
         sceneRef.current.splatMesh = splatMesh;
         setSplatLoading(false);
@@ -231,7 +225,8 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
         r?.setAnimationLoop(null);
         ro?.disconnect();
         m?.dispose();
-        s?.dispose();
+        // SparkRenderer extends THREE.Mesh — no public dispose() method
+        if (s && typeof s.dispose === 'function') s.dispose();
         r?.dispose();
         sceneRef.current = null;
       }

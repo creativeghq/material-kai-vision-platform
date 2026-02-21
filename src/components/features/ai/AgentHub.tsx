@@ -64,7 +64,7 @@ interface AgentDefinition {
 const AGENTS: AgentDefinition[] = [
   {
     id: 'kai',
-    name: 'KAI',
+    name: 'JARVIS',
     description: 'Material intelligence — search, insights, research & content',
     icon: Bot,
     color: 'text-blue-500',
@@ -1278,28 +1278,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       <div className="w-80 flex flex-col m-4 rounded-3xl glass-panel bg-white/40 border-white/20">
         {/* Header */}
         <div className="p-5 border-b border-white/10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-foreground/80 tracking-tight">Library</h2>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleImportConversation}
-                title="Import conversation"
-                className="hover:bg-white/10"
-              >
-                <Upload className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleExportConversation}
-                title="Export current conversation"
-                disabled={!currentConversationId}
-                className="hover:bg-white/10"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center shadow-inner flex-shrink-0">
+              <AgentIcon className={`h-5 w-5 ${currentAgent?.color}`} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold tracking-tight leading-tight">{currentAgent?.name}</h3>
             </div>
           </div>
 
@@ -1373,52 +1357,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat Header */}
-        <div className="min-h-16 px-6 py-4 flex items-center justify-between m-4 rounded-3xl glass-panel border-white/20">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center shadow-inner">
-              <AgentIcon className={`h-6 w-6 ${currentAgent?.color}`} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold tracking-tight">{currentAgent?.name}</h3>
-              <p className="text-sm text-muted-foreground/70">
-                {currentAgent?.description}
-              </p>
-            </div>
-          </div>
-
-          {/* Agent Icon Selector - Available to all users */}
-          <TooltipProvider delayDuration={200}>
-            <div className="flex items-center gap-1.5 p-1 rounded-full bg-white/10 backdrop-blur-sm">
-              {availableAgents.map((agent) => {
-                const Icon = agent.icon;
-                const isActive = selectedAgent === agent.id;
-                return (
-                  <Tooltip key={agent.id}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setSelectedAgent(agent.id)}
-                        className={cn(
-                          'p-2.5 rounded-full transition-all duration-200 ease-out',
-                          isActive
-                            ? 'bg-primary text-primary-foreground shadow-lg scale-110 ring-2 ring-primary/30'
-                            : 'hover:bg-white/20 text-muted-foreground hover:text-foreground hover:scale-105'
-                        )}
-                      >
-                        <Icon className={cn('h-5 w-5', isActive && agent.color)} />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[200px]">
-                      <p className="font-semibold">{agent.name}</p>
-                      <p className="text-xs text-muted-foreground">{agent.description}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
-          </TooltipProvider>
-        </div>
-
         {/* Messages Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
           {messages.length === 0 ? (
@@ -1760,6 +1698,40 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           )}
 
           {/* REMOVED: Attached PDF display - PDF processing moved to /admin/data-import page */}
+
+          {/* Agent Selector */}
+          <div className="px-4 pt-3 pb-1 flex items-center gap-2">
+            <span className="text-xs text-muted-foreground/60 font-medium">Agent</span>
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-1 p-0.5 rounded-full bg-white/10 backdrop-blur-sm">
+                {availableAgents.map((agent) => {
+                  const Icon = agent.icon;
+                  const isActive = selectedAgent === agent.id;
+                  return (
+                    <Tooltip key={agent.id}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setSelectedAgent(agent.id)}
+                          className={cn(
+                            'p-2 rounded-full transition-all duration-200 ease-out',
+                            isActive
+                              ? 'bg-primary text-primary-foreground shadow-md scale-105 ring-1 ring-primary/30'
+                              : 'hover:bg-white/20 text-muted-foreground hover:text-foreground hover:scale-105'
+                          )}
+                        >
+                          <Icon className={cn('h-4 w-4', !isActive && agent.color)} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="font-semibold">{agent.name}</p>
+                        <p className="text-xs text-muted-foreground">{agent.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
+          </div>
 
           {/* Input Controls */}
           <div className="p-4">
