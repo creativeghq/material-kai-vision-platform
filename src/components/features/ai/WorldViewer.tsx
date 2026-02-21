@@ -69,6 +69,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
   const [isSceneReady, setIsSceneReady] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [splatLoading, setSplatLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   // Poll for generation status
   useEffect(() => {
@@ -174,11 +175,12 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
           1000
         );
         camera.position.set(0, 1.5, 3);
+        camera.lookAt(0, 0, 0);
 
-        // Create Spark renderer
+        // Create Spark renderer — must be added directly to scene (not camera).
+        // Spark.js internally auto-creates with scene.add(new SparkRenderer({renderer}))
         const spark = new SparkRenderer({ renderer });
-        camera.add(spark);
-        scene.add(camera);
+        scene.add(spark);
 
         // Create controls
         const controls = new SparkControls({ canvas });
@@ -194,6 +196,15 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
           },
         });
         scene.add(splatMesh);
+
+        // Catch silent load failures (SplatMesh.initialized rejects on error)
+        splatMesh.initialized.catch((err: Error) => {
+          if (!disposed) {
+            console.error('[WorldViewer] SplatMesh load error:', err);
+            setSplatLoading(false);
+            setLoadError(err?.message || 'Failed to load 3D world data');
+          }
+        });
 
         // Store references for cleanup and mode switching
         sceneRef.current = {
@@ -365,11 +376,20 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       />
 
       {/* Loading overlay for splat */}
-      {splatLoading && (
+      {(splatLoading || loadError) && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 z-10">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
-            <p className="text-white/80 text-xs">Loading 3D world...</p>
+            {loadError ? (
+              <>
+                <AlertCircle className="w-6 h-6 text-red-400" />
+                <p className="text-red-300 text-xs text-center max-w-[280px]">{loadError}</p>
+              </>
+            ) : (
+              <>
+                <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+                <p className="text-white/80 text-xs">Loading 3D world...</p>
+              </>
+            )}
           </div>
         </div>
       )}
