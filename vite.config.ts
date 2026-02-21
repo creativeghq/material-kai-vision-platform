@@ -9,6 +9,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    optimizeDeps: {
+      // Excluding @sparkjsdev/spark from pre-bundling fixes the "(void 0) is not a constructor"
+      // error in dev mode. When Vite pre-bundles spark with esbuild, it externalises `three`
+      // but creates EMPTY imports (import {} from "chunk-three.js") for the `import * as THREE`
+      // namespace — so all THREE.* constructors are undefined inside the pre-bundle.
+      // Excluding makes Vite serve spark.module.js as raw ESM and rewrite its bare "three"
+      // specifier to the proper pre-bundled three URL, giving spark the full THREE namespace.
+      exclude: ['@sparkjsdev/spark'],
+    },
     server: {
       port: 8080,
       host: true,
