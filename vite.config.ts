@@ -48,25 +48,44 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            // Core framework — loaded on every page
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            // UI primitives — loaded on every page (shared across all routes)
-            'vendor-ui': ['lucide-react', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-tooltip', '@radix-ui/react-popover', '@radix-ui/react-tabs', '@radix-ui/react-select'],
-            // 3D rendering — only loaded when WorldViewer/SVBRDF routes are visited
-            'vendor-3d': ['three', '@react-three/fiber', '@react-three/drei', '@sparkjsdev/spark'],
-            // Charts — only loaded on admin monitoring/analytics routes
-            'vendor-charts': ['recharts'],
-            // Supabase client — shared but separable
-            'vendor-supabase': ['@supabase/supabase-js'],
-            // Sentry — monitoring, can load independently
-            'vendor-sentry': ['@sentry/react'],
+          // Function-based manualChunks checks the resolved file path, ensuring
+          // @sparkjsdev/spark is co-located with three in the same chunk.
+          // The array syntax was insufficient — spark.module.js ended up in its
+          // own separate chunk, getting a tree-shaken THREE namespace that was
+          // missing Vector2, ShaderMaterial, etc. → "(void 0) is not a constructor"
+          manualChunks: (id) => {
+            if (!id.includes('node_modules')) return undefined;
+            // 3D rendering — three + spark MUST be in the same chunk so spark's
+            // `import * as THREE from "three"` resolves against the full, un-shaken THREE
+            if (
+              id.includes('/three/') ||
+              id.includes('/@react-three/') ||
+              id.includes('/@sparkjsdev/')
+            ) return 'vendor-3d';
+            // Core framework
+            if (id.includes('/react-dom/') || id.includes('/react-router') || (id.includes('/react/') && !id.includes('/react-query'))) return 'vendor-react';
+            // UI primitives
+            if (id.includes('/lucide-react/') || id.includes('/@radix-ui/')) return 'vendor-ui';
+            // Charts
+            if (id.includes('/recharts/') || id.includes('/victory-')) return 'vendor-charts';
+            // Supabase
+            if (id.includes('/@supabase/')) return 'vendor-supabase';
+            // Sentry
+            if (id.includes('/@sentry/')) return 'vendor-sentry';
             // Data layer
-            'vendor-query': ['@tanstack/react-query', '@tanstack/query-core'],
-            // Flow builder — only loaded on /admin/flows route
-            'vendor-xyflow': ['@xyflow/react'],
+            if (id.includes('/@tanstack/')) return 'vendor-query';
+            // Flow builder
+            if (id.includes('/@xyflow/')) return 'vendor-xyflow';
             // Utility libraries
-            'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge', 'zod', 'zustand', 'immer'],
+            if (
+              id.includes('/date-fns/') ||
+              id.includes('/clsx/') ||
+              id.includes('/tailwind-merge/') ||
+              id.includes('/zod/') ||
+              id.includes('/zustand/') ||
+              id.includes('/immer/')
+            ) return 'vendor-utils';
+            return undefined;
           },
         },
       },
