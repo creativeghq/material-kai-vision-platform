@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    optimizeDeps: {
+      // Force pre-bundle @sparkjsdev/spark so its `import * as THREE from "three"`
+      // resolves correctly through Vite's module graph. Without this, the dynamic
+      // import() serves the raw ESM which can't resolve bare specifiers in-browser.
+      include: ['@sparkjsdev/spark'],
+    },
     server: {
       port: 8080,
       host: true,
