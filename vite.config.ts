@@ -48,44 +48,61 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          // Function-based manualChunks checks the resolved file path, ensuring
-          // @sparkjsdev/spark is co-located with three in the same chunk.
-          // The array syntax was insufficient — spark.module.js ended up in its
-          // own separate chunk, getting a tree-shaken THREE namespace that was
-          // missing Vector2, ShaderMaterial, etc. → "(void 0) is not a constructor"
+          // Extract the exact package name from the resolved module path (handles
+          // both scoped @org/pkg and plain pkg, and both / and \ path separators).
+          // This is equivalent to the array-based manualChunks but also correctly
+          // assigns @sparkjsdev/spark into vendor-3d (which the array syntax failed
+          // to do, causing spark to get a tree-shaken THREE with missing exports).
           manualChunks: (id) => {
             if (!id.includes('node_modules')) return undefined;
-            // 3D rendering — three + spark MUST be in the same chunk so spark's
-            // `import * as THREE from "three"` resolves against the full, un-shaken THREE
-            if (
-              id.includes('/three/') ||
-              id.includes('/@react-three/') ||
-              id.includes('/@sparkjsdev/')
-            ) return 'vendor-3d';
-            // Core framework
-            if (id.includes('/react-dom/') || id.includes('/react-router') || (id.includes('/react/') && !id.includes('/react-query'))) return 'vendor-react';
-            // UI primitives
-            if (id.includes('/lucide-react/') || id.includes('/@radix-ui/')) return 'vendor-ui';
-            // Charts
-            if (id.includes('/recharts/') || id.includes('/victory-')) return 'vendor-charts';
-            // Supabase
-            if (id.includes('/@supabase/')) return 'vendor-supabase';
-            // Sentry
-            if (id.includes('/@sentry/')) return 'vendor-sentry';
-            // Data layer
-            if (id.includes('/@tanstack/')) return 'vendor-query';
-            // Flow builder
-            if (id.includes('/@xyflow/')) return 'vendor-xyflow';
-            // Utility libraries
-            if (
-              id.includes('/date-fns/') ||
-              id.includes('/clsx/') ||
-              id.includes('/tailwind-merge/') ||
-              id.includes('/zod/') ||
-              id.includes('/zustand/') ||
-              id.includes('/immer/')
-            ) return 'vendor-utils';
-            return undefined;
+
+            // Extract "pkg" or "@scope/pkg" from the resolved path
+            const m = id.match(/node_modules[\\/](@[^\\/]+[\\/][^\\/]+|[^\\/]+)/);
+            if (!m) return undefined;
+            const pkg = m[1].replace(/\\/g, '/'); // normalise Windows separators
+
+            // Chunk assignments — mirrors the old array-based config exactly,
+            // with @sparkjsdev/spark added to vendor-3d.
+            const CHUNK: Record<string, string> = {
+              // 3D (three + spark must be co-bundled so spark's `import * as THREE`
+              // resolves the full, un-tree-shaken namespace)
+              'three': 'vendor-3d',
+              '@react-three/fiber': 'vendor-3d',
+              '@react-three/drei': 'vendor-3d',
+              '@sparkjsdev/spark': 'vendor-3d',
+              // Core framework
+              'react': 'vendor-react',
+              'react-dom': 'vendor-react',
+              'react-router-dom': 'vendor-react',
+              // UI primitives
+              'lucide-react': 'vendor-ui',
+              '@radix-ui/react-dialog': 'vendor-ui',
+              '@radix-ui/react-dropdown-menu': 'vendor-ui',
+              '@radix-ui/react-tooltip': 'vendor-ui',
+              '@radix-ui/react-popover': 'vendor-ui',
+              '@radix-ui/react-tabs': 'vendor-ui',
+              '@radix-ui/react-select': 'vendor-ui',
+              // Charts
+              'recharts': 'vendor-charts',
+              // Supabase
+              '@supabase/supabase-js': 'vendor-supabase',
+              // Sentry
+              '@sentry/react': 'vendor-sentry',
+              // Data layer
+              '@tanstack/react-query': 'vendor-query',
+              '@tanstack/query-core': 'vendor-query',
+              // Flow builder
+              '@xyflow/react': 'vendor-xyflow',
+              // Utility libraries
+              'date-fns': 'vendor-utils',
+              'clsx': 'vendor-utils',
+              'tailwind-merge': 'vendor-utils',
+              'zod': 'vendor-utils',
+              'zustand': 'vendor-utils',
+              'immer': 'vendor-utils',
+            };
+
+            return CHUNK[pkg] ?? undefined;
           },
         },
       },
