@@ -151,8 +151,8 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
 
     const initScene = async () => {
       try {
-        // Import only what's needed — SplatMesh auto-creates SparkRenderer internally
-        const { SplatMesh, SparkControls } = await import('@sparkjsdev/spark');
+        // Import Spark.js — SparkRenderer + SplatMesh + SparkControls
+        const { SparkRenderer, SplatMesh, SparkControls } = await import('@sparkjsdev/spark');
 
         if (disposed) return;
 
@@ -176,11 +176,17 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
         const camera = new PerspectiveCamera(60, w / h, 0.1, 1000);
         // Start inside the world at eye level — Marble scenes are centered at origin
         camera.position.set(0, 1.6, 0);
+        scene.add(camera);
+
+        // Attach SparkRenderer to camera (recommended for large/room-scale scenes — better float16 precision)
+        // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
+        const spark = new SparkRenderer({ renderer });
+        camera.add(spark);
 
         // Create controls
         const controls = new SparkControls({ canvas });
 
-        // Load splat mesh — SparkRenderer is auto-created by SplatMesh's detection mesh
+        // Load splat mesh
         const splatMesh = new SplatMesh({
           url,
           onLoad: () => {
@@ -204,7 +210,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
 
         // Store references for cleanup and mode switching
         // @ts-expect-error three@0.160 types mismatch with @types/three@0.179
-        sceneRef.current = { renderer, scene, camera, controls, splatMesh, clock: new Clock() };
+        sceneRef.current = { renderer, scene, camera, spark, controls, splatMesh, clock: new Clock() };
 
         // Animation loop — use setAnimationLoop (same as Spark.js README)
         renderer.setAnimationLoop(() => {
@@ -246,10 +252,11 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       cancelAnimationFrame(animFrameRef.current);
 
       if (sceneRef.current) {
-        const { renderer, splatMesh, resizeObserver } = sceneRef.current;
+        const { renderer, spark, splatMesh, resizeObserver } = sceneRef.current;
         renderer.setAnimationLoop(null);
         resizeObserver?.disconnect();
         splatMesh?.dispose();
+        spark?.dispose();
         renderer?.dispose();
         sceneRef.current = null;
       }

@@ -522,24 +522,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     sourceMessage: Message,
   ) => {
     try {
-      // Trigger VR generation via edge function
-      const { vrWorldId } = await vrWorldService.generateVRWorld({
+      // Trigger VR generation via edge function (synchronous — awaits full WorldLabs generation)
+      const vrResult = await vrWorldService.generateVRWorld({
         sourceImageUrl: imageUrl,
         prompt: context.prompt || `Interior design: ${context.roomType || 'room'} in ${context.style || 'modern'} style`,
         roomType: context.roomType,
         style: context.style,
       });
 
-      // Add a new assistant message with the WorldViewer
+      // World is already completed — pass all splat URLs directly to WorldViewer (no polling needed)
       const vrMessage: Message = {
         id: `vr-${Date.now()}`,
         role: 'assistant',
-        content: `Generating an explorable VR world from your design. This takes about 30-45 seconds...`,
+        content: `Your explorable VR world is ready! Use orbit controls to look around, or switch to first-person (WASD) to walk through.`,
         timestamp: new Date(),
         agentId: 'interior-designer',
         worldData: {
-          vrWorldId,
-          status: 'generating',
+          vrWorldId: vrResult.vrWorldId,
+          status: vrResult.status || 'completed',
+          splatUrl100k: vrResult.splatUrl100k,
+          splatUrl500k: vrResult.splatUrl500k,
+          splatUrlFull: vrResult.splatUrlFull,
+          colliderGlbUrl: vrResult.colliderGlbUrl,
+          caption: vrResult.caption,
           sourceImageUrl: imageUrl,
           prompt: context.prompt,
         },
@@ -558,8 +563,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
 
       toast({
-        title: 'VR World Generation Started',
-        description: `Creating 3D world (${VR_CREDIT_COSTS['marble-0.1-mini']} credits). You can continue chatting.`,
+        title: 'VR World Ready',
+        description: `Your 3D world has been generated successfully.`,
       });
     } catch (error: any) {
       console.error('VR generation error:', error);

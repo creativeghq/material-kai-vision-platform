@@ -51,7 +51,16 @@ export const vrWorldService = {
    * Returns the vr_world_id immediately; the edge function handles the rest.
    * The frontend polls the vr_worlds table for status updates.
    */
-  async generateVRWorld(params: GenerateVRParams): Promise<{ vrWorldId: string }> {
+  async generateVRWorld(params: GenerateVRParams): Promise<{
+    vrWorldId: string;
+    status: string;
+    splatUrl100k?: string;
+    splatUrl500k?: string;
+    splatUrlFull?: string;
+    colliderGlbUrl?: string;
+    panoramaUrl?: string;
+    caption?: string;
+  }> {
     const { data, error } = await supabase.functions.invoke('generate-vr-world', {
       body: {
         source_image_url: params.sourceImageUrl,
@@ -77,7 +86,17 @@ export const vrWorldService = {
     }
     if (!data?.success) throw new Error(data?.error || 'Failed to generate VR world');
 
-    return { vrWorldId: data.data.id };
+    const world = data.data as VRWorld;
+    return {
+      vrWorldId: world.id,
+      status: world.status,
+      splatUrl100k: world.splat_url_100k,
+      splatUrl500k: world.splat_url_500k,
+      splatUrlFull: world.splat_url_full,
+      colliderGlbUrl: world.collider_glb_url,
+      panoramaUrl: world.panorama_url,
+      caption: world.caption,
+    };
   },
 
   /**
