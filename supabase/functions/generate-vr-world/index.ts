@@ -284,7 +284,8 @@ async function uploadImageToWorldLabs(imageUrl: string): Promise<{ id: string }>
   }
 
   const prepareData = await prepareResponse.json();
-  const mediaAssetId = prepareData.media_asset?.id;
+  // WorldLabs returns media_asset_id (not id) in the media_asset object
+  const mediaAssetId = prepareData.media_asset?.media_asset_id || prepareData.media_asset?.id;
   const uploadUrl = prepareData.upload_info?.upload_url;
   const requiredHeaders = prepareData.upload_info?.required_headers || {};
 

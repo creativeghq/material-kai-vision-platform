@@ -94,12 +94,10 @@ class MaterialProductMatcherService {
         console.log(`🔍 Searching for: "${searchQuery}" (confidence: ${material.confidence})`);
 
         // Use MIVAA semantic search API
-        const response = await mivaaApi.searchSemantic({
+        const response = await mivaaApi.searchMultiVector({
           query: searchQuery,
+          workspace_id: workspaceId,
           limit: limit,
-          filters: {
-            workspace_id: workspaceId,
-          },
         });
 
         if (!response.success || !response.data?.results) {

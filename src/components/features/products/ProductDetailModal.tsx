@@ -139,6 +139,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   useEffect(() => {
     const loadImages = async () => {
       if (!product?.id) return;
+      // Skip DB queries for demo products (non-UUID IDs like "demo-wood-green-001")
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
 
       try {
         setIsLoadingImages(true);
@@ -206,6 +208,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   useEffect(() => {
     const loadAdminData = async () => {
       if (!product?.id || !isAdmin || !isOpen) return;
+      // Skip DB queries for demo products (non-UUID IDs like "demo-wood-green-001")
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
 
       try {
         // Load chunks from chunk_product_relationships table
