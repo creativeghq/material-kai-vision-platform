@@ -8,6 +8,7 @@ import ProductCard from '@/components/features/products/ProductCard';
 import type { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import Design3DModal from './Design3DModal';
+import SEOArticleViewer from './SEOArticleViewer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 
@@ -266,87 +267,9 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
     );
   }
 
-  // SEO Article Display
+  // SEO Article Display — uses the full Frase-style SEOArticleViewer
   if (result.type === 'seo_article' && result.data) {
-    const article = result.data;
-    return (
-      <div className="space-y-6 bg-white rounded-lg p-6 shadow-lg">
-        {/* Header */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge style={{ background: 'var(--mocha-color)', color: 'white' }}>SEO Article</Badge>
-            <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
-              Score: {article.seo_score}/100
-            </Badge>
-            <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50">
-              Readability: {article.readability_score}/100
-            </Badge>
-            <Badge variant="outline" className="text-purple-700 border-purple-300 bg-purple-50">
-              {article.estimated_rank} target
-            </Badge>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900">{article.title}</h2>
-          <p className="text-sm text-gray-600 italic">{article.meta_description}</p>
-        </div>
-
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-gray-50 border-gray-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{article.word_count.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">Word Count</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gray-50 border-gray-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{article.monthly_search_volume.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">Monthly Searches</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gray-50 border-gray-200">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-gray-900">{article.keywords.length}</p>
-              <p className="text-xs text-gray-500 mt-1">Target Keywords</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Keywords */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Target Keywords</h3>
-          <div className="flex flex-wrap gap-2">
-            {article.keywords.map((kw: string, i: number) => (
-              <Badge key={i} variant="outline" className="bg-white text-gray-700 border-gray-300 text-xs">
-                {kw}
-              </Badge>
-            ))}
-          </div>
-        </div>
-
-        {/* Article sections */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-gray-700">Article Content</h3>
-          {article.sections.map((section: { heading: string; content: string }, i: number) => (
-            <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-              <h4 className="font-semibold text-gray-900 mb-2">{section.heading}</h4>
-              <p className="text-sm text-gray-700 leading-relaxed">{section.content}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Tags */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">Tags</h3>
-          <div className="flex flex-wrap gap-2">
-            {article.tags.map((tag: string, i: number) => (
-              <Badge key={i} variant="secondary" className="text-xs">
-                #{tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <SEOArticleViewer initialArticle={result.data} />;
   }
 
   // B2B Manufacturer Results Display

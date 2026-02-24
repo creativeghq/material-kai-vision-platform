@@ -987,19 +987,21 @@ function ArticleContent({ markdown, html }: { markdown: string | null; html: str
 // ─── Main Component ─────────────────────────────────────────────
 
 interface SEOArticleViewerProps {
-  articleId: string;
+  articleId?: string;
+  initialArticle?: SEOArticle; // Demo / offline mode — skips Supabase fetch
 }
 
-export default function SEOArticleViewer({ articleId }: SEOArticleViewerProps) {
-  const [article, setArticle] = useState<SEOArticle | null>(null);
+export default function SEOArticleViewer({ articleId, initialArticle }: SEOArticleViewerProps) {
+  const [article, setArticle] = useState<SEOArticle | null>(initialArticle ?? null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeTab, setActiveTab] = useState('content');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialArticle && !!articleId);
 
   const isInProgress = article && !['completed', 'failed'].includes(article.status);
 
-  // Initial fetch
+  // Initial fetch — skipped when initialArticle is provided (demo mode)
   useEffect(() => {
+    if (initialArticle || !articleId) return;
     const fetchArticle = async () => {
       const { data, error } = await supabase
         .from('seo_articles')
@@ -1013,13 +1015,13 @@ export default function SEOArticleViewer({ articleId }: SEOArticleViewerProps) {
       setLoading(false);
     };
     fetchArticle();
-  }, [articleId]);
+  }, [articleId, initialArticle]);
 
-  // Adaptive polling while in progress
+  // Adaptive polling while in progress — disabled in demo mode
   useAdaptivePolling(
-    articleId,
+    articleId ?? '',
     (data) => setArticle(data),
-    !!isInProgress,
+    !initialArticle && !!isInProgress,
   );
 
   if (loading) {
