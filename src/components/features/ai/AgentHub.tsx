@@ -1656,8 +1656,8 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                   <div
                     className={`${message.demoData || message.materialData || message.designData || message.worldData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
-                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
-                        : 'bg-white/80 dark:bg-gray-800/80 border border-white/40 dark:border-gray-700/40 text-gray-900 dark:text-gray-100 backdrop-blur-sm shadow-sm'
+                        ? 'bg-primary/10 border border-primary/20 text-foreground shadow-sm'
+                        : 'bg-white/40 border border-white/30 text-foreground backdrop-blur-sm shadow-sm'
                     }`}
                   >
                     {message.demoData ? (
