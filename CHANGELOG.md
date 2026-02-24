@@ -15,14 +15,6 @@ All notable changes to the Material Kai Vision Platform.
 - Automatic image extraction and linking
 - 3 API endpoints: `/api/scraping/process-session`, `/api/scraping/session/{id}/status`, `/api/scraping/session/{id}/retry`
 
-**Spaceformer Spatial Analysis**
-- AI-powered spatial reasoning using Claude Vision
-- Room layout optimization and furniture placement suggestions
-- Material placement recommendations with surface area calculations
-- Accessibility compliance analysis (ADA compliance)
-- Traffic flow optimization and bottleneck identification
-- API endpoint: `/api/spaceformer/analyze`
-
 **Price Monitoring System**
 - Competitive price monitoring for products across multiple sources
 - On-demand and scheduled price checks (hourly, daily, weekly)
@@ -52,7 +44,6 @@ All notable changes to the Material Kai Vision Platform.
 
 **New Route Categories:**
 - Web Scraping Routes (3 endpoints)
-- Spaceformer Routes (1 endpoint)
 - Price Monitoring Routes (14+ endpoints)
 - Saved Searches Routes (7+ endpoints)
 - Interior Design Routes (2 endpoints)
@@ -64,7 +55,6 @@ All notable changes to the Material Kai Vision Platform.
 **New Tables:**
 - `scraping_sessions` - Web scraping job tracking
 - `scraping_pages` - Scraped page content storage
-- `spatial_analysis` - Spaceformer analysis results
 - `price_monitoring_products` - Products being monitored
 - `price_history` - Historical price data
 - `competitor_sources` - Competitor source URLs
@@ -97,7 +87,6 @@ All notable changes to the Material Kai Vision Platform.
 
 **New Documentation Files:**
 - `docs/web-scraping-integration.md` - Complete web scraping guide
-- `docs/spaceformer_architecture.md` - Spatial analysis system architecture
 - `docs/price-monitoring-system.md` - Price monitoring features
 - `docs/price-monitoring-deployment-guide.md` - Deployment instructions
 - `docs/saved-searches-deduplication.md` - Smart search deduplication
@@ -120,10 +109,6 @@ All notable changes to the Material Kai Vision Platform.
 - Success rate: 95%+ scraping, 85%+ product discovery
 - Cost: $0.02-0.05 per product
 
-**Spaceformer Analysis:**
-- Analysis time: 3-8 seconds per room
-- Supports: layout, materials, accessibility, flow optimization
-- Cost: ~$0.01-0.02 per analysis
 
 **Interior Design:**
 - Generation time: 5-13 seconds per model

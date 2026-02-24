@@ -8,7 +8,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 1. [PDF Processing Flow](#1-pdf-processing-flow)
 2. [Search & Discovery Flow](#2-search--discovery-flow)
-3. [Spatial Analysis Flow (Spaceformer)](#3-spatial-analysis-flow-spaceformer) ✨ NEW
 4. [Data Import Flow](#4-data-import-flow)
 5. [3D Generation Flow](#5-3d-generation-flow)
 6. [Knowledge Base Flow](#6-knowledge-base-flow)
@@ -90,66 +89,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **API Endpoint:** `POST /api/rag/search`  
 **Frontend Component:** `SearchHub.tsx`  
 **Documentation:** [search-strategies.md](search-strategies.md)
-
----
-
-## 3. Spatial Analysis Flow (Spaceformer) ✨ NEW
-
-**Purpose:** AI-powered room layout optimization, material placement, and accessibility analysis
-
-**User Journey:**
-```
-1. User uploads room image or provides URL
-   ↓
-2. User selects:
-   - Room type (living room, bedroom, kitchen, etc.)
-   - Analysis type (full, layout, materials, accessibility)
-   - Optional: Room dimensions, preferences, constraints
-   ↓
-3. Frontend calls Spaceformer API
-   ↓
-4. Claude Vision (Sonnet 4.5) analyzes image:
-   - Detects spatial features (windows, doors, furniture)
-   - Analyzes room layout and dimensions
-   - Identifies traffic patterns
-   - Evaluates accessibility compliance
-   ↓
-5. AI generates recommendations:
-   - Layout suggestions (furniture placement)
-   - Material placements (flooring, walls, accents)
-   - Accessibility improvements (ADA compliance)
-   - Flow optimization (traffic patterns, bottlenecks)
-   ↓
-6. Results saved to database (spatial_analysis table)
-   ↓
-7. Frontend displays:
-   - 3D visualization of suggestions
-   - Confidence scores
-   - Alternative placements
-   - Detailed reasoning
-   - Accessibility report
-```
-
-**API Endpoint:** `POST /api/spaceformer/analyze`  
-**Frontend Service:** `spaceformerAnalysisService.ts`  
-**AI Model:** Claude Sonnet 4.5 (Vision)  
-**Database Table:** `spatial_analysis`
-
-**Analysis Types:**
-- **Full** - Complete analysis (all features)
-- **Layout** - Furniture placement only (~2-3 seconds)
-- **Materials** - Material selection and placement
-- **Accessibility** - ADA compliance and barrier-free paths
-
-**Use Cases:**
-- Interior design planning
-- Accessibility compliance verification
-- Material selection for specific spaces
-- Furniture layout optimization
-- Traffic flow analysis
-- Space utilization optimization
-
-**Documentation:** [api-endpoints.md](api-endpoints.md#18-spaceformer-routes)
 
 ---
 
@@ -334,7 +273,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 |------|-------------|-----------|-----------------|--------|
 | PDF Processing | Upload PDF | Claude, GPT-4o, Qwen | 2-10 min | Products, Images, Metadata |
 | Search | Search query | OpenAI, Claude | <1 sec | Ranked results |
-| **Spaceformer** ✨ | **Room image** | **Claude Vision** | **2-5 sec** | **Layout, Materials, Accessibility** |
 | Data Import | Upload XML | Claude | 1-5 min | Products, Images |
 | 3D Generation | Text prompt | Stable Diffusion | 10-30 sec | 3D models, Images |
 | Knowledge Base | Create doc | OpenAI | <1 sec | Searchable docs |

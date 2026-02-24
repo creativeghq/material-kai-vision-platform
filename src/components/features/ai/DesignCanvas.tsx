@@ -355,7 +355,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 <h3 className="text-xl font-bold">AI Spatial Analysis</h3>
               </div>
               <p className="text-white/90 text-sm">
-                Powered by SpaceFormer AI - Advanced spatial understanding and design optimization
+                Powered by Claude Vision AI - Advanced spatial understanding and design optimization
               </p>
             </div>
 
@@ -871,7 +871,7 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
 
                 {/* Right: Analysis & Materials */}
                 <div className="space-y-4">
-                  {/* SpaceFormer Analysis */}
+                  {/* Spatial Analysis */}
                   {spatialAnalysis && (
                     <div className="bg-blue-50 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">

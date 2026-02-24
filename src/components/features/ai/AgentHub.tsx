@@ -1013,6 +1013,47 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 },
                 message: 'Heat pump comparison table',
               };
+            } else if (command === 'seo_article') {
+              demoData = {
+                type: 'seo_article',
+                data: {
+                  title: 'The Ultimate Guide to Accessories Marketing: Trends & Strategies for 2025',
+                  meta_description: 'Discover proven accessories marketing strategies, industry trends, and data-driven techniques to boost your brand\'s visibility and sales in 2025.',
+                  keywords: ['accessories marketing', 'fashion accessories trends', 'accessories retail strategy', 'jewellery marketing', 'bag marketing campaigns', 'accessories SEO'],
+                  word_count: 1850,
+                  seo_score: 87,
+                  readability_score: 76,
+                  estimated_rank: 'Top 3',
+                  monthly_search_volume: 45200,
+                  sections: [
+                    { heading: 'Introduction: The Accessories Market Landscape', content: 'The global accessories market is projected to reach $540 billion by 2025, driven by social media influence, sustainability trends, and the rise of personal styling culture. Brands that master modern marketing techniques are capturing outsized market share.' },
+                    { heading: '1. Social Commerce & Influencer Partnerships', content: 'Accessories are among the top-performing categories on TikTok Shop and Instagram Shopping. Micro-influencers (10K–100K followers) generate 60% higher engagement rates than macro-influencers for accessories categories. Focus on authentic unboxing and styling content.' },
+                    { heading: '2. SEO-Driven Content Strategy', content: 'Long-tail keywords like "silver minimalist bracelet for office" convert 3× better than generic terms. Build a content hub around styling guides, care tips, and trend reports. Target "how to style" queries which see 280% higher CTR in accessories niches.' },
+                    { heading: '3. Visual Merchandising & UGC', content: 'User-generated content increases accessories conversion rates by 29%. Implement AR try-on features — brands using virtual try-on see 40% fewer returns. Pinterest remains the highest purchase-intent platform for fashion accessories.' },
+                    { heading: '4. Seasonal Campaign Planning', content: 'Q4 accounts for 38% of annual accessories revenue. Plan gifting campaigns 8 weeks ahead. Valentine\'s Day, Mother\'s Day, and graduation season are critical windows. Bundle offers increase average order value by 24%.' },
+                    { heading: '5. Sustainability as a Brand Differentiator', content: '67% of accessories buyers under 35 prioritize sustainability credentials. Certifications, recycled materials labeling, and repair programs drive brand loyalty. Brands with clear sustainability messaging see 18% higher repeat purchase rates.' },
+                  ],
+                  tags: ['accessories', 'marketing', 'fashion', 'retail', 'SEO', 'content strategy'],
+                },
+                message: 'SEO article generated for Accessories Marketing',
+              };
+            } else if (command === 'b2b_results') {
+              demoData = {
+                type: 'b2b_results',
+                data: {
+                  query: 'Tiles companies in Spain',
+                  total_found: 8,
+                  market_overview: 'Spain is the world\'s 3rd largest ceramic tile producer (700M m²/year), with the Castellón region housing 85% of production capacity. Key strengths: design innovation, sustainability leadership, and EU market access.',
+                  companies: [
+                    { name: 'Porcelanosa Group', location: 'Villarreal, Castellón', specialization: 'Premium Ceramic & Porcelain Tiles', annual_revenue: '€1.2B', employees: '4,500+', website: 'porcelanosa.com', contact: 'international@porcelanosa.com', certifications: ['ISO 9001', 'ISO 14001', 'CE Mark', 'LEED Compliant'], min_order: '500 m²', lead_time: '3–5 weeks' },
+                    { name: 'Roca Tile', location: 'Alcora, Castellón', specialization: 'Glazed Ceramic Wall & Floor Tiles', annual_revenue: '€380M', employees: '2,100+', website: 'rocatile.com', contact: 'export@rocatile.com', certifications: ['ISO 9001', 'CE Mark', 'GreenGuard'], min_order: '300 m²', lead_time: '4–6 weeks' },
+                    { name: 'Vives Cerámica', location: 'Castellón de la Plana', specialization: 'Designer Porcelain & Large Format Slabs', annual_revenue: '€210M', employees: '980+', website: 'vivesceramica.com', contact: 'export@vivesceramica.com', certifications: ['ISO 14001', 'CE Mark', 'Declare Label'], min_order: '200 m²', lead_time: '2–4 weeks' },
+                    { name: 'Pamesa Cerámica', location: 'Vila-real, Castellón', specialization: 'Full Range Ceramic & Porcelain', annual_revenue: '€560M', employees: '3,200+', website: 'pamesa.com', contact: 'comercial@pamesa.com', certifications: ['ISO 9001', 'CE Mark', 'EMAS'], min_order: '400 m²', lead_time: '3–5 weeks' },
+                    { name: 'STN Cerámica', location: 'Nules, Castellón', specialization: 'Technical Porcelain & Outdoor Tiles', annual_revenue: '€95M', employees: '420+', website: 'stnceramic.com', contact: 'export@stnceramica.com', certifications: ['ISO 9001', 'CE Mark'], min_order: '150 m²', lead_time: '2–3 weeks' },
+                  ],
+                },
+                message: 'B2B manufacturer research: Tiles companies in Spain',
+              };
             }
           }
         } catch (e) {
@@ -1831,7 +1872,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         />
       )}
 
-      {/* Material Matching Modal with SpaceFormer Context */}
+      {/* Material Matching Modal */}
       {showMaterialModal && selectedMaterialsData && (
         <MaterialMatchingModal
           materials={selectedMaterialsData.materials}

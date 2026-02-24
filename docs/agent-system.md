@@ -107,7 +107,6 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 **Available Tools**:
 - `material_search` - Material discovery (only when user explicitly asks)
 - `image_analysis` - Room and material analysis
-- `spaceformer_analysis` - Room layout and spatial analysis
 - `generate_3d` - Trigger async 3D interior design generation
 
 **Special Behavior**: Material search is only injected when user message contains keywords like "find materials", "search for materials", etc.

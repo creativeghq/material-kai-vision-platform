@@ -371,7 +371,6 @@ For questions or issues:
 
 **Recent Additions**:
 - ✨ **NEW**: web-scraping-integration.md - Firecrawl integration guide
-- ✨ **NEW**: spaceformer_architecture.md - Spatial analysis system
 - ✨ **NEW**: price-monitoring-system.md - Competitive price tracking
 - ✨ **NEW**: price-monitoring-deployment-guide.md - Setup instructions
 - ✨ **NEW**: saved-searches-deduplication.md - AI-powered search deduplication

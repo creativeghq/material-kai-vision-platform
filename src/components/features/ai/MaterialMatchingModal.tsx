@@ -106,7 +106,7 @@ export const MaterialMatchingModal: React.FC<MaterialMatchingModalProps> = ({
                 <div>
                   <h2 className="text-3xl font-bold mb-1">AI-Matched Materials</h2>
                   <p className="text-white/90 text-sm">
-                    Powered by SpaceFormer spatial intelligence
+                    Powered by AI spatial intelligence
                   </p>
                 </div>
               </div>
@@ -268,7 +268,7 @@ export const MaterialMatchingModal: React.FC<MaterialMatchingModalProps> = ({
                   <h3 className="text-xl font-bold">AI Design Insights</h3>
                 </div>
                 <p className="text-white/90 text-sm">
-                  SpaceFormer analyzed your space and generated these intelligent recommendations
+                  AI analyzed your space and generated these intelligent recommendations
                 </p>
               </div>
 

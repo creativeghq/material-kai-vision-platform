@@ -17,7 +17,6 @@
   - Quality validation
   - Web scraping product discovery
   - XML field mapping
-  - Spatial analysis (Spaceformer)
   - Search deduplication analysis
 - **Context**: 200,000 tokens
 - **Cost**: ~$0.015 per 1K tokens
@@ -202,10 +201,6 @@
 - **Field Mapping**: Claude Sonnet 4.5
 - **Dynamic mapping with AI reasoning**
 
-### Spaceformer (Spatial Analysis)
-- **Room Analysis**: Claude Sonnet 4.5 Vision
-- **Layout optimization, accessibility, flow analysis**
-
 ### Interior Design Generation
 - **Text-to-Image**: 7 Replicate models (FLUX, SDXL, etc.)
 - **Image-to-Image**: 3 production-ready Replicate models
@@ -314,7 +309,6 @@
 
 **January 2026**:
 - ✨ Added 14 Replicate models for interior design
-- ✨ Added Claude Vision for Spaceformer spatial analysis
 - ✨ Expanded SigLIP to generate 5 embedding types (was 1)
 - ✨ Added GPT-5 support (future-proofing)
 
@@ -329,7 +323,6 @@
 
 - [PDF Processing Pipeline](./pdf-processing-pipeline.md) - Detailed pipeline with model usage
 - [Interior Design Models](./interior-design-models.md) - 14 Replicate models
-- [Spaceformer Architecture](./spaceformer_architecture.md) - Spatial analysis with Claude Vision
 - [Web Scraping Integration](./web-scraping-integration.md) - AI-powered product discovery
 - [Async Processing & Limits](./async-processing-and-limits.md) - Concurrency limits per model
 

@@ -36,7 +36,6 @@ Complete documentation for Material Kai Vision Platform.
 **[platform-flows.md](platform-flows.md)** - User workflows & feature flows ✨ NEW
 - PDF Processing Flow
 - Search & Discovery Flow
-- Spatial Analysis Flow (Spaceformer)
 - Data Import Flow
 - 3D Generation Flow
 - Knowledge Base Flow
@@ -490,7 +489,6 @@ All documentation follows these standards:
 - ✨ **NEW**: Query-Adaptive Weight Profiles - Dynamic 7-vector search weights selected per query intent (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced)
 - ✨ **NEW**: Frontend Code Splitting - React.lazy() on 60+ routes, main chunk reduced from 2,754KB to 221KB (-92%)
 - ✨ **NEW**: Web Scraping Integration - Complete Firecrawl integration with AI product discovery
-- ✨ **NEW**: Spaceformer Spatial Analysis - AI-powered room layout optimization
 - ✨ **NEW**: Price Monitoring System - Competitive price tracking with alerts
 - ✨ **NEW**: Saved Searches Deduplication - AI-powered search management
 - ✨ **NEW**: VR World Generation - WorldLabs Marble + Spark.js 3D viewer integration

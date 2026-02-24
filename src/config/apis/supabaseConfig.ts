@@ -201,46 +201,6 @@ export const supabaseConfig: SupabaseApiConfig = {
       timeout: 120000, // 2 minutes for SVBRDF extraction
     },
 
-    'spaceformer-analysis': {
-      inputSchema: z.object({
-        image_url: z.string().url('Please enter a valid image URL'),
-        analysis_type: z.string().optional(),
-        include_suggestions: z.boolean().optional(),
-      }),
-      outputSchema: z.union([
-        z.object({
-          success: z.literal(true),
-          analysis: z.object({
-            layout: z.object({
-              room_type: z.string(),
-              dimensions: z
-                .object({
-                  width: z.number(),
-                  height: z.number(),
-                  depth: z.number(),
-                })
-                .optional(),
-              features: z.array(z.string()),
-            }),
-            furniture: z.array(
-              z.object({
-                type: z.string(),
-                position: z.object({ x: z.number(), y: z.number() }),
-                confidence: z.number(),
-              }),
-            ),
-            style: z.object({
-              primary_style: z.string(),
-              color_palette: z.array(z.string()),
-              materials: z.array(z.string()),
-            }),
-            suggestions: z.array(z.string()).optional(),
-          }),
-        }),
-        commonErrorSchema,
-      ]),
-      timeout: 90000, // 1.5 minutes for analysis
-    },
   },
 };
 

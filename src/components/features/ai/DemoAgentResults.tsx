@@ -266,6 +266,167 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
     );
   }
 
+  // SEO Article Display
+  if (result.type === 'seo_article' && result.data) {
+    const article = result.data;
+    return (
+      <div className="space-y-6 bg-white rounded-lg p-6 shadow-lg">
+        {/* Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge style={{ background: 'var(--mocha-color)', color: 'white' }}>SEO Article</Badge>
+            <Badge variant="outline" className="text-green-700 border-green-300 bg-green-50">
+              Score: {article.seo_score}/100
+            </Badge>
+            <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50">
+              Readability: {article.readability_score}/100
+            </Badge>
+            <Badge variant="outline" className="text-purple-700 border-purple-300 bg-purple-50">
+              {article.estimated_rank} target
+            </Badge>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900">{article.title}</h2>
+          <p className="text-sm text-gray-600 italic">{article.meta_description}</p>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="bg-gray-50 border-gray-200">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-gray-900">{article.word_count.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">Word Count</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-50 border-gray-200">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-gray-900">{article.monthly_search_volume.toLocaleString()}</p>
+              <p className="text-xs text-gray-500 mt-1">Monthly Searches</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gray-50 border-gray-200">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-gray-900">{article.keywords.length}</p>
+              <p className="text-xs text-gray-500 mt-1">Target Keywords</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Keywords */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Target Keywords</h3>
+          <div className="flex flex-wrap gap-2">
+            {article.keywords.map((kw: string, i: number) => (
+              <Badge key={i} variant="outline" className="bg-white text-gray-700 border-gray-300 text-xs">
+                {kw}
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        {/* Article sections */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">Article Content</h3>
+          {article.sections.map((section: { heading: string; content: string }, i: number) => (
+            <div key={i} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <h4 className="font-semibold text-gray-900 mb-2">{section.heading}</h4>
+              <p className="text-sm text-gray-700 leading-relaxed">{section.content}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tags */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">Tags</h3>
+          <div className="flex flex-wrap gap-2">
+            {article.tags.map((tag: string, i: number) => (
+              <Badge key={i} variant="secondary" className="text-xs">
+                #{tag}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // B2B Manufacturer Results Display
+  if (result.type === 'b2b_results' && result.data) {
+    const { query, total_found, market_overview, companies } = result.data;
+    return (
+      <div className="space-y-6 bg-white rounded-lg p-6 shadow-lg">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge style={{ background: 'var(--mocha-color)', color: 'white' }}>B2B Research</Badge>
+              <Badge variant="outline" className="text-blue-700 border-blue-300 bg-blue-50">
+                {total_found} found
+              </Badge>
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">{query}</h2>
+          </div>
+        </div>
+
+        {/* Market overview */}
+        {market_overview && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-blue-900 mb-1">Market Overview</h3>
+            <p className="text-sm text-blue-800">{market_overview}</p>
+          </div>
+        )}
+
+        {/* Company cards */}
+        <div className="space-y-4">
+          {companies.map((company: any, i: number) => (
+            <Card key={i} className="bg-white border border-gray-200 hover:shadow-md transition-shadow">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-base">{company.name}</h3>
+                    <p className="text-sm text-gray-500">{company.location}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-gray-900">{company.annual_revenue}</p>
+                    <p className="text-xs text-gray-500">{company.employees} employees</p>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-700 mb-3">{company.specialization}</p>
+
+                <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                  <div>
+                    <span className="text-gray-500 text-xs">Min. Order</span>
+                    <p className="font-medium text-gray-800">{company.min_order}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Lead Time</span>
+                    <p className="font-medium text-gray-800">{company.lead_time}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Website</span>
+                    <p className="font-medium text-gray-800 truncate">{company.website}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 text-xs">Contact</span>
+                    <p className="font-medium text-gray-800 truncate">{company.contact}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {company.certifications.map((cert: string, j: number) => (
+                    <Badge key={j} variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">
+                      {cert}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // Default/Error Display
   return (
     <Card>

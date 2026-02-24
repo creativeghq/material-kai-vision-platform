@@ -68,7 +68,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
   const [caption, setCaption] = useState(initialCaption || '');
   const [errorMessage, setErrorMessage] = useState('');
   const [navMode, setNavMode] = useState<NavigationMode>('orbit');
-  const [quality, setQuality] = useState<QualityLevel>('standard');
+  const [quality, setQuality] = useState<QualityLevel>('full');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSceneReady, setIsSceneReady] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -160,7 +160,8 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    const renderer = new WebGLRenderer({ canvas });
+    const renderer = new WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     const scene = new Scene();
     const camera = new PerspectiveCamera(65, canvas.clientWidth / canvas.clientHeight, 0.01, 1000);
     scene.add(camera);
@@ -176,6 +177,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       if (!container || disposed) return;
       const w = container.clientWidth || 600;
       const h = container.clientHeight || 450;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -431,8 +433,8 @@ function getSplatUrl(
   if (quality === 'full' && urls.full) return urls.full;
   if (quality === 'standard' && urls.standard) return urls.standard;
   if (quality === 'draft' && urls.draft) return urls.draft;
-  // Fallback: pick whatever is available
-  return urls.standard || urls.draft || urls.full;
+  // Fallback: pick best available
+  return urls.full || urls.standard || urls.draft;
 }
 
 export default WorldViewer;

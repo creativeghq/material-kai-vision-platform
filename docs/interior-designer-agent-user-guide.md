@@ -100,10 +100,9 @@ Click the **✨ Sparkles button** in the input area to open the Prompt Library:
 **You:** [Upload room photo] "I want to redesign this bedroom in a modern minimalist style. What do you suggest?"
 
 **Agent:** 
-1. Analyzes your space using Spaceformer
-2. Provides layout recommendations
-3. Suggests material improvements
-4. Offers to generate 3D visualizations
+1. Provides layout recommendations
+2. Suggests material improvements
+3. Offers to generate 3D visualizations
 
 **You:** "Yes, generate some design options"
 

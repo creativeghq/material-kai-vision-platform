@@ -91,7 +91,6 @@ AI-powered interior design with spatial analysis and material matching.
 **Tools:**
 - Material search
 - Image analysis
-- Spaceformer spatial analysis
 - 3D generation (async)
 
 **Example:**
@@ -195,7 +194,7 @@ Searches for materials using the MIVAA Python API.
 
 ### Image Analysis Tool
 
-Analyzes images using Spaceformer or other vision models.
+Analyzes images using Claude Vision.
 
 **Parameters:**
 - `imageUrl` (string): URL of image to analyze

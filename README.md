@@ -203,8 +203,7 @@ LOG_LEVEL=ERROR
 - [Unified Product Generation Flow](./docs/unified-product-generation-flow.md) - Multi-source integration
 - [Async Processing & Limits](./docs/async-processing-and-limits.md) - Concurrency architecture
 
-### **🏠 Interior Design & Spatial**
-- [Spaceformer Architecture](./docs/spaceformer_architecture.md) - Spatial analysis system
+### **🏠 Interior Design**
 - [Interior Design Models](./docs/interior-design-models.md) - 14 AI models inventory
 - [Interior Design Data Flow](./docs/interior-design-data-flow.md) - Generation workflow
 - [Interior Designer Agent Guide](./docs/interior-designer-agent-user-guide.md) - User guide
@@ -307,14 +306,6 @@ curl https://v1api.materialshub.gr/docs
 - **LangChain.js Integration**: Tool orchestration and function calling
 - **Database-Driven Prompts**: Real-time prompt updates without deployment
 
-### **4. Spatial Analysis (Spaceformer)**
-- AI-powered room layout optimization
-- Furniture placement suggestions with confidence scores
-- Material placement recommendations
-- Accessibility compliance analysis (ADA)
-- Traffic flow optimization
-- Bottleneck identification
-
 ### **5. Interior Design Generation**
 - 14 AI models (7 text-to-image, 7 image-to-image)
 - Parallel processing (3 concurrent generations)
@@ -364,7 +355,6 @@ curl https://v1api.materialshub.gr/docs
 - **XML Import**: <1 minute for 100 products
 - **Product Detection**: 25-55 seconds for 200 chunks → 15 products
 - **Multi-Vector Search**: 300-500ms (6 embeddings in parallel)
-- **Spaceformer Analysis**: 3-8 seconds per room
 - **Interior Design**: 5-13 seconds per model (parallel processing)
 
 ### **Quality Metrics**

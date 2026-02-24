@@ -12,12 +12,6 @@ import {
   validateWithGuard as _validateWithGuard,
   isAgentExecutionResult,
 } from '@/types/guards';
-import {
-  spaceformerAnalysisService,
-  type UserPreferences,
-  type SpaceformerResult,
-} from '@/services/spaceformerAnalysisService';
-
 // Material Agent Orchestrator Services
 export interface MaterialAgentTaskRequest {
   user_id: string;
@@ -43,7 +37,7 @@ export interface MaterialAgentInputData {
 
   material_data?: MaterialData | null;
   spatial_analysis?: SpatialAnalysisData | null;
-  user_preferences?: UserPreferences;
+  user_preferences?: Record<string, unknown>;
 }
 
 export interface AgentExecution {
@@ -64,56 +58,6 @@ export interface MaterialAgentResult {
   coordination_summary: string;
   overall_confidence: number;
   total_processing_time_ms: number;
-  error_message?: string;
-}
-
-// SpaceFormer Services
-export interface SpaceFormerRequest {
-  user_id: string;
-
-  room_type: string;
-  room_dimensions?: Record<string, unknown>;
-  user_preferences?: UserPreferences;
-  constraints?: Record<string, unknown>;
-}
-
-export interface SpatialFeature {
-  type: string;
-  position: { x: number; y: number; z: number };
-  dimensions: { width: number; height: number; depth: number };
-  importance: number;
-  accessibility_rating: number;
-}
-
-export interface LayoutSuggestion {
-  item_type: string;
-  position: { x: number; y: number; z: number };
-  rotation: number;
-  reasoning: string;
-  confidence: number;
-  alternative_positions?: Array<{ x: number; y: number; z: number }>;
-}
-
-export interface MaterialPlacement {
-  zone: string;
-  recommended_materials: string[];
-  reasoning: string;
-  durability_requirements: string;
-  maintenance_level: string;
-  cost_range: string;
-}
-
-export interface SpaceFormerResult {
-  success: boolean;
-  analysis_id: string;
-  spatial_features: SpatialFeature[];
-  layout_suggestions: LayoutSuggestion[];
-  material_placements: MaterialPlacement[];
-  accessibility_analysis: Record<string, unknown>;
-  flow_optimization: Record<string, unknown>;
-  reasoning_explanation: string;
-  confidence_score: number;
-  processing_time_ms: number;
   error_message?: string;
 }
 
@@ -303,9 +247,6 @@ export class MaterialAgentOrchestratorAPI {
   }
 }
 
-// REMOVED: SpaceFormerAPI class (deprecated)
-// Use spaceformerAnalysisService directly instead for spatial analysis features.
-//
 // REMOVED: IntegratedAIService class
 // This service was only used by the deleted AIStudioPage component.
 //

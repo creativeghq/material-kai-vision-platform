@@ -24,7 +24,6 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 
 **New Capabilities (2026):**
 - 🌐 **Web Scraping**: Automatic product discovery from websites
-- 🏠 **Spaceformer**: AI-powered spatial analysis and room optimization
 - 💰 **Price Monitoring**: Competitive price tracking across sources
 - 🎨 **Interior Design**: 14 AI models for design generation
 - 🔍 **Smart Search Management**: AI-powered search deduplication

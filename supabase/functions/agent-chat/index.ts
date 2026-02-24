@@ -909,98 +909,6 @@ const createKnowledgeBaseSearchTool = (workspaceId: string) => {
 
 
 /**
- * LangChain Tool: Spaceformer Spatial Analysis
- */
-const createSpaceformerTool = (workspaceId: string) => {
-  return tool(
-    async ({ imageUrl, roomType, analysisType = 'full' }) => {
-      try {
-        const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
-
-        console.log(`🏠 Spaceformer analysis: room="${roomType}", type="${analysisType}"`);
-        const startTime = Date.now();
-
-        // Add timeout to prevent edge function from hanging
-        // Spaceformer can take a long time for complex analysis
-        const TIMEOUT_MS = 300000; // 5 minutes
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-        try {
-          const response = await fetch(`${MIVAA_GATEWAY_URL}/api/spaceformer/analyze`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(MIVAA_API_KEY ? { 'Authorization': `Bearer ${MIVAA_API_KEY}` } : {}),
-            },
-            body: JSON.stringify({
-              image_url: imageUrl,
-              room_type: roomType,
-              analysis_type: analysisType,
-              workspace_id: workspaceId,
-              user_id: userId,
-            }),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-          const elapsed = Date.now() - startTime;
-          console.log(`⏱️ Spaceformer API responded in ${elapsed}ms`);
-
-          if (!response.ok) {
-            throw new Error(`Spaceformer analysis failed: ${response.statusText}`);
-          }
-
-          const data = await response.json();
-
-          return JSON.stringify({
-            success: true,
-            analysis_id: data.analysis_id,
-            room_type: data.room_type,
-            layout_analysis: data.layout_analysis || {},
-            material_suggestions: data.material_suggestions || [],
-            accessibility_report: data.accessibility_report || {},
-            spatial_metrics: data.spatial_metrics || {},
-          });
-        } catch (fetchError) {
-          clearTimeout(timeoutId);
-
-          if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-            const elapsed = Date.now() - startTime;
-            console.error(`⏱️ Spaceformer timeout after ${elapsed}ms (limit: ${TIMEOUT_MS}ms)`);
-            return JSON.stringify({
-              success: false,
-              error: `Spatial analysis timeout - Spaceformer took longer than ${TIMEOUT_MS / 1000} seconds. Please try again or use a simpler analysis type.`,
-              timeout: true,
-            });
-          }
-          throw fetchError;
-        }
-      } catch (error) {
-        console.error('Spaceformer tool error:', error);
-        return JSON.stringify({
-          success: false,
-          error: error instanceof Error ? error.message : 'Spatial analysis failed',
-        });
-      }
-    },
-    {
-      name: 'spaceformer_analysis',
-      description: 'Analyze room layout, material placement, and accessibility using Claude Vision AI. Provides spatial metrics, layout optimization suggestions, and material recommendations based on room analysis.',
-      schema: z.object({
-        imageUrl: z.string().describe('Room image URL'),
-        roomType: z.string().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
-        analysisType: z
-          .enum(['full', 'layout', 'materials', 'accessibility'])
-          .default('full')
-          .describe('Type of spatial analysis - full (complete analysis), layout (room structure only), materials (material suggestions only), accessibility (accessibility compliance only)'),
-      }),
-    }
-  );
-};
-
-/**
  * LangChain Tool: Interior Design Generation
  *
  * Calls MIVAA API to create generation job
@@ -3805,7 +3713,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     name: 'Interior Designer Agent',
     description: 'AI-powered interior design with spatial analysis and material matching',
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
-    tools: ['material_search', 'spaceformer_analysis', 'generate_3d'],
+    tools: ['material_search', 'generate_3d'],
     // systemPrompt loaded from database
     // NOTE: generate_3d triggers async generation and returns job ID immediately
     // NOTE: material_search is only injected when user message contains keywords like "find materials"
@@ -3932,8 +3840,12 @@ async function executeAgent(
       return { text: "Here's a comparison of our heat pump models.\n\nDEMO_DATA: {\"data\":{\"command\":\"heat_pumps\"}}" };
     } else if (lowerInput.includes('3d') || lowerInput.includes('design') || lowerInput.includes('room')) {
       return { text: "Here's a modern living room 3D design.\n\nDEMO_DATA: {\"data\":{\"command\":\"3d_design\"}}" };
+    } else if (lowerInput.includes('article') || lowerInput.includes('marketing') || lowerInput.includes('seo') || lowerInput.includes('content')) {
+      return { text: "I'm creating a comprehensive SEO article for you. Our AI pipeline analyzed 12 high-value keywords (45,200 combined monthly searches), structured content for featured snippets, and optimized for top-3 ranking potential.\n\n**Article: The Ultimate Guide to Accessories Marketing**\n\nKeyword targeting, content structure, meta tags, and readability score all optimized.\n\nDEMO_DATA: {\"data\":{\"command\":\"seo_article\"}}" };
+    } else if (lowerInput.includes('compan') || lowerInput.includes('manufactur') || lowerInput.includes('spain') || lowerInput.includes('find me')) {
+      return { text: "Searching our B2B manufacturer database using Perplexity Sonar AI...\n\nFound **8 verified manufacturers** matching your criteria with full contact details, revenue data, certifications, and lead times.\n\nDEMO_DATA: {\"data\":{\"command\":\"b2b_results\"}}" };
     } else {
-      return { text: "I can show you demo materials. Try asking for:\n- Cement tiles\n- Green wood materials\n- Heat pumps\n- 3D room designs" };
+      return { text: "I can show you demo content. Try asking for:\n- Cement tiles\n- Green wood materials\n- Heat pumps\n- 3D room designs\n- SEO article (e.g. 'I want an article for Accessories Marketing')\n- B2B research (e.g. 'Find me Tiles companies in Spain')" };
     }
   }
 
@@ -3981,9 +3893,6 @@ async function executeAgent(
   }
 
   // --- Interior Designer tools ---
-  if (config.tools.includes('spaceformer_analysis')) {
-    tools.push(createSpaceformerTool(workspaceId));
-  }
   if (config.tools.includes('generate_3d')) {
     tools.push(create3DGenerationTool(userId, workspaceId, onChunk));
     tools.push(createGenerationStatusTool());
