@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Search, Globe, Scan, Package, RefreshCw, AlertCircle } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
+import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { mivaaApi } from '@/services/mivaaApiClient';
@@ -52,7 +53,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   const [modalSegmenting, setModalSegmenting] = useState(false);
   const [modalSegmentsLoaded, setModalSegmentsLoaded] = useState(false);
   const [modalSegmentError, setModalSegmentError] = useState<string | null>(null);
-  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState(0);
+  const [imageZoom, setImageZoom] = useState(1);
 
   // Initialize with placeholder data immediately
   useEffect(() => {
@@ -136,8 +137,8 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     setModalSegmenting(false);
     setModalSegmentsLoaded(false);
     setModalSegmentError(null);
-    setSelectedSegmentIndex(0);
     setModalActiveTab('image');
+    setImageZoom(1);
   }, [selectedImage]);
 
   // Load segments on demand — called when user opens the Products tab
@@ -157,22 +158,38 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         .order('segment_index');
 
       if (existing && existing.length > 0) {
-        setModalSegments(
-          existing.map((row) => ({
-            id: row.id,
-            segment_index: row.segment_index,
-            model_id: row.model_id,
-            source_image_url: row.source_image_url,
-            label: row.label ?? '',
-            material_type: row.material_type ?? '',
-            finish: row.finish ?? '',
-            dominant_color: row.dominant_color ?? '#888888',
-            bbox: row.bbox as SegmentWithResults['bbox'],
-            confidence: row.confidence ?? 0,
-            crop_storage_url: row.crop_storage_url ?? undefined,
-            search_results: (row.search_results as any[]) ?? [],
-          })),
+        // Re-crop zones that have no stored URL — crop_data_url is transient and not persisted
+        const { width: imgW, height: imgH } = await getImageDimensions(selectedImage.url);
+        const segments = await Promise.all(
+          existing.map(async (row) => {
+            let cropDataUrl: string | undefined;
+            if (!row.crop_storage_url) {
+              cropDataUrl =
+                (await cropZone(
+                  selectedImage.url,
+                  row.bbox as SegmentWithResults['bbox'],
+                  imgW,
+                  imgH,
+                )) ?? undefined;
+            }
+            return {
+              id: row.id,
+              segment_index: row.segment_index,
+              model_id: row.model_id,
+              source_image_url: row.source_image_url,
+              label: row.label ?? '',
+              material_type: row.material_type ?? '',
+              finish: row.finish ?? '',
+              dominant_color: row.dominant_color ?? '#888888',
+              bbox: row.bbox as SegmentWithResults['bbox'],
+              confidence: row.confidence ?? 0,
+              crop_storage_url: row.crop_storage_url ?? undefined,
+              crop_data_url: cropDataUrl,
+              search_results: (row.search_results as any[]) ?? [],
+            };
+          }),
         );
+        setModalSegments(segments);
         setModalSegmentsLoaded(true);
         return;
       }
@@ -233,7 +250,38 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         });
       }
 
-      // 3. Persist to DB
+      // 3. Enrich search results with product image URLs (from image_product_associations → document_images)
+      const allProductIds = [...new Set(
+        allSegments.flatMap(s => (s.search_results ?? []).map((r: any) => r.id))
+      )].filter(Boolean);
+
+      if (allProductIds.length > 0) {
+        try {
+          const { data: imageAssocs } = await supabase
+            .from('image_product_associations')
+            .select('product_id, overall_score, document_images!inner(image_url)')
+            .in('product_id', allProductIds)
+            .order('overall_score', { ascending: false });
+
+          const productImageMap: Record<string, string> = {};
+          (imageAssocs ?? []).forEach((assoc: any) => {
+            if (!productImageMap[assoc.product_id]) {
+              productImageMap[assoc.product_id] = assoc.document_images?.image_url ?? '';
+            }
+          });
+
+          for (const seg of allSegments) {
+            seg.search_results = (seg.search_results ?? []).map((r: any) => ({
+              ...r,
+              image_url: productImageMap[r.id] || null,
+            }));
+          }
+        } catch (imgErr) {
+          console.warn('[ProgressiveImageGrid] Could not fetch product images:', imgErr);
+        }
+      }
+
+      // 4. Persist to DB
       if (allSegments.length > 0) {
         const rows = allSegments.map((s) => ({
           generation_id: jobId,
@@ -273,6 +321,19 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
       setModalSegmenting(false);
     }
   }, [selectedImage, jobId, workspaceId, modalSegmentsLoaded, modalSegmenting]);
+
+  // Delete cached DB rows then trigger a fresh segmentation run
+  const handleRegenerate = useCallback(async () => {
+    if (!selectedImage || !jobId) return;
+    await supabase
+      .from('generation_3d_segments')
+      .delete()
+      .eq('generation_id', jobId)
+      .eq('model_id', selectedImage.model_id);
+    setModalSegments([]);
+    setModalSegmentError(null);
+    setModalSegmentsLoaded(false);
+  }, [selectedImage, jobId]);
 
   // Trigger loading when the Products tab is selected
   useEffect(() => {
@@ -378,223 +439,300 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
       {/* Image Modal */}
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedImage?.name}</DialogTitle>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
+          {/* Header */}
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <DialogTitle className="text-base font-semibold text-gray-900 truncate">
+                  {selectedImage?.name}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  AI-generated render — click Products to detect material zones
+                </DialogDescription>
+              </div>
+              {selectedImage && (
+                <Badge variant="outline" className="text-xs flex-shrink-0 text-gray-500 border-gray-200">
+                  3D Render
+                </Badge>
+              )}
+            </div>
           </DialogHeader>
 
-          <Tabs
-            value={modalActiveTab}
-            onValueChange={(v) => setModalActiveTab(v as typeof modalActiveTab)}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="image" className="gap-2">
-                <ZoomIn className="w-4 h-4" />
-                Image
-              </TabsTrigger>
-              <TabsTrigger value="products" className="gap-2">
-                {modalSegmenting
-                  ? <Loader2 className="w-4 h-4 animate-spin" />
-                  : <Scan className="w-4 h-4" />}
-                Products
-              </TabsTrigger>
-            </TabsList>
+          <div className="flex-1 overflow-y-auto px-6 pb-6 pt-4">
+            <Tabs
+              value={modalActiveTab}
+              onValueChange={(v) => setModalActiveTab(v as typeof modalActiveTab)}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2 bg-gray-100 p-1 rounded-lg h-9">
+                <TabsTrigger value="image" className="gap-1.5 text-xs rounded-md">
+                  <ZoomIn className="w-3.5 h-3.5" />
+                  Image
+                </TabsTrigger>
+                <TabsTrigger value="products" className="gap-1.5 text-xs rounded-md">
+                  {modalSegmenting
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Scan className="w-3.5 h-3.5" />}
+                  Materials
+                  {modalSegments.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                      {modalSegments.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Image Tab */}
-            <TabsContent value="image" className="space-y-4">
-              <div className="relative bg-gray-100 rounded-lg overflow-hidden" style={{ minHeight: '400px' }}>
-                {selectedImage && (
-                  <>
-                    <img
-                      src={selectedImage.url}
-                      alt={selectedImage.name}
-                      className="w-full h-full object-contain"
-                    />
-                    {onGenerateVR && (
-                      <div className="absolute top-4 right-4 z-10">
+              {/* Image Tab */}
+              <TabsContent value="image" className="mt-4">
+                <div
+                  className="relative bg-gray-50 rounded-xl border border-gray-200 overflow-auto"
+                  style={{ minHeight: '380px', maxHeight: '62vh' }}
+                >
+                  {selectedImage && (
+                    <>
+                      <img
+                        src={selectedImage.url}
+                        alt={selectedImage.name}
+                        onClick={() => setImageZoom(z => z >= 3 ? 1 : parseFloat((z + 0.5).toFixed(1)))}
+                        style={{
+                          width: `${imageZoom * 100}%`,
+                          display: 'block',
+                          cursor: imageZoom >= 3 ? 'zoom-out' : 'zoom-in',
+                        }}
+                      />
+                      {/* Zoom controls */}
+                      <div className="absolute bottom-3 left-3 z-10 flex items-center bg-black/60 rounded-lg overflow-hidden select-none">
                         <button
-                          onClick={() => {
-                            if (!vrGenerating) {
-                              onGenerateVR(selectedImage.url, { prompt: selectedImage.name });
-                            }
-                          }}
-                          disabled={vrGenerating}
-                          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white rounded-lg transition-colors shadow-lg"
-                          title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
-                        >
-                          {vrGenerating ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Globe className="w-5 h-5" />
-                          )}
-                          <span className="font-medium">{vrGenerating ? 'Generating VR...' : 'Generate VR'}</span>
-                        </button>
+                          onClick={(e) => { e.stopPropagation(); setImageZoom(z => Math.max(1, parseFloat((z - 0.5).toFixed(1)))); }}
+                          className="px-2.5 py-1 text-white text-sm hover:bg-white/20 transition-colors disabled:opacity-40"
+                          disabled={imageZoom <= 1}
+                        >−</button>
+                        <span className="text-white text-xs px-1.5 min-w-[30px] text-center tabular-nums">{imageZoom}×</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setImageZoom(z => Math.min(3, parseFloat((z + 0.5).toFixed(1)))); }}
+                          className="px-2.5 py-1 text-white text-sm hover:bg-white/20 transition-colors disabled:opacity-40"
+                          disabled={imageZoom >= 3}
+                        >+</button>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </TabsContent>
-
-            {/* Products Tab — on-demand segmentation */}
-            <TabsContent value="products" className="space-y-4">
-              {modalSegmenting ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-500">
-                  <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-                  <p className="font-medium">Detecting material zones…</p>
-                  <p className="text-sm text-gray-400">Qwen3-VL is analysing your render</p>
-                </div>
-              ) : modalSegmentError ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-red-500">
-                  <AlertCircle className="w-8 h-8" />
-                  <p className="font-medium">Segmentation failed</p>
-                  <p className="text-sm text-center text-red-400 max-w-sm">{modalSegmentError}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 mt-2"
-                    onClick={() => { setModalSegmentsLoaded(false); setModalSegmentError(null); }}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Retry
-                  </Button>
-                </div>
-              ) : modalSegmentsLoaded && modalSegments.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
-                  <Scan className="w-8 h-8" />
-                  <p className="font-medium">No material zones detected</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 mt-2"
-                    onClick={() => { setModalSegmentsLoaded(false); }}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Retry
-                  </Button>
-                </div>
-              ) : modalSegments.length > 0 ? (
-                <>
-                  {/* Zone selector strip */}
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {modalSegments.map((seg, idx) => (
-                      <button
-                        key={seg.id ?? idx}
-                        onClick={() => setSelectedSegmentIndex(idx)}
-                        className={`flex-shrink-0 flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
-                          selectedSegmentIndex === idx
-                            ? 'border-blue-600 bg-blue-50 shadow-md'
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                        }`}
-                        style={{ minWidth: 88 }}
-                      >
-                        <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 relative">
-                          {seg.crop_storage_url || seg.crop_data_url ? (
-                            <img
-                              src={seg.crop_storage_url ?? seg.crop_data_url}
-                              alt={seg.label}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div
-                              className="w-full h-full"
-                              style={{ backgroundColor: seg.dominant_color ?? '#e5e7eb' }}
-                            />
-                          )}
-                          <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl">
-                            {Math.round(seg.confidence * 100)}%
-                          </div>
+                      {onGenerateVR && (
+                        <div className="absolute top-3 right-3 z-10">
+                          <button
+                            onClick={() => {
+                              if (!vrGenerating) {
+                                onGenerateVR(selectedImage.url, { prompt: selectedImage.name });
+                              }
+                            }}
+                            disabled={vrGenerating}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white text-xs font-medium rounded-lg transition-colors shadow-md"
+                            title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                          >
+                            {vrGenerating ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Globe className="w-3.5 h-3.5" />
+                            )}
+                            {vrGenerating ? 'Generating VR…' : 'Generate VR'}
+                          </button>
                         </div>
-                        <p className="text-[11px] font-medium text-gray-800 text-center line-clamp-1 w-16">{seg.label}</p>
-                        <p className="text-[10px] text-gray-500 text-center line-clamp-1 w-16">{seg.material_type}</p>
-                      </button>
-                    ))}
+                      )}
+                    </>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Materials Tab — on-demand segmentation */}
+              <TabsContent value="products" className="mt-4 space-y-3">
+                {/* Action bar */}
+                {modalSegmentsLoaded && !modalSegmenting && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {modalSegments.length > 0
+                        ? `${modalSegments.length} material zone${modalSegments.length !== 1 ? 's' : ''} detected`
+                        : 'No zones detected'}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs"
+                      onClick={handleRegenerate}
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      Regenerate
+                    </Button>
                   </div>
+                )}
 
-                  {/* Selected zone detail + matched products */}
-                  {modalSegments[selectedSegmentIndex] && (() => {
-                    const seg = modalSegments[selectedSegmentIndex];
-                    const results: any[] = seg.search_results ?? [];
-                    return (
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
-                          <div
-                            className="w-6 h-6 rounded-full border border-gray-300 flex-shrink-0"
-                            style={{ backgroundColor: seg.dominant_color ?? '#888' }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 text-sm capitalize">{seg.label}</p>
-                            <p className="text-xs text-gray-500">{seg.material_type} · {seg.finish}</p>
-                          </div>
-                          {onAskKAI && (
-                            <button
-                              onClick={() => onAskKAI(seg)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
-                            >
-                              <Search className="w-3.5 h-3.5" />
-                              Ask KAI
-                            </button>
-                          )}
-                        </div>
-
-                        {results.length > 0 ? (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {results.map((product: any, pidx: number) => (
-                              <div
-                                key={product.id ?? pidx}
-                                className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-600 hover:shadow-md transition-all"
-                              >
-                                <div className="aspect-square bg-gray-100">
-                                  {product.image_url ? (
+                {modalSegmenting ? (
+                  <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-500">
+                    <div className="relative">
+                      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                    </div>
+                    <p className="font-medium text-sm">Detecting material zones…</p>
+                    <p className="text-xs text-muted-foreground">AI is analysing surfaces in the render</p>
+                  </div>
+                ) : modalSegmentError ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <div className="p-3 bg-red-50 rounded-full">
+                      <AlertCircle className="w-6 h-6 text-red-500" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-sm text-gray-900">Detection failed</p>
+                      <p className="text-xs text-center text-muted-foreground max-w-xs mt-1">{modalSegmentError}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-8"
+                      onClick={handleRegenerate}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Try again
+                    </Button>
+                  </div>
+                ) : modalSegmentsLoaded && modalSegments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <div className="p-3 bg-gray-100 rounded-full">
+                      <Scan className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <div className="text-center">
+                      <p className="font-medium text-sm text-gray-700">No material zones detected</p>
+                      <p className="text-xs text-muted-foreground mt-1">Try regenerating or use a clearer render</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-8"
+                      onClick={handleRegenerate}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Regenerate
+                    </Button>
+                  </div>
+                ) : modalSegments.length > 0 ? (
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-200 text-left">
+                          <th className="px-3 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide w-[72px]">Zone</th>
+                          <th className="px-3 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide">Material</th>
+                          <th className="px-3 py-2.5 font-medium text-gray-500 text-xs uppercase tracking-wide">Platform Match</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {modalSegments.map((seg, idx) => {
+                          const topMatch = (seg.search_results ?? [])
+                            .find(r => (r.score ?? r.final_score ?? 0) >= 0.7);
+                          const matchScore = topMatch?.score ?? topMatch?.final_score;
+                          const matchName = topMatch?.product_name ?? topMatch?.name ?? 'Product';
+                          return (
+                            <tr key={seg.id ?? idx} className="hover:bg-gray-50/70 transition-colors">
+                              {/* Zone thumbnail */}
+                              <td className="px-3 py-3 align-top">
+                                <div className="w-14 h-14 rounded-lg overflow-hidden bg-gray-100 relative flex-shrink-0">
+                                  {seg.crop_storage_url || seg.crop_data_url ? (
                                     <img
-                                      src={product.image_url}
-                                      alt={product.name ?? product.product_name}
+                                      src={seg.crop_storage_url ?? seg.crop_data_url}
+                                      alt={seg.label}
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                                      <Package className="w-8 h-8" />
+                                    <div
+                                      className="w-full h-full"
+                                      style={{ backgroundColor: seg.dominant_color ?? '#e5e7eb' }}
+                                    />
+                                  )}
+                                  <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl leading-tight">
+                                    {Math.round(seg.confidence * 100)}%
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Material description */}
+                              <td className="px-3 py-3 align-top">
+                                <p className="font-semibold text-gray-900 capitalize leading-tight text-sm">{seg.label}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">{seg.material_type} · {seg.finish}</p>
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                  <div
+                                    className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0"
+                                    style={{ backgroundColor: seg.dominant_color ?? '#888' }}
+                                  />
+                                  <span className="text-[10px] text-muted-foreground font-mono">{seg.dominant_color}</span>
+                                </div>
+                              </td>
+
+                              {/* Platform match */}
+                              <td className="px-3 py-3 align-top">
+                                {topMatch ? (
+                                  <div className="space-y-2">
+                                    <div className="flex items-start gap-2">
+                                      <div className="w-11 h-11 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 border border-gray-200">
+                                        {topMatch.image_url ? (
+                                          <img
+                                            src={topMatch.image_url}
+                                            alt={matchName}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                            <Package className="w-4 h-4" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-medium text-gray-900 line-clamp-2 leading-tight">
+                                          {matchName}
+                                        </p>
+                                        {matchScore != null && (
+                                          <Badge variant="outline" className="mt-1 h-4 px-1.5 text-[10px] bg-green-50 text-green-700 border-green-200">
+                                            {Math.round(matchScore * 100)}% match
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
-                                  )}
-                                </div>
-                                <div className="p-2">
-                                  <p className="font-medium text-xs text-gray-900 line-clamp-2">
-                                    {product.name ?? product.product_name ?? 'Product'}
-                                  </p>
-                                  {product.final_score != null && (
-                                    <p className="text-[10px] text-gray-400 mt-0.5">
-                                      {Math.round(product.final_score * 100)}% match
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center py-8 gap-2 text-gray-400">
-                            <Package className="w-6 h-6" />
-                            <p className="text-sm">No matching products for this zone</p>
-                            {onAskKAI && (
-                              <button onClick={() => onAskKAI(seg)} className="text-xs text-blue-600 hover:underline">
-                                Ask KAI to search
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </>
-              ) : (
-                // Not yet loaded — shows briefly before useEffect triggers loading
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
-                  <Scan className="w-8 h-8" />
-                  <p className="font-medium">Preparing material analysis…</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+                                    {onAskKAI && (
+                                      <button
+                                        onClick={() => onAskKAI(seg)}
+                                        className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                        Search Relevant
+                                      </button>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2">
+                                    <span className="text-xs text-muted-foreground italic">N/A</span>
+                                    {onAskKAI && (
+                                      <button
+                                        onClick={() => onAskKAI(seg)}
+                                        className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                      >
+                                        <ExternalLink className="w-3 h-3" />
+                                        Search Relevant
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  // Not yet loaded — shows briefly before useEffect triggers loading
+                  <div className="flex flex-col items-center justify-center py-16 gap-3">
+                    <div className="p-3 bg-gray-100 rounded-full">
+                      <Scan className="w-6 h-6 text-gray-400" />
+                    </div>
+                    <p className="text-sm font-medium text-gray-700">Preparing material analysis…</p>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
         </DialogContent>
       </Dialog>
     </>
