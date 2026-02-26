@@ -30,7 +30,7 @@ import type {
   SendAgentMessageConfig,
   CreateMoodboardConfig,
   AddToMoodboardConfig,
-  PerplexitySearchConfig,
+  WebSearchConfig,
   FirecrawlScrapeConfig,
   ApolloEnrichConfig,
   HunterFindContactsConfig,
@@ -747,12 +747,12 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       );
     }
 
-    case 'perplexity_search': {
-      const cfg = config as PerplexitySearchConfig;
+    case 'web_search': {
+      const cfg = config as WebSearchConfig;
       return (
         <div className="space-y-3">
           <div className="text-xs text-muted-foreground">
-            AI-powered B2B manufacturer search across 30 markets in 5 regions. Native language searches performed automatically. ~0.75 credits per region.
+            AI-powered B2B manufacturer search using Claude web search. Specify a country for focused results or leave blank for a broad global search.
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Product Category</Label>
@@ -782,7 +782,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               </SelectContent>
             </Select>
             <p className="text-[10px] text-muted-foreground">
-              Leave empty to search all 30 markets in parallel
+              Leave empty for broad global search
             </p>
           </div>
           <div className="space-y-1.5">
@@ -794,7 +794,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               className="h-8 text-sm"
             />
             <p className="text-[10px] text-muted-foreground">
-              Overrides region. Use for single-country search (~0.75 credits).
+              Overrides region. Use for focused single-country results.
             </p>
           </div>
           <div className="space-y-1.5">

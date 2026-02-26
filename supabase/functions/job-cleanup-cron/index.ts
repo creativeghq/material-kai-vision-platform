@@ -1,16 +1,27 @@
 /**
  * Job Cleanup Cron Edge Function
- * 
- * Automatically cleans up old completed/failed jobs every 5 days
- * 
+ *
+ * Automatically cleans up old completed/failed jobs, logs, and stale records.
+ * Triggered every Sunday at 03:00 UTC via pg_cron (cron.job table).
+ *
  * Cleans:
- * - background_jobs (completed/failed older than 5 days)
- * - scraping_sessions (completed/failed older than 5 days)
- * - data_import_jobs (completed/failed older than 5 days)
- * - job_checkpoints (older than 7 days)
- * - data_import_history (older than 30 days)
- * 
- * Schedule: Run via cron every 5 days
+ * - background_jobs         completed/failed > 5 days old
+ * - scraping_sessions       completed/failed > 5 days old
+ * - data_import_jobs        completed/failed, non-scheduled > 5 days old
+ * - job_checkpoints         > 7 days old
+ * - data_import_history     > 30 days old
+ * - agent_checkpoints       > 30 days old  (conversation snapshots, not needed after)
+ * - flow_run_steps          steps belonging to completed/failed runs > 30 days old
+ * - flow_runs               completed/failed > 30 days old
+ * - vr_worlds (failed)      status=failed > 7 days old
+ * - job_progress            not updated > 7 days old  (stale progress records from completed/failed jobs)
+ * - system_logs             > 30 days old  (operational Python API logs, ~77k rows/day)
+ * - ai_call_logs            > 30 days old  (per-call AI API debug logs, distinct from ai_usage_logs)
+ * - search_query_tracking   > 90 days old  (search analytics)
+ *
+ * NOTE: ai_usage_logs is intentionally excluded — retained indefinitely for billing/business analytics.
+ * NOTE: system_logs also has a dedicated daily pg_cron SQL job (system-logs-daily-cleanup) for
+ *       high-volume purging — this weekly pass handles any overflow.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
@@ -27,11 +38,20 @@ interface CleanupStats {
   dataImportJobs: number;
   jobCheckpoints: number;
   importHistory: number;
+  agentCheckpoints: number;
+  flowRunSteps: number;
+  flowRuns: number;
+  vrWorldsFailed: number;
+  generation3d: number;
+  generation3dStorageFiles: number;
+  jobProgress: number;
+  systemLogs: number;
+  aiCallLogs: number;
+  searchQueryTracking: number;
   totalCleaned: number;
 }
 
 serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -49,107 +69,283 @@ serve(async (req) => {
       dataImportJobs: 0,
       jobCheckpoints: 0,
       importHistory: 0,
+      agentCheckpoints: 0,
+      flowRunSteps: 0,
+      flowRuns: 0,
+      vrWorldsFailed: 0,
+      generation3d: 0,
+      generation3dStorageFiles: 0,
+      jobProgress: 0,
+      systemLogs: 0,
+      aiCallLogs: 0,
+      searchQueryTracking: 0,
       totalCleaned: 0,
     };
 
-    // Calculate cutoff dates
-    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const fiveDaysAgo    = new Date(Date.now() -  5 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo   = new Date(Date.now() -  7 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const ninetyDaysAgo  = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
 
-    // 1. Clean background_jobs (completed/failed older than 5 days)
-    console.log('[JobCleanupCron] Cleaning background_jobs...');
-    const { data: bgJobs, error: bgError } = await supabase
-      .from('background_jobs')
-      .delete()
-      .in('status', ['completed', 'failed'])
-      .or(`completed_at.lt.${fiveDaysAgo},failed_at.lt.${fiveDaysAgo}`)
-      .limit(1000)
-      .select('id');
-
-    if (!bgError && bgJobs) {
-      stats.backgroundJobs = bgJobs.length;
-      console.log(`[JobCleanupCron] ✅ Cleaned ${bgJobs.length} background jobs`);
-    } else if (bgError) {
-      console.error('[JobCleanupCron] ❌ Error cleaning background_jobs:', bgError);
+    // ── 1. background_jobs ──────────────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('background_jobs')
+        .delete()
+        .in('status', ['completed', 'failed'])
+        .or(`completed_at.lt.${fiveDaysAgo},failed_at.lt.${fiveDaysAgo}`)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] background_jobs error:', error);
+      else stats.backgroundJobs = data?.length ?? 0;
+      console.log(`[JobCleanupCron] background_jobs: ${stats.backgroundJobs} deleted`);
     }
 
-    // 2. Clean scraping_sessions (completed/failed older than 5 days)
-    console.log('[JobCleanupCron] Cleaning scraping_sessions...');
-    const { data: scrapingSessions, error: scrapingError } = await supabase
-      .from('scraping_sessions')
-      .delete()
-      .in('status', ['completed', 'failed'])
-      .lt('updated_at', fiveDaysAgo)
-      .limit(1000)
-      .select('id');
-
-    if (!scrapingError && scrapingSessions) {
-      stats.scrapingSessions = scrapingSessions.length;
-      console.log(`[JobCleanupCron] ✅ Cleaned ${scrapingSessions.length} scraping sessions`);
-    } else if (scrapingError) {
-      console.error('[JobCleanupCron] ❌ Error cleaning scraping_sessions:', scrapingError);
+    // ── 2. scraping_sessions ────────────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('scraping_sessions')
+        .delete()
+        .in('status', ['completed', 'failed'])
+        .lt('updated_at', fiveDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] scraping_sessions error:', error);
+      else stats.scrapingSessions = data?.length ?? 0;
+      console.log(`[JobCleanupCron] scraping_sessions: ${stats.scrapingSessions} deleted`);
     }
 
-    // 3. Clean data_import_jobs (completed/failed older than 5 days, excluding scheduled jobs)
-    console.log('[JobCleanupCron] Cleaning data_import_jobs...');
-    const { data: importJobs, error: importError } = await supabase
-      .from('data_import_jobs')
-      .delete()
-      .in('status', ['completed', 'failed'])
-      .eq('is_scheduled', false) // Don't delete scheduled jobs
-      .lt('updated_at', fiveDaysAgo)
-      .limit(1000)
-      .select('id');
-
-    if (!importError && importJobs) {
-      stats.dataImportJobs = importJobs.length;
-      console.log(`[JobCleanupCron] ✅ Cleaned ${importJobs.length} data import jobs`);
-    } else if (importError) {
-      console.error('[JobCleanupCron] ❌ Error cleaning data_import_jobs:', importError);
+    // ── 3. data_import_jobs ─────────────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('data_import_jobs')
+        .delete()
+        .in('status', ['completed', 'failed'])
+        .eq('is_scheduled', false)
+        .lt('updated_at', fiveDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] data_import_jobs error:', error);
+      else stats.dataImportJobs = data?.length ?? 0;
+      console.log(`[JobCleanupCron] data_import_jobs: ${stats.dataImportJobs} deleted`);
     }
 
-    // 4. Clean job_checkpoints (older than 7 days)
-    console.log('[JobCleanupCron] Cleaning job_checkpoints...');
-    const { data: checkpoints, error: checkpointError } = await supabase
-      .from('job_checkpoints')
-      .delete()
-      .lt('created_at', sevenDaysAgo)
-      .limit(1000)
-      .select('id');
-
-    if (!checkpointError && checkpoints) {
-      stats.jobCheckpoints = checkpoints.length;
-      console.log(`[JobCleanupCron] ✅ Cleaned ${checkpoints.length} job checkpoints`);
-    } else if (checkpointError) {
-      console.error('[JobCleanupCron] ❌ Error cleaning job_checkpoints:', checkpointError);
+    // ── 4. job_checkpoints ──────────────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('job_checkpoints')
+        .delete()
+        .lt('created_at', sevenDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] job_checkpoints error:', error);
+      else stats.jobCheckpoints = data?.length ?? 0;
+      console.log(`[JobCleanupCron] job_checkpoints: ${stats.jobCheckpoints} deleted`);
     }
 
-    // 5. Clean data_import_history (older than 30 days)
-    console.log('[JobCleanupCron] Cleaning data_import_history...');
-    const { data: importHistory, error: historyError } = await supabase
-      .from('data_import_history')
-      .delete()
-      .lt('created_at', thirtyDaysAgo)
-      .limit(1000)
-      .select('id');
-
-    if (!historyError && importHistory) {
-      stats.importHistory = importHistory.length;
-      console.log(`[JobCleanupCron] ✅ Cleaned ${importHistory.length} import history records`);
-    } else if (historyError) {
-      console.error('[JobCleanupCron] ❌ Error cleaning data_import_history:', historyError);
+    // ── 5. data_import_history ──────────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('data_import_history')
+        .delete()
+        .lt('created_at', thirtyDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] data_import_history error:', error);
+      else stats.importHistory = data?.length ?? 0;
+      console.log(`[JobCleanupCron] data_import_history: ${stats.importHistory} deleted`);
     }
 
-    // Calculate total
-    stats.totalCleaned = 
-      stats.backgroundJobs + 
-      stats.scrapingSessions + 
-      stats.dataImportJobs + 
-      stats.jobCheckpoints + 
-      stats.importHistory;
+    // ── 6. agent_checkpoints (conversation snapshots) ───────────────────────
+    {
+      const { data, error } = await supabase
+        .from('agent_checkpoints')
+        .delete()
+        .lt('updated_at', thirtyDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] agent_checkpoints error:', error);
+      else stats.agentCheckpoints = data?.length ?? 0;
+      console.log(`[JobCleanupCron] agent_checkpoints: ${stats.agentCheckpoints} deleted`);
+    }
 
-    console.log(`[JobCleanupCron] 🎉 Cleanup complete! Total cleaned: ${stats.totalCleaned}`);
+    // ── 7. flow_run_steps (delete before parent flow_runs) ──────────────────
+    {
+      // Delete steps whose parent run is completed/failed and older than 30 days
+      const { data, error } = await supabase
+        .from('flow_run_steps')
+        .delete()
+        .lt('created_at', thirtyDaysAgo)
+        .limit(2000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] flow_run_steps error:', error);
+      else stats.flowRunSteps = data?.length ?? 0;
+      console.log(`[JobCleanupCron] flow_run_steps: ${stats.flowRunSteps} deleted`);
+    }
+
+    // ── 8. flow_runs ────────────────────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('flow_runs')
+        .delete()
+        .in('status', ['completed', 'failed', 'cancelled'])
+        .lt('created_at', thirtyDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] flow_runs error:', error);
+      else stats.flowRuns = data?.length ?? 0;
+      console.log(`[JobCleanupCron] flow_runs: ${stats.flowRuns} deleted`);
+    }
+
+    // ── 9. vr_worlds (failed only) ──────────────────────────────────────────
+    {
+      const { data, error } = await supabase
+        .from('vr_worlds')
+        .delete()
+        .eq('status', 'failed')
+        .lt('created_at', sevenDaysAgo)
+        .limit(500)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] vr_worlds error:', error);
+      else stats.vrWorldsFailed = data?.length ?? 0;
+      console.log(`[JobCleanupCron] vr_worlds (failed): ${stats.vrWorldsFailed} deleted`);
+    }
+
+    // ── 10. generation_3d — unsaved renders older than 15 days ───────────────
+    // Collect crop Storage paths BEFORE deleting rows (CASCADE removes segments)
+    {
+      const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Fetch segment crop URLs so we can delete them from Storage
+      const { data: segRows } = await supabase
+        .from('generation_3d_segments')
+        .select('crop_storage_url, generation_id')
+        .not('crop_storage_url', 'is', null)
+        .in(
+          'generation_id',
+          // Sub-select IDs that will be deleted
+          (await supabase
+            .from('generation_3d')
+            .select('id')
+            .is('saved_to_moodboard_at', null)
+            .lt('created_at', fifteenDaysAgo)
+            .in('generation_status', ['completed', 'failed'])
+          ).data?.map((r: any) => r.id) ?? [],
+        );
+
+      // Delete crop files from Storage
+      if (segRows && segRows.length > 0) {
+        const storagePaths = segRows
+          .map((r: any) => {
+            // Extract path after /product-images/
+            const url: string = r.crop_storage_url ?? '';
+            const marker = '/product-images/';
+            const idx = url.indexOf(marker);
+            return idx >= 0 ? url.slice(idx + marker.length) : null;
+          })
+          .filter(Boolean) as string[];
+
+        if (storagePaths.length > 0) {
+          const { data: removed } = await supabase.storage
+            .from('product-images')
+            .remove(storagePaths);
+          stats.generation3dStorageFiles = removed?.length ?? 0;
+          console.log(`[JobCleanupCron] generation_3d storage files removed: ${stats.generation3dStorageFiles}`);
+        }
+      }
+
+      // Delete the generations (CASCADE removes generation_3d_segments)
+      const { data: deleted, error: delErr } = await supabase
+        .from('generation_3d')
+        .delete()
+        .is('saved_to_moodboard_at', null)
+        .lt('created_at', fifteenDaysAgo)
+        .in('generation_status', ['completed', 'failed'])
+        .limit(500)
+        .select('id');
+
+      if (delErr) console.error('[JobCleanupCron] generation_3d error:', delErr);
+      else stats.generation3d = deleted?.length ?? 0;
+      console.log(`[JobCleanupCron] generation_3d (unsaved >15d): ${stats.generation3d} deleted`);
+    }
+
+    // ── 11. job_progress — stale progress records > 7 days ──────────────────
+    // Progress rows are only useful while the job runs. Once the parent job
+    // completes/fails (and is cleaned above), these become orphaned. Delete any
+    // record not updated in 7 days. Uses updated_at (no created_at column).
+    {
+      const { data, error } = await supabase
+        .from('job_progress')
+        .delete()
+        .lt('updated_at', sevenDaysAgo)
+        .limit(1000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] job_progress error:', error);
+      else stats.jobProgress = data?.length ?? 0;
+      console.log(`[JobCleanupCron] job_progress: ${stats.jobProgress} deleted`);
+    }
+
+    // ── 12. system_logs — Python API operational logs > 30 days ─────────────
+    // High-volume table (~77k rows/day). A dedicated daily pg_cron SQL job
+    // (system-logs-daily-cleanup) handles the bulk; this pass cleans overflow.
+    {
+      const { data, error } = await supabase
+        .from('system_logs')
+        .delete()
+        .lt('created_at', thirtyDaysAgo)
+        .limit(10000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] system_logs error:', error);
+      else stats.systemLogs = data?.length ?? 0;
+      console.log(`[JobCleanupCron] system_logs: ${stats.systemLogs} deleted`);
+    }
+
+    // ── 13. ai_call_logs — per-call AI debug logs > 30 days ─────────────────
+    // NOT the same as ai_usage_logs (billing). These are raw API call records
+    // with request/response payloads retained for debugging only.
+    {
+      const { data, error } = await supabase
+        .from('ai_call_logs')
+        .delete()
+        .lt('created_at', thirtyDaysAgo)
+        .limit(5000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] ai_call_logs error:', error);
+      else stats.aiCallLogs = data?.length ?? 0;
+      console.log(`[JobCleanupCron] ai_call_logs: ${stats.aiCallLogs} deleted`);
+    }
+
+    // ── 14. search_query_tracking — search analytics > 90 days ──────────────
+    // Uses 'timestamp' column (not created_at).
+    {
+      const { data, error } = await supabase
+        .from('search_query_tracking')
+        .delete()
+        .lt('timestamp', ninetyDaysAgo)
+        .limit(2000)
+        .select('id');
+      if (error) console.error('[JobCleanupCron] search_query_tracking error:', error);
+      else stats.searchQueryTracking = data?.length ?? 0;
+      console.log(`[JobCleanupCron] search_query_tracking: ${stats.searchQueryTracking} deleted`);
+    }
+
+    stats.totalCleaned =
+      stats.backgroundJobs +
+      stats.scrapingSessions +
+      stats.dataImportJobs +
+      stats.jobCheckpoints +
+      stats.importHistory +
+      stats.agentCheckpoints +
+      stats.flowRunSteps +
+      stats.flowRuns +
+      stats.vrWorldsFailed +
+      stats.generation3d +
+      stats.jobProgress +
+      stats.systemLogs +
+      stats.aiCallLogs +
+      stats.searchQueryTracking;
+
+    console.log(`[JobCleanupCron] ✅ Done. Total cleaned: ${stats.totalCleaned}`);
 
     return new Response(
       JSON.stringify({
@@ -166,14 +362,10 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString(),
       }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
-

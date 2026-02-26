@@ -107,7 +107,7 @@ export function getRegionById(regionId: string): RegionConfig | undefined {
   return SUPPORTED_MARKETS.find(r => r.id === regionId);
 }
 
-/** Build a regional search query for Perplexity */
+/** Build a regional search query */
 export function buildRegionalQuery(region: RegionConfig, category: string, limitPerRegion: number): string {
   const countryList = region.markets.map(m => m.country).join(', ');
   const languageHints = region.markets
@@ -138,7 +138,7 @@ Return up to ${limitPerRegion} manufacturers total across all countries in this 
 Group results by country.`;
 }
 
-/** Build a single-country search query for Perplexity */
+/** Build a single-country search query */
 export function buildSingleCountryQuery(market: MarketInfo, category: string, limit: number): string {
   const langHint = market.language !== 'English'
     ? `\nSearch in BOTH English AND ${market.language} language sources for better coverage of local manufacturers.`

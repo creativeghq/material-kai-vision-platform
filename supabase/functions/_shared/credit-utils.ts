@@ -2,7 +2,7 @@
  * External Service Credit Utilities for Supabase Edge Functions
  *
  * Shared credit debit helper for all external (non-AI) services:
- * Twilio, Perplexity, Apollo, Hunter.io, ZeroBounce, Firecrawl.
+ * Twilio, Apollo, Hunter.io, ZeroBounce, Firecrawl.
  *
  * Mirrors pricing from Python AIPricingConfig.EXTERNAL_SERVICE_PRICING.
  * Uses the existing debit_user_credits RPC and ai_usage_logs table.
@@ -15,7 +15,6 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const EXTERNAL_SERVICE_PRICING: Record<string, { cost_per_unit: number; unit: string }> = {
   'twilio-sms':           { cost_per_unit: 0.0079, unit: 'message' },
   'twilio-whatsapp':      { cost_per_unit: 0.005,  unit: 'message' },
-  'perplexity-sonar':     { cost_per_unit: 0.005,  unit: 'query' },
   'apollo-enrich':        { cost_per_unit: 0.05,   unit: 'enrichment' },
   'apollo-people-match':  { cost_per_unit: 0.03,   unit: 'lookup' },
   'hunter-email-finder':  { cost_per_unit: 0.01,   unit: 'search' },
@@ -96,7 +95,7 @@ export async function debitExternalServiceCredits(
       user_id: userId,
       operation_type: operationType,
       model_name: serviceName,
-      api_provider: serviceName.split('-')[0], // twilio, perplexity, apollo, hunter, zerobounce, firecrawl
+      api_provider: serviceName.split('-')[0], // twilio, apollo, hunter, zerobounce, firecrawl
       input_tokens: 0,
       output_tokens: 0,
       input_cost_usd: 0,

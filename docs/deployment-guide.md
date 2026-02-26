@@ -289,7 +289,6 @@ SLIG_NAMESPACE=basiliskan
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
 |------------|------|----------------------|-------------|----------------|
-| `PERPLEXITY_API_KEY` | **Secret** | `agent-chat` | Perplexity AI for web research | `pplx-xxxxxxxxxxxxxxxx` |
 | `APOLLO_API_KEY` | **Secret** | `agent-chat` | Apollo.io for company/contact enrichment + email finder fallback | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `HUNTER_API_KEY` | **Secret** | `agent-chat` | Hunter.io for domain search + person email finder | `xxxxxxxxxxxxxxxxxxxxxxxx` |
 | `ZEROBOUNCE_API_KEY` | **Secret** | `agent-chat` | ZeroBounce for email validation (all discovered emails) | `xxxxxxxxxxxxxxxxxxxxxxxx` |

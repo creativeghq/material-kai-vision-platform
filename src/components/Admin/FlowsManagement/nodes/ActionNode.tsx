@@ -11,7 +11,7 @@ import type {
   ActionNodeData, ActionType,
   SendSmsConfig, SendEmailConfig, HttpRequestConfig,
   SendAgentMessageConfig, CreateMoodboardConfig, AddToMoodboardConfig,
-  PerplexitySearchConfig, FirecrawlScrapeConfig, ApolloEnrichConfig,
+  WebSearchConfig, FirecrawlScrapeConfig, ApolloEnrichConfig,
   HunterFindContactsConfig, ZeroBounceValidateConfig,
 } from '@/services/flows/types';
 
@@ -34,7 +34,7 @@ const actionIcons: Record<ActionType, React.ElementType> = {
   send_agent_message: BotMessageSquare,
   create_moodboard: LayoutGrid,
   add_to_moodboard: ImagePlus,
-  perplexity_search: Compass,
+  web_search: Compass,
   firecrawl_scrape: FileSearch,
   apollo_enrich: Building2,
   hunter_find_contacts: UserSearch,
@@ -67,8 +67,8 @@ function getActionSummary(data: ActionNodeData): string {
       const cfg = data.config as AddToMoodboardConfig;
       return cfg.moodboard_id ? 'Add product to moodboard' : 'Configure...';
     }
-    case 'perplexity_search': {
-      const cfg = data.config as PerplexitySearchConfig;
+    case 'web_search': {
+      const cfg = data.config as WebSearchConfig;
       return cfg.country && cfg.category ? `${cfg.category} in ${cfg.country}` : 'Configure search...';
     }
     case 'firecrawl_scrape': {

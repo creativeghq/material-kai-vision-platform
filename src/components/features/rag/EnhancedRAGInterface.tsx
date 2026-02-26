@@ -348,7 +348,7 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
               <Select
                 value={searchType}
                 onValueChange={(
-                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'perplexity' | 'all',
+                  value: 'comprehensive' | 'semantic' | 'hybrid' | 'all',
                 ) => setSearchType(value)}
               >
                 <SelectTrigger>
@@ -363,9 +363,6 @@ export const EnhancedRAGInterface: React.FC<EnhancedRAGInterfaceProps> = ({
                   </SelectItem>
                   <SelectItem value="hybrid">
                     ⚡ Hybrid (Mixed Approach)
-                  </SelectItem>
-                  <SelectItem value="perplexity">
-                    🌐 Real-time (Perplexity)
                   </SelectItem>
                   <SelectItem value="all">
                     🚀 All Strategies (Parallel - 3-4x Faster!)

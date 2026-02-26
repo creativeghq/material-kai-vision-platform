@@ -1694,21 +1694,23 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           parsedRequest={message.designData.parsedRequest}
                           qualityAssessment={message.designData.qualityAssessment}
                           processingTimeMs={message.designData.processingTimeMs}
+                          generationId={message.generation_job?.job_id}
+                          workspaceId={session?.user?.user_metadata?.workspace_id}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                           onMaterialClick={(materialId) => {
                             console.log('Material clicked:', materialId);
-                            // Could open material details modal or navigate
                           }}
                           onFindMaterials={async (imageUrl) => {
-                            console.log('🔍 Find Materials clicked for image:', imageUrl);
-                            // Send a clear message that triggers material_search tool
-                            // Use explicit keywords that match the system prompt conditions
                             const findMaterialsPrompt = `Find materials and products that match this interior design image: ${imageUrl}`;
                             setInput(findMaterialsPrompt);
-                            // Wait for input to be set, then send
                             setTimeout(async () => {
                               await handleSendMessage();
                             }, 100);
+                          }}
+                          onAskKAI={(segment) => {
+                            const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
+                            setInput(prompt);
+                            setTimeout(async () => { await handleSendMessage(); }, 100);
                           }}
                           onViewAllMaterials={() => {
                             setSelectedMaterialsData({

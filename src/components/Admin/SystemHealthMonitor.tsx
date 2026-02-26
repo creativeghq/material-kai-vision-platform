@@ -101,7 +101,6 @@ interface ExternalServiceStatus {
 
 const EXTERNAL_SERVICES_CONFIG = [
   { name: 'Twilio', url: 'https://api.twilio.com', category: 'messaging' as const, icon: '📱' },
-  { name: 'Perplexity', url: 'https://api.perplexity.ai', category: 'b2b' as const, icon: '🔎' },
   { name: 'Apollo', url: 'https://api.apollo.io', category: 'b2b' as const, icon: '🏢' },
   { name: 'Hunter.io', url: 'https://api.hunter.io/v2', category: 'b2b' as const, icon: '📧' },
   { name: 'ZeroBounce', url: 'https://api.zerobounce.net/v2', category: 'b2b' as const, icon: '✉️' },

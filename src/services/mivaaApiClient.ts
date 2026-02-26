@@ -29,6 +29,28 @@ export interface MivaaApiResponse<T = any> {
 }
 
 /**
+ * Material zone detected by segmentation
+ */
+export interface MaterialZone {
+  label: string;          // e.g. "floor", "back wall"
+  material_type: string;  // e.g. "white oak hardwood"
+  finish: string;         // e.g. "satin", "matte"
+  dominant_color: string; // hex e.g. "#c8a97a"
+  bbox: { x: number; y: number; w: number; h: number }; // relative 0–1
+  confidence: number;
+  // Added by frontend after cropping:
+  crop_data_url?: string;
+  crop_storage_url?: string;
+  search_results?: any[];
+}
+
+export interface SegmentationResponse {
+  zones: MaterialZone[];
+  count: number;
+  processing_time_ms: number;
+}
+
+/**
  * PDF Upload Response - returned by /api/rag/documents/upload
  */
 export interface PDFUploadResponse {
@@ -621,6 +643,42 @@ export class MivaaApiClient {
     return this.request('/api/internal/generate-product-embeddings', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Detect material zones in a 3D rendered image.
+   * Returns bounding boxes (relative 0–1) + metadata per zone.
+   */
+  async segmentImage(payload: {
+    image_base64: string;
+    workspace_id?: string;
+  }): Promise<MivaaApiResponse<SegmentationResponse>> {
+    return this.request<SegmentationResponse>('/api/images/segment', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Search for similar materials using an image crop (base64).
+   * Uses multi_vector strategy for best results.
+   */
+  async searchByImageCrop(payload: {
+    image_base64: string;
+    query: string;
+    workspace_id: string;
+    top_k?: number;
+  }): Promise<MivaaApiResponse> {
+    return this.request('/api/rag/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        image_base64: payload.image_base64,
+        query: payload.query,
+        workspace_id: payload.workspace_id,
+        top_k: payload.top_k ?? 8,
+        strategy: 'multi_vector',
+      }),
     });
   }
 }

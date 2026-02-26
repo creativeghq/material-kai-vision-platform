@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -23,7 +23,9 @@ import {
   Search,
   Globe,
   Loader2,
+  Scan,
 } from 'lucide-react';
+import { useSegmentation, SegmentWithResults } from '@/hooks/useSegmentation';
 
 interface ModelResult {
   model_id: string;
@@ -68,9 +70,14 @@ interface DesignCanvasProps {
   processingTimeMs?: number;
   onMaterialClick?: (materialId: string) => void;
   onViewAllMaterials?: () => void;
-  onFindMaterials?: (imageUrl: string) => void; // NEW: Callback to trigger material search
+  onFindMaterials?: (imageUrl: string) => void;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   vrGenerating?: boolean;
+  /** ID of the generation_3d record — enables auto-segmentation & Products tab */
+  generationId?: string;
+  workspaceId?: string;
+  /** Called when the user hits "Ask KAI" on a segment crop */
+  onAskKAI?: (segment: SegmentWithResults) => void;
 }
 
 export const DesignCanvas: React.FC<DesignCanvasProps> = ({
@@ -88,10 +95,30 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
   onViewAllMaterials,
   onGenerateVR,
   vrGenerating,
+  generationId = null,
+  workspaceId = '',
+  onAskKAI,
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'details'>('images');
+  const [activeTab, setActiveTab] = useState<'images' | 'analysis' | 'materials' | 'products' | 'details'>('images');
   const [showImageModal, setShowImageModal] = useState(false);
+  const [selectedSegmentIndex, setSelectedSegmentIndex] = useState<number>(0);
+
+  // Build completed images list for segmentation hook
+  const completedImages = useMemo(() =>
+    images.map((url) => {
+      const model = modelResults.find((m) => m.image_urls?.includes(url));
+      return { model_id: model?.model_id ?? 'unknown', image_url: url };
+    }),
+    [images, modelResults],
+  );
+
+  const { segments, loading: segmenting } = useSegmentation({
+    generationId,
+    workspaceId,
+    completedImages,
+    enabled: !!generationId && images.length > 0,
+  });
 
   // Helper function to get model info for an image
   const getModelForImage = (imageUrl: string): ModelResult | undefined => {
@@ -152,6 +179,19 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
           >
             <LayoutGrid className="w-4 h-4" />
             Materials ({matchedMaterials.length})
+          </button>
+        )}
+        {(segments.length > 0 || segmenting) && (
+          <button
+            onClick={() => setActiveTab('products')}
+            className={`flex-1 px-4 py-3 font-medium transition-colors flex items-center justify-center gap-2 ${
+              activeTab === 'products'
+                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            {segmenting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scan className="w-4 h-4" />}
+            Products {segments.length > 0 ? `(${segments.length})` : ''}
           </button>
         )}
         {(parsedRequest || qualityAssessment || processingTimeMs) && (
@@ -722,6 +762,148 @@ export const DesignCanvas: React.FC<DesignCanvasProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Products Tab — segment crops from the 3D render */}
+        {activeTab === 'products' && (
+          <div className="space-y-4">
+            {segmenting && segments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-500">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+                <p className="font-medium">Detecting material zones…</p>
+                <p className="text-sm text-gray-400">Qwen3-VL is analysing the render</p>
+              </div>
+            ) : segments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-3 text-gray-400">
+                <Scan className="w-8 h-8" />
+                <p className="font-medium">No segments detected yet</p>
+              </div>
+            ) : (
+              <>
+                {/* Zone selector strip */}
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {segments.map((seg, idx) => (
+                    <button
+                      key={seg.id ?? idx}
+                      onClick={() => setSelectedSegmentIndex(idx)}
+                      className={`flex-shrink-0 flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-all ${
+                        selectedSegmentIndex === idx
+                          ? 'border-blue-600 bg-blue-50 shadow-md'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                      style={{ minWidth: 90 }}
+                    >
+                      {/* Crop thumbnail */}
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 relative">
+                        {seg.crop_storage_url || seg.crop_data_url ? (
+                          <img
+                            src={seg.crop_storage_url ?? seg.crop_data_url}
+                            alt={seg.label}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-full h-full"
+                            style={{ backgroundColor: seg.dominant_color ?? '#e5e7eb' }}
+                          />
+                        )}
+                        {/* Confidence badge */}
+                        <div className="absolute bottom-0 right-0 bg-black/60 text-white text-[9px] px-1 rounded-tl">
+                          {Math.round(seg.confidence * 100)}%
+                        </div>
+                      </div>
+                      <p className="text-[11px] font-medium text-gray-800 text-center line-clamp-1 w-16">
+                        {seg.label}
+                      </p>
+                      <p className="text-[10px] text-gray-500 text-center line-clamp-1 w-16">
+                        {seg.material_type}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Selected zone detail */}
+                {segments[selectedSegmentIndex] && (() => {
+                  const seg = segments[selectedSegmentIndex];
+                  const results: any[] = seg.search_results ?? [];
+                  return (
+                    <div className="space-y-3">
+                      {/* Zone metadata bar */}
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-200">
+                        <div
+                          className="w-6 h-6 rounded-full border border-gray-300 flex-shrink-0"
+                          style={{ backgroundColor: seg.dominant_color ?? '#888' }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm capitalize">{seg.label}</p>
+                          <p className="text-xs text-gray-500">{seg.material_type} · {seg.finish}</p>
+                        </div>
+                        {onAskKAI && (
+                          <button
+                            onClick={() => onAskKAI(seg)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            Ask KAI
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Matched products grid */}
+                      {results.length > 0 ? (
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {results.map((product: any, pidx: number) => (
+                            <button
+                              key={product.id ?? pidx}
+                              onClick={() => onMaterialClick?.(product.id)}
+                              className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-600 hover:shadow-md transition-all group text-left"
+                            >
+                              <div className="aspect-square bg-gray-100">
+                                {product.image_url ? (
+                                  <img
+                                    src={product.image_url}
+                                    alt={product.name ?? product.product_name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                    <Package className="w-8 h-8" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="p-2">
+                                <p className="font-medium text-xs text-gray-900 line-clamp-2 group-hover:text-blue-600">
+                                  {product.name ?? product.product_name ?? 'Product'}
+                                </p>
+                                {product.final_score != null && (
+                                  <p className="text-[10px] text-gray-400 mt-0.5">
+                                    {Math.round(product.final_score * 100)}% match
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 gap-2 text-gray-400">
+                          <Package className="w-6 h-6" />
+                          <p className="text-sm">No matching products found for this zone</p>
+                          {onAskKAI && (
+                            <button
+                              onClick={() => onAskKAI(seg)}
+                              className="mt-1 text-xs text-blue-600 hover:underline"
+                            >
+                              Ask KAI to search
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </>
+            )}
           </div>
         )}
 

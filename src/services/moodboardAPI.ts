@@ -416,6 +416,19 @@ class MoodBoardAPI {
       updatedAt: new Date(board.updated_at),
     }));
   }
+
+  /**
+   * Mark a 3D generation as saved to a moodboard.
+   * This prevents it from being deleted by the cleanup cron after 15 days.
+   */
+  async markGenerationSaved(generationId: string): Promise<void> {
+    const { error } = await supabase
+      .from('generation_3d')
+      .update({ saved_to_moodboard_at: new Date().toISOString() })
+      .eq('id', generationId);
+
+    if (error) throw error;
+  }
 }
 
 export const moodboardAPI = new MoodBoardAPI();

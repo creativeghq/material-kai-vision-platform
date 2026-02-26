@@ -11,9 +11,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate } from '../_shared/auth.ts';
-import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
-import { SUPPORTED_MARKETS, ALL_MARKETS, findMarketByCountry, getRegionById, buildRegionalQuery, buildSingleCountryQuery } from '../_shared/b2b-markets.ts';
-import { getToolPrompt } from '../_shared/prompt-utils.ts';
+import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -364,9 +362,10 @@ async function executeAction(
       return { output: { added: true, position: nextPosition } };
     }
 
+    case 'web_search':
     case 'perplexity_search': {
-      const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
-      if (!PERPLEXITY_API_KEY) throw new Error('PERPLEXITY_API_KEY not configured');
+      const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+      if (!ANTHROPIC_API_KEY) throw new Error('ANTHROPIC_API_KEY not configured');
 
       const country = String(resolved.country || '');
       const regionId = String(resolved.region || '');
@@ -375,121 +374,47 @@ async function executeAction(
 
       if (!category) throw new Error('Category is required');
 
-      // Load system prompt from database (editable via /admin/ai-configs)
-      const b2bSystemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
-      // Flow-engine appends JSON format instruction for structured parsing
-      const flowSystemPrompt = b2bSystemPrompt + ' Return results as JSON array with fields: name, website, location, country, products, contact_info.';
+      const scope = country
+        ? `in ${country}`
+        : regionId
+        ? `in the ${regionId} region`
+        : 'across Europe and major global manufacturing hubs';
 
-      // Helper: single Perplexity fetch with timeout
-      const fetchPerplexity = async (query: string): Promise<{ content: string; citations: string[] } | null> => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 60000);
-        try {
-          const response = await fetch('https://api.perplexity.ai/chat/completions', {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${PERPLEXITY_API_KEY}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'sonar',
-              messages: [
-                { role: 'system', content: flowSystemPrompt },
-                { role: 'user', content: query },
-              ],
-              temperature: 0.2,
-              max_tokens: 8192,
-            }),
-            signal: controller.signal,
-          });
-          if (!response.ok) {
-            const errText = await response.text();
-            console.error(`Perplexity API error ${response.status}: ${errText}`);
-            return null;
-          }
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content || '';
-          return content ? { content, citations: data.citations || [] } : null;
-        } catch (err) {
-          if (err instanceof Error && err.name === 'AbortError') {
-            console.error('Perplexity API timeout after 60s');
-          }
-          return null;
-        } finally {
-          clearTimeout(timer);
-        }
-      };
+      const query = `Find B2B manufacturers of ${category} ${scope}. I need actual production companies (not distributors) with their own manufacturing facilities. For each company provide: name, website URL, city/country, main products. Return up to ${limit} results as a structured list.`;
 
-      // Single country mode
-      if (country) {
-        const market = findMarketByCountry(country);
-        const query = market
-          ? buildSingleCountryQuery(market, category, limit)
-          : `Find up to ${limit} B2B manufacturers of ${category} in ${country}. Return structured results.`;
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-beta': 'web-search-2025-03-05',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4096,
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+          messages: [{ role: 'user', content: query }],
+        }),
+      });
 
-        if (userId) {
-          const check = await checkCreditBalance(supabase, userId, 'perplexity-sonar', 1);
-          if (!check.sufficient) throw new Error(`Insufficient credits. Required: ${check.required_credits.toFixed(2)}, Balance: ${check.balance.toFixed(2)}`);
-        }
-
-        const result = await fetchPerplexity(query);
-        if (userId && result) {
-          await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', 1, { country, category, source: 'flow' });
-        }
-
-        return {
-          output: {
-            success: !!result,
-            search_results: result?.content || 'No results found.',
-            citations: result?.citations || [],
-            query: { country, category, limit, search_mode: 'single_country' },
-          },
-        };
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Web search failed: ${response.status} - ${errText}`);
       }
 
-      // Region or global mode
-      const regionsToSearch = regionId
-        ? (getRegionById(regionId) ? [getRegionById(regionId)!] : [...SUPPORTED_MARKETS])
-        : [...SUPPORTED_MARKETS];
-
-      const totalQueries = regionsToSearch.length;
-      const limitPerRegion = Math.ceil(limit / totalQueries);
-
-      if (userId) {
-        const check = await checkCreditBalance(supabase, userId, 'perplexity-sonar', totalQueries);
-        if (!check.sufficient) throw new Error(`Insufficient credits for global search. Required: ${check.required_credits.toFixed(2)} (${totalQueries} regions), Balance: ${check.balance.toFixed(2)}`);
-      }
-
-      const results = await Promise.allSettled(
-        regionsToSearch.map(async (regionConfig) => {
-          const query = buildRegionalQuery(regionConfig, category, limitPerRegion);
-          const result = await fetchPerplexity(query);
-          return { region: regionConfig, result };
-        })
-      );
-
-      const allContent: string[] = [];
-      const allCitations: string[] = [];
-      let successCount = 0;
-
-      for (const settled of results) {
-        if (settled.status === 'fulfilled' && settled.value.result) {
-          allContent.push(`## ${settled.value.region.name}\n${settled.value.result.content}`);
-          allCitations.push(...settled.value.result.citations);
-          successCount++;
-        }
-      }
-
-      if (userId && successCount > 0) {
-        await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', successCount, {
-          category, search_mode: regionsToSearch.length === 1 ? `region:${regionsToSearch[0].id}` : 'all_markets',
-          regions_searched: successCount, total_regions: totalQueries, source: 'flow',
-        });
-      }
+      const data = await response.json();
+      const textContent = (data.content as any[])
+        ?.filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('\n') || '';
 
       return {
         output: {
-          success: successCount > 0,
-          search_results: allContent.join('\n\n') || 'No results found.',
-          citations: [...new Set(allCitations)],
-          query: { category, limit, search_mode: regionsToSearch.length === 1 ? 'region' : 'all_markets', regions_searched: successCount },
+          success: !!textContent,
+          search_results: textContent || 'No results found.',
+          query: { country, category, limit },
+          source: 'claude_web_search',
         },
       };
     }

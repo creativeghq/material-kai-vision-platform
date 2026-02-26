@@ -43,7 +43,7 @@ export type {
   SendAgentMessageConfig,
   CreateMoodboardConfig,
   AddToMoodboardConfig,
-  PerplexitySearchConfig,
+  WebSearchConfig,
   FirecrawlScrapeConfig,
   ApolloEnrichConfig,
   HunterFindContactsConfig,

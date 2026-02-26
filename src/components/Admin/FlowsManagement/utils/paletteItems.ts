@@ -165,9 +165,9 @@ export const paletteItems: NodePaletteItem[] = [
     defaultData: { label: 'Send Agent Message', category: 'action', actionType: 'send_agent_message', config: { conversation_id: '', message: '', role: 'user', trigger_agent_response: false } } as ActionNodeData },
 
   // ── B2B Research ──
-  { type: 'actionNode', category: 'action', subType: 'perplexity_search', group: 'B2B Research',
-    label: 'Manufacturer Search', description: 'Search 30 markets for B2B manufacturers', icon: 'Compass', color: 'blue',
-    defaultData: { label: 'Manufacturer Search', category: 'action', actionType: 'perplexity_search', config: { category: '', limit: 30 } } as ActionNodeData },
+  { type: 'actionNode', category: 'action', subType: 'web_search', group: 'B2B Research',
+    label: 'Manufacturer Search', description: 'Search for B2B manufacturers using Claude web search', icon: 'Compass', color: 'blue',
+    defaultData: { label: 'Manufacturer Search', category: 'action', actionType: 'web_search', config: { category: '', limit: 30 } } as ActionNodeData },
   { type: 'actionNode', category: 'action', subType: 'firecrawl_scrape', group: 'B2B Research',
     label: 'Scrape Website', description: 'Extract company info from website', icon: 'FileSearch', color: 'blue',
     defaultData: { label: 'Scrape Website', category: 'action', actionType: 'firecrawl_scrape', config: { url: '' } } as ActionNodeData },

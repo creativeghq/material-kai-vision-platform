@@ -663,9 +663,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return undefined;
   };
 
+  // Extract code/SKU dictionaries filtered to entries that belong to THIS product.
+  // Keys may be space-separated ("ONA MINT/12X45") or underscore-separated ("valenova_blue_30x60").
+  const extractFilteredCodes = (val: unknown): string | undefined => {
+    if (!val) return undefined;
+    const inner = (typeof val === 'object' && !Array.isArray(val) && 'value' in (val as Record<string, unknown>))
+      ? (val as Record<string, unknown>).value
+      : val;
+    if (!inner || typeof inner !== 'object' || Array.isArray(inner)) return extractValue(val);
+    const entries = Object.entries(inner as Record<string, unknown>);
+    const filtered = entries.filter(([k]) => {
+      const underscorePrefix = normalizeMatch(k.split('_')[0]);
+      const spacePrefix = normalizeMatch(k.split(' ')[0]);
+      return underscorePrefix === productNameNorm || spacePrefix === productNameNorm;
+    });
+    if (filtered.length === 0) return undefined;
+    return filtered.map(([k, v]) => `${k}: ${v}`).join(', ');
+  };
+
   const commercial = {
-    'Product Codes': extractValue(commercialData?.product_codes),
-    'SKU Codes': extractValue(commercialData?.sku_codes),
+    'Product Codes': extractFilteredCodes(commercialData?.product_codes),
+    'SKU Codes': extractFilteredCodes(commercialData?.sku_codes),
     'Grout Suppliers': extractValue(commercialData?.grout_suppliers),
     'Grout Mapei': extractValue(commercialData?.grout_mapei) ||
       (groutRecommendations.mapei ? `${formatGroutSuggestion(groutRecommendations.mapei)} (AI Suggested)` : undefined),

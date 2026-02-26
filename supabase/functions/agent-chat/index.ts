@@ -19,7 +19,6 @@ const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.ma
 const MIVAA_API_KEY = Deno.env.get('MIVAA_API_KEY') || '';
 
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
-import { SUPPORTED_MARKETS, ALL_MARKETS, findMarketByCountry, getRegionById, buildRegionalQuery, buildSingleCountryQuery } from '../_shared/b2b-markets.ts';
 import { getToolPrompt } from '../_shared/prompt-utils.ts';
 
 if (!ANTHROPIC_API_KEY) {
@@ -2224,239 +2223,59 @@ const createProductAnalysisTool = (workspaceId: string) => {
 
 /**
  * B2B Research Tool: Manufacturer Search
- * Uses Perplexity API for AI-powered web research to find B2B manufacturers.
- * Searches all 30 supported markets by default (5 regional batches in parallel),
- * or a specific country/region when provided.
+ * Uses Claude's built-in web_search to find B2B manufacturers.
+ * No extra API key required — uses ANTHROPIC_API_KEY.
  */
-const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: string) => void) => {
-  // Helper: single Perplexity API call
-  const fetchPerplexity = async (query: string, apiKey: string, systemPrompt: string): Promise<{ content: string; citations: string[] } | null> => {
-    const TIMEOUT_MS = 60000;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-    try {
-      const response = await fetch('https://api.perplexity.ai/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'sonar',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: query },
-          ],
-          temperature: 0.2,
-          max_tokens: 8192,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ Perplexity API error: ${response.status} - ${errorText}`);
-        return null;
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      const citations = data.citations || [];
-      return content ? { content, citations } : null;
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        console.error('Perplexity API timeout after 60s');
-      } else {
-        console.error('Perplexity API fetch error:', fetchError);
-      }
-      return null;
-    }
-  };
-
+const createB2BManufacturerSearchTool = (_userId: string, onProgress?: (status: string) => void) => {
   return tool(
     async ({ country, region, category, limit = 30 }) => {
       try {
-        const startTime = Date.now();
+        const scope = country
+          ? `in ${country}`
+          : region
+          ? `in the ${region} region (Central/Eastern Europe, Balkans & Turkey, Baltic & Nordic, Western & Southern Europe, or Global Manufacturing Hubs)`
+          : 'across Europe and major global manufacturing hubs (Poland, Turkey, Germany, Italy, Czech Republic, Romania, Bulgaria, Greece, Baltic states, Morocco, India, China)';
 
-        const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
-        if (!PERPLEXITY_API_KEY) {
-          return JSON.stringify({
-            success: false,
-            error: 'PERPLEXITY_API_KEY not configured. Please add it to Supabase secrets.',
-          });
-        }
+        const query = `Find B2B manufacturers of ${category} ${scope}. I need actual production companies (not distributors or retailers) with their own manufacturing facilities. For each company provide: company name, website URL, city/country, main products, and any manufacturing indicators. Return up to ${limit} results.`;
 
-        // Load system prompt from database (editable via /admin/ai-configs)
-        const b2bSystemPrompt = await getToolPrompt(supabase, 'b2b_manufacturer_search');
+        console.log(`🔍 B2B Web Search: ${category}${country ? ` in ${country}` : region ? ` (${region})` : ' (global)'}`);
+        onProgress?.(`Searching for ${category} manufacturers${country ? ` in ${country}` : ''}...`);
 
-        // Determine search scope
-        let regionsToSearch: typeof SUPPORTED_MARKETS;
-        let searchMode: string;
-
-        if (country) {
-          // Single country mode
-          const market = findMarketByCountry(country);
-          if (market) {
-            searchMode = `single_country:${market.country}`;
-            const query = buildSingleCountryQuery(market, category, limit);
-            console.log(`🔍 B2B Search: ${category} in ${market.country}`);
-            onProgress?.(`Searching for ${category} manufacturers in ${market.country}...`);
-
-            // Pre-check credits (1 query)
-            const creditCheck = await checkCreditBalance(supabase, userId, 'perplexity-sonar', 1);
-            if (!creditCheck.sufficient) {
-              return JSON.stringify({
-                success: false,
-                error: `Insufficient credits. Required: ${creditCheck.required_credits.toFixed(2)}, Balance: ${creditCheck.balance.toFixed(2)}. Please purchase more credits.`,
-              });
-            }
-
-            const result = await fetchPerplexity(query, PERPLEXITY_API_KEY, b2bSystemPrompt);
-            const elapsed = Date.now() - startTime;
-
-            if (!result) {
-              return JSON.stringify({ success: false, error: 'Search returned no results. Try a different query.' });
-            }
-
-            // Only debit on successful response
-            await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', 1, {
-              category, country: market.country, search_mode: 'single_country', source: 'agent',
-            });
-
-            return JSON.stringify({
-              success: true,
-              search_results: result.content,
-              citations: result.citations,
-              query_params: { country: market.country, category, limit },
-              search_mode: 'single_country',
-              regions_searched: 1,
-              elapsed_ms: elapsed,
-              source: 'perplexity',
-            });
-          }
-          // Country not found in supported markets — still search it as a custom query
-          searchMode = `custom_country:${country}`;
-          const query = `Find B2B manufacturers of ${category} in ${country}.\nI need actual manufacturing companies (not distributors or retailers) with their own production facilities.\nFor each manufacturer, provide: Company name, Website URL, City/location, Main products, Manufacturing indicators.\nReturn up to ${limit} manufacturers.`;
-          console.log(`🔍 B2B Search (custom): ${category} in ${country}`);
-          onProgress?.(`Searching for ${category} manufacturers in ${country}...`);
-
-          const creditCheck = await checkCreditBalance(supabase, userId, 'perplexity-sonar', 1);
-          if (!creditCheck.sufficient) {
-            return JSON.stringify({
-              success: false,
-              error: `Insufficient credits. Required: ${creditCheck.required_credits.toFixed(2)}, Balance: ${creditCheck.balance.toFixed(2)}.`,
-            });
-          }
-
-          const result = await fetchPerplexity(query, PERPLEXITY_API_KEY, b2bSystemPrompt);
-          const elapsed = Date.now() - startTime;
-
-          if (result) {
-            await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', 1, {
-              category, country, search_mode: 'custom_country', source: 'agent',
-            });
-          }
-
-          return JSON.stringify({
-            success: !!result,
-            search_results: result?.content || 'No results found.',
-            citations: result?.citations || [],
-            query_params: { country, category, limit },
-            search_mode: 'custom_country',
-            elapsed_ms: elapsed,
-            source: 'perplexity',
-          });
-        }
-
-        // Region or global mode
-        if (region) {
-          const targetRegion = getRegionById(region);
-          if (targetRegion) {
-            regionsToSearch = [targetRegion];
-          } else {
-            regionsToSearch = [...SUPPORTED_MARKETS];
-          }
-        } else {
-          regionsToSearch = [...SUPPORTED_MARKETS];
-        }
-
-        searchMode = regionsToSearch.length === 1 ? `region:${regionsToSearch[0].id}` : 'all_markets';
-        const totalQueries = regionsToSearch.length;
-        const limitPerRegion = Math.ceil(limit / totalQueries);
-
-        console.log(`🔍 B2B Global Search: ${category} across ${totalQueries} regions (${ALL_MARKETS.length} markets)`);
-        onProgress?.(`Starting global manufacturer search for "${category}" across ${ALL_MARKETS.length} markets (${totalQueries} regions)...`);
-
-        // Pre-check credits for all planned queries
-        const creditCheck = await checkCreditBalance(supabase, userId, 'perplexity-sonar', totalQueries);
-        if (!creditCheck.sufficient) {
-          return JSON.stringify({
-            success: false,
-            error: `Insufficient credits for global search. Required: ${creditCheck.required_credits.toFixed(2)} credits (${totalQueries} regions), Balance: ${creditCheck.balance.toFixed(2)}. Try searching a specific country instead.`,
-          });
-        }
-
-        // Run regional searches in parallel
-        const regionPromises = regionsToSearch.map(async (regionConfig) => {
-          onProgress?.(`Searching ${regionConfig.name} (${regionConfig.markets.map(m => m.country).join(', ')})...`);
-          const query = buildRegionalQuery(regionConfig, category, limitPerRegion);
-          const result = await fetchPerplexity(query, PERPLEXITY_API_KEY, b2bSystemPrompt);
-          if (result) {
-            onProgress?.(`✓ ${regionConfig.name} complete`);
-          }
-          return { region: regionConfig, result };
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'anthropic-beta': 'web-search-2025-03-05',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 4096,
+            tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+            messages: [{ role: 'user', content: query }],
+          }),
         });
 
-        const results = await Promise.allSettled(regionPromises);
-
-        // Aggregate results
-        const allContent: string[] = [];
-        const allCitations: string[] = [];
-        const regionSummary: { region: string; success: boolean }[] = [];
-        let successCount = 0;
-
-        for (const settled of results) {
-          if (settled.status === 'fulfilled') {
-            const { region: reg, result } = settled.value;
-            if (result) {
-              allContent.push(`\n## ${reg.name}\n${result.content}`);
-              allCitations.push(...result.citations);
-              regionSummary.push({ region: reg.name, success: true });
-              successCount++;
-            } else {
-              regionSummary.push({ region: reg.name, success: false });
-            }
-          } else {
-            regionSummary.push({ region: 'Unknown', success: false });
-          }
+        if (!response.ok) {
+          const errText = await response.text();
+          console.error(`❌ Web search API error ${response.status}: ${errText}`);
+          return JSON.stringify({ success: false, error: `Web search failed: ${response.status}` });
         }
 
-        const elapsed = Date.now() - startTime;
-        const failedCount = totalQueries - successCount;
+        const data = await response.json();
+        const textContent = (data.content as any[])
+          ?.filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('\n') || '';
 
-        onProgress?.(`Global search complete: ${successCount}/${totalQueries} regions returned results (${elapsed}ms)`);
-
-        // Only debit for successful queries
-        if (successCount > 0) {
-          await debitExternalServiceCredits(supabase, userId, 'perplexity-sonar', 'b2b_manufacturer_search', successCount, {
-            category, search_mode: searchMode, regions_searched: successCount, total_regions: totalQueries, source: 'agent',
-          });
-        }
+        onProgress?.(`Search complete.`);
 
         return JSON.stringify({
-          success: successCount > 0,
-          search_results: allContent.join('\n') || 'No results found across any region.',
-          citations: [...new Set(allCitations)],
-          query_params: { category, limit, search_mode: searchMode },
-          search_mode: searchMode,
-          regions_searched: successCount,
-          regions_failed: failedCount,
-          region_summary: regionSummary,
-          elapsed_ms: elapsed,
-          source: 'perplexity',
+          success: !!textContent,
+          search_results: textContent || 'No results found.',
+          query_params: { country, region, category, limit },
+          source: 'claude_web_search',
         });
       } catch (error) {
         console.error('B2B manufacturer search error:', error);
@@ -2468,12 +2287,12 @@ const createB2BManufacturerSearchTool = (userId: string, onProgress?: (status: s
     },
     {
       name: 'b2b_manufacturer_search',
-      description: 'Search for B2B manufacturers across 30 supported markets or a specific country. When no country is specified, searches ALL markets in 5 regional batches (Central/Eastern Europe, Balkans & Turkey, Baltic & Nordic, Western & Southern Europe, Global Manufacturing Hubs) in parallel. Native language searches are performed automatically for each market. Costs ~0.75 credits per region (~3.75 for all markets, ~0.75 for single country).',
+      description: 'Search for B2B manufacturers using web search. Finds actual production companies with their websites, locations, and product info. Specify a country for focused results, a region (cee/balkans/baltic_nordic/western_southern/global) for regional search, or omit both for a broad global search.',
       schema: z.object({
-        country: z.string().optional().describe('Specific country to search (e.g., "Poland", "Turkey"). Omit to search ALL 30 markets.'),
-        region: z.string().optional().describe('Specific region: "cee", "balkans", "baltic_nordic", "western_southern", "global". Ignored if country is provided.'),
+        country: z.string().optional().describe('Specific country to search (e.g., "Poland", "Turkey"). Omit for broader search.'),
+        region: z.string().optional().describe('Region hint: "cee", "balkans", "baltic_nordic", "western_southern", "global". Ignored if country is provided.'),
         category: z.string().describe('Product category (e.g., "ceramic tiles", "bathroom furniture", "flexible panels")'),
-        limit: z.number().optional().default(30).describe('Max total manufacturers to find. Default: 30'),
+        limit: z.number().optional().default(30).describe('Max manufacturers to find. Default: 30'),
       }),
     }
   );
@@ -3834,7 +3653,7 @@ async function executeAgent(
     // Detect what demo data to return based on keywords
     // B2B check FIRST — must precede generic product keywords (e.g. 'tile' appears in "Tiles companies")
     if (lowerInput.includes('compan') || lowerInput.includes('manufactur') || lowerInput.includes('spain') || lowerInput.includes('find me')) {
-      return { text: "Searching our B2B manufacturer database using Perplexity Sonar AI...\n\nFound **8 verified manufacturers** matching your criteria with full contact details, revenue data, certifications, and lead times.\n\nDEMO_DATA: {\"data\":{\"command\":\"b2b_results\"}}" };
+      return { text: "Searching for B2B manufacturers using web search...\n\nFound **8 verified manufacturers** matching your criteria with full contact details, revenue data, certifications, and lead times.\n\nDEMO_DATA: {\"data\":{\"command\":\"b2b_results\"}}" };
     } else if (lowerInput.includes('article') || lowerInput.includes('marketing') || lowerInput.includes('seo') || lowerInput.includes('content')) {
       return { text: "I'm creating a comprehensive SEO article for you. Our AI pipeline analyzed 12 high-value keywords (45,200 combined monthly searches), structured content for featured snippets, and optimized for top-3 ranking potential.\n\n**Article: The Ultimate Guide to Accessories Marketing**\n\nKeyword targeting, content structure, meta tags, and readability score all optimized.\n\nDEMO_DATA: {\"data\":{\"command\":\"seo_article\"}}" };
     } else if (lowerInput.includes('heat') || lowerInput.includes('pump') || lowerInput.includes('hvac')) {

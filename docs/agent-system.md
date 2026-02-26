@@ -89,7 +89,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 - `material_search` - Material discovery
 
 **B2B Research Tools:**
-- `b2b_manufacturer_search` - Find manufacturers via Perplexity AI
+- `b2b_manufacturer_search` - Find manufacturers via Claude web search
 - `company_website_scrape` - Scrape company websites via Firecrawl
 - `company_enrichment` - Enrich company data via Apollo.io
 - `contact_discovery` - Find contacts via Hunter.io domain search or find a specific person's email (Hunter Email Finder + Apollo.io People Match fallback). All discovered emails are validated with ZeroBounce.
@@ -137,19 +137,18 @@ The B2B manufacturer search supports 30 markets across 5 regions with native-lan
 
 ### Global Multi-Region Search
 
-By default, the B2B manufacturer search searches **all 30 markets in parallel** across 5 regional batches. Each batch makes one Perplexity API call covering all countries in that region.
+The B2B manufacturer search uses Claude's built-in web search. Specify a country for focused results, a region for regional scope, or omit both for a broad global search — all powered by the existing `ANTHROPIC_API_KEY`.
 
 **Search modes:**
-- **All markets** (default) — 5 parallel Perplexity calls, ~3.75 credits
-- **Single region** — 1 call targeting a specific region, ~0.75 credits
-- **Single country** — 1 call targeting one country, ~0.75 credits
+- **Global** (default) — broad search across Europe and major manufacturing hubs
+- **By region** — focused on a specific region (cee/balkans/baltic_nordic/western_southern/global)
+- **By country** — single-country focused results
 
 **How it works:**
-1. Credit balance is pre-checked before any API calls
-2. Regional queries are built with all country names + native language hints
-3. All 5 regions are searched in parallel via `Promise.allSettled`
-4. Results are aggregated, citations deduplicated, and a region summary returned
-5. Credits are only debited for successful responses
+1. A natural language query is constructed with country/region scope and product category
+2. Claude performs web search using the `web_search_20250305` built-in tool
+3. Results are returned as a structured manufacturer list
+4. No separate API key required — uses `ANTHROPIC_API_KEY`
 
 ### Dual-Language Search
 
@@ -166,7 +165,6 @@ This ensures discovery of:
 
 | Variable | Service | Purpose |
 |----------|---------|---------|
-| `PERPLEXITY_API_KEY` | Perplexity AI | B2B manufacturer search |
 | `FIRECRAWL_API_KEY` | Firecrawl | Website scraping |
 | `APOLLO_API_KEY` | Apollo.io | Company enrichment + person email finder fallback |
 | `HUNTER_API_KEY` | Hunter.io | Domain search + person email finder |
@@ -242,7 +240,6 @@ const SKILL_FILES = {
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MIVAA_GATEWAY_URL` | `https://v1api.materialshub.gr` | MIVAA API endpoint |
-| `PERPLEXITY_API_KEY` | - | B2B search (Insights agent) |
 | `FIRECRAWL_API_KEY` | - | Website scraping |
 | `APOLLO_API_KEY` | - | Company enrichment + email finder fallback |
 | `HUNTER_API_KEY` | - | Domain search + person email finder |
@@ -352,9 +349,8 @@ All requests require:
 4. Review rate limits
 
 ### B2B Search Failing
-1. Verify `PERPLEXITY_API_KEY` is set
-2. Check country is in supported list
-3. Review Perplexity API quota
+1. Verify `ANTHROPIC_API_KEY` is set and has sufficient quota
+2. Check that the web search beta (`web-search-2025-03-05`) is available on your Anthropic plan
 
 ### Skills Not Loading
 1. Verify SKILL.md has correct frontmatter

@@ -190,7 +190,7 @@ export type ActionType =
   | 'send_agent_message'
   | 'create_moodboard'
   | 'add_to_moodboard'
-  | 'perplexity_search'
+  | 'web_search'
   | 'firecrawl_scrape'
   | 'apollo_enrich'
   | 'hunter_find_contacts'
@@ -310,7 +310,7 @@ export interface AddToMoodboardConfig {
   notes?: string;
 }
 
-export interface PerplexitySearchConfig {
+export interface WebSearchConfig {
   category: string;
   country?: string;
   region?: string;
@@ -366,7 +366,7 @@ export interface ConditionNodeData extends BaseNodeData {
 export interface ActionNodeData extends BaseNodeData {
   category: 'action';
   actionType: ActionType;
-  config: SendSmsConfig | SendEmailConfig | SendPushConfig | SendQuoteConfig | BuildQuoteConfig | ApproveQuoteConfig | CreateNotificationConfig | HttpRequestConfig | AssignUserConfig | AddTagConfig | AddNoteConfig | UpdateContactConfig | UpdateProductConfig | RunEdgeFunctionConfig | LogEventConfig | SendAgentMessageConfig | CreateMoodboardConfig | AddToMoodboardConfig | PerplexitySearchConfig | FirecrawlScrapeConfig | ApolloEnrichConfig | HunterFindContactsConfig | ZeroBounceValidateConfig;
+  config: SendSmsConfig | SendEmailConfig | SendPushConfig | SendQuoteConfig | BuildQuoteConfig | ApproveQuoteConfig | CreateNotificationConfig | HttpRequestConfig | AssignUserConfig | AddTagConfig | AddNoteConfig | UpdateContactConfig | UpdateProductConfig | RunEdgeFunctionConfig | LogEventConfig | SendAgentMessageConfig | CreateMoodboardConfig | AddToMoodboardConfig | WebSearchConfig | FirecrawlScrapeConfig | ApolloEnrichConfig | HunterFindContactsConfig | ZeroBounceValidateConfig;
 }
 
 export type FlowNodeData = TriggerNodeData | ConditionNodeData | ActionNodeData;

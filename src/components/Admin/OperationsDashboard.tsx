@@ -302,7 +302,6 @@ interface ExternalServiceUsageData {
 const EXT_SERVICE_COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'];
 
 const EXT_SERVICE_LABELS: Record<string, string> = {
-  'perplexity-sonar': 'Perplexity',
   'apollo-enrich': 'Apollo Enrich',
   'apollo-people-match': 'Apollo People',
   'hunter-email-finder': 'Hunter Email',
@@ -1156,7 +1155,7 @@ export const OperationsDashboard: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-1">Services & Billing</h2>
               <p className="text-muted-foreground text-sm">
-                Subscription revenue, user credit balances, and external service usage across Twilio, Apollo, Hunter, ZeroBounce, Perplexity, and Firecrawl.
+                Subscription revenue, user credit balances, and external service usage across Twilio, Apollo, Hunter, ZeroBounce, and Firecrawl.
               </p>
             </div>
 

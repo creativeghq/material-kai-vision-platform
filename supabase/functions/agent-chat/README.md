@@ -48,7 +48,6 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
 
 # B2B Research (Insights Agent)
-PERPLEXITY_API_KEY=your-perplexity-key      # Manufacturer search
 FIRECRAWL_API_KEY=your-firecrawl-key        # Website scraping
 APOLLO_API_KEY=your-apollo-key              # Company enrichment + email finder fallback
 HUNTER_API_KEY=your-hunter-key              # Domain search + person email finder
@@ -82,7 +81,6 @@ supabase secrets set ANTHROPIC_API_KEY=your-key-here
 supabase secrets set MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
 
 # B2B Research tools (Insights Agent)
-supabase secrets set PERPLEXITY_API_KEY=your-key-here
 supabase secrets set FIRECRAWL_API_KEY=your-key-here
 supabase secrets set APOLLO_API_KEY=your-key-here
 supabase secrets set HUNTER_API_KEY=your-key-here
