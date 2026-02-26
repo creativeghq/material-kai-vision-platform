@@ -223,6 +223,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>(undefined);
   const [showPromptLibrary, setShowPromptLibrary] = useState(false);
   const [thinkingStartTime, setThinkingStartTime] = useState<number | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -281,6 +282,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       } = await supabase.auth.getUser();
       if (user) {
         setUserId(user.id);
+        setWorkspaceId(user.user_metadata?.workspace_id);
       }
     };
     fetchUserId();
@@ -1694,8 +1696,6 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           parsedRequest={message.designData.parsedRequest}
                           qualityAssessment={message.designData.qualityAssessment}
                           processingTimeMs={message.designData.processingTimeMs}
-                          generationId={message.generation_job?.job_id}
-                          workspaceId={session?.user?.user_metadata?.workspace_id}
                           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
                           onMaterialClick={(materialId) => {
                             console.log('Material clicked:', materialId);
@@ -1706,11 +1706,6 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                             setTimeout(async () => {
                               await handleSendMessage();
                             }, 100);
-                          }}
-                          onAskKAI={(segment) => {
-                            const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
-                            setInput(prompt);
-                            setTimeout(async () => { await handleSendMessage(); }, 100);
                           }}
                           onViewAllMaterials={() => {
                             setSelectedMaterialsData({
@@ -1793,7 +1788,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                               jobId={message.generation_job.job_id}
                               modelCount={message.generation_job.model_count}
                               models={message.generation_job.models}
-                              workspaceId={session?.user?.user_metadata?.workspace_id}
+                              workspaceId={workspaceId}
                               onImageClick={(url, name) => {
                                 console.log('🖼️ Image clicked:', url, name);
                               }}

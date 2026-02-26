@@ -52,7 +52,8 @@ Sentry.init({
   beforeSend(event, hint) {
     // Log errors to console in development
     if (import.meta.env.MODE === 'development' && event.exception) {
-      console.error('Error captured by Sentry:', hint.originalException || hint.syntheticException);
+      const ex = hint.originalException ?? hint.syntheticException;
+      if (ex != null) console.error('Error captured by Sentry:', ex);
     }
     return event;
   },
