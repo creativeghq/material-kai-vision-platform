@@ -651,7 +651,8 @@ export class MivaaApiClient {
    * Returns bounding boxes (relative 0–1) + metadata per zone.
    */
   async segmentImage(payload: {
-    image_base64: string;
+    image_url?: string;
+    image_base64?: string;
     workspace_id?: string;
   }): Promise<MivaaApiResponse<SegmentationResponse>> {
     return this.request<SegmentationResponse>('/api/images/segment', {

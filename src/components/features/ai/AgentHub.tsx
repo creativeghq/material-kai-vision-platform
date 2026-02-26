@@ -1793,10 +1793,16 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                               jobId={message.generation_job.job_id}
                               modelCount={message.generation_job.model_count}
                               models={message.generation_job.models}
+                              workspaceId={session?.user?.user_metadata?.workspace_id}
                               onImageClick={(url, name) => {
                                 console.log('🖼️ Image clicked:', url, name);
                               }}
                               onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+                              onAskKAI={(segment) => {
+                                const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
+                                setInput(prompt);
+                                setTimeout(async () => { await handleSendMessage(); }, 100);
+                              }}
                             />
                           </div>
                         )}
