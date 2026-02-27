@@ -75,6 +75,7 @@ export function useSegmentation({
               confidence: row.confidence ?? 0,
               crop_storage_url: row.crop_storage_url ?? undefined,
               search_results: (row.search_results as any[]) ?? [],
+              search_query: (row as any).search_query ?? undefined,
             })),
           );
         }
@@ -119,7 +120,7 @@ export function useSegmentation({
             const cropBase64 = cropDataUrl.split(',')[1];
             const searchRes = await mivaaApi.searchByImageCrop({
               image_base64: cropBase64,
-              query: `${zone.material_type} ${zone.finish}`.trim(),
+              query: zone.search_query || `${zone.material_type} ${zone.finish} ${zone.label}`.trim(),
               workspace_id: workspaceId,
               top_k: 8,
             });
@@ -162,6 +163,7 @@ export function useSegmentation({
           crop_storage_url: s.crop_storage_url ?? null,
           search_results: s.search_results ?? null,
           confidence: s.confidence,
+          search_query: s.search_query ?? null,
         }));
 
         const { data: inserted } = await supabase
