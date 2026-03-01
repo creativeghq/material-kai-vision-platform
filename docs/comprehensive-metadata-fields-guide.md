@@ -10,7 +10,6 @@ The MIVAA platform extracts **200+ metadata fields** from PDF catalogs using AI-
 
 ### ⚙️ How It Works
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 0: Product Discovery & Metadata Extraction            │
 ├─────────────────────────────────────────────────────────────┤
@@ -31,7 +30,6 @@ The MIVAA platform extracts **200+ metadata fields** from PDF catalogs using AI-
 │  └── Store enriched products in database                    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ### 🤖 AI Models Used
 
@@ -77,20 +75,6 @@ When merging metadata from multiple sources, the system uses this priority:
 - `density` - Material density
 - `durability_rating` - Durability classification
 
-**Example**:
-```json
-{
-  "material_type": "ceramic",
-  "composition": "100% ceramic",
-  "texture": "smooth",
-  "finish": "matte",
-  "pattern": "wood grain",
-  "weight": "800 kg/m³",
-  "density": "2.3 g/cm³",
-  "durability_rating": "high"
-}
-```
-
 ---
 
 ### 📏 2. Dimensions
@@ -107,17 +91,6 @@ When merging metadata from multiple sources, the system uses this priority:
 - `area` - Surface area (e.g., "0.57 m²")
 - `volume` - Volume measurement
 
-**Example**:
-```json
-{
-  "size": "15×38 cm",
-  "length": "38 cm",
-  "width": "15 cm",
-  "thickness": "8mm",
-  "area": "0.057 m²"
-}
-```
-
 ---
 
 ### 🎨 3. Appearance
@@ -133,17 +106,6 @@ When merging metadata from multiple sources, the system uses this priority:
 - `grain` - Grain pattern (e.g., "wood grain", "marble veins")
 - `visual_effect` - Special visual effects
 
-**Example**:
-```json
-{
-  "color": "beige",
-  "color_code": "RAL 1001",
-  "gloss_level": "60%",
-  "sheen": "satin",
-  "grain": "wood grain"
-}
-```
-
 ---
 
 ### ✅ 6. Compliance & Certifications
@@ -157,18 +119,6 @@ When merging metadata from multiple sources, the system uses this priority:
 - `sustainability_rating` - Sustainability rating
 - `voc_rating` - VOC (Volatile Organic Compounds) rating (e.g., "low VOC", "zero VOC")
 - `safety_rating` - Safety rating
-
-**Example**:
-```json
-{
-  "certifications": "ISO 9001:2015, CE certified",
-  "standards": "EN 14411, ISO 10545",
-  "eco_friendly": true,
-  "sustainability_rating": "LEED certified",
-  "voc_rating": "low VOC",
-  "safety_rating": "A+"
-}
-```
 
 ---
 
@@ -184,18 +134,6 @@ When merging metadata from multiple sources, the system uses this priority:
 - `aesthetic_style` - Aesthetic style (e.g., "contemporary", "minimalist", "rustic")
 - `design_era` - Design era (e.g., "modern", "vintage")
 
-**Example**:
-```json
-{
-  "designer": "SG NY",
-  "studio": "Studio Gronda",
-  "collection": "Harmony Collection",
-  "series": "Urban Series",
-  "aesthetic_style": "contemporary",
-  "design_era": "modern"
-}
-```
-
 ---
 
 ### 🏭 8. Manufacturing
@@ -210,18 +148,6 @@ When merging metadata from multiple sources, the system uses this priority:
 - `manufacturing_process` - Manufacturing process description
 - `construction` - Construction method
 
-**Example**:
-```json
-{
-  "factory": "Castellón Factory",
-  "manufacturer": "Harmony Ceramics",
-  "factory_group": "Harmony Group",
-  "country_of_origin": "Spain",
-  "manufacturing_process": "digital printing",
-  "construction": "pressed ceramic"
-}
-```
-
 ---
 
 ### 💰 9. Commercial
@@ -235,116 +161,17 @@ When merging metadata from multiple sources, the system uses this priority:
 - `sku` - SKU/product code
 - `warranty` - Warranty information (e.g., "5-year warranty", "lifetime warranty")
 
-**Example**:
-```json
-{
-  "pricing": "€45/m²",
-  "availability": "in stock",
-  "supplier": "Harmony Distributors",
-  "sku": "HAR-NOVA-1538",
-  "warranty": "5-year warranty"
-}
-```
-
 ---
 
 ## 🔧 Technical Implementation
 
 ### 🗄️ Database Schema
 
-All metadata is stored in the `products` table in the `metadata` JSONB field:
-
-```sql
-CREATE TABLE products (
-  id UUID PRIMARY KEY,
-  sku TEXT,
-  name TEXT,
-  description TEXT,
-  category TEXT,
-  type TEXT,
-  status TEXT,
-  metadata JSONB,  -- All 200+ metadata fields stored here
-  properties JSONB,
-  specifications JSONB,
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
-);
-```
+All metadata is stored in the `products` table in the `metadata` JSONB field. The products table has columns: `id` (UUID), `sku`, `name`, `description`, `category`, `type`, `status`, `metadata` (JSONB — all 200+ metadata fields), `properties` (JSONB), `specifications` (JSONB), `created_at`, and `updated_at`.
 
 ### 📝 Example Product Metadata
 
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "sku": "HAR-NOVA-1538",
-  "name": "NOVA",
-  "category": "ceramic_tiles",
-  "metadata": {
-    // Material Properties
-    "material_type": "ceramic",
-    "composition": "100% ceramic",
-    "texture": "smooth",
-    "finish": "matte",
-    "pattern": "wood grain",
-    "weight": "800 kg/m³",
-    "density": "2.3 g/cm³",
-
-    // Dimensions
-    "size": "15×38 cm",
-    "thickness": "8mm",
-    "area": "0.057 m²",
-
-    // Appearance
-    "color": "beige",
-    "color_code": "RAL 1001",
-    "gloss_level": "60%",
-    "grain": "wood grain",
-
-    // Performance
-    "water_absorption": "Class 3",
-    "fire_rating": "A1",
-    "slip_resistance": "R11",
-    "wear_rating": "PEI 4",
-    "breaking_strength": "1200 N",
-
-    // Application
-    "recommended_use": "residential flooring",
-    "installation_method": "adhesive installation",
-    "room_type": "bathroom, kitchen",
-    "traffic_level": "high traffic areas",
-
-    // Compliance
-    "certifications": "ISO 9001:2015, CE certified",
-    "standards": "EN 14411",
-    "eco_friendly": true,
-    "voc_rating": "low VOC",
-
-    // Design
-    "designer": "SG NY",
-    "collection": "Harmony Collection",
-    "aesthetic_style": "contemporary",
-
-    // Manufacturing
-    "factory": "Castellón Factory",
-    "factory_group": "Harmony Group",
-    "country_of_origin": "Spain",
-
-    // Commercial
-    "pricing": "€45/m²",
-    "availability": "in stock",
-    "warranty": "5-year warranty",
-
-    // Extraction Metadata
-    "_extraction_metadata": {
-      "extraction_timestamp": "2025-01-12T10:30:00Z",
-      "extraction_method": "ai_dynamic_claude",
-      "model_used": "claude-sonnet-4-5",
-      "confidence_score": 0.92,
-      "validation_passed": true
-    }
-  }
-}
-```
+A complete product record has a `metadata` JSONB field containing fields from all 9 categories: material properties (material_type, composition, texture, finish, pattern, weight, density), dimensions (size, thickness, area), appearance (color, color_code, gloss_level, grain), performance (water_absorption, fire_rating, slip_resistance, wear_rating, breaking_strength), application (recommended_use, installation_method, room_type, traffic_level), compliance (certifications, standards, eco_friendly, voc_rating), design (designer, collection, aesthetic_style), manufacturing (factory, factory_group, country_of_origin), commercial (pricing, availability, warranty), and `_extraction_metadata` (extraction_timestamp, extraction_method, model_used, confidence_score, validation_passed).
 
 ---
 
@@ -354,71 +181,19 @@ CREATE TABLE products (
 
 **Endpoint**: `POST /api/rag/process-pdf`
 
-**Request**:
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/process-pdf" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@harmony-catalog.pdf" \
-  -F "extract_categories=products,certificates,logos"
-```
-
-**Response**:
-```json
-{
-  "job_id": "job_abc123",
-  "status": "processing",
-  "message": "PDF processing started",
-  "products_discovered": 14,
-  "metadata_extraction": "in_progress"
-}
-```
+Upload a PDF file with `extract_categories` parameter. The response contains a `job_id`, `status`, `message`, `products_discovered` count, and `metadata_extraction` status.
 
 ### 📥 Get Product with Metadata
 
 **Endpoint**: `GET /api/products/{product_id}`
 
-**Request**:
-```bash
-curl -X GET "https://v1api.materialshub.gr/api/products/550e8400-e29b-41d4-a716-446655440000"
-```
-
-**Response**:
-```json
-{
-  "id": "550e8400-e29b-41d4-a716-446655440000",
-  "sku": "HAR-NOVA-1538",
-  "name": "NOVA",
-  "category": "ceramic_tiles",
-  "metadata": {
-    "material_type": "ceramic",
-    "size": "15×38 cm",
-    "thickness": "8mm",
-    "slip_resistance": "R11",
-    "fire_rating": "A1",
-    "designer": "SG NY",
-    "factory": "Castellón Factory",
-    "country_of_origin": "Spain",
-    // ... all other metadata fields
-  }
-}
-```
+Returns the product record with its complete `metadata` object containing all extracted fields.
 
 ### 🔍 Search Products by Metadata
 
 **Endpoint**: `POST /api/search/products`
 
-**Request**:
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/search/products" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "filters": {
-      "metadata.slip_resistance": "R11",
-      "metadata.fire_rating": "A1",
-      "metadata.country_of_origin": "Spain"
-    }
-  }'
-```
+Send a `filters` object with dot-notation keys like `"metadata.slip_resistance": "R11"`, `"metadata.fire_rating": "A1"`, or `"metadata.country_of_origin": "Spain"` to filter products by their metadata values.
 
 ---
 
@@ -438,7 +213,6 @@ The frontend displays metadata organized by category in the `ProductDetailModal`
 - ✅ Support for nested metadata structures
 
 **Example UI**:
-```
 ┌─────────────────────────────────────────────────────────┐
 │ NOVA - Product Details                                  │
 ├─────────────────────────────────────────────────────────┤
@@ -474,7 +248,6 @@ The frontend displays metadata organized by category in the `ProductDetailModal`
 │ ... (6 more categories)                                 │
 │                                                          │
 └─────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -483,122 +256,22 @@ The frontend displays metadata organized by category in the `ProductDetailModal`
 ### Step-by-Step Process
 
 #### 1. PDF Upload
-```
 User uploads PDF → MIVAA API receives file → Job created
-```
 
 #### 2. Product Discovery (Stage 0A)
-```python
-# ProductDiscoveryService discovers products
-catalog = await discovery_service.discover_products(
-    pdf_content=pdf_bytes,
-    pdf_text=pdf_text,
-    extract_categories=["products"]
-)
-
-# Result: Products with basic metadata
-{
-  "products": [
-    {
-      "name": "NOVA",
-      "page_range": [5, 8],
-      "metadata": {
-        "designer": "SG NY",
-        "dimensions": ["15×38", "20×40"],
-        "variants": ["matte", "glossy"]
-      }
-    }
-  ]
-}
-```
+The `ProductDiscoveryService` analyzes the PDF and returns products with basic metadata including name, page_range, and initial fields (designer, dimensions, variants).
 
 #### 3. Metadata Enrichment (Stage 0B)
-```python
-# For each product, extract comprehensive metadata
-for product in catalog.products:
-    # Extract product-specific text
-    product_text = extract_product_text(pdf_text, product.page_range)
-
-    # Initialize DynamicMetadataExtractor
-    extractor = DynamicMetadataExtractor(model="claude", job_id=job_id)
-
-    # Extract 200+ metadata fields
-    extracted = await extractor.extract_metadata(
-        pdf_text=product_text,
-        category_hint=product.metadata.get("category")
-    )
-
-    # Result: Comprehensive metadata
-    {
-      "critical": {
-        "material_category": "ceramic",
-        "factory_name": "Castellón Factory",
-        "factory_group_name": "Harmony Group"
-      },
-      "discovered": {
-        "material_type": "ceramic",
-        "size": "15×38 cm",
-        "thickness": "8mm",
-        "slip_resistance": "R11",
-        "fire_rating": "A1",
-        "water_absorption": "Class 3",
-        "breaking_strength": "1200 N",
-        "color": "beige",
-        "gloss_level": "60%",
-        "designer": "SG NY",
-        "collection": "Harmony Collection",
-        "country_of_origin": "Spain",
-        // ... 180+ more fields
-      },
-      "metadata": {
-        "extraction_timestamp": "2025-01-12T10:30:00Z",
-        "extraction_method": "ai_dynamic_claude",
-        "confidence_score": 0.92
-      }
-    }
-```
+For each product, the system extracts product-specific text from the page range, initializes `DynamicMetadataExtractor`, and runs extraction to get 200+ fields organized into `critical` (material_category, factory_name, factory_group_name), `discovered` (all dynamic fields), and `metadata` (extraction tracking info).
 
 #### 4. Metadata Merging
-```python
-# Merge metadata with priority: discovery > critical > discovered
-product.metadata = {
-    **extracted["discovered"],      # 200+ dynamic fields
-    **extracted["critical"],         # Critical fields
-    **product.metadata,              # Discovery metadata (highest priority)
-    "_extraction_metadata": extracted["metadata"]
-}
-```
+Metadata is merged with this priority: `discovered` fields as base, then `critical` fields override, then `discovery metadata` (highest priority) overrides those, plus `_extraction_metadata` added separately.
 
 #### 5. Database Storage
-```python
-# Store product with comprehensive metadata
-await db.products.insert({
-    "id": uuid.uuid4(),
-    "sku": "HAR-NOVA-1538",
-    "name": "NOVA",
-    "category": "ceramic_tiles",
-    "metadata": product.metadata  # All 200+ fields stored here
-})
-```
+The product record is stored with its complete metadata JSONB containing all 200+ fields.
 
 #### 6. Frontend Display
-```typescript
-// ProductDetailModal displays metadata by category
-const materialProperties = {
-  'Material Type': metadata.material_type,
-  'Texture': metadata.texture,
-  'Finish': metadata.finish,
-  // ... other material properties
-};
-
-const performance = {
-  'Slip Resistance': metadata.slip_resistance,
-  'Fire Rating': metadata.fire_rating,
-  // ... other performance metrics
-};
-
-// Render each category dynamically
-```
+The `ProductDetailModal` component reads the metadata object and renders each category section dynamically, showing only categories that have data.
 
 ---
 
@@ -612,21 +285,7 @@ Each extracted metadata field has a confidence score (0.0-1.0):
 - **0.3-0.5**: Low-medium confidence - weak inference
 - **0.0-0.3**: Low confidence - uncertain extraction
 
-**Example**:
-```json
-{
-  "slip_resistance": {
-    "value": "R11",
-    "confidence": 0.95,
-    "source": "page 6, line 23"
-  },
-  "color": {
-    "value": "beige",
-    "confidence": 0.85,
-    "source": "inferred from image description"
-  }
-}
-```
+Confidence scores are stored alongside field values, tracking both the value and the source location (e.g., "page 6, line 23" or "inferred from image description").
 
 ---
 
@@ -705,18 +364,6 @@ Each extracted metadata field has a confidence score (0.0-1.0):
 - `breaking_strength` - Breaking strength (e.g., "1200 N")
 - `hardness` - Material hardness (e.g., "Mohs 7")
 
-**Example**:
-```json
-{
-  "water_absorption": "Class 3",
-  "fire_rating": "A1",
-  "slip_resistance": "R11",
-  "wear_rating": "PEI 4",
-  "breaking_strength": "1200 N",
-  "hardness": "Mohs 7"
-}
-```
-
 ---
 
 ### 🔧 5. Application
@@ -731,19 +378,4 @@ Each extracted metadata field has a confidence score (0.0-1.0):
 - `traffic_level` - Traffic level suitability (e.g., "high traffic", "residential")
 - `care_instructions` - Care and maintenance instructions
 - `maintenance` - Maintenance requirements
-
-**Example**:
-```json
-{
-  "recommended_use": "residential flooring",
-  "installation_method": "adhesive installation",
-  "room_type": "bathroom, kitchen",
-  "traffic_level": "high traffic areas",
-  "care_instructions": "clean with mild detergent",
-  "maintenance": "low maintenance"
-}
-```
-
----
-
 

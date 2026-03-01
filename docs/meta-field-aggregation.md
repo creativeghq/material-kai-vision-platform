@@ -31,22 +31,13 @@ Use 3 complementary extraction methods to catch everything:
 
 | Source | What It Catches | Strengths | Weaknesses |
 |--------|----------------|-----------|------------|
-| **Product Discovery** | Structured product pages | ✅ High accuracy<br>✅ Structured format | ❌ Misses scattered info<br>❌ Limited to product pages |
-| **AI Extraction** | Context-aware semantics | ✅ Understands context<br>✅ Extracts implied info | ❌ Limited to page range<br>❌ Expensive (AI calls) |
-| **Chunk Aggregation** | Everything mentioned anywhere | ✅ Comprehensive<br>✅ No AI cost<br>✅ Fills gaps | ❌ No context<br>❌ Keyword-based only |
+| **Product Discovery** | Structured product pages | ✅ High accuracy, ✅ Structured format | ❌ Misses scattered info, ❌ Limited to product pages |
+| **AI Extraction** | Context-aware semantics | ✅ Understands context, ✅ Extracts implied info | ❌ Limited to page range, ❌ Expensive (AI calls) |
+| **Chunk Aggregation** | Everything mentioned anywhere | ✅ Comprehensive, ✅ No AI cost, ✅ Fills gaps | ❌ No context, ❌ Keyword-based only |
 
 ### **Result:**
-```json
-// Without chunk aggregation (Sources 1 + 2 only):
-{
-  "colors": ["beige", "white"]  // ❌ Missing clay, natural
-}
 
-// With all 3 sources:
-{
-  "colors": ["beige", "clay", "natural", "white"]  // ✅ Complete!
-}
-```
+Without chunk aggregation (Sources 1 + 2 only), you might get `colors: ["beige", "white"]`, missing clay and natural. With all 3 sources, the result is `colors: ["beige", "clay", "natural", "white"]` — complete.
 
 ---
 
@@ -85,15 +76,8 @@ Use 3 complementary extraction methods to catch everything:
 5. Return structured dictionary
 
 **Example Output:**
-```json
-{
-  "colors": ["beige", "clay", "natural", "white"],
-  "textures": ["matte", "polished", "smooth"],
-  "finishes": ["glazed", "matte", "natural"],
-  "materials": ["ceramic", "porcelain"],
-  "applications": ["floor", "indoor", "wall", "waterproof"]
-}
-```
+
+The method returns a dictionary with keys `colors`, `textures`, `finishes`, `materials`, and `applications`, each containing a sorted, deduplicated list of values found across all chunks mentioning the product.
 
 ---
 
@@ -110,17 +94,8 @@ Use 3 complementary extraction methods to catch everything:
 4. **Existing dict/other** → Keep AI extraction as-is (takes priority)
 
 **Example Deduplication:**
-```python
-# AI extraction provides:
-metadata['colors'] = ['White', 'Beige']
 
-# Chunk aggregation finds:
-chunk_colors = ['white', 'clay', 'natural']
-
-# Result (case-insensitive merge):
-metadata['colors'] = ['beige', 'clay', 'natural', 'white']
-# ✅ No duplicates! 'White' and 'white' merged to 'white'
-```
+AI extraction provides `['White', 'Beige']`. Chunk aggregation finds `['white', 'clay', 'natural']`. The result after case-insensitive merge is `['beige', 'clay', 'natural', 'white']` — no duplicates, 'White' and 'white' merged correctly.
 
 ---
 
@@ -146,17 +121,8 @@ metadata['colors'] = ['beige', 'clay', 'natural', 'white']
 3. "Matte finish, waterproof for indoor use"
 
 **Aggregated Metadata:**
-```json
-{
-  "available_sizes": [
-    {"width": 15, "height": 38, "unit": "cm", "raw_text": "15×38 cm"}
-  ],
-  "colors": ["beige", "white"],
-  "materials": ["ceramic"],
-  "finishes": ["matte"],
-  "applications": ["indoor", "waterproof"]
-}
-```
+
+The NOVA product would have: `available_sizes` with one entry (15×38 cm), `colors: ["beige", "white"]`, `materials: ["ceramic"]`, `finishes: ["matte"]`, `applications: ["indoor", "waterproof"]`.
 
 ---
 
@@ -193,13 +159,7 @@ metadata['colors'] = ['beige', 'clay', 'natural', 'white']
 
 ### **Merge Priority:**
 
-```
-Product Discovery (highest priority)
-    ↓
-AI Extraction (medium priority)
-    ↓
-Chunk Aggregation (lowest priority, fills gaps)
-```
+Product Discovery (highest priority) → AI Extraction (medium priority) → Chunk Aggregation (lowest priority, fills gaps)
 
 **Why This Order?**
 - **Product Discovery:** Most accurate (from structured product pages)
@@ -208,41 +168,11 @@ Chunk Aggregation (lowest priority, fills gaps)
 
 ### **Deduplication Strategy:**
 
-**Case-Insensitive Merge:**
-```python
-# Source 1: AI extraction
-metadata['colors'] = ['White', 'Beige']
+**Case-Insensitive Merge:** When AI extraction provides `['White', 'Beige']` and chunk aggregation finds `['white', 'clay', 'natural', 'BEIGE']`, the result is `['beige', 'clay', 'natural', 'white']` — fully deduplicated.
 
-# Source 2: Chunk aggregation
-chunk_colors = ['white', 'clay', 'natural', 'BEIGE']
+**String to List Conversion:** When AI extraction returns a single string value (e.g., `'Matte'`) and chunk aggregation finds a list, the string is converted to a list and merged.
 
-# Result: Case-insensitive deduplication
-metadata['colors'] = ['beige', 'clay', 'natural', 'white']
-```
-
-**String to List Conversion:**
-```python
-# Source 1: AI extraction (single value)
-metadata['finish'] = 'Matte'
-
-# Source 2: Chunk aggregation
-chunk_finishes = ['matte', 'glossy']
-
-# Result: Convert to list and merge
-metadata['finish'] = ['glossy', 'matte']
-```
-
-**AI Dict Format Preserved:**
-```python
-# Source 1: AI extraction (with confidence)
-metadata['color'] = {'value': 'White', 'confidence': 0.95}
-
-# Source 2: Chunk aggregation
-chunk_colors = ['white', 'beige']
-
-# Result: Keep AI format (takes priority)
-metadata['color'] = {'value': 'White', 'confidence': 0.95}
-```
+**AI Dict Format Preserved:** When AI extraction returns a dict with confidence scores (e.g., `{'value': 'White', 'confidence': 0.95}`), that format is preserved and chunk aggregation values are not merged into it.
 
 ---
 
@@ -256,20 +186,7 @@ metadata['color'] = {'value': 'White', 'confidence': 0.95}
 - ✅ Sorted lists for easy reading
 - ✅ AI extraction values preserved when present
 
-**Validation:**
-```python
-# Expected result for NOVA:
-{
-  "colors": ["beige", "clay", "natural", "white"],  # Merged from AI + chunks
-  "materials": ["ceramic", "porcelain"],            # From chunks
-  "finishes": ["glazed", "matte"],                  # From AI + chunks
-  "applications": ["floor", "indoor", "wall"],      # From chunks
-  "available_sizes": [                              # From chunks
-    {"width": 15, "height": 38, "unit": "cm"},
-    {"width": 20, "height": 40, "unit": "cm"}
-  ]
-}
-```
+Expected result for NOVA: `colors: ["beige", "clay", "natural", "white"]`, `materials: ["ceramic", "porcelain"]`, `finishes: ["glazed", "matte"]`, `applications: ["floor", "indoor", "wall"]`, plus `available_sizes` with 15×38 and 20×40 cm entries.
 
 ---
 

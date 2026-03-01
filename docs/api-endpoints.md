@@ -78,7 +78,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 7. [Products Routes](#7-products-routes) - Product management
 8. [Images Routes](#8-images-routes) - Image processing
 9. [Embeddings Routes](#9-embeddings-routes) - Embedding generation
-10. [Together AI Routes](#10-together-ai-routes) - TogetherAI integration
+10. [HuggingFace/Qwen Routes](#10-huggingface-qwen-routes) - Qwen3-VL integration
 11. [Anthropic Routes](#11-anthropic-routes) - Anthropic integration
 12. [Monitoring Routes](#12-monitoring-routes) - System monitoring
 13. [AI Metrics Routes](#13-ai-metrics-routes) - AI performance metrics
@@ -97,29 +97,7 @@ Complete reference of all consolidated API endpoints with detailed usage informa
 **Purpose:** Unified health check for all MIVAA services
 **Replaces:** 10+ individual health check endpoints (`/api/pdf/health`, `/api/rag/health`, `/api/search/health`, etc.)
 
-**Request:**
-```http
-GET /health
-```
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2025-11-02T10:00:00Z",
-  "services": {
-    "database": {"status": "healthy", "response_time_ms": 5},
-    "storage": {"status": "healthy", "response_time_ms": 10},
-    "ai_models": {
-      "claude": {"status": "healthy", "response_time_ms": 150},
-      "gpt": {"status": "healthy", "response_time_ms": 120},
-      "QWEN": {"status": "healthy", "response_time_ms": 200}
-    },
-    "rag": {"status": "healthy", "service_type": "Direct Vector DB", "response_time_ms": 8}
-  },
-  "version": "1.0.0"
-}
-```
+The response includes `status`, `timestamp`, per-service health details with response times (database, storage, AI models including Claude/GPT/QWEN, and RAG), and a `version` field.
 
 **Benefits:**
 - ✅ Single request instead of 10+ requests
@@ -141,40 +119,9 @@ GET /health
 **Used In:** Knowledge Base admin panel, Documentation editor
 **Flow:** User creates document → Generate 1536D embedding → Store in database
 
-**Request:**
-```http
-POST /api/kb/documents
-Content-Type: application/json
+**Request fields:** `workspace_id`, `title`, `content`, `content_markdown`, `summary`, `category_id`, `seo_keywords`, `status`, `visibility`, `metadata`
 
-{
-  "workspace_id": "uuid",
-  "title": "Installation Guide",
-  "content": "Step 1: Prepare the surface...",
-  "content_markdown": "# Installation Guide\n\n## Step 1...",
-  "summary": "Complete installation instructions",
-  "category_id": "uuid",
-  "seo_keywords": ["installation", "guide", "setup"],
-  "status": "draft",
-  "visibility": "workspace",
-  "metadata": {}
-}
-```
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "workspace_id": "uuid",
-  "title": "Installation Guide",
-  "content": "Step 1: Prepare the surface...",
-  "text_embedding": [0.123, -0.456, ...],
-  "embedding_status": "success",
-  "embedding_generated_at": "2025-11-14T10:30:00Z",
-  "embedding_model": "text-embedding-3-small",
-  "created_at": "2025-11-14T10:30:00Z",
-  "view_count": 0
-}
-```
+**Response fields:** `id`, `workspace_id`, `title`, `content`, `text_embedding`, `embedding_status`, `embedding_generated_at`, `embedding_model`, `created_at`, `view_count`
 
 **Database Operations:**
 - INSERT into `kb_docs` with embedding
@@ -188,27 +135,9 @@ Content-Type: application/json
 **Purpose:** Retrieve a single knowledge base document by ID
 **Used In:** Document viewer, Edit modal
 
-**Request:**
-```http
-GET /api/kb/documents/{doc_id}?workspace_id=uuid
-```
+**Request:** `GET /api/kb/documents/{doc_id}?workspace_id=uuid`
 
-**Response:**
-```json
-{
-  "id": "uuid",
-  "workspace_id": "uuid",
-  "title": "Installation Guide",
-  "content": "Step 1: Prepare the surface...",
-  "content_markdown": "# Installation Guide...",
-  "summary": "Complete installation instructions",
-  "category_id": "uuid",
-  "embedding_status": "success",
-  "created_at": "2025-11-14T10:30:00Z",
-  "updated_at": "2025-11-14T10:30:00Z",
-  "view_count": 5
-}
-```
+**Response fields:** `id`, `workspace_id`, `title`, `content`, `content_markdown`, `summary`, `category_id`, `embedding_status`, `created_at`, `updated_at`, `view_count`
 
 ---
 
@@ -218,30 +147,9 @@ GET /api/kb/documents/{doc_id}?workspace_id=uuid
 **Smart Detection:** Only regenerates embedding if content changed (title, content, summary, keywords, category)
 **Used In:** Document editor
 
-**Request:**
-```http
-PATCH /api/kb/documents/{doc_id}
-Content-Type: application/json
+**Request fields:** `workspace_id`, `title`, `content`, `status`
 
-{
-  "workspace_id": "uuid",
-  "title": "Updated Installation Guide",
-  "content": "New content...",
-  "status": "published"
-}
-```
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "title": "Updated Installation Guide",
-  "content": "New content...",
-  "embedding_status": "success",
-  "embedding_generated_at": "2025-11-14T11:00:00Z",
-  "updated_at": "2025-11-14T11:00:00Z"
-}
-```
+**Response fields:** `id`, `title`, `content`, `embedding_status`, `embedding_generated_at`, `updated_at`
 
 **Database Operations:**
 - UPDATE `kb_docs` with new content
@@ -255,15 +163,9 @@ Content-Type: application/json
 **Purpose:** Delete a knowledge base document
 **Used In:** Document management, Admin panel
 
-**Request:**
-```http
-DELETE /api/kb/documents/{doc_id}?workspace_id=uuid
-```
+**Request:** `DELETE /api/kb/documents/{doc_id}?workspace_id=uuid`
 
-**Response:**
-```
-204 No Content
-```
+**Response:** 204 No Content
 
 **Database Operations:**
 - DELETE from `kb_docs` (cascades to attachments, versions, comments)
@@ -276,29 +178,9 @@ DELETE /api/kb/documents/{doc_id}?workspace_id=uuid
 **Used In:** PDF upload modal in Knowledge Base
 **Flow:** Upload PDF → Extract text using PyMuPDF → Generate embedding → Store document
 
-**Request:**
-```http
-POST /api/kb/documents/from-pdf
-Content-Type: multipart/form-data
+**Request:** Multipart form-data with fields: `file` (PDF), `workspace_id`, `title`, `category_id` (optional), `status`
 
-Parameters:
-- file: PDF file
-- workspace_id: uuid
-- title: "Product Specifications"
-- category_id: uuid (optional)
-- status: "draft" | "published"
-```
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "title": "Product Specifications",
-  "content": "Extracted text from PDF...",
-  "embedding_status": "success",
-  "created_at": "2025-11-14T10:30:00Z"
-}
-```
+**Response fields:** `id`, `title`, `content` (extracted text), `embedding_status`, `created_at`
 
 **Database Operations:**
 - Extract text using PyMuPDF (fitz)
@@ -326,18 +208,7 @@ Parameters:
 - Cannot generate embeddings in Supabase RPC (requires OpenAI API call)
 - Uses pgvector's optimized cosine similarity for fast search
 
-**Request:**
-```http
-POST /api/kb/search
-Content-Type: application/json
-
-{
-  "workspace_id": "uuid",
-  "query": "How to install the product?",
-  "search_type": "semantic",
-  "limit": 20
-}
-```
+**Request fields:** `workspace_id`, `query`, `search_type`, `limit`
 
 **Search Types:**
 - `semantic` - Vector similarity using pgvector cosine distance (default)
@@ -351,24 +222,7 @@ Content-Type: application/json
 - `hybrid` - Combination of semantic + full-text
   - Weighted scoring for best results
 
-**Response:**
-```json
-{
-  "success": true,
-  "results": [
-    {
-      "id": "uuid",
-      "title": "Installation Guide",
-      "content": "Step 1: Prepare the surface...",
-      "similarity_score": 0.92,
-      "created_at": "2025-11-14T10:30:00Z"
-    }
-  ],
-  "total_count": 1,
-  "search_time_ms": 45,
-  "search_type": "semantic"
-}
-```
+**Response fields:** `success`, `results` (array with id, title, content, similarity_score, created_at), `total_count`, `search_time_ms`, `search_type`
 
 **Database Operations:**
 - Generate query embedding (1536D)
@@ -382,33 +236,9 @@ Content-Type: application/json
 **Purpose:** Create a new category
 **Used In:** Category management UI
 
-**Request:**
-```http
-POST /api/kb/categories
-Content-Type: application/json
+**Request fields:** `workspace_id`, `name`, `description`, `parent_category_id`, `color`, `icon`, `sort_order`
 
-{
-  "workspace_id": "uuid",
-  "name": "Installation Guides",
-  "description": "Step-by-step installation instructions",
-  "parent_category_id": "uuid",
-  "color": "#3B82F6",
-  "icon": "📖",
-  "sort_order": 1
-}
-```
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "name": "Installation Guides",
-  "description": "Step-by-step installation instructions",
-  "color": "#3B82F6",
-  "icon": "📖",
-  "created_at": "2025-11-14T10:30:00Z"
-}
-```
+**Response fields:** `id`, `name`, `description`, `color`, `icon`, `created_at`
 
 ---
 
@@ -417,29 +247,9 @@ Content-Type: application/json
 **Purpose:** List all categories for a workspace
 **Used In:** Category dropdown, Category management
 
-**Request:**
-```http
-GET /api/kb/categories?workspace_id=uuid
-```
+**Request:** `GET /api/kb/categories?workspace_id=uuid`
 
-**Response:**
-```json
-{
-  "success": true,
-  "categories": [
-    {
-      "id": "uuid",
-      "name": "Installation Guides",
-      "description": "Step-by-step installation instructions",
-      "parent_category_id": null,
-      "color": "#3B82F6",
-      "icon": "📖",
-      "sort_order": 1,
-      "document_count": 5
-    }
-  ]
-}
-```
+**Response:** `success` and a `categories` array with fields: `id`, `name`, `description`, `parent_category_id`, `color`, `icon`, `sort_order`, `document_count`
 
 ---
 
@@ -448,19 +258,7 @@ GET /api/kb/categories?workspace_id=uuid
 **Purpose:** Attach a document to one or more products
 **Used In:** Product attachment modal
 
-**Request:**
-```http
-POST /api/kb/attachments
-Content-Type: application/json
-
-{
-  "workspace_id": "uuid",
-  "document_id": "uuid",
-  "product_id": "uuid",
-  "relationship_type": "primary",
-  "relevance_score": 5
-}
-```
+**Request fields:** `workspace_id`, `document_id`, `product_id`, `relationship_type`, `relevance_score`
 
 **Relationship Types:**
 - `primary` - Main documentation for product
@@ -469,17 +267,7 @@ Content-Type: application/json
 - `certification` - Certification documents
 - `specification` - Technical specifications
 
-**Response:**
-```json
-{
-  "id": "uuid",
-  "document_id": "uuid",
-  "product_id": "uuid",
-  "relationship_type": "primary",
-  "relevance_score": 5,
-  "created_at": "2025-11-14T10:30:00Z"
-}
-```
+**Response fields:** `id`, `document_id`, `product_id`, `relationship_type`, `relevance_score`, `created_at`
 
 ---
 
@@ -488,26 +276,9 @@ Content-Type: application/json
 **Purpose:** Get all products attached to a document
 **Used In:** Document viewer, Product links section
 
-**Request:**
-```http
-GET /api/kb/documents/{doc_id}/attachments?workspace_id=uuid
-```
+**Request:** `GET /api/kb/documents/{doc_id}/attachments?workspace_id=uuid`
 
-**Response:**
-```json
-{
-  "success": true,
-  "attachments": [
-    {
-      "id": "uuid",
-      "product_id": "uuid",
-      "product_name": "Premium Flooring",
-      "relationship_type": "primary",
-      "relevance_score": 5
-    }
-  ]
-}
-```
+**Response:** `success` and `attachments` array with fields: `id`, `product_id`, `product_name`, `relationship_type`, `relevance_score`
 
 ---
 
@@ -516,27 +287,9 @@ GET /api/kb/documents/{doc_id}/attachments?workspace_id=uuid
 **Purpose:** Get all documents attached to a product
 **Used In:** Product page documentation tab
 
-**Request:**
-```http
-GET /api/kb/products/{product_id}/documents?workspace_id=uuid
-```
+**Request:** `GET /api/kb/products/{product_id}/documents?workspace_id=uuid`
 
-**Response:**
-```json
-{
-  "success": true,
-  "documents": [
-    {
-      "id": "uuid",
-      "title": "Installation Guide",
-      "summary": "Complete installation instructions",
-      "relationship_type": "primary",
-      "relevance_score": 5,
-      "view_count": 10
-    }
-  ]
-}
-```
+**Response:** `success` and `documents` array with fields: `id`, `title`, `summary`, `relationship_type`, `relevance_score`, `view_count`
 
 ---
 
@@ -545,27 +298,9 @@ GET /api/kb/products/{product_id}/documents?workspace_id=uuid
 **Purpose:** Health check for Knowledge Base service
 **Used In:** System monitoring
 
-**Request:**
-```http
-GET /api/kb/health
-```
+**Request:** `GET /api/kb/health`
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "knowledge_base",
-  "features": {
-    "document_crud": true,
-    "embedding_generation": true,
-    "pdf_extraction": true,
-    "semantic_search": true,
-    "categories": true,
-    "attachments": true
-  },
-  "endpoints": 15
-}
-```
+**Response fields:** `status`, `service`, `features` (document_crud, embedding_generation, pdf_extraction, semantic_search, categories, attachments), `endpoints`
 
 ---
 
@@ -591,60 +326,17 @@ GET /api/kb/health
 **Used In:** Main PDF upload modal, Product catalog processing, Simple document upload
 **Flow:** User uploads PDF → AI discovery → Category extraction → Chunking → Image processing → Product creation
 
-**Request:**
-```http
-POST /api/rag/documents/upload
-Content-Type: multipart/form-data
+**Request:** Multipart form-data. Choose one source: `file` (PDF file) or `file_url` (URL to PDF). Additional parameters:
+- `categories` — `products` | `certificates` | `logos` | `specifications` | `all` | `extract_only`
+- `discovery_model` — `claude` | `gpt` | `haiku` (default: `claude`)
+- `agent_prompt` — Custom prompt for AI processing (optional)
+- `enable_prompt_enhancement` — `true` | `false` (default: `true`)
+- `title`, `description`, `tags`, `workspace_id`
+- `chunk_size` (default: 2048), `chunk_overlap` (default: 200)
 
-Parameters (Form Data):
-# File Upload (choose one)
-- file: PDF file (for file upload)
-- file_url: URL to PDF (for URL-based upload)
+All uploads use deep processing mode with complete AI analysis, image embeddings (CLIP), advanced product enrichment, quality validation, and full RAG pipeline.
 
-# Category Extraction (choose one or more)
-- categories: "products" | "certificates" | "logos" | "specifications" | "all" | "extract_only"
-  * products: Extract product information
-  * certificates: Extract certificates (async)
-  * logos: Extract logos (async)
-  * specifications: Extract specifications (async)
-  * all: Extract all categories (comprehensive deep analysis)
-  * extract_only: No category extraction, just chunks
-
-# Processing Mode
-All uploads use deep processing mode with:
-- Complete AI analysis with all models
-- Image embeddings (CLIP)
-- Advanced product enrichment
-- Quality validation
-- Full RAG pipeline
-
-# AI Model Selection
-- discovery_model: "claude" | "gpt" | "haiku" (default: "claude")
-
-# Prompt Enhancement System (PRESERVED)
-- agent_prompt: Custom prompt for AI processing (optional)
-- enable_prompt_enhancement: true | false (default: true)
-
-# Document Metadata
-- title: Document title (optional)
-- description: Document description (optional)
-- tags: Comma-separated tags (optional)
-- workspace_id: Workspace ID (default: system workspace)
-
-# Chunking Configuration
-- chunk_size: Chunk size in characters (default: 2048)
-- chunk_overlap: Overlap between chunks (default: 200)
-```
-
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "document_id": "uuid",
-  "status": "processing",
-  "message": "Document upload started with product discovery"
-}
-```
+**Response fields:** `job_id`, `document_id`, `status: "processing"`, `message`
 
 **Database Operations:**
 - INSERT INTO documents
@@ -678,29 +370,9 @@ All uploads use deep processing mode with:
 **Used In:** Progress tracking, completion detection, error handling
 **Flow:** Frontend polls this endpoint every 2 seconds during processing
 
-**Request:**
-```http
-GET /api/rag/documents/job/{job_id}
-Content-Type: multipart/form-data
+**Request:** `GET /api/rag/documents/job/{job_id}`
 
-Parameters:
-- file: PDF file (required)
-- title: Document title (optional)
-- description: Document description (optional)
-- tags: Comma-separated tags (optional)
-- chunk_size: Chunk size (default: 2048)
-- chunk_overlap: Chunk overlap (default: 200)
-```
-
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "document_id": "uuid",
-  "status": "processing",
-  "message": "Document processing started"
-}
-```
+**Response fields:** `job_id`, `status` (`processing` | `completed` | `failed` | `interrupted`), `document_id`, `progress`, `error`, `metadata` (chunks_created, products_created, images_extracted, processing_time, current_stage, pages_completed, pages_failed, pages_skipped), `checkpoints`, `created_at`, `updated_at`
 
 **Database Operations:**
 - INSERT INTO documents
@@ -716,31 +388,9 @@ Parameters:
 **Used In:** Single product extraction from multi-product catalogs
 **Flow:** User specifies product → PDF scanned → Extract matching pages → Process focused PDF
 
-**Request:**
-```http
-POST /api/rag/documents/upload-focused
-Content-Type: multipart/form-data
+**Request:** Multipart form-data with fields: `file` (required), `product_name` (required), `designer` (optional), `search_terms` (optional), `title`, `description`, `tags`
 
-Parameters:
-- file: PDF file (required)
-- product_name: Product name to search for (required)
-- designer: Designer/studio name (optional)
-- search_terms: Additional search terms (optional)
-- title: Document title (optional)
-- description: Document description (optional)
-- tags: Comma-separated tags (optional)
-```
-
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "document_id": "uuid",
-  "status": "processing",
-  "product_name": "NOVA",
-  "pages_found": [5, 6, 7, 8, 9, 10, 11]
-}
-```
+**Response fields:** `job_id`, `document_id`, `status: "processing"`, `product_name`, `pages_found`
 
 **Database Operations:**
 - INSERT INTO documents
@@ -757,43 +407,11 @@ Parameters:
 **Used In:** Progress tracking, completion detection, error handling
 **Flow:** Frontend polls this endpoint every 2 seconds during processing
 
-**Request:**
-```http
-GET /api/rag/documents/job/{job_id}
-```
+**Request:** `GET /api/rag/documents/job/{job_id}`
 
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "status": "processing|completed|failed|interrupted",
-  "document_id": "uuid",
-  "progress": 75,
-  "error": null,
-  "metadata": {
-    "chunks_created": 16,
-    "products_created": 11,
-    "images_extracted": 28,
-    "processing_time": 123.45,
-    "current_stage": "image_processing",
-    "pages_completed": 7,
-    "pages_failed": 0,
-    "pages_skipped": 4
-  },
-  "checkpoints": [
-    {
-      "stage": "product_discovery",
-      "progress": 15,
-      "completed_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "created_at": "2025-11-01T17:58:00Z",
-  "updated_at": "2025-11-01T18:02:00Z"
-}
-```
+**Response fields:** `job_id`, `status`, `document_id`, `progress`, `error`, `metadata`, `checkpoints`, `created_at`, `updated_at`
 
-**Database Operations:**
-- SELECT FROM background_jobs WHERE id = ?
+**Database Operations:** SELECT FROM background_jobs WHERE id = ?
 
 **Critical Fields:** ✅ VERIFIED
 - `metadata.chunks_created` - Used by test validation
@@ -813,32 +431,9 @@ GET /api/rag/documents/job/{job_id}
 **Used In:** Knowledge Base viewer, Chunk inspector, Admin dashboard
 **Flow:** User views document → Fetch chunks → Display in UI
 
-**Request:**
-```http
-GET /api/rag/chunks?document_id={uuid}&limit=100&offset=0
-```
+**Request:** `GET /api/rag/chunks?document_id={uuid}&limit=100&offset=0`
 
-**Response:**
-```json
-{
-  "chunks": [
-    {
-      "id": "uuid",
-      "document_id": "uuid",
-      "content": "Chunk text content...",
-      "chunk_index": 0,
-      "metadata": {
-        "page_number": 1,
-        "chunk_type": "product",
-        "product_id": "uuid"
-      },
-      "quality_score": 0.85,
-      "created_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "total": 16
-}
-```
+**Response:** `chunks` array (id, document_id, content, chunk_index, metadata, quality_score, created_at) and `total` count
 
 **Database Operations:**
 - SELECT FROM document_chunks WHERE document_id = ? LIMIT ? OFFSET ?
@@ -856,33 +451,9 @@ GET /api/rag/chunks?document_id={uuid}&limit=100&offset=0
 **Used In:** Image gallery, Image inspector, Admin dashboard
 **Flow:** User views document → Fetch images → Display gallery
 
-**Request:**
-```http
-GET /api/rag/images?document_id={uuid}&limit=100&offset=0
-```
+**Request:** `GET /api/rag/images?document_id={uuid}&limit=100&offset=0`
 
-**Response:**
-```json
-{
-  "images": [
-    {
-      "id": "uuid",
-      "document_id": "uuid",
-      "image_url": "https://storage.supabase.co/...",
-      "page_number": 5,
-      "QWEN_analysis": {
-        "materials": ["fabric", "leather"],
-        "colors": ["beige", "brown"],
-        "ocr_text": "NOVA Sofa"
-      },
-      "clip_embedding": [0.123, 0.456, ...],
-      "quality_score": 0.92,
-      "created_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "total": 28
-}
-```
+**Response:** `images` array (id, document_id, image_url, page_number, QWEN_analysis, clip_embedding, quality_score, created_at) and `total` count
 
 **Database Operations:**
 - SELECT FROM document_images WHERE document_id = ? LIMIT ? OFFSET ?
@@ -900,33 +471,9 @@ GET /api/rag/images?document_id={uuid}&limit=100&offset=0
 **Used In:** Products tab, Product catalog, Materials page
 **Flow:** User views products → Fetch from database → Display cards
 
-**Request:**
-```http
-GET /api/rag/products?document_id={uuid}&limit=100&offset=0
-```
+**Request:** `GET /api/rag/products?document_id={uuid}&limit=100&offset=0`
 
-**Response:**
-```json
-{
-  "products": [
-    {
-      "id": "uuid",
-      "name": "NOVA Sofa",
-      "description": "Modern modular sofa system...",
-      "source_document_id": "uuid",
-      "metadata": {
-        "designer": "Studio Kairos",
-        "dimensions": "W: 240cm, D: 95cm, H: 75cm",
-        "materials": ["fabric", "wood", "metal"],
-        "page_range": [5, 11]
-      },
-      "quality_score": 0.88,
-      "created_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "total": 11
-}
-```
+**Response:** `products` array (id, name, description, source_document_id, metadata, quality_score, created_at) and `total` count
 
 **Database Operations:**
 - SELECT FROM products WHERE source_document_id = ? LIMIT ? OFFSET ?
@@ -944,10 +491,7 @@ GET /api/rag/products?document_id={uuid}&limit=100&offset=0
 **Used In:** Test scripts, Admin dashboard, Relationship viewer
 **Flow:** Query relationships → Return product-image links with scores
 
-**Request:**
-```http
-GET /api/rag/product-image-relationships?document_id={uuid}&limit=100&offset=0&min_score=0.0
-```
+**Request:** `GET /api/rag/product-image-relationships?document_id={uuid}&limit=100&offset=0&min_score=0.0`
 
 **Query Parameters:**
 - `document_id` (optional) - Filter by document ID
@@ -956,43 +500,7 @@ GET /api/rag/product-image-relationships?document_id={uuid}&limit=100&offset=0&m
 - `offset` (optional) - Pagination offset (default: 0)
 - `min_score` (optional) - Minimum relevance score (default: 0.0, range: 0.0-1.0)
 
-**Response:**
-```json
-{
-  "document_id": "uuid",
-  "product_id": null,
-  "relationships": [
-    {
-      "id": "uuid",
-      "product_id": "uuid",
-      "image_id": "uuid",
-      "relationship_type": "product_image",
-      "relevance_score": 0.88,
-      "created_at": "2025-11-22T14:17:52Z",
-      "products": {
-        "name": "NOVA",
-        "source_document_id": "uuid"
-      },
-      "document_images": {
-        "id": "uuid",
-        "caption": "Image from page 10",
-        "image_url": "https://...",
-        "page_number": 10
-      }
-    }
-  ],
-  "count": 51,
-  "limit": 100,
-  "offset": 0,
-  "statistics": {
-    "total_relationships": 51,
-    "by_relationship_type": {
-      "product_image": 51
-    },
-    "min_score_filter": 0.0
-  }
-}
-```
+**Response:** `document_id`, `product_id`, `relationships` array (with product and image details), `count`, `limit`, `offset`, and `statistics` (total_relationships, by_relationship_type, min_score_filter)
 
 **Database Operations:**
 - SELECT FROM product_image_relationships JOIN products JOIN document_images
@@ -1013,10 +521,7 @@ GET /api/rag/product-image-relationships?document_id={uuid}&limit=100&offset=0&m
 **Used In:** Test scripts, Admin dashboard, Content analysis
 **Flow:** Query relationships → Return chunk-product links
 
-**Request:**
-```http
-GET /api/rag/chunk-product-relationships?document_id={uuid}&limit=100&offset=0
-```
+**Request:** `GET /api/rag/chunk-product-relationships?document_id={uuid}&limit=100&offset=0`
 
 **Query Parameters:**
 - `document_id` (optional) - Filter by document ID
@@ -1024,32 +529,7 @@ GET /api/rag/chunk-product-relationships?document_id={uuid}&limit=100&offset=0
 - `limit` (optional) - Maximum results (default: 100, max: 1000)
 - `offset` (optional) - Pagination offset (default: 0)
 
-**Response:**
-```json
-{
-  "document_id": "uuid",
-  "product_id": null,
-  "relationships": [
-    {
-      "id": "uuid",
-      "chunk_id": "uuid",
-      "product_id": "uuid",
-      "created_at": "2025-11-22T14:17:53Z",
-      "document_chunks": {
-        "document_id": "uuid",
-        "content": "NOVA collection features modern design..."
-      },
-      "products": {
-        "id": "uuid",
-        "name": "NOVA"
-      }
-    }
-  ],
-  "count": 163,
-  "limit": 100,
-  "offset": 0
-}
-```
+**Response:** `document_id`, `product_id`, `relationships` array (with chunk content and product name details), `count`, `limit`, `offset`
 
 **Database Operations:**
 - SELECT FROM chunk_product_relationships JOIN document_chunks JOIN products
@@ -1069,34 +549,9 @@ GET /api/rag/chunk-product-relationships?document_id={uuid}&limit=100&offset=0
 **Used In:** Main search interface, Q&A functionality
 **Flow:** User asks question → Semantic search → Retrieve relevant chunks → Generate answer with AI
 
-**Request:**
-```http
-POST /api/rag/query
-Content-Type: application/json
+**Request fields:** `query`, `document_ids`, `top_k`, `model`
 
-{
-  "query": "What materials are used in NOVA sofa?",
-  "document_ids": ["uuid1", "uuid2"],
-  "top_k": 5,
-  "model": "claude"
-}
-```
-
-**Response:**
-```json
-{
-  "answer": "The NOVA sofa uses fabric, wood, and metal materials...",
-  "sources": [
-    {
-      "chunk_id": "uuid",
-      "content": "...",
-      "score": 0.92,
-      "document_id": "uuid"
-    }
-  ],
-  "model_used": "claude-sonnet-4.5"
-}
-```
+**Response fields:** `answer`, `sources` (chunk_id, content, score, document_id), `model_used`
 
 **Database Operations:** SELECT FROM document_chunks, embeddings
 **Frontend Integration:** SearchInterface.tsx, QAModal.tsx
@@ -1109,27 +564,9 @@ Content-Type: application/json
 **Used In:** Chat interface, conversational search
 **Flow:** User sends message → Maintain conversation history → Generate contextual response
 
-**Request:**
-```http
-POST /api/rag/chat
-Content-Type: application/json
+**Request fields:** `message`, `conversation_id`, `document_ids`
 
-{
-  "message": "Tell me more about the dimensions",
-  "conversation_id": "uuid",
-  "document_ids": ["uuid1"]
-}
-```
-
-**Response:**
-```json
-{
-  "response": "The NOVA sofa dimensions are W: 240cm, D: 95cm, H: 75cm...",
-  "conversation_id": "uuid",
-  "sources": [...],
-  "model_used": "claude-sonnet-4.5"
-}
-```
+**Response fields:** `response`, `conversation_id`, `sources`, `model_used`
 
 **Database Operations:** SELECT FROM document_chunks, embeddings
 **Frontend Integration:** ChatInterface.tsx
@@ -1142,36 +579,9 @@ Content-Type: application/json
 **Used In:** Search page, knowledge base search
 **Flow:** User enters search term → Semantic/hybrid/keyword search → Return ranked results
 
-**Request:**
-```http
-POST /api/rag/search
-Content-Type: application/json
+**Request fields:** `query`, `search_type`, `filters` (document_ids, tags), `top_k`
 
-{
-  "query": "modern sofas",
-  "search_type": "semantic",
-  "filters": {
-    "document_ids": ["uuid1"],
-    "tags": ["furniture"]
-  },
-  "top_k": 10
-}
-```
-
-**Response:**
-```json
-{
-  "results": [
-    {
-      "chunk_id": "uuid",
-      "content": "...",
-      "score": 0.89,
-      "metadata": {...}
-    }
-  ],
-  "total": 45
-}
-```
+**Response:** `results` array (chunk_id, content, score, metadata) and `total`
 
 **Database Operations:** SELECT FROM document_chunks, embeddings
 **Frontend Integration:** SearchPage.tsx, KnowledgeBase.tsx
@@ -1184,18 +594,7 @@ Content-Type: application/json
 **Used In:** Advanced search interface
 **Flow:** User query → Query expansion → Multi-strategy search → Ranked results
 
-**Request:**
-```http
-POST /api/rag/search/advanced
-Content-Type: application/json
-
-{
-  "query": "sustainable furniture",
-  "expand_query": true,
-  "rerank": true,
-  "filters": {...}
-}
-```
+**Request fields:** `query`, `expand_query`, `rerank`, `filters`
 
 **Database Operations:** SELECT FROM document_chunks, embeddings
 **Frontend Integration:** AdvancedSearch.tsx
@@ -1208,17 +607,7 @@ Content-Type: application/json
 **Used In:** Search with diversity requirements
 **Flow:** User query → Semantic search → MMR reranking → Diverse results
 
-**Request:**
-```http
-POST /api/rag/search/mmr
-Content-Type: application/json
-
-{
-  "query": "chairs",
-  "lambda_param": 0.5,
-  "top_k": 10
-}
-```
+**Request fields:** `query`, `lambda_param`, `top_k`
 
 **Database Operations:** SELECT FROM document_chunks, embeddings
 **Frontend Integration:** SearchPage.tsx (diversity mode)
@@ -1231,29 +620,9 @@ Content-Type: application/json
 **Used In:** Documents page, admin dashboard
 **Flow:** User views documents → Fetch with filters → Display list
 
-**Request:**
-```http
-GET /api/rag/documents?limit=20&offset=0&search=harmony&tags=catalog
-```
+**Request:** `GET /api/rag/documents?limit=20&offset=0&search=harmony&tags=catalog`
 
-**Response:**
-```json
-{
-  "documents": [
-    {
-      "id": "uuid",
-      "title": "Harmony PDF",
-      "filename": "harmony.pdf",
-      "page_count": 120,
-      "chunks_count": 45,
-      "images_count": 28,
-      "products_count": 11,
-      "created_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "total": 1
-}
-```
+**Response:** `documents` array (id, title, filename, page_count, chunks_count, images_count, products_count, created_at) and `total`
 
 **Database Operations:** SELECT FROM documents
 **Frontend Integration:** DocumentsPage.tsx, AdminDashboard.tsx
@@ -1266,24 +635,9 @@ GET /api/rag/documents?limit=20&offset=0&search=harmony&tags=catalog
 **Used In:** Document management, cleanup
 **Flow:** User deletes document → Remove from database → Delete from storage → Cleanup embeddings
 
-**Request:**
-```http
-DELETE /api/rag/documents/{document_id}
-```
+**Request:** `DELETE /api/rag/documents/{document_id}`
 
-**Response:**
-```json
-{
-  "success": true,
-  "deleted": {
-    "document": 1,
-    "chunks": 45,
-    "images": 28,
-    "products": 11,
-    "embeddings": 225
-  }
-}
-```
+**Response:** `success` and `deleted` counts (document, chunks, images, products, embeddings)
 
 **Database Operations:**
 - DELETE FROM documents
@@ -1302,24 +656,9 @@ DELETE /api/rag/documents/{document_id}
 **Used In:** Monitoring, admin dashboard
 **Flow:** System checks → Verify all services → Return status
 
-**Request:**
-```http
-GET /api/rag/health
-```
+**Request:** `GET /api/rag/health`
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "services": {
-    "rag": "healthy",
-    "embeddings": "healthy",
-    "vector_store": "healthy",
-    "database": "healthy"
-  },
-  "timestamp": "2025-11-01T18:30:00Z"
-}
-```
+**Response fields:** `status`, `services` (rag, embeddings, vector_store, database), `timestamp`
 
 **Database Operations:** None (service checks only)
 **Frontend Integration:** AdminDashboard.tsx (health monitor)
@@ -1332,23 +671,9 @@ GET /api/rag/health
 **Used In:** Admin dashboard, analytics
 **Flow:** Fetch system metrics → Calculate statistics → Return summary
 
-**Request:**
-```http
-GET /api/rag/stats
-```
+**Request:** `GET /api/rag/stats`
 
-**Response:**
-```json
-{
-  "documents": 150,
-  "chunks": 6750,
-  "images": 4200,
-  "products": 1650,
-  "embeddings": 33750,
-  "storage_used_mb": 2450,
-  "avg_processing_time": 125.5
-}
-```
+**Response fields:** `documents`, `chunks`, `images`, `products`, `embeddings`, `storage_used_mb`, `avg_processing_time`
 
 **Database Operations:** SELECT COUNT FROM documents, document_chunks, document_images, products, embeddings
 **Frontend Integration:** AdminDashboard.tsx (statistics panel)
@@ -1361,37 +686,9 @@ GET /api/rag/stats
 **Used In:** Job monitoring, AI usage analytics
 **Flow:** Fetch job → Get AI tracking data → Return model usage details
 
-**Request:**
-```http
-GET /api/rag/job/{job_id}/ai-tracking
-```
+**Request:** `GET /api/rag/job/{job_id}/ai-tracking`
 
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "models_used": {
-    "QWEN": {
-      "calls": 28,
-      "tokens": 45000,
-      "cost": 0.45,
-      "stages": ["image_analysis"]
-    },
-    "ANTHROPIC": {
-      "calls": 2,
-      "tokens": 12000,
-      "cost": 1.20,
-      "stages": ["product_discovery", "validation"]
-    },
-    "CLIP": {
-      "calls": 140,
-      "embeddings_generated": 140,
-      "stages": ["image_embeddings"]
-    }
-  },
-  "total_cost": 1.65
-}
-```
+**Response:** `job_id` and `models_used` (per-model: calls, tokens, cost, stages) and `total_cost`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** JobMonitor.tsx, AIUsagePanel.tsx
@@ -1404,10 +701,7 @@ GET /api/rag/job/{job_id}/ai-tracking
 **Used In:** Model-specific analytics
 **Flow:** Fetch job → Filter by model → Return model-specific data
 
-**Request:**
-```http
-GET /api/rag/job/{job_id}/ai-tracking/model/QWEN
-```
+**Request:** `GET /api/rag/job/{job_id}/ai-tracking/model/QWEN`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** AIUsagePanel.tsx (model filter)
@@ -1420,10 +714,7 @@ GET /api/rag/job/{job_id}/ai-tracking/model/QWEN
 **Used In:** Stage-specific analytics
 **Flow:** Fetch job → Filter by stage → Return stage-specific AI usage
 
-**Request:**
-```http
-GET /api/rag/job/{job_id}/ai-tracking/stage/image_analysis
-```
+**Request:** `GET /api/rag/job/{job_id}/ai-tracking/stage/image_analysis`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** StageMonitor.tsx
@@ -1436,25 +727,9 @@ GET /api/rag/job/{job_id}/ai-tracking/stage/image_analysis
 **Used In:** Job recovery, debugging
 **Flow:** Fetch job → Get checkpoint history → Return checkpoint data
 
-**Request:**
-```http
-GET /api/rag/jobs/{job_id}/checkpoints
-```
+**Request:** `GET /api/rag/jobs/{job_id}/checkpoints`
 
-**Response:**
-```json
-{
-  "checkpoints": [
-    {
-      "stage": "product_discovery",
-      "progress": 15,
-      "data": {...},
-      "completed_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "count": 6
-}
-```
+**Response:** `checkpoints` array (stage, progress, data, completed_at) and `count`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** JobMonitor.tsx (checkpoint viewer)
@@ -1467,20 +742,9 @@ GET /api/rag/jobs/{job_id}/checkpoints
 **Used In:** Job recovery, error handling
 **Flow:** User triggers restart → Load checkpoint → Resume processing
 
-**Request:**
-```http
-POST /api/rag/jobs/{job_id}/restart
-```
+**Request:** `POST /api/rag/jobs/{job_id}/restart`
 
-**Response:**
-```json
-{
-  "success": true,
-  "job_id": "uuid",
-  "resumed_from": "image_processing",
-  "progress": 65
-}
-```
+**Response:** `success`, `job_id`, `resumed_from`, `progress`
 
 **Database Operations:**
 - SELECT FROM background_jobs
@@ -1508,27 +772,9 @@ POST /api/rag/jobs/{job_id}/restart
 **Used In:** Admin dashboard, job management
 **Flow:** Fetch jobs → Apply filters → Return paginated list
 
-**Request:**
-```http
-GET /api/rag/documents/jobs?limit=20&offset=0&status=processing
-```
+**Request:** `GET /api/rag/documents/jobs?limit=20&offset=0&status=processing`
 
-**Response:**
-```json
-{
-  "jobs": [
-    {
-      "id": "uuid",
-      "document_id": "uuid",
-      "filename": "harmony.pdf",
-      "status": "processing",
-      "progress": 75,
-      "created_at": "2025-11-01T18:00:00Z"
-    }
-  ],
-  "total": 5
-}
-```
+**Response:** `jobs` array (id, document_id, filename, status, progress, created_at) and `total`
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** AdminDashboard.tsx (jobs panel)
@@ -1541,21 +787,9 @@ GET /api/rag/documents/jobs?limit=20&offset=0&status=processing
 **Used In:** Document viewer, export functionality
 **Flow:** Fetch document → Get all related data → Return comprehensive content
 
-**Request:**
-```http
-GET /api/rag/documents/documents/{document_id}/content?include_chunks=true&include_images=true&include_products=true
-```
+**Request:** `GET /api/rag/documents/documents/{document_id}/content?include_chunks=true&include_images=true&include_products=true`
 
-**Response:**
-```json
-{
-  "document": {...},
-  "chunks": [...],
-  "images": [...],
-  "products": [...],
-  "embeddings": [...]
-}
-```
+**Response:** `document`, `chunks`, `images`, `products`, `embeddings`
 
 **Database Operations:**
 - SELECT FROM documents
@@ -1574,17 +808,7 @@ GET /api/rag/documents/documents/{document_id}/content?include_chunks=true&inclu
 **Used In:** Simple document upload
 **Flow:** Upload → Process → Generate embeddings → Complete
 
-**Request:**
-```http
-POST /api/rag/documents/upload
-Content-Type: multipart/form-data
-
-Parameters:
-- file: PDF file
-- title: Document title
-- chunk_size: 2048
-- chunk_overlap: 200
-```
+**Request:** Multipart form-data with fields: `file` (PDF), `title`, `chunk_size` (default: 2048), `chunk_overlap` (default: 200)
 
 **Database Operations:**
 - INSERT INTO documents
@@ -1607,18 +831,9 @@ Parameters:
 **Used In:** Admin dashboard jobs panel
 **Flow:** Admin views jobs → Apply filters → Display paginated list
 
-**Request:**
-```http
-GET /api/admin/jobs?status=processing&limit=20&offset=0
-```
+**Request:** `GET /api/admin/jobs?status=processing&limit=20&offset=0`
 
-**Response:**
-```json
-{
-  "jobs": [...],
-  "total": 45
-}
-```
+**Response:** `jobs` array and `total` count
 
 **Database Operations:** SELECT FROM background_jobs
 **Frontend Integration:** AdminDashboard.tsx (jobs panel)
@@ -1818,35 +1033,9 @@ GET /api/admin/jobs?status=processing&limit=20&offset=0
 **Used In:** PDF processing pipeline, metadata classification
 **Flow:** Analyze chunk → Classify scope → Return scope with confidence
 
-**Request:**
-```http
-POST /api/rag/metadata/detect-scope
-Content-Type: application/json
+**Request fields:** `chunk_content`, `product_names`, `document_context`
 
-Body:
-{
-  "chunk_content": "Available in 15×38 dimensions",
-  "product_names": ["NOVA", "HARMONY", "ESSENCE"],
-  "document_context": "Tile catalog with multiple products"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "scope": "catalog_general_implicit",
-    "confidence": 0.92,
-    "reasoning": "Dimensions mentioned without specific product reference",
-    "applies_to": ["NOVA", "HARMONY", "ESSENCE"],
-    "extracted_metadata": {
-      "dimensions": "15×38"
-    },
-    "is_override": false
-  }
-}
-```
+**Response:** `success` and `data` with `scope`, `confidence`, `reasoning`, `applies_to`, `extracted_metadata`, `is_override`
 
 **Scope Types:**
 - `product_specific` - Mentions specific product name
@@ -1865,47 +1054,9 @@ Body:
 **Used In:** PDF processing pipeline (Stage 4), metadata management
 **Flow:** Detect scope → Apply in order → Track overrides → Update database
 
-**Request:**
-```http
-POST /api/rag/metadata/apply-to-products
-Content-Type: application/json
+**Request fields:** `document_id`, `chunks_with_scope` (array of chunk_id, content, scope, metadata, applies_to)
 
-Body:
-{
-  "document_id": "uuid",
-  "chunks_with_scope": [
-    {
-      "chunk_id": "uuid",
-      "content": "Available in 15×38",
-      "scope": "catalog_general_implicit",
-      "metadata": {"dimensions": "15×38"},
-      "applies_to": ["NOVA", "HARMONY", "ESSENCE"]
-    },
-    {
-      "chunk_id": "uuid",
-      "content": "HARMONY dimensions: 20×40",
-      "scope": "product_specific",
-      "metadata": {"dimensions": "20×40"},
-      "applies_to": ["HARMONY"]
-    }
-  ]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "products_updated": 3,
-    "metadata_fields_applied": 5,
-    "overrides_tracked": 1,
-    "catalog_general_count": 1,
-    "product_specific_count": 1,
-    "processing_time_ms": 245
-  }
-}
-```
+**Response:** `success` and `data` with `products_updated`, `metadata_fields_applied`, `overrides_tracked`, `catalog_general_count`, `product_specific_count`, `processing_time_ms`
 
 **Processing Order:**
 1. Catalog-general (explicit) - Lowest priority
@@ -1927,10 +1078,7 @@ Body:
 **Used In:** Admin metadata viewer, metadata analytics
 **Flow:** Query database → Filter → Paginate → Return results
 
-**Request:**
-```http
-GET /api/rag/metadata/list?document_id=uuid&scope=catalog_general_implicit&limit=50&offset=0
-```
+**Request:** `GET /api/rag/metadata/list?document_id=uuid&scope=catalog_general_implicit&limit=50&offset=0`
 
 **Query Parameters:**
 - `document_id` (optional) - Filter by document
@@ -1940,29 +1088,7 @@ GET /api/rag/metadata/list?document_id=uuid&scope=catalog_general_implicit&limit
 - `limit` (optional) - Results per page (default: 50)
 - `offset` (optional) - Pagination offset (default: 0)
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "product_id": "uuid",
-        "product_name": "NOVA",
-        "metadata_key": "dimensions",
-        "metadata_value": "15×38",
-        "scope": "catalog_general_implicit",
-        "source_chunk_id": "uuid",
-        "is_override": false,
-        "created_at": "2025-11-03T10:00:00Z"
-      }
-    ],
-    "total": 125,
-    "limit": 50,
-    "offset": 0
-  }
-}
-```
+**Response:** `success` and `data` with `items` array (product_id, product_name, metadata_key, metadata_value, scope, source_chunk_id, is_override, created_at), `total`, `limit`, `offset`
 
 **Database Operations:**
 - SELECT FROM products WHERE document_id = ?
@@ -1978,42 +1104,13 @@ GET /api/rag/metadata/list?document_id=uuid&scope=catalog_general_implicit&limit
 **Used In:** Admin dashboard, metadata analytics
 **Flow:** Aggregate metadata → Calculate stats → Return summary
 
-**Request:**
-```http
-GET /api/rag/metadata/statistics?document_id=uuid
-```
+**Request:** `GET /api/rag/metadata/statistics?document_id=uuid`
 
 **Query Parameters:**
 - `document_id` (optional) - Filter by document
 - `product_id` (optional) - Filter by product
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "total_products": 14,
-    "total_metadata_fields": 156,
-    "catalog_general_count": 45,
-    "product_specific_count": 98,
-    "category_specific_count": 13,
-    "override_count": 8,
-    "most_common_fields": [
-      {"field": "dimensions", "count": 14},
-      {"field": "material_category", "count": 14},
-      {"field": "factory_name", "count": 14},
-      {"field": "slip_resistance", "count": 12},
-      {"field": "finish", "count": 10}
-    ],
-    "scope_distribution": {
-      "catalog_general_implicit": 45,
-      "catalog_general_explicit": 12,
-      "product_specific": 98,
-      "category_specific": 13
-    }
-  }
-}
-```
+**Response:** `success` and `data` with `total_products`, `total_metadata_fields`, `catalog_general_count`, `product_specific_count`, `category_specific_count`, `override_count`, `most_common_fields`, `scope_distribution`
 
 **Database Operations:**
 - SELECT COUNT(*) FROM products
@@ -2053,160 +1150,29 @@ GET /api/rag/metadata/statistics?document_id=uuid
 | `image` | ✅ | Visual similarity | <150ms |
 | `all` | ✅ | All strategies combined | <800ms |
 
-**Request:**
-```http
-POST /api/rag/search?strategy={strategy}
-Content-Type: application/json
+**Request:** `POST /api/rag/search?strategy={strategy}` with body fields:
+- `query` — search query text
+- `workspace_id`
+- `top_k`
+- `similarity_threshold`
+- `text_weight`, `visual_weight`, `multimodal_weight` (for multi_vector strategy)
+- `semantic_weight`, `keyword_weight` (for hybrid strategy)
+- `material_filters` — `material_type`, `slip_resistance`, `finish` (for material strategy)
+- `image_url` or `image_base64` (for image strategy)
 
-Query Parameters:
-- strategy: "semantic" | "vector" | "multi_vector" | "hybrid" | "material" | "image" | "all"
-  * semantic: Natural language understanding with MMR diversity
-  * vector: Pure vector similarity (no diversity)
-  * multi_vector: Combines 3 embeddings (text 40%, visual 30%, multimodal 30%)
-  * hybrid: Semantic (70%) + keyword matching (30%)
-  * material: JSONB property filtering
-  * image: Visual similarity using CLIP embeddings
-  * all: Runs all 6 strategies in parallel (recommended)
-
-Body:
-{
-  "query": "search query text",
-  "workspace_id": "uuid",
-  "top_k": 10,
-  "similarity_threshold": 0.6,
-
-  // Multi-vector weights (optional)
-  "text_weight": 0.4,
-  "visual_weight": 0.3,
-  "multimodal_weight": 0.3,
-
-  // Hybrid weights (optional)
-  "semantic_weight": 0.7,
-  "keyword_weight": 0.3,
-
-  // Material filters (for material strategy)
-  "material_filters": {
-    "material_type": "Porcelain",
-    "slip_resistance": "R11",
-    "finish": "matte"
-  },
-
-  // Image search (for image strategy)
-  "image_url": "https://example.com/tile.jpg",
-  "image_base64": "data:image/jpeg;base64,..."
-}
-```
-
-**Response:**
-```json
-{
-  "query": "search query",
-  "enhanced_query": "enhanced query if prompts applied",
-  "results": [
-    {
-      "id": "uuid",
-      "name": "Product Name",
-      "description": "Product description",
-      "relevance_score": 0.88,
-      "metadata": {
-        "material_type": "Porcelain",
-        "dimensions": "60x60",
-        "slip_resistance": "R11"
-      },
-
-      // For multi_vector strategy
-      "score_breakdown": {
-        "text_score": 0.85,
-        "visual_score": 0.90,
-        "multimodal_score": 0.89
-      },
-
-      // For all strategy
-      "found_in_strategies": ["semantic", "multi_vector", "hybrid"],
-      "strategy_scores": {
-        "semantic": 0.85,
-        "multi_vector": 0.90,
-        "hybrid": 0.89
-      }
-    }
-  ],
-  "total_results": 15,
-  "search_type": "all",
-  "processing_time": 0.45,
-
-  // For all strategy
-  "strategies_executed": ["semantic", "vector", "multi_vector", "hybrid"],
-  "strategies_count": 4
-}
-```
+**Response:** `query`, `enhanced_query`, `results` array (id, name, description, relevance_score, metadata, score_breakdown for multi_vector, found_in_strategies for all), `total_results`, `search_type`, `processing_time`, `strategies_executed`, `strategies_count`
 
 **Usage Examples:**
 
-**1. Semantic Search (Natural Language):**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=semantic" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "modern minimalist tiles for bathroom",
-    "workspace_id": "uuid",
-    "top_k": 10
-  }'
-```
+**1. Semantic Search (Natural Language):** POST to `?strategy=semantic` with `query` and `workspace_id`
 
-**2. Multi-Vector Search (Text + Visual):**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "geometric patterns in neutral colors",
-    "workspace_id": "uuid",
-    "top_k": 10,
-    "text_weight": 0.4,
-    "visual_weight": 0.3,
-    "multimodal_weight": 0.3
-  }'
-```
+**2. Multi-Vector Search (Text + Visual):** POST to `?strategy=multi_vector` with `query`, `workspace_id`, and optional weight overrides
 
-**3. Hybrid Search (Semantic + Keyword):**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=hybrid" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "R11 slip resistance porcelain",
-    "workspace_id": "uuid",
-    "top_k": 10,
-    "semantic_weight": 0.7,
-    "keyword_weight": 0.3
-  }'
-```
+**3. Hybrid Search (Semantic + Keyword):** POST to `?strategy=hybrid` with `query`, `workspace_id`, `semantic_weight`, `keyword_weight`
 
-**4. Material Property Search:**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=material" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "",
-    "workspace_id": "uuid",
-    "top_k": 50,
-    "material_filters": {
-      "material_type": "Porcelain",
-      "slip_resistance": "R11",
-      "finish": "matte"
-    }
-  }'
-```
+**4. Material Property Search:** POST to `?strategy=material` with `query: ""`, `workspace_id`, and `material_filters` object
 
-**5. Image Search (Visual Similarity):**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=image" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "",
-    "workspace_id": "uuid",
-    "top_k": 10,
-    "image_url": "https://example.com/tile-sample.jpg"
-  }'
-```
+**5. Image Search (Visual Similarity):** POST to `?strategy=image` with `query: ""`, `workspace_id`, and `image_url`
 
 ---
 
@@ -2224,92 +1190,16 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=image" \
 - Supports category filtering and entity type filtering
 - Returns comprehensive results with all metadata and embeddings
 
-**Request:**
-```http
-POST /api/rag/search/knowledge-base
-Content-Type: application/json
+**Request fields:**
+- `query` (required)
+- `workspace_id` (required)
+- `search_types` (optional) — `["products", "entities", "chunks", "images"]` (default: all)
+- `categories` (optional) — `["product", "certificate", "logo", "specification", "general"]`
+- `entity_types` (optional) — `["certificate", "logo", "specification"]`
+- `top_k` (optional, default: 10)
+- `similarity_threshold` (optional, default: 0.7)
 
-{
-  "query": "waterproof ceramic tiles with matte finish",
-  "workspace_id": "uuid",
-  "search_types": ["products", "entities", "chunks", "images"],
-  "categories": ["product", "certificate"],
-  "entity_types": ["certificate", "logo", "specification"],
-  "top_k": 10,
-  "similarity_threshold": 0.7
-}
-```
-
-**Parameters:**
-- `query` (required): Search query text
-- `workspace_id` (required): Workspace ID to search within
-- `search_types` (optional): Array of types to search - `["products", "entities", "chunks", "images"]` (default: all)
-- `categories` (optional): Filter by categories - `["product", "certificate", "logo", "specification", "general"]`
-- `entity_types` (optional): Filter by entity types - `["certificate", "logo", "specification"]`
-- `top_k` (optional): Number of results per type (default: 10)
-- `similarity_threshold` (optional): Minimum similarity score (default: 0.7)
-
-**Response:**
-```json
-{
-  "query": "waterproof ceramic tiles with matte finish",
-  "total_results": 25,
-  "products": [
-    {
-      "id": "uuid",
-      "name": "NOVA",
-      "description": "Waterproof porcelain tiles...",
-      "metadata": {
-        "material_type": "Porcelain",
-        "finish": "matte",
-        "waterproof": true
-      },
-      "relevance_score": 0.92,
-      "type": "product",
-      "embeddings": {
-        "text": true,
-        "visual": true,
-        "color": true,
-        "texture": true,
-        "style": true,
-        "material": true
-      }
-    }
-  ],
-  "entities": [
-    {
-      "id": "uuid",
-      "entity_type": "certificate",
-      "name": "ISO 9001:2015",
-      "description": "Quality Management System",
-      "metadata": {
-        "issuer": "TÜV SÜD",
-        "standards": ["ISO 9001:2015"]
-      },
-      "relevance_score": 0.85,
-      "type": "entity"
-    }
-  ],
-  "chunks": [
-    {
-      "id": "uuid",
-      "content": "NOVA tiles are waterproof and suitable for...",
-      "category": "product",
-      "metadata": {},
-      "relevance_score": 0.88,
-      "type": "chunk"
-    }
-  ],
-  "images": [],
-  "processing_time": 0.45,
-  "search_metadata": {
-    "search_types": ["products", "entities", "chunks"],
-    "categories_filter": ["product"],
-    "entity_types_filter": null,
-    "similarity_threshold": 0.7
-  }
-}
-```
+**Response fields:** `query`, `total_results`, `products` array, `entities` array, `chunks` array, `images` array, `processing_time`, `search_metadata`
 
 **Database Operations:**
 - SELECT FROM products (with multi-vector search)
@@ -2323,56 +1213,10 @@ Content-Type: application/json
 - ProductSearch.tsx
 
 **Usage Examples:**
-
-**1. Search for products only:**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search/knowledge-base" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "waterproof ceramic tiles",
-    "workspace_id": "uuid",
-    "search_types": ["products"],
-    "top_k": 10
-  }'
-```
-
-**2. Search for certificates:**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search/knowledge-base" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "ISO 9001",
-    "workspace_id": "uuid",
-    "search_types": ["entities"],
-    "entity_types": ["certificate"],
-    "top_k": 5
-  }'
-```
-
-**3. Search across all types with category filter:**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search/knowledge-base" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "matte finish tiles",
-    "workspace_id": "uuid",
-    "search_types": ["products", "chunks"],
-    "categories": ["product"],
-    "top_k": 20,
-    "similarity_threshold": 0.75
-  }'
-```
-
-**6. All Strategies Combined (Recommended):**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=all" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "modern geometric tiles",
-    "workspace_id": "uuid",
-    "top_k": 10
-  }'
-```
+- Search for products only: set `search_types: ["products"]`
+- Search for certificates: set `search_types: ["entities"]`, `entity_types: ["certificate"]`
+- Search across all types with category filter: set `search_types: ["products", "chunks"]`, `categories: ["product"]`
+- All strategies combined: POST to `?strategy=all` with query
 
 **Database Operations:**
 - SELECT FROM products with vector similarity (pgvector)
@@ -2384,16 +1228,6 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=all" \
 
 **Related Documentation:** [Search Strategies Guide](./search-strategies.md)
 
-**Database Operations:**
-- SELECT FROM document_chunks (for text search)
-- SELECT FROM document_images (for image search)
-- SELECT FROM products (for material search)
-- Uses pgvector for similarity search
-
-**Frontend Integration:**
-- Used in: `SearchInterface.tsx`, `KnowledgeBase.tsx`
-- API Client: `mivaaApiClient.searchSemantic()`, `mivaaApiClient.searchVector()`, etc.
-
 ---
 
 ### 3.2 POST /query
@@ -2401,35 +1235,9 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=all" \
 **Purpose:** CONSOLIDATED query endpoint with auto-detecting modality
 **Replaces:** Multiple query endpoints with different modalities
 
-**Request:**
-```http
-POST /api/rag/query
-Content-Type: application/json
+**Request fields:** `query`, `modality` (`auto` | `text` | `image` | `multimodal`), `limit`, `workspace_id`
 
-{
-  "query": "What are the dimensions of Nova?",
-  "modality": "auto",  // "auto" | "text" | "image" | "multimodal"
-  "limit": 10,
-  "workspace_id": "uuid"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "answer": "Nova has dimensions of 120cm x 80cm x 2cm",
-  "sources": [
-    {
-      "chunk_id": "uuid",
-      "content": "Nova dimensions: 120cm x 80cm x 2cm",
-      "relevance_score": 0.98
-    }
-  ],
-  "modality_detected": "text",
-  "processing_time_ms": 150
-}
-```
+**Response fields:** `success`, `answer`, `sources` (chunk_id, content, relevance_score), `modality_detected`, `processing_time_ms`
 
 ---
 
@@ -2444,19 +1252,7 @@ Content-Type: application/json
 
 **Replacement:** Use `POST /api/rag/documents/upload`
 
-The RAG endpoint provides identical functionality using the same PyMuPDF4LLM library:
-```http
-POST /api/rag/documents/upload
-Content-Type: multipart/form-data
-
-Body:
-{
-  "file": <PDF file>,
-  "workspace_id": "uuid"
-}
-
-Response: { markdown, tables, images, status }
-```
+The RAG endpoint provides identical functionality using the same PyMuPDF4LLM library. It accepts multipart/form-data with a `file` (PDF) and `workspace_id` and returns markdown, tables, images, and status.
 
 **Benefits of consolidation:**
 - ✅ Single endpoint for all extraction needs
@@ -2482,423 +1278,97 @@ See Section 2 (RAG System) for current endpoints:
 
 ### 3. Search APIs (8 endpoints)
 
-**Semantic Search**
-```http
-POST /api/search/semantic
-Content-Type: application/json
+**Semantic Search** — `POST /api/search/semantic` — body: `query`, `workspace_id`, `limit`, `threshold` — response: `results` array (id, title, score, content)
 
-Body: {
-  query: "string",
-  workspace_id: "string",
-  limit: 10,
-  threshold: 0.7
-}
+**Vector Search** — `POST /api/search/vector` — body: `embedding` (float array), `workspace_id`, `limit`, `metric` — response: `results` array (id, similarity_score)
 
-Response: { results: [{ id, title, score, content }] }
-```
+**Hybrid Search** — `POST /api/search/hybrid` — body: `query`, `embedding`, `workspace_id`, `limit`, `semantic_weight` — response: `results` array
 
-**Vector Search**
-```http
-POST /api/search/vector
-Content-Type: application/json
+**Visual Search** — `POST /api/search/visual` — multipart: `image` file, `workspace_id`, `limit` — response: `results` array (id, similarity_score, image_url)
 
-Body: {
-  embedding: [float],
-  workspace_id: "string",
-  limit: 10,
-  metric: "cosine"
-}
+**Material Search** — `POST /api/search/materials` — body: `query`, `filters` (material_type, color, texture), `limit` — response: `materials` array
 
-Response: { results: [{ id, similarity_score }] }
-```
+**Search Recommendations** — `GET /api/search/recommendations` — query params: `query`, `workspace_id` — response: `suggestions` array
 
-**Hybrid Search**
-```http
-POST /api/search/hybrid
-Content-Type: application/json
-
-Body: {
-  query: "string",
-  embedding: [float],
-  workspace_id: "string",
-  limit: 10,
-  semantic_weight: 0.5
-}
-
-Response: { results: [...] }
-```
-
-**Visual Search**
-```http
-POST /api/search/visual
-Content-Type: multipart/form-data
-
-Parameters:
-- image: Image file
-- workspace_id: string
-- limit: 10
-
-Response: { results: [{ id, similarity_score, image_url }] }
-```
-
-**Material Search**
-```http
-POST /api/search/materials
-Content-Type: application/json
-
-Body: {
-  query: "string",
-  filters: { material_type, color, texture },
-  limit: 10
-}
-
-Response: { materials: [...] }
-```
-
-**Search Recommendations**
-```http
-GET /api/search/recommendations
-
-Query Parameters:
-- query: string
-- workspace_id: string
-
-Response: { suggestions: [...] }
-```
-
-**Search Analytics**
-```http
-GET /api/analytics
-
-Query Parameters:
-- workspace_id: string
-- date_range: "7d" | "30d" | "90d"
-
-Response: { top_queries, search_volume, avg_response_time }
-```
+**Search Analytics** — `GET /api/analytics` — query params: `workspace_id`, `date_range` — response: `top_queries`, `search_volume`, `avg_response_time`
 
 ---
 
 ### 4. Image Analysis (6 endpoints)
 
-**Analyze Image**
-```http
-POST /api/images/analyze
-Content-Type: multipart/form-data
+**Analyze Image** — `POST /api/images/analyze` — multipart: `image` file, `analysis_type` — response: `materials`, `colors`, `textures`, `quality_score`
 
-Parameters:
-- image: Image file
-- analysis_type: "material" | "color" | "texture" | "all"
+**Batch Image Analysis** — `POST /api/images/analyze/batch` — multipart: multiple `images` — response: `results` array (image_id, analysis)
 
-Response: { materials, colors, textures, quality_score }
-```
+**Search Similar Images** — `POST /api/images/search` — multipart: `image` file, `limit` — response: `similar_images` array
 
-**Batch Image Analysis**
-```http
-POST /api/images/analyze/batch
-Content-Type: multipart/form-data
+**Upload & Analyze** — `POST /api/images/upload-and-analyze` — multipart — response: `image_id`, `url`, `analysis`
 
-Parameters:
-- images: Multiple image files
-
-Response: { results: [{ image_id, analysis }] }
-```
-
-**Search Similar Images**
-```http
-POST /api/images/search
-Content-Type: multipart/form-data
-
-Parameters:
-- image: Image file
-- limit: 10
-
-Response: { similar_images: [...] }
-```
-
-**Upload & Analyze**
-```http
-POST /api/images/upload-and-analyze
-Content-Type: multipart/form-data
-
-Response: { image_id, url, analysis }
-```
-
-**Re-classify Image** ✨ NEW
-```http
-POST /api/images/reclassify/{image_id}
-
-Parameters:
-- image_id: UUID of the image to re-classify
-- force_validation: boolean (optional) - Force validation with secondary model
-
-Response: {
-  success: true,
-  image_id: "uuid",
-  classification: {
-    is_material: true,
-    confidence: 0.85,
-    reason: "Shows ceramic tiles in close-up",
-    model: "qwen3-vl-8b"
-  },
-  updated_data: {
-    category: "product",
-    confidence: 0.85,
-    metadata: { ai_classification: {...} }
-  },
-  message: "Image re-classified as product"
-}
-```
+**Re-classify Image ✨ NEW** — `POST /api/images/reclassify/{image_id}` — params: `image_id`, `force_validation` (optional boolean) — response: `success`, `image_id`, `classification` (is_material, confidence, reason, model), `updated_data`, `message`
 
 ---
 
 ### 5. RAG System (7 endpoints)
 
-**Upload Document**
-```http
-POST /api/v1/rag/documents/upload
-Content-Type: multipart/form-data
+**Upload Document** — `POST /api/v1/rag/documents/upload` — multipart: `file`, `title`, `metadata` — response: `document_id`, `chunks_created`, `embeddings_generated`
 
-Parameters:
-- file: PDF file
-- title: string
-- metadata: JSON
+**Query RAG** — `POST /api/v1/rag/query` — body: `query`, `workspace_id`, `top_k` — response: `results` array (chunk_id, content, score)
 
-Response: { document_id, chunks_created, embeddings_generated }
-```
+**Chat with RAG** — `POST /api/v1/rag/chat` — body: `message`, `conversation_id`, `workspace_id` — response: `response`, `sources` array
 
-**Query RAG**
-```http
-POST /api/v1/rag/query
-Content-Type: application/json
+**Search RAG** — `POST /api/v1/rag/search` — body: `query`, `filters`, `limit` — response: `results` array
 
-Body: {
-  query: "string",
-  workspace_id: "string",
-  top_k: 5
-}
+**List RAG Documents** — `GET /api/v1/rag/documents` — query params: `workspace_id`, `limit` — response: `documents` array
 
-Response: { results: [{ chunk_id, content, score }] }
-```
+**RAG Health** — `GET /api/v1/rag/health` — response: `status`, `indices_count`, `memory_usage`
 
-**Chat with RAG**
-```http
-POST /api/v1/rag/chat
-Content-Type: application/json
-
-Body: {
-  message: "string",
-  conversation_id: "string",
-  workspace_id: "string"
-}
-
-Response: { response, sources: [...] }
-```
-
-**Search RAG**
-```http
-POST /api/v1/rag/search
-Content-Type: application/json
-
-Body: { query, filters, limit }
-
-Response: { results: [...] }
-```
-
-**List RAG Documents**
-```http
-GET /api/v1/rag/documents
-
-Query Parameters:
-- workspace_id: string
-- limit: 20
-
-Response: { documents: [...] }
-```
-
-**RAG Health**
-```http
-GET /api/v1/rag/health
-
-Response: { status, indices_count, memory_usage }
-```
-
-**RAG Statistics**
-```http
-GET /api/v1/rag/stats
-
-Response: { document_count, chunk_count, embedding_count }
-```
+**RAG Statistics** — `GET /api/v1/rag/stats` — response: `document_count`, `chunk_count`, `embedding_count`
 
 ---
 
 ### 6. Embeddings (3 endpoints)
 
-**Generate Embedding**
-```http
-POST /api/embeddings/generate
-Content-Type: application/json
+**Generate Embedding** — `POST /api/embeddings/generate` — body: `text` — response: `embedding` (float array), `dimension`
 
-Body: { text: "string" }
+**Batch Embeddings** — `POST /api/embeddings/batch` — body: `texts` (string array) — response: `embeddings` (array of float arrays)
 
-Response: { embedding: [float], dimension: 1536 }
-```
-
-**Batch Embeddings**
-```http
-POST /api/embeddings/batch
-Content-Type: application/json
-
-Body: { texts: ["string"] }
-
-Response: { embeddings: [[float]] }
-```
-
-**CLIP Embeddings**
-```http
-POST /api/embeddings/clip-generate
-Content-Type: multipart/form-data
-
-Parameters:
-- image: Image file
-- embedding_type: "visual" | "color" | "texture" | "application"
-
-Response: { embedding: [float], type, dimension }
-```
+**CLIP Embeddings** — `POST /api/embeddings/clip-generate` — multipart: `image` file, `embedding_type` — response: `embedding`, `type`, `dimension`
 
 ---
 
 ### 7. Products (6 endpoints)
 
-**Create Product**
-```http
-POST /api/products
-Content-Type: application/json
+**Create Product** — `POST /api/products` — body: `name`, `description`, `metafields`, `images`, `chunks` — response: `product_id`, `created_at`
 
-Body: {
-  name: "string",
-  description: "string",
-  metafields: {},
-  images: ["image_id"],
-  chunks: ["chunk_id"]
-}
+**Get Product** — `GET /api/products/{id}` — response: `id`, `name`, `description`, `metafields`, `images`, `chunks`
 
-Response: { product_id, created_at }
-```
+**Update Product** — `PATCH /api/products/{id}` — body: `name`, `description`, `metafields` — response: `success`, `updated_at`
 
-**Get Product**
-```http
-GET /api/products/{id}
+**Delete Product** — `DELETE /api/products/{id}` — response: `success`
 
-Response: { id, name, description, metafields, images, chunks }
-```
+**List Products** — `GET /api/products` — query params: `workspace_id`, `limit`, `offset` — response: `products` array, `total_count`
 
-**Update Product**
-```http
-PATCH /api/products/{id}
-Content-Type: application/json
-
-Body: { name, description, metafields }
-
-Response: { success, updated_at }
-```
-
-**Delete Product**
-```http
-DELETE /api/products/{id}
-
-Response: { success }
-```
-
-**List Products**
-```http
-GET /api/products
-
-Query Parameters:
-- workspace_id: string
-- limit: 50
-- offset: 0
-
-Response: { products: [...], total_count }
-```
-
-**Find Similar Products**
-```http
-GET /api/products/{id}/similar
-
-Query Parameters:
-- limit: 10
-
-Response: { similar_products: [...] }
-```
+**Find Similar Products** — `GET /api/products/{id}/similar` — query params: `limit` — response: `similar_products` array
 
 ---
 
 ### 8. Admin & Monitoring (8 endpoints)
 
-**Get Job Progress**
-```http
-GET /api/admin/jobs/{id}/progress
+**Get Job Progress** — `GET /api/admin/jobs/{id}/progress` — response: `job_id`, `status`, `progress_percent`, `current_stage`
 
-Response: { job_id, status, progress_percent, current_stage }
-```
+**Get Page Progress** — `GET /api/admin/jobs/{id}/progress/pages` — response: `pages` array (page_number, status, progress)
 
-**Get Page Progress**
-```http
-GET /api/admin/jobs/{id}/progress/pages
+**Stream Progress** — `GET /api/admin/jobs/{id}/progress/stream` — response: Server-Sent Events
 
-Response: { pages: [{ page_number, status, progress }] }
-```
+**Get Chunk Quality** — `GET /api/admin/chunks/quality` — query params: `workspace_id` — response: `chunks` array (id, quality_score, status)
 
-**Stream Progress**
-```http
-GET /api/admin/jobs/{id}/progress/stream
+**AI Metrics** — `GET /api/admin/ai-metrics` — response: `models_used`, `total_tokens`, `cost_estimate`, `processing_time`
 
-Response: Server-Sent Events
-```
+**System Health** — `GET /health` — response: `status`, `uptime`, `database`, `api_latency`
 
-**Get Chunk Quality**
-```http
-GET /api/admin/chunks/quality
+**Performance Metrics** — `GET /metrics` — response: `requests_per_second`, `avg_latency`, `error_rate`
 
-Query Parameters:
-- workspace_id: string
-
-Response: { chunks: [{ id, quality_score, status }] }
-```
-
-**AI Metrics**
-```http
-GET /api/admin/ai-metrics
-
-Response: {
-  models_used: [...],
-  total_tokens: number,
-  cost_estimate: number,
-  processing_time: number
-}
-```
-
-**System Health**
-```http
-GET /health
-
-Response: { status, uptime, database, api_latency }
-```
-
-**Performance Metrics**
-```http
-GET /metrics
-
-Response: { requests_per_second, avg_latency, error_rate }
-```
-
-**Performance Summary**
-```http
-GET /performance/summary
-
-Response: { summary_stats }
-```
+**Performance Summary** — `GET /performance/summary` — response: `summary_stats`
 
 ---
 
@@ -2915,42 +1385,17 @@ Response: { summary_stats }
 **Used In:** Docs Admin Page, Agentic queries
 **Flow:** Query entities → Apply filters → Return paginated results
 
-**Request:**
-```http
-GET /api/document-entities/?workspace_id={uuid}&entity_type=certificate&factory_name=Castellón Factory&limit=100&offset=0
+**Request:** `GET /api/document-entities/?workspace_id={uuid}&entity_type=certificate&factory_name=Castellón Factory&limit=100&offset=0`
 
-Query Parameters:
-- workspace_id: UUID (required)
-- entity_type: certificate | logo | specification | marketing | bank_statement (optional)
-- factory_name: Filter by factory name (optional)
-- factory_group: Filter by factory group (optional)
-- limit: Maximum results (default: 100)
-- offset: Pagination offset (default: 0)
-```
+**Query Parameters:**
+- `workspace_id` — UUID (required)
+- `entity_type` — certificate | logo | specification | marketing | bank_statement (optional)
+- `factory_name` — Filter by factory name (optional)
+- `factory_group` — Filter by factory group (optional)
+- `limit` — Maximum results (default: 100)
+- `offset` — Pagination offset (default: 0)
 
-**Response:**
-```json
-[
-  {
-    "id": "uuid",
-    "entity_type": "certificate",
-    "name": "ISO 9001:2015",
-    "description": "Quality Management System certification",
-    "page_range": [45, 46],
-    "factory_name": "Castellón Factory",
-    "factory_group": "Harmony Group",
-    "manufacturer": "Harmony Materials",
-    "metadata": {
-      "certificate_type": "quality_management",
-      "issue_date": "2024-01-15",
-      "expiry_date": "2027-01-15",
-      "certifying_body": "TÜV SÜD",
-      "standards": ["ISO 9001:2015"]
-    },
-    "created_at": "2024-01-15T10:30:00Z"
-  }
-]
-```
+**Response:** Array of entities with fields: `id`, `entity_type`, `name`, `description`, `page_range`, `factory_name`, `factory_group`, `manufacturer`, `metadata`, `created_at`
 
 **Database Operations:**
 - SELECT FROM document_entities WHERE workspace_id = ? AND entity_type = ? AND factory_name = ?
@@ -2969,24 +1414,9 @@ Query Parameters:
 **Used In:** Entity detail view, relationship management
 **Flow:** Fetch entity by ID → Return entity details
 
-**Request:**
-```http
-GET /api/document-entities/{entity_id}
-```
+**Request:** `GET /api/document-entities/{entity_id}`
 
-**Response:**
-```json
-{
-  "id": "uuid",
-  "entity_type": "certificate",
-  "name": "ISO 9001:2015",
-  "description": "Quality Management System certification",
-  "page_range": [45, 46],
-  "factory_name": "Castellón Factory",
-  "metadata": {...},
-  "created_at": "2024-01-15T10:30:00Z"
-}
-```
+**Response fields:** `id`, `entity_type`, `name`, `description`, `page_range`, `factory_name`, `metadata`, `created_at`
 
 **Database Operations:**
 - SELECT FROM document_entities WHERE id = ?
@@ -3001,27 +1431,12 @@ GET /api/document-entities/{entity_id}
 **Used In:** Product detail page, agentic queries
 **Flow:** Fetch product relationships → Get linked entities → Return entities
 
-**Request:**
-```http
-GET /api/document-entities/product/{product_id}?entity_type=certificate
+**Request:** `GET /api/document-entities/product/{product_id}?entity_type=certificate`
 
-Query Parameters:
-- entity_type: Filter by entity type (optional)
-```
+**Query Parameters:**
+- `entity_type` — Filter by entity type (optional)
 
-**Response:**
-```json
-[
-  {
-    "entity_type": "certificate",
-    "name": "ISO 9001:2015",
-    "description": "Quality Management System certification",
-    "page_range": [45, 46],
-    "factory_name": "Castellón Factory",
-    "metadata": {...}
-  }
-]
-```
+**Response:** Array of entities with fields: `entity_type`, `name`, `description`, `page_range`, `factory_name`, `metadata`
 
 **Database Operations:**
 - SELECT document_entities.* FROM product_document_relationships JOIN document_entities WHERE product_id = ?
@@ -3039,26 +1454,12 @@ Query Parameters:
 **Used In:** Factory-specific queries, compliance reports
 **Flow:** Query by factory name → Filter by entity type → Return entities
 
-**Request:**
-```http
-GET /api/document-entities/factory/Castellón Factory?entity_type=certificate
+**Request:** `GET /api/document-entities/factory/Castellón Factory?entity_type=certificate`
 
-Query Parameters:
-- entity_type: Filter by entity type (optional)
-```
+**Query Parameters:**
+- `entity_type` — Filter by entity type (optional)
 
-**Response:**
-```json
-[
-  {
-    "entity_type": "certificate",
-    "name": "ISO 9001:2015",
-    "factory_name": "Castellón Factory",
-    "factory_group": "Harmony Group",
-    "metadata": {...}
-  }
-]
-```
+**Response:** Array of entities with fields: `entity_type`, `name`, `factory_name`, `factory_group`, `metadata`
 
 **Database Operations:**
 - SELECT FROM document_entities WHERE factory_name = ? AND entity_type = ?
@@ -3076,28 +1477,9 @@ Query Parameters:
 **Used In:** Relationship management, linking visualization
 **Flow:** Fetch relationships → Return relationship details with scores
 
-**Request:**
-```http
-GET /api/document-entities/relationships/product/{product_id}
-```
+**Request:** `GET /api/document-entities/relationships/product/{product_id}`
 
-**Response:**
-```json
-[
-  {
-    "id": "uuid",
-    "product_id": "uuid",
-    "document_entity_id": "uuid",
-    "relationship_type": "certification",
-    "relevance_score": 0.95,
-    "metadata": {
-      "linking_method": "ai_discovery",
-      "confidence": 0.95
-    },
-    "created_at": "2024-01-15T10:30:00Z"
-  }
-]
-```
+**Response:** Array of relationships with fields: `id`, `product_id`, `document_entity_id`, `relationship_type`, `relevance_score`, `metadata` (linking_method, confidence), `created_at`
 
 **Database Operations:**
 - SELECT FROM product_document_relationships WHERE product_id = ?
@@ -3110,35 +1492,15 @@ GET /api/document-entities/relationships/product/{product_id}
 
 All endpoints require one of:
 
-1. **Supabase JWT** (Frontend)
-   ```
-   Authorization: Bearer {supabase_jwt_token}
-   ```
-
-2. **MIVAA JWT** (Internal)
-   ```
-   Authorization: Bearer {mivaa_jwt_token}
-   ```
-
-3. **API Key** (External)
-   ```
-   X-API-Key: {api_key}
-   ```
+1. **Supabase JWT** (Frontend) — `Authorization: Bearer {supabase_jwt_token}`
+2. **MIVAA JWT** (Internal) — `Authorization: Bearer {mivaa_jwt_token}`
+3. **API Key** (External) — `X-API-Key: {api_key}`
 
 ---
 
 ## 📊 Response Format
 
-All endpoints return JSON:
-
-```json
-{
-  "success": boolean,
-  "data": {},
-  "error": null,
-  "timestamp": "2025-10-31T12:00:00Z"
-}
-```
+All endpoints return JSON with fields: `success` (boolean), `data` (object), `error` (null or string), `timestamp`.
 
 ---
 
@@ -3160,32 +1522,9 @@ All endpoints return JSON:
 
 **Purpose:** Detect potential duplicates for a specific product
 
-**Request:**
-```json
-{
-  "product_id": "uuid",
-  "workspace_id": "uuid",
-  "similarity_threshold": 0.60
-}
-```
+**Request fields:** `product_id`, `workspace_id`, `similarity_threshold`
 
-**Response:**
-```json
-{
-  "success": true,
-  "product_id": "uuid",
-  "duplicates_found": 3,
-  "duplicates": [
-    {
-      "product_id": "uuid",
-      "name": "Product Name",
-      "factory": "Factory Name",
-      "overall_similarity": 0.92,
-      "confidence_level": "high"
-    }
-  ]
-}
-```
+**Response:** `success`, `product_id`, `duplicates_found`, `duplicates` array (product_id, name, factory, overall_similarity, confidence_level)
 
 ---
 
@@ -3193,24 +1532,9 @@ All endpoints return JSON:
 
 **Purpose:** Scan entire workspace for duplicate products
 
-**Request:**
-```json
-{
-  "workspace_id": "uuid",
-  "similarity_threshold": 0.75,
-  "limit": 1000
-}
-```
+**Request fields:** `workspace_id`, `similarity_threshold`, `limit`
 
-**Response:**
-```json
-{
-  "success": true,
-  "workspace_id": "uuid",
-  "duplicate_pairs_found": 15,
-  "duplicate_pairs": [...]
-}
-```
+**Response:** `success`, `workspace_id`, `duplicate_pairs_found`, `duplicate_pairs` array
 
 ---
 
@@ -3223,15 +1547,7 @@ All endpoints return JSON:
 - `status` (optional): 'pending', 'reviewed', 'merged', 'dismissed'
 - `min_similarity` (optional): default 0.60
 
-**Response:**
-```json
-{
-  "success": true,
-  "workspace_id": "uuid",
-  "cached_duplicates": 42,
-  "duplicates": [...]
-}
-```
+**Response:** `success`, `workspace_id`, `cached_duplicates`, `duplicates` array
 
 ---
 
@@ -3239,14 +1555,7 @@ All endpoints return JSON:
 
 **Purpose:** Update duplicate detection status
 
-**Request:**
-```json
-{
-  "cache_id": "uuid",
-  "status": "reviewed",
-  "user_id": "uuid"
-}
-```
+**Request fields:** `cache_id`, `status`, `user_id`
 
 **Valid Statuses:** 'pending', 'reviewed', 'merged', 'dismissed'
 
@@ -3256,28 +1565,9 @@ All endpoints return JSON:
 
 **Purpose:** Merge duplicate products into a single product
 
-**Request:**
-```json
-{
-  "target_product_id": "uuid",
-  "source_product_ids": ["uuid1", "uuid2"],
-  "workspace_id": "uuid",
-  "user_id": "uuid",
-  "merge_strategy": "manual",
-  "merge_reason": "Duplicate from same factory"
-}
-```
+**Request fields:** `target_product_id`, `source_product_ids`, `workspace_id`, `user_id`, `merge_strategy`, `merge_reason`
 
-**Response:**
-```json
-{
-  "success": true,
-  "history_id": "uuid",
-  "target_product": {...},
-  "merged_count": 2,
-  "message": "Successfully merged 2 products"
-}
-```
+**Response:** `success`, `history_id`, `target_product`, `merged_count`, `message`
 
 ---
 
@@ -3285,22 +1575,9 @@ All endpoints return JSON:
 
 **Purpose:** Undo a product merge operation
 
-**Request:**
-```json
-{
-  "history_id": "uuid",
-  "user_id": "uuid"
-}
-```
+**Request fields:** `history_id`, `user_id`
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Merge successfully undone",
-  "restored_products": 2
-}
-```
+**Response:** `success`, `message`, `restored_products`
 
 ---
 
@@ -3312,15 +1589,7 @@ All endpoints return JSON:
 - `workspace_id` (required)
 - `limit` (optional): default 50
 
-**Response:**
-```json
-{
-  "success": true,
-  "workspace_id": "uuid",
-  "merge_count": 12,
-  "merges": [...]
-}
-```
+**Response:** `success`, `workspace_id`, `merge_count`, `merges` array
 
 ---
 
@@ -3334,22 +1603,9 @@ All endpoints return JSON:
 
 **Purpose:** Start processing an import job (called by Edge Function)
 
-**Request:**
-```json
-{
-  "job_id": "uuid",
-  "workspace_id": "uuid"
-}
-```
+**Request fields:** `job_id`, `workspace_id`
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Import job processing started",
-  "job_id": "uuid"
-}
-```
+**Response:** `success`, `message`, `job_id`
 
 **Features:**
 - Background task processing
@@ -3374,24 +1630,7 @@ All endpoints return JSON:
 **Path Parameters:**
 - `job_id` (required): Import job ID
 
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "status": "processing",
-  "import_type": "xml",
-  "source_name": "Supplier Catalog",
-  "total_products": 100,
-  "processed_products": 45,
-  "failed_products": 2,
-  "progress_percentage": 45,
-  "current_stage": "downloading_images",
-  "started_at": "2025-11-10T10:00:00Z",
-  "completed_at": null,
-  "error_message": null,
-  "estimated_time_remaining": 120
-}
-```
+**Response fields:** `job_id`, `status`, `import_type`, `source_name`, `total_products`, `processed_products`, `failed_products`, `progress_percentage`, `current_stage`, `started_at`, `completed_at`, `error_message`, `estimated_time_remaining`
 
 **Status Values:**
 - `pending` - Job created, waiting to start
@@ -3411,35 +1650,13 @@ All endpoints return JSON:
 **Purpose:** Get import history for a workspace with pagination and filters
 
 **Query Parameters:**
-- `workspace_id` (required): Workspace ID
-- `page` (optional, default: 1): Page number
-- `page_size` (optional, default: 20): Items per page
-- `status` (optional): Filter by status (pending, processing, completed, failed)
-- `import_type` (optional): Filter by import type (xml, web_scraping)
+- `workspace_id` (required)
+- `page` (optional, default: 1)
+- `page_size` (optional, default: 20)
+- `status` (optional): pending, processing, completed, failed
+- `import_type` (optional): xml, web_scraping
 
-**Response:**
-```json
-{
-  "imports": [
-    {
-      "job_id": "uuid",
-      "import_type": "xml",
-      "source_name": "Supplier Catalog",
-      "status": "completed",
-      "total_products": 100,
-      "processed_products": 98,
-      "failed_products": 2,
-      "created_at": "2025-11-10T10:00:00Z",
-      "completed_at": "2025-11-10T10:15:00Z",
-      "is_scheduled": false,
-      "next_run_at": null
-    }
-  ],
-  "total_count": 50,
-  "page": 1,
-  "page_size": 20
-}
-```
+**Response:** `imports` array (job_id, import_type, source_name, status, total_products, processed_products, failed_products, created_at, completed_at, is_scheduled, next_run_at), `total_count`, `page`, `page_size`
 
 **Database Operations:**
 - Queries `data_import_jobs` table with filters
@@ -3452,22 +1669,7 @@ All endpoints return JSON:
 
 **Purpose:** Health check for data import API
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "data-import-api",
-  "version": "1.0.0",
-  "features": {
-    "xml_import": true,
-    "web_scraping": false,
-    "batch_processing": true,
-    "concurrent_image_downloads": true,
-    "checkpoint_recovery": true,
-    "real_time_progress": true
-  }
-}
-```
+**Response fields:** `status`, `service`, `version`, `features` (xml_import, web_scraping, batch_processing, concurrent_image_downloads, checkpoint_recovery, real_time_progress)
 
 **Features Status:**
 - ✅ `xml_import` - XML import with dynamic field mapping
@@ -3487,47 +1689,11 @@ All endpoints return JSON:
 
 **Hosted:** Supabase Edge Function (Deno)
 
-**Request:**
-```json
-{
-  "workspace_id": "uuid",
-  "category": "materials",
-  "xml_content": "base64_encoded_xml",
-  "preview_only": false,
-  "field_mappings": {
-    "name": "name",
-    "factory": "factory_name",
-    "category": "material_category"
-  },
-  "mapping_template_id": "uuid",
-  "parent_job_id": "uuid"
-}
-```
+**Request fields:** `workspace_id`, `category`, `xml_content` (base64 encoded), `preview_only`, `field_mappings`, `mapping_template_id`, `parent_job_id`
 
-**Response (Preview Mode):**
-```json
-{
-  "success": true,
-  "detected_fields": [
-    {
-      "xml_field": "ProductName",
-      "suggested_mapping": "name",
-      "confidence": 0.95,
-      "sample_values": ["Product A", "Product B"]
-    }
-  ],
-  "total_products": 10
-}
-```
+**Response (Preview Mode):** `success`, `detected_fields` array (xml_field, suggested_mapping, confidence, sample_values), `total_products`
 
-**Response (Import Mode):**
-```json
-{
-  "success": true,
-  "job_id": "uuid",
-  "total_products": 10
-}
-```
+**Response (Import Mode):** `success`, `job_id`, `total_products`
 
 **Features:**
 - XML parsing with field detection
@@ -3573,9 +1739,6 @@ All endpoints return JSON:
 - [Data Import System Documentation](data-import-system.md) - Complete guide to XML import and web scraping
 **API Version**: v1
 
-
-
-
 ---
 
 ---
@@ -3589,46 +1752,16 @@ All endpoints return JSON:
 
 ### Environment Variables (Supabase Secrets)
 
-```
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your_auth_token
-```
+Required secrets: `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN`
 
 ### 19.1 POST /functions/v1/messaging-api (action: send)
 
 **Purpose:** Send a single message via SMS or WhatsApp
 **Used In:** Test messages, transactional notifications, OTP delivery
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "send"`, `channel` (`sms` | `whatsapp`), `to` (phone number), `content`, `from` (optional), `messageType` (`transactional` | `marketing` | `otp` | `notification`), `variables` (for template rendering), `templateSlug` (optional), `mediaUrl` (optional), `tags` (optional), `whatsappContentSid` (optional, for WhatsApp pre-approved templates)
 
-{
-  "action": "send",
-  "channel": "sms" | "whatsapp",
-  "to": "+1234567890",
-  "content": "Your verification code is 123456",
-  "from": "+1987654321",  // Optional, uses default channel if not provided
-  "messageType": "transactional" | "marketing" | "otp" | "notification",
-  "variables": {"code": "123456"},  // For template rendering
-  "templateSlug": "otp-template",  // Optional template
-  "mediaUrl": "https://...",  // For MMS/rich messages
-  "tags": {"campaign": "welcome"},
-  // WhatsApp specific
-  "whatsappContentSid": "HXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"  // Twilio Content SID
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "messageId": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "logId": "log-uuid-abcde"
-}
-```
+**Response:** `success`, `messageId`, `logId`
 
 **Twilio API Endpoints Used:**
 - SMS: `POST /2010-04-01/Accounts/{AccountSid}/Messages.json`
@@ -3641,42 +1774,9 @@ Content-Type: application/json
 **Purpose:** Send messages to multiple recipients in bulk
 **Used In:** Marketing campaigns, mass notifications
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "send-bulk"`, `channel`, `recipients` (array of {to, variables}), `content`, `templateSlug` (optional), `messageType`, `from` (optional)
 
-{
-  "action": "send-bulk",
-  "channel": "sms",
-  "recipients": [
-    {"to": "+1234567890", "variables": {"name": "John"}},
-    {"to": "+0987654321", "variables": {"name": "Jane"}}
-  ],
-  "content": "Hello {{name}}, welcome to our service!",
-  "templateSlug": "welcome-template",
-  "messageType": "marketing",
-  "from": "+1987654321"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "bulkId": "bulk-uuid-12345",
-  "total": 100,
-  "sent": 95,
-  "failed": 3,
-  "optedOut": 2,
-  "results": [
-    {"to": "+1234567890", "status": "sent", "messageId": "msg-1"},
-    {"to": "+0987654321", "status": "failed", "error": "Invalid number"},
-    {"to": "+1111111111", "status": "opted_out", "error": "Recipient has opted out"}
-  ]
-}
-```
+**Response:** `success`, `bulkId`, `total`, `sent`, `failed`, `optedOut`, `results` array (to, status, messageId or error)
 
 ---
 
@@ -3685,38 +1785,9 @@ Content-Type: application/json
 **Purpose:** List all configured messaging channels
 **Used In:** Channel management UI, channel selection dropdowns
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "channels"`, `channelType` (optional filter: `sms` | `whatsapp`)
 
-{
-  "action": "channels",
-  "channelType": "sms"  // Optional filter: "sms" | "whatsapp"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "channels": [
-    {
-      "id": "uuid",
-      "channel_type": "sms",
-      "provider": "twilio",
-      "sender_id": "+1234567890",
-      "display_name": "Marketing SMS",
-      "is_active": true,
-      "is_default": true,
-      "daily_quota": 10000,
-      "max_send_rate": 100,
-      "config": {}
-    }
-  ]
-}
-```
+**Response:** `success`, `channels` array (id, channel_type, provider, sender_id, display_name, is_active, is_default, daily_quota, max_send_rate, config)
 
 **Database Table:** `messaging_channels`
 
@@ -3727,38 +1798,9 @@ Content-Type: application/json
 **Purpose:** List all messaging templates
 **Used In:** Template management UI, campaign creation
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "templates"`, `channelType` (optional filter)
 
-{
-  "action": "templates",
-  "channelType": "whatsapp"  // Optional filter
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "templates": [
-    {
-      "id": "uuid",
-      "name": "Order Confirmation",
-      "slug": "order-confirmation",
-      "channel_type": "whatsapp",
-      "content": "Hi {{name}}, your order #{{order_id}} has been confirmed.",
-      "variables": ["name", "order_id"],
-      "category": "transactional",
-      "whatsapp_template_name": "order_confirmation",
-      "is_approved": true,
-      "is_active": true
-    }
-  ]
-}
-```
+**Response:** `success`, `templates` array (id, name, slug, channel_type, content, variables, category, whatsapp_template_name, is_approved, is_active)
 
 **Database Table:** `messaging_templates`
 
@@ -3769,42 +1811,9 @@ Content-Type: application/json
 **Purpose:** Get message delivery logs with filtering
 **Used In:** Message logs tab, delivery tracking, debugging
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "logs"`, `channelType` (optional), `status` (optional: queued | sent | delivered | read | failed | rejected), `messageType` (optional), `limit`
 
-{
-  "action": "logs",
-  "channelType": "sms",  // Optional
-  "status": "delivered",  // Optional: queued|sent|delivered|read|failed|rejected
-  "messageType": "marketing",  // Optional
-  "limit": 50
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "logs": [
-    {
-      "id": "uuid",
-      "channel_type": "sms",
-      "provider_message_id": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "from_number": "+1234567890",
-      "to_number": "+0987654321",
-      "content": "Hello John!",
-      "status": "delivered",
-      "sent_at": "2025-01-15T10:30:00Z",
-      "delivered_at": "2025-01-15T10:30:05Z",
-      "cost": 0.0055,
-      "currency": "USD"
-    }
-  ]
-}
-```
+**Response:** `success`, `logs` array (id, channel_type, provider_message_id, from_number, to_number, content, status, sent_at, delivered_at, cost, currency)
 
 **Database Table:** `messaging_logs`
 
@@ -3815,39 +1824,9 @@ Content-Type: application/json
 **Purpose:** Get aggregated messaging analytics
 **Used In:** Analytics dashboard, reporting
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "analytics"`, `channelType` (optional), `dateRange` (start, end)
 
-{
-  "action": "analytics",
-  "channelType": "sms",  // Optional
-  "dateRange": {
-    "start": "2025-01-01",
-    "end": "2025-01-31"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "totalSent": 10000,
-  "totalDelivered": 9800,
-  "totalRead": 5000,  // WhatsApp only
-  "totalFailed": 200,
-  "totalCost": 55.00,
-  "deliveryRate": 98.0,
-  "readRate": 51.02,
-  "failureRate": 2.0,
-  "dailyData": [
-    {"date": "2025-01-15", "channel_type": "sms", "total_sent": 500, "total_delivered": 490}
-  ]
-}
-```
+**Response:** `success`, `totalSent`, `totalDelivered`, `totalRead` (WhatsApp only), `totalFailed`, `totalCost`, `deliveryRate`, `readRate`, `failureRate`, `dailyData` array
 
 **Database Table:** `messaging_analytics`
 
@@ -3858,25 +1837,9 @@ Content-Type: application/json
 **Purpose:** Get Twilio account balance
 **Used In:** Header balance display, billing monitoring
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "balance"`
 
-{
-  "action": "balance"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "balance": 150.50,
-  "currency": "USD"
-}
-```
+**Response:** `success`, `balance`, `currency`
 
 **Twilio API Endpoint:** `GET /2010-04-01/Accounts/{AccountSid}/Balance.json`
 
@@ -3887,34 +1850,9 @@ Content-Type: application/json
 **Purpose:** Sync senders/numbers from Twilio account to local database
 **Used In:** Channel sync button, initial setup
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "sync-senders"`, `autoImport` (boolean — set to true to automatically import to database)
 
-{
-  "action": "sync-senders",
-  "autoImport": true  // Set to true to automatically import to database
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "senders": {
-    "sms": [
-      {"sender_id": "+1234567890", "display_name": "Marketing", "status": "active"}
-    ],
-    "whatsapp": [
-      {"sender_id": "+1234567890", "display_name": "Business", "status": "active"}
-    ]
-  },
-  "total": 2,
-  "imported": true
-}
-```
+**Response:** `success`, `senders` (sms and whatsapp arrays with sender_id, display_name, status), `total`, `imported`
 
 **Twilio API Endpoints Used:**
 - Phone Numbers: `GET /2010-04-01/Accounts/{AccountSid}/IncomingPhoneNumbers.json`
@@ -3927,35 +1865,9 @@ Content-Type: application/json
 **Purpose:** Fetch WhatsApp templates from Twilio Content API
 **Used In:** WhatsApp template selection, template sync
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "whatsapp-templates"`
 
-{
-  "action": "whatsapp-templates"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "templates": [
-    {
-      "sid": "HXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-      "friendly_name": "order_confirmation",
-      "language": "en",
-      "types": {
-        "twilio/text": {
-          "body": "Hi {{1}}, your order {{2}} is confirmed."
-        }
-      }
-    }
-  ]
-}
-```
+**Response:** `success`, `templates` array (sid, friendly_name, language, types with body)
 
 **Twilio API Endpoint:** `GET /v1/Content` (Twilio Content API)
 
@@ -3966,26 +1878,9 @@ Content-Type: application/json
 **Purpose:** Send a test message for a campaign
 **Used In:** Campaign testing, preview verification
 
-**Request:**
-```http
-POST /functions/v1/messaging-api
-Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: application/json
+**Request fields:** `action: "send-test"`, `campaignId`, `testNumber`
 
-{
-  "action": "send-test",
-  "campaignId": "uuid",
-  "testNumber": "+1234567890"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "messageId": "msg-uuid-12345"
-}
-```
+**Response:** `success`, `messageId`
 
 ---
 
@@ -4007,72 +1902,13 @@ Content-Type: application/json
 
 ### Database Tables
 
-```sql
--- Messaging channels (SMS, WhatsApp senders)
-messaging_channels (
-  id UUID PRIMARY KEY,
-  channel_type TEXT NOT NULL,  -- 'sms' | 'whatsapp'
-  provider TEXT DEFAULT 'twilio',
-  sender_id TEXT NOT NULL,
-  display_name TEXT,
-  is_active BOOLEAN DEFAULT true,
-  is_default BOOLEAN DEFAULT false,
-  config JSONB DEFAULT '{}',  -- messaging_service_sid for WhatsApp
-  daily_quota INTEGER DEFAULT 10000,
-  max_send_rate INTEGER DEFAULT 100
-)
+The messaging system uses the following tables:
 
--- Messaging templates
-messaging_templates (
-  id UUID PRIMARY KEY,
-  name TEXT NOT NULL,
-  slug TEXT UNIQUE NOT NULL,
-  channel_type TEXT NOT NULL,
-  content TEXT NOT NULL,
-  variables TEXT[],
-  category TEXT DEFAULT 'marketing',
-  whatsapp_content_sid TEXT,  -- Twilio Content SID for approved templates
-  is_approved BOOLEAN DEFAULT false,
-  is_active BOOLEAN DEFAULT true
-)
-
--- Message logs
-messaging_logs (
-  id UUID PRIMARY KEY,
-  channel_type TEXT NOT NULL,
-  provider_message_id TEXT,  -- Twilio Message SID
-  from_number TEXT NOT NULL,
-  to_number TEXT NOT NULL,
-  content TEXT,
-  status TEXT DEFAULT 'queued',
-  sent_at TIMESTAMPTZ,
-  delivered_at TIMESTAMPTZ,
-  read_at TIMESTAMPTZ,
-  cost DECIMAL(10,4),
-  currency TEXT DEFAULT 'USD'
-)
-
--- Analytics (aggregated daily)
-messaging_analytics (
-  id UUID PRIMARY KEY,
-  date DATE NOT NULL,
-  channel_type TEXT NOT NULL,
-  total_sent INTEGER DEFAULT 0,
-  total_delivered INTEGER DEFAULT 0,
-  total_read INTEGER DEFAULT 0,
-  total_failed INTEGER DEFAULT 0,
-  total_cost DECIMAL(10,2) DEFAULT 0
-)
-
--- Opt-outs (compliance)
-messaging_optouts (
-  id UUID PRIMARY KEY,
-  phone_number TEXT NOT NULL,
-  channel_type TEXT NOT NULL,
-  source TEXT DEFAULT 'manual',
-  opted_out_at TIMESTAMPTZ DEFAULT NOW()
-)
-```
+- **`messaging_channels`** — Stores SMS and WhatsApp sender configurations (channel_type, provider, sender_id, display_name, is_active, is_default, config JSONB, daily_quota, max_send_rate)
+- **`messaging_templates`** — Message templates with variables (name, slug, channel_type, content, variables array, category, whatsapp_content_sid, is_approved, is_active)
+- **`messaging_logs`** — Per-message delivery records (channel_type, provider_message_id, from/to numbers, content, status, timestamps, cost, currency)
+- **`messaging_analytics`** — Daily aggregated analytics per channel (date, channel_type, total_sent, total_delivered, total_read, total_failed, total_cost)
+- **`messaging_optouts`** — Compliance opt-out records (phone_number, channel_type, source, opted_out_at)
 
 ---
 

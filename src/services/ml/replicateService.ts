@@ -635,6 +635,102 @@ export class ReplicateService extends BaseService<ReplicateServiceConfig> {
     }, 'cancelPrediction');
   }
 
+  /**
+   * Generate a pixel-level segmentation mask using Replicate SAM 2.
+   * Returns a base64 PNG mask (white = selected region, black = background).
+   * Falls back gracefully — callers should also try mivaaApi.generateSAMMask() for bbox masks.
+   */
+  async generateSAMMask(params: {
+    imageUrl: string;
+    bbox: [number, number, number, number]; // [x, y, w, h] normalized 0–1
+    imageWidth: number;
+    imageHeight: number;
+  }): Promise<string> {
+    return this.executeOperation(async () => {
+      // Convert normalized bbox to pixel coords for SAM input
+      const [nx, ny, nw, nh] = params.bbox;
+      const px1 = Math.round(nx * params.imageWidth);
+      const py1 = Math.round(ny * params.imageHeight);
+      const px2 = Math.round((nx + nw) * params.imageWidth);
+      const py2 = Math.round((ny + nh) * params.imageHeight);
+
+      const prediction = await this.createPrediction({
+        version: 'meta/sam-2:be9a8ff42d90c9258a97d9b3f4c13b2c7cd93bc4ad40a74b953e5c9c2b3e0f62',
+        input: {
+          image: params.imageUrl,
+          box_prompt: `${px1},${py1},${px2},${py2}`,
+          output_type: 'mask',
+        },
+      });
+
+      const result = await this.waitForCompletion(prediction.id);
+
+      if (result.status === 'failed') {
+        throw new Error(`SAM mask generation failed: ${result.error}`);
+      }
+
+      const maskUrl = Array.isArray(result.output) ? result.output[0] : result.output as string;
+      // Fetch mask image and convert to base64
+      const response = await fetch(maskUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      return base64;
+    }, 'generateSAMMask');
+  }
+
+  /**
+   * Inpaint a region of an image using FLUX Fill Pro.
+   * mask_base64: PNG where white = replace area, black = preserve area.
+   * Returns the Supabase Storage URL of the result (downloaded + re-uploaded by caller).
+   */
+  async inpaintRegion(params: {
+    imageUrl: string;
+    maskBase64: string;
+    prompt: string;
+    negativePrompt?: string;
+    model?: 'flux-fill-pro' | 'flux-fill-dev' | 'sd-inpainting';
+  }): Promise<string> {
+    return this.executeOperation(async () => {
+      const model = params.model ?? 'flux-fill-pro';
+      const negPrompt = params.negativePrompt
+        ?? 'blurry, artifacts, distorted, low quality, unrealistic, cartoon, illustration, collage edges';
+
+      const modelVersions: Record<string, string> = {
+        'flux-fill-pro': 'black-forest-labs/flux-fill-pro',
+        'flux-fill-dev': 'black-forest-labs/flux-fill-dev',
+        'sd-inpainting': 'stability-ai/stable-diffusion-inpainting',
+      };
+
+      const modelId = modelVersions[model];
+      const isFlux = model.startsWith('flux');
+
+      const prediction = await this.createPrediction({
+        // FLUX models use model string directly, not version hash
+        ...(isFlux ? { model: modelId } : { version: 'stability-ai/stable-diffusion-inpainting:95b7223104132402a9ae91cc677285bc5eb997834bd2349fa486f53910fd68b3' }),
+        input: {
+          image: params.imageUrl,
+          mask: `data:image/png;base64,${params.maskBase64}`,
+          prompt: params.prompt,
+          negative_prompt: negPrompt,
+          ...(isFlux ? {} : {
+            num_inference_steps: 50,
+            guidance_scale: 7.5,
+          }),
+        },
+      });
+
+      const result = await this.waitForCompletion(prediction.id);
+
+      if (result.status === 'failed') {
+        throw new Error(`Inpainting failed: ${result.error}`);
+      }
+
+      const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output as string;
+      if (!outputUrl) throw new Error('Inpainting returned no output URL');
+      return outputUrl;
+    }, 'inpaintRegion');
+  }
+
   // Private helper methods
 
   private async createPrediction(

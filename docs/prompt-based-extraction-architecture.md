@@ -31,22 +31,7 @@ Services use AI (Claude/GPT) to interpret data and extract information:
 
 ### 3. No Hardcoded Logic
 
-**❌ WRONG:**
-```python
-# Hardcoded patterns
-PATTERNS = {
-    'slip_resistance': [r'\bR11\b', r'\bR12\b'],
-    'fire_rating': [r'\bA1\b', r'\bA2\b']
-}
-```
-
-**✅ CORRECT:**
-```python
-# Load prompt from database
-prompt = load_prompt(stage='image_analysis', category='icon_metadata')
-# Use AI to interpret
-result = ai_extract(data, prompt)
-```
+The correct approach is to load prompts from the database and use AI to interpret data, rather than embedding hardcoded regex patterns or logic directly in the service code.
 
 ---
 
@@ -100,70 +85,11 @@ result = ai_extract(data, prompt)
 
 ### Step 1: Create Database Prompt
 
-```sql
-INSERT INTO prompts (
-  workspace_id,
-  prompt_type,
-  stage,
-  category,
-  name,
-  prompt_text,
-  status,
-  is_active,
-  version
-) VALUES (
-  'ffafc28b-1b8b-4b0d-b226-9f9a6154004e',
-  'extraction',
-  'entity_creation',
-  'my_category',
-  'My Extraction Name',
-  'Detailed AI instructions here...',
-  'active',
-  true,
-  1
-);
-```
+Insert a new record into the `prompts` table specifying the workspace ID, prompt type (`extraction`), stage, category, name, detailed AI instructions, status (`active`), active flag, and version number.
 
 ### Step 2: Create Service Class
 
-```python
-class MyExtractionService:
-    def __init__(self, workspace_id: str):
-        self.supabase = get_supabase_client()
-        self.workspace_id = workspace_id
-        self.ai_logger = AICallLogger()
-        self._load_prompt()
-    
-    def _load_prompt(self):
-        result = self.supabase.table('prompts') \\
-            .select('prompt_text') \\
-            .eq('workspace_id', self.workspace_id) \\
-            .eq('prompt_type', 'extraction') \\
-            .eq('stage', 'entity_creation') \\
-            .eq('category', 'my_category') \\
-            .eq('is_active', True) \\
-            .order('version', desc=True) \\
-            .limit(1) \\
-            .execute()
-        
-        self.prompt = result.data[0]['prompt_text'] if result.data else None
-    
-    async def extract(self, data):
-        # Build full prompt
-        full_prompt = f"{self.prompt}\\n\\nData:\\n{data}"
-        
-        # Call AI
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=2048,
-            messages=[{"role": "user", "content": full_prompt}]
-        )
-        
-        # Parse JSON response
-        result = json.loads(response.content[0].text)
-        return result
-```
+Create a service class that loads the prompt from the database on initialization, then calls the AI model with the combined prompt and data. Parse the structured JSON response returned by the AI.
 
 ### Step 3: Integrate into Pipeline
 
@@ -190,4 +116,3 @@ Prompts can be managed through:
 - API endpoints (future)
 
 All changes are tracked in `prompt_history` table.
-

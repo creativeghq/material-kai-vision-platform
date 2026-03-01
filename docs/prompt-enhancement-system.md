@@ -14,7 +14,6 @@ This system enables:
 
 ## Architecture
 
-```
 ┌─────────────────┐
 │  Agent Request  │  "Search for Nova"
 └────────┬────────┘
@@ -41,7 +40,6 @@ This system enables:
 ┌─────────────────┐
 │  Claude/GPT AI  │  Processes with full context
 └─────────────────┘
-```
 
 ---
 
@@ -49,13 +47,11 @@ This system enables:
 
 ### 1. Agent Sends Simple Prompt
 
-**Example Agent Requests:**
-```
-"extract products"
-"search for NOVA"
-"find certificates"
-"get all logos"
-```
+Agent requests are intentionally simple, such as:
+- "extract products"
+- "search for NOVA"
+- "find certificates"
+- "get all logos"
 
 ### 2. System Enhances Prompt
 
@@ -92,35 +88,12 @@ Claude/GPT receives the full, detailed prompt and returns comprehensive results.
 ### Database Schema
 
 **Table: `prompts`** (Unified table for all AI prompts)
-```sql
-CREATE TABLE prompts (
-    id UUID PRIMARY KEY,
-    workspace_id UUID NOT NULL,
-    prompt_type TEXT NOT NULL,  -- 'extraction', 'agent', etc.
-    stage TEXT,  -- 'discovery', 'chunking', 'image_analysis', 'entity_creation'
-    category TEXT NOT NULL,  -- 'products', 'certificates', 'logos', 'specifications'
-    name TEXT,
-    prompt_text TEXT NOT NULL,  -- The actual prompt template
-    system_prompt TEXT,  -- Optional system prompt
-    description TEXT,
-    quality_threshold FLOAT DEFAULT 0.7,
-    is_active BOOLEAN DEFAULT true,
-    is_custom BOOLEAN DEFAULT false,
-    version INTEGER DEFAULT 1,
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    created_by UUID,
-    updated_by UUID
-);
-```
+
+The table stores the following fields: id, workspace_id, prompt_type (e.g., 'extraction', 'agent'), stage (e.g., 'discovery', 'chunking', 'image_analysis', 'entity_creation'), category (e.g., 'products', 'certificates', 'logos', 'specifications'), name, prompt_text (the actual prompt template), system_prompt (optional), description, quality_threshold (default 0.7), is_active (default true), is_custom (default false), version (default 1), created_at, updated_at, created_by, and updated_by.
 
 ### Default Prompts
 
-Default prompts are seeded using:
-```bash
-cd mivaa-pdf-extractor
-python scripts/seed_default_prompts.py
-```
+Default prompts are seeded using a seed script located at `cd mivaa-pdf-extractor` then running `python scripts/seed_default_prompts.py`.
 
 **Default Prompts Include:**
 - `discovery/products` - Comprehensive product extraction
@@ -131,21 +104,8 @@ python scripts/seed_default_prompts.py
 ### Customizing Prompts
 
 **Via Admin API:**
-```bash
-# Get current prompt
-GET /api/admin/extraction-prompts/discovery/products
 
-# Update prompt
-PUT /api/admin/extraction-prompts/discovery/products
-{
-  "template": "Your custom prompt template...",
-  "quality_threshold": 0.8,
-  "description": "Updated for better accuracy"
-}
-
-# View history
-GET /api/admin/extraction-prompts/history/{prompt_id}
-```
+The admin API provides endpoints to get the current prompt for a given stage and category, update a prompt with a new template, quality threshold, and description, and view the version history for a prompt.
 
 **Via Admin Panel:**
 1. Navigate to Admin → Extraction Prompts
@@ -158,115 +118,15 @@ GET /api/admin/extraction-prompts/history/{prompt_id}
 
 ## Example: "Search for Nova"
 
-### Input
-```json
-{
-  "agent_prompt": "search for NOVA",
-  "categories": ["products"],
-  "workspace_id": "ffafc28b-1b8b-4b0d-b226-9f9a6154004e"
-}
-```
-
 ### Enhancement Process
 
-**Step 1: Parse Intent**
-```python
-{
-  "action": "search",
-  "target": "NOVA",
-  "category": "products",
-  "specificity": "high"
-}
-```
+**Step 1: Parse Intent** — The system identifies the action as "search", the target as "NOVA", the category as "products", and the specificity as "high".
 
-**Step 2: Load Admin Template**
-```
-Analyze this PDF catalog and identify ALL products with complete metadata.
+**Step 2: Load Admin Template** — The full admin template is retrieved from the database, containing detailed instructions for analyzing the PDF catalog and identifying all products with complete metadata.
 
-**REQUIRED INFORMATION:**
-- Product name and all variants
-- Page ranges where product appears
-- Designer/brand/studio information
-...
-```
+**Step 3: Add Context** — Workspace settings such as quality threshold and preferred models are combined with document context such as total page count and PDF preview text.
 
-**Step 3: Add Context**
-```python
-{
-  "workspace_settings": {
-    "quality_threshold": 0.7,
-    "preferred_models": ["claude-sonnet-4-5"]
-  },
-  "document_context": {
-    "total_pages": 52,
-    "pdf_preview": "HARMONY COLLECTION..."
-  }
-}
-```
-
-**Step 4: Build Enhanced Prompt**
-```
-You are analyzing a material/product catalog PDF with 52 pages.
-
-**USER REQUEST:** "search for NOVA"
-
-Your task is to identify and extract content across the following categories:
-
-**PRODUCTS:**
-Analyze this PDF catalog and identify ALL products with complete metadata.
-[Full admin template...]
-
-**SPECIAL HANDLING FOR USER REQUEST:**
-- User mentioned specific product name: "NOVA"
-- Prioritize finding this product
-- Provide comprehensive results with high confidence scores
-- Include all variants, dimensions, and metadata for NOVA
-
-**OUTPUT FORMAT (JSON):**
-{
-  "products": [
-    {
-      "name": "NOVA",
-      "designer": "...",
-      ...
-    }
-  ],
-  ...
-}
-
-**PDF CONTENT:**
-[First 50,000 characters of PDF text]
-
-Analyze the above content and return ONLY valid JSON...
-```
-
-### Output
-```json
-{
-  "products": [
-    {
-      "name": "NOVA",
-      "designer": "SG NY",
-      "studio": "SG NY",
-      "page_range": [12, 13, 14],
-      "dimensions": ["15×38", "20×40"],
-      "variants": [
-        {"type": "color", "value": "beige"},
-        {"type": "finish", "value": "matte"}
-      ],
-      "category": "tiles",
-      "metafields": {
-        "slip_resistance": "R11",
-        "fire_rating": "A1",
-        "thickness": "8mm"
-      },
-      "confidence": 0.95
-    }
-  ],
-  "total_products": 1,
-  "confidence_score": 0.95
-}
-```
+**Step 4: Build Enhanced Prompt** — The final prompt combines the user request, the full admin template instructions, special handling directives to prioritize finding the named product, the required JSON output format, and the PDF content.
 
 ---
 
@@ -274,51 +134,32 @@ Analyze the above content and return ONLY valid JSON...
 
 ### Upload with Agent Prompt
 
-```bash
-POST /api/rag/documents/upload
-Content-Type: multipart/form-data
-
-file: harmony.pdf
-categories: products
-agent_prompt: search for NOVA
-enable_prompt_enhancement: true
-workspace_id: ffafc28b-1b8b-4b0d-b226-9f9a6154004e
-```
+Send a multipart form upload to `POST /api/rag/documents/upload` including the PDF file, categories (e.g., "products"), agent_prompt (e.g., "search for NOVA"), enable_prompt_enhancement set to true, and workspace_id.
 
 ### Response
-```json
-{
-  "job_id": "abc-123",
-  "document_id": "doc-456",
-  "status": "processing",
-  "message": "Document upload started with products extraction",
-  "status_url": "/api/rag/documents/job/abc-123",
-  "categories": ["products"],
-  "discovery_model": "claude",
-  "prompt_enhancement_enabled": true
-}
-```
+
+The response includes a job_id, document_id, processing status, a status URL for polling, the categories being extracted, the discovery model being used, and a flag confirming prompt enhancement is enabled.
 
 ---
 
 ## Benefits
 
 ### For Admins
-✅ **Full Control**: Customize extraction prompts without code changes  
-✅ **Version History**: Track all prompt changes with audit trail  
-✅ **Quality Tuning**: Adjust quality thresholds per category  
-✅ **Testing**: Test prompts before deploying to production  
+✅ **Full Control**: Customize extraction prompts without code changes
+✅ **Version History**: Track all prompt changes with audit trail
+✅ **Quality Tuning**: Adjust quality thresholds per category
+✅ **Testing**: Test prompts before deploying to production
 
 ### For Agents
-✅ **Simplicity**: Send simple requests like "search for Nova"  
-✅ **Consistency**: Always get high-quality, detailed results  
-✅ **Flexibility**: No need to know extraction details  
+✅ **Simplicity**: Send simple requests like "search for Nova"
+✅ **Consistency**: Always get high-quality, detailed results
+✅ **Flexibility**: No need to know extraction details
 
 ### For System
-✅ **Maintainability**: Update prompts without code deployment  
-✅ **Scalability**: Easy to add new categories and stages  
-✅ **Quality**: Consistent extraction across all documents  
-✅ **Auditability**: Full history of prompt changes  
+✅ **Maintainability**: Update prompts without code deployment
+✅ **Scalability**: Easy to add new categories and stages
+✅ **Quality**: Consistent extraction across all documents
+✅ **Auditability**: Full history of prompt changes
 
 ---
 
@@ -331,18 +172,6 @@ workspace_id: ffafc28b-1b8b-4b0d-b226-9f9a6154004e
 3. **Set Quality Bars**: Define minimum confidence scores
 4. **Handle Edge Cases**: Account for variations in documents
 5. **Use Structured Output**: Request JSON for easy parsing
-
-### Testing Prompts
-
-```bash
-POST /api/admin/extraction-prompts/test
-{
-  "stage": "discovery",
-  "category": "products",
-  "template": "Your test prompt...",
-  "test_content": "Sample PDF text..."
-}
-```
 
 ### Monitoring Performance
 
@@ -362,4 +191,3 @@ The following enhancements are planned for future releases:
 - **Multi-Language Support**: Support for prompts in multiple languages for international documents
 - **Prompt Templates Marketplace**: Community-driven marketplace for sharing and discovering prompt templates
 - **AI-Assisted Prompt Generation**: Use AI to automatically generate and refine extraction prompts
-

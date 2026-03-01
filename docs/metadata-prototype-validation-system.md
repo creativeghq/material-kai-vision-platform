@@ -60,109 +60,17 @@ The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic m
    - Examples: `_custom_installation_time`, `_custom_warranty_years`, `_custom_special_coating`
    - Completely dynamic - no schema required
 
-**Storage Example**:
-```json
-{
-  "id": "prod-123",
-  "name": "NOVA Ceramic Tile",
-  "metadata": {
-    // Critical
-    "material_category": "ceramic_tile",
-    "factory_name": "Castellón Ceramics",
-
-    // Discovered (predefined categories)
-    "finish": "shiny",  // ❌ Inconsistent - should be "glossy"
-    "slip_resistance": "R11",
-    "color": "beige",
-    "dimensions": "15×38",
-
-    // Custom (discovered by AI, not in predefined list)
-    "_custom_installation_time": "2 hours",
-    "_custom_warranty_years": "10",
-    "_custom_special_coating": "anti-bacterial"
-  }
-}
-```
+**Storage Example**: Products have a `metadata` JSONB field containing critical fields (e.g., `material_category: "ceramic_tile"`, `factory_name: "Castellón Ceramics"`), discovered fields (e.g., `finish: "shiny"` — inconsistent, should be "glossy"), and custom fields with `_custom_` prefix. This illustrates the problem the validation system solves.
 
 ### How New System Enhances This (Non-Breaking)
 
-**MetadataPrototypeValidator** adds validation layer WITHOUT changing storage:
+**MetadataPrototypeValidator** adds a validation layer WITHOUT changing storage:
 
-1. **Check if property has prototypes**:
-   ```python
-   # Query material_properties table
-   property = await db.material_properties.get(property_key="finish")
+1. **Check if property has prototypes**: Query the `material_properties` table. If the property has `prototype_descriptions`, validate the extracted value against them. Otherwise, store as-is (custom metadata).
 
-   if property and property.prototype_descriptions:
-       # Property has prototypes → validate
-       validated_value = await validate_against_prototypes(
-           property_key="finish",
-           extracted_value="shiny",
-           prototype_embedding=property.text_embedding_512
-       )
-   else:
-       # No prototypes → store as-is (custom metadata)
-       validated_value = extracted_value
-   ```
+2. **Validate against prototypes** (if they exist): Generate a CLIP embedding for the extracted value, compare it to the prototype embedding using cosine similarity. If similarity exceeds 0.80, return the standardized prototype value with `validated: True` and the confidence score. Otherwise, keep the original with `validated: False`.
 
-2. **Validate against prototypes** (if they exist):
-   ```python
-   # Generate embedding for extracted value
-   value_embedding = await generate_clip_embedding("shiny")
-
-   # Compare to prototype embedding
-   similarity = cosine_similarity(value_embedding, prototype_embedding)
-
-   if similarity > 0.80:
-       # High confidence → use prototype value
-       return {
-           "value": "glossy",  # Standardized
-           "validated": True,
-           "confidence": 0.92,
-           "original_value": "shiny"
-       }
-   else:
-       # Low confidence → keep original
-       return {
-           "value": "shiny",
-           "validated": False,
-           "confidence": 0.65,
-           "original_value": "shiny"
-       }
-   ```
-
-3. **Track validation metadata**:
-   ```json
-   {
-     "metadata": {
-       // Validated properties (standardized)
-       "finish": "glossy",  // ✅ Validated: "shiny" → "glossy"
-       "slip_resistance": "R11",  // ✅ Validated: exact match
-
-       // Custom properties (no validation)
-       "_custom_installation_time": "2 hours",
-       "_custom_warranty_years": "10",
-
-       // Validation tracking
-       "_validation": {
-         "finish": {
-           "original_value": "shiny",
-           "validated_value": "glossy",
-           "confidence": 0.92,
-           "prototype_matched": true,
-           "timestamp": "2024-01-15T10:30:00Z"
-         },
-         "slip_resistance": {
-           "original_value": "R11",
-           "validated_value": "R11",
-           "confidence": 1.0,
-           "prototype_matched": true,
-           "timestamp": "2024-01-15T10:30:00Z"
-         }
-       }
-     }
-   }
-   ```
+3. **Track validation metadata**: The `metadata._validation` dictionary stores per-property validation details including `original_value`, `validated_value`, `confidence`, `prototype_matched`, and `timestamp`.
 
 **Key Benefits**:
 - Custom metadata still works (no validation required)
@@ -187,49 +95,12 @@ The **Metadata Prototype Validation System** enhances MIVAA's existing dynamic m
 
 #### Phase 1: Automatic Frequency Tracking
 
-Track all extracted values for each property:
-
-```sql
--- New table for tracking metadata value frequency
-CREATE TABLE metadata_value_frequency (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_key VARCHAR(100) NOT NULL,
-    extracted_value VARCHAR(500) NOT NULL,
-    frequency_count INT DEFAULT 1,
-    first_seen_at TIMESTAMP DEFAULT NOW(),
-    last_seen_at TIMESTAMP DEFAULT NOW(),
-    workspace_ids UUID[],  -- Which workspaces use this value
-    product_ids UUID[],    -- Which products have this value
-    validation_status VARCHAR(50) DEFAULT 'unvalidated',  -- 'validated', 'unvalidated', 'rejected'
-
-    UNIQUE(property_key, extracted_value)
-);
-
-CREATE INDEX idx_metadata_frequency_property ON metadata_value_frequency(property_key);
-CREATE INDEX idx_metadata_frequency_count ON metadata_value_frequency(frequency_count DESC);
-```
-
-**Automatic Updates**:
-```python
-# After metadata extraction, track frequency
-async def track_metadata_frequency(property_key: str, value: str, product_id: str, workspace_id: str):
-    await db.execute("""
-        INSERT INTO metadata_value_frequency (property_key, extracted_value, workspace_ids, product_ids)
-        VALUES ($1, $2, ARRAY[$3], ARRAY[$4])
-        ON CONFLICT (property_key, extracted_value)
-        DO UPDATE SET
-            frequency_count = metadata_value_frequency.frequency_count + 1,
-            last_seen_at = NOW(),
-            workspace_ids = array_append(metadata_value_frequency.workspace_ids, $3),
-            product_ids = array_append(metadata_value_frequency.product_ids, $4)
-    """, property_key, value, workspace_id, product_id)
-```
+Track all extracted values for each property using a `metadata_value_frequency` table with columns: `property_key`, `extracted_value`, `frequency_count`, `first_seen_at`, `last_seen_at`, `workspace_ids` (UUID array), `product_ids` (UUID array), and `validation_status` (unvalidated/validated/rejected). A unique constraint on `(property_key, extracted_value)` prevents duplicates. After each metadata extraction, an upsert increments the frequency count and appends the workspace and product IDs.
 
 #### Phase 2: Admin Review Dashboard
 
 **Admin Panel** (`/admin/metadata-prototypes`) shows:
 
-```
 ┌─────────────────────────────────────────────────────────────────┐
 │ Metadata Prototype Management                                   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -254,163 +125,16 @@ async def track_metadata_frequency(property_key: str, value: str, product_id: st
 │ └──────────────────────────────────────────────────────────┘   │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
-```
 
-**API Endpoint**:
-```python
-@router.get("/api/admin/metadata-prototypes/suggestions")
-async def get_prototype_suggestions(
-    property_key: Optional[str] = None,
-    min_frequency: int = 10
-):
-    """Get suggested prototype additions based on frequency analysis."""
-
-    # Query unvalidated values with high frequency
-    suggestions = await db.execute("""
-        SELECT
-            mf.property_key,
-            mf.extracted_value,
-            mf.frequency_count,
-            mf.product_ids,
-            mp.name as property_name,
-            mp.prototype_descriptions
-        FROM metadata_value_frequency mf
-        JOIN material_properties mp ON mp.property_key = mf.property_key
-        WHERE mf.frequency_count >= $1
-          AND mf.validation_status = 'unvalidated'
-          AND ($2 IS NULL OR mf.property_key = $2)
-        ORDER BY mf.frequency_count DESC
-    """, min_frequency, property_key)
-
-    # For each suggestion, calculate similarity to existing prototypes
-    enriched_suggestions = []
-    for suggestion in suggestions:
-        # Generate embedding for suggested value
-        value_embedding = await generate_clip_embedding(suggestion.extracted_value)
-
-        # Compare to existing prototypes
-        similarities = []
-        for prototype_value in suggestion.prototype_descriptions.keys():
-            prototype_embedding = await generate_clip_embedding(prototype_value)
-            similarity = cosine_similarity(value_embedding, prototype_embedding)
-            similarities.append({
-                "prototype": prototype_value,
-                "similarity": similarity
-            })
-
-        enriched_suggestions.append({
-            **suggestion,
-            "similar_prototypes": sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:3]
-        })
-
-    return enriched_suggestions
-```
+The API endpoint `GET /api/admin/metadata-prototypes/suggestions` queries unvalidated values with frequency >= a threshold, calculates CLIP embedding similarity against existing prototypes for each suggestion, and returns enriched suggestions ordered by frequency.
 
 #### Phase 3: Admin Actions
 
-**Action 1: Add as New Prototype**
-```python
-@router.post("/api/admin/metadata-prototypes/add")
-async def add_prototype_value(
-    property_key: str,
-    prototype_value: str,
-    variations: List[str]
-):
-    """Add new prototype value to property."""
+**Action 1: Add as New Prototype** — `POST /api/admin/metadata-prototypes/add` updates the `prototype_descriptions` JSONB on the `material_properties` row, regenerates the CLIP embedding for the property, marks the value as validated in the frequency table, and queues a re-validation job for all affected products.
 
-    # 1. Update material_properties.prototype_descriptions
-    await db.execute("""
-        UPDATE material_properties
-        SET prototype_descriptions = jsonb_set(
-            COALESCE(prototype_descriptions, '{}'::jsonb),
-            ARRAY[$2],
-            to_jsonb($3::text[])
-        ),
-        prototype_updated_at = NOW()
-        WHERE property_key = $1
-    """, property_key, prototype_value, variations)
+**Action 2: Merge with Existing** — `POST /api/admin/metadata-prototypes/merge` adds the extracted value as a variation of an existing prototype, regenerates the embedding, updates all products that had the extracted value to use the target prototype, and marks the value as validated.
 
-    # 2. Regenerate CLIP embedding for property
-    await regenerate_property_embedding(property_key)
-
-    # 3. Mark value as validated in frequency table
-    await db.execute("""
-        UPDATE metadata_value_frequency
-        SET validation_status = 'validated'
-        WHERE property_key = $1 AND extracted_value = $2
-    """, property_key, prototype_value)
-
-    # 4. Queue re-validation job for affected products
-    product_ids = await db.fetch_val("""
-        SELECT product_ids FROM metadata_value_frequency
-        WHERE property_key = $1 AND extracted_value = $2
-    """, property_key, prototype_value)
-
-    await queue_revalidation_job(property_key, product_ids)
-
-    return {"success": True, "products_queued": len(product_ids)}
-```
-
-**Action 2: Merge with Existing**
-```python
-@router.post("/api/admin/metadata-prototypes/merge")
-async def merge_with_existing(
-    property_key: str,
-    extracted_value: str,
-    target_prototype: str
-):
-    """Merge extracted value with existing prototype."""
-
-    # 1. Add extracted_value as variation of target_prototype
-    await db.execute("""
-        UPDATE material_properties
-        SET prototype_descriptions = jsonb_set(
-            prototype_descriptions,
-            ARRAY[$2],
-            (
-                SELECT jsonb_agg(elem)
-                FROM jsonb_array_elements_text(prototype_descriptions->$2) elem
-                UNION
-                SELECT to_jsonb($3::text)
-            )
-        ),
-        prototype_updated_at = NOW()
-        WHERE property_key = $1
-    """, property_key, target_prototype, extracted_value)
-
-    # 2. Regenerate embedding
-    await regenerate_property_embedding(property_key)
-
-    # 3. Update all products with extracted_value to use target_prototype
-    await db.execute("""
-        UPDATE products
-        SET metadata = jsonb_set(
-            metadata,
-            ARRAY[$1],
-            to_jsonb($2::text)
-        )
-        WHERE metadata->>$1 = $3
-    """, property_key, target_prototype, extracted_value)
-
-    # 4. Mark as validated
-    await db.execute("""
-        UPDATE metadata_value_frequency
-        SET validation_status = 'validated'
-        WHERE property_key = $1 AND extracted_value = $2
-    """, property_key, extracted_value)
-```
-
-**Action 3: Ignore**
-```python
-@router.post("/api/admin/metadata-prototypes/ignore")
-async def ignore_suggestion(property_key: str, extracted_value: str):
-    """Mark suggestion as rejected (won't show again)."""
-    await db.execute("""
-        UPDATE metadata_value_frequency
-        SET validation_status = 'rejected'
-        WHERE property_key = $1 AND extracted_value = $2
-    """, property_key, extracted_value)
-```
+**Action 3: Ignore** — `POST /api/admin/metadata-prototypes/ignore` marks the suggestion as rejected so it won't appear in the dashboard again.
 
 ---
 
@@ -422,70 +146,14 @@ async def ignore_suggestion(property_key: str, extracted_value: str):
 
 **Architecture**:
 
-1. **search_query_tracking** table tracks EVERY search:
-   ```sql
-   CREATE TABLE search_query_tracking (
-       id UUID PRIMARY KEY,
-       workspace_id UUID NOT NULL,
-       query_text TEXT,
-       query_metadata JSONB,  -- {"finish": "shiny", "material_type": "ceramic"}
-       search_type VARCHAR(50),
-       result_count INT,
-       zero_results BOOLEAN,  -- Flag for zero-result queries
+1. A `search_query_tracking` table records every search with: `workspace_id`, `query_text`, `query_metadata` (JSONB, e.g., `{"finish": "shiny"}`), `search_type`, `result_count`, `zero_results` flag, `searched_terms` array, `matched_terms` array (those that validated), `unmatched_terms` array (those that didn't), `validation_results` JSONB, and `response_time_ms`.
 
-       -- Track what matched vs what didn't
-       searched_terms TEXT[],   -- ["shiny", "ceramic"]
-       matched_terms TEXT[],    -- ["ceramic"] (validated)
-       unmatched_terms TEXT[],  -- ["shiny"] (not validated)
+2. An `unmatched_term_frequency` table aggregates patterns with: `term`, `property_key`, `frequency_count`, `workspace_ids`, `similar_prototypes` JSONB (e.g., `[{"prototype": "glossy", "similarity": 0.78}]`), and `review_status` (pending/approved/rejected).
 
-       validation_results JSONB,  -- Full validation details
-       response_time_ms INT
-   );
-   ```
-
-2. **unmatched_term_frequency** table aggregates patterns:
-   ```sql
-   CREATE TABLE unmatched_term_frequency (
-       id UUID PRIMARY KEY,
-       term TEXT NOT NULL,
-       property_key VARCHAR(100),
-       frequency_count INT,  -- How many times users searched this
-       workspace_ids UUID[],
-
-       -- Similarity to existing prototypes
-       similar_prototypes JSONB,  -- [{"prototype": "glossy", "similarity": 0.78}]
-
-       -- Admin review workflow
-       review_status VARCHAR(50) DEFAULT 'pending'
-   );
-   ```
-
-**How It Works**:
-
-```python
-# Automatic tracking in multi_vector_search (enabled by default)
-async def multi_vector_search(...):
-    # ... perform search ...
-
-    # Track query asynchronously
-    tracker = get_search_tracker()
-    await tracker.track_query(
-        workspace_id=workspace_id,
-        query_text=query,
-        query_metadata=material_filters,  # {"finish": "shiny"}
-        result_count=len(results)
-    )
-
-    # Tracker automatically:
-    # 1. Validates each filter term against prototypes
-    # 2. Identifies unmatched terms
-    # 3. Updates frequency counts
-    # 4. Flags zero-result queries
-```
+**How It Works**: The `multi_vector_search` function automatically tracks each query asynchronously. The tracker validates each filter term against prototypes, identifies unmatched terms, updates frequency counts, and flags zero-result queries.
 
 **Admin Dashboard** (`/admin/prototype-suggestions`):
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ Unmatched Terms Requiring Review                            │
 ├─────────────────────────────────────────────────────────────┤
@@ -506,7 +174,6 @@ async def multi_vector_search(...):
 │ └────────────────────────────────────────────────────────┘  │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
-```
 
 **Benefits**:
 - Identifies missing prototypes from real user behavior
@@ -520,85 +187,17 @@ async def multi_vector_search(...):
 
 **Answer**: YES - Enabled by default with automatic scoring boost.
 
-**Implementation**:
+**Implementation**: In `rag_service.py`, the `multi_vector_search` function automatically applies validation scoring when `material_filters` and results are both present. It loads the `MetadataPrototypeValidator`, calculates a metadata boost (up to +20% of the original score) for each result based on how well the product's validated metadata matches the query filters, and re-sorts results by their enhanced scores.
 
-```python
-# In rag_service.py (Direct Vector DB)
-async def multi_vector_search(...):
-    # ... execute vector search ...
-
-    # ENABLED BY DEFAULT - no flag needed
-    if material_filters and results:
-        validator = get_metadata_validator()
-        await validator.load_prototypes()
-
-        # Enhance each result with validation scoring
-        for result in results:
-            metadata_boost = await self._calculate_metadata_validation_boost(
-                product_metadata=result["metadata"],
-                query_filters=material_filters,
-                validator=validator
-            )
-
-            # Apply up to 20% score boost
-            result["score"] = result["score"] * (1.0 + metadata_boost * 0.2)
-
-        # Re-sort by enhanced scores
-        results.sort(key=lambda x: x["score"], reverse=True)
-```
-
-**Scoring Formula**:
-
-```python
-# For each query filter (e.g., {"finish": "shiny"})
-for filter_key, filter_value in query_filters.items():
-    product_value = product.metadata.get(filter_key)
-
-    if filter_key in validated_properties:
-        # Check if product has validation metadata
-        validation_info = product.metadata.get('_validation', {}).get(filter_key)
-
-        if validation_info.get('prototype_matched'):
-            # Both query and product are validated
-            if product_value == filter_value:
-                score += 1.0  # Exact match
-            else:
-                # Semantic similarity
-                similarity = cosine_similarity(
-                    embedding(filter_value),
-                    embedding(product_value)
-                )
-                if similarity > 0.70:
-                    score += similarity  # Partial match
-        else:
-            # Product not validated → penalty
-            if product_value == filter_value:
-                score += 0.8  # Exact match but unvalidated
-    else:
-        # No prototypes → exact match only
-        if product_value == filter_value:
-            score += 1.0
-
-# Normalize and apply boost
-metadata_boost = score / len(query_filters)
-final_score = original_score * (1.0 + metadata_boost * 0.2)
-```
+**Scoring Formula**: For each query filter field and value, the system checks whether the product has validation metadata. If both are validated and match the same prototype, the field scores 1.0. If they're different prototypes, cosine similarity determines a partial score (if > 0.70). Unvalidated product values receive an exact-match score of 0.8 or a fuzzy match with 0.8× penalty. Unvalidated properties use exact match only. The per-field scores are averaged and multiplied by 0.2 to produce the final boost factor.
 
 **Example**:
 
 Query: `{"finish": "shiny", "slip_resistance": "R-11"}`
 
-**Product A** (validated):
-- `finish: "glossy"` (validated from "shiny", confidence 0.92)
-- `slip_resistance: "R11"` (validated from "R-11", confidence 1.0)
-- **Metadata boost**: (0.92 + 1.0) / 2 = 0.96
-- **Final score**: 0.85 * 1.192 = **1.013** ✅
+**Product A** (validated): `finish: "glossy"` (validated from "shiny", confidence 0.92), `slip_resistance: "R11"` (validated from "R-11", confidence 1.0). Metadata boost: (0.92 + 1.0) / 2 = 0.96. Final score: 0.85 × 1.192 = **1.013** ✅
 
-**Product B** (unvalidated):
-- `finish: "shiny surface"` (not validated)
-- `slip_resistance: "R-11"` (not validated)
-- **Metadata boost**: 0.0
-- **Final score**: 0.85 * 1.0 = **0.85** ❌
+**Product B** (unvalidated): `finish: "shiny surface"`, `slip_resistance: "R-11"`. Metadata boost: 0.0. Final score: 0.85 × 1.0 = **0.85** ❌
 
 **Result**: Product A ranks 19% higher!
 
@@ -616,7 +215,6 @@ Query: `{"finish": "shiny", "slip_resistance": "R-11"}`
 
 **Flow**:
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ 1. AI Discovers New Metadata Field                          │
 ├─────────────────────────────────────────────────────────────┤
@@ -688,14 +286,9 @@ Query: `{"finish": "shiny", "slip_resistance": "R-11"}`
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │ Admin creates prototypes:                                    │
-│                                                              │
-│ UPDATE material_properties                                  │
-│ SET prototype_descriptions = {                              │
-│   "quick": ["1 hour", "fast", "quick install"],             │
-│   "standard": ["2 hours", "2-3 hours", "normal"],           │
+│   "quick": ["1 hour", "fast", "quick install"]              │
+│   "standard": ["2 hours", "2-3 hours", "normal"]            │
 │   "extended": ["3-4 hours", "4+ hours", "complex"]          │
-│ }                                                            │
-│ WHERE property_key = "_custom_installation_time"            │
 │                                                              │
 │ System generates 512D CLIP embeddings                       │
 │                                                              │
@@ -727,33 +320,19 @@ Query: `{"finish": "shiny", "slip_resistance": "R-11"}`
 │ - Consistent terminology                                    │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
-```
 
 **Key Points**:
 
-1. **Automatic Property Creation**:
-   - Every discovered field gets a `material_properties` entry
-   - No manual intervention needed
-   - Enables future prototype addition
+1. **Automatic Property Creation**: Every discovered field gets a `material_properties` entry. No manual intervention needed. Enables future prototype addition.
 
-2. **Graceful Degradation**:
-   - Properties without prototypes still work (exact match only)
-   - No validation errors or failures
-   - System remains functional
+2. **Graceful Degradation**: Properties without prototypes still work (exact match only). No validation errors or failures. System remains functional.
 
-3. **Progressive Enhancement**:
-   - Start with no prototypes (exact match)
-   - Add prototypes when patterns emerge
-   - Automatically upgrade to semantic matching
+3. **Progressive Enhancement**: Start with no prototypes (exact match), add prototypes when patterns emerge, automatically upgrade to semantic matching.
 
-4. **Data-Driven Workflow**:
-   - Frequency tracking identifies candidates
-   - Admin reviews and approves
-   - System learns from real usage
+4. **Data-Driven Workflow**: Frequency tracking identifies candidates, admin reviews and approves, system learns from real usage.
 
 **Example Timeline**:
 
-```
 Day 1:  AI discovers "_custom_warranty_years"
         → Auto-created in material_properties (no prototypes)
         → Stored as-is: "10 years", "5 years", "lifetime"
@@ -771,7 +350,6 @@ Day 31: Admin adds prototypes:
 Day 32: New extractions get validated:
         → "5-year warranty" → "standard" (confidence 0.95)
         → "decade coverage" → "extended" (confidence 0.88)
-```
 
 ---
 
@@ -779,7 +357,6 @@ Day 32: New extractions get validated:
 
 ### Integration with Existing System
 
-```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ EXISTING: PDF Processing Pipeline (UNCHANGED)                       │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -789,13 +366,7 @@ Day 32: New extractions get validated:
 │                                                                      │
 │  Stage 0B: Metadata Extraction (DynamicMetadataExtractor)           │
 │  └── Extract 200+ fields across 9 categories                        │
-│      Returns: {                                                      │
-│        "critical": {"material_category": "ceramic tile"},           │
-│        "discovered": {                                               │
-│          "material_properties": {"finish": "glossy"},                │
-│          "performance": {"slip_resistance": "R11"}                   │
-│        }                                                             │
-│      }                                                               │
+│      Returns critical metadata and discovered metadata              │
 │                                                                      │
 ├─────────────────────────────────────────────────────────────────────┤
 │ NEW: Prototype Validation Layer (ADDED)                             │
@@ -808,20 +379,12 @@ Day 32: New extractions get validated:
 │        1. Generate CLIP embedding for "glossy"                      │
 │        2. Compare to finish prototypes (glossy, matte, satin)       │
 │        3. Return best match with confidence                         │
-│      Output: {                                                       │
-│        "finish": {                                                   │
-│          "value": "glossy",                                          │
-│          "validated": true,                                          │
-│          "confidence": 0.94,                                         │
-│          "original": "glossy"                                        │
-│        }                                                             │
-│      }                                                               │
+│      Output: validated value, validated flag, confidence score      │
 │                                                                      │
 │  Stage 1-8: Continue as normal (UNCHANGED)                          │
 │  └── Image extraction, embeddings, chunking, etc.                   │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
-```
 
 ### Key Principle: **NON-BREAKING ADDITION**
 
@@ -866,15 +429,7 @@ Day 32: New extractions get validated:
 
 ### Current Search Scoring (Before Prototype Validation)
 
-```python
-# Multi-vector search scoring (rag_service.py)
-final_score = (
-    0.4 * text_similarity +      # Text embedding match
-    0.3 * visual_similarity +    # Image embedding match
-    0.2 * metadata_match +       # Exact metadata match
-    0.1 * confidence_score       # Extraction confidence
-)
-```
+The current scoring formula weights: 40% text similarity, 30% visual similarity, 20% metadata match (exact), 10% confidence score.
 
 **Problem**: Metadata matching is binary (exact match or no match)
 - "shiny" doesn't match "glossy" (even though they're semantically similar)
@@ -883,62 +438,9 @@ final_score = (
 
 ### Enhanced Scoring with Prototype Validation
 
-```python
-# Calculate metadata_prototype_match score
-metadata_prototype_match = 0.0
-validated_fields = 0
-total_query_fields = 0
+For each query filter field, the system checks whether the property has prototype validation. If so, and the product's value is prototype-matched, it scores 1.0 for an exact prototype match or a cosine similarity score (if > 0.70) for a different prototype. Unvalidated product values receive fuzzy match scores with a penalty. Properties without prototypes use exact match only. Scores are averaged across all query fields to produce `metadata_prototype_match`.
 
-for field, query_value in query_metadata.items():
-    total_query_fields += 1
-
-    # Check if this field has prototype validation
-    if field in VALIDATED_PROPERTIES:
-        product_value = product.metadata.get(field)
-        validation_info = product.metadata.get('_validation', {}).get(field, {})
-
-        if validation_info.get('prototype_matched'):
-            # Both query and product values are validated
-            # Check if they match the same prototype
-            if product_value == query_value:
-                # Exact match → full score
-                metadata_prototype_match += 1.0
-                validated_fields += 1
-            else:
-                # Different prototypes → check semantic similarity
-                query_embedding = await generate_clip_embedding(query_value)
-                product_embedding = await generate_clip_embedding(product_value)
-                similarity = cosine_similarity(query_embedding, product_embedding)
-
-                if similarity > 0.70:
-                    # Semantically similar → partial score
-                    metadata_prototype_match += similarity
-                    validated_fields += 1
-        else:
-            # Product value not validated → fuzzy match
-            similarity = fuzzy_match(query_value, product_value)
-            if similarity > 0.70:
-                metadata_prototype_match += similarity * 0.8  # Penalty for unvalidated
-                validated_fields += 1
-    else:
-        # No prototype validation → exact match only
-        if product.metadata.get(field) == query_value:
-            metadata_prototype_match += 1.0
-            validated_fields += 1
-
-# Normalize score
-if total_query_fields > 0:
-    metadata_prototype_match /= total_query_fields
-
-# New scoring formula
-final_score = (
-    0.3 * text_similarity +           # Reduced from 0.4
-    0.3 * visual_similarity +          # Same
-    0.2 * metadata_prototype_match +   # NEW - validated metadata boost
-    0.1 * metadata_match +             # Reduced from 0.2 - exact match fallback
-    0.1 * confidence_score             # Same
-)
-```
+The new scoring formula weights: 30% text similarity, 30% visual similarity, 20% metadata_prototype_match (NEW), 10% metadata_match (reduced, exact fallback), 10% confidence score.
 
 **Benefits**:
 1. **Semantic Matching**: "shiny" query finds "glossy" products (0.92 similarity)
@@ -950,63 +452,19 @@ final_score = (
 
 **Query**: `{"finish": "shiny", "slip_resistance": "R-11"}`
 
-**Product A** (validated metadata):
-```json
-{
-  "metadata": {
-    "finish": "glossy",  // Validated: "shiny" → "glossy" (0.92 similarity)
-    "slip_resistance": "R11",  // Validated: "R-11" → "R11" (1.0 similarity)
-    "_validation": {
-      "finish": {"prototype_matched": true, "confidence": 0.92},
-      "slip_resistance": {"prototype_matched": true, "confidence": 1.0}
-    }
-  }
-}
-```
-**Metadata Score**: `(0.92 + 1.0) / 2 = 0.96` ✅ High score
+**Product A** (validated metadata): `finish: "glossy"` validated from "shiny" at confidence 0.92, `slip_resistance: "R11"` validated from "R-11" at confidence 1.0. **Metadata Score**: (0.92 + 1.0) / 2 = 0.96 ✅ High score
 
-**Product B** (unvalidated metadata):
-```json
-{
-  "metadata": {
-    "finish": "shiny surface",  // Not validated
-    "slip_resistance": "R-11"   // Not validated
-  }
-}
-```
-**Metadata Score**: `(0.7 * 0.8 + 0.0) / 2 = 0.28` ❌ Low score
+**Product B** (unvalidated metadata): `finish: "shiny surface"` not validated, `slip_resistance: "R-11"` not validated. **Metadata Score**: approximately 0.28 ❌ Low score
 
 **Result**: Product A ranks significantly higher despite not having exact text match!
 
 ### Integration Points
 
-**1. Multi-Vector Search** (`rag_service.py`):
-```python
-# Add metadata_prototype_match to scoring
-results = await self._score_with_metadata_validation(
-    results=results,
-    query_metadata=filters.get('metadata', {}),
-    enable_prototype_matching=True  # Enabled by default
-)
-```
+**1. Multi-Vector Search** (`rag_service.py`): Results are scored using `_score_with_metadata_validation` with `enable_prototype_matching=True` (enabled by default).
 
-**2. Material Visual Search** (`material_visual_search_service.py`, line 411):
-```python
-# Use validated category for filtering
-validated_category = await validate_metadata_value(
-    property_key="material_type",
-    value=category_filter
-)
-products = await self._filter_by_category(validated_category)
-```
+**2. Material Visual Search** (`material_visual_search_service.py`, line 411): The category filter value is validated against prototypes before being used to filter products.
 
-**3. Semantic Search** (`rag_service.py`):
-```python
-# Boost results with validated metadata
-for result in results:
-    validation_boost = calculate_validation_boost(result.metadata)
-    result.score *= (1.0 + validation_boost * 0.2)  # Up to 20% boost
-```
+**3. Semantic Search** (`rag_service.py`): Each result's score is multiplied by `(1.0 + validation_boost * 0.2)` where `validation_boost` is calculated from the product's validation metadata.
 
 ---
 
@@ -1014,42 +472,14 @@ for result in results:
 
 ### material_properties Table (ENHANCED)
 
-**Existing Columns** (UNCHANGED):
-```sql
-id UUID PRIMARY KEY
-property_key VARCHAR UNIQUE  -- e.g., "material_type", "finish", "slip_resistance"
-name VARCHAR                  -- e.g., "Material Type", "Finish", "Slip Resistance"
-display_name VARCHAR
-description TEXT
-data_type VARCHAR             -- "string", "number", "enum", "boolean"
-validation_rules JSONB
-is_searchable BOOLEAN
-is_filterable BOOLEAN
-is_ai_extractable BOOLEAN
-```
+**Existing Columns** (UNCHANGED): `id`, `property_key` (unique), `name`, `display_name`, `description`, `data_type` (string/number/enum/boolean), `validation_rules` (JSONB), `is_searchable`, `is_filterable`, `is_ai_extractable`.
 
 **NEW Columns** (ADDED):
-```sql
--- Prototype validation columns
-prototype_descriptions TEXT[]        -- Array of 3-5 prototype descriptions per value
-text_embedding_512 VECTOR(512)      -- Averaged CLIP embedding for prototypes
-prototype_updated_at TIMESTAMP      -- Last update timestamp
+- `prototype_descriptions` — JSONB mapping value names to arrays of 3-5 prototype descriptions. For example, the "finish" property maps "glossy" to descriptions like "High gloss reflective surface, Polished shiny appearance, Mirror-like finish".
+- `text_embedding_512` — VECTOR(512) containing the averaged CLIP embedding for all prototypes of that property
+- `prototype_updated_at` — TIMESTAMP of last update
 
--- Example for "finish" property:
--- prototype_descriptions: {
---   "glossy": ["High gloss reflective surface", "Polished shiny appearance", "Mirror-like finish"],
---   "matte": ["Non-reflective flat surface", "No shine or gloss", "Flat appearance"],
---   "satin": ["Semi-gloss subtle sheen", "Soft luster finish", "Between matte and glossy"]
--- }
-```
-
-**Vector Index**:
-```sql
-CREATE INDEX idx_material_properties_embedding 
-ON material_properties 
-USING ivfflat (text_embedding_512 vector_cosine_ops) 
-WITH (lists = 100);
-```
+A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embedding_512` for fast similarity search.
 
 ---
 
@@ -1057,73 +487,13 @@ WITH (lists = 100);
 
 ### Step-by-Step Process
 
-**1. Qwen Extracts Free Text**
-```python
-llama_result = {
-    "materials_identified": ["ceramic tile with glossy finish"],
-    "properties": {
-        "finish": "glossy",
-        "pattern": "marble-like veining"
-    }
-}
-```
+**1. Qwen Extracts Free Text**: The vision model produces structured property values such as `finish: "glossy"` and `pattern: "marble-like veining"`.
 
-**2. Prototype Validator Processes Each Field**
-```python
-validator = MetadataPrototypeValidator()
+**2. Prototype Validator Processes Each Field**: The `MetadataPrototypeValidator.validate_property(property_key, extracted_value)` method is called for each field. It returns the best-matching prototype value, a `validated` boolean, a `confidence` score, and the similarity scores against all prototypes.
 
-# Validate "finish" property
-validated_finish = await validator.validate_property(
-    property_key="finish",
-    extracted_value="glossy"
-)
-# Returns: {
-#   "value": "glossy",
-#   "validated": True,
-#   "confidence": 0.94,
-#   "similarity_scores": {"glossy": 0.94, "matte": 0.12, "satin": 0.45}
-# }
-```
+**3. Validation Algorithm**: A CLIP embedding is generated for the extracted value. The property's prototypes are retrieved from the database. Cosine similarity is computed between the extracted embedding and each prototype embedding. The best match is selected; if its similarity exceeds 0.80, the prototype value is returned as validated, otherwise the original value is kept.
 
-**3. Validation Algorithm**
-```python
-# Generate CLIP embedding for extracted value
-extracted_embedding = generate_clip_embedding("glossy")  # 512D vector
-
-# Get property from database
-property = get_property("finish")
-
-# Compare against all prototype values
-similarities = {}
-for value_name, prototype_embedding in property.prototypes.items():
-    similarity = cosine_similarity(extracted_embedding, prototype_embedding)
-    similarities[value_name] = similarity
-
-# Get best match
-best_match = max(similarities.items(), key=lambda x: x[1])
-# Returns: ("glossy", 0.94)
-
-# Validate confidence threshold
-if best_match[1] >= 0.80:
-    return {"value": best_match[0], "validated": True, "confidence": best_match[1]}
-else:
-    return {"value": extracted_value, "validated": False, "confidence": best_match[1]}
-```
-
-**4. Store Validated Metadata**
-```python
-product.metadata = {
-    "material_type": "ceramic",      # Validated
-    "finish": "glossy",               # Validated
-    "slip_resistance": "R11",         # Validated
-    "pattern": "marble-like veining", # Free text (no prototype)
-    "_validation_metadata": {
-        "material_type": {"validated": True, "confidence": 0.92},
-        "finish": {"validated": True, "confidence": 0.94},
-        "slip_resistance": {"validated": True, "confidence": 0.96}
-    }
-}
-```
+**4. Store Validated Metadata**: The product metadata is saved with both validated values and a `_validation_metadata` dictionary tracking which properties were validated and at what confidence.
 
 ---
 
@@ -1131,43 +501,11 @@ product.metadata = {
 
 ### Enhanced Search Capabilities
 
-**1. Exact Metadata Filtering (EXISTING - UNCHANGED)**
-```python
-# Search for products with specific metadata
-POST /api/search/products
-{
-    "filters": {
-        "metadata.finish": "glossy",
-        "metadata.slip_resistance": "R11"
-    }
-}
-```
+**1. Exact Metadata Filtering (EXISTING - UNCHANGED)**: Search products by exact metadata values using `POST /api/search/products` with a `filters` object (e.g., `{"metadata.finish": "glossy", "metadata.slip_resistance": "R11"}`).
 
-**2. Semantic Metadata Search (NEW - ADDED)**
-```python
-# Search using natural language
-POST /api/search/products/semantic
-{
-    "query": "shiny ceramic tiles for wet areas",
-    "use_metadata_prototypes": true
-}
+**2. Semantic Metadata Search (NEW - ADDED)**: Search using natural language via `POST /api/search/products/semantic` with `use_metadata_prototypes: true`. The system generates CLIP embeddings for query terms (e.g., "shiny" → matches "glossy" prototype at 0.89), then boosts products whose validated metadata matches the inferred prototypes.
 
-# Process:
-# 1. Generate CLIP embedding for "shiny" → matches "glossy" prototype (0.89)
-# 2. Generate CLIP embedding for "wet areas" → matches "R11 slip resistance" (0.87)
-# 3. Boost products with validated metadata matching prototypes
-```
-
-**3. Metadata Similarity Scoring (NEW - ADDED)**
-```python
-# Rank products by metadata similarity
-search_score = (
-    0.4 * text_similarity +           # Existing
-    0.3 * visual_similarity +          # Existing
-    0.2 * metadata_prototype_match +   # NEW: Prototype similarity
-    0.1 * confidence_score             # Existing
-)
-```
+**3. Metadata Similarity Scoring (NEW - ADDED)**: The combined score formula now includes a 20% weight for `metadata_prototype_match` alongside text similarity (40%), visual similarity (30%), and confidence score (10%).
 
 ### Search Enhancement Benefits
 
@@ -1182,83 +520,11 @@ search_score = (
 
 ### Core Material Properties
 
-**material_type** (Primary classification)
-```python
-PROTOTYPES = {
-    "ceramic": [
-        "Ceramic tiles with glazed surface for interior applications",
-        "Porcelain ceramic with uniform texture and color patterns",
-        "Glazed ceramic tiles with smooth finish for residential use"
-    ],
-    "marble": [
-        "Natural marble stone with characteristic veining patterns",
-        "Polished marble with high gloss finish and natural variations",
-        "Marble slabs with unique patterns and premium appearance"
-    ],
-    "porcelain": [
-        "Porcelain tiles with high density and low water absorption",
-        "Vitrified porcelain with uniform color throughout the body",
-        "Porcelain stoneware for high-traffic commercial applications"
-    ],
-    "wood": [
-        "Natural wood with visible grain patterns and organic texture",
-        "Hardwood flooring with warm appearance and natural variations",
-        "Wood planks with authentic texture and natural characteristics"
-    ],
-    "granite": [
-        "Natural granite stone with speckled appearance and high durability",
-        "Polished granite with crystalline structure and premium finish",
-        "Granite slabs with natural variations and exceptional hardness"
-    ]
-}
-```
+**material_type** (Primary classification) has prototypes for: "ceramic" (glazed surfaces, interior applications), "marble" (natural stone with veining, polished high gloss), "porcelain" (high density, low water absorption, vitrified), "wood" (natural grain, hardwood flooring, organic texture), and "granite" (speckled appearance, crystalline structure, exceptional hardness). Each prototype value has 3 descriptive sentences for averaging.
 
-**finish** (Surface treatment)
-```python
-PROTOTYPES = {
-    "glossy": [
-        "High gloss reflective surface finish with mirror-like quality",
-        "Polished shiny appearance with maximum light reflection",
-        "Glossy coating with brilliant shine and reflective properties"
-    ],
-    "matte": [
-        "Non-reflective matte surface finish with flat appearance",
-        "Matte coating with no shine or gloss, low light reflection",
-        "Flat finish without sheen, ideal for hiding imperfections"
-    ],
-    "satin": [
-        "Semi-gloss satin finish with subtle sheen and soft luster",
-        "Satin coating between matte and glossy, elegant appearance",
-        "Soft sheen finish with moderate light reflection"
-    ]
-}
-```
+**finish** (Surface treatment) has prototypes for: "glossy" (high gloss reflective surface, mirror-like quality, brilliant shine), "matte" (non-reflective flat surface, no shine, ideal for hiding imperfections), and "satin" (semi-gloss with subtle sheen, between matte and glossy, soft luster).
 
-**slip_resistance** (Safety rating)
-```python
-PROTOTYPES = {
-    "R9": [
-        "Low slip resistance rating R9 suitable for dry interior areas",
-        "R9 classification for minimal slip protection in dry conditions",
-        "Basic slip resistance R9 for residential dry spaces"
-    ],
-    "R10": [
-        "Medium slip resistance rating R10 for wet areas and bathrooms",
-        "R10 classification for moderate slip protection in damp conditions",
-        "Standard slip resistance R10 for kitchens and wet rooms"
-    ],
-    "R11": [
-        "High slip resistance rating R11 for commercial wet areas",
-        "R11 classification for enhanced slip protection in wet conditions",
-        "Superior slip resistance R11 for high-traffic wet environments"
-    ],
-    "R12": [
-        "Very high slip resistance rating R12 for industrial applications",
-        "R12 classification for maximum slip protection in extreme conditions",
-        "Industrial-grade slip resistance R12 for outdoor wet areas"
-    ]
-}
-```
+**slip_resistance** (Safety rating) has prototypes for R9 (low, dry interior areas), R10 (medium, wet areas/bathrooms), R11 (high, commercial wet areas), and R12 (very high, industrial/outdoor). Each has 3 descriptive sentences.
 
 ---
 
@@ -1266,116 +532,27 @@ PROTOTYPES = {
 
 ### Database Schema
 
-The system adds prototype validation columns to the `material_properties` table:
-
-```sql
--- Add prototype columns
-ALTER TABLE material_properties
-ADD COLUMN prototype_descriptions JSONB DEFAULT '{}',  -- Store prototypes per value
-ADD COLUMN text_embedding_512 VECTOR(512),
-ADD COLUMN prototype_updated_at TIMESTAMP;
-
--- Create vector index
-CREATE INDEX idx_material_properties_embedding
-ON material_properties
-USING ivfflat (text_embedding_512 vector_cosine_ops)
-WITH (lists = 100);
-```
+Three new columns are added to `material_properties`: `prototype_descriptions` (JSONB, default `{}`), `text_embedding_512` (VECTOR(512)), and `prototype_updated_at` (TIMESTAMP). A vector index using `ivfflat` with `vector_cosine_ops` is created on `text_embedding_512`.
 
 ### Property Population
 
-The `material_properties` table is populated with 50+ meta fields organized into categories:
-
-- **Material Properties**: material_type, composition, texture, finish, pattern, weight, density
-- **Dimensions**: length, width, height, thickness, diameter, size
-- **Appearance**: color, color_code, gloss_level, sheen, transparency
-- **Performance**: slip_resistance, fire_rating, water_resistance, wear_rating
-- **Application**: recommended_use, installation_method, room_type, traffic_level
-- **Compliance**: certifications, standards, eco_friendly, sustainability_rating
-- **Design**: designer, studio, collection, series, aesthetic_style
-- **Manufacturing**: factory, manufacturer, country_of_origin
-- **Commercial**: pricing, availability, supplier, sku, warranty
+The `material_properties` table is populated with 50+ meta fields organized into categories: Material Properties, Dimensions, Appearance, Performance, Application, Compliance, Design, Manufacturing, and Commercial.
 
 ### Prototype Definitions
 
-The system uses a PROPERTY_PROTOTYPES dictionary with 3-5 descriptions per property value:
-
-```python
-PROPERTY_PROTOTYPES = {
-    "material_type": {
-        "ceramic": ["Ceramic tiles with glazed surface...", ...],
-        "marble": ["Natural marble stone with veining...", ...],
-        "porcelain": ["Porcelain tiles with high density...", ...]
-    },
-    "finish": {
-        "glossy": ["High gloss reflective surface...", ...],
-        "matte": ["Non-reflective flat surface...", ...],
-        "satin": ["Semi-gloss subtle sheen...", ...]
-    },
-    "slip_resistance": {
-        "R9": ["Low slip resistance rating R9...", ...],
-        "R10": ["Medium slip resistance rating R10...", ...],
-        "R11": ["High slip resistance rating R11...", ...]
-    }
-}
-```
+A `PROPERTY_PROTOTYPES` dictionary maps property keys to value names, each with 3-5 descriptive sentences. For example, `material_type` → `ceramic` → list of 3 descriptions. This dictionary is used to populate the database.
 
 ### Embedding Generation
 
-The system generates CLIP embeddings for all prototype values using averaged embeddings:
-
-```python
-for property_key, values in PROPERTY_PROTOTYPES.items():
-    for value_name, descriptions in values.items():
-        # Generate embeddings for all descriptions
-        embeddings = [generate_clip_embedding(desc) for desc in descriptions]
-        # Average embeddings
-        avg_embedding = np.mean(embeddings, axis=0)
-        # Store in database
-        update_property_prototype(property_key, value_name, descriptions, avg_embedding)
-```
+For each property/value combination, embeddings are generated for all descriptions and then averaged to produce a single representative embedding that is stored in the database.
 
 ### Validation Service
 
-The `MetadataPrototypeValidator` service provides validation logic:
-
-```python
-class MetadataPrototypeValidator:
-    async def validate_property(self, property_key: str, extracted_value: str) -> Dict
-    async def validate_metadata(self, metadata: Dict) -> Dict
-    async def get_property_prototypes(self, property_key: str) -> Dict
-```
-
-The validator:
-- Generates CLIP embedding for extracted values
-- Compares to all prototype embeddings for that property
-- Returns best match with confidence score
-- Uses confidence threshold (0.80 default)
-- Falls back to original value if confidence < threshold
+The `MetadataPrototypeValidator` class provides three main methods: `validate_property(property_key, extracted_value)` for single-field validation, `validate_metadata(metadata)` for batch validation, and `get_property_prototypes(property_key)` for inspection. The validator generates CLIP embeddings for extracted values, compares them against all prototype embeddings for the property, returns the best match with confidence, uses a 0.80 confidence threshold, and falls back to the original value if confidence is below threshold.
 
 ### Pipeline Integration
 
-The validation is integrated into the PDF processing pipeline after metadata extraction:
-
-```python
-# Extract metadata
-extracted = await metadata_extractor.extract_metadata(
-    pdf_text=product_text,
-    category_hint=category_hint
-)
-
-# Validate metadata
-validator = MetadataPrototypeValidator()
-validated = await validator.validate_metadata(extracted)
-
-# Merge with validation metadata
-enriched_metadata = {
-    **validated,  # Validated values
-    "_validation_metadata": {
-        # Store validation details
-    }
-}
-```
+After metadata extraction, the `MetadataPrototypeValidator` is called to validate the extracted values. The validated results are merged with validation tracking metadata before being stored in the database.
 
 ### Search Integration
 
@@ -1387,54 +564,7 @@ The system integrates prototype validation into all search endpoints:
 4. `/api/search/multimodal`
 5. `/api/search/material-visual`
 
-**Multi-Vector Search Enhancement**:
-
-```python
-# Prototype-based fuzzy matching
-if material_filters:
-    validator = MetadataPrototypeValidator()
-    for key, value in material_filters.items():
-        # Validate filter value against prototypes
-        validated = await validator.validate_property(key, value)
-
-        if validated['validated']:
-            # Use validated value for exact match
-            metadata_conditions.append(f"p.metadata->>'{key}' = '{validated['value']}'")
-
-            # ALSO match similar values (similarity > 0.7)
-            similar_values = validated.get('similar_values', [])
-            if similar_values:
-                similar_str = "', '".join(similar_values)
-                metadata_conditions.append(f"OR p.metadata->>'{key}' IN ('{similar_str}')")
-```
-
-**Scoring Enhancement**:
-
-```python
-# Add metadata validation score
-for result in results:
-    metadata_match_score = 0.0
-    if material_filters:
-        # Calculate how well product metadata matches validated filters
-        for key, filter_value in material_filters.items():
-            product_value = result['metadata'].get(key)
-            if product_value:
-                # Compare using prototype embeddings
-                similarity = await validator.compare_values(key, product_value, filter_value)
-                metadata_match_score += similarity
-        metadata_match_score /= len(material_filters)
-
-    # Update combined score with 10% weight for metadata validation
-    result['combined_score'] = (
-        text_weight * result['text_score'] +
-        visual_weight * result['visual_score'] +
-        color_weight * result['color_score'] +
-        texture_weight * result['texture_score'] +
-        style_weight * result['style_score'] +
-        material_weight * result['material_score'] +
-        0.10 * metadata_match_score
-    )
-```
+In multi-vector search, filter values are validated against prototypes before building SQL conditions, and similar values (similarity > 0.7) are also included in the match. The combined score is recalculated to include a 10% weight for the metadata validation match score.
 
 ---
 
@@ -1464,48 +594,11 @@ for result in results:
 
 ### Validation Endpoints (NEW)
 
-**Populate Property Prototypes**
-```bash
-POST /api/metadata/properties/populate-prototypes
-{
-    "property_key": "finish",  # Optional: specific property
-    "regenerate": false        # Optional: regenerate embeddings
-}
-```
+**Populate Property Prototypes** — `POST /api/metadata/properties/populate-prototypes` with optional `property_key` (specific property) and `regenerate` (boolean) fields.
 
-**Validate Metadata**
-```bash
-POST /api/metadata/validate
-{
-    "metadata": {
-        "finish": "glossy",
-        "slip_resistance": "R11"
-    }
-}
+**Validate Metadata** — `POST /api/metadata/validate` with a `metadata` object containing property key-value pairs. Returns a `validated_metadata` object where each field has `value`, `validated` (boolean), and `confidence`.
 
-Response:
-{
-    "validated_metadata": {
-        "finish": {"value": "glossy", "validated": true, "confidence": 0.94},
-        "slip_resistance": {"value": "R11", "validated": true, "confidence": 0.96}
-    }
-}
-```
-
-**Get Property Prototypes**
-```bash
-GET /api/metadata/properties/{property_key}/prototypes
-
-Response:
-{
-    "property_key": "finish",
-    "prototypes": {
-        "glossy": ["High gloss reflective surface", ...],
-        "matte": ["Non-reflective flat surface", ...],
-        "satin": ["Semi-gloss subtle sheen", ...]
-    }
-}
-```
+**Get Property Prototypes** — `GET /api/metadata/properties/{property_key}/prototypes` returns the property's `prototypes` dictionary mapping value names to their description arrays.
 
 ---
 
@@ -1516,6 +609,4 @@ Response:
 - **Fallback Logic**: If validation fails, original extracted value is preserved
 - **Admin Control**: Prototypes can be edited via admin panel
 - **Performance**: CLIP embedding generation cached, validation is fast (<100ms)
-
-
 

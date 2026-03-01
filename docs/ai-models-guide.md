@@ -45,22 +45,6 @@ Complete reference of all AI models used across the Material KAI Vision Platform
 - Validate product completeness
 - Generate product descriptions
 
-**Usage**:
-```python
-from anthropic import Anthropic
-
-client = Anthropic(api_key=ANTHROPIC_API_KEY)
-response = client.messages.create(
-    model="claude-sonnet-4-5",
-    max_tokens=8000,
-    temperature=0.1,
-    messages=[{
-        "role": "user",
-        "content": "Analyze this product catalog..."
-    }]
-)
-```
-
 **Performance**:
 - Accuracy: 95%+
 - Latency: 2-5 seconds
@@ -82,18 +66,6 @@ response = client.messages.create(
 - Quick product candidate identification
 - Basic metadata extraction
 - Real-time validation
-
-**Usage**:
-```python
-response = client.messages.create(
-    model="claude-haiku-4-5",
-    max_tokens=1000,
-    messages=[{
-        "role": "user",
-        "content": "Is this a product?"
-    }]
-)
-```
 
 **Performance**:
 - Accuracy: 92%+
@@ -117,20 +89,6 @@ response = client.messages.create(
 - Metadata extraction
 - Alternative to Claude
 
-**Usage**:
-```python
-import openai
-
-response = openai.ChatCompletion.create(
-    model="gpt-4o",
-    messages=[{
-        "role": "user",
-        "content": "Analyze this product catalog..."
-    }],
-    response_format={"type": "json_object"}
-)
-```
-
 **Performance**:
 - Accuracy: 94%+
 - Latency: 3-6 seconds
@@ -151,15 +109,6 @@ response = openai.ChatCompletion.create(
 - Convert text to 1536D vectors
 - Enable semantic similarity search
 - Fast embedding generation
-
-**Usage**:
-```python
-response = openai.Embedding.create(
-    model="text-embedding-3-small",
-    input="Material description text"
-)
-embedding = response['data'][0]['embedding']  # 1536D vector
-```
 
 **Performance**:
 - Dimension: 1536D
@@ -190,26 +139,6 @@ embedding = response['data'][0]['embedding']  # 1536D vector
 - Color and texture analysis
 - Image quality scoring
 - Multi-image reasoning
-
-**Usage**:
-```python
-import httpx
-
-async with httpx.AsyncClient() as client:
-    response = await client.post(
-        "https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud",
-        headers={
-            "Authorization": f"Bearer {QWEN_ENDPOINT_TOKEN}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "inputs": {
-                "text": "Analyze this material image...",
-                "image": image_base64
-            }
-        }
-    )
-```
 
 **Performance**:
 - Accuracy: State-of-the-art vision understanding
@@ -255,22 +184,6 @@ async with httpx.AsyncClient() as client:
 - Application-based search
 - Context understanding
 
-**Usage**:
-```python
-from PIL import Image
-import openai
-
-# Load image
-image = Image.open("material.jpg")
-
-# Generate visual embedding
-response = openai.Embedding.create(
-    model="text-embedding-3-small",
-    input="visual_embedding",
-    image=image
-)
-```
-
 **Performance**:
 - Dimension: 256D-1536D (varies)
 - Latency: 200-500ms per image
@@ -300,18 +213,6 @@ response = openai.Embedding.create(
 - **Hybrid**: Combination of both
 - **Layout-Aware**: Respect document layout
 
-**Usage**:
-```python
-from app.services.unified_chunking_service import UnifiedChunkingService
-
-chunker = UnifiedChunkingService()
-chunks = chunker.chunk_text(
-    text=document_text,
-    document_id="doc_1",
-    strategy="semantic"
-)
-```
-
 **Performance**:
 - Chunk quality: 0.85-0.95
 - Latency: 1-2 seconds per 10K chars
@@ -328,19 +229,6 @@ chunks = chunker.chunk_text(
 - 6-way parallel multi-vector search
 - Claude 4.5 synthesis (200K context)
 - Intelligent embedding fusion
-
-**Usage**:
-```python
-from app.services.rag_service import RAGService
-
-rag = RAGService()
-result = await rag.search(
-    query="What materials are available?",
-    strategy="multi_vector",
-    top_k=10
-)
-response = result['answer']  # Claude 4.5 synthesis
-```
 
 **Performance**:
 - Retrieval latency: 300-500ms (parallel execution)
@@ -381,27 +269,16 @@ response = result['answer']  # Claude 4.5 synthesis
 ## 🔐 API Keys & Configuration
 
 **Required Environment Variables**:
-```
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-VOYAGE_API_KEY=pa-...
-QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
-QWEN_ENDPOINT_TOKEN=hf_...
-SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
-SLIG_ENDPOINT_TOKEN=hf_...
-```
 
-**Configuration**:
-```python
-# models/config.py
-MODELS = {
-    "discovery": "claude-sonnet-4-5",
-    "validation": "claude-haiku-4-5",
-    "text_embeddings": "voyage-3.5",
-    "vision": "Qwen/Qwen3-VL-32B-Instruct",
-    "visual_embeddings": "SLIG"
-}
-```
+- `ANTHROPIC_API_KEY` — Anthropic Claude API key
+- `OPENAI_API_KEY` — OpenAI API key
+- `VOYAGE_API_KEY` — Voyage AI API key
+- `QWEN_ENDPOINT_URL` — HuggingFace Qwen endpoint URL
+- `QWEN_ENDPOINT_TOKEN` — HuggingFace endpoint token
+- `SLIG_ENDPOINT_URL` — HuggingFace SLIG endpoint URL
+- `SLIG_ENDPOINT_TOKEN` — HuggingFace SLIG endpoint token
+
+The model configuration maps each task to its designated model: `discovery` uses `claude-sonnet-4-5`, `validation` uses `claude-haiku-4-5`, `text_embeddings` uses `voyage-3.5`, `vision` uses `Qwen/Qwen3-VL-32B-Instruct`, and `visual_embeddings` uses `SLIG`.
 
 ---
 
@@ -437,19 +314,6 @@ MODELS = {
 - Superior semantic understanding vs OpenAI
 - Optimized for retrieval tasks
 - Better performance on domain-specific content
-
-**Usage**:
-```python
-import voyageai
-
-vo = voyageai.Client(api_key=VOYAGE_API_KEY)
-result = vo.embed(
-    texts=["Product description text..."],
-    model="voyage-3",
-    input_type="document"
-)
-embeddings = result.embeddings
-```
 
 **Performance**:
 - Dimensions: 1024D
@@ -487,26 +351,6 @@ embeddings = result.embeddings
   - Style-guided embeddings
 - Zero-shot classification (zero_shot mode)
 - Image-text similarity (similarity mode)
-
-**Usage**:
-```python
-from app.services.embeddings.slig_endpoint_manager import SLIGEndpointManager
-
-slig = SLIGEndpointManager(
-    endpoint_url=SLIG_ENDPOINT_URL,
-    token=SLIG_ENDPOINT_TOKEN,
-    endpoint_name="mh-siglip2",
-    namespace="basiliskan"
-)
-
-# Generate visual embedding
-visual_embedding = await slig.generate_image_embedding(image_base64)
-
-# Generate text-guided embedding
-color_embedding = await slig.generate_text_embedding(
-    text="focus on color palette and color relationships"
-)
-```
 
 **Performance**:
 - Dimensions: 768D (all embeddings)
@@ -571,4 +415,3 @@ color_embedding = await slig.generate_text_embedding(
 **Last Updated**: December 26, 2025
 **Version**: 2.0.0
 **Status**: Production
-

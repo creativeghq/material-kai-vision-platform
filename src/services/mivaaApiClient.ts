@@ -665,6 +665,47 @@ export class MivaaApiClient {
   }
 
   /**
+   * Generate a binary inpainting mask from an image zone hint.
+   * Returns a base64 PNG where white = replace area, black = keep area.
+   * Backend uses Pillow bbox masks (instant). For pixel-precise masks,
+   * call replicateService.generateSAMMask() first, then pass result to inpainting.
+   */
+  async generateSAMMask(payload: {
+    image_base64: string;
+    hint_type: 'bbox' | 'point';
+    bbox?: { x: number; y: number; w: number; h: number };
+    point?: { x: number; y: number; radius?: number };
+    image_width?: number;
+    image_height?: number;
+    workspace_id?: string;
+  }): Promise<MivaaApiResponse<{ mask_base64: string; mask_width: number; mask_height: number; method: string; confidence: number }>> {
+    return this.request('/api/segment/sam', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Replace a masked region in an image using FLUX Fill Pro (or other models).
+   * Mask must be a base64 PNG where white = replace area, black = keep.
+   * Returns a permanent Supabase Storage URL for the inpainted result.
+   */
+  async inpaintRegion(payload: {
+    image_url: string;
+    mask_base64: string;
+    prompt: string;
+    negative_prompt?: string;
+    model?: 'flux-fill-pro' | 'flux-fill-dev' | 'sd-inpainting';
+    job_id: string;
+    workspace_id?: string;
+  }): Promise<MivaaApiResponse<{ storage_url: string; replicate_url: string; model_used: string; processing_time_ms: number }>> {
+    return this.request('/api/segment/inpaint', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
    * Search for similar materials using an image crop (base64).
    * Uses multi_vector strategy for best results.
    */

@@ -130,27 +130,7 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
 
 **File**: `mivaa-pdf-extractor/app/services/embeddings/slig_client.py`
 
-**Cloud-Only Architecture** (HuggingFace Inference Endpoint):
-```python
-# SLIG Client - 4 modes: zero_shot, image_embedding, text_embedding, similarity
-async def get_image_embedding(image_url=None, image_data=None):
-    """Get 768D image embedding from SLIG endpoint"""
-    payload = {
-        "mode": "image_embedding",
-        "image": image_data or image_url
-    }
-    result = await client.post(endpoint_url, json=payload)
-    return result["embedding"]  # 768D vector
-
-# Specialized embeddings using similarity mode
-async def get_specialized_embedding(image_data, text_prompt):
-    """Create text-guided embeddings using similarity scoring"""
-    # 1. Get base image embedding (768D)
-    # 2. Get similarity score with text prompt
-    # 3. Get text embedding (768D)
-    # 4. Blend: weighted_emb = (blend_weight * image + (1-blend_weight) * text)
-    # 5. Normalize to unit vector
-```
+**Cloud-Only Architecture** (HuggingFace Inference Endpoint): The SLIG client supports 4 modes — `zero_shot`, `image_embedding`, `text_embedding`, and `similarity`. For general visual embeddings it uses `image_embedding` mode to retrieve a 768D vector. For specialized embeddings (color, texture, material, style), it uses the similarity mode: it obtains the base image embedding, scores it against a text prompt, retrieves the text embedding, and blends the two with weighted averaging before normalizing to a unit vector.
 
 **Benefits**:
 - ✅ No local model loading (faster startup, lower memory)
@@ -180,14 +160,7 @@ async def get_specialized_embedding(image_data, text_prompt):
 
 **File**: `mivaa-pdf-extractor/app/services/real_embeddings_service.py`
 
-**Usage**:
-```python
-response = await client.post(
-    "https://api.openai.com/v1/embeddings",
-    json={"input": text, "model": "text-embedding-3-small"}
-)
-embedding = response.json()["data"][0]["embedding"]  # 1536D
-```
+The service posts to `https://api.openai.com/v1/embeddings` with the model `text-embedding-3-small` and extracts the embedding vector from the response. This produces a 1536D text embedding used for chunk indexing and semantic search.
 
 **Purpose**:
 - Generate 1536D text embeddings for chunks
@@ -209,20 +182,7 @@ embedding = response.json()["data"][0]["embedding"]  # 1536D
 
 **File**: `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
-**Usage**:
-```python
-response = await client.post(
-    "https://api.together.xyz/v1/chat/completions",
-    json={
-        "model": "Qwen/Qwen3-VL-8B-Instruct",
-        "messages": [{"role": "user", "content": [
-            # CRITICAL: Text must come BEFORE image for Qwen models
-            {"type": "text", "text": analysis_prompt},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-        ]}]
-    }
-)
-```
+Requests are sent to the Together AI chat completions endpoint using the `Qwen/Qwen3-VL-8B-Instruct` model. The message structure requires the text prompt to appear **before** the image content block — this ordering is critical for Qwen models. The image is provided as a base64-encoded data URL.
 
 **Purpose**:
 - **Primary image analysis** for all product images
@@ -253,21 +213,7 @@ response = await client.post(
 
 **File**: `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
-**Usage**:
-```python
-client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-response = client.messages.create(
-    model="claude-sonnet-4-5",
-    max_tokens=4096,
-    messages=[{
-        "role": "user",
-        "content": [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_base64}},
-            {"type": "text", "text": validation_prompt}
-        ]
-    }]
-)
-```
+Uses the Anthropic Python client to call `claude-sonnet-4-5` with `max_tokens=4096`. The message includes an image block (base64 source, JPEG media type) followed by a text validation prompt.
 
 **Purpose**:
 - **Validation** of low-quality Qwen results
@@ -299,18 +245,7 @@ response = client.messages.create(
 - `mivaa-pdf-extractor/app/services/product_discovery_service.py`
 - `mivaa-pdf-extractor/app/services/rag_service.py` (Direct Vector DB)
 
-**Usage**:
-```python
-# Product Discovery
-response = await client.post(
-    "https://api.openai.com/v1/chat/completions",
-    json={"model": "gpt-5", "messages": [...]}
-)
-
-# Direct Vector DB RAG (Claude 4.5)
-from anthropic import Anthropic
-llm = OpenAI(model="gpt-4o", temperature=0.1)
-```
+GPT-5 is used for product discovery via the OpenAI chat completions endpoint. GPT-4o is available for Direct Vector DB RAG as the synthesis LLM.
 
 **Purpose**:
 - **Product Discovery**: Alternative to Claude for identifying products
@@ -332,15 +267,7 @@ llm = OpenAI(model="gpt-4o", temperature=0.1)
 
 **File**: `src/components/AI/AgentHub.tsx`
 
-**Usage**:
-```typescript
-const response = await supabase.functions.invoke('agent-chat', {
-  body: {
-    model: 'anthropic/claude-haiku-4-20250514',
-    messages: [...]
-  }
-});
-```
+The frontend invokes the `agent-chat` Supabase Edge Function with `model: 'anthropic/claude-haiku-4-20250514'` for fast agent responses.
 
 **Purpose**:
 - **Fast agent responses** in Agent Hub
@@ -361,18 +288,7 @@ const response = await supabase.functions.invoke('agent-chat', {
 
 **File**: `mivaa-pdf-extractor/app/services/rag_service.py`
 
-**Usage**:
-```python
-# 6 specialized CLIP embeddings for multi-vector search
-embeddings = {
-    'visual': 'SigLIP-SO400M (1152D)',
-    'color': 'CLIP specialized',
-    'texture': 'CLIP specialized',
-    'style': 'CLIP specialized',
-    'material': 'CLIP specialized',
-    'text': 'Voyage AI 3.5 (1024D)'
-}
-```
+The RAG service uses 6 specialized embedding collections for multi-vector search: `visual` (SigLIP-SO400M 1152D), `color`, `texture`, `style`, and `material` (all CLIP specialized), plus `text` (Voyage AI 3.5 1024D). These are queried in parallel for maximum retrieval accuracy.
 
 **Purpose**:
 - **Multi-vector semantic search** across 6 specialized dimensions
@@ -410,39 +326,11 @@ embeddings = {
 
 ### PDF Processing Pipeline
 
-```
-1. Product Discovery (Stage 1)
-   ├─ Default: Claude Sonnet 4.5
-   └─ Alternative: GPT-5
-
-2. OCR Filtering (Stage 2)
-   └─ SigLIP ViT-SO400M (only model)
-
-3. Image Analysis (Stage 6)
-   ├─ Primary: Qwen3-VL 17B Vision (ALL images)
-   └─ Validation: Claude 4.5 Sonnet (quality_score < 0.7)
-
-4. Visual Embeddings (Stage 7-10)
-   └─ SigLIP ViT-SO400M (only model)
-
-5. Text Embeddings (Stage 5)
-   └─ OpenAI text-embedding-3-small (only model)
-```
+Product Discovery (Stage 1): Default model is Claude Sonnet 4.5, with GPT-5 as an alternative. OCR Filtering (Stage 2) uses SigLIP ViT-SO400M as the only model. Image Analysis (Stage 6) uses Qwen3-VL 17B Vision for all images, with Claude 4.5 Sonnet used for validation when quality_score < 0.7. Visual Embeddings (Stages 7-10) use SigLIP ViT-SO400M as the only model. Text Embeddings (Stage 5) use OpenAI text-embedding-3-small as the only model.
 
 ### Search & Agents
 
-```
-1. Direct Vector DB RAG (Claude 4.5)
-   ├─ Text Embeddings: Voyage AI 3.5 (1024D)
-   ├─ Visual Embeddings: 6x CLIP specialized (multi-vector)
-   └─ LLM: Claude Sonnet 4.5 (200K context)
-
-2. Agent Hub (Mastra)
-   ├─ Default: Claude Sonnet 4.5
-   ├─ Fast: Claude Haiku 4.5
-   ├─ Advanced: GPT-5
-   └─ Cost-effective: Qwen3-VL 17B
-```
+Direct Vector DB RAG (Claude 4.5) uses Voyage AI 3.5 (1024D) for text embeddings, 6x CLIP specialized embeddings for multi-vector visual search, and Claude Sonnet 4.5 (200K context) for synthesis. The Agent Hub (Mastra) supports Claude Sonnet 4.5 as default, Claude Haiku 4.5 for fast responses, GPT-5 for advanced reasoning, and Qwen3-VL 17B as a cost-effective option.
 
 ---
 
@@ -517,4 +405,3 @@ embeddings = {
 
 **Last Updated**: 2025-01-17
 **Status**: ✅ Production Ready
-

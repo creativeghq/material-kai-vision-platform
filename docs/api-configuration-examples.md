@@ -27,13 +27,6 @@ All internal pipeline endpoints (`/api/internal/*`) accept an optional `ai_confi
 
 If you don't provide `ai_config`, the system uses these defaults:
 
-```json
-{
-  "job_id": "abc123",
-  "extracted_images": [...]
-}
-```
-
 **Defaults Used**:
 - Visual Embeddings: SLIG (SigLIP2) - HuggingFace endpoint (768D)
 - Classification: Qwen3-VL-32B-Instruct - HuggingFace endpoint
@@ -43,18 +36,7 @@ If you don't provide `ai_config`, the system uses these defaults:
 
 ### Custom Configuration
 
-Override specific models while keeping others as default:
-
-```json
-{
-  "job_id": "abc123",
-  "extracted_images": [...],
-  "ai_config": {
-    "classification_confidence_threshold": 0.8,
-    "discovery_model": "gpt-5"
-  }
-}
-```
+You can override specific models while keeping others as default by providing an `ai_config` object with only the fields you want to change.
 
 ---
 
@@ -64,47 +46,11 @@ Override specific models while keeping others as default:
 
 Best overall accuracy and reliability.
 
-```json
-{
-  "ai_config": {
-    "visual_embedding_model": "SLIG",
-    "visual_embedding_dimensions": 768,
-    "text_embedding_model": "voyage-3.5",
-    "text_embedding_dimensions": 1024,
-    "text_embedding_input_type": "document",
-    "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "classification_confidence_threshold": 0.7,
-    "discovery_model": "claude-sonnet-4-20250514",
-    "metadata_extraction_model": "claude",
-    "chunking_model": "gpt-4o",
-    "discovery_temperature": 0.1,
-    "classification_temperature": 0.1,
-    "metadata_temperature": 0.1,
-    "discovery_max_tokens": 4096,
-    "classification_max_tokens": 512,
-    "metadata_max_tokens": 4096
-  }
-}
-```
-
 **Use When**: You need the best balance of accuracy, reliability, and performance.
 
 ### 2. FAST_CONFIG (Speed Optimized)
 
 Faster processing with good accuracy.
-
-```json
-{
-  "ai_config": {
-    "discovery_model": "gpt-4o",
-    "classification_validation_model": "claude-haiku-4-20250514",
-    "metadata_extraction_model": "gpt",
-    "discovery_max_tokens": 2048,
-    "metadata_max_tokens": 2048
-  }
-}
-```
 
 **Use When**: You need faster processing times and can accept slightly lower accuracy.
 
@@ -117,19 +63,6 @@ Faster processing with good accuracy.
 
 Maximum accuracy for critical processing.
 
-```json
-{
-  "ai_config": {
-    "discovery_model": "gpt-5",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "metadata_extraction_model": "claude",
-    "classification_confidence_threshold": 0.8,
-    "discovery_max_tokens": 8192,
-    "metadata_max_tokens": 8192
-  }
-}
-```
-
 **Use When**: Accuracy is critical and processing time is not a concern.
 
 **Accuracy Improvements**:
@@ -140,19 +73,6 @@ Maximum accuracy for critical processing.
 ### 4. COST_OPTIMIZED_CONFIG (Budget Friendly)
 
 Minimize costs while maintaining acceptable quality.
-
-```json
-{
-  "ai_config": {
-    "discovery_model": "gpt-4o",
-    "classification_validation_model": "claude-haiku-4-20250514",
-    "metadata_extraction_model": "gpt",
-    "classification_confidence_threshold": 0.6,
-    "discovery_max_tokens": 2048,
-    "metadata_max_tokens": 2048
-  }
-}
-```
 
 **Use When**: You need to minimize API costs.
 
@@ -168,120 +88,17 @@ Minimize costs while maintaining acceptable quality.
 
 ### Endpoint 10: classify-images
 
-Customize image classification models and thresholds.
-
-```bash
-POST /api/internal/classify-images/abc123
-```
-
-```json
-{
-  "job_id": "abc123",
-  "extracted_images": [
-    {
-      "filename": "image1.jpg",
-      "path": "/tmp/image1.jpg",
-      "page_number": 5,
-      "width": 800,
-      "height": 600
-    }
-  ],
-  "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "classification_confidence_threshold": 0.75,
-    "classification_temperature": 0.1,
-    "classification_max_tokens": 512
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "material_images": [...],
-  "non_material_images": [...],
-  "total_classified": 100,
-  "material_count": 65,
-  "non_material_count": 35
-}
-```
-
----
+Customize image classification models and thresholds via the `ai_config` parameter.
 
 ### Endpoint 30: save-images-db
 
-Customize visual embedding models (SigLIP/CLIP).
-
-```bash
-POST /api/internal/save-images-db/abc123
-```
-
-```json
-{
-  "job_id": "abc123",
-  "material_images": [
-    {
-      "filename": "material1.jpg",
-      "storage_url": "https://...supabase.co/storage/v1/object/public/material-images/...",
-      "page_number": 5
-    }
-  ],
-  "document_id": "doc123",
-  "workspace_id": "ws123",
-  "ai_config": {
-    "visual_embedding_primary": "google/siglip-so400m-patch14-384",
-    "visual_embedding_fallback": "openai/clip-vit-base-patch32"
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "images_saved": 65,
-  "clip_embeddings_generated": 325
-}
-```
+Customize visual embedding models (SigLIP/CLIP) via the `ai_config` parameter.
 
 **Note**: 5 embeddings per image (visual, color, texture, style, material) = 65 × 5 = 325 total embeddings.
-
----
 
 ### Endpoint 40: extract-metadata
 
 Customize metadata extraction model and parameters.
-
-```bash
-POST /api/internal/extract-metadata/abc123
-```
-
-```json
-{
-  "job_id": "abc123",
-  "document_id": "doc123",
-  "product_ids": ["prod1", "prod2", "prod3"],
-  "pdf_text": "Full PDF text content...",
-  "ai_config": {
-    "metadata_extraction_model": "claude",
-    "metadata_temperature": 0.1,
-    "metadata_max_tokens": 4096
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "products_enriched": 3,
-  "metadata_fields_extracted": 42,
-  "extraction_method": "ai_dynamic_claude",
-  "model_used": "claude"
-}
-```
 
 **Metadata Fields Extracted**:
 - Dimensions (width, height, thickness)
@@ -292,41 +109,9 @@ POST /api/internal/extract-metadata/abc123
 - Certifications and standards
 - Designer/manufacturer info
 
----
-
 ### Endpoint 50: create-chunks
 
 Customize chunking and text embedding models.
-
-```bash
-POST /api/internal/create-chunks/abc123
-```
-
-```json
-{
-  "job_id": "abc123",
-  "document_id": "doc123",
-  "workspace_id": "ws123",
-  "extracted_text": "Full PDF text content...",
-  "product_ids": ["prod1", "prod2"],
-  "chunk_size": 1024,
-  "chunk_overlap": 128,
-  "ai_config": {
-    "text_embedding_model": "text-embedding-3-small",
-    "chunking_model": "gpt-4o"
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "chunks_created": 107,
-  "embeddings_generated": 107,
-  "relationships_created": 163
-}
-```
 
 ---
 
@@ -335,21 +120,6 @@ POST /api/internal/create-chunks/abc123
 ### High-Volume Processing
 
 For processing large batches of PDFs, optimize for speed and cost:
-
-```json
-{
-  "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
-    "classification_validation_model": "claude-haiku-4-20250514",
-    "classification_confidence_threshold": 0.65,
-    "discovery_model": "gpt-4o",
-    "metadata_extraction_model": "gpt",
-    "discovery_temperature": 0.2,
-    "discovery_max_tokens": 2048,
-    "metadata_max_tokens": 2048
-  }
-}
-```
 
 **Benefits**:
 - Lower threshold (0.65) = fewer validation calls
@@ -363,23 +133,6 @@ For processing large batches of PDFs, optimize for speed and cost:
 ### Premium Quality Processing
 
 For high-value catalogs requiring maximum accuracy:
-
-```json
-{
-  "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-8B-Instruct",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "classification_confidence_threshold": 0.85,
-    "discovery_model": "gpt-5",
-    "metadata_extraction_model": "claude",
-    "visual_embedding_primary": "google/siglip2-so400m-patch14-384",
-    "discovery_temperature": 0.05,
-    "metadata_temperature": 0.05,
-    "discovery_max_tokens": 8192,
-    "metadata_max_tokens": 8192
-  }
-}
-```
 
 **Benefits**:
 - GPT-5 for discovery = best accuracy
@@ -424,20 +177,6 @@ For high-value catalogs requiring maximum accuracy:
 
 ### Reduce Processing Time
 
-```json
-{
-  "ai_config": {
-    "classification_confidence_threshold": 0.6,
-    "discovery_model": "gpt-4o",
-    "metadata_extraction_model": "gpt",
-    "classification_validation_model": "claude-haiku-4-20250514",
-    "discovery_max_tokens": 1024,
-    "metadata_max_tokens": 1024,
-    "classification_max_tokens": 256
-  }
-}
-```
-
 **Speed Improvements**:
 - Lower threshold = fewer validation calls = faster
 - GPT-4o = 2x faster than Claude
@@ -446,19 +185,6 @@ For high-value catalogs requiring maximum accuracy:
 - **Estimated**: 40-50% faster processing
 
 ### Balance Speed and Quality
-
-```json
-{
-  "ai_config": {
-    "classification_confidence_threshold": 0.7,
-    "discovery_model": "claude-sonnet-4-20250514",
-    "metadata_extraction_model": "claude",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "discovery_max_tokens": 3072,
-    "metadata_max_tokens": 3072
-  }
-}
-```
 
 **Benefits**:
 - Standard threshold (0.7) = good balance
@@ -472,37 +198,7 @@ For high-value catalogs requiring maximum accuracy:
 
 ### A/B Testing Example
 
-Test two configurations side-by-side:
-
-**Configuration A (Speed)**:
-```bash
-curl -X POST https://v1api.materialshub.gr/api/internal/classify-images/job_a \
-  -H "Content-Type: application/json" \
-  -d '{
-    "job_id": "job_a",
-    "extracted_images": [...],
-    "ai_config": {
-      "classification_confidence_threshold": 0.6,
-      "classification_validation_model": "claude-haiku-4-20250514"
-    }
-  }'
-```
-
-**Configuration B (Quality)**:
-```bash
-curl -X POST https://v1api.materialshub.gr/api/internal/classify-images/job_b \
-  -H "Content-Type: application/json" \
-  -d '{
-    "job_id": "job_b",
-    "extracted_images": [...],
-    "ai_config": {
-      "classification_confidence_threshold": 0.8,
-      "classification_validation_model": "claude-sonnet-4-20250514"
-    }
-  }'
-```
-
-Compare results to find the best configuration for your use case.
+Test two configurations side-by-side by submitting separate jobs with different `ai_config` values. Compare results to find the best configuration for your use case.
 
 ---
 
@@ -533,62 +229,25 @@ Compare results to find the best configuration for your use case.
 
 **Problem**: Too many false positives/negatives in image classification.
 
-**Solution**: Increase confidence threshold and use Claude Sonnet for validation:
-```json
-{
-  "ai_config": {
-    "classification_confidence_threshold": 0.8,
-    "classification_validation_model": "claude-sonnet-4-20250514"
-  }
-}
-```
+**Solution**: Increase confidence threshold and use Claude Sonnet for validation by setting `classification_confidence_threshold` to 0.8 and `classification_validation_model` to `claude-sonnet-4-20250514` in your `ai_config`.
 
 ### Slow Processing
 
 **Problem**: Pipeline takes too long to complete.
 
-**Solution**: Use FAST_CONFIG or reduce max tokens:
-```json
-{
-  "ai_config": {
-    "discovery_model": "gpt-4o",
-    "classification_validation_model": "claude-haiku-4-20250514",
-    "discovery_max_tokens": 2048,
-    "metadata_max_tokens": 2048
-  }
-}
-```
+**Solution**: Use FAST_CONFIG or reduce max tokens by switching to `gpt-4o` for discovery, `claude-haiku-4-20250514` for validation, and reducing `discovery_max_tokens` and `metadata_max_tokens` to 2048.
 
 ### High API Costs
 
 **Problem**: API costs are too high.
 
-**Solution**: Use COST_OPTIMIZED_CONFIG or lower threshold:
-```json
-{
-  "ai_config": {
-    "classification_confidence_threshold": 0.6,
-    "discovery_model": "gpt-4o",
-    "metadata_extraction_model": "gpt",
-    "classification_validation_model": "claude-haiku-4-20250514"
-  }
-}
-```
+**Solution**: Use COST_OPTIMIZED_CONFIG or lower threshold by reducing `classification_confidence_threshold` to 0.6, switching to `gpt-4o` for discovery, `gpt` for metadata extraction, and `claude-haiku-4-20250514` for validation.
 
 ### Poor Metadata Quality
 
 **Problem**: Extracted metadata is incomplete or inaccurate.
 
-**Solution**: Use Claude with higher max tokens:
-```json
-{
-  "ai_config": {
-    "metadata_extraction_model": "claude",
-    "metadata_temperature": 0.05,
-    "metadata_max_tokens": 8192
-  }
-}
-```
+**Solution**: Use Claude with higher max tokens by setting `metadata_extraction_model` to `claude`, `metadata_temperature` to 0.05, and `metadata_max_tokens` to 8192.
 
 ---
 
@@ -601,7 +260,4 @@ The dynamic AI model configuration system gives you complete control over the PD
 - **Cost First**: COST_OPTIMIZED_CONFIG
 - **Balanced**: DEFAULT_AI_CONFIG
 
-All configurations are production-ready and tested with the NOVA end-to-end test script
-```
-
-
+All configurations are production-ready and tested with the NOVA end-to-end test script.

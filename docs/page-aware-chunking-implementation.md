@@ -44,16 +44,8 @@ This document describes the implementation of page-aware chunking system that pr
 ### 2. RAGService (`mivaa-pdf-extractor/app/services/rag_service.py`)
 
 #### Updated Method: `index_pdf_content()`
-- **Old Behavior**: 
-  ```python
-  markdown_text = pymupdf4llm.to_markdown(tmp_path)
-  chunks = await chunking_service.chunk_text(text=markdown_text, ...)
-  ```
-- **New Behavior**:
-  ```python
-  pages = pymupdf4llm.to_markdown(tmp_path, page_chunks=True)
-  chunks = await chunking_service.chunk_pages(pages=pages, ...)
-  ```
+- **Old Behavior**: Called `pymupdf4llm.to_markdown(tmp_path)` returning a single markdown string, then chunked it without page awareness
+- **New Behavior**: Calls `pymupdf4llm.to_markdown(tmp_path, page_chunks=True)` returning a list of page dicts, then calls `chunking_service.chunk_pages(pages=pages, ...)`
 - **Benefits**:
   - Preserves page metadata from PyMuPDF4LLM
   - Each chunk knows which page it came from
@@ -90,15 +82,7 @@ This document describes the implementation of page-aware chunking system that pr
 ### document_chunks Table
 - **Column**: `metadata` (JSONB)
 - **New Field**: `metadata.page_number` (integer, 1-based)
-- **Example**:
-  ```json
-  {
-    "page_number": 24,
-    "chunk_strategy": "hybrid",
-    "chunk_size_actual": 980,
-    "created_at": "2025-12-31T10:00:00"
-  }
-  ```
+- **Example**: A chunk's metadata would contain `page_number: 24`, plus `chunk_strategy`, `chunk_size_actual`, and `created_at`.
 
 ### chunk_product_relationships Table
 - **No schema changes** - uses existing `relevance_score` column

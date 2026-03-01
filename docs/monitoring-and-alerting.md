@@ -102,14 +102,8 @@ All failures are automatically reported to **Sentry** for real-time alerting and
 3. Update linked background_job if exists
 
 #### 4. Configuration
-```python
-job_monitor = JobMonitorService(
-    check_interval=60,        # Check every 60 seconds
-    stuck_timeout=5,          # PDF jobs: 5min timeout
-    auto_restart=True,        # Enable auto-restart for PDF jobs
-    max_restart_attempts=3    # Max 3 restart attempts per job
-)
-```
+
+The `JobMonitorService` is configured with `check_interval=60` (check every 60 seconds), `stuck_timeout=5` (PDF jobs: 5min timeout), `auto_restart=True` (enable auto-restart for PDF jobs), and `max_restart_attempts=3` (max 3 restart attempts per job).
 
 ---
 
@@ -142,27 +136,7 @@ job_monitor = JobMonitorService(
 - `captureException(error, context)` - Report errors
 - `captureMessage(message, level, context)` - Report messages
 
-**Usage Example**:
-```typescript
-import { captureException } from '../_shared/sentry.ts';
-
-try {
-  // ... processing logic
-} catch (error) {
-  await captureException(error, {
-    tags: {
-      function: 'my-function',
-      error_type: 'processing_failed',
-    },
-    extra: {
-      job_id: jobId,
-      error_message: error.message,
-    },
-    fingerprint: ['my-function', 'error'],
-  });
-  throw error;
-}
-```
+The helper is used in edge functions by importing `captureException` from the shared module, then wrapping processing logic in a try/catch that calls `captureException` with tags (function name, error type), extra context (job ID, error message), and a fingerprint for Sentry grouping before re-throwing the error.
 
 ### Monitored Edge Functions
 1. **scrape-session-manager** - Web scraping orchestration
@@ -231,4 +205,3 @@ Access at: https://sentry.io/organizations/basilis-kanonidis/issues/
 3. **Optimize Timeouts**: Adjust based on actual processing times
 4. **Test Recovery**: Periodically test checkpoint recovery
 5. **Update Fingerprints**: Keep Sentry fingerprints unique for proper grouping
-

@@ -72,7 +72,6 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 
 ### System Overview
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND (DataImportHub)                                    │
 │ ├─ XML Import Tab                                           │
@@ -104,11 +103,9 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 │ ├─ Text Embeddings (RealEmbeddingsService)                  │
 │ └─ Product enrichment (optional)                            │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ### Data Flow
 
-```
 1. User uploads XML file
    ↓
 2. Edge Function parses XML and detects fields
@@ -130,7 +127,6 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 10. Text processing queued (async)
     ↓
 11. Job marked as completed
-```
 
 ---
 
@@ -182,36 +178,11 @@ Configure cron schedules for recurring imports:
 - Preview mode for field detection only
 - Stores products in job metadata for Python API
 
-**Request:**
-```typescript
-{
-  workspace_id: string;
-  category: string;
-  xml_content: string; // Base64 encoded
-  preview_only?: boolean;
-  field_mappings?: Record<string, string>;
-  mapping_template_id?: string;
-  parent_job_id?: string;
-}
-```
+**Request parameters:** workspace_id, category, xml_content (base64 encoded), optional preview_only flag, optional field_mappings, optional mapping_template_id, and optional parent_job_id.
 
-**Response (Preview Mode):**
-```typescript
-{
-  success: true;
-  detected_fields: DetectedField[];
-  total_products: number;
-}
-```
+**Response (Preview Mode):** success, detected_fields array, total_products count.
 
-**Response (Import Mode):**
-```typescript
-{
-  success: true;
-  job_id: string;
-  total_products: number;
-}
-```
+**Response (Import Mode):** success, job_id, total_products count.
 
 #### scheduled-import-runner (`supabase/functions/scheduled-import-runner/index.ts`)
 
@@ -291,31 +262,9 @@ See [API Reference](#api-reference) for detailed documentation.
 
 Upload XML file and create import job.
 
-**Request Body:**
-```json
-{
-  "workspace_id": "uuid",
-  "category": "materials",
-  "xml_content": "base64_encoded_xml",
-  "preview_only": false,
-  "field_mappings": {
-    "name": "name",
-    "factory": "factory_name",
-    "category": "material_category"
-  },
-  "mapping_template_id": "uuid",
-  "parent_job_id": "uuid"
-}
-```
+**Request Body parameters:** workspace_id (UUID), category (e.g., "materials"), xml_content (base64-encoded XML), optional preview_only flag (default false), optional field_mappings object mapping XML fields to platform fields, optional mapping_template_id, and optional parent_job_id.
 
-**Response:**
-```json
-{
-  "success": true,
-  "job_id": "uuid",
-  "total_products": 10
-}
-```
+**Response:** success, job_id, total_products count.
 
 ### Python API
 
@@ -323,45 +272,15 @@ Upload XML file and create import job.
 
 Start processing an import job (called by Edge Function).
 
-**Request Body:**
-```json
-{
-  "job_id": "uuid",
-  "workspace_id": "uuid"
-}
-```
+**Request Body:** job_id and workspace_id.
 
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Import job processing started",
-  "job_id": "uuid"
-}
-```
+**Response:** success, message, job_id.
 
 #### GET /api/import/jobs/{job_id}
 
 Get import job status and progress.
 
-**Response:**
-```json
-{
-  "job_id": "uuid",
-  "status": "processing",
-  "import_type": "xml",
-  "source_name": "Supplier Catalog",
-  "total_products": 100,
-  "processed_products": 45,
-  "failed_products": 2,
-  "progress_percentage": 45,
-  "current_stage": "downloading_images",
-  "started_at": "2025-11-10T10:00:00Z",
-  "completed_at": null,
-  "error_message": null,
-  "estimated_time_remaining": 120
-}
-```
+**Response:** job_id, status, import_type, source_name, total_products, processed_products, failed_products, progress_percentage, current_stage, started_at, completed_at, error_message, and estimated_time_remaining.
 
 #### GET /api/import/history
 
@@ -374,48 +293,13 @@ Get import history for a workspace.
 - `status` (optional) - Filter by status
 - `import_type` (optional) - Filter by import type
 
-**Response:**
-```json
-{
-  "imports": [
-    {
-      "job_id": "uuid",
-      "import_type": "xml",
-      "source_name": "Supplier Catalog",
-      "status": "completed",
-      "total_products": 100,
-      "processed_products": 98,
-      "failed_products": 2,
-      "created_at": "2025-11-10T10:00:00Z",
-      "completed_at": "2025-11-10T10:15:00Z"
-    }
-  ],
-  "total_count": 50,
-  "page": 1,
-  "page_size": 20
-}
-```
+**Response:** imports array (each with job_id, import_type, source_name, status, total_products, processed_products, failed_products, created_at, completed_at), total_count, page, and page_size.
 
 #### GET /api/import/health
 
 Health check for data import API.
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "data-import-api",
-  "version": "1.0.0",
-  "features": {
-    "xml_import": true,
-    "web_scraping": false,
-    "batch_processing": true,
-    "concurrent_image_downloads": true,
-    "checkpoint_recovery": true,
-    "real_time_progress": true
-  }
-}
-```
+**Response:** status, service name, version, and a features object indicating which capabilities are enabled (xml_import, web_scraping, batch_processing, concurrent_image_downloads, checkpoint_recovery, real_time_progress).
 
 ---
 
@@ -423,71 +307,15 @@ Health check for data import API.
 
 ### data_import_jobs
 
-Tracks import jobs with status and progress.
-
-```sql
-CREATE TABLE data_import_jobs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  workspace_id UUID NOT NULL REFERENCES workspaces(id),
-  import_type TEXT NOT NULL, -- 'xml', 'web_scraping'
-  source_name TEXT,
-  source_url TEXT,
-  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
-  total_products INTEGER DEFAULT 0,
-  processed_products INTEGER DEFAULT 0,
-  failed_products INTEGER DEFAULT 0,
-  category TEXT,
-  original_xml_content TEXT, -- For re-runs
-  field_mappings JSONB, -- User-configured field mappings
-  mapping_template_id UUID REFERENCES xml_mapping_templates(id),
-  parent_job_id UUID REFERENCES data_import_jobs(id), -- For re-runs and scheduled runs
-  is_scheduled BOOLEAN DEFAULT FALSE,
-  cron_schedule TEXT,
-  last_run_at TIMESTAMPTZ,
-  next_run_at TIMESTAMPTZ,
-  started_at TIMESTAMPTZ,
-  completed_at TIMESTAMPTZ,
-  error_message TEXT,
-  metadata JSONB, -- Stores products for processing
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+Tracks import jobs with status and progress. Key fields include: id, workspace_id, import_type ('xml' or 'web_scraping'), source_name, source_url, status ('pending', 'processing', 'completed', 'failed'), total_products, processed_products, failed_products, category, original_xml_content (for re-runs), field_mappings (JSONB), mapping_template_id, parent_job_id (for re-runs and scheduled runs), is_scheduled, cron_schedule, last_run_at, next_run_at, started_at, completed_at, error_message, and metadata (stores products for processing).
 
 ### data_import_history
 
-Tracks individual product imports for audit trail.
-
-```sql
-CREATE TABLE data_import_history (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  job_id UUID NOT NULL REFERENCES data_import_jobs(id) ON DELETE CASCADE,
-  source_data JSONB NOT NULL, -- Original product data from XML
-  normalized_data JSONB, -- Normalized product data after field mapping
-  processing_status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'success', 'failed'
-  error_details TEXT,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+Tracks individual product imports for audit trail. Key fields include: id, job_id (references data_import_jobs), source_data (JSONB with original product data from XML), normalized_data (JSONB with normalized product data after field mapping), and processing_status ('pending', 'success', or 'failed').
 
 ### xml_mapping_templates
 
-Stores reusable field mapping templates.
-
-```sql
-CREATE TABLE xml_mapping_templates (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  workspace_id UUID NOT NULL REFERENCES workspaces(id),
-  name TEXT NOT NULL,
-  description TEXT,
-  field_mappings JSONB NOT NULL, -- XML field -> Platform field mappings
-  created_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(workspace_id, name)
-);
-```
+Stores reusable field mapping templates. Key fields include: id, workspace_id, name, description, field_mappings (JSONB mapping XML fields to platform fields), created_by, created_at, and updated_at. A unique constraint applies on (workspace_id, name).
 
 ---
 
@@ -529,10 +357,7 @@ CREATE TABLE xml_mapping_templates (
 
 **Location:** `scripts/testing/test-xml-import-phase2.js`
 
-**Usage:**
-```bash
-node scripts/testing/test-xml-import-phase2.js
-```
+**Usage:** Run with `node scripts/testing/test-xml-import-phase2.js`.
 
 **Test Flow:**
 1. Upload XML with 3 sample products
@@ -663,4 +488,3 @@ For detailed implementation, see:
 - Advanced dynamic mapping for complex web structures
 - Automatic product extraction from supplier websites
 - Unified processing through `data_import_jobs` pipeline
-

@@ -64,7 +64,7 @@ Frontend (Vercel)
             ├─→ Supabase (Data)
             ├─→ OpenAI (Embeddings)
             ├─→ Anthropic (Claude)
-            ├─→ Together AI (Qwen)
+            ├─→ HuggingFace Endpoint (Qwen3-VL)
             └─→ Supabase Storage (Images)
 ```
 
@@ -158,13 +158,7 @@ Frontend (Vercel)
 
 ### Row-Level Security (RLS)
 
-```sql
--- Users can only access their workspace data
-CREATE POLICY "workspace_isolation"
-ON documents
-FOR SELECT
-USING (workspace_id = auth.uid());
-```
+All tables use RLS policies that restrict access based on workspace membership. Users can only read, insert, update, and delete data that belongs to their own workspace, enforced via `auth.uid()` checks.
 
 ---
 
@@ -227,8 +221,8 @@ USING (workspace_id = auth.uid());
    - Claude integration
    - Vision analysis
 
-10. **Together AI APIs** (3 endpoints)
-    - Qwen integration
+10. **HuggingFace Endpoint APIs** (3 endpoints)
+    - Qwen3-VL integration
     - Vision analysis
 
 11. **Monitoring Routes** (3 endpoints)
@@ -267,8 +261,8 @@ USING (workspace_id = auth.uid());
 - Visual embeddings (768D) via HuggingFace Cloud Endpoint
 - 5 collections: visual, color, texture, style, material
 
-**Together AI**:
-- Qwen3-VL 17B Vision (Image analysis, OCR → feeds understanding embeddings)
+**HuggingFace Endpoint**:
+- Qwen3-VL 32B Vision (Image analysis, OCR → feeds understanding embeddings via Voyage AI)
 
 **Direct Vector DB RAG**:
 - Claude 4.5 + Multi-Vector Search (Document retrieval, synthesis)
@@ -392,7 +386,7 @@ USING (workspace_id = auth.uid());
 **AI Services**:
 - OpenAI API
 - Anthropic API (Claude 4.5)
-- Together AI API (Qwen3-VL)
+- HuggingFace Endpoint API (Qwen3-VL 32B)
 - Voyage AI (Embeddings)
 
 **Infrastructure**:
@@ -432,14 +426,14 @@ USING (workspace_id = auth.uid());
 
 ## 🔒 Security Measures
 
-✅ HTTPS/TLS encryption  
-✅ JWT authentication  
-✅ Row-Level Security (RLS)  
-✅ API rate limiting  
-✅ Input validation  
-✅ SQL injection prevention  
-✅ CORS configuration  
-✅ Audit logging  
+✅ HTTPS/TLS encryption
+✅ JWT authentication
+✅ Row-Level Security (RLS)
+✅ API rate limiting
+✅ Input validation
+✅ SQL injection prevention
+✅ CORS configuration
+✅ Audit logging
 
 ---
 
@@ -455,6 +449,5 @@ USING (workspace_id = auth.uid());
 ---
 
 **Last Updated**: November 3, 2025
-**Version**: 1.0.0  
+**Version**: 1.0.0
 **Status**: Production
-

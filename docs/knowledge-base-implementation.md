@@ -120,34 +120,7 @@ The Knowledge Base & Documentation System provides a comprehensive solution for 
    - Pagination support (default: 20 results)
    - Returns: Results with search time metrics (ms)
 
-   **Request:**
-   ```json
-   {
-     "workspace_id": "uuid",
-     "query": "sustainable wood materials",
-     "search_type": "semantic",  // or "full_text" or "hybrid"
-     "limit": 20
-   }
-   ```
-
-   **Response:**
-   ```json
-   {
-     "results": [
-       {
-         "id": "uuid",
-         "title": "Sustainable Wood Guide",
-         "content": "...",
-         "similarity": 0.87,
-         "category_id": "uuid",
-         "tags": ["wood", "sustainable"],
-         "status": "published"
-       }
-     ],
-     "search_time_ms": 145.3,
-     "total_results": 5
-   }
-   ```
+   The request body takes `workspace_id`, `query`, `search_type` (semantic, full_text, or hybrid), and optional `limit`. The response includes `results` with similarity scores, `search_time_ms`, and `total_results`.
 
    **Architecture:**
    - Frontend → MIVAA API `/api/kb/search`
@@ -243,38 +216,7 @@ Stored in `kb_docs` table:
 
 ## 📊 API Response Formats
 
-### Success Response
-```json
-{
-  "id": "uuid",
-  "workspace_id": "uuid",
-  "title": "Installation Guide",
-  "content": "Step 1: ...",
-  "embedding_status": "success",
-  "embedding_generated_at": "2025-11-14T10:30:00Z",
-  "created_at": "2025-11-14T10:30:00Z",
-  "view_count": 0
-}
-```
-
-### Error Response
-```json
-{
-  "detail": "Error message",
-  "status_code": 500
-}
-```
-
-### Search Response
-```json
-{
-  "success": true,
-  "results": [...],
-  "total_count": 10,
-  "search_time_ms": 45,
-  "search_type": "semantic"
-}
-```
+Success responses include document fields such as `id`, `workspace_id`, `title`, `content`, `embedding_status`, `embedding_generated_at`, `created_at`, and `view_count`. Error responses include a `detail` message and `status_code`. Search responses include `success`, `results`, `total_count`, `search_time_ms`, and `search_type`.
 
 ---
 
@@ -432,4 +374,3 @@ Stored in `kb_docs` table:
 - **Embedding Dimension:** 1536D
 - **Search Types:** 3 (semantic, full-text, hybrid)
 - **Relationship Types:** 5 (primary, supplementary, related, certification, specification)
-

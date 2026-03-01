@@ -1,12 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
+import { MaterialPickerModal, PickedMaterial, EditedImageResult, AppliedMaterial } from './MaterialPickerModal';
+import { BillOfMaterials } from './BillOfMaterials';
 
 interface ModelResult {
   model_id: string;
@@ -19,6 +21,16 @@ interface ModelResult {
   completed_at?: string;
 }
 
+interface EditedImageEntry {
+  id: string;
+  url: string;
+  label: string;
+  jobId: string;
+  sourceImageUrl: string;
+  appliedMaterials: AppliedMaterial[];
+  createdAt: string;
+}
+
 interface ProgressiveImageGridProps {
   jobId: string;
   modelCount: number;
@@ -28,6 +40,9 @@ interface ProgressiveImageGridProps {
   vrGenerating?: boolean;
   workspaceId?: string;
   onAskKAI?: (segment: SegmentWithResults) => void;
+  onFindMaterial?: (segment: SegmentWithResults) => void;
+  pendingReplacement?: { id: string; name: string; imageUrl?: string } | null;
+  onZoneSelectedForReplacement?: (segment: SegmentWithResults) => void;
 }
 
 export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
@@ -39,6 +54,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   vrGenerating,
   workspaceId = '',
   onAskKAI,
+  onFindMaterial,
+  pendingReplacement,
+  onZoneSelectedForReplacement,
 }) => {
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [progress, setProgress] = useState(0);
@@ -54,6 +72,26 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
   const [modalSegmentsLoaded, setModalSegmentsLoaded] = useState(false);
   const [modalSegmentError, setModalSegmentError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
+  // ── Phase 5: Edit mode ───────────────────────────────────────────────────────
+  const [editMode, setEditMode] = useState<'none' | 'zone-select' | 'freehand'>('none');
+  const [generatingMask, setGeneratingMask] = useState(false);
+  const [activeMask, setActiveMask] = useState<string | null>(null);
+  const [activeZone, setActiveZone] = useState<SegmentWithResults | null>(null);
+  const [showMaskReview, setShowMaskReview] = useState(false);
+  const [showMaterialPicker, setShowMaterialPicker] = useState(false);
+  const [pickerPreselectedMaterial, setPickerPreselectedMaterial] = useState<PickedMaterial | null>(null);
+
+  // Freehand drawing canvas
+  const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const [brushSize, setBrushSize] = useState(30);
+  const [eraseMode, setEraseMode] = useState(false);
+
+  // ── Phase 6: Edited images ───────────────────────────────────────────────────
+  const [editedImages, setEditedImages] = useState<EditedImageEntry[]>([]);
+  const [bomEntry, setBomEntry] = useState<EditedImageEntry | null>(null);
 
   // Initialize with placeholder data immediately
   useEffect(() => {
@@ -131,13 +169,19 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     };
   }, [jobId]);
 
-  // Reset modal segment state whenever the selected image changes
+  // Reset modal segment state and edit state whenever the selected image changes
   useEffect(() => {
     setModalSegments([]);
     setModalSegmenting(false);
     setModalSegmentsLoaded(false);
     setModalSegmentError(null);
     setModalActiveTab('image');
+    setEditMode('none');
+    setActiveMask(null);
+    setActiveZone(null);
+    setShowMaskReview(false);
+    setShowMaterialPicker(false);
+    setPickerPreselectedMaterial(null);
   }, [selectedImage]);
 
   // Load segments on demand — called when user opens the Products tab
@@ -343,6 +387,131 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     }
   }, [modalActiveTab, selectedImage, modalSegmentsLoaded, modalSegmenting, loadModalSegments]);
 
+  // ── Edit mode: initialise freehand canvas at natural image size ──────────────
+  useEffect(() => {
+    if (editMode !== 'freehand' || !drawingCanvasRef.current || !selectedImage) return;
+    getImageDimensions(selectedImage.url).then(({ width, height }) => {
+      const canvas = drawingCanvasRef.current;
+      if (!canvas) return;
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+    });
+  }, [editMode, selectedImage]);
+
+  // ── Edit mode: generate SAM mask from a detected zone bbox ───────────────────
+  const generateMaskFromZone = useCallback(async (seg: SegmentWithResults) => {
+    if (!selectedImage) return;
+    setGeneratingMask(true);
+    try {
+      const imageBase64 = await imageUrlToBase64(selectedImage.url);
+      const res = await mivaaApi.generateSAMMask({
+        image_base64: imageBase64,
+        hint_type: 'bbox',
+        bbox: seg.bbox,
+        workspace_id: workspaceId,
+      });
+      if (res.success && res.data?.mask_base64) {
+        setActiveMask(res.data.mask_base64);
+      } else {
+        // Fallback: client-side bbox mask
+        const { width, height } = await getImageDimensions(selectedImage.url);
+        setActiveMask(await createBboxMask(seg.bbox, width, height));
+      }
+    } catch {
+      // Fallback on any error
+      try {
+        const { width, height } = await getImageDimensions(selectedImage.url);
+        setActiveMask(await createBboxMask(seg.bbox, width, height));
+      } catch { /* ignore */ }
+    } finally {
+      setGeneratingMask(false);
+    }
+    setActiveZone(seg);
+    // If pendingReplacement is set, pre-populate the picker material
+    if (pendingReplacement) {
+      setPickerPreselectedMaterial({
+        id: pendingReplacement.id,
+        name: pendingReplacement.name,
+        imageUrl: pendingReplacement.imageUrl,
+        category: '',
+        raw: {},
+      });
+      // Signal parent to clear pendingReplacement banner
+      onZoneSelectedForReplacement?.(seg);
+    }
+    setShowMaskReview(true);
+  }, [selectedImage, workspaceId, pendingReplacement, onZoneSelectedForReplacement]);
+
+  // ── Freehand canvas helpers ───────────────────────────────────────────────────
+  const getCanvasCoords = (e: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  };
+
+  const paintOnCanvas = (x: number, y: number, from?: { x: number; y: number }) => {
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const color = eraseMode ? '#000000' : '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = brushSize;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    if (from) {
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(x, y, brushSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingCanvasRef.current) return;
+    isDrawingRef.current = true;
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    const pt = getCanvasCoords(e, drawingCanvasRef.current);
+    lastPointRef.current = pt;
+    paintOnCanvas(pt.x, pt.y);
+  };
+
+  const handleCanvasPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || !drawingCanvasRef.current) return;
+    const pt = getCanvasCoords(e, drawingCanvasRef.current);
+    paintOnCanvas(pt.x, pt.y, lastPointRef.current ?? undefined);
+    lastPointRef.current = pt;
+  };
+
+  const handleCanvasPointerUp = () => {
+    isDrawingRef.current = false;
+    lastPointRef.current = null;
+  };
+
+  const clearFreehandCanvas = () => {
+    const canvas = drawingCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const exportFreehandMask = (): string | null => {
+    if (!drawingCanvasRef.current) return null;
+    return drawingCanvasRef.current.toDataURL('image/png').split(',')[1];
+  };
+
   const handleImageClick = (result: ModelResult) => {
     if (result.status === 'completed' && result.image_urls[0]) {
       setSelectedImage({ url: result.image_urls[0], name: result.model_name, model_id: result.model_id });
@@ -438,6 +607,94 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         )}
       </div>
 
+      {/* ── Edited Versions (Phase 6) ────────────────────────────────────────── */}
+      {editedImages.length > 0 && (
+        <div className="space-y-3 mt-4">
+          <div className="flex items-center gap-2">
+            <Paintbrush className="w-4 h-4 text-violet-600" />
+            <h4 className="text-sm font-semibold text-foreground">Edited Versions</h4>
+            <Badge variant="secondary" className="text-xs">{editedImages.length}</Badge>
+          </div>
+          <div className={`grid gap-3 ${editedImages.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-2'}`}>
+            {editedImages.map(edited => (
+              <div
+                key={edited.id}
+                className="relative rounded-xl overflow-hidden border-2 border-violet-200 bg-white group cursor-pointer"
+                onClick={() => setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' })}
+              >
+                <img
+                  src={edited.url}
+                  alt={edited.label}
+                  className="w-full aspect-square object-cover"
+                />
+                {/* Edited badge */}
+                <div className="absolute top-2 left-2 z-10">
+                  <Badge className="bg-violet-600 text-white text-[10px] px-1.5 py-0.5 shadow">
+                    ✏ {edited.label || 'Edited'}
+                  </Badge>
+                </div>
+                {/* Hover action buttons */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all" />
+                <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  {onGenerateVR && (
+                    <button
+                      onClick={e => { e.stopPropagation(); onGenerateVR(edited.url, { prompt: edited.label }); }}
+                      className="flex items-center gap-1 px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-medium rounded transition-colors"
+                    >
+                      <Globe className="w-3 h-3" />
+                      VR
+                    </button>
+                  )}
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' });
+                      setModalActiveTab('products');
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium rounded transition-colors"
+                  >
+                    <Scan className="w-3 h-3" />
+                    Re-Segment
+                  </button>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setSelectedImage({ url: edited.url, name: `Edited: ${edited.label}`, model_id: 'edited' });
+                      setEditMode('zone-select');
+                      setModalActiveTab('products');
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-medium rounded transition-colors"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Edit More
+                  </button>
+                  {edited.appliedMaterials.length > 0 && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setBomEntry(edited); }}
+                      className="flex items-center gap-1 px-2 py-1 bg-slate-600 hover:bg-slate-700 text-white text-[10px] font-medium rounded transition-colors"
+                    >
+                      <Package className="w-3 h-3" />
+                      BoM
+                    </button>
+                  )}
+                  <a
+                    href={edited.url}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1 px-2 py-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-medium rounded transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    Download
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Image Modal */}
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col gap-0 p-0">
@@ -452,11 +709,31 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                   AI-generated render — click Products to detect material zones
                 </DialogDescription>
               </div>
-              {selectedImage && (
-                <Badge variant="outline" className="text-xs flex-shrink-0 text-gray-500 border-gray-200">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {selectedImage && (
+                  <button
+                    onClick={() => {
+                      if (editMode !== 'none') {
+                        setEditMode('none');
+                      } else {
+                        setEditMode('zone-select');
+                        setModalActiveTab('products');
+                      }
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      editMode !== 'none'
+                        ? 'bg-violet-600 text-white'
+                        : 'bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200'
+                    }`}
+                  >
+                    <Paintbrush className="w-3.5 h-3.5" />
+                    {editMode !== 'none' ? 'Editing' : 'Edit Mode'}
+                  </button>
+                )}
+                <Badge variant="outline" className="text-xs text-gray-500 border-gray-200">
                   3D Render
                 </Badge>
-              )}
+              </div>
             </div>
           </DialogHeader>
 
@@ -484,52 +761,152 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                 </TabsTrigger>
               </TabsList>
 
+              {/* Edit mode tabs */}
+              {editMode !== 'none' && (
+                <div className="flex gap-1 mt-2 p-1 bg-violet-50 rounded-lg border border-violet-200">
+                  <button
+                    onClick={() => { setEditMode('zone-select'); setModalActiveTab('products'); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      editMode === 'zone-select' ? 'bg-violet-600 text-white' : 'text-violet-600 hover:bg-violet-100'
+                    }`}
+                  >
+                    <Scan className="w-3.5 h-3.5" />
+                    Zone Select
+                  </button>
+                  <button
+                    onClick={() => { setEditMode('freehand'); setModalActiveTab('image'); }}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                      editMode === 'freehand' ? 'bg-violet-600 text-white' : 'text-violet-600 hover:bg-violet-100'
+                    }`}
+                  >
+                    <Paintbrush className="w-3.5 h-3.5" />
+                    Draw Mask
+                  </button>
+                </div>
+              )}
+
               {/* Image Tab */}
               <TabsContent value="image" className="mt-4">
-                <div
-                  className="relative bg-gray-50 rounded-xl overflow-hidden border border-gray-200 group"
-                  style={{ minHeight: '380px' }}
-                >
-                  {selectedImage && (
-                    <>
-                      <img
-                        src={selectedImage.url}
-                        alt={selectedImage.name}
-                        className="w-full h-full object-contain cursor-zoom-in"
-                        onClick={() => setLightboxUrl(selectedImage.url)}
-                      />
-                      {/* Click-to-expand hint */}
-                      <div className="absolute bottom-3 left-3 z-10 bg-black/50 text-white text-[11px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none select-none">
-                        Click to expand
-                      </div>
-                      {onGenerateVR && (
-                        <div className="absolute top-3 right-3 z-10">
+                {editMode === 'freehand' ? (
+                  /* Freehand draw mode */
+                  <div className="relative bg-gray-50 rounded-xl overflow-hidden border-2 border-violet-400" style={{ minHeight: '380px' }}>
+                    {selectedImage && (
+                      <>
+                        <img
+                          src={selectedImage.url}
+                          alt={selectedImage.name}
+                          className="w-full h-full object-contain pointer-events-none select-none"
+                        />
+                        <canvas
+                          ref={drawingCanvasRef}
+                          className="absolute inset-0 w-full h-full cursor-crosshair"
+                          style={{ opacity: 0.55, mixBlendMode: 'screen' }}
+                          onPointerDown={handleCanvasPointerDown}
+                          onPointerMove={handleCanvasPointerMove}
+                          onPointerUp={handleCanvasPointerUp}
+                          onPointerLeave={handleCanvasPointerUp}
+                        />
+                        {/* Freehand toolbar */}
+                        <div className="absolute bottom-0 left-0 right-0 flex items-center gap-2 bg-black/75 px-3 py-2 backdrop-blur-sm">
+                          <span className="text-white/70 text-[10px]">Size</span>
+                          <input
+                            type="range" min="5" max="80" value={brushSize}
+                            onChange={e => setBrushSize(Number(e.target.value))}
+                            className="w-16 accent-violet-400"
+                          />
+                          <span className="text-white/70 text-[10px] w-6">{brushSize}</span>
+                          <button
+                            onClick={() => setEraseMode(!eraseMode)}
+                            className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                              eraseMode ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                            }`}
+                          >
+                            {eraseMode ? 'Erase' : 'Draw'}
+                          </button>
+                          <button
+                            onClick={clearFreehandCanvas}
+                            className="text-white/60 hover:text-white text-[10px] transition-colors"
+                          >
+                            Clear
+                          </button>
+                          <div className="flex-1" />
                           <button
                             onClick={() => {
-                              if (!vrGenerating) {
-                                onGenerateVR(selectedImage.url, { prompt: selectedImage.name });
+                              const mask = exportFreehandMask();
+                              if (mask) {
+                                setActiveMask(mask);
+                                setActiveZone(null);
+                                setShowMaskReview(true);
                               }
                             }}
-                            disabled={vrGenerating}
-                            className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white text-xs font-medium rounded-lg transition-colors shadow-md"
-                            title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                            className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-[11px] font-medium rounded-lg flex items-center gap-1.5 transition-colors"
                           >
-                            {vrGenerating ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Globe className="w-3.5 h-3.5" />
-                            )}
-                            {vrGenerating ? 'Generating VR…' : 'Generate VR'}
+                            <Paintbrush className="w-3 h-3" />
+                            Apply Mask →
                           </button>
                         </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                        <div className="absolute top-2 left-2 bg-violet-600 text-white text-[10px] px-2 py-1 rounded-md font-medium">
+                          Draw the area to replace
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  /* Normal image view */
+                  <div
+                    className="relative bg-gray-50 rounded-xl overflow-hidden border border-gray-200 group"
+                    style={{ minHeight: '380px' }}
+                  >
+                    {selectedImage && (
+                      <>
+                        <img
+                          src={selectedImage.url}
+                          alt={selectedImage.name}
+                          className="w-full h-full object-contain cursor-zoom-in"
+                          onClick={() => setLightboxUrl(selectedImage.url)}
+                        />
+                        {/* Click-to-expand hint */}
+                        <div className="absolute bottom-3 left-3 z-10 bg-black/50 text-white text-[11px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none select-none">
+                          Click to expand
+                        </div>
+                        {onGenerateVR && (
+                          <div className="absolute top-3 right-3 z-10">
+                            <button
+                              onClick={() => {
+                                if (!vrGenerating) {
+                                  onGenerateVR(selectedImage.url, { prompt: selectedImage.name });
+                                }
+                              }}
+                              disabled={vrGenerating}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-600/50 text-white text-xs font-medium rounded-lg transition-colors shadow-md"
+                              title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (50 credits)'}
+                            >
+                              {vrGenerating ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Globe className="w-3.5 h-3.5" />
+                              )}
+                              {vrGenerating ? 'Generating VR…' : 'Generate VR'}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </TabsContent>
 
               {/* Materials Tab — on-demand segmentation */}
               <TabsContent value="products" className="mt-4 space-y-3">
+                {/* Pending replacement banner */}
+                {pendingReplacement && (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-violet-50 border border-violet-200 rounded-lg">
+                    <Paintbrush className="w-4 h-4 text-violet-600 flex-shrink-0" />
+                    <p className="text-xs text-violet-800 flex-1 font-medium">
+                      Select a zone below to replace with <span className="font-semibold">"{pendingReplacement.name}"</span>
+                    </p>
+                  </div>
+                )}
                 {/* Action bar */}
                 {modalSegmentsLoaded && !modalSegmenting && (
                   <div className="flex items-center justify-between">
@@ -710,30 +1087,97 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                                 );
                               })}
 
-                              {onAskKAI && (
-                                <div className="px-3 py-2 bg-gray-50/60">
-                                  <button
-                                    onClick={() => onAskKAI(seg)}
-                                    className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors w-full justify-center"
-                                  >
-                                    <ExternalLink className="w-3 h-3" />
-                                    Search Relevant
-                                  </button>
+                              {(onAskKAI || onFindMaterial || onZoneSelectedForReplacement || editMode === 'zone-select') && (
+                                <div className="px-3 py-2 bg-gray-50/60 flex flex-col gap-1.5">
+                                  {/* Edit mode: Replace Material button */}
+                                  {editMode === 'zone-select' && (
+                                    <button
+                                      onClick={() => generateMaskFromZone(seg)}
+                                      disabled={generatingMask}
+                                      className="flex items-center gap-1 px-2 py-1 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white text-[11px] font-semibold rounded-md transition-colors w-full justify-center"
+                                    >
+                                      {generatingMask
+                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                        : <Paintbrush className="w-3 h-3" />}
+                                      {generatingMask ? 'Generating mask…' : 'Replace Material'}
+                                    </button>
+                                  )}
+                                  {onAskKAI && (
+                                    <button
+                                      onClick={() => onAskKAI(seg)}
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Search Relevant
+                                    </button>
+                                  )}
+                                  {onFindMaterial && (
+                                    <button
+                                      onClick={() => onFindMaterial(seg)}
+                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                    >
+                                      <Search className="w-3 h-3" />
+                                      Find This Material
+                                    </button>
+                                  )}
+                                  {onZoneSelectedForReplacement && pendingReplacement && editMode === 'none' && (
+                                    <button
+                                      onClick={() => generateMaskFromZone(seg)}
+                                      disabled={generatingMask}
+                                      className="flex items-center gap-1 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-medium rounded-md transition-colors w-full justify-center"
+                                    >
+                                      {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
+                                      Replace with "{pendingReplacement.name}"
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
                           ) : (
-                            <div className="flex items-center justify-between px-3 py-2.5">
-                              <span className="text-xs text-muted-foreground italic">No platform matches above 70%</span>
-                              {onAskKAI && (
-                                <button
-                                  onClick={() => onAskKAI(seg)}
-                                  className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors"
-                                >
-                                  <ExternalLink className="w-3 h-3" />
-                                  Search Relevant
-                                </button>
-                              )}
+                            <div className="px-3 py-2.5 space-y-1.5">
+                              <span className="text-xs text-muted-foreground italic block">No platform matches above 70%</span>
+                              <div className="flex flex-col gap-1.5">
+                                {editMode === 'zone-select' && (
+                                  <button
+                                    onClick={() => generateMaskFromZone(seg)}
+                                    disabled={generatingMask}
+                                    className="flex items-center gap-1 px-2 py-1 bg-violet-600 hover:bg-violet-700 disabled:bg-violet-400 text-white text-[11px] font-semibold rounded-md transition-colors w-full justify-center"
+                                  >
+                                    {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
+                                    {generatingMask ? 'Generating mask…' : 'Replace Material'}
+                                  </button>
+                                )}
+                                <div className="flex flex-wrap gap-1.5">
+                                  {onAskKAI && (
+                                    <button
+                                      onClick={() => onAskKAI(seg)}
+                                      className="flex items-center gap-1 px-2 py-1 bg-primary/5 hover:bg-primary/10 text-primary text-[11px] font-medium rounded-md transition-colors"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Search Relevant
+                                    </button>
+                                  )}
+                                  {onFindMaterial && (
+                                    <button
+                                      onClick={() => onFindMaterial(seg)}
+                                      className="flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-medium rounded-md transition-colors"
+                                    >
+                                      <Search className="w-3 h-3" />
+                                      Find This Material
+                                    </button>
+                                  )}
+                                  {onZoneSelectedForReplacement && pendingReplacement && editMode === 'none' && (
+                                    <button
+                                      onClick={() => generateMaskFromZone(seg)}
+                                      disabled={generatingMask}
+                                      className="flex items-center gap-1 px-2 py-1 bg-violet-50 hover:bg-violet-100 text-violet-700 text-[11px] font-medium rounded-md transition-colors"
+                                    >
+                                      {generatingMask ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paintbrush className="w-3 h-3" />}
+                                      Replace here
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -754,6 +1198,106 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mask Review Overlay */}
+      {showMaskReview && activeMask && selectedImage && (
+        <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-2xl space-y-4 p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm text-gray-900">
+                  {activeZone ? `Replacing: ${activeZone.label}` : 'Drawn mask'}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Purple area = zone to replace with new material</p>
+              </div>
+              <button
+                onClick={() => setShowMaskReview(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            {/* Image + mask overlay */}
+            <div className="relative rounded-lg overflow-hidden border border-border">
+              <img src={selectedImage.url} alt="" className="w-full object-contain" />
+              <div
+                className="absolute inset-0"
+                style={{
+                  WebkitMaskImage: `url(data:image/png;base64,${activeMask})`,
+                  WebkitMaskSize: '100% 100%',
+                  maskImage: `url(data:image/png;base64,${activeMask})`,
+                  maskSize: '100% 100%',
+                  backgroundColor: 'rgba(124, 58, 237, 0.55)',
+                }}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowMaskReview(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-violet-600 hover:bg-violet-700 text-white"
+                onClick={() => {
+                  setShowMaskReview(false);
+                  setShowMaterialPicker(true);
+                }}
+              >
+                <Paintbrush className="w-3.5 h-3.5 mr-1.5" />
+                Pick Material →
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MaterialPickerModal */}
+      {showMaterialPicker && activeMask && selectedImage && (
+        <MaterialPickerModal
+          isOpen={showMaterialPicker}
+          onClose={() => {
+            setShowMaterialPicker(false);
+            setPickerPreselectedMaterial(null);
+          }}
+          zone={activeZone}
+          maskBase64={activeMask}
+          sourceImageUrl={selectedImage.url}
+          jobId={jobId}
+          workspaceId={workspaceId}
+          preSelectedMaterial={pickerPreselectedMaterial}
+          onEditedImage={(result: EditedImageResult) => {
+            const newEntry: EditedImageEntry = {
+              id: `edited-${Date.now()}`,
+              url: result.storageUrl,
+              label: result.appliedMaterials.map(m => m.zone_label).join(' + '),
+              jobId,
+              sourceImageUrl: selectedImage.url,
+              appliedMaterials: result.appliedMaterials,
+              createdAt: new Date().toISOString(),
+            };
+            setEditedImages(prev => [newEntry, ...prev]);
+            setShowMaterialPicker(false);
+            setEditMode('none');
+            setActiveMask(null);
+            setActiveZone(null);
+            setPickerPreselectedMaterial(null);
+          }}
+          onAddAnotherZone={() => {
+            setShowMaterialPicker(false);
+            setEditMode('zone-select');
+            setModalActiveTab('products');
+          }}
+        />
+      )}
+
+      {/* Bill of Materials modal */}
+      {bomEntry && (
+        <BillOfMaterials
+          isOpen={!!bomEntry}
+          onClose={() => setBomEntry(null)}
+          appliedMaterials={bomEntry.appliedMaterials}
+        />
+      )}
 
       {/* Lightbox — full-screen image viewer */}
       {lightboxUrl && (
@@ -815,6 +1359,53 @@ async function cropZone(
     };
     img.onerror = () => resolve(null);
     img.src = imageUrl;
+  });
+}
+
+/** Convert a public image URL to base64 via Canvas2D (requires CORS headers on the image). */
+async function imageUrlToBase64(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { reject(new Error('No canvas context')); return; }
+      ctx.drawImage(img, 0, 0);
+      try {
+        resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = () => reject(new Error('Failed to load image for base64 conversion'));
+    img.src = url;
+  });
+}
+
+/** Create a simple white-on-black bbox mask PNG as a base64 string (client-side fallback). */
+async function createBboxMask(
+  bbox: { x: number; y: number; w: number; h: number },
+  width: number,
+  height: number,
+): Promise<string> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(
+      Math.round(bbox.x * width),
+      Math.round(bbox.y * height),
+      Math.max(1, Math.round(bbox.w * width)),
+      Math.max(1, Math.round(bbox.h * height)),
+    );
+    resolve(canvas.toDataURL('image/png').split(',')[1]);
   });
 }
 

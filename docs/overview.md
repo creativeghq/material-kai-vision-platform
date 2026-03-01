@@ -2,7 +2,7 @@
 
 **AI-Powered Material Intelligence System for Enterprise Catalogs**
 
-> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using 12+ AI models across 4 providers.
+> Production-grade platform serving 5,000+ users with 99.5%+ uptime. Transforms material catalogs from multiple sources (PDF, Web, XML) into searchable, intelligent knowledge using 12+ AI models across 5 providers.
 
 ---
 
@@ -13,11 +13,11 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **12+ AI models** across 4 providers (Anthropic, OpenAI, Google, TogetherAI, Replicate)
+- **12+ AI models** across 5 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs)
 - **150+ API endpoints** across 16 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
-- **6 embedding types** for multi-modal search
+- **7 embedding types** for multi-modal search (text, visual, understanding, color, texture, style, material)
 - **95%+ product detection accuracy**
 - **85%+ search relevance**
 - **90%+ material recognition accuracy**
@@ -27,6 +27,9 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 💰 **Price Monitoring**: Competitive price tracking across sources
 - 🎨 **Interior Design**: 14 AI models for design generation
 - 🔍 **Smart Search Management**: AI-powered search deduplication
+- 🥽 **VR World Generation**: WorldLabs Marble 3D Gaussian Splat worlds from interior images
+- 🤖 **Unified Jarvis Agent**: Merged Search + Insights + SEO into one intelligent agent
+- 🔍 **B2B Manufacturer Search**: Claude built-in web search (no separate API key)
 
 ---
 
@@ -53,11 +56,13 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - 30+ Edge Functions (TypeScript/Deno)
 
 **AI Services**:
-- OpenAI (GPT-4o, text-embedding-3-small)
-- Anthropic (Claude Sonnet 4.5, Claude Haiku 4.5)
-- Together AI (Qwen3-VL 17B Vision)
-- CLIP (Visual embeddings)
-- Replicate (Image generation)
+- Anthropic (Claude Sonnet 4.5, Claude Haiku 4.5 + built-in web search)
+- OpenAI (GPT-4o, GPT-4o-mini for query parsing)
+- Voyage AI (voyage-3.5, primary text/understanding embeddings, 1024D)
+- HuggingFace Endpoint (Qwen3-VL 32B Vision)
+- SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
+- Replicate (14 interior design generation models)
+- WorldLabs Marble (3D Gaussian Splat VR world generation)
 
 ### System Flow
 
@@ -74,10 +79,10 @@ MIVAA API (FastAPI) → Creates background job
   1. Focused Extraction (product pages only)
   2. Text Extraction (PyMuPDF4LLM)
   3. Semantic Chunking (Anthropic)
-  4. Text Embeddings (OpenAI 1536D)
+  4. Text Embeddings (Voyage AI voyage-3.5, 1024D)
   5. Image Extraction
-  6. Image Analysis (Qwen Vision)
-  7-10. Multi-Vector CLIP Embeddings (512D)
+  6. Image Analysis (Qwen3-VL 32B → understanding embeddings via Voyage AI)
+  7-10. Multi-Vector SigLIP2 Embeddings (768D: visual, color, texture, style, material)
   11. Product Creation & Entity Linking
   12. Entity Relationship Mapping
   13. Quality Enhancement (async)
@@ -123,17 +128,17 @@ Real-time updates → Frontend displays results
 - **Cost**: $0.02 per 1M tokens
 - **Pipeline Stages**: Text Embedding Generation (Stage 5)
 
-#### 3. Together AI - Qwen3-VL 17B Vision
+#### 3. HuggingFace Endpoint - Qwen3-VL 32B Vision
 
-- **Parameters**: 17 billion
+- **Parameters**: 32 billion
 - **Modality**: Vision + Text
 - **Use Cases**: Material image analysis, product classification, OCR
-- **Performance**: 
+- **Performance**:
   - 69.4% MMMU (Massive Multitask Multimodal Understanding)
   - #1 ranked for OCR tasks
   - 85%+ accuracy on material recognition
 - **Cost**: $0.30 per 1M tokens
-- **Pipeline Stages**: Image Analysis (Stage 7), Material Recognition
+- **Pipeline Stages**: Image Analysis (Stage 6, 8)
 
 #### 4. CLIP (OpenAI)
 
@@ -146,19 +151,22 @@ Real-time updates → Frontend displays results
 
 #### 5. Replicate Models
 
-**Stable Diffusion XL**: 3D texture generation, material visualization  
+**Stable Diffusion XL**: 3D texture generation, material visualization
 **FLUX-Schnell**: Fast image generation, material previews
 
-### Multi-Vector Embeddings (6 Types)
+### Multi-Vector Embeddings (7 Types)
 
-The platform generates **6 types of embeddings** for comprehensive search:
+The platform generates **7 types of embeddings** stored as `halfvec` (float16, 50% storage savings):
 
-1. **Text Embeddings** (1536D) - OpenAI text-embedding-3-small
-2. **Visual CLIP Embeddings** (512D) - CLIP ViT-B/32
-3. **Color Embeddings** (256D) - Custom color analysis
-4. **Texture Embeddings** (256D) - Custom texture analysis
-5. **Application Embeddings** (512D) - Use-case classifier
-6. **Multimodal Embeddings** (2048D) - Combined text + visual
+1. **Text Embeddings** (1024D) - Voyage AI voyage-3.5 (primary)
+2. **Visual Embeddings** (768D) - SigLIP2 via HuggingFace Endpoint
+3. **Understanding Embeddings** (1024D) - Voyage AI from Qwen3-VL structured analysis (enables spec-based search)
+4. **Color Embeddings** (768D) - SigLIP2 color-guided
+5. **Texture Embeddings** (768D) - SigLIP2 texture-guided
+6. **Style Embeddings** (768D) - SigLIP2 style-guided
+7. **Material Embeddings** (768D) - SigLIP2 material-guided
+
+**Dynamic Weight Profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected per query.
 
 ---
 
@@ -215,7 +223,7 @@ The platform generates **6 types of embeddings** for comprehensive search:
 - **Checkpoint**: IMAGES_EXTRACTED
 
 **Stage 9: Image Analysis (AI)**
-- Qwen3-VL 17B Vision: Analyze each image (1-3 seconds)
+- Qwen3-VL 32B Vision: Analyze each image (1-3 seconds)
 - Extract material properties
 - Quality scoring (0-100)
 - Classify image type (product, detail, mood, diagram)
@@ -324,27 +332,27 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ### Core Tables
 
-**workspaces**: Multi-tenant workspace management  
-**documents**: PDF documents and metadata  
-**document_chunks**: Semantic text chunks with 1536D embeddings  
-**document_images**: Extracted images with 512D CLIP embeddings  
-**products**: Product records from PDFs  
-**background_jobs**: Async job tracking with checkpoint recovery  
-**material_metadata_fields**: Dynamic metafield definitions  
+**workspaces**: Multi-tenant workspace management
+**documents**: PDF documents and metadata
+**document_chunks**: Semantic text chunks with 1536D embeddings
+**document_images**: Extracted images with 512D CLIP embeddings
+**products**: Product records from PDFs
+**background_jobs**: Async job tracking with checkpoint recovery
+**material_metadata_fields**: Dynamic metafield definitions
 **metafield_values**: Metafield data for chunks/products/images
 
 ### Storage Buckets
 
-**pdf-documents**: Original PDF files (50MB max)  
-**pdf-tiles**: Extracted images (10MB max)  
-**material-images**: Material photos (10MB max)  
+**pdf-documents**: Original PDF files (50MB max)
+**pdf-tiles**: Extracted images (10MB max)
+**material-images**: Material photos (10MB max)
 **3d-models**: Generated 3D models (100MB max)
 
 ### Security
 
-**Row-Level Security (RLS)**: All tables protected  
-**Workspace Isolation**: Users only access their workspace data  
-**JWT Authentication**: Supabase Auth with automatic token refresh  
+**Row-Level Security (RLS)**: All tables protected
+**Workspace Isolation**: Users only access their workspace data
+**JWT Authentication**: Supabase Auth with automatic token refresh
 **Encryption**: At rest and in transit
 
 ---
@@ -353,8 +361,8 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ### User-Facing Features
 
-**Dashboard**: Metrics, feature grid, quick actions  
-**PDF Processing**: Drag-and-drop upload with real-time progress  
+**Dashboard**: Metrics, feature grid, quick actions
+**PDF Processing**: Drag-and-drop upload with real-time progress
 **Materials Catalog**: Searchable, filterable product catalog
 **Search Hub**: AI-powered semantic search
 **Material Recognition**: Upload images for material identification
@@ -405,7 +413,7 @@ The platform uses **6 embedding types** for comprehensive search:
 8. AI Services (10 endpoints - AI model integration)
 9. Background Jobs (7 endpoints - async job tracking)
 10. Anthropic APIs (3 endpoints - Claude integration)
-11. Together AI APIs (3 endpoints - Qwen integration)
+11. HuggingFace Endpoint APIs (3 endpoints - Qwen integration)
 12. Monitoring Routes (3 endpoints - health checks, metrics)
 13. AI Metrics Routes (2 endpoints - AI performance tracking)
 
@@ -491,18 +499,19 @@ The platform uses **6 embedding types** for comprehensive search:
 
 ---
 
-**Last Updated**: 2025-01-09
-**Version**: 2.3.0
+**Last Updated**: March 1, 2026
+**Version**: 3.2.0
 **Status**: Production
 **Users**: 5,000+
 **Uptime**: 99.5%+
 
 **Recent Enhancements**:
+- ✨ Unified Jarvis Agent — Search + Insights + SEO merged into one agent (2026-02-19)
+- ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
+- ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
+- ✨ 7-vector fusion search with query-adaptive weight profiles
+- ✨ Understanding embeddings — Qwen3-VL analysis → Voyage AI 1024D embedding
+- ✨ B2B web search powered by Anthropic built-in web_search tool (no Perplexity key)
 - ✨ Real-time PDF Processing Monitor with auto-refresh
 - ✨ Enhanced Analytics Dashboard with 4 comprehensive tabs
-- ✨ AI model cost tracking and usage analytics
-- ✨ Stage 0 and Stage 1 monitoring integration
-- ✨ Stage 3.5 (Embedding-to-Text) and Stage 4 (Metadata Consolidation)
 - ✨ Sentry integration for all pipeline stages
-- ✨ Comprehensive checkpoint system with 9 stages
-

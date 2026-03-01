@@ -45,6 +45,21 @@ export const VR_CREDIT_COSTS: Record<string, number> = {
   'marble-0.1-plus': 300,
 };
 
+// Inpainting credit costs per operation
+export const INPAINTING_CREDIT_COSTS: Record<'flux-fill-pro' | 'flux-fill-dev' | 'sd-inpainting', number> = {
+  'flux-fill-pro': 40,   // ~$0.015 — best quality, FLUX Fill Pro
+  'flux-fill-dev': 20,   // ~$0.008 — standard quality, FLUX Fill Dev
+  'sd-inpainting': 10,   // ~$0.003 — fast/cheap, Stable Diffusion
+};
+
+export type InpaintingModel = keyof typeof INPAINTING_CREDIT_COSTS;
+
+export const INPAINTING_MODEL_LABELS: Record<InpaintingModel, string> = {
+  'flux-fill-pro': 'Best (FLUX Pro)',
+  'flux-fill-dev': 'Standard (FLUX Dev)',
+  'sd-inpainting': 'Fast',
+};
+
 export const vrWorldService = {
   /**
    * Trigger VR world generation via edge function.

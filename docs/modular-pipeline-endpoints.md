@@ -10,7 +10,6 @@ The PDF processing pipeline has been refactored into **6 modular internal API en
 
 ## 🔄 Data Flow Between Endpoints
 
-```
 10. classify-images      → Receives: ALL extracted images
     ↓                      Returns: material_images + non_material_images
 
@@ -28,7 +27,6 @@ The PDF processing pipeline has been refactored into **6 modular internal API en
 
 60. create-relationships → Receives: document_id + product_ids
                            Returns: chunk-image + product-image relationships
-```
 
 **Important**: Each endpoint receives **pre-filtered data** from the orchestrator, which calls them in sequence and passes the output of one as input to the next.
 
@@ -40,42 +38,25 @@ All endpoints support **dynamic AI model configuration** via the optional `ai_co
 
 ### Configuration Parameters
 
-```typescript
-interface AIModelConfig {
-  // Visual Embedding Model (SLIG via HuggingFace Endpoint)
-  visual_embedding_model?: string;            // Default: "SLIG"
-  visual_embedding_dimensions?: number;       // Default: 768
+The `ai_config` object accepts the following optional fields:
 
-  // Text Embedding Model (Voyage AI)
-  text_embedding_model?: string;              // Default: "voyage-3.5"
-  text_embedding_dimensions?: number;         // Default: 1024
-  text_embedding_input_type?: string;         // Default: "document"
-
-  // Image Classification Models
-  classification_primary_model?: string;      // Default: "Qwen/Qwen3-VL-32B-Instruct"
-  classification_validation_model?: string;   // Default: "claude-sonnet-4-20250514"
-  classification_confidence_threshold?: number; // Default: 0.7
-
-  // Product Discovery Model
-  discovery_model?: "claude-sonnet-4-20250514" | "gpt-5" | "gpt-4o"; // Default: "claude-sonnet-4-20250514"
-
-  // Metadata Extraction Model
-  metadata_extraction_model?: "claude" | "gpt"; // Default: "claude"
-
-  // Chunking Model
-  chunking_model?: string;                    // Default: "gpt-4o"
-
-  // Temperature Settings
-  discovery_temperature?: number;             // Default: 0.1
-  classification_temperature?: number;        // Default: 0.1
-  metadata_temperature?: number;              // Default: 0.1
-
-  // Max Tokens
-  discovery_max_tokens?: number;              // Default: 4096
-  classification_max_tokens?: number;         // Default: 512
-  metadata_max_tokens?: number;               // Default: 4096
-}
-```
+- `visual_embedding_model` — Default: "SLIG"
+- `visual_embedding_dimensions` — Default: 768
+- `text_embedding_model` — Default: "voyage-3.5"
+- `text_embedding_dimensions` — Default: 1024
+- `text_embedding_input_type` — Default: "document"
+- `classification_primary_model` — Default: "Qwen/Qwen3-VL-32B-Instruct"
+- `classification_validation_model` — Default: "claude-sonnet-4-20250514"
+- `classification_confidence_threshold` — Default: 0.7
+- `discovery_model` — Default: "claude-sonnet-4-20250514"
+- `metadata_extraction_model` — Default: "claude"
+- `chunking_model` — Default: "gpt-4o"
+- `discovery_temperature` — Default: 0.1
+- `classification_temperature` — Default: 0.1
+- `metadata_temperature` — Default: 0.1
+- `discovery_max_tokens` — Default: 4096
+- `classification_max_tokens` — Default: 512
+- `metadata_max_tokens` — Default: 4096
 
 ### Pre-configured Profiles
 
@@ -100,22 +81,6 @@ interface AIModelConfig {
 - Uses GPT-4o and Claude Haiku (cheaper models)
 - Lower confidence threshold (0.6) to reduce validation calls
 - Reduced max tokens to minimize costs
-
-### Usage Example
-
-```json
-{
-  "job_id": "abc123",
-  "extracted_images": [...],
-  "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "classification_confidence_threshold": 0.8,
-    "visual_embedding_model": "SLIG",
-    "visual_embedding_dimensions": 768
-  }
-}
-```
 
 If `ai_config` is not provided, the endpoint uses `DEFAULT_AI_CONFIG`.
 
@@ -157,81 +122,13 @@ All internal endpoints are prefixed with `/api/internal/` and tagged as "Interna
     - `non_material`: NOT material-related (faces, logos, charts, text)
   - Returns confidence score (0-1)
   - Concurrency: 5 parallel calls
-  
+
 - **Stage 2 - Claude Validation (High Quality)**:
   - Model: `Claude Sonnet 4.5` (Anthropic)
   - Only validates images with confidence < threshold (default: 0.7)
   - Provides detailed reasoning for classification
   - Improves accuracy for edge cases
   - Concurrency: 2 parallel calls
-
-**AI Configuration** (Optional):
-All endpoints accept an optional `ai_config` parameter to customize AI models:
-```json
-{
-  "visual_embedding_model": "SLIG",
-  "visual_embedding_dimensions": 768,
-  "text_embedding_model": "voyage-3.5",
-  "text_embedding_dimensions": 1024,
-  "text_embedding_input_type": "document",
-  "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
-  "classification_validation_model": "claude-sonnet-4-20250514",
-  "classification_confidence_threshold": 0.7,
-  "discovery_model": "claude-sonnet-4-20250514",
-  "metadata_extraction_model": "claude",
-  "chunking_model": "gpt-4o"
-}
-```
-
-**Request**:
-```json
-{
-  "job_id": "string",
-  "extracted_images": [
-    {
-      "filename": "image1.jpg",
-      "path": "/tmp/image1.jpg",
-      "page_number": 5,
-      "width": 800,
-      "height": 600
-    }
-  ],
-  "ai_config": {
-    "classification_primary_model": "Qwen/Qwen3-VL-32B-Instruct",
-    "classification_validation_model": "claude-sonnet-4-20250514",
-    "classification_confidence_threshold": 0.7
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "material_images": [
-    {
-      "filename": "material1.jpg",
-      "path": "/tmp/material1.jpg",
-      "page_number": 5,
-      "classification": "material_closeup",
-      "confidence": 0.92
-    }
-  ],
-  "non_material_images": [
-    {
-      "filename": "logo.jpg",
-      "path": "/tmp/logo.jpg",
-      "page_number": 1,
-      "classification": "non_material",
-      "confidence": 0.88,
-      "reason": "Company logo, not material-related"
-    }
-  ],
-  "total_classified": 100,
-  "material_count": 65,
-  "non_material_count": 35
-}
-```
 
 **Defaults**:
 - Uses `DEFAULT_AI_CONFIG` if `ai_config` not provided
@@ -262,37 +159,6 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - Path format: `{document_id}/{filename}`
 - Parallel uploads with rate limiting
 - Generates public URLs for each image
-
-**Request**:
-```json
-{
-  "job_id": "string",
-  "material_images": [
-    {
-      "filename": "material1.jpg",
-      "path": "/tmp/material1.jpg",
-      "page_number": 5
-    }
-  ],
-  "document_id": "uuid"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "uploaded_images": [
-    {
-      "filename": "material1.jpg",
-      "storage_url": "https://...supabase.co/storage/v1/object/public/material-images/...",
-      "page_number": 5
-    }
-  ],
-  "uploaded_count": 65,
-  "failed_count": 0
-}
-```
 
 **Defaults**:
 - Concurrency: 5 parallel uploads
@@ -347,31 +213,6 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
   - style_slig_768 (SLIG style embedding)
   - material_slig_768 (SLIG material embedding)
 
-**Request**:
-```json
-{
-  "job_id": "string",
-  "material_images": [
-    {
-      "filename": "material1.jpg",
-      "storage_url": "https://...",
-      "page_number": 5
-    }
-  ],
-  "document_id": "uuid",
-  "workspace_id": "uuid"
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "images_saved": 65,
-  "slig_embeddings_generated": 325
-}
-```
-
 **Calculation**: 65 images × 5 embeddings = 325 total SLIG embeddings (768D each)
 
 **Defaults**:
@@ -407,32 +248,6 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - **Max Tokens**: Configurable via `ai_config.metadata_max_tokens` (default: 4096)
 - **Extraction Method**: Dynamic metadata extraction with category hints
 - **Metadata Fields**: Dimensions, colors, patterns, materials, finishes, applications, certifications, etc.
-
-**Request**:
-```json
-{
-  "job_id": "string",
-  "document_id": "uuid",
-  "product_ids": ["uuid1", "uuid2"],
-  "pdf_text": "Full PDF text content...",
-  "ai_config": {
-    "metadata_extraction_model": "claude",
-    "metadata_temperature": 0.1,
-    "metadata_max_tokens": 4096
-  }
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "products_enriched": 7,
-  "metadata_fields_extracted": 42,
-  "extraction_method": "ai_dynamic_claude",
-  "model_used": "claude"
-}
-```
 
 **Defaults**:
 - `metadata_extraction_model`: "claude"
@@ -479,29 +294,6 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
   - Creates chunk-to-product relationships
   - Links chunks to products based on page ranges
 
-**Request**:
-```json
-{
-  "job_id": "string",
-  "document_id": "uuid",
-  "workspace_id": "uuid",
-  "extracted_text": "Full PDF text content...",
-  "product_ids": ["uuid1", "uuid2"],
-  "chunk_size": 512,
-  "chunk_overlap": 50
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "chunks_created": 107,
-  "embeddings_generated": 107,
-  "relationships_created": 163
-}
-```
-
 **Defaults**:
 - `chunk_size`: 512 characters
 - `chunk_overlap`: 50 characters
@@ -540,25 +332,6 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
   - Links images to products based on page numbers
   - Uses product page ranges from discovery
   - Example: Product on pages 5-8 links to all images on those pages
-
-**Request**:
-```json
-{
-  "job_id": "string",
-  "document_id": "uuid",
-  "product_ids": ["uuid1", "uuid2"],
-  "similarity_threshold": 0.5
-}
-```
-
-**Response**:
-```json
-{
-  "success": true,
-  "chunk_image_relationships": 245,
-  "product_image_relationships": 132
-}
-```
 
 **Defaults**:
 - `similarity_threshold`: 0.5 (50% minimum similarity)
@@ -664,4 +437,3 @@ All endpoints accept an optional `ai_config` parameter to customize AI models:
 - ✅ **Error handling** with Sentry integration
 - ✅ **Real-time database sync** after each stage
 - ✅ **Pre-filtered data flow** (each endpoint receives processed output from previous stage)
-

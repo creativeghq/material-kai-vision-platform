@@ -2,7 +2,6 @@
 
 ## Architecture Overview
 
-```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     PRICE MONITORING SYSTEM                      │
 └─────────────────────────────────────────────────────────────────┘
@@ -30,7 +29,6 @@
                                           │  - price_alerts      │
                                           │  - ai_usage_logs     │
                                           └──────────────────────┘
-```
 
 ## Prerequisites
 
@@ -43,15 +41,7 @@
 
 ### Apply Migrations
 
-```bash
-cd material-kai-vision-platform
-
-# Apply all migrations
-supabase db push
-
-# Verify tables exist
-supabase db diff
-```
+Run `supabase db push` from the project root to apply all migrations. Verify the schema with `supabase db diff`.
 
 ### Verify Tables
 
@@ -74,87 +64,31 @@ Check that these functions exist:
 
 ### Environment Variables
 
-Add to `mivaa-pdf-extractor/.env`:
-
-```bash
-# Firecrawl API Key
-FIRECRAWL_API_KEY=fc-your-api-key-here
-
-# Supabase Configuration (should already exist)
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_JWT_SECRET=your-jwt-secret
-
-# Material Kai API Key (should already exist)
-MATERIAL_KAI_API_KEY=your-material-kai-api-key
-MATERIAL_KAI_WORKSPACE_ID=your-workspace-id
-```
+Add the following to `mivaa-pdf-extractor/.env`:
+- `FIRECRAWL_API_KEY` - Your Firecrawl API key
+- `SUPABASE_URL` - Supabase project URL (should already exist)
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (should already exist)
+- `SUPABASE_JWT_SECRET` - JWT secret (should already exist)
+- `MATERIAL_KAI_API_KEY` - Material Kai API key (should already exist)
+- `MATERIAL_KAI_WORKSPACE_ID` - Workspace ID (should already exist)
 
 ### Verify Backend is Running
 
-```bash
-cd mivaa-pdf-extractor
-
-# Start backend
-python -m uvicorn app.main:app --reload --port 8000
-
-# Test health endpoint
-curl http://localhost:8000/health
-
-# Test price monitoring endpoint (should return 401 without auth)
-curl http://localhost:8000/api/v1/price-monitoring/status/test-id
-```
+Start the backend with `python -m uvicorn app.main:app --reload --port 8000`. Verify the health endpoint responds at `http://localhost:8000/health`. The price monitoring endpoint at `http://localhost:8000/api/v1/price-monitoring/status/test-id` should return 401 without authentication.
 
 ## Step 3: Edge Function Deployment
 
 ### Set Secrets
 
-```bash
-# Set all required secrets
-supabase secrets set SUPABASE_URL=https://your-project.supabase.co
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-supabase secrets set PYTHON_BACKEND_URL=http://localhost:8000  # or production URL
-supabase secrets set CRON_SECRET=$(openssl rand -hex 32)
-
-# Verify secrets are set
-supabase secrets list
-```
+Use `supabase secrets set` to configure the following secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PYTHON_BACKEND_URL (localhost for dev or the production URL), and CRON_SECRET (generate with `openssl rand -hex 32`). Verify with `supabase secrets list`.
 
 ### Deploy Edge Function
 
-```bash
-# Deploy the cron function
-supabase functions deploy price-monitoring-cron
-
-# Verify deployment
-supabase functions list
-```
+Run `supabase functions deploy price-monitoring-cron` and verify with `supabase functions list`.
 
 ### Test Edge Function Manually
 
-```bash
-# Get your cron secret
-CRON_SECRET=$(supabase secrets get CRON_SECRET)
-
-# Test the function
-curl -X POST https://your-project.supabase.co/functions/v1/price-monitoring-cron \
-  -H "x-cron-secret: $CRON_SECRET" \
-  -H "Content-Type: application/json"
-
-# Expected response:
-# {
-#   "success": true,
-#   "message": "Price monitoring completed: 0/0 succeeded",
-#   "stats": {
-#     "total": 0,
-#     "processed": 0,
-#     "succeeded": 0,
-#     "failed": 0,
-#     "results": []
-#   },
-#   "timestamp": "2025-12-25T15:30:00Z"
-# }
-```
+Send a POST request to `https://your-project.supabase.co/functions/v1/price-monitoring-cron` with the `x-cron-secret` header set to your CRON_SECRET value. With no products configured yet, the expected response will show success with all stats at zero.
 
 ## Step 4: Set Up Cron Schedule
 
@@ -165,199 +99,51 @@ curl -X POST https://your-project.supabase.co/functions/v1/price-monitoring-cron
 3. Configure:
    - **Name**: `price-monitoring-hourly`
    - **Schedule**: `0 * * * *` (every hour)
-   - **Command**:
-   ```sql
-   SELECT net.http_post(
-     url := 'https://your-project.supabase.co/functions/v1/price-monitoring-cron',
-     headers := jsonb_build_object(
-       'Content-Type', 'application/json',
-       'x-cron-secret', 'your-cron-secret-here'
-     )
-   );
-   ```
+   - **Command**: A SQL statement using `net.http_post` to call the price-monitoring-cron edge function URL with the Content-Type and x-cron-secret headers.
 
 ### Option B: SQL Command
 
-```sql
-SELECT cron.schedule(
-  'price-monitoring-hourly',
-  '0 * * * *',  -- Every hour
-  $$
-  SELECT net.http_post(
-    url := 'https://your-project.supabase.co/functions/v1/price-monitoring-cron',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', 'your-cron-secret-here'
-    )
-  );
-  $$
-);
-```
+Execute a `SELECT cron.schedule(...)` statement with the job name `'price-monitoring-hourly'`, schedule `'0 * * * *'`, and a dollar-quoted SQL block that calls `net.http_post` with the edge function URL and the required headers including the cron secret.
 
 ### Verify Cron Job
 
-```sql
--- List all cron jobs
-SELECT * FROM cron.job;
-
--- Check cron job runs
-SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;
-```
+Query `SELECT * FROM cron.job;` to list all scheduled cron jobs. Query `SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;` to check recent execution history.
 
 ## Step 5: Testing the Complete Flow
 
 ### 1. Create Test Product Monitoring
 
-```bash
-# Use your JWT token
-TOKEN="your-jwt-token-here"
-
-# Start monitoring for a product
-curl -X POST http://localhost:8000/api/v1/price-monitoring/start \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_id": "test-product-123",
-    "frequency": "hourly",
-    "enabled": true
-  }'
-```
+Send a POST request to `http://localhost:8000/api/v1/price-monitoring/start` with your JWT token in the Authorization header and a body specifying `product_id`, `frequency: 'hourly'`, and `enabled: true`.
 
 ### 2. Add Competitor Sources
 
-```bash
-# Add first competitor
-curl -X POST http://localhost:8000/api/v1/price-monitoring/sources \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_id": "test-product-123",
-    "source_name": "Amazon",
-    "source_url": "https://www.amazon.com/dp/B08N5WRWNW",
-    "scraping_config": {
-      "waitFor": 2000,
-      "timeout": 30000
-    }
-  }'
-
-# Add second competitor
-curl -X POST http://localhost:8000/api/v1/price-monitoring/sources \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_id": "test-product-123",
-    "source_name": "Wayfair",
-    "source_url": "https://www.wayfair.com/furniture/pdp/example.html"
-  }'
-```
+Send POST requests to `http://localhost:8000/api/v1/price-monitoring/sources` with your JWT token. Each request body specifies `product_id`, `source_name`, `source_url`, and optionally `scraping_config` with settings like `waitFor` (milliseconds) and `timeout`.
 
 ### 3. Trigger Manual Price Check
 
-```bash
-# Check prices now
-curl -X POST http://localhost:8000/api/v1/price-monitoring/check-now \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "product_id": "test-product-123",
-    "product_name": "Premium Leather Sofa"
-  }'
-
-# Expected response:
-# {
-#   "success": true,
-#   "message": "Checked 2 sources",
-#   "job_id": "uuid",
-#   "sources_checked": 2,
-#   "prices_found": 2,
-#   "credits_consumed": 2
-# }
-```
+Send a POST request to `http://localhost:8000/api/v1/price-monitoring/check-now` with your JWT token and a body specifying `product_id` and `product_name`. The expected response includes success, message, job_id, sources_checked, prices_found, and credits_consumed.
 
 ### 4. Verify Database Records
 
-```sql
--- Check price history
-SELECT * FROM price_history 
-WHERE product_id = 'test-product-123' 
-ORDER BY scraped_at DESC;
-
--- Check monitoring jobs
-SELECT * FROM price_monitoring_jobs 
-WHERE product_id = 'test-product-123' 
-ORDER BY created_at DESC;
-
--- Check AI usage logs
-SELECT * FROM ai_usage_logs
-WHERE provider = 'firecrawl'
-ORDER BY created_at DESC;
-```
+Query the `price_history` table filtering by product_id and ordering by scraped_at descending to confirm price records were created. Query `price_monitoring_jobs` similarly to confirm job records. Query `ai_usage_logs` filtering by provider 'firecrawl' to confirm credit usage was logged.
 
 ### 5. Test Cron Job Execution
 
-```bash
-# Manually trigger the cron job
-CRON_SECRET=$(supabase secrets get CRON_SECRET)
-
-curl -X POST https://your-project.supabase.co/functions/v1/price-monitoring-cron \
-  -H "x-cron-secret: $CRON_SECRET" \
-  -H "Content-Type: application/json"
-
-# Check Edge Function logs
-supabase functions logs price-monitoring-cron --tail
-
-# Check Python backend logs
-# (in your Python backend terminal)
-```
+Manually trigger the cron function by sending a POST request with the cron secret header. Check Edge Function logs with `supabase functions logs price-monitoring-cron --tail`. Check Python backend logs in the backend terminal.
 
 ### 6. Verify Cron Schedule
 
-```sql
--- Check if cron job is scheduled
-SELECT * FROM cron.job WHERE jobname = 'price-monitoring-hourly';
-
--- Check recent cron job runs
-SELECT
-  jobid,
-  runid,
-  job_pid,
-  database,
-  username,
-  command,
-  status,
-  return_message,
-  start_time,
-  end_time
-FROM cron.job_run_details
-WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'price-monitoring-hourly')
-ORDER BY start_time DESC
-LIMIT 10;
-```
+Query `SELECT * FROM cron.job WHERE jobname = 'price-monitoring-hourly';` to confirm the job is scheduled. Query `cron.job_run_details` filtering by the jobid to see fields including jobid, runid, job_pid, database, username, command, status, return_message, start_time, and end_time.
 
 ## Step 6: Monitoring & Troubleshooting
 
 ### Check Edge Function Logs
 
-```bash
-# View real-time logs
-supabase functions logs price-monitoring-cron --tail
-
-# View last 100 logs
-supabase functions logs price-monitoring-cron --limit 100
-```
+Use `supabase functions logs price-monitoring-cron --tail` for real-time logs or `supabase functions logs price-monitoring-cron --limit 100` for the last 100 entries.
 
 ### Check Python Backend Logs
 
-```bash
-# If using systemd
-sudo journalctl -u mivaa-backend -f
-
-# If using Docker
-docker logs -f mivaa-backend
-
-# If running locally
-# Check terminal output
-```
+View logs via systemd (`sudo journalctl -u mivaa-backend -f`), Docker (`docker logs -f mivaa-backend`), or directly in the terminal if running locally.
 
 ### Common Issues
 
@@ -378,10 +164,7 @@ docker logs -f mivaa-backend
 **Solutions**:
 - Verify `CRON_SECRET` is set correctly
 - Check cron job is using correct secret
-- Regenerate secret if needed:
-  ```bash
-  supabase secrets set CRON_SECRET=$(openssl rand -hex 32)
-  ```
+- Regenerate secret if needed using `openssl rand -hex 32` and set it via `supabase secrets set CRON_SECRET=...`
 
 #### 3. Python Backend Not Responding
 
@@ -389,7 +172,7 @@ docker logs -f mivaa-backend
 
 **Solutions**:
 - Verify `PYTHON_BACKEND_URL` is correct
-- Check Python backend is running: `curl http://localhost:8000/health`
+- Check Python backend is running at the health endpoint
 - Check firewall rules allow Edge Function → Backend communication
 - For production, ensure backend URL is publicly accessible
 
@@ -401,17 +184,7 @@ docker logs -f mivaa-backend
 - Check `price_monitoring_products` table has records
 - Verify `monitoring_enabled = true`
 - Verify `next_check_at <= NOW()`
-- Check product monitoring status:
-  ```sql
-  SELECT
-    product_id,
-    monitoring_enabled,
-    monitoring_frequency,
-    next_check_at,
-    status
-  FROM price_monitoring_products
-  WHERE monitoring_enabled = true;
-  ```
+- Query the price_monitoring_products table filtering by `monitoring_enabled = true` to see product_id, monitoring_frequency, next_check_at, and status for each record.
 
 #### 5. Firecrawl API Errors
 
@@ -438,47 +211,15 @@ docker logs -f mivaa-backend
 
 ### 1. Update Environment Variables
 
-```bash
-# Production Python backend URL
-supabase secrets set PYTHON_BACKEND_URL=https://api.yourdomain.com
-
-# Verify all secrets
-supabase secrets list
-```
+Set the production Python backend URL using `supabase secrets set PYTHON_BACKEND_URL=https://api.yourdomain.com`. Verify all secrets with `supabase secrets list`.
 
 ### 2. Deploy Edge Function
 
-```bash
-# Deploy to production
-supabase functions deploy price-monitoring-cron --project-ref your-project-ref
-
-# Verify deployment
-supabase functions list --project-ref your-project-ref
-```
+Deploy to production with `supabase functions deploy price-monitoring-cron --project-ref your-project-ref`. Verify with `supabase functions list --project-ref your-project-ref`.
 
 ### 3. Update Cron Schedule
 
-Update the cron job to use production URL:
-
-```sql
--- Delete old cron job
-SELECT cron.unschedule('price-monitoring-hourly');
-
--- Create new cron job with production URL
-SELECT cron.schedule(
-  'price-monitoring-hourly',
-  '0 * * * *',
-  $$
-  SELECT net.http_post(
-    url := 'https://your-project.supabase.co/functions/v1/price-monitoring-cron',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', 'your-production-cron-secret'
-    )
-  );
-  $$
-);
-```
+Delete the old cron job with `SELECT cron.unschedule('price-monitoring-hourly');`. Create a new cron job using `SELECT cron.schedule(...)` pointing to the production URL with the production cron secret.
 
 ### 4. Set Up Monitoring
 
@@ -537,6 +278,3 @@ For issues or questions:
 3. Review database tables for errors
 4. Check Firecrawl API status: https://status.firecrawl.dev
 5. Review Supabase status: https://status.supabase.com
-
-
-

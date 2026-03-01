@@ -208,4 +208,3 @@ For issues or questions:
 - Review error messages
 - Test with single page mode
 - Adjust configuration settings
-

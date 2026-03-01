@@ -24,14 +24,7 @@ This plan outlines a comprehensive strategy for extracting metadata from **multi
 
 ### Text-Guided Prompts
 
-```python
-text_prompts = {
-    "color": "focus on color palette and color relationships",
-    "texture": "focus on surface patterns and texture details",
-    "material": "focus on material type and physical properties",
-    "style": "focus on design style and aesthetic elements"
-}
-```
+The specialized embeddings are generated using text prompts that focus the model's attention: color embeddings focus on "color palette and color relationships", texture embeddings on "surface patterns and texture details", material embeddings on "material type and physical properties", and style embeddings on "design style and aesthetic elements".
 
 ## Problem Statement
 
@@ -47,7 +40,6 @@ text_prompts = {
 
 ### Architecture
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │                    METADATA SOURCES                         │
 ├─────────────────────────────────────────────────────────────┤
@@ -111,7 +103,6 @@ text_prompts = {
 │    }                                                        │
 │  }                                                          │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ## Implementation Plan
 
@@ -139,45 +130,7 @@ text_prompts = {
 
 **Purpose**: Merge metadata from all sources with conflict resolution
 
-**Algorithm**:
-```python
-def consolidate_metadata(sources: Dict[str, Dict]) -> Dict:
-    """
-    sources = {
-        "ai_text": {"color": "beige", "finish": "matte"},
-        "visual_embedding": {"color": "warm beige", "finish": "matte"},
-        "pattern_matching": {"slip_resistance": "R11"},
-        "factory_defaults": {"country_of_origin": "Spain"}
-    }
-    """
-    consolidated = {}
-    extraction_metadata = {}
-    
-    for field in all_fields:
-        candidates = []
-        for source_name, source_data in sources.items():
-            if field in source_data:
-                candidates.append({
-                    "value": source_data[field],
-                    "source": source_name,
-                    "confidence": get_confidence(source_name, field)
-                })
-        
-        if candidates:
-            # Pick highest confidence
-            best = max(candidates, key=lambda x: x["confidence"])
-            consolidated[field] = best["value"]
-            extraction_metadata[field] = {
-                "source": best["source"],
-                "confidence": best["confidence"],
-                "alternatives": [c["value"] for c in candidates if c != best]
-            }
-    
-    return {
-        **consolidated,
-        "_extraction_metadata": extraction_metadata
-    }
-```
+**Algorithm**: The `consolidate_metadata(sources)` function receives a dictionary of source names to their extracted metadata dictionaries. For each metadata field, it collects all candidate values from all sources along with their confidence scores (determined by source type). The candidate with the highest confidence becomes the final value, with alternatives tracked. The output is a flat metadata dictionary plus `_extraction_metadata` tracking source, confidence, and alternatives for each field.
 
 ### Phase 3: Confidence Scoring System
 
@@ -228,63 +181,11 @@ def consolidate_metadata(sources: Dict[str, Dict]) -> Dict:
 
 ### New Table: `metadata_vocabulary`
 
-```sql
-CREATE TABLE metadata_vocabulary (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  field_name TEXT NOT NULL,  -- 'color', 'texture', 'material', 'style'
-  value TEXT NOT NULL,        -- 'beige', 'matte', 'ceramic', 'modern'
-  embedding VECTOR(1152),     -- Pre-computed SigLIP embedding
-  category TEXT,              -- 'warm_colors', 'neutral_colors', etc.
-  synonyms TEXT[],            -- ['sand', 'tan', 'cream'] for 'beige'
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_metadata_vocab_field ON metadata_vocabulary(field_name);
-CREATE INDEX idx_metadata_vocab_embedding ON metadata_vocabulary
-  USING ivfflat (embedding vector_cosine_ops);
-```
+A new `metadata_vocabulary` table stores: `id` (UUID), `field_name` (e.g., 'color', 'texture', 'material', 'style'), `value` (e.g., 'beige', 'matte', 'ceramic', 'modern'), `embedding` (VECTOR(1152) — pre-computed SigLIP embedding), `category` (e.g., 'warm_colors', 'neutral_colors'), and `synonyms` (TEXT array). Indexes are created on `field_name` and on the embedding column using `ivfflat` with `vector_cosine_ops`.
 
 ### Enhanced `products.metadata` Structure
 
-```json
-{
-  "color": "beige",
-  "finish": "matte",
-  "material": "ceramic",
-  "style": "modern minimalist",
-  "slip_resistance": "R11",
-  "fire_rating": "A1",
-
-  "_extraction_metadata": {
-    "color": {
-      "source": "visual_embedding",
-      "confidence": 0.88,
-      "alternatives": ["warm beige", "sand"],
-      "extraction_timestamp": "2024-01-15T10:30:00Z"
-    },
-    "finish": {
-      "source": "ai_text_extraction",
-      "confidence": 0.92,
-      "alternatives": [],
-      "extraction_timestamp": "2024-01-15T10:25:00Z"
-    },
-    "slip_resistance": {
-      "source": "ai_text_extraction",
-      "confidence": 0.95,
-      "alternatives": [],
-      "extraction_timestamp": "2024-01-15T10:25:00Z"
-    }
-  },
-
-  "_sources_used": [
-    "ai_text_extraction",
-    "visual_embedding",
-    "pattern_matching"
-  ],
-
-  "_overall_confidence": 0.89
-}
-```
+The enriched metadata includes the core fields (color, finish, material, style, slip_resistance, fire_rating), plus an `_extraction_metadata` dictionary tracking source, confidence, alternatives, and extraction timestamp for each field, plus `_sources_used` (array of source names used) and `_overall_confidence` (float).
 
 ## Implementation Steps
 
@@ -293,16 +194,9 @@ CREATE INDEX idx_metadata_vocab_embedding ON metadata_vocabulary
 **Action**: Create AI prompts for embedding interpretation and metadata consolidation
 
 **Prompts Created**:
-1. **Embedding-to-Text Interpretation** (stage: image_analysis, category: embedding_to_text)
-   - Vocabulary: 50+ colors, 30+ finishes, 40+ materials, 25+ styles
-   - AI interprets embedding patterns and returns structured JSON
-   - Confidence scoring: 0.60-1.00 based on clarity
+1. **Embedding-to-Text Interpretation** (stage: image_analysis, category: embedding_to_text) — Contains vocabulary of 50+ colors, 30+ finishes, 40+ materials, 25+ styles. AI interprets embedding patterns and returns structured JSON with confidence scoring 0.60–1.00.
 
-2. **Metadata Consolidation** (stage: entity_creation, category: metadata_consolidation)
-   - Priority order: manual > AI text > visual > pattern > factory defaults
-   - Agreement bonus: +0.05 when sources agree
-   - Conflict penalty: -0.10 when sources disagree
-   - Returns consolidated metadata with extraction tracking
+2. **Metadata Consolidation** (stage: entity_creation, category: metadata_consolidation) — Priority order: manual > AI text > visual > pattern > factory defaults. Agreement bonus: +0.05 when sources agree. Conflict penalty: -0.10 when sources disagree. Returns consolidated metadata with extraction tracking.
 
 ### Step 2: Implement Embedding-to-Text Service ✅
 
@@ -341,22 +235,7 @@ CREATE INDEX idx_metadata_vocab_embedding ON metadata_vocabulary
 
 ### Step 4: Add visual_metadata Column to document_images ✅
 
-**Migration**: Added JSONB column to store AI-extracted metadata from embeddings
-
-```sql
-ALTER TABLE document_images
-ADD COLUMN visual_metadata JSONB DEFAULT '{}'::jsonb;
-```
-
-**Structure**:
-```json
-{
-  "color": {"primary": "beige", "secondary": ["warm tones"], "confidence": 0.88},
-  "finish": {"primary": "matte", "secondary": [], "confidence": 0.85},
-  "material": {"primary": "ceramic", "secondary": ["porcelain"], "confidence": 0.92},
-  "style": {"primary": "modern minimalist", "secondary": ["contemporary"], "confidence": 0.80}
-}
-```
+**Migration**: Added JSONB column `visual_metadata` (default `{}`) to `document_images` to store AI-extracted metadata from embeddings. The structure contains per-field objects with `primary` value, `secondary` alternatives array, and `confidence` score.
 
 ### Step 5: Integrate into PDF Processing Pipeline ✅
 
@@ -378,46 +257,11 @@ ADD COLUMN visual_metadata JSONB DEFAULT '{}'::jsonb;
 
 ### Before (Current System)
 
-```json
-{
-  "name": "FOLD WHITE",
-  "metadata": {
-    "designer": "SG NY",
-    "dimensions": ["15×38"],
-    "slip_resistance": "R11"
-  }
-}
-```
-
-**Missing**: color, finish, material, style (even though embeddings exist!)
+Product metadata only contains explicitly stated fields like designer, dimensions, and slip_resistance — missing color, finish, material, and style even though the visual embeddings for those properties exist.
 
 ### After (Multi-Source System)
 
-```json
-{
-  "name": "FOLD WHITE",
-  "metadata": {
-    "designer": "SG NY",
-    "dimensions": ["15×38"],
-    "slip_resistance": "R11",
-
-    "color": "white",
-    "finish": "matte",
-    "material": "ceramic",
-    "style": "modern minimalist",
-    "texture": "smooth",
-
-    "_extraction_metadata": {
-      "color": {"source": "visual_embedding", "confidence": 0.92},
-      "finish": {"source": "visual_embedding", "confidence": 0.88},
-      "material": {"source": "ai_text_extraction", "confidence": 0.95},
-      "style": {"source": "visual_embedding", "confidence": 0.85},
-      "slip_resistance": {"source": "ai_text_extraction", "confidence": 0.95}
-    },
-    "_overall_confidence": 0.91
-  }
-}
-```
+Product metadata includes all the above plus visually-derived fields (color, finish, material, style, texture), each tracked in `_extraction_metadata` with their source and confidence, and an `_overall_confidence` summary score.
 
 **Gained**: 5 additional metadata fields from visual analysis!
 

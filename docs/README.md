@@ -53,12 +53,12 @@
 - Phase 1 & 2 complete
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models reference
-- 8 AI models across 4 providers
+- 12+ AI models across 5 providers
 - Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
-- OpenAI: GPT-4o, GPT-5, text-embedding-3-small
-- Google: SigLIP ViT-SO400M (primary CLIP)
-- TogetherAI: Qwen3-VL 17B Vision
-- OpenAI CLIP ViT-B/32 (fallback)
+- OpenAI: GPT-4o, GPT-4o-mini
+- Voyage AI: voyage-3.5 (primary text + understanding embeddings, 1024D)
+- HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (768D visual embeddings)
+- WorldLabs Marble: 3D Gaussian Splat generation
 - Model usage by stage
 - Cost optimization
 
@@ -110,7 +110,7 @@
 - Embeddings Routes (3)
 - AI Services Routes (10)
 - Background Jobs (7)
-- Together AI Routes (3)
+- HuggingFace/Qwen Routes (3)
 - Anthropic Routes (3)
 - Monitoring Routes (3)
 - AI Metrics Routes (2)

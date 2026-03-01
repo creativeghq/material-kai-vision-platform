@@ -61,48 +61,7 @@ The multi-vector search has been **significantly enhanced** to be the single com
 
 ### Example Usage
 
-#### Basic Multi-Vector Search
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "query": "modern ceramic tiles",
-    "workspace_id": "your-workspace-id",
-    "top_k": 10
-  }'
-```
-
-#### With Manual Filters
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "query": "ceramic tiles",
-    "workspace_id": "your-workspace-id",
-    "material_filters": {
-      "finish": "matte",
-      "properties": ["waterproof", "outdoor"]
-    },
-    "top_k": 10
-  }'
-```
-
-#### With Query Understanding (DEFAULT)
-```bash
-# Query understanding is ENABLED BY DEFAULT
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "query": "waterproof ceramic tiles for outdoor patio, matte finish, light beige",
-    "workspace_id": "your-workspace-id",
-    "top_k": 10
-  }'
-```
-
-**What happens:**
+**What happens with query understanding (DEFAULT):**
 1. GPT-4o-mini parses the query
 2. Extracts filters:
    - material_type: "ceramic tiles"
@@ -112,18 +71,6 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector
    - application: "patio"
 3. Multi-vector search executes with 6 embeddings + filters
 4. Returns highly accurate, filtered results
-
-#### Disable Query Understanding (If Needed)
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector&enable_query_understanding=false" \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "query": "tiles",
-    "workspace_id": "your-workspace-id",
-    "top_k": 10
-  }'
-```
 
 ---
 
@@ -164,11 +111,7 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector
 
 ## 🔐 Authentication
 
-All API endpoints require JWT authentication:
-
-```bash
-Authorization: Bearer YOUR_JWT_TOKEN
-```
+All API endpoints require JWT authentication via the `Authorization: Bearer YOUR_JWT_TOKEN` header.
 
 Get your token from:
 1. Frontend application (automatic)
@@ -179,35 +122,7 @@ Get your token from:
 
 ## 📊 Response Format
 
-### Success Response
-```json
-{
-  "success": true,
-  "results": [...],
-  "total_results": 10,
-  "processing_time": 0.25,
-  "weights": {
-    "text": 0.2,
-    "visual": 0.2,
-    "color": 0.15,
-    "texture": 0.15,
-    "style": 0.15,
-    "material": 0.15
-  },
-  "material_filters_applied": {...},
-  "query": "...",
-  "search_type": "multi_vector_enhanced"
-}
-```
-
-### Error Response
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "detail": "Detailed error information"
-}
-```
+All endpoints return JSON with a consistent structure indicating success/failure, results array, processing metadata, weights applied, filters applied, and the search type used.
 
 ---
 
@@ -218,12 +133,7 @@ Get your token from:
    - Get your JWT token from the dashboard
 
 2. **Make Your First Request**
-   ```bash
-   curl -X POST "https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector" \
-     -H "Content-Type: application/json" \
-     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     -d '{"query": "modern tiles", "workspace_id": "your-workspace-id"}'
-   ```
+   - POST to `https://v1api.materialshub.gr/api/rag/search?strategy=multi_vector` with your query and workspace_id
 
 3. **Explore Interactive Docs**
    - Visit [https://v1api.materialshub.gr/docs](https://v1api.materialshub.gr/docs)
@@ -241,4 +151,3 @@ Get your token from:
 ---
 
 **Questions?** Contact support or check the interactive documentation at `/docs`.
-

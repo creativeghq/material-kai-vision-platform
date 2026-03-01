@@ -185,7 +185,7 @@ The image search system is designed for speed and accuracy:
 The multi-vector search uses advanced async programming to achieve maximum performance:
 
 **Architecture:**
-```
+
 Query → Generate Embeddings → Search 6 Collections in Parallel
                                ├─ Visual (SigLIP 768D)
                                ├─ Understanding (Voyage AI 1024D)
@@ -195,7 +195,6 @@ Query → Generate Embeddings → Search 6 Collections in Parallel
                                └─ Material (SigLIP 768D)
                                ↓
                           Combine Scores → Apply Filters → Return Results
-```
 
 **Key Technologies:**
 - **asyncio.gather()** - Executes all searches simultaneously
@@ -227,30 +226,7 @@ These are useful for:
 
 ### Search Response Format
 
-The multi-vector search returns detailed scoring information:
-
-```json
-{
-  "results": [{
-    "id": "product_123",
-    "product_name": "Ceramic Tile",
-    "score": 0.87,
-    "text_score": 0.85,
-    "visual_score": 0.92,
-    "understanding_score": 0.94,
-    "color_score": 0.88,
-    "texture_score": 0.81,
-    "style_score": 0.79,
-    "material_score": 0.90,
-    "filter_boost": 0.15
-  }],
-  "total_results": 10,
-  "processing_time": 0.345,
-  "embeddings_used": ["text", "visual", "understanding", "color", "texture", "style", "material"]
-}
-```
-
-This transparency allows you to understand why each result was returned and debug search quality.
+The multi-vector search returns detailed scoring information for each result, including combined score, per-embedding scores (text, visual, understanding, color, texture, style, material), filter boost, and total processing time. This transparency allows you to understand why each result was returned and debug search quality.
 
 ## Related Features
 

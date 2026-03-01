@@ -54,7 +54,6 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
 
 ### System Overview
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND (React)                                            │
 │ ├─ Email Service (src/services/email/emailService.ts)      │
@@ -84,7 +83,6 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
 │ ├─ email_events (Delivery events)                          │
 │ └─ email_analytics (Daily statistics)                      │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ### Components
 
@@ -160,15 +158,7 @@ The Email System provides enterprise-grade email capabilities using **Amazon SES
 
 **Authentication:** Requires Supabase `anon` or `service_role` key in `Authorization` header
 
-**Base Request Format:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: string,  // Required: 'send', 'verify-domain', 'check-domain', 'analytics', 'sending-stats'
-    ...actionSpecificParams
-  }
-});
-```
+All requests are made by invoking the `email-api` edge function with a body containing an `action` string (required: 'send', 'verify-domain', 'check-domain', 'analytics', 'sending-stats') plus action-specific parameters.
 
 ---
 
@@ -176,51 +166,9 @@ const { data, error } = await supabase.functions.invoke('email-api', {
 
 Send an email with or without a template.
 
-**Request:**
-```typescript
-{
-  action: 'send',
-  to: string | string[],           // Recipient email(s)
-  subject: string,                  // Email subject
-  html?: string,                    // HTML body (if not using template)
-  text?: string,                    // Plain text body
-  templateSlug?: string,            // Template slug from email_templates
-  variables?: Record<string, any>,  // Variables for template
-  from?: string,                    // Sender email (default: from email_settings table)
-  fromName?: string,                // Sender name (default: from email_settings table)
-  cc?: string[],                    // CC recipients
-  bcc?: string[],                   // BCC recipients
-  emailType?: 'transactional' | 'marketing' | 'notification',
-  tags?: Record<string, string>,    // Custom tags for tracking
-  metadata?: Record<string, any>    // Custom metadata
-}
-```
+**Request parameters:** `to` (string or array of recipient emails), `subject`, optional `html` body, optional `text` body, optional `templateSlug`, optional `variables` for template substitution, optional `from` email, optional `fromName`, optional `cc` and `bcc` arrays, optional `emailType` ('transactional', 'marketing', or 'notification'), optional `tags`, and optional `metadata`.
 
-**Response:**
-```typescript
-{
-  success: true,
-  messageId: string,  // SES message ID
-  logId: string       // email_logs record ID
-}
-```
-
-**Example:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'send',
-    to: 'user@example.com',
-    subject: 'Welcome to Material Kai',
-    templateSlug: 'welcome',
-    variables: {
-      userName: 'John Doe',
-      loginUrl: 'https://app.materialkai.com/login'
-    },
-    emailType: 'transactional'
-  }
-});
-```
+**Response:** `success: true`, `messageId` (SES message ID), `logId` (email_logs record ID).
 
 ---
 
@@ -228,36 +176,11 @@ const { data, error } = await supabase.functions.invoke('email-api', {
 
 Initiate domain verification with Amazon SES.
 
-**Request:**
-```typescript
-{
-  action: 'verify-domain',
-  domain: string  // Domain to verify (e.g., 'example.com')
-}
-```
+**Request parameters:** `action: 'verify-domain'`, `domain` (e.g., 'example.com').
 
-**Response:**
-```typescript
-{
-  success: true,
-  verificationToken: string,  // DNS TXT record value
-  domain: string
-}
-```
+**Response:** `success: true`, `verificationToken` (DNS TXT record value), `domain`.
 
-**Example:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'verify-domain',
-    domain: 'materialkai.com'
-  }
-});
-
-// Add DNS TXT record:
-// Name: _amazonses.materialkai.com
-// Value: data.verificationToken
-```
+After receiving the token, add a DNS TXT record with name `_amazonses.yourdomain.com` and value set to the verification token.
 
 ---
 
@@ -265,32 +188,9 @@ const { data, error } = await supabase.functions.invoke('email-api', {
 
 Check domain verification status.
 
-**Request:**
-```typescript
-{
-  action: 'check-domain',
-  domain: string  // Domain to check
-}
-```
+**Request parameters:** `action: 'check-domain'`, `domain`.
 
-**Response:**
-```typescript
-{
-  success: true,
-  isVerified: boolean,
-  status: 'pending' | 'verified' | 'failed'
-}
-```
-
-**Example:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'check-domain',
-    domain: 'materialkai.com'
-  }
-});
-```
+**Response:** `success: true`, `isVerified` (boolean), `status` ('pending', 'verified', or 'failed').
 
 ---
 
@@ -298,43 +198,9 @@ const { data, error } = await supabase.functions.invoke('email-api', {
 
 Get email analytics for a date range.
 
-**Request:**
-```typescript
-{
-  action: 'analytics',
-  dateRange?: {
-    start: string,  // ISO date (e.g., '2025-01-01')
-    end: string     // ISO date (e.g., '2025-01-31')
-  }
-}
-```
+**Request parameters:** `action: 'analytics'`, optional `dateRange` object with `start` and `end` ISO date strings.
 
-**Response:**
-```typescript
-{
-  success: true,
-  totalSent: number,
-  totalDelivered: number,
-  totalBounced: number,
-  totalComplained: number,
-  deliveryRate: number,    // Percentage
-  bounceRate: number,      // Percentage
-  complaintRate: number    // Percentage
-}
-```
-
-**Example:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'analytics',
-    dateRange: {
-      start: '2025-01-01',
-      end: '2025-01-31'
-    }
-  }
-});
-```
+**Response:** `success: true`, `totalSent`, `totalDelivered`, `totalBounced`, `totalComplained`, `deliveryRate` (percentage), `bounceRate` (percentage), `complaintRate` (percentage).
 
 ---
 
@@ -342,32 +208,9 @@ const { data, error } = await supabase.functions.invoke('email-api', {
 
 Get SES account sending statistics and quota.
 
-**Request:**
-```typescript
-{
-  action: 'sending-stats'
-}
-```
+**Request parameters:** `action: 'sending-stats'`.
 
-**Response:**
-```typescript
-{
-  success: true,
-  max24HourSend: number,      // Maximum emails per 24 hours
-  maxSendRate: number,        // Maximum emails per second
-  sentLast24Hours: number,    // Emails sent in last 24 hours
-  remainingQuota: number      // Remaining quota
-}
-```
-
-**Example:**
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'sending-stats'
-  }
-});
-```
+**Response:** `success: true`, `max24HourSend`, `maxSendRate`, `sentLast24Hours`, `remainingQuota`.
 
 
 ---
@@ -554,29 +397,7 @@ Daily aggregated email statistics.
 1. Go to AWS Console → IAM → Users
 2. Click **Create User**
 3. Name: `material-kai-ses`
-4. Attach policy:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ses:SendEmail",
-        "ses:SendRawEmail",
-        "ses:VerifyDomainIdentity",
-        "ses:GetIdentityVerificationAttributes",
-        "ses:GetSendQuota",
-        "ses:GetSendStatistics",
-        "ses:GetAccount"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
+4. Attach a policy granting permissions for ses:SendEmail, ses:SendRawEmail, ses:VerifyDomainIdentity, ses:GetIdentityVerificationAttributes, ses:GetSendQuota, ses:GetSendStatistics, and ses:GetAccount on all resources.
 5. Create access key → Save credentials
 
 #### 1.2 Request Production Access
@@ -611,25 +432,7 @@ Daily aggregated email statistics.
 
 ### Step 3: Deploy Edge Functions
 
-```bash
-# Navigate to project root
-cd material-kai-vision-platform
-
-# Deploy email API
-supabase functions deploy email-api
-
-# Deploy webhook handler
-supabase functions deploy email-webhooks
-```
-
-**Verify deployment:**
-```bash
-# Test email-api
-curl -X POST https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-api \
-  -H "Authorization: Bearer YOUR_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"action": "sending-stats"}'
-```
+Deploy the edge functions using the Supabase CLI: `supabase functions deploy email-api` and `supabase functions deploy email-webhooks`. Verify the deployment by calling the `sending-stats` action on the deployed endpoint.
 
 ### Step 4: Configure SNS Webhooks
 
@@ -668,12 +471,7 @@ curl -X POST https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-api \
 5. Copy DNS records shown
 6. Add to your DNS provider:
 
-**TXT Record:**
-```
-Name: _amazonses.materialkai.com
-Value: [verification token from step 4]
-TTL: 1800
-```
+**TXT Record:** Name: `_amazonses.materialkai.com`, Value: `[verification token from step 4]`, TTL: 1800
 
 7. Wait for DNS propagation (5-30 minutes)
 8. Click **Check Verification**
@@ -697,121 +495,23 @@ TTL: 1800
 
 ### Example 1: Send Welcome Email
 
-```typescript
-import { supabase } from '@/lib/supabase';
-
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'send',
-    to: 'newuser@example.com',
-    subject: 'Welcome to Material Kai!',
-    templateSlug: 'welcome',
-    variables: {
-      userName: 'John Doe',
-      loginUrl: 'https://app.materialkai.com/login',
-      supportEmail: 'support@materialkai.com'
-    },
-    emailType: 'transactional'
-  }
-});
-
-if (error) {
-  console.error('Failed to send email:', error);
-} else {
-  console.log('Email sent:', data.messageId);
-}
-```
+Invoke the `email-api` edge function with `action: 'send'`, the recipient email, subject, `templateSlug: 'welcome'`, the template variables (userName, loginUrl, supportEmail), and `emailType: 'transactional'`.
 
 ### Example 2: Send Order Confirmation
 
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'send',
-    to: 'customer@example.com',
-    subject: 'Order Confirmation #12345',
-    html: `
-      <h1>Thank you for your order!</h1>
-      <p>Order #12345 has been confirmed.</p>
-      <ul>
-        <li>Product A x 2</li>
-        <li>Product B x 1</li>
-      </ul>
-      <p>Total: $150.00</p>
-    `,
-    emailType: 'transactional',
-    tags: {
-      orderId: '12345',
-      customerId: '67890'
-    }
-  }
-});
-```
+Invoke `email-api` with `action: 'send'`, the customer email, an order confirmation subject, raw HTML body content, `emailType: 'transactional'`, and custom tags containing the orderId and customerId.
 
 ### Example 3: Send Marketing Campaign
 
-```typescript
-const recipients = ['user1@example.com', 'user2@example.com'];
-
-for (const email of recipients) {
-  await supabase.functions.invoke('email-api', {
-    body: {
-      action: 'send',
-      to: email,
-      subject: 'New Products Available!',
-      templateSlug: 'marketing-campaign',
-      variables: {
-        firstName: 'Customer',
-        productName: 'Premium Materials Collection',
-        ctaUrl: 'https://materialkai.com/products/premium'
-      },
-      emailType: 'marketing',
-      tags: {
-        campaign: 'spring-2025',
-        segment: 'premium-customers'
-      }
-    }
-  });
-
-  // Rate limiting: wait 100ms between sends
-  await new Promise(resolve => setTimeout(resolve, 100));
-}
-```
+Loop through a list of recipient emails, invoking `email-api` for each with `action: 'send'`, the marketing template slug, per-recipient variables, `emailType: 'marketing'`, and campaign tags. Implement rate limiting between sends (e.g., 100ms wait between each invocation).
 
 ### Example 4: Get Analytics
 
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'analytics',
-    dateRange: {
-      start: '2025-01-01',
-      end: '2025-01-31'
-    }
-  }
-});
-
-console.log(`Delivery Rate: ${data.deliveryRate}%`);
-console.log(`Bounce Rate: ${data.bounceRate}%`);
-console.log(`Complaint Rate: ${data.complaintRate}%`);
-```
+Invoke `email-api` with `action: 'analytics'` and a `dateRange` object specifying start and end dates. The response contains `deliveryRate`, `bounceRate`, and `complaintRate` percentages.
 
 ### Example 5: Check Sending Quota
 
-```typescript
-const { data, error } = await supabase.functions.invoke('email-api', {
-  body: {
-    action: 'sending-stats'
-  }
-});
-
-const percentUsed = (data.sentLast24Hours / data.max24HourSend) * 100;
-console.log(`Quota used: ${percentUsed.toFixed(2)}%`);
-
-if (percentUsed > 80) {
-  console.warn('Approaching sending limit!');
-}
-```
+Invoke `email-api` with `action: 'sending-stats'`. Use the returned `sentLast24Hours` and `max24HourSend` values to calculate and monitor your quota utilization percentage.
 
 ---
 
@@ -975,12 +675,7 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
 
 **Solutions:**
 
-1. **Check Supabase Secrets:**
-   ```bash
-   # Verify secrets are set
-   supabase secrets list
-   ```
-   Ensure `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` are set.
+1. **Check Supabase Secrets:** Verify that `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` are set using `supabase secrets list`.
 
 2. **Check Domain Verification:**
    - Go to `/admin/emails` → Domains
@@ -992,19 +687,9 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
    - If in sandbox, request production access
    - In sandbox, can only send to verified addresses
 
-4. **Check Sending Quota:**
-   ```typescript
-   const { data } = await supabase.functions.invoke('email-api', {
-     body: { action: 'sending-stats' }
-   });
-   console.log(data);
-   ```
-   If quota exceeded, wait or request increase.
+4. **Check Sending Quota:** Invoke the `sending-stats` action and review the quota data. If quota exceeded, wait or request increase.
 
-5. **Check Edge Function Logs:**
-   ```bash
-   supabase functions logs email-api
-   ```
+5. **Check Edge Function Logs:** Run `supabase functions logs email-api` to review function output.
 
 ### Issue: High Bounce Rate
 
@@ -1014,10 +699,7 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
 
 **Solutions:**
 
-1. **Validate Email Addresses:**
-   ```typescript
-   const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-   ```
+1. **Validate Email Addresses:** Use a regex or email validation library to check address format before sending.
 
 2. **Clean Email List:**
    - Remove hard bounces immediately
@@ -1029,13 +711,7 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
    - Monitor blacklist status
    - Improve email content quality
 
-4. **Review Bounce Types:**
-   ```sql
-   SELECT event_data->>'bounceType', COUNT(*)
-   FROM email_events
-   WHERE event_type = 'bounce'
-   GROUP BY event_data->>'bounceType';
-   ```
+4. **Review Bounce Types:** Query the email_events table filtering by event_type 'bounce' and group by the bounceType field in the event_data JSON to identify patterns.
 
 ### Issue: Webhooks Not Working
 
@@ -1056,17 +732,9 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
    - Verify event publishing is enabled
    - Check SNS topic is correct
 
-3. **Test Webhook:**
-   ```bash
-   curl -X POST https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks \
-     -H "Content-Type: application/json" \
-     -d '{"Type": "SubscriptionConfirmation", "Token": "test"}'
-   ```
+3. **Test Webhook:** Send a POST request to the email-webhooks endpoint with a test SubscriptionConfirmation body to verify it responds.
 
-4. **Check Edge Function Logs:**
-   ```bash
-   supabase functions logs email-webhooks
-   ```
+4. **Check Edge Function Logs:** Run `supabase functions logs email-webhooks` to review function output.
 
 ### Issue: High Complaint Rate
 
@@ -1087,13 +755,7 @@ Access the admin dashboard at `/admin/emails` (requires admin role).
    - Respect user preferences
    - Honor unsubscribe requests
 
-3. **Monitor Feedback Loop:**
-   ```sql
-   SELECT event_data, COUNT(*)
-   FROM email_events
-   WHERE event_type = 'complaint'
-   GROUP BY event_data;
-   ```
+3. **Monitor Feedback Loop:** Query the email_events table filtering by event_type 'complaint' and group by event_data to identify patterns.
 
 4. **Implement Unsubscribe:**
    - Add unsubscribe link to all marketing emails

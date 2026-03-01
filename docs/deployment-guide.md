@@ -124,20 +124,7 @@ The platform uses HuggingFace Inference Endpoints for vision models and visual e
 - **Namespace**: `basiliskan`
 - **Auto-pause**: Enabled (pauses after 15 minutes of inactivity)
 
-**Required Environment Variables:**
-```bash
-# Qwen Vision Model
-QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
-QWEN_ENDPOINT_TOKEN=hf_your_token_here
-QWEN_ENDPOINT_NAME=mh-qwen332binstruct
-QWEN_NAMESPACE=basiliskan
-
-# SLIG Visual Embeddings
-SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
-SLIG_ENDPOINT_TOKEN=hf_your_token_here
-SLIG_ENDPOINT_NAME=mh-siglip2
-SLIG_NAMESPACE=basiliskan
-```
+**Required Environment Variables:** Set `QWEN_ENDPOINT_URL`, `QWEN_ENDPOINT_TOKEN`, `QWEN_ENDPOINT_NAME`, `QWEN_NAMESPACE`, `SLIG_ENDPOINT_URL`, `SLIG_ENDPOINT_TOKEN`, `SLIG_ENDPOINT_NAME`, and `SLIG_NAMESPACE` in the server environment.
 
 **Benefits:**
 - ✅ Auto-pause reduces costs during inactivity
@@ -191,19 +178,7 @@ SLIG_NAMESPACE=basiliskan
    - Click "Create"
    - Copy endpoint URL
 
-3. **Configure Environment Variables:**
-   ```bash
-   # Required
-   HF_TOKEN=hf_your_token_here
-
-   # Optional (defaults shown)
-   CHANDRA_ENDPOINT_URL=https://kgvlceo5zrww8a6m.us-east-1.aws.endpoints.huggingface.cloud
-   CHANDRA_ENDPOINT_NAME=mh-chandra
-   CHANDRA_NAMESPACE=basiliskan
-   CHANDRA_ENABLED=true
-   CHANDRA_CONFIDENCE_THRESHOLD=0.7
-   CHANDRA_AUTO_PAUSE_TIMEOUT=60
-   ```
+3. **Configure Environment Variables:** Set `HF_TOKEN` (required) plus the optional Chandra variables (`CHANDRA_ENDPOINT_URL`, `CHANDRA_ENDPOINT_NAME`, `CHANDRA_NAMESPACE`, `CHANDRA_ENABLED`, `CHANDRA_CONFIDENCE_THRESHOLD`, `CHANDRA_AUTO_PAUSE_TIMEOUT`) in the server environment.
 
 4. **Verify Endpoint Status:**
    - Endpoint should be **PAUSED** by default (no billing)
@@ -427,24 +402,13 @@ SLIG_NAMESPACE=basiliskan
 
 **Go to:** https://supabase.com/dashboard/project/bgbavxtjlbvgplozizxu/settings/vault
 
-Add these 4 secrets:
-```
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_CREDITS_PRODUCT_ID=prod_...
-STRIPE_PRO_PRICE_ID=price_...
-STRIPE_ENTERPRISE_PRICE_ID=price_...
-```
+Add these secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CREDITS_PRODUCT_ID`, `STRIPE_PRO_PRICE_ID`, and `STRIPE_ENTERPRISE_PRICE_ID`.
 
 ### **Step 5: Configure Vercel Environment Variables**
 
 **Go to:** https://vercel.com/creativeghq/material-kai-vision-platform/settings/environment-variables
 
-Add these variables (select **ALL** environments: Production, Preview, Development):
-```
-VITE_STRIPE_PRO_PRICE_ID=price_...
-VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
-```
+Add `VITE_STRIPE_PRO_PRICE_ID` and `VITE_STRIPE_ENTERPRISE_PRICE_ID` for ALL environments (Production, Preview, Development).
 
 ### **Step 6: Test the Integration**
 
@@ -487,187 +451,39 @@ The Material Kai Vision Platform uses a multi-service deployment strategy:
 1. **Frontend**: Vercel (Static hosting + Edge functions)
 2. **MIVAA Service**: Systemd service with UV (Self-hosted server)
 3. **Database**: Supabase (Managed PostgreSQL)
-4. **External APIs**: Third-party services (OpenAI, Anthropic, Together AI, Replicate)
+4. **External APIs**: Third-party services (OpenAI, Anthropic, Voyage AI, HuggingFace, Replicate, WorldLabs)
 
 ## 🏗️ Infrastructure Overview
 
-```mermaid
-graph TB
-    subgraph "Production Environment"
-        A[Vercel Frontend<br/>Static + Edge]
-        B[MIVAA Service<br/>Systemd + UV]
-        C[Supabase<br/>Database + Auth]
-        D[External APIs<br/>OpenAI, Anthropic, Together AI]
-    end
+**Production Environment**: Vercel Frontend (Static + Edge) connects to MIVAA Service (Systemd + UV) and Supabase (Database + Auth). MIVAA Service also connects to External APIs (OpenAI, Anthropic, Voyage AI, HuggingFace).
 
-    subgraph "Development Environment"
-        E[Local Frontend<br/>localhost:5173]
-        F[Local MIVAA<br/>localhost:8000]
-        G[Supabase Cloud<br/>Shared Instance]
-    end
-
-    A --> B
-    A --> C
-    B --> C
-    B --> D
-    E --> F
-    E --> G
-    F --> G
-```
+**Development Environment**: Local Frontend (localhost:5173) connects to Local MIVAA (localhost:8000) and Supabase Cloud (Shared Instance). Local MIVAA also connects to the shared Supabase Cloud instance.
 
 ## 🔧 Environment Configuration
 
 ### Production Environment Variables
 
-#### Frontend (Set in Vercel Production Environment)
-```bash
-# Application
-NODE_ENV=production
-VITE_DEBUG=false
+**Frontend variables** (set in Vercel Production Environment): `NODE_ENV=production`, `VITE_DEBUG=false`, the Supabase URL and anon key with `VITE_` prefix, the three MIVAA service URLs (`VITE_MIVAA_API_URL`, `VITE_MIVAA_SERVICE_URL`, `VITE_MIVAA_GATEWAY_URL`) all pointing to `https://v1api.materialshub.gr`, the WebSocket URL, and the two Stripe price IDs.
 
-# Supabase (must have VITE_ prefix for Vite to expose to frontend)
-VITE_SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-VITE_SUPABASE_ANON_KEY=your_production_anon_key
-
-# MIVAA Services
-VITE_MIVAA_API_URL=https://v1api.materialshub.gr
-VITE_MIVAA_SERVICE_URL=https://v1api.materialshub.gr
-VITE_MIVAA_GATEWAY_URL=https://v1api.materialshub.gr
-
-# WebSocket
-VITE_WS_URL=wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1
-
-# Stripe Price IDs
-VITE_STRIPE_PRO_PRICE_ID=price_...
-VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
-```
-
-#### MIVAA Service (Set in Deployment Platform)
-```bash
-# Application
-ENVIRONMENT=production
-DEBUG=false
-LOG_LEVEL=ERROR
-HOST=0.0.0.0
-PORT=8000
-
-# Database
-SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-SUPABASE_ANON_KEY=your_production_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_production_service_key
-
-# Security
-JWT_SECRET_KEY=your_secure_production_jwt_secret
-CORS_ORIGINS=https://your-domain.com
-RATE_LIMIT_REQUESTS=50
-RATE_LIMIT_WINDOW=60
-
-# Performance
-MAX_WORKERS=4
-CACHE_TTL=3600
-DATABASE_POOL_SIZE=20
-
-# Monitoring
-SENTRY_DSN=your_sentry_dsn
-LOG_FILE=/var/log/mivaa/app.log
-```
+**MIVAA Service variables** (set in deployment platform): `ENVIRONMENT=production`, `DEBUG=false`, `LOG_LEVEL=ERROR`, `HOST=0.0.0.0`, `PORT=8000`, the Supabase URL and both keys, `JWT_SECRET_KEY`, `CORS_ORIGINS`, rate limit settings (`RATE_LIMIT_REQUESTS=50`, `RATE_LIMIT_WINDOW=60`), performance settings (`MAX_WORKERS=4`, `CACHE_TTL=3600`, `DATABASE_POOL_SIZE=20`), and monitoring settings (`SENTRY_DSN`, `LOG_FILE`).
 
 ## 📦 Frontend Deployment (Vercel)
 
 ### Vercel Configuration
 
-**File**: `vercel.json`
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "headers": [
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
-    }
-  ]
-}
-```
+**File**: `vercel.json` — configures the build command (`npm run build`), output directory (`dist`), framework (`vite`), and security headers. Static assets under `/assets/` get a one-year immutable cache. All routes get `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `X-XSS-Protection: 1; mode=block` headers.
 
 ### Deployment Steps
 
-1. **Connect Repository**:
-   ```bash
-   # Install Vercel CLI
-   npm install -g vercel
-   
-   # Login and link project
-   vercel login
-   vercel link
-   ```
+1. **Connect Repository**: Install the Vercel CLI (`npm install -g vercel`), log in with `vercel login`, and link the project with `vercel link`.
 
-2. **Configure Environment Variables**:
-   ```bash
-   # Set production environment variables (must match VITE_ prefix)
-   vercel env add VITE_SUPABASE_URL production
-   vercel env add VITE_SUPABASE_ANON_KEY production
-   vercel env add VITE_MIVAA_API_URL production
-   vercel env add VITE_MIVAA_SERVICE_URL production
-   vercel env add VITE_MIVAA_GATEWAY_URL production
-   vercel env add VITE_WS_URL production
-   vercel env add VITE_STRIPE_PRO_PRICE_ID production
-   vercel env add VITE_STRIPE_ENTERPRISE_PRICE_ID production
-   ```
+2. **Configure Environment Variables**: Use `vercel env add` to set each `VITE_` prefixed variable for the production environment, including `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_MIVAA_API_URL`, `VITE_MIVAA_SERVICE_URL`, `VITE_MIVAA_GATEWAY_URL`, `VITE_WS_URL`, `VITE_STRIPE_PRO_PRICE_ID`, and `VITE_STRIPE_ENTERPRISE_PRICE_ID`.
 
-3. **Deploy**:
-   ```bash
-   # Deploy to production
-   vercel --prod
-   
-   # Or use automatic deployment via Git
-   git push origin main  # Triggers automatic deployment
-   ```
+3. **Deploy**: Run `vercel --prod` for a manual production deploy, or push to `main` to trigger automatic deployment via Git.
 
 ### Build Optimization
 
-**Vite Configuration** (`vite.config.ts`):
-```typescript
-export default defineConfig({
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
-          supabase: ['@supabase/supabase-js'],
-          utils: ['clsx', 'tailwind-merge', 'lucide-react'],
-        },
-      },
-    },
-    sourcemap: true,
-    chunkSizeWarningLimit: 1000,
-  },
-});
-```
+**Vite Configuration** (`vite.config.ts`): Uses `rollupOptions.output.manualChunks` to split the bundle into separate chunks for `vendor` (react, react-dom), `ui` (@radix-ui packages), `supabase` (@supabase/supabase-js), and `utils` (clsx, tailwind-merge, lucide-react). Also enables sourcemaps and sets `chunkSizeWarningLimit: 1000`.
 
 ## ⚙️ MIVAA Service Deployment (Systemd + UV)
 
@@ -717,37 +533,7 @@ All MIVAA service endpoints are available at:
 
 **Service File**: `/etc/systemd/system/mivaa-pdf-extractor.service`
 
-```ini
-[Unit]
-Description=MIVAA PDF Extractor FastAPI service
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/var/www/mivaa-pdf-extractor
-Environment=SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-Environment=SUPABASE_SERVICE_KEY=<your-service-key>
-Environment=ANTHROPIC_API_KEY=<your-anthropic-key>
-Environment=OPENAI_API_KEY=<your-openai-key>
-Environment=VOYAGE_API_KEY=<your-voyage-ai-key>
-Environment=QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
-Environment=QWEN_ENDPOINT_TOKEN=<your-hf-token>
-Environment=QWEN_ENDPOINT_NAME=mh-qwen332binstruct
-Environment=QWEN_NAMESPACE=basiliskan
-Environment=SLIG_ENDPOINT_URL=<your-slig-endpoint-url>
-Environment=SLIG_ENDPOINT_TOKEN=<your-hf-token>
-Environment=SLIG_ENDPOINT_NAME=mh-siglip2
-Environment=SLIG_NAMESPACE=basiliskan
-ExecStart=/var/www/mivaa-pdf-extractor/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
-Restart=always
-RestartSec=3
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-```
+The service is a `simple` type running as `root` with `WorkingDirectory=/var/www/mivaa-pdf-extractor`. It sets all environment variables inline (Supabase URL and keys, JWT secret, OpenAI and Anthropic API keys, Voyage AI key, Qwen and SLIG endpoint URLs, tokens, names, and namespaces). The `ExecStart` command launches uvicorn from the virtual environment at `.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`. The service uses `Restart=always` with a 3-second restart delay, and logs to the systemd journal.
 
 ### 🚀 Deployment Process
 
@@ -766,67 +552,11 @@ The deployment is fully automated via GitHub Actions workflow (`.github/workflow
 
 #### **Manual Deployment**
 
-If you need to deploy manually:
-
-```bash
-# SSH into server
-ssh root@165.227.31.109
-
-# Navigate to project directory
-cd /var/www/mivaa-pdf-extractor
-
-# Pull latest code
-git pull origin main
-
-# Install/update dependencies with UV
-uv pip install -r requirements.txt
-
-# Restart service
-sudo systemctl restart mivaa-pdf-extractor
-
-# Check service status
-sudo systemctl status mivaa-pdf-extractor
-
-# View logs
-sudo journalctl -u mivaa-pdf-extractor -f
-```
+If you need to deploy manually, SSH into the server, navigate to `/var/www/mivaa-pdf-extractor`, pull the latest code with `git pull origin main`, install dependencies with `uv pip install -r requirements.txt`, restart the service with `sudo systemctl restart mivaa-pdf-extractor`, check its status with `sudo systemctl status mivaa-pdf-extractor`, and tail logs with `sudo journalctl -u mivaa-pdf-extractor -f`.
 
 ### 🔧 Server Setup (One-Time)
 
-**Initial Server Configuration**:
-
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install Python 3.11
-sudo apt install python3.11 python3.11-venv python3-pip -y
-
-# Install UV package manager
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone repository
-cd /var/www
-git clone https://github.com/creativeghq/mivaa-pdf-extractor.git
-cd mivaa-pdf-extractor
-
-# Create virtual environment
-python3.11 -m venv .venv
-
-# Install dependencies
-uv pip install -r requirements.txt
-
-# Create systemd service (see configuration above)
-sudo nano /etc/systemd/system/mivaa-pdf-extractor.service
-
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable mivaa-pdf-extractor
-sudo systemctl start mivaa-pdf-extractor
-
-# Check status
-sudo systemctl status mivaa-pdf-extractor
-```
+**Initial Server Configuration**: Update system packages with `sudo apt update && sudo apt upgrade -y`. Install Python 3.11 and pip. Install UV with `curl -LsSf https://astral.sh/uv/install.sh | sh`. Clone the repository to `/var/www/`, create a virtual environment with `python3.11 -m venv .venv`, install dependencies with `uv pip install -r requirements.txt`, create the systemd service file at `/etc/systemd/system/mivaa-pdf-extractor.service`, then run `sudo systemctl daemon-reload`, `sudo systemctl enable mivaa-pdf-extractor`, and `sudo systemctl start mivaa-pdf-extractor` to enable and start the service.
 
 ## 🤖 GitHub Actions Deployment Workflows
 
@@ -843,14 +573,7 @@ sudo systemctl status mivaa-pdf-extractor
 - **Auto-Recovery**: Service restart attempts with verification
 - **GitHub Summary**: Detailed deployment results on action summary page
 
-**Usage**:
-```bash
-# Automatic deployment
-git push origin main
-
-# Manual deployment
-# Go to GitHub Actions → "MIVAA Deployment (Default)" → Run workflow
-```
+**Usage**: Trigger automatically by pushing to `main`. For manual runs, go to GitHub Actions → "MIVAA Deployment (Default)" → Run workflow.
 
 ### 🚀 Orchestrated Deployment Workflow
 
@@ -868,29 +591,14 @@ git push origin main
 - **Enhanced Diagnostics**: Detailed system analysis and recovery attempts
 - **Complete Audit Trail**: Full deployment journey with metrics and status
 
-**Usage**:
-```bash
-# Manual orchestrated deployment
-# Go to GitHub Actions → "Orchestrated MIVAA Deployment Pipeline (On-Demand)"
-# Configure options:
-# - Deployment Mode: intelligent
-# - Target Branch: main
-# - Deployment Reason: "Feature release with enhanced monitoring"
-# Run workflow
-```
+**Usage**: Go to GitHub Actions → "Orchestrated MIVAA Deployment Pipeline (On-Demand)", configure the deployment mode (e.g., "intelligent"), target branch, and deployment reason, then run.
 
 ### 🏥 Health Check Features
 
 Both workflows include comprehensive health monitoring:
 
 #### **Endpoint Testing**
-```bash
-# Tested endpoints:
-curl https://v1api.materialshub.gr/health
-curl https://v1api.materialshub.gr/docs
-curl https://v1api.materialshub.gr/redoc
-curl https://v1api.materialshub.gr/openapi.json
-```
+The following endpoints are tested: `https://v1api.materialshub.gr/health`, `/docs`, `/redoc`, and `/openapi.json`.
 
 #### **Status Code Verification**
 - **200**: ✅ Service healthy and responding correctly
@@ -900,17 +608,7 @@ curl https://v1api.materialshub.gr/openapi.json
 - **000**: ❌ Connection failed - Service not reachable
 
 #### **Automatic Diagnostics on Failure**
-```bash
-# System diagnostics collected:
-- Server uptime and load averages
-- Memory and disk usage
-- Service status (systemctl status mivaa-pdf-extractor)
-- Recent service logs (last 50 lines)
-- Network status (port 8000 availability)
-- Process binding verification
-- Service restart attempt
-- Post-restart verification
-```
+When health checks fail, the system collects: server uptime and load averages, memory and disk usage, service status (`systemctl status mivaa-pdf-extractor`), recent service logs (last 50 lines), network status (port 8000 availability), process binding verification, service restart attempt, and post-restart verification.
 
 #### **GitHub Action Summary**
 All deployment results are displayed on the main GitHub Action page with:
@@ -969,67 +667,15 @@ All deployment results are displayed on the main GitHub Action page with:
 
 #### **Required Secrets by Workflow**
 
-**`deploy.yml`** (Frontend & Supabase Functions deployment):
-```bash
-# Supabase CLI (deploy edge functions + generate types)
-SUPABASE_ACCESS_TOKEN=sbp_your_token_here
-SUPABASE_PROJECT_ID=bgbavxtjlbvgplozizxu
+**`deploy.yml`** (Frontend & Supabase Functions deployment): requires `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`.
 
-# Vercel (deploy frontend)
-VERCEL_TOKEN=your_vercel_token
-VERCEL_ORG_ID=team_your_org_id
-VERCEL_PROJECT_ID=prj_your_project_id
-```
+**`ai-changelog-update.yml`** (AI-powered changelog on PR merge): requires `GH_TOKEN` and `OPENAI_API_KEY`.
 
-**`ai-changelog-update.yml`** (AI-powered changelog on PR merge):
-```bash
-GH_TOKEN=ghp_your_github_pat
-OPENAI_API_KEY=sk-proj-your_openai_key
-```
+**`deploy-docs.yml`** (Deploy docs to GitHub Pages): requires `GH_TOKEN` (same as above, needs cross-repo access).
 
-**`deploy-docs.yml`** (Deploy docs to GitHub Pages):
-```bash
-GH_TOKEN=ghp_your_github_pat  # Same as above, needs cross-repo access
-```
+**`update-supabase-types.yml`** (Auto-generate TypeScript types): requires `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID`.
 
-**`update-supabase-types.yml`** (Auto-generate TypeScript types):
-```bash
-SUPABASE_ACCESS_TOKEN=sbp_your_token_here  # Same as deploy.yml
-SUPABASE_PROJECT_ID=bgbavxtjlbvgplozizxu  # Same as deploy.yml
-```
-
-**Backend Server Deployment** (manual SSH or orchestrated):
-```bash
-# Server Access
-SSH_PRIVATE_KEY=your_ssh_private_key
-SSH_HOST=165.227.31.109
-SSH_USER=root
-
-# Application Environment (set on server via systemd)
-SUPABASE_URL=https://bgbavxtjlbvgplozizxu.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-JWT_SECRET_KEY=your_jwt_secret
-OPENAI_API_KEY=your_openai_key
-ANTHROPIC_API_KEY=your_anthropic_key
-VOYAGE_API_KEY=your_voyage_ai_key
-
-# HuggingFace Inference Endpoints
-QWEN_ENDPOINT_URL=https://gbz6krk3i2is85b0.us-east-1.aws.endpoints.huggingface.cloud
-QWEN_ENDPOINT_TOKEN=hf_your_token_here
-QWEN_ENDPOINT_NAME=mh-qwen332binstruct
-QWEN_NAMESPACE=basiliskan
-SLIG_ENDPOINT_URL=https://xxxxxxxx.us-east-1.aws.endpoints.huggingface.cloud
-SLIG_ENDPOINT_TOKEN=hf_your_token_here
-SLIG_ENDPOINT_NAME=mh-siglip2
-SLIG_NAMESPACE=basiliskan
-
-# Price Monitoring
-FIRECRAWL_API_KEY=fc-your-firecrawl-key
-
-# Monitoring
-SENTRY_DSN=your_sentry_dsn
-```
+**Backend Server Deployment** (manual SSH or orchestrated): requires `SSH_PRIVATE_KEY`, `SSH_HOST`, `SSH_USER`, plus all application environment variables including Supabase credentials, JWT secret, AI API keys, and HuggingFace endpoint configuration.
 
 #### **Deployment Process**
 1. **Code Checkout**: Latest code from target branch
@@ -1048,184 +694,45 @@ SENTRY_DSN=your_sentry_dsn
    - Create new project
    - Note project URL and keys
 
-2. **Configure Database**:
-   ```sql
-   -- Enable required extensions
-   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-   CREATE EXTENSION IF NOT EXISTS "vector";
-   CREATE EXTENSION IF NOT EXISTS "ltree";
-   ```
+2. **Configure Database**: Enable required extensions via the SQL Editor — `uuid-ossp`, `vector`, and `ltree`.
 
-3. **Set Up Authentication**:
-   ```bash
-   # Configure JWT settings in Supabase dashboard
-   # Set up email templates
-   # Configure OAuth providers (if needed)
-   ```
+3. **Set Up Authentication**: Configure JWT settings in the Supabase dashboard, set up email templates, and configure OAuth providers if needed.
 
-4. **Deploy Schema**:
-   ```bash
-   # Initialize migrations (when available)
-   supabase migration new initial_schema
-   supabase db push
-   ```
+4. **Deploy Schema**: Initialize and push migrations using the Supabase CLI (`supabase migration new initial_schema` and `supabase db push`).
 
 ### Database Security
 
-**Row Level Security (RLS)**:
-```sql
--- Enable RLS on all tables
-ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
-
--- Create policies
-CREATE POLICY "Users can only access their workspace data" ON documents
-  FOR ALL USING (workspace_id IN (
-    SELECT workspace_id FROM user_workspaces 
-    WHERE user_id = auth.uid()
-  ));
-```
+**Row Level Security (RLS)**: Enable RLS on all tables with `ALTER TABLE ... ENABLE ROW LEVEL SECURITY`. Create workspace-scoped policies using `auth.uid()` and a lookup into `user_workspaces` to ensure users can only access data belonging to their own workspace.
 
 ## 🔐 Security Configuration
 
 ### SSL/TLS Setup
 
-**Nginx Configuration** (`nginx.conf`):
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name your-domain.com;
-
-    ssl_certificate /etc/nginx/ssl/cert.pem;
-    ssl_certificate_key /etc/nginx/ssl/key.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
-
-    location / {
-        proxy_pass http://mivaa-service:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
+**Nginx Configuration** (`nginx.conf`): Configure an HTTP-to-HTTPS redirect on port 80, and the main server block on port 443 with SSL (certificate + key, TLSv1.2/1.3, strong cipher suites). The `location /` block proxies requests to `http://mivaa-service:8000` with the standard `Host`, `X-Real-IP`, `X-Forwarded-For`, and `X-Forwarded-Proto` headers.
 
 ### Firewall Configuration
 
-```bash
-# UFW firewall setup
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-```
+Use UFW to set default deny for incoming, default allow for outgoing, then explicitly allow SSH, port 80/tcp, and port 443/tcp before enabling the firewall.
 
 ## 📊 Monitoring & Logging
 
 ### Application Monitoring
 
-**Health Check Endpoints**:
-```bash
-# Frontend health
-curl https://your-domain.com/api/health
-
-# MIVAA service health
-curl https://your-mivaa-service.com/health
-
-# Database health
-curl https://your-mivaa-service.com/api/v1/health
-```
+**Health Check Endpoints**: Test the frontend health at `https://your-domain.com/api/health`, the MIVAA service at `https://your-mivaa-service.com/health`, and the database health at `https://your-mivaa-service.com/api/v1/health`.
 
 ### Logging Configuration
 
-**Structured Logging**:
-```python
-# mivaa-pdf-extractor/app/utils/logging.py
-import structlog
-
-logger = structlog.get_logger()
-
-# Log with context
-logger.info("Document processed", 
-           document_id=doc_id, 
-           processing_time=time_taken,
-           user_id=user_id)
-```
+**Structured Logging** (`mivaa-pdf-extractor/app/utils/logging.py`): Uses `structlog` to produce structured log entries. Log calls include key-value context such as `document_id`, `processing_time`, and `user_id` alongside the log message.
 
 ### Error Tracking
 
-**Sentry Integration**:
-```typescript
-// Frontend error tracking
-import * as Sentry from "@sentry/react";
-
-Sentry.init({
-  dsn: process.env.VITE_SENTRY_DSN,
-  environment: process.env.NODE_ENV,
-});
-```
+**Sentry Integration**: The frontend initializes Sentry with the DSN from `process.env.VITE_SENTRY_DSN`, the current `NODE_ENV`, a `tracesSampleRate` of `1.0`, and a `Replay` integration with `maskAllText` and `blockAllMedia` enabled.
 
 ## 🔄 CI/CD Pipeline
 
 ### GitHub Actions Workflow
 
-```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Production
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-
-  deploy-frontend:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: amondnet/vercel-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.ORG_ID }}
-          vercel-project-id: ${{ secrets.PROJECT_ID }}
-          vercel-args: '--prod'
-
-  deploy-backend:
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.KEY }}
-          script: |
-            cd /var/www/mivaa-pdf-extractor
-            git pull origin main
-            uv pip install -r requirements.txt
-            sudo systemctl restart mivaa-pdf-extractor
-            sudo systemctl status mivaa-pdf-extractor
-```
+**File**: `.github/workflows/deploy.yml` — a workflow named "Deploy to Production" triggered on push to `main`. It runs a `test` job (checkout, Node setup, `npm ci`, `npm test`, `npm run build`) and two deployment jobs that depend on `test`: `deploy-frontend` (using the Vercel GitHub Action with prod flag) and `deploy-backend` (using the SSH action to pull the latest code, install dependencies with UV, and restart the systemd service).
 
 ### ⚠️ GitHub Actions Security Notes
 
@@ -1275,23 +782,7 @@ jobs:
 
 #### **Remote GPU-Accelerated Embeddings (Optional)**
 
-Enable Hugging Face Inference API for 15x faster visual embeddings:
-
-**Add to systemd service** (`/etc/systemd/system/mivaa-pdf-extractor.service`):
-
-```bash
-# Visual Embedding Mode
-Environment="VISUAL_EMBEDDING_MODE=remote"
-
-# Hugging Face API
-Environment="HUGGINGFACE_API_KEY=hf_YOUR_API_KEY"
-Environment="HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384"
-Environment="HUGGINGFACE_BATCH_SIZE=10"
-Environment="HUGGINGFACE_TIMEOUT=60"
-
-# Optional: Upgrade local model to SigLIP v2
-Environment="VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384"
-```
+Enable Hugging Face Inference API for 15x faster visual embeddings by adding the following to the systemd service: `VISUAL_EMBEDDING_MODE=remote`, `HUGGINGFACE_API_KEY` (your HF token), `HUGGINGFACE_SIGLIP_MODEL=google/siglip2-so400m-patch14-384`, `HUGGINGFACE_BATCH_SIZE=10`, `HUGGINGFACE_TIMEOUT=60`, and optionally `VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384` to upgrade the local model to SigLIP v2.
 
 **Benefits:**
 - ✅ GPU-accelerated: ~15x faster (12-17s → <1s per image)
@@ -1304,44 +795,13 @@ Environment="VISUAL_EMBEDDING_PRIMARY_MODEL=google/siglip2-so400m-patch14-384"
 2. Create new token (Read access)
 3. Copy token (starts with `hf_...`)
 
-**Deployment:**
-```bash
-# Edit service file
-sudo nano /etc/systemd/system/mivaa-pdf-extractor.service
-
-# Add environment variables above
-
-# Reload and restart
-sudo systemctl daemon-reload
-sudo systemctl restart mivaa-pdf-extractor
-
-# Verify
-journalctl -u mivaa-pdf-extractor -n 50 | grep "Visual embedding mode"
-# Expected: "🤗 Visual embedding mode: REMOTE (Hugging Face API)"
-```
+**Deployment:** Edit the service file (`sudo nano /etc/systemd/system/mivaa-pdf-extractor.service`), add the environment variables, then run `sudo systemctl daemon-reload` and `sudo systemctl restart mivaa-pdf-extractor`. Verify by checking logs for "Visual embedding mode: REMOTE (Hugging Face API)".
 
 **See:** `mivaa-pdf-extractor/HUGGINGFACE_DEPLOYMENT.md` for detailed guide
 
 ### Rollback Strategy
 
-```bash
-# Quick rollback for MIVAA service
-ssh root@165.227.31.109
-
-# Navigate to project directory
-cd /var/www/mivaa-pdf-extractor
-
-# Checkout previous commit
-git log --oneline -n 5  # Find previous commit hash
-git checkout <previous-commit-hash>
-
-# Restart service
-sudo systemctl restart mivaa-pdf-extractor
-
-# Verify service is running
-sudo systemctl status mivaa-pdf-extractor
-curl https://v1api.materialshub.gr/health
-```
+To roll back the MIVAA service: SSH into the server at `root@165.227.31.109`, navigate to `/var/www/mivaa-pdf-extractor`, find the desired previous commit hash with `git log --oneline -n 5`, check out that commit with `git checkout <previous-commit-hash>`, restart the service with `sudo systemctl restart mivaa-pdf-extractor`, and verify with `sudo systemctl status mivaa-pdf-extractor` and `curl https://v1api.materialshub.gr/health`.
 
 ## 📋 Deployment Checklist
 
@@ -1371,26 +831,9 @@ curl https://v1api.materialshub.gr/health
 
 ### Automated Backup Strategy
 
-**Database Backups** (Supabase):
-```bash
-# Supabase provides automatic daily backups
-# Access backups in Supabase Dashboard → Settings → Backups
+**Database Backups** (Supabase): Supabase provides automatic daily backups accessible from the Supabase Dashboard → Settings → Backups. Point-in-time recovery (PITR) is available for 7 days and can be restored via the dashboard or API.
 
-# Point-in-time recovery (PITR) available for 7 days
-# Restore via Supabase Dashboard or API
-```
-
-**Application Data Backups**:
-```bash
-# Automated backup script (runs daily via cron)
-# Location: /usr/local/bin/backup-mivaa.sh
-
-# Manual backup
-backup-mivaa.sh
-
-# Backup location: /backups/mivaa_backup_YYYYMMDD_HHMMSS.tar.gz
-# Retention: Last 7 backups kept automatically
-```
+**Application Data Backups**: An automated backup script runs daily via cron and is located at `/usr/local/bin/backup-mivaa.sh`. Backups are stored at `/backups/mivaa_backup_YYYYMMDD_HHMMSS.tar.gz` and the last 7 backups are retained automatically.
 
 ### Disaster Recovery Procedures
 
@@ -1400,15 +843,7 @@ backup-mivaa.sh
 3. Click "Restore" and confirm
 4. Verify data integrity after restore
 
-**Application Recovery**:
-```bash
-# Restore from backup
-cd /backups
-tar -xzf mivaa_backup_YYYYMMDD_HHMMSS.tar.gz -C /app
-
-# Restart service
-systemctl restart mivaa-pdf-extractor
-```
+**Application Recovery**: Restore from backup by extracting the tar.gz archive from `/backups/` into `/app/`, then restart the service with `systemctl restart mivaa-pdf-extractor`.
 
 ---
 
@@ -1416,17 +851,7 @@ systemctl restart mivaa-pdf-extractor
 
 ### Migration Strategy
 
-**Using Supabase Migrations**:
-```bash
-# Create new migration
-supabase migration new add_new_table
-
-# Apply migrations
-supabase db push
-
-# Rollback migration
-supabase db reset
-```
+**Using Supabase Migrations**: Create new migrations with `supabase migration new <name>`, apply them with `supabase db push`, and roll back with `supabase db reset`.
 
 **Zero-Downtime Deployments**:
 1. Add new columns as nullable
@@ -1436,13 +861,7 @@ supabase db reset
 
 ### Extension Management
 
-**Required PostgreSQL Extensions**:
-```sql
--- Enable in Supabase Dashboard → SQL Editor
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "vector";
-CREATE EXTENSION IF NOT EXISTS "ltree";
-```
+**Required PostgreSQL Extensions**: Enable in Supabase Dashboard → SQL Editor — `uuid-ossp`, `vector`, and `ltree`.
 
 ---
 
@@ -1459,22 +878,9 @@ The platform implements automatic job recovery for PDF processing:
 - `failed` - Processing failed
 - `cancelled` - User cancelled
 
-**Recovery on Restart**:
-```python
-# Automatic on service startup
-# Resumes jobs in 'processing' state
-# Retries failed jobs up to max_retries
-```
+**Recovery on Restart**: On service startup, the system automatically resumes jobs that were in `processing` state and retries failed jobs up to `max_retries`.
 
-**Graceful Shutdown**:
-```bash
-# Service receives SIGTERM
-# Completes current operations
-# Persists job state
-# Exits cleanly
-
-# Timeout: 30 seconds before SIGKILL
-```
+**Graceful Shutdown**: When the service receives SIGTERM, it completes current in-flight operations, persists job state to the database, and exits cleanly. A 30-second grace period is allowed before SIGKILL.
 
 ---
 
@@ -1482,62 +888,15 @@ The platform implements automatic job recovery for PDF processing:
 
 ### Horizontal Scaling
 
-**MIVAA Service Scaling**:
-
-For horizontal scaling, you can run multiple instances of the MIVAA service on different ports and use nginx for load balancing:
-
-```bash
-# Create multiple systemd services
-sudo cp /etc/systemd/system/mivaa-pdf-extractor.service /etc/systemd/system/mivaa-pdf-extractor-8001.service
-sudo cp /etc/systemd/system/mivaa-pdf-extractor.service /etc/systemd/system/mivaa-pdf-extractor-8002.service
-
-# Edit each service to use different ports
-# mivaa-pdf-extractor.service uses port 8000
-# mivaa-pdf-extractor-8001.service uses port 8001
-# mivaa-pdf-extractor-8002.service uses port 8002
-
-# Start all services
-sudo systemctl start mivaa-pdf-extractor
-sudo systemctl start mivaa-pdf-extractor-8001
-sudo systemctl start mivaa-pdf-extractor-8002
-```
-
-**Load Balancing with Nginx**:
-```nginx
-upstream mivaa_backend {
-    server localhost:8000;
-    server localhost:8001;
-    server localhost:8002;
-}
-
-server {
-    location / {
-        proxy_pass http://mivaa_backend;
-    }
-}
-```
+**MIVAA Service Scaling**: For horizontal scaling, copy the systemd service file to create instances on ports 8001 and 8002 (editing the `ExecStart` port in each copy), then start all three services. Use nginx as a load balancer with an `upstream mivaa_backend` block pointing to `localhost:8000`, `localhost:8001`, and `localhost:8002`, with a `location /` block that `proxy_pass`es to `http://mivaa_backend`.
 
 ### Database Connection Pooling
 
-**Supabase Connection Pool**:
-```bash
-# Set in MIVAA environment
-DATABASE_POOL_SIZE=20
-DATABASE_POOL_TIMEOUT=30
-```
+**Supabase Connection Pool**: Set `DATABASE_POOL_SIZE=20` and `DATABASE_POOL_TIMEOUT=30` in the MIVAA service environment.
 
 ### Caching Strategy
 
-**Application-Level Caching**:
-```typescript
-// Production caching configuration
-caching: {
-  enabled: true,
-  ttl: 3600000,        // 1 hour
-  maxSize: 1000,       // 1000 items
-  strategy: 'lru'      // Least Recently Used
-}
-```
+**Application-Level Caching**: Configure caching with `enabled: true`, `ttl: 3600000` (1 hour), `maxSize: 1000` items, and `strategy: 'lru'` (Least Recently Used).
 
 ---
 
@@ -1553,32 +912,11 @@ caching: {
 - CPU utilization
 - Job processing time
 
-**Sentry Configuration**:
-```typescript
-// Frontend monitoring
-Sentry.init({
-  dsn: process.env.VITE_SENTRY_DSN,
-  environment: process.env.NODE_ENV,
-  tracesSampleRate: 1.0,
-  integrations: [
-    new Sentry.Replay({
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
-  ],
-});
-```
+**Sentry Configuration**: Initialize Sentry on the frontend with the DSN, current environment, `tracesSampleRate: 1.0`, and a Replay integration with `maskAllText: true` and `blockAllMedia: true`.
 
 ### Alert Thresholds
 
-```typescript
-alertThresholds: {
-  errorRate: 0.05,        // 5% error rate
-  responseTime: 2000,     // 2 seconds
-  memoryUsage: 0.7,       // 70% memory
-  cpuUsage: 0.8,          // 80% CPU
-}
-```
+Configure alerts for: `errorRate: 0.05` (5% error rate), `responseTime: 2000` (2 seconds), `memoryUsage: 0.7` (70% memory), and `cpuUsage: 0.8` (80% CPU).
 
 ---
 
@@ -1586,22 +924,11 @@ alertThresholds: {
 
 ### API Rate Limiting
 
-```bash
-# MIVAA Service environment
-RATE_LIMIT_REQUESTS=50
-RATE_LIMIT_WINDOW=60  # per minute
-```
+Set `RATE_LIMIT_REQUESTS=50` and `RATE_LIMIT_WINDOW=60` (per minute) in the MIVAA service environment.
 
 ### Security Headers
 
-```nginx
-# nginx.conf
-add_header X-Content-Type-Options "nosniff";
-add_header X-Frame-Options "DENY";
-add_header X-XSS-Protection "1; mode=block";
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
-add_header Content-Security-Policy "default-src 'self'";
-```
+Configure nginx to add: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `X-XSS-Protection: 1; mode=block`, `Strict-Transport-Security: max-age=31536000; includeSubDomains`, and `Content-Security-Policy: default-src 'self'`.
 
 ### Secrets Rotation
 
@@ -1623,20 +950,9 @@ add_header Content-Security-Policy "default-src 'self'";
 
 ### Supabase Edge Functions
 
-**Deploy Function**:
-```bash
-# Create new function
-supabase functions new my-function
+**Deploy Function**: Create new functions with `supabase functions new my-function` and deploy them with `supabase functions deploy my-function --project-ref bgbavxtjlbvgplozizxu`.
 
-# Deploy to production
-supabase functions deploy my-function --project-ref bgbavxtjlbvgplozizxu
-```
-
-**Environment Variables**:
-```bash
-# Set in Supabase Dashboard → Edge Functions → Secrets
-supabase secrets set JWT_SECRET_KEY=your_secret
-```
+**Environment Variables**: Set secrets via the Supabase Dashboard → Edge Functions → Secrets, or use `supabase secrets set JWT_SECRET_KEY=your_secret` from the CLI.
 
 ---
 

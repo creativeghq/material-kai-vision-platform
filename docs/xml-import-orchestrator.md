@@ -6,7 +6,6 @@ Edge Function for parsing XML files and orchestrating product imports into Mater
 
 ## Architecture
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ LAYER 1: DATA INGESTION (EDGE FUNCTION)                    │
 │ ├─ Parse XML file (Deno XML parser)                        │
@@ -25,49 +24,10 @@ Edge Function for parsing XML files and orchestrating product imports into Mater
 │ ├─ Queue for product creation                              │
 │ └─ Update job status in real-time                          │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ## Supported XML Formats
 
-The function supports multiple common XML schemas:
-
-### Format 1: Products
-```xml
-<products>
-  <product>
-    <name>Product Name</name>
-    <factory>Manufacturer Inc</factory>
-    <category>tiles</category>
-    <description>Product description</description>
-    <price>$50</price>
-    <image>https://example.com/image1.jpg</image>
-    <image>https://example.com/image2.jpg</image>
-  </product>
-</products>
-```
-
-### Format 2: Items
-```xml
-<items>
-  <item>
-    <title>Product Name</title>
-    <manufacturer>Manufacturer Inc</manufacturer>
-    <material_type>tiles</material_type>
-    <desc>Product description</desc>
-  </item>
-</items>
-```
-
-### Format 3: Materials
-```xml
-<materials>
-  <material>
-    <name>Product Name</name>
-    <supplier>Manufacturer Inc</supplier>
-    <type>tiles</type>
-  </material>
-</materials>
-```
+The function supports multiple common XML schemas. Each format uses a different root and item element name (e.g., `<products>/<product>`, `<items>/<item>`, `<materials>/<material>`), and each item may contain varying field names for name, manufacturer, category, description, and image URLs.
 
 ## Required Fields
 
@@ -91,141 +51,35 @@ Each product must have:
 
 ## API Endpoint
 
-```
-POST /functions/v1/xml-import-orchestrator
-```
+`POST /functions/v1/xml-import-orchestrator`
 
 ## Request Format
 
-```typescript
-{
-  "workspace_id": "uuid",
-  "category": "materials",
-  "xml_content": "base64-encoded-xml-string",
-  "source_name": "supplier_catalog.xml" // optional
-}
-```
+The request body is a JSON object containing: workspace_id (UUID), category (e.g., "materials"), xml_content (base64-encoded XML string), and optionally source_name (e.g., "supplier_catalog.xml").
 
 ## Response Format
 
 ### Success
-```json
-{
-  "success": true,
-  "job_id": "550e8400-e29b-41d4-a716-446655440000",
-  "message": "Import job created, processing started",
-  "total_products": 50
-}
-```
+
+The success response contains: success (true), job_id (UUID), message confirming the import job was created and processing started, and total_products count.
 
 ### Error
-```json
-{
-  "success": false,
-  "error": "Product validation failed: Product 1: Missing factory_name"
-}
-```
 
-## Usage Example
-
-### JavaScript/TypeScript
-```typescript
-import { supabase } from '@/integrations/supabase/client';
-
-async function importXMLFile(file: File, workspaceId: string, category: string) {
-  // Read file as text
-  const xmlText = await file.text();
-  
-  // Encode to base64
-  const xmlBase64 = btoa(xmlText);
-  
-  // Call Edge Function
-  const { data, error } = await supabase.functions.invoke('xml-import-orchestrator', {
-    body: {
-      workspace_id: workspaceId,
-      category: category,
-      xml_content: xmlBase64,
-      source_name: file.name,
-    },
-  });
-  
-  if (error) {
-    console.error('Import failed:', error);
-    return null;
-  }
-  
-  console.log('Import started:', data);
-  return data.job_id;
-}
-```
-
-### cURL
-```bash
-# Encode XML file to base64
-XML_BASE64=$(base64 -w 0 catalog.xml)
-
-# Call Edge Function
-curl -X POST \
-  "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/xml-import-orchestrator" \
-  -H "Authorization: Bearer YOUR_SUPABASE_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d "{
-    \"workspace_id\": \"your-workspace-id\",
-    \"category\": \"materials\",
-    \"xml_content\": \"$XML_BASE64\",
-    \"source_name\": \"catalog.xml\"
-  }"
-```
+The error response contains: success (false) and an error message describing the failure (e.g., "Product validation failed: Product 1: Missing factory_name").
 
 ## Job Status Tracking
 
-After receiving the job_id, track progress using:
-
-```typescript
-// Poll for job status
-const { data: job } = await supabase
-  .from('data_import_jobs')
-  .select('*')
-  .eq('id', jobId)
-  .single();
-
-console.log('Job status:', job.status);
-console.log('Progress:', `${job.processed_products}/${job.total_products}`);
-```
+After receiving the job_id, track progress by querying the `data_import_jobs` table from Supabase, selecting all fields for the given job ID. The record exposes status (pending, processing, completed, failed) and progress as processed_products divided by total_products.
 
 ## Database Tables
 
 ### data_import_jobs
-Tracks import job status and progress.
 
-```sql
-SELECT 
-  id,
-  status,
-  total_products,
-  processed_products,
-  failed_products,
-  created_at,
-  completed_at
-FROM data_import_jobs
-WHERE workspace_id = 'your-workspace-id'
-ORDER BY created_at DESC;
-```
+Tracks import job status and progress. Query the table with fields id, status, total_products, processed_products, failed_products, created_at, and completed_at, filtering by workspace_id and ordering by created_at descending.
 
 ### data_import_history
-Tracks individual product imports.
 
-```sql
-SELECT 
-  id,
-  job_id,
-  product_id,
-  processing_status,
-  source_data,
-  normalized_data
-FROM data_import_history
-WHERE job_id = 'your-job-id';
-```
+Tracks individual product imports. Query with fields id, job_id, product_id, processing_status, source_data, and normalized_data, filtering by job_id.
 
 ## Error Handling
 
@@ -277,33 +131,7 @@ XML Import implements **complete production hardening** for reliability and moni
 
 ### Source Tracking ✅
 
-Every product, chunk, and image is tagged with source information:
-
-```python
-# Products
-await supabase.table('products').insert({
-    'name': product_name,
-    'source_type': 'xml_import',     # ✅ Tracks source
-    'source_job_id': job_id,         # ✅ Links to import job
-    # ... other fields
-})
-
-# Chunks
-await supabase.table('document_chunks').insert({
-    'content': chunk_text,
-    'source_type': 'xml_import',     # ✅ Tracks source
-    'source_job_id': job_id,         # ✅ Links to import job
-    # ... other fields
-})
-
-# Images
-await supabase.table('document_images').insert({
-    'url': image_url,
-    'source_type': 'xml_import',     # ✅ Tracks source
-    'source_job_id': job_id,         # ✅ Links to import job
-    # ... other fields
-})
-```
+Every product, chunk, and image is tagged with source information. When inserting records into the products, document_chunks, and document_images tables, each record includes `source_type: 'xml_import'` and `source_job_id` linking to the originating import job.
 
 **Benefits:**
 - Filter Materials Data page by specific XML import job
@@ -315,20 +143,7 @@ await supabase.table('document_images').insert({
 
 ### Heartbeat Monitoring ✅
 
-Updates `last_heartbeat` field **every batch (10 products)** to detect stuck jobs:
-
-```python
-# Update heartbeat during batch processing
-await supabase.table('background_jobs').update({
-    'last_heartbeat': datetime.utcnow().isoformat(),
-    'progress_percent': progress,
-    'metadata': {
-        'processed': processed_count,
-        'failed': failed_count,
-        'total': total_products
-    }
-}).eq('id', background_job_id).execute()
-```
+Updates `last_heartbeat` field **every batch (10 products)** to detect stuck jobs. The background_jobs table record is updated with the current timestamp, current progress percentage, and processing counts (processed, failed, total).
 
 **Implementation:**
 - Location: `data_import_service.py` line 584
@@ -340,32 +155,7 @@ await supabase.table('background_jobs').update({
 
 ### Sentry Error Tracking ✅
 
-Comprehensive error tracking and performance monitoring:
-
-```python
-# Transaction tracking
-with sentry_sdk.start_transaction(op="xml_import", name="process_import_job") as transaction:
-    transaction.set_tag("job_id", job_id)
-    transaction.set_tag("workspace_id", workspace_id)
-    transaction.set_data("total_products", total_products)
-    transaction.set_data("batch_size", batch_size)
-
-    # Breadcrumbs for debugging
-    sentry_sdk.add_breadcrumb(
-        category="xml_import",
-        message=f"Processing batch {batch_index + 1}",
-        level="info",
-        data={"batch_size": len(batch)}
-    )
-
-    try:
-        # ... processing logic ...
-        transaction.set_status("ok")
-    except Exception as e:
-        sentry_sdk.capture_exception(e)
-        transaction.set_status("internal_error")
-        raise
-```
+Comprehensive error tracking and performance monitoring using Sentry transactions for the overall import job, breadcrumbs for each batch, and exception capture with full stack traces.
 
 **Features:**
 - Transaction tracking for performance monitoring
@@ -396,4 +186,3 @@ with sentry_sdk.start_transaction(op="xml_import", name="process_import_job") as
 - [Python API Import Endpoints](../../../mivaa-pdf-extractor/docs/import-api.md)
 - [Database Schema](../../../supabase/migrations/20251110_create_data_import_tables.sql)
 - [Unified Product Generation Flow](../../../docs/unified-product-generation-flow.md) - Complete production hardening details
-

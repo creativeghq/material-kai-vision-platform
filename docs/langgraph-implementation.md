@@ -71,69 +71,18 @@ The platform uses **LangGraph** for agent orchestration, providing:
 
 ## State Schema (AgentStateAnnotation)
 
-The state schema defines what data flows through the graph:
+The state schema defines what data flows through the graph. It uses `Annotation.Root` from LangGraph with the following fields:
 
-```typescript
-const AgentStateAnnotation = Annotation.Root({
-  // Messages with append reducer (accumulates all messages)
-  messages: Annotation<BaseMessage[]>({
-    reducer: (prev, next) => [...prev, ...next],
-    default: () => [],
-  }),
-
-  // System prompt (replace reducer)
-  systemPrompt: Annotation<string>({
-    reducer: (_, next) => next,
-    default: () => '',
-  }),
-
-  // Tool results collected during execution
-  toolResults: Annotation<any[]>({
-    reducer: (prev, next) => [...prev, ...next],
-    default: () => [],
-  }),
-
-  // Products found during search/recommendations
-  collectedProducts: Annotation<any[]>({
-    reducer: (prev, next) => [...prev, ...next],
-    default: () => [],
-  }),
-
-  // Current iteration count
-  iteration: Annotation<number>({
-    reducer: (_, next) => next,
-    default: () => 0,
-  }),
-
-  // Token usage tracking (sum reducers)
-  inputTokens: Annotation<number>({
-    reducer: (prev, next) => prev + next,
-    default: () => 0,
-  }),
-  outputTokens: Annotation<number>({
-    reducer: (prev, next) => prev + next,
-    default: () => 0,
-  }),
-
-  // Turn count for billing
-  turnCount: Annotation<number>({
-    reducer: (prev, next) => prev + next,
-    default: () => 0,
-  }),
-
-  // Final response when agent completes
-  finalResponse: Annotation<string | null>({
-    reducer: (_, next) => next,
-    default: () => null,
-  }),
-
-  // 3D generation job if triggered
-  generationJob: Annotation<any | null>({
-    reducer: (_, next) => next,
-    default: () => null,
-  }),
-});
-```
+- **messages** — `BaseMessage[]` with an append reducer (`[...prev, ...next]`). Accumulates all messages. Default: `[]`.
+- **systemPrompt** — `string` with a replace reducer (`(_, next) => next`). Holds the current system prompt. Default: `''`.
+- **toolResults** — `any[]` with an append reducer. Collects tool results during execution. Default: `[]`.
+- **collectedProducts** — `any[]` with an append reducer. Products found during search/recommendations. Default: `[]`.
+- **iteration** — `number` with a replace reducer. Current iteration count. Default: `0`.
+- **inputTokens** — `number` with a sum reducer (`prev + next`). Accumulated input token count. Default: `0`.
+- **outputTokens** — `number` with a sum reducer. Accumulated output token count. Default: `0`.
+- **turnCount** — `number` with a sum reducer. Turn count for billing. Default: `0`.
+- **finalResponse** — `string | null` with a replace reducer. Set when the agent produces its final answer. Default: `null`.
+- **generationJob** — `any | null` with a replace reducer. Set if a 3D generation job is triggered. Default: `null`.
 
 ### Reducer Types
 
@@ -147,26 +96,7 @@ const AgentStateAnnotation = Annotation.Root({
 
 ## Graph Construction
 
-```typescript
-function createAgentGraph(
-  model: any,
-  tools: any[],
-  onChunk?: (chunk: any) => void
-) {
-  const maxIterations = 10;
-
-  // Build the graph
-  const graph = new StateGraph(AgentStateAnnotation)
-    .addNode('agent', agentNode)
-    .addNode('tools', toolsNode)
-    .addEdge(START, 'agent')
-    .addConditionalEdges('agent', shouldContinue)
-    .addEdge('tools', 'agent')
-    .compile();
-
-  return graph;
-}
-```
+The `createAgentGraph` function accepts a model, a tools array, and an optional `onChunk` streaming callback. It builds a `StateGraph` with `AgentStateAnnotation`, adds an `agent` node and a `tools` node, connects `START` to `agent`, adds a conditional edge from `agent` using `shouldContinue`, adds an edge from `tools` back to `agent`, and compiles the graph. The maximum iteration limit is set to 10.
 
 ### Nodes
 
@@ -184,24 +114,7 @@ function createAgentGraph(
 
 ### Conditional Edge: shouldContinue
 
-```typescript
-function shouldContinue(state: AgentState): string {
-  const lastMessage = state.messages[state.messages.length - 1];
-
-  // Check iteration limit
-  if (state.iteration >= maxIterations) {
-    return END;
-  }
-
-  // Check for tool calls
-  if (lastMessage.tool_calls?.length > 0) {
-    return 'tools';
-  }
-
-  // No tool calls = done
-  return END;
-}
-```
+The `shouldContinue` function examines the last message in the state. If the iteration count has reached the maximum (10), it returns `END`. If the last message contains tool calls, it returns `'tools'`. Otherwise (no tool calls), it returns `END`.
 
 ---
 
@@ -211,60 +124,19 @@ Enables resumable conversations by persisting state to Supabase.
 
 ### Database Schema
 
-```sql
-CREATE TABLE public.agent_checkpoints (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  thread_id TEXT NOT NULL UNIQUE,
-  checkpoint_data JSONB NOT NULL DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_checkpoints_thread ON agent_checkpoints(thread_id);
-```
+The `agent_checkpoints` table stores checkpoint data indexed by thread ID. It has a UUID primary key, a `thread_id` text field (unique), a `checkpoint_data` JSONB column, and `created_at`/`updated_at` timestamps. An index on `thread_id` supports fast lookup.
 
 ### Checkpointer Class
 
-```typescript
-class SupabaseCheckpointer {
-  private tableName = 'agent_checkpoints';
+The `SupabaseCheckpointer` class provides three methods:
 
-  async get(threadId: string): Promise<any | null> {
-    const { data } = await supabase
-      .from(this.tableName)
-      .select('checkpoint_data')
-      .eq('thread_id', threadId)
-      .single();
-    return data?.checkpoint_data || null;
-  }
-
-  async put(threadId: string, checkpoint: any): Promise<void> {
-    await supabase
-      .from(this.tableName)
-      .upsert({
-        thread_id: threadId,
-        checkpoint_data: checkpoint,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'thread_id' });
-  }
-
-  async delete(threadId: string): Promise<void> {
-    await supabase
-      .from(this.tableName)
-      .delete()
-      .eq('thread_id', threadId);
-  }
-}
-```
+- **get(threadId)** — Queries the `agent_checkpoints` table for the given `thread_id` and returns the `checkpoint_data` JSONB, or `null` if not found.
+- **put(threadId, checkpoint)** — Upserts the checkpoint into the table, updating `updated_at` on conflict with `thread_id`.
+- **delete(threadId)** — Deletes the checkpoint record matching the given `thread_id`.
 
 ### Thread ID Generation
 
-```typescript
-// Generate unique thread ID for conversation tracking
-const threadId = conversationId
-  ? `${agentId}-${conversationId}`
-  : `${agentId}-${crypto.randomUUID()}`;
-```
+Thread IDs are constructed as `${agentId}-${conversationId}` when a `conversationId` is provided, or `${agentId}-${crypto.randomUUID()}` for new conversations.
 
 ---
 
@@ -274,24 +146,7 @@ Stores user preferences, facts, and context across conversations.
 
 ### Database Schema
 
-```sql
-CREATE TABLE public.agent_memories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  workspace_id UUID NOT NULL,
-  agent_id TEXT NOT NULL,
-  memory_type TEXT NOT NULL
-    CHECK (memory_type IN ('preference', 'fact', 'context', 'relationship')),
-  content TEXT NOT NULL,
-  conversation_id UUID,
-  metadata JSONB DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_memories_user ON agent_memories(user_id, workspace_id);
-CREATE INDEX idx_memories_type ON agent_memories(memory_type);
-CREATE INDEX idx_memories_agent ON agent_memories(agent_id);
-```
+The `agent_memories` table has a UUID primary key, foreign key references to `auth.users(id)` for `user_id`, a `workspace_id` UUID, an `agent_id` text field, a `memory_type` text field constrained to `('preference', 'fact', 'context', 'relationship')`, a `content` text field, an optional `conversation_id` UUID, a `metadata` JSONB field, and a `created_at` timestamp. Indexes cover `(user_id, workspace_id)`, `memory_type`, and `agent_id`.
 
 ### Memory Types
 
@@ -304,310 +159,67 @@ CREATE INDEX idx_memories_agent ON agent_memories(agent_id);
 
 ### LongTermMemory Class
 
-```typescript
-class LongTermMemory {
-  async store(
-    userId: string,
-    workspaceId: string,
-    memory: {
-      agentId: string;
-      type: 'preference' | 'fact' | 'context' | 'relationship';
-      content: string;
-      conversationId?: string;
-      metadata?: Record<string, any>;
-    }
-  ): Promise<void> {
-    await supabase.from('agent_memories').insert({
-      user_id: userId,
-      workspace_id: workspaceId,
-      agent_id: memory.agentId,
-      memory_type: memory.type,
-      content: memory.content,
-      conversation_id: memory.conversationId,
-      metadata: memory.metadata || {},
-    });
-  }
+The `LongTermMemory` class provides three methods:
 
-  async retrieve(
-    userId: string,
-    workspaceId: string,
-    options?: {
-      agentId?: string;
-      types?: string[];
-      limit?: number;
-    }
-  ): Promise<any[]> {
-    let query = supabase
-      .from('agent_memories')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('workspace_id', workspaceId)
-      .order('created_at', { ascending: false })
-      .limit(options?.limit || 20);
-
-    if (options?.agentId) {
-      query = query.eq('agent_id', options.agentId);
-    }
-    if (options?.types?.length) {
-      query = query.in('memory_type', options.types);
-    }
-
-    const { data } = await query;
-    return data || [];
-  }
-
-  formatForContext(memories: any[]): string {
-    if (!memories.length) return '';
-
-    const grouped = memories.reduce((acc, m) => {
-      if (!acc[m.memory_type]) acc[m.memory_type] = [];
-      acc[m.memory_type].push(m.content);
-      return acc;
-    }, {} as Record<string, string[]>);
-
-    let context = '\n\n## User Context from Previous Conversations:\n';
-
-    if (grouped.preference?.length) {
-      context += '\n### Preferences:\n';
-      grouped.preference.forEach(p => { context += `- ${p}\n`; });
-    }
-    if (grouped.fact?.length) {
-      context += '\n### Known Facts:\n';
-      grouped.fact.forEach(f => { context += `- ${f}\n`; });
-    }
-    if (grouped.context?.length) {
-      context += '\n### Previous Context:\n';
-      grouped.context.forEach(c => { context += `- ${c}\n`; });
-    }
-
-    return context;
-  }
-}
-```
+- **store(userId, workspaceId, memory)** — Inserts a record into `agent_memories` with the provided `agentId`, `type`, `content`, optional `conversationId`, and optional `metadata`.
+- **retrieve(userId, workspaceId, options?)** — Queries `agent_memories` for the user and workspace, filtered by optional `agentId` and `types` array, ordered by `created_at` descending, limited to `options.limit` (default 20).
+- **formatForContext(memories)** — Groups memories by type and formats them as a markdown context block with sections for Preferences, Known Facts, and Previous Context.
 
 ### Automatic Memory Extraction
 
-```typescript
-async function extractAndStoreMemories(
-  userId: string,
-  workspaceId: string,
-  agentId: string,
-  userInput: string,
-  assistantResponse: string,
-  toolResults: any[]
-): Promise<void> {
-  // Use LLM to extract memories from conversation
-  const extractionPrompt = `
-    Analyze this conversation and extract any memorable information.
-    Return JSON array of objects with 'type' and 'content' fields.
-    Types: preference, fact, context, relationship
-
-    User: ${userInput}
-    Assistant: ${assistantResponse}
-
-    Only extract truly notable information. Return empty array if nothing notable.
-  `;
-
-  // Extract and store memories asynchronously
-  // (implementation details in index.ts)
-}
-```
+After each agent turn, an `extractAndStoreMemories` function runs asynchronously (non-blocking). It constructs an extraction prompt with the user's input and the assistant's response, asks the LLM to identify notable information (preferences, facts, context, relationships), and stores any extracted memories. Only truly notable information is stored; the function returns an empty array if nothing is notable.
 
 ---
 
 ## Execution Flow
 
-```typescript
-async function executeAgent(
-  agentId: string,
-  userInput: string,
-  conversationId?: string,
-  previousMessages?: any[],
-  user?: any,
-  workspaceId?: string,
-  onChunk?: (chunk: any) => void
-) {
-  // 1. Load agent configuration
-  const config = AGENT_CONFIGS[agentId];
-  const systemPrompt = await getAgentSystemPrompt(agentId);
+The `executeAgent` function orchestrates the full agent lifecycle:
 
-  // 2. Load long-term memory
-  const memories = await longTermMemory.retrieve(user.id, workspaceId, {
-    agentId,
-    limit: 20,
-  });
-  const memoryContext = longTermMemory.formatForContext(memories);
-  const enrichedPrompt = systemPrompt + memoryContext;
-
-  // 3. Generate thread ID
-  const threadId = conversationId
-    ? `${agentId}-${conversationId}`
-    : `${agentId}-${crypto.randomUUID()}`;
-
-  // 4. Create agent graph
-  const agentGraph = createAgentGraph(selectedModel, tools, onChunk);
-
-  // 5. Build initial state
-  const initialState = {
-    messages: [new HumanMessage(userInput)],
-    systemPrompt: enrichedPrompt,
-    toolResults: [],
-    collectedProducts: [],
-    iteration: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    turnCount: 0,
-    finalResponse: null,
-    generationJob: null,
-  };
-
-  // 6. Execute graph
-  const finalState = await agentGraph.invoke(initialState);
-
-  // 7. Save checkpoint
-  await checkpointer.put(threadId, finalState);
-
-  // 8. Extract and store memories (async, non-blocking)
-  extractAndStoreMemories(
-    user.id,
-    workspaceId,
-    agentId,
-    userInput,
-    finalState.finalResponse,
-    finalState.toolResults
-  ).catch(console.error);
-
-  // 9. Return result
-  return {
-    text: finalState.finalResponse,
-    toolResults: finalState.toolResults,
-    products: finalState.collectedProducts,
-    generationJob: finalState.generationJob,
-    tokenUsage: {
-      input: finalState.inputTokens,
-      output: finalState.outputTokens,
-    },
-    turnCount: finalState.turnCount,
-    threadId,
-  };
-}
-```
+1. Load agent configuration from `AGENT_CONFIGS[agentId]` and fetch the system prompt.
+2. Retrieve long-term memories (limit 20) and append a formatted context block to the system prompt.
+3. Generate a thread ID from `agentId` and `conversationId` (or a new UUID).
+4. Create the agent graph with `createAgentGraph(selectedModel, tools, onChunk)`.
+5. Build the initial state with the user's input as a `HumanMessage`, the enriched system prompt, and zeroed counters.
+6. Invoke the graph and obtain the final state.
+7. Persist the final state to the checkpointer using the thread ID.
+8. Kick off `extractAndStoreMemories` asynchronously (errors are silently caught).
+9. Return the final response text, tool results, collected products, generation job reference, token usage totals, turn count, and thread ID.
 
 ---
 
 ## Streaming Updates
 
-The `onChunk` callback sends real-time updates during execution:
+The `onChunk` callback is invoked at multiple points during execution to provide real-time progress to the client:
 
-```typescript
-// Iteration status
-onChunk?.({
-  type: 'iteration',
-  iteration: 3,
-  maxIterations: 10,
-  message: 'Processing step 3/10...'
-});
-
-// Assistant thinking
-onChunk?.({
-  type: 'assistant_thinking',
-  content: response.content,
-  hasToolCalls: true
-});
-
-// Tool call
-onChunk?.({
-  type: 'tool_call',
-  tool: 'searchProducts',
-  args: { query: 'marble tiles' },
-  message: 'Calling searchProducts...'
-});
-
-// Tool result
-onChunk?.({
-  type: 'tool_result',
-  tool: 'searchProducts',
-  result: { products: [...] },
-  message: 'searchProducts completed'
-});
-
-// Final text (streaming)
-onChunk?.({
-  type: 'text',
-  content: 'Based on your requirements...'
-});
-```
+- **iteration** — Sent at the start of each agent iteration, with the current iteration number, max iterations, and a status message.
+- **assistant_thinking** — Sent after the LLM responds, includes the response content and whether tool calls are present.
+- **tool_call** — Sent before each tool is executed, includes the tool name, arguments, and a status message.
+- **tool_result** — Sent after each tool completes, includes the tool name, result, and a completion message.
+- **text** — Sent for the final text response content.
 
 ---
 
 ## Human-in-the-Loop (Planned)
 
-For critical actions like 3D generation or large purchases:
-
-```typescript
-// Future implementation
-function shouldRequireApproval(state: AgentState): string {
-  const lastMessage = state.messages[state.messages.length - 1];
-
-  // Check if about to execute critical action
-  const criticalTools = ['generate3D', 'createQuote', 'submitOrder'];
-  const hasCriticalCall = lastMessage.tool_calls?.some(
-    tc => criticalTools.includes(tc.name)
-  );
-
-  if (hasCriticalCall) {
-    return 'human_approval';  // Route to approval node
-  }
-
-  return 'tools';  // Continue normally
-}
-```
+For critical actions like 3D generation or large purchases, a future `shouldRequireApproval` conditional edge is planned. It would inspect the last message's tool calls for critical tool names (e.g., `generate3D`, `createQuote`, `submitOrder`) and route to a `human_approval` node instead of continuing directly to `tools`.
 
 ---
 
 ## Dependencies
 
-```json
-// deno.json
-{
-  "imports": {
-    "@langchain/anthropic": "npm:@langchain/anthropic",
-    "@langchain/core/tools": "npm:@langchain/core/tools",
-    "@langchain/core/messages": "npm:@langchain/core/messages",
-    "@langchain/langgraph": "npm:@langchain/langgraph",
-    "zod": "npm:zod",
-    "@supabase/supabase-js": "npm:@supabase/supabase-js@2"
-  }
-}
-```
+The edge function's `deno.json` imports include:
+- `@langchain/anthropic` — Anthropic LLM integration
+- `@langchain/core/tools` — Tool base classes
+- `@langchain/core/messages` — Message types (HumanMessage, etc.)
+- `@langchain/langgraph` — StateGraph, START, END, Annotation
+- `zod` — Schema validation for tool inputs
+- `@supabase/supabase-js@2` — Supabase client
 
 ---
 
 ## Token Usage Tracking
 
-Token usage is accumulated across all iterations:
-
-```typescript
-// In agentNode
-const usage = response.response_metadata?.usage;
-const inputTokens = usage?.input_tokens || 0;
-const outputTokens = usage?.output_tokens || 0;
-
-return {
-  // ... other state
-  inputTokens,   // Will be summed by reducer
-  outputTokens,  // Will be summed by reducer
-};
-```
-
-Total usage available in final state:
-```typescript
-const totalTokens = {
-  input: finalState.inputTokens,
-  output: finalState.outputTokens,
-  total: finalState.inputTokens + finalState.outputTokens,
-};
-```
+Token usage is accumulated across all iterations using the sum reducers on `inputTokens` and `outputTokens`. In each `agentNode` invocation, the function reads `response.response_metadata?.usage` to extract `input_tokens` and `output_tokens`, then returns them as part of the state update. Because the reducers sum values across iterations, the final state contains the total tokens used for the entire conversation turn. The total is computed as `finalState.inputTokens + finalState.outputTokens`.
 
 ---
 

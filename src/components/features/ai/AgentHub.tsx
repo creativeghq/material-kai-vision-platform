@@ -243,6 +243,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Track previous agent to detect actual agent switches
   const previousAgentRef = useRef<string | null>(null);
 
+  // Pending material replacement — set by "Replace in Image" on ProductStrip cards
+  const [pendingReplacement, setPendingReplacement] = useState<{ id: string; name: string; imageUrl?: string } | null>(null);
+
   // Material Modal State
   const [showMaterialModal, setShowMaterialModal] = useState(false);
   const [selectedMaterialsData, setSelectedMaterialsData] = useState<{
@@ -1778,6 +1781,14 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                           <ProductStrip
                             products={message.materialData.products}
                             title={`Found ${message.materialData.products.length} products`}
+                            onReplaceInImage={(product) => {
+                              const primaryImage = product.images?.find((img: any) => img.isPrimary) || product.images?.[0];
+                              setPendingReplacement({
+                                id: product.id,
+                                name: product.name,
+                                imageUrl: primaryImage?.url,
+                              });
+                            }}
                           />
                         )}
 
@@ -1797,6 +1808,19 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                                 const prompt = `Find products similar to this material zone from my 3D render: ${segment.material_type}, ${segment.finish} finish${segment.crop_storage_url ? `. Image: ${segment.crop_storage_url}` : ''}`;
                                 setInput(prompt);
                                 setTimeout(async () => { await handleSendMessage(); }, 100);
+                              }}
+                              onFindMaterial={(segment) => {
+                                const cropUrl = segment.crop_data_url || segment.crop_storage_url;
+                                if (cropUrl) setAttachedImages([cropUrl]);
+                                const prompt = `Find this exact material using all available search methods. Zone analysis: ${segment.label} — material type: ${segment.material_type}, finish: ${segment.finish}, dominant color: ${segment.dominant_color}, confidence: ${Math.round((segment.confidence ?? 0) * 100)}%. Identify and return matching products from our catalog with full similarity scoring across all dimensions.`;
+                                setInput(prompt);
+                                setTimeout(async () => { await handleSendMessage(); }, 100);
+                              }}
+                              pendingReplacement={pendingReplacement}
+                              onZoneSelectedForReplacement={(segment) => {
+                                // Phase 5 will open MaterialPickerModal here with pendingReplacement pre-selected
+                                console.log('Zone selected for replacement:', segment.label, 'with material:', pendingReplacement?.name);
+                                setPendingReplacement(null);
                               }}
                             />
                           </div>

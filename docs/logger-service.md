@@ -1,7 +1,7 @@
 # Logger Service Documentation
 
-**Version:** 1.0  
-**Last Updated:** December 12, 2024  
+**Version:** 1.0
+**Last Updated:** December 12, 2024
 **File:** [`src/services/logger.service.ts`](../src/services/logger.service.ts)
 
 ---
@@ -49,7 +49,6 @@ The Logger Service is a centralized, structured logging system that replaces dir
 
 ### Architecture
 
-```
 ┌─────────────────────────────────────────────────────────┐
 │                   Your Application Code                  │
 │  logger.info('User logged in', { userId: '123' })       │
@@ -72,22 +71,12 @@ The Logger Service is a centralized, structured logging system that replaces dir
 │  • Full details  │    │  • Log aggregation             │
 │  • Stack traces  │    │  • Monitoring dashboard        │
 └──────────────────┘    └────────────────────────────────┘
-```
 
 ### Log Flow
 
 1. **You call:** `logger.info('message', { metadata })`
 2. **Logger checks:** Is log level >= minimum threshold?
-3. **Logger creates entry:**
-   ```typescript
-   {
-     timestamp: '2024-12-12T09:00:00.000Z',
-     level: LogLevel.INFO,
-     message: 'message',
-     metadata: { /* your data */ },
-     service: 'YourService'
-   }
-   ```
+3. **Logger creates entry** with timestamp, level, message, metadata, and service name
 4. **Logger outputs:**
    - **Development:** To browser console (you see it immediately)
    - **Production:** To remote service (for monitoring) + console for errors
@@ -109,19 +98,7 @@ The Logger Service is a centralized, structured logging system that replaces dir
 
 #### What You'll See:
 
-```
-[INFO] 2024-12-12T09:00:00.000Z: User logged in
-  { userId: '123', action: 'login', timestamp: 1702371600000 }
-
-[WARN] 2024-12-12T09:00:05.000Z: API rate limit approaching
-  { remaining: 10, limit: 100, service: 'ApiService' }
-
-[ERROR] 2024-12-12T09:00:10.000Z: Failed to fetch user data
-  { userId: '123', endpoint: '/api/users/123', service: 'UserService' }
-  Error: Network request failed
-    at fetch (...)
-    Stack trace: ...
-```
+Log entries formatted as `[LEVEL] timestamp: message` followed by metadata on the next line. Errors include stack traces.
 
 #### Filtering Console Logs:
 
@@ -129,47 +106,15 @@ The Logger Service is a centralized, structured logging system that replaces dir
    - Click console settings (gear icon)
    - Enable/disable: Verbose, Info, Warnings, Errors
 
-2. **By service:**
-   ```javascript
-   // Type in console filter box
-   service: "UserService"
-   ```
+2. **By service:** Type `service: "UserService"` in the console filter box
 
-3. **By text:**
-   ```javascript
-   // Type in console filter box
-   logged in
-   ```
+3. **By text:** Type any search term in the console filter box
 
 ### 2. Log Buffer (In-Memory Debugging)
 
 **Access recent logs programmatically in the console.**
 
-```javascript
-// Open browser console and type:
-
-// Get last 10 logs
-import { logger } from './src/services/logger.service';
-logger.getRecentLogs(10);
-
-// Or access via window (in development)
-window.__logger = logger; // If exposed
-window.__logger.getRecentLogs();
-```
-
-**What you get:**
-```javascript
-[
-  {
-    timestamp: '2024-12-12T09:00:00.000Z',
-    level: 1, // INFO
-    message: 'User logged in',
-    metadata: { userId: '123' },
-    service: 'AuthService'
-  },
-  // ... more logs
-]
-```
+Import `logger` from `./src/services/logger.service` and call `logger.getRecentLogs(10)` to get the last N log entries. Each entry contains timestamp, level (numeric), message, metadata, and service name.
 
 ### 3. Network Tab (Remote Logging)
 
@@ -182,24 +127,7 @@ window.__logger.getRecentLogs();
 3. Filter by: `fetch` or your logging endpoint URL
 4. Click on logging requests to see payload
 
-**Example payload sent:**
-```json
-{
-  "timestamp": "2024-12-12T09:00:00.000Z",
-  "level": 3,
-  "message": "API call failed",
-  "metadata": {
-    "endpoint": "/api/users",
-    "statusCode": 500
-  },
-  "error": {
-    "message": "Internal Server Error",
-    "name": "Error",
-    "stack": "Error: Internal Server Error\n    at ..."
-  },
-  "service": "MaterialKAI"
-}
-```
+The payload includes timestamp, level, message, metadata, error details (if applicable), and service name.
 
 ### 4. Production Monitoring Dashboard
 
@@ -211,20 +139,7 @@ window.__logger.getRecentLogs();
 - **New Relic** - Application performance monitoring
 - **Custom endpoint** - Your own logging service
 
-#### Setup Example (Sentry):
-
-```typescript
-// In src/services/logger.service.ts configuration
-import * as Sentry from '@sentry/browser';
-
-// In remoteOutput method
-if (env.isProduction) {
-  Sentry.captureMessage(entry.message, {
-    level: this.getSentryLevel(entry.level),
-    extra: entry.metadata,
-  });
-}
-```
+The setup involves configuring the logger's `remoteOutput` method to forward log entries to the chosen service (e.g., `Sentry.captureMessage` for Sentry integration).
 
 ---
 
@@ -232,48 +147,15 @@ if (env.isProduction) {
 
 ### 1. Import the Logger
 
-```typescript
-import { logger } from '@/config';
-// or
-import { logger } from '@/services/logger.service';
-```
+Import `logger` from `@/config` or `@/services/logger.service`.
 
 ### 2. Log Messages
 
-```typescript
-// Info - General information
-logger.info('User logged in successfully', { 
-  userId: user.id,
-  timestamp: Date.now() 
-});
-
-// Warning - Something to be aware of
-logger.warn('API rate limit approaching', { 
-  remaining: 10,
-  limit: 100 
-});
-
-// Error - Something went wrong
-logger.error('Failed to save data', error, { 
-  userId: user.id,
-  operation: 'save' 
-});
-
-// Debug - Detailed debugging info (only in development)
-logger.debug('Processing item', { 
-  itemId: '123',
-  step: 'validation' 
-});
-```
+Use `logger.info(message, metadata)` for general information, `logger.warn(message, metadata)` for warnings, `logger.error(message, error, metadata)` for errors, and `logger.debug(message, metadata)` for detailed debugging info (development only).
 
 ### 3. View in Console
 
-Open browser console (`F12`) and you'll see:
-
-```
-[INFO] 2024-12-12T09:00:00.000Z: User logged in successfully
-  { userId: 'user-123', timestamp: 1702371600000 }
-```
+Open browser console (`F12`) and you'll see formatted log entries with level, timestamp, message, and metadata.
 
 ---
 
@@ -281,76 +163,20 @@ Open browser console (`F12`) and you'll see:
 
 ### Scoped Loggers (Recommended for Services)
 
-**Create a logger specific to your service/component:**
-
-```typescript
-import { createLogger } from '@/config';
-
-export class UserService {
-  private logger = createLogger('UserService');
-
-  async getUser(userId: string) {
-    this.logger.info('Fetching user', { userId });
-    
-    try {
-      const user = await this.fetchUser(userId);
-      this.logger.info('User fetched successfully', { userId, hasData: !!user });
-      return user;
-    } catch (error) {
-      this.logger.error('Failed to fetch user', error, { userId });
-      throw error;
-    }
-  }
-}
-```
+**Create a logger specific to your service/component** using `createLogger('ServiceName')`. This automatically prefixes all log entries with the service name, making logs easy to filter.
 
 **Benefits:**
 - Automatic service name in all logs
 - Easy to filter logs by service
 - Better organization
 
-**Console output:**
-```
-[INFO] 2024-12-12T09:00:00.000Z: Fetching user
-  { userId: 'user-123', service: 'UserService' }
-
-[INFO] 2024-12-12T09:00:01.000Z: User fetched successfully
-  { userId: 'user-123', hasData: true, service: 'UserService' }
-```
-
 ### Accessing Recent Logs
 
-```typescript
-import { logger } from '@/config';
-
-// Get last 50 logs
-const recentLogs = logger.getRecentLogs(50);
-
-// Analyze logs
-const errorLogs = recentLogs.filter(log => log.level === LogLevel.ERROR);
-console.log(`Found ${errorLogs.length} errors in recent logs`);
-
-// Export logs for debugging
-const logsJson = JSON.stringify(recentLogs, null, 2);
-console.log(logsJson);
-```
+Call `logger.getRecentLogs(count)` to retrieve recent log entries. You can then filter them by level, serialize to JSON, or analyze error patterns.
 
 ### Conditional Logging
 
-```typescript
-import { logger } from '@/config';
-import { env } from '@/config/environment';
-
-// Only log in development
-if (env.isDevelopment) {
-  logger.debug('Detailed debug info', { data: sensitiveData });
-}
-
-// Only log if feature is enabled
-if (env.features.enableLogging) {
-  logger.info('Feature is enabled', { feature: 'analytics' });
-}
-```
+Use environment checks (`env.isDevelopment`, `env.features.enableLogging`) to conditionally log sensitive or verbose information only when appropriate.
 
 ---
 
@@ -358,56 +184,25 @@ if (env.features.enableLogging) {
 
 ### Logger Configuration Object
 
-```typescript
-interface LoggerConfig {
-  minLevel: LogLevel;           // Minimum level to log
-  enableConsole: boolean;       // Output to console
-  enableRemote: boolean;        // Send to remote service
-  remoteEndpoint?: string;      // Remote logging URL
-  serviceName: string;          // Default service name
-}
-```
+The `LoggerConfig` interface has these fields: `minLevel` (minimum level to log), `enableConsole` (boolean), `enableRemote` (boolean), `remoteEndpoint` (optional URL), and `serviceName` (default service name).
 
 ### Default Configuration
 
-```typescript
-// In logger.service.ts
-const config = {
-  minLevel: env.isProduction ? LogLevel.INFO : LogLevel.DEBUG,
-  enableConsole: env.features.enableLogging,
-  enableRemote: env.isProduction && env.features.enableAnalytics,
-  serviceName: 'MaterialKAI',
-};
-```
+In development, `minLevel` is `LogLevel.DEBUG` and console logging is enabled. In production, `minLevel` is `LogLevel.INFO` and remote logging is enabled when analytics is active.
 
 ### Customizing Configuration
 
-```typescript
-import { logger } from '@/config';
-
-// Update configuration at runtime
-logger.configure({
-  minLevel: LogLevel.WARN,        // Only log warnings and errors
-  enableRemote: true,             // Enable remote logging
-  remoteEndpoint: 'https://your-logging-service.com/logs',
-});
-```
+Call `logger.configure(config)` at runtime to update settings such as `minLevel`, `enableRemote`, or `remoteEndpoint`.
 
 ### Log Levels
 
-```typescript
-enum LogLevel {
-  DEBUG = 0,    // Detailed debug information (dev only)
-  INFO = 1,     // General informational messages
-  WARN = 2,     // Warning messages
-  ERROR = 3,    // Error messages
-  NONE = 4,     // Disable all logging
-}
-```
+- `DEBUG = 0` - Detailed debug information (dev only)
+- `INFO = 1` - General informational messages
+- `WARN = 2` - Warning messages
+- `ERROR = 3` - Error messages
+- `NONE = 4` - Disable all logging
 
-**Level Hierarchy:**
-- If `minLevel = LogLevel.WARN`, only WARN and ERROR logs are output
-- DEBUG < INFO < WARN < ERROR < NONE
+**Level Hierarchy:** If `minLevel = LogLevel.WARN`, only WARN and ERROR logs are output. DEBUG < INFO < WARN < ERROR < NONE.
 
 ---
 
@@ -415,106 +210,29 @@ enum LogLevel {
 
 ### ✅ DO
 
-```typescript
-// 1. Use scoped loggers for services
-const logger = createLogger('MyService');
-
-// 2. Include relevant context in metadata
-logger.info('Operation completed', {
-  userId: user.id,
-  duration: elapsedTime,
-  result: 'success'
-});
-
-// 3. Log errors with the error object
-logger.error('Failed to process', error, {
-  operation: 'processData',
-  itemId: item.id
-});
-
-// 4. Use appropriate log levels
-logger.debug('Processing step 1');  // Debug info
-logger.info('User logged in');      // Important event
-logger.warn('Rate limit approaching'); // Warning
-logger.error('API call failed');    // Error
-
-// 5. Keep messages concise but descriptive
-logger.info('User authentication successful', { userId, method: 'oauth' });
-```
+1. Use scoped loggers for services: `const logger = createLogger('MyService')`
+2. Include relevant context in metadata (userId, duration, result)
+3. Log errors with the error object as the second argument
+4. Use appropriate log levels (debug for steps, info for events, warn for alerts, error for failures)
+5. Keep messages concise but descriptive
 
 ### ❌ DON'T
 
-```typescript
-// 1. Don't log sensitive data
-logger.info('User logged in', { 
-  password: user.password,  // ❌ NEVER!
-  apiKey: user.apiKey       // ❌ NEVER!
-});
-
-// 2. Don't use console.* directly
-console.log('User logged in'); // ❌ Use logger.info instead
-
-// 3. Don't log in loops without throttling
-for (let item of items) {
-  logger.info('Processing item', { item }); // ❌ Will spam logs
-}
-
-// 4. Don't log without context
-logger.info('Success'); // ❌ What succeeded?
-
-// 5. Don't stringify objects manually
-logger.info('Data: ' + JSON.stringify(data)); // ❌ Use metadata instead
-logger.info('Data received', { data }); // ✅ Better
-```
+1. Don't log sensitive data (passwords, API keys — NEVER!)
+2. Don't use `console.*` directly — use `logger.info` instead
+3. Don't log in tight loops without throttling
+4. Don't log without context — "Success" says nothing; describe what succeeded
+5. Don't stringify objects manually — pass them as metadata
 
 ### Logging Patterns
 
 #### Service Pattern
 
-```typescript
-export class DataService {
-  private logger = createLogger('DataService');
-
-  async fetchData(id: string) {
-    this.logger.info('Fetching data', { id });
-
-    try {
-      const data = await this.apiCall(id);
-      this.logger.info('Data fetched successfully', { id, size: data.length });
-      return data;
-    } catch (error) {
-      this.logger.error('Failed to fetch data', error, { id });
-      throw error;
-    }
-  }
-}
-```
+Create a scoped logger as a class property. In each method, log before the operation (with relevant IDs), then log success with result metadata, and catch/log errors with the error object and context before re-throwing.
 
 #### Component Pattern
 
-```typescript
-export function UserProfile({ userId }: Props) {
-  useEffect(() => {
-    logger.debug('UserProfile mounted', { userId });
-    
-    return () => {
-      logger.debug('UserProfile unmounted', { userId });
-    };
-  }, [userId]);
-
-  const handleUpdate = async () => {
-    logger.info('Updating user profile', { userId });
-    try {
-      await updateProfile(userId, data);
-      logger.info('Profile updated successfully', { userId });
-    } catch (error) {
-      logger.error('Failed to update profile', error, { userId });
-    }
-  };
-
-  // ...
-}
-```
+In `useEffect`, log mount/unmount events with relevant props. In event handlers, log the action, then success or failure.
 
 ---
 
@@ -524,76 +242,33 @@ export function UserProfile({ userId }: Props) {
 
 **Solutions:**
 
-1. **Check console filter level**
-   - Open Console Settings (gear icon)
-   - Ensure "Info" is enabled
+1. **Check console filter level** — Open Console Settings (gear icon) and ensure "Info" is enabled
 
-2. **Check browser console level**
-   - Make sure console is set to "All levels" or "Verbose"
+2. **Check browser console level** — Make sure console is set to "All levels" or "Verbose"
 
-3. **Check logger configuration**
-   ```typescript
-   import { logger } from '@/config';
-   
-   // Verify configuration
-   logger.configure({
-     minLevel: LogLevel.DEBUG,
-     enableConsole: true
-   });
-   ```
+3. **Check logger configuration** — Import `logger` from `@/config` and call `logger.configure({ minLevel: LogLevel.DEBUG, enableConsole: true })`
 
-4. **Check environment**
-   ```typescript
-   import { env } from '@/config';
-   
-   console.log('Logging enabled?', env.features.enableLogging);
-   console.log('Environment:', env.nodeEnv);
-   ```
+4. **Check environment** — Import `env` from `@/config` and verify `env.features.enableLogging` and `env.nodeEnv`
 
 ### Problem: Logs not appearing in production
 
-**Expected behavior:** Only INFO, WARN, and ERROR logs appear in production (DEBUG is filtered out)
+**Expected behavior:** Only INFO, WARN, and ERROR logs appear in production (DEBUG is filtered out).
 
-**To verify:**
-```typescript
-import { env } from '@/config';
-
-console.log('Environment:', env.nodeEnv);      // Should be 'production'
-console.log('Is production:', env.isProduction); // Should be true
-```
+**To verify:** Check `env.nodeEnv` (should be `'production'`) and `env.isProduction` (should be `true`).
 
 ### Problem: Too many logs
 
 **Solutions:**
 
-1. **Increase minimum log level**
-   ```typescript
-   logger.configure({ minLevel: LogLevel.WARN }); // Only warnings and errors
-   ```
+1. **Increase minimum log level** — Call `logger.configure({ minLevel: LogLevel.WARN })`
 
-2. **Filter in console**
-   - Use console filter: `-service:VerboseService`
-   - Filter by level: Click to disable INFO logs
+2. **Filter in console** — Use console filter `-service:VerboseService` or disable INFO logs by clicking their level indicator
 
-3. **Use scoped loggers and filter**
-   ```typescript
-   // In console filter
-   service: "ImportantService"
-   ```
+3. **Use scoped loggers and filter** — Type `service: "ImportantService"` in the console filter
 
 ### Problem: Cannot access logger.getRecentLogs()
 
-**Solution:** Make sure you're importing from the right place
-
-```typescript
-// ✅ Correct
-import { logger } from '@/config';
-logger.getRecentLogs(10);
-
-// ❌ Wrong - createLogger returns scoped logger without getRecentLogs
-const myLogger = createLogger('MyService');
-myLogger.getRecentLogs; // undefined
-```
+**Solution:** Import `logger` from `@/config` (not via `createLogger`, which returns a scoped logger without `getRecentLogs`).
 
 ---
 
@@ -601,206 +276,40 @@ myLogger.getRecentLogs; // undefined
 
 ### Example 1: Authentication Service
 
-```typescript
-import { createLogger } from '@/config';
-import { env } from '@/config/environment';
-
-export class AuthService {
-  private logger = createLogger('AuthService');
-
-  async login(email: string, password: string) {
-    this.logger.info('Login attempt', { email });
-
-    try {
-      const user = await this.authenticate(email, password);
-      
-      this.logger.info('Login successful', {
-        userId: user.id,
-        email: user.email,
-        loginMethod: 'password'
-      });
-
-      // Only log sensitive operations in development
-      if (env.isDevelopment) {
-        this.logger.debug('User session created', {
-          sessionId: user.sessionId,
-          expiresAt: user.sessionExpiry
-        });
-      }
-
-      return user;
-    } catch (error) {
-      this.logger.error('Login failed', error, {
-        email,
-        reason: error.message,
-        attemptedAt: new Date().toISOString()
-      });
-      throw error;
-    }
-  }
-
-  async logout(userId: string) {
-    this.logger.info('Logout initiated', { userId });
-    
-    try {
-      await this.destroySession(userId);
-      this.logger.info('Logout successful', { userId });
-    } catch (error) {
-      this.logger.warn('Logout partially failed', { userId, error: error.message });
-      // Still succeed the logout from user perspective
-    }
-  }
-}
-```
-
-**Console output:**
-```
-[INFO] 2024-12-12T09:00:00.000Z: Login attempt
-  { email: 'user@example.com', service: 'AuthService' }
-
-[INFO] 2024-12-12T09:00:01.000Z: Login successful
-  {
-    userId: 'user-123',
-    email: 'user@example.com',
-    loginMethod: 'password',
-    service: 'AuthService'
-  }
-
-[DEBUG] 2024-12-12T09:00:01.100Z: User session created
-  {
-    sessionId: 'session-abc',
-    expiresAt: '2024-12-13T09:00:00.000Z',
-    service: 'AuthService'
-  }
-```
+A scoped logger created as `createLogger('AuthService')` is used throughout the `AuthService` class. On `login`, it logs the attempt with the email, then on success logs the userId and loginMethod. Sensitive session details are only logged in development. On failure, it logs the error with email, reason, and timestamp before re-throwing. The `logout` method similarly logs initiation, success, or partial failure.
 
 ### Example 2: API Client with Retry Logic
 
-```typescript
-import { createLogger } from '@/config';
-
-export class ApiClient {
-  private logger = createLogger('ApiClient');
-
-  async request(endpoint: string, options: RequestOptions, retries = 3) {
-    this.logger.info('API request started', { 
-      endpoint, 
-      method: options.method,
-      attempt: 1,
-      maxRetries: retries
-    });
-
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const response = await fetch(endpoint, options);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        this.logger.info('API request successful', {
-          endpoint,
-          status: response.status,
-          attempt,
-          duration: Date.now() - startTime
-        });
-
-        return await response.json();
-
-      } catch (error) {
-        if (attempt < retries) {
-          this.logger.warn('API request failed, retrying', {
-            endpoint,
-            attempt,
-            maxRetries: retries,
-            error: error.message,
-            nextRetryIn: Math.pow(2, attempt) * 1000
-          });
-
-          await this.delay(Math.pow(2, attempt) * 1000);
-        } else {
-          this.logger.error('API request failed after all retries', error, {
-            endpoint,
-            attempts: retries,
-            totalDuration: Date.now() - startTime
-          });
-          throw error;
-        }
-      }
-    }
-  }
-}
-```
+An `ApiClient` using `createLogger('ApiClient')` logs each request attempt with endpoint and method. On each retry it logs a warning with attempt number, error message, and next retry delay. After all retries fail it logs an error with total duration before throwing.
 
 ### Example 3: React Component Lifecycle
 
-```typescript
-import { useEffect } from 'react';
-import { logger } from '@/config';
-
-export function MaterialSearch({ query }: Props) {
-  useEffect(() => {
-    logger.debug('MaterialSearch mounted', { query });
-
-    const loadResults = async () => {
-      logger.info('Starting material search', { query, timestamp: Date.now() });
-
-      try {
-        const results = await searchMaterials(query);
-        
-        logger.info('Search completed', {
-          query,
-          resultsCount: results.length,
-          hasResults: results.length > 0
-        });
-
-      } catch (error) {
-        logger.error('Search failed', error, { query });
-      }
-    };
-
-    if (query) {
-      loadResults();
-    }
-
-    return () => {
-      logger.debug('MaterialSearch unmounted', { query });
-    };
-  }, [query]);
-
-  // Component render...
-}
-```
+A `MaterialSearch` component logs mount/unmount events via `useEffect`. Before searching it logs the query, on completion it logs result count, and on error it logs the failure with the query.
 
 ---
 
 ## Quick Reference Card
 
 ### Import
-```typescript
-import { logger, createLogger } from '@/config';
-```
+
+Import `logger` and `createLogger` from `@/config`.
 
 ### Log Methods
-```typescript
-logger.debug(message, metadata)    // Dev only
-logger.info(message, metadata)     // General info
-logger.warn(message, metadata)     // Warnings
-logger.error(message, error, metadata) // Errors
-```
+
+- `logger.debug(message, metadata)` — Dev only
+- `logger.info(message, metadata)` — General info
+- `logger.warn(message, metadata)` — Warnings
+- `logger.error(message, error, metadata)` — Errors
 
 ### Scoped Logger
-```typescript
-const myLogger = createLogger('ServiceName');
-myLogger.info(message, metadata);
-```
+
+Create with `createLogger('ServiceName')` then call methods on the returned logger instance.
 
 ### Utility Methods
-```typescript
-logger.getRecentLogs(count)   // Get recent logs
-logger.clearBuffer()          // Clear log buffer
-logger.configure(config)      // Update configuration
-```
+
+- `logger.getRecentLogs(count)` — Get recent logs
+- `logger.clearBuffer()` — Clear log buffer
+- `logger.configure(config)` — Update configuration
 
 ### Where to See Logs
 1. Browser Console (`F12`)
@@ -830,6 +339,6 @@ If you have questions or issues:
 
 ---
 
-**Last Updated:** December 12, 2024  
-**Version:** 1.0  
+**Last Updated:** December 12, 2024
+**Version:** 1.0
 **Status:** Production Ready ✅

@@ -56,7 +56,6 @@ The Campaign System provides enterprise-grade email marketing capabilities with 
 
 ### System Overview
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND (React)                                            │
 │ ├─ Campaign Service (src/services/email/campaignService.ts)│
@@ -84,7 +83,6 @@ The Campaign System provides enterprise-grade email marketing capabilities with 
 │ WEBHOOK PROCESSING (Supabase Edge Function)                │
 │ └─ ses-webhook (Updates campaign_recipients status)        │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ### Components
 
@@ -217,67 +215,11 @@ Complete campaign management service with methods:
 
 ### campaigns Table
 
-```sql
-CREATE TABLE campaigns (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL,
-  description TEXT,
-  template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL,
-  
-  -- Campaign status
-  status TEXT NOT NULL DEFAULT 'draft' 
-    CHECK (status IN ('draft', 'scheduled', 'sending', 'sent', 'paused', 'cancelled')),
-  
-  -- Scheduling
-  scheduled_at TIMESTAMPTZ,
-  sent_at TIMESTAMPTZ,
-  
-  -- Audience targeting
-  audience_filter JSONB DEFAULT '{}'::jsonb,
-  recipient_count INTEGER DEFAULT 0,
-  
-  -- Campaign settings
-  subject_line TEXT,
-  preview_text TEXT,
-  from_name TEXT,
-  from_email TEXT,
-  reply_to TEXT,
-  
-  -- Tracking settings
-  track_opens BOOLEAN DEFAULT true,
-  track_clicks BOOLEAN DEFAULT true,
-  
-  -- Campaign metadata
-  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
-  metadata JSONB DEFAULT '{}'::jsonb,
-  
-  -- Audit fields
-  created_by UUID REFERENCES auth.users(id),
-  updated_by UUID REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+The `campaigns` table stores the following key fields: id (UUID primary key), name, description, template_id (references email_templates), status (one of: draft, scheduled, sending, sent, paused, cancelled), scheduled_at, sent_at, audience_filter (JSONB), recipient_count (auto-updated via trigger), subject_line, preview_text, from_name, from_email, reply_to, track_opens (boolean, default true), track_clicks (boolean, default true), tags (text array), metadata (JSONB), created_by, updated_by, created_at, and updated_at.
 
--- Indexes
-CREATE INDEX idx_campaigns_status ON campaigns(status);
-CREATE INDEX idx_campaigns_scheduled_at ON campaigns(scheduled_at);
-CREATE INDEX idx_campaigns_created_by ON campaigns(created_by);
-CREATE INDEX idx_campaigns_template_id ON campaigns(template_id);
-CREATE INDEX idx_campaigns_tags ON campaigns USING GIN(tags);
+Indexes are created on status, scheduled_at, created_by, template_id, and a GIN index on tags.
 
--- RLS Policies (Admin-only access)
-ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Admins can manage campaigns"
-ON campaigns FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM user_profiles up
-    JOIN roles r ON up.role_id = r.id
-    WHERE up.user_id = auth.uid() AND r.name = 'admin'
-  )
-);
-```
+RLS is enabled with an admin-only policy that checks membership in the admin role via user_profiles and roles tables.
 
 **Key Fields:**
 - `status` - Campaign lifecycle state
@@ -289,64 +231,9 @@ USING (
 
 ### campaign_recipients Table
 
-```sql
-CREATE TABLE campaign_recipients (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  campaign_id UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+The `campaign_recipients` table stores: id (UUID primary key), campaign_id (references campaigns, cascade delete), email, user_id (references auth.users), contact_id (future use), variables (JSONB for personalization), status (one of: pending, sending, sent, failed, bounced, complained), tracking timestamps (sent_at, delivered_at, opened_at, clicked_at, bounced_at, complained_at), error_message, retry_count, email_log_id (references email_logs), created_at, and updated_at. A unique constraint enforces one email per campaign.
 
-  -- Recipient information
-  email TEXT NOT NULL,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  contact_id UUID, -- Future: REFERENCES contacts(id)
-
-  -- Personalization data
-  variables JSONB DEFAULT '{}'::jsonb,
-
-  -- Sending status
-  status TEXT NOT NULL DEFAULT 'pending'
-    CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'bounced', 'complained')),
-
-  -- Tracking timestamps
-  sent_at TIMESTAMPTZ,
-  delivered_at TIMESTAMPTZ,
-  opened_at TIMESTAMPTZ,
-  clicked_at TIMESTAMPTZ,
-  bounced_at TIMESTAMPTZ,
-  complained_at TIMESTAMPTZ,
-
-  -- Error tracking
-  error_message TEXT,
-  retry_count INTEGER DEFAULT 0,
-
-  -- Link to email_logs
-  email_log_id UUID REFERENCES email_logs(id) ON DELETE SET NULL,
-
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-
-  -- Unique constraint: one recipient per email per campaign
-  UNIQUE(campaign_id, email)
-);
-
--- Indexes
-CREATE INDEX idx_campaign_recipients_campaign_id ON campaign_recipients(campaign_id);
-CREATE INDEX idx_campaign_recipients_email ON campaign_recipients(email);
-CREATE INDEX idx_campaign_recipients_status ON campaign_recipients(status);
-CREATE INDEX idx_campaign_recipients_sent_at ON campaign_recipients(sent_at);
-
--- RLS Policies (Admin-only access)
-ALTER TABLE campaign_recipients ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Admins can manage recipients"
-ON campaign_recipients FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM user_profiles up
-    JOIN roles r ON up.role_id = r.id
-    WHERE up.user_id = auth.uid() AND r.name = 'admin'
-  )
-);
-```
+Indexes are created on campaign_id, email, status, and sent_at. RLS is enabled with the same admin-only policy.
 
 **Key Fields:**
 - `status` - Recipient-specific delivery status
@@ -360,28 +247,9 @@ USING (
 
 ### email_actions Table
 
-```sql
-CREATE TABLE email_actions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  action_key TEXT UNIQUE NOT NULL,
-  action_name TEXT NOT NULL,
-  description TEXT,
-  template_id UUID REFERENCES email_templates(id) ON DELETE SET NULL,
-  is_active BOOLEAN DEFAULT true,
-  trigger_conditions JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+The `email_actions` table maps system events to email templates for automatic sending. It stores: id, action_key (unique text identifier), action_name, description, template_id (references email_templates), is_active (default true), trigger_conditions (JSONB), created_at, and updated_at.
 
--- Default actions
-INSERT INTO email_actions (action_key, action_name, description) VALUES
-  ('welcome_email', 'Welcome Email', 'Sent when a new user signs up'),
-  ('password_reset', 'Password Reset', 'Sent when user requests password reset'),
-  ('email_verification', 'Email Verification', 'Sent to verify email address'),
-  ('quote_request', 'Quote Request Confirmation', 'Sent when user submits a quote request'),
-  ('quote_response', 'Quote Response', 'Sent when admin responds to a quote request'),
-  ('order_confirmation', 'Order Confirmation', 'Sent when an order is placed');
-```
+Default actions are pre-seeded for: welcome_email, password_reset, email_verification, quote_request, quote_response, and order_confirmation.
 
 **Purpose:** Maps system events to email templates for automatic sending.
 
@@ -396,116 +264,33 @@ INSERT INTO email_actions (action_key, action_name, description) VALUES
 
 #### Campaign Management
 
-**getCampaigns(filters?)**
-```typescript
-async getCampaigns(filters?: {
-  status?: string;
-  limit?: number;
-  offset?: number;
-}): Promise<Campaign[]>
-```
-Get all campaigns with optional filtering.
+**getCampaigns(filters?)** — Get all campaigns with optional filtering by status, limit, and offset. Returns a Promise of Campaign array.
 
-**getCampaign(id)**
-```typescript
-async getCampaign(id: string): Promise<Campaign>
-```
-Get campaign details with template information.
+**getCampaign(id)** — Get campaign details with template information. Returns a Promise of Campaign.
 
-**createCampaign(data)**
-```typescript
-async createCampaign(data: {
-  name: string;
-  description?: string;
-  template_id: string;
-  subject_line: string;
-  preview_text?: string;
-  from_name?: string;
-  from_email?: string;
-  reply_to?: string;
-  audience_filter?: object;
-  tags?: string[];
-}): Promise<Campaign>
-```
-Create a new campaign.
+**createCampaign(data)** — Create a new campaign with name, description, template_id, subject_line, preview_text, from_name, from_email, reply_to, audience_filter, and tags. Returns a Promise of Campaign.
 
-**updateCampaign(id, data)**
-```typescript
-async updateCampaign(id: string, data: Partial<Campaign>): Promise<Campaign>
-```
-Update campaign details (only for draft campaigns).
+**updateCampaign(id, data)** — Update campaign details (only for draft campaigns). Returns a Promise of Campaign.
 
-**deleteCampaign(id)**
-```typescript
-async deleteCampaign(id: string): Promise<void>
-```
-Delete a campaign (only draft campaigns).
+**deleteCampaign(id)** — Delete a campaign (only draft campaigns). Returns a Promise of void.
 
 #### Campaign Actions
 
-**scheduleCampaign(id, scheduledAt)**
-```typescript
-async scheduleCampaign(id: string, scheduledAt: Date): Promise<void>
-```
-Schedule campaign for future delivery.
+**scheduleCampaign(id, scheduledAt)** — Schedule campaign for future delivery at the given Date.
 
-**sendCampaign(id)**
-```typescript
-async sendCampaign(id: string): Promise<void>
-```
-Send campaign immediately. Creates recipients and queues emails.
+**sendCampaign(id)** — Send campaign immediately. Creates recipients and queues emails.
 
-**pauseCampaign(id)**
-```typescript
-async pauseCampaign(id: string): Promise<void>
-```
-Pause a sending campaign.
+**pauseCampaign(id)** — Pause a sending campaign.
 
-**cancelCampaign(id)**
-```typescript
-async cancelCampaign(id: string): Promise<void>
-```
-Cancel a scheduled campaign.
+**cancelCampaign(id)** — Cancel a scheduled campaign.
 
-**sendTestEmail(campaignId, email)**
-```typescript
-async sendTestEmail(campaignId: string, email: string): Promise<void>
-```
-Send test email to specified address.
+**sendTestEmail(campaignId, email)** — Send test email to specified address.
 
 #### Recipient Management
 
-**getCampaignRecipients(campaignId, filters?)**
-```typescript
-async getCampaignRecipients(
-  campaignId: string,
-  filters?: {
-    status?: string;
-    limit?: number;
-    offset?: number;
-  }
-): Promise<CampaignRecipient[]>
-```
-Get recipients for a campaign with optional filtering.
+**getCampaignRecipients(campaignId, filters?)** — Get recipients for a campaign with optional filtering by status, limit, and offset.
 
-**getCampaignStats(campaignId)**
-```typescript
-async getCampaignStats(campaignId: string): Promise<{
-  totalRecipients: number;
-  sent: number;
-  delivered: number;
-  opened: number;
-  clicked: number;
-  bounced: number;
-  complained: number;
-  deliveryRate: number;
-  openRate: number;
-  clickRate: number;
-  bounceRate: number;
-  complaintRate: number;
-}>
-```
-Get comprehensive campaign statistics.
+**getCampaignStats(campaignId)** — Get comprehensive campaign statistics including totalRecipients, sent, delivered, opened, clicked, bounced, complained counts, and deliveryRate, openRate, clickRate, bounceRate, complaintRate percentages.
 
 ---
 
@@ -579,21 +364,7 @@ Get comprehensive campaign statistics.
 
 ### 1. Create Campaign
 
-```typescript
-// Create campaign
-const campaign = await campaignService.createCampaign({
-  name: 'Product Launch Announcement',
-  description: 'Announce new material collection',
-  template_id: 'template-uuid',
-  subject_line: 'Introducing Our New Collection',
-  preview_text: 'Discover innovative materials for your next project',
-  from_name: 'Material Kai',
-  from_email: 'hello@materialkai.com',
-  reply_to: 'support@materialkai.com',
-  audience_filter: { role: 'user', subscription_tier: 'pro' },
-  tags: ['product-launch', 'marketing'],
-});
-```
+Call `campaignService.createCampaign()` with the campaign name, description, template_id, subject_line, preview_text, from_name, from_email, reply_to, audience_filter (e.g., `{ role: 'user', subscription_tier: 'pro' }`), and tags.
 
 ### 2. Add Recipients
 
@@ -601,58 +372,22 @@ Recipients are automatically added based on `audience_filter` when campaign is s
 
 **Audience Filter Examples:**
 
-```typescript
-// All users
-{ type: 'all_users' }
-
-// Filter by role
-{ role: 'user' }
-
-// Filter by subscription
-{ subscription_tier: 'pro' }
-
-// Complex filter
-{
-  role: 'user',
-  subscription_tier: ['pro', 'enterprise'],
-  status: 'active'
-}
-```
+- All users: `{ type: 'all_users' }`
+- Filter by role: `{ role: 'user' }`
+- Filter by subscription: `{ subscription_tier: 'pro' }`
+- Complex filter: `{ role: 'user', subscription_tier: ['pro', 'enterprise'], status: 'active' }`
 
 ### 3. Send Test Email
 
-```typescript
-await campaignService.sendTestEmail(campaign.id, 'test@example.com');
-```
+Call `campaignService.sendTestEmail(campaign.id, 'test@example.com')` to send a test before launching.
 
 ### 4. Schedule or Send
 
-```typescript
-// Schedule for later
-await campaignService.scheduleCampaign(
-  campaign.id,
-  new Date('2025-01-15T10:00:00Z')
-);
-
-// Or send immediately
-await campaignService.sendCampaign(campaign.id);
-```
+Call `campaignService.scheduleCampaign(campaign.id, scheduledDate)` to schedule for a future time, or `campaignService.sendCampaign(campaign.id)` to send immediately.
 
 ### 5. Monitor Progress
 
-```typescript
-// Get campaign stats
-const stats = await campaignService.getCampaignStats(campaign.id);
-
-console.log(`Delivery Rate: ${stats.deliveryRate}%`);
-console.log(`Open Rate: ${stats.openRate}%`);
-console.log(`Bounce Rate: ${stats.bounceRate}%`);
-
-// Get recipients with status
-const recipients = await campaignService.getCampaignRecipients(campaign.id, {
-  status: 'bounced'
-});
-```
+Call `campaignService.getCampaignStats(campaign.id)` to retrieve delivery rate, open rate, bounce rate, and other metrics. Call `campaignService.getCampaignRecipients(campaign.id, { status: 'bounced' })` to inspect recipients by status.
 
 ---
 
@@ -660,72 +395,15 @@ const recipients = await campaignService.getCampaignRecipients(campaign.id, {
 
 ### Example 1: Welcome Campaign
 
-```typescript
-// Create welcome campaign for new users
-const welcomeCampaign = await campaignService.createCampaign({
-  name: 'Welcome Series - Day 1',
-  template_id: welcomeTemplateId,
-  subject_line: 'Welcome to Material Kai! 🎉',
-  from_name: 'Material Kai Team',
-  from_email: 'hello@materialkai.com',
-  audience_filter: {
-    created_after: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
-  },
-});
-
-// Send immediately
-await campaignService.sendCampaign(welcomeCampaign.id);
-```
+Create a welcome campaign targeting users created in the last 24 hours by setting `audience_filter` with a `created_after` timestamp. Then send immediately with `campaignService.sendCampaign()`.
 
 ### Example 2: Product Announcement
 
-```typescript
-// Create product announcement for pro users
-const announcement = await campaignService.createCampaign({
-  name: 'New Material Collection Launch',
-  template_id: announcementTemplateId,
-  subject_line: 'Exclusive First Look: New Materials',
-  preview_text: 'Be the first to explore our latest collection',
-  from_name: 'Material Kai',
-  from_email: 'announcements@materialkai.com',
-  audience_filter: {
-    subscription_tier: ['pro', 'enterprise'],
-    status: 'active'
-  },
-  tags: ['product-launch', 'pro-users'],
-});
-
-// Schedule for next week
-const launchDate = new Date();
-launchDate.setDate(launchDate.getDate() + 7);
-launchDate.setHours(10, 0, 0, 0);
-
-await campaignService.scheduleCampaign(announcement.id, launchDate);
-```
+Create an announcement campaign targeting active pro and enterprise subscribers using `audience_filter: { subscription_tier: ['pro', 'enterprise'], status: 'active' }`. Schedule it for a future date/time using `campaignService.scheduleCampaign()`.
 
 ### Example 3: Re-engagement Campaign
 
-```typescript
-// Re-engage inactive users
-const reengagement = await campaignService.createCampaign({
-  name: 'We Miss You - Special Offer',
-  template_id: reengagementTemplateId,
-  subject_line: 'Come back and get 20% off',
-  from_name: 'Material Kai',
-  from_email: 'hello@materialkai.com',
-  audience_filter: {
-    last_login_before: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-    status: 'active'
-  },
-  tags: ['re-engagement', 'special-offer'],
-});
-
-// Send test first
-await campaignService.sendTestEmail(reengagement.id, 'marketing@materialkai.com');
-
-// Then send to all
-await campaignService.sendCampaign(reengagement.id);
-```
+Create a re-engagement campaign targeting users who haven't logged in for 30 days using a `last_login_before` filter. Send a test email first with `campaignService.sendTestEmail()`, then launch with `campaignService.sendCampaign()`.
 
 ---
 
@@ -813,12 +491,7 @@ await campaignService.sendCampaign(reengagement.id);
 3. Check for errors in campaign_recipients table
 4. Review email-api Edge Function logs
 
-```sql
--- Check for failed recipients
-SELECT * FROM campaign_recipients
-WHERE campaign_id = 'your-campaign-id'
-AND status = 'failed';
-```
+Query the campaign_recipients table for rows with `status = 'failed'` and the relevant campaign_id to identify failed recipients and their error messages.
 
 ### High Bounce Rate
 
@@ -830,13 +503,7 @@ AND status = 'failed';
 3. Check email content for spam triggers
 4. Verify SPF/DKIM records
 
-```sql
--- Find bounced emails
-SELECT email, error_message, bounced_at
-FROM campaign_recipients
-WHERE status = 'bounced'
-AND campaign_id = 'your-campaign-id';
-```
+Query campaign_recipients for rows with `status = 'bounced'` and the relevant campaign_id to see email addresses, error messages, and bounce timestamps.
 
 ### Recipients Not Receiving Emails
 
@@ -848,13 +515,7 @@ AND campaign_id = 'your-campaign-id';
 3. Check SNS webhook is working
 4. Review email_logs for errors
 
-```sql
--- Check email logs
-SELECT * FROM email_logs
-WHERE to_email = 'recipient@example.com'
-ORDER BY created_at DESC
-LIMIT 10;
-```
+Query the email_logs table filtering by recipient email and ordering by created_at descending to see recent send attempts.
 
 ### Tracking Not Working
 
@@ -866,30 +527,17 @@ LIMIT 10;
 3. Verify links have tracking parameters
 4. Check ses-webhook is processing events
 
-```sql
--- Check if tracking is enabled
-SELECT track_opens, track_clicks
-FROM campaigns
-WHERE id = 'your-campaign-id';
-```
+Query the campaigns table for the relevant campaign_id to confirm track_opens and track_clicks are set to true.
 
 ### Webhook Not Updating Status
 
 **Symptoms:** campaign_recipients status not updating
 
 **Solutions:**
-1. Check ses-webhook Edge Function logs
+1. Check ses-webhook Edge Function logs using `supabase functions logs ses-webhook --tail`
 2. Verify SNS subscription is confirmed
 3. Check message_id is being saved in email_logs
-4. Test webhook with SES simulator emails
-
-```bash
-# View webhook logs
-supabase functions logs ses-webhook --tail
-
-# Send test bounce
-# Email to: bounce@simulator.amazonses.com
-```
+4. Test webhook with SES simulator emails (e.g., email to bounce@simulator.amazonses.com)
 
 ---
 
@@ -905,26 +553,7 @@ supabase functions logs ses-webhook --tail
 
 ### Monitoring
 
-```sql
--- Campaign performance summary
-SELECT
-  c.name,
-  c.status,
-  c.recipient_count,
-  COUNT(CASE WHEN cr.status = 'sent' THEN 1 END) as sent,
-  COUNT(CASE WHEN cr.delivered_at IS NOT NULL THEN 1 END) as delivered,
-  COUNT(CASE WHEN cr.opened_at IS NOT NULL THEN 1 END) as opened,
-  COUNT(CASE WHEN cr.clicked_at IS NOT NULL THEN 1 END) as clicked,
-  COUNT(CASE WHEN cr.status = 'bounced' THEN 1 END) as bounced,
-  COUNT(CASE WHEN cr.status = 'complained' THEN 1 END) as complained,
-  ROUND(100.0 * COUNT(CASE WHEN cr.delivered_at IS NOT NULL THEN 1 END) / NULLIF(c.recipient_count, 0), 2) as delivery_rate,
-  ROUND(100.0 * COUNT(CASE WHEN cr.status = 'bounced' THEN 1 END) / NULLIF(c.recipient_count, 0), 2) as bounce_rate
-FROM campaigns c
-LEFT JOIN campaign_recipients cr ON c.id = cr.campaign_id
-WHERE c.status = 'sent'
-GROUP BY c.id, c.name, c.status, c.recipient_count
-ORDER BY c.sent_at DESC;
-```
+Query the campaigns and campaign_recipients tables with a join to compute per-campaign statistics including recipient_count, sent count, delivered count, opened count, clicked count, bounced count, complained count, delivery_rate, and bounce_rate. Filter to campaigns with status 'sent' and order by sent_at descending.
 
 ---
 
@@ -932,20 +561,7 @@ ORDER BY c.sent_at DESC;
 
 ### Row Level Security (RLS)
 
-All campaign tables have RLS enabled with admin-only access:
-
-```sql
--- Only admins can access campaigns
-CREATE POLICY "Admins can manage campaigns"
-ON campaigns FOR ALL TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM user_profiles up
-    JOIN roles r ON up.role_id = r.id
-    WHERE up.user_id = auth.uid() AND r.name = 'admin'
-  )
-);
-```
+All campaign tables have RLS enabled with admin-only access. The policy checks that the authenticated user has the 'admin' role via the user_profiles and roles tables.
 
 ### Data Protection
 
@@ -966,33 +582,15 @@ USING (
 
 ### Email Actions
 
-Trigger-based emails that send automatically on events:
-
-```typescript
-// Example: Send welcome email on user signup
-// This is handled automatically by email_actions table
-// No campaign needed - just link action to template
-```
+Trigger-based emails send automatically on system events (such as user signup triggering a welcome email) by linking an action key to a template in the email_actions table. No campaign is needed for these automated sends.
 
 ### Email Templates
 
-React Email templates used by campaigns:
-
-```typescript
-// Templates are managed in /admin/emails → Templates tab
-// Each campaign references a template_id
-// Variables are substituted per recipient
-```
+React Email templates are managed in `/admin/emails` → Templates tab. Each campaign references a template_id, and variables are substituted per recipient at send time.
 
 ### SES Webhooks
 
-Automatic bounce/complaint handling:
-
-```typescript
-// Webhooks update campaign_recipients automatically
-// No manual intervention needed
-// See docs/ses-webhook-setup.md for configuration
-```
+SES webhook processing automatically updates campaign_recipients status when bounces, complaints, or deliveries are reported by Amazon SES via SNS. No manual intervention is needed. See docs/ses-webhook-setup.md for configuration details.
 
 ---
 
@@ -1000,38 +598,11 @@ Automatic bounce/complaint handling:
 
 ### REST API (Future)
 
-Campaign management via REST API:
-
-```bash
-# Get campaigns
-GET /api/campaigns
-
-# Create campaign
-POST /api/campaigns
-
-# Send campaign
-POST /api/campaigns/{id}/send
-
-# Get campaign stats
-GET /api/campaigns/{id}/stats
-```
+Campaign management via REST API is planned, with endpoints for listing campaigns, creating campaigns, sending campaigns, and retrieving campaign statistics.
 
 ### Webhooks (Future)
 
-Campaign event webhooks:
-
-```json
-{
-  "event": "campaign.sent",
-  "campaign_id": "uuid",
-  "timestamp": "2025-01-15T10:00:00Z",
-  "stats": {
-    "total_recipients": 1000,
-    "sent": 1000,
-    "delivered": 950
-  }
-}
-```
+Campaign event webhooks are planned and will deliver JSON payloads containing the event type (e.g., "campaign.sent"), campaign_id, timestamp, and statistics including total_recipients, sent, and delivered counts.
 
 ---
 
@@ -1074,4 +645,3 @@ For questions or issues:
 **Version:** 1.0.0
 **Status:** Production Ready
 **Maintainer:** Development Team
-

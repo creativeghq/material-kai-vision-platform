@@ -48,8 +48,8 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 6. Results displayed in Materials Catalog
 ```
 
-**API Endpoint:** `POST /api/rag/documents/upload`  
-**Frontend Component:** `EnhancedPDFProcessor.tsx`  
+**API Endpoint:** `POST /api/rag/documents/upload`
+**Frontend Component:** `EnhancedPDFProcessor.tsx`
 **Documentation:** [pdf-processing-pipeline.md](pdf-processing-pipeline.md)
 
 ---
@@ -86,8 +86,8 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Relevance scores
 ```
 
-**API Endpoint:** `POST /api/rag/search`  
-**Frontend Component:** `SearchHub.tsx`  
+**API Endpoint:** `POST /api/rag/search`
+**Frontend Component:** `SearchHub.tsx`
 **Documentation:** [search-strategies.md](search-strategies.md)
 
 ---
@@ -120,8 +120,8 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 8. Results displayed in Import History
 ```
 
-**API Endpoint:** `POST /api/data-import/xml`  
-**Frontend Component:** `DataImportHub.tsx`  
+**API Endpoint:** `POST /api/data-import/xml`
+**Frontend Component:** `DataImportHub.tsx`
 **Documentation:** [data-import-system.md](data-import-system.md)
 
 ---
@@ -184,8 +184,8 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 7. Available in semantic search
 ```
 
-**API Endpoint:** `POST /api/knowledge-base/documents`  
-**Frontend Component:** `KnowledgeBaseHub.tsx`  
+**API Endpoint:** `POST /api/knowledge-base/documents`
+**Frontend Component:** `KnowledgeBaseHub.tsx`
 **Documentation:** [knowledge-base-implementation.md](knowledge-base-implementation.md)
 
 ---
@@ -217,9 +217,9 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 6. User continues conversation
 ```
 
-**Edge Function:** `agent-chat`  
-**Frontend Component:** `AgentHub.tsx`  
-**AI Model:** Claude Sonnet 4.5  
+**Edge Function:** `agent-chat`
+**Frontend Component:** `AgentHub.tsx`
+**AI Model:** Claude Sonnet 4.5
 **Documentation:** [agent-system.md](agent-system.md)
 
 ---
@@ -281,7 +281,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 ---
 
-**Last Updated:** December 3, 2025  
-**Version:** 2.4.0  
+**Last Updated:** December 3, 2025
+**Version:** 2.4.0
 **Status:** Production
-

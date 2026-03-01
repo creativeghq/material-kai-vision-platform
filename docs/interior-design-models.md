@@ -31,72 +31,28 @@ Used when user provides **reference image + prompt** for interior transformation
 ## 🎯 Smart Model Selection Logic
 
 ### Scenario 1: Text-to-Image Request
-**User Input:**
-```
-"Generate a modern minimalist bedroom with oak flooring"
-```
 
-**Models Used:** All 7 text-to-image models
-- FLUX.1-dev
-- FLUX.1-schnell
-- SDXL
-- Playground v2.5
-- Stable Diffusion 3
-- Kandinsky 2.2
-- Proteus v0.2
-
-**Result:** 7 different variations
+When the user provides only a text prompt (e.g., "Generate a modern minimalist bedroom with oak flooring"), all 7 text-to-image models are used: FLUX.1-dev, FLUX.1-schnell, SDXL, Playground v2.5, Stable Diffusion 3, Kandinsky 2.2, and Proteus v0.2. This produces 7 different variations.
 
 ### Scenario 2: Image-to-Image Request
-**User Input:**
-```
-Image: [bedroom.jpg]
-Prompt: "Transform this into a modern minimalist style"
-```
 
-**Models Used:** Only 3 working image-to-image models
-- ComfyUI Interior Remodel
-- Interiorly Gen1 Dev
-- Designer Architecture
-
-**Result:** 3 transformed variations
+When the user provides a reference image along with a prompt (e.g., "Transform this into a modern minimalist style"), only the 3 working image-to-image models are used: ComfyUI Interior Remodel, Interiorly Gen1 Dev, and Designer Architecture. This produces 3 transformed variations.
 
 ### Scenario 3: Custom Model Selection
-**User Input:**
-```
-{
-  "prompt": "Modern bedroom",
-  "models": ["flux-dev", "sdxl"]
-}
-```
 
-**Models Used:** Only specified models
-- FLUX.1-dev
-- SDXL
-
-**Result:** 2 variations
+When the user specifies particular models in the request (e.g., `"models": ["flux-dev", "sdxl"]`), only those specified models are used, producing the corresponding number of variations.
 
 ## 🔧 API Behavior
 
 ### Default Behavior (No Models Specified)
 
-```python
-# Text-to-image (no reference image)
-if not request.image:
-    models_to_use = TEXT_TO_IMAGE_MODELS  # All 7 text-to-image models
-
-# Image-to-image (with reference image)
-if request.image:
-    models_to_use = [m for m in IMAGE_TO_IMAGE_MODELS if m.get("status") != "failing"]
-    # Only 3 working models
-```
+When no models are specified in the request:
+- If there is no reference image, all text-to-image models are used (all 7 models).
+- If a reference image is provided, only the working image-to-image models are used (filtering out any with status "failing"), resulting in 3 models.
 
 ### Custom Model Selection
 
-```python
-if request.models:
-    models_to_use = [m for m in ALL_MODELS if m["id"] in request.models]
-```
+When a models array is provided in the request, the API filters the full model list to include only those whose IDs appear in the request array.
 
 ## 📈 Expected Results
 
@@ -109,4 +65,3 @@ if request.models:
 ## ✅ Complete Model Count: 14 Total
 - 7 Text-to-Image
 - 7 Image-to-Image (3 working, 4 failing)
-

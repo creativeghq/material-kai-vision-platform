@@ -58,68 +58,13 @@ overall_score = (name_sim × 0.50) + (desc_sim × 0.30) + (meta_sim × 0.20)
 
 Tracks all merge operations with full audit trail and undo capability.
 
-```sql
-CREATE TABLE product_merge_history (
-  id UUID PRIMARY KEY,
-  workspace_id UUID NOT NULL,
-  merged_at TIMESTAMP DEFAULT NOW(),
-  merged_by UUID REFERENCES auth.users(id),
-  
-  -- Source products being merged
-  source_product_ids UUID[] NOT NULL,
-  source_product_names TEXT[] NOT NULL,
-  
-  -- Target product (kept)
-  target_product_id UUID NOT NULL,
-  target_product_name TEXT NOT NULL,
-  
-  -- Merge metadata
-  similarity_score FLOAT,
-  merge_reason TEXT,
-  merge_strategy TEXT, -- 'manual', 'auto', 'suggested'
-  
-  -- Snapshots for undo
-  source_products_snapshot JSONB,
-  target_product_before_merge JSONB,
-  target_product_after_merge JSONB,
-  
-  -- Undo tracking
-  is_undone BOOLEAN DEFAULT FALSE,
-  undone_at TIMESTAMP,
-  undone_by UUID REFERENCES auth.users(id)
-);
-```
+Fields: `id`, `workspace_id`, `merged_at`, `merged_by`, `source_product_ids`, `source_product_names`, `target_product_id`, `target_product_name`, `similarity_score`, `merge_reason`, `merge_strategy` ('manual', 'auto', 'suggested'), `source_products_snapshot`, `target_product_before_merge`, `target_product_after_merge`, `is_undone`, `undone_at`, `undone_by`.
 
 ### duplicate_detection_cache Table
 
 Stores pre-computed duplicate pairs for quick lookup.
 
-```sql
-CREATE TABLE duplicate_detection_cache (
-  id UUID PRIMARY KEY,
-  workspace_id UUID NOT NULL,
-  
-  -- Product pair
-  product_id_1 UUID NOT NULL,
-  product_id_2 UUID NOT NULL,
-  
-  -- Similarity scores
-  overall_similarity_score FLOAT NOT NULL,
-  name_similarity FLOAT,
-  description_similarity FLOAT,
-  metadata_similarity FLOAT,
-  similarity_breakdown JSONB,
-  
-  -- Status tracking
-  is_duplicate BOOLEAN DEFAULT FALSE,
-  confidence_level TEXT, -- 'high', 'medium', 'low'
-  status TEXT DEFAULT 'pending', -- 'pending', 'reviewed', 'merged', 'dismissed'
-  
-  -- Review tracking
-  reviewed_by UUID REFERENCES auth.users(id),
-  reviewed_at TIMESTAMP
-);
-```
+Fields: `id`, `workspace_id`, `product_id_1`, `product_id_2`, `overall_similarity_score`, `name_similarity`, `description_similarity`, `metadata_similarity`, `similarity_breakdown`, `is_duplicate`, `confidence_level` ('high', 'medium', 'low'), `status` ('pending', 'reviewed', 'merged', 'dismissed'), `reviewed_by`, `reviewed_at`.
 
 ---
 
@@ -131,36 +76,7 @@ CREATE TABLE duplicate_detection_cache (
 
 Find potential duplicates for a specific product.
 
-**Request:**
-```json
-{
-  "product_id": "uuid",
-  "workspace_id": "uuid",
-  "similarity_threshold": 0.60
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "product_id": "uuid",
-  "duplicates_found": 3,
-  "duplicates": [
-    {
-      "product_id": "uuid",
-      "name": "Product Name",
-      "factory": "Factory Name",
-      "overall_similarity": 0.92,
-      "name_similarity": 0.95,
-      "description_similarity": 0.88,
-      "metadata_similarity": 0.85,
-      "confidence_level": "high"
-    }
-  ],
-  "note": "Only products from the same factory/manufacturer are considered duplicates"
-}
-```
+The request takes `product_id`, `workspace_id`, and an optional `similarity_threshold`. The response includes a list of matching products with their `overall_similarity`, `name_similarity`, `description_similarity`, `metadata_similarity`, and `confidence_level`.
 
 **CRITICAL:** Returns empty list if product has no factory metadata.
 
@@ -172,35 +88,7 @@ Find potential duplicates for a specific product.
 
 Scan entire workspace for duplicate products.
 
-**Request:**
-```json
-{
-  "workspace_id": "uuid",
-  "similarity_threshold": 0.75,
-  "limit": 1000
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "workspace_id": "uuid",
-  "duplicate_pairs_found": 15,
-  "duplicate_pairs": [
-    {
-      "product_id_1": "uuid",
-      "product_id_2": "uuid",
-      "product_1_name": "Name 1",
-      "product_2_name": "Name 2",
-      "factory": "Factory Name",
-      "overall_similarity": 0.88,
-      "confidence_level": "high"
-    }
-  ],
-  "note": "Only products from the same factory/manufacturer are considered duplicates"
-}
-```
+The request takes `workspace_id`, `similarity_threshold`, and `limit`. The response includes all detected duplicate pairs, each showing both product IDs, names, shared factory, overall similarity, and confidence level.
 
 ---
 
@@ -215,16 +103,6 @@ Retrieve cached duplicate detections.
 - `status` (optional): Filter by status ('pending', 'reviewed', 'merged', 'dismissed')
 - `min_similarity` (optional): Minimum similarity score (default: 0.60)
 
-**Response:**
-```json
-{
-  "success": true,
-  "workspace_id": "uuid",
-  "cached_duplicates": 42,
-  "duplicates": [...]
-}
-```
-
 ---
 
 ### 4. Update Duplicate Status
@@ -233,28 +111,13 @@ Retrieve cached duplicate detections.
 
 Update the status of a cached duplicate detection.
 
-**Request:**
-```json
-{
-  "cache_id": "uuid",
-  "status": "reviewed",
-  "user_id": "uuid"
-}
-```
+The request takes `cache_id`, `status`, and `user_id`.
 
 **Valid Statuses:**
 - `pending` - Not yet reviewed
 - `reviewed` - Admin has reviewed
 - `merged` - Products have been merged
 - `dismissed` - Not actually duplicates
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Status updated to 'reviewed'"
-}
-```
 
 ---
 
@@ -264,34 +127,13 @@ Update the status of a cached duplicate detection.
 
 Merge duplicate products into a single product.
 
-**Request:**
-```json
-{
-  "target_product_id": "uuid",
-  "source_product_ids": ["uuid1", "uuid2"],
-  "workspace_id": "uuid",
-  "user_id": "uuid",
-  "merge_strategy": "manual",
-  "merge_reason": "Duplicate from same factory"
-}
-```
+The request takes `target_product_id`, `source_product_ids`, `workspace_id`, `user_id`, `merge_strategy`, and `merge_reason`.
 
 **Merge Process:**
 1. Merges data from source products into target
 2. Transfers all relationships (images, chunks, etc.)
 3. Deletes source products
 4. Records merge in history for undo capability
-
-**Response:**
-```json
-{
-  "success": true,
-  "history_id": "uuid",
-  "target_product": {...},
-  "merged_count": 2,
-  "message": "Successfully merged 2 products"
-}
-```
 
 **Data Merge Strategy:**
 - **Name:** Keep target name (primary identifier)
@@ -308,27 +150,12 @@ Merge duplicate products into a single product.
 
 Undo a product merge operation.
 
-**Request:**
-```json
-{
-  "history_id": "uuid",
-  "user_id": "uuid"
-}
-```
+The request takes `history_id` and `user_id`.
 
 **Undo Process:**
 1. Restores all source products from snapshot
 2. Reverts target product to pre-merge state
 3. Marks merge as undone in history
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Merge successfully undone",
-  "restored_products": 2
-}
-```
 
 ---
 
@@ -342,26 +169,7 @@ Retrieve merge history for a workspace.
 - `workspace_id` (required): Workspace to query
 - `limit` (optional): Maximum results (default: 50)
 
-**Response:**
-```json
-{
-  "success": true,
-  "workspace_id": "uuid",
-  "merge_count": 12,
-  "merges": [
-    {
-      "id": "uuid",
-      "merged_at": "2025-11-09T10:30:00Z",
-      "merged_by": "uuid",
-      "source_product_names": ["Product A", "Product B"],
-      "target_product_name": "Product A",
-      "similarity_score": 0.92,
-      "merge_strategy": "manual",
-      "is_undone": false
-    }
-  ]
-}
-```
+The response includes a list of merge records with `merged_at`, `merged_by`, `source_product_names`, `target_product_name`, `similarity_score`, `merge_strategy`, and `is_undone`.
 
 ---
 
@@ -369,59 +177,15 @@ Retrieve merge history for a workspace.
 
 ### Factory Extraction
 
-Factory information is extracted from product metadata in priority order:
-
-```python
-FACTORY_KEYS = [
-    'factory',           # Primary
-    'manufacturer',      # Secondary
-    'factory_group',     # Tertiary
-    'brand',            # Fallback
-    'company'           # Last resort
-]
-```
-
-**Example:**
-```json
-{
-  "product_id": "uuid",
-  "name": "Ceramic Tile",
-  "metadata": {
-    "factory": "Porcelanosa",
-    "manufacturer": "Porcelanosa Group",
-    "color": "White",
-    "size": "30x30cm"
-  }
-}
-```
-
-Factory extracted: `"porcelanosa"` (normalized to lowercase)
+Factory information is extracted from product metadata in priority order: `factory` (Primary), `manufacturer` (Secondary), `factory_group` (Tertiary), `brand` (Fallback), `company` (Last resort). The extracted value is normalized to lowercase.
 
 ### Similarity Calculation
 
-**Name Similarity:**
-```python
-# Sequence matching with normalization
-similarity = SequenceMatcher(
-    None,
-    name1.lower().strip(),
-    name2.lower().strip()
-).ratio()
-```
+**Name Similarity:** Uses sequence matching with normalization — lowercase, trimmed comparison of product names.
 
-**Description Similarity:**
-```python
-# Text similarity using word overlap
-common_words = set(desc1.split()) & set(desc2.split())
-similarity = len(common_words) / max(len(desc1.split()), len(desc2.split()))
-```
+**Description Similarity:** Text similarity using word overlap — counts common words divided by the maximum word count of either description.
 
-**Metadata Similarity:**
-```python
-# Property comparison (excluding factory keys)
-matching_properties = count_matching_metadata_properties(meta1, meta2)
-similarity = matching_properties / total_properties
-```
+**Metadata Similarity:** Property comparison (excluding factory keys) — counts matching metadata properties divided by total properties.
 
 ---
 
@@ -429,47 +193,15 @@ similarity = matching_properties / total_properties
 
 ### Example 1: Detect Duplicates for Product
 
-```bash
-curl -X POST http://localhost:8000/api/duplicates/detect \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{
-    "product_id": "550e8400-e29b-41d4-a716-446655440000",
-    "workspace_id": "550e8400-e29b-41d4-a716-446655440001",
-    "similarity_threshold": 0.70
-  }'
-```
+Send a POST request to `/api/duplicates/detect` with the `product_id`, `workspace_id`, and `similarity_threshold` in the request body, including your authorization token.
 
 ### Example 2: Merge Duplicate Products
 
-```bash
-curl -X POST http://localhost:8000/api/duplicates/merge \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{
-    "target_product_id": "550e8400-e29b-41d4-a716-446655440000",
-    "source_product_ids": [
-      "550e8400-e29b-41d4-a716-446655440002",
-      "550e8400-e29b-41d4-a716-446655440003"
-    ],
-    "workspace_id": "550e8400-e29b-41d4-a716-446655440001",
-    "user_id": "550e8400-e29b-41d4-a716-446655440004",
-    "merge_strategy": "manual",
-    "merge_reason": "Duplicate from Porcelanosa factory"
-  }'
-```
+Send a POST request to `/api/duplicates/merge` specifying the `target_product_id`, `source_product_ids` array, `workspace_id`, `user_id`, `merge_strategy`, and `merge_reason`.
 
 ### Example 3: Undo Merge
 
-```bash
-curl -X POST http://localhost:8000/api/duplicates/undo-merge \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{
-    "history_id": "550e8400-e29b-41d4-a716-446655440005",
-    "user_id": "550e8400-e29b-41d4-a716-446655440004"
-  }'
-```
+Send a POST request to `/api/duplicates/undo-merge` with the `history_id` and `user_id`.
 
 ---
 
@@ -559,4 +291,3 @@ When integrating with the platform:
 **Last Updated**: November 9, 2025
 **Status**: Production Ready
 **API Version**: 1.0
-

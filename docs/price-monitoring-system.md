@@ -82,31 +82,9 @@ All tables have RLS enabled with role-based policies:
 - `check_now` - Trigger immediate price check (on-demand)
 - `get_status` - Get monitoring status and recent data
 
-**Request Example:**
-```json
-{
-  "action": "start_monitoring",
-  "productId": "uuid",
-  "monitoringSettings": {
-    "frequency": "weekly",
-    "enabled": true
-  }
-}
-```
+**Request format:** JSON body with an `action` field and a `productId` field. For `start_monitoring`, also include a `monitoringSettings` object with `frequency` and `enabled` fields.
 
-**Response Example:**
-```json
-{
-  "success": true,
-  "message": "Price monitoring started",
-  "monitoring": {
-    "id": "uuid",
-    "product_id": "uuid",
-    "monitoring_frequency": "weekly",
-    "next_check_at": "2025-12-26T00:00:00Z"
-  }
-}
-```
+**Response format:** JSON with `success` (boolean), `message` (string), and for `start_monitoring` a `monitoring` object containing id, product_id, monitoring_frequency, and next_check_at.
 
 #### 2. price-monitoring-cron
 **Endpoint:** `/functions/v1/price-monitoring-cron`
@@ -123,19 +101,7 @@ All tables have RLS enabled with role-based policies:
 5. Check and trigger price alerts
 6. Update next check times
 
-**Response Example:**
-```json
-{
-  "success": true,
-  "message": "Price monitoring cron completed",
-  "stats": {
-    "total": 10,
-    "processed": 10,
-    "succeeded": 8,
-    "failed": 2
-  }
-}
-```
+**Response:** JSON with success, message, and stats (total, processed, succeeded, failed).
 
 ### Firecrawl Integration
 
@@ -147,18 +113,7 @@ The system uses Firecrawl v2 API for web scraping:
 - Browser actions for dynamic content
 - Timeout configuration
 
-**Price Extraction Schema:**
-```json
-{
-  "type": "object",
-  "properties": {
-    "price": { "type": "string", "description": "Product price" },
-    "currency": { "type": "string", "description": "Currency code" },
-    "availability": { "type": "string", "description": "Stock status" },
-    "shipping_cost": { "type": "string", "description": "Shipping cost" }
-  }
-}
-```
+**Price Extraction Schema:** The schema extracts four string fields from each page: price (product price), currency (currency code), availability (stock status), and shipping_cost.
 
 **Credits:** Each scrape consumes approximately 1 Firecrawl credit
 
@@ -226,69 +181,19 @@ Modal to add products:
 
 ### 1. Database Migration
 
-Run the migrations in order:
-
-```bash
-# Apply migrations to Supabase
-supabase db push
-
-# Or manually apply each migration:
-psql $DATABASE_URL -f supabase/migrations/20251225000001_create_price_monitoring_tables.sql
-psql $DATABASE_URL -f supabase/migrations/20251225000002_create_price_alerts_and_stats.sql
-psql $DATABASE_URL -f supabase/migrations/20251225000003_create_rls_policies.sql
-psql $DATABASE_URL -f supabase/migrations/20251225000004_create_price_monitoring_functions.sql
-```
+Apply migrations using `supabase db push` or apply each migration file manually using psql. The migrations create all price monitoring tables, alert tables, RLS policies, and database functions.
 
 ### 2. Deploy Edge Functions
 
-```bash
-# Deploy price monitoring function
-supabase functions deploy price-monitoring
-
-# Deploy cron function
-supabase functions deploy price-monitoring-cron
-
-# Set environment variables
-supabase secrets set FIRECRAWL_API_KEY=your_api_key
-supabase secrets set CRON_SECRET=your_cron_secret
-```
+Deploy the price-monitoring and price-monitoring-cron functions using the Supabase CLI. Set the required environment secrets: `FIRECRAWL_API_KEY` and `CRON_SECRET`.
 
 ### 3. Configure Cron Job
 
-Set up a cron trigger in Supabase:
-
-```sql
--- In Supabase Dashboard > Database > Cron Jobs
-SELECT cron.schedule(
-  'price-monitoring-hourly',
-  '0 * * * *', -- Every hour
-  $$
-  SELECT net.http_post(
-    url := 'https://your-project.supabase.co/functions/v1/price-monitoring-cron',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-cron-secret', 'your_cron_secret'
-    )
-  );
-  $$
-);
-```
+Set up a cron job in the Supabase Dashboard under Database → Cron Jobs to call the price-monitoring-cron function on an hourly schedule (`0 * * * *`), passing the cron secret in the request headers.
 
 ### 4. Frontend Integration
 
-Add route to your app:
-
-```tsx
-// In your router configuration
-import { PriceMonitoringDashboard } from '@/components/PriceMonitoring';
-
-// Add route
-{
-  path: '/price-monitoring',
-  element: <PriceMonitoringDashboard />,
-  // Add auth guard for Factory/Store users only
-}
-```
+Add the `/price-monitoring` route to your app router and render the `PriceMonitoringDashboard` component. Apply an auth guard so only Factory and Store users can access this route.
 
 ## Usage Guide
 
@@ -356,55 +261,15 @@ import { PriceMonitoringDashboard } from '@/components/PriceMonitoring';
 
 ### Start Monitoring
 
-```typescript
-const response = await fetch('/functions/v1/price-monitoring', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    action: 'start_monitoring',
-    productId: 'uuid',
-    monitoringSettings: {
-      frequency: 'weekly',
-      enabled: true,
-    },
-  }),
-});
-```
+Call `POST /functions/v1/price-monitoring` with Authorization header, Content-Type application/json, and a body containing `action: 'start_monitoring'`, `productId`, and `monitoringSettings` with `frequency` and `enabled` fields.
 
 ### Check Now
 
-```typescript
-const response = await fetch('/functions/v1/price-monitoring', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    action: 'check_now',
-    productId: 'uuid',
-  }),
-});
-```
+Call `POST /functions/v1/price-monitoring` with Authorization header and a body containing `action: 'check_now'` and `productId`.
 
 ### Get Status
 
-```typescript
-const response = await fetch('/functions/v1/price-monitoring', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    action: 'get_status',
-    productId: 'uuid',
-  }),
-});
-```
+Call `POST /functions/v1/price-monitoring` with Authorization header and a body containing `action: 'get_status'` and `productId`.
 
 ## Monitoring and Maintenance
 
@@ -470,4 +335,3 @@ For issues or questions:
 - Check logs in Supabase Dashboard
 - Review error messages in price_monitoring_jobs table
 - Contact support with job ID for troubleshooting
-

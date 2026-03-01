@@ -1,7 +1,7 @@
 # Complete AI Models Inventory
 
-**Last Updated**: January 18, 2026  
-**Version**: 3.0.0  
+**Last Updated**: January 18, 2026
+**Version**: 3.0.0
 **Total Models**: 30+ across 5 providers
 
 ---
@@ -11,7 +11,7 @@
 ### 1. Anthropic (Claude)
 
 #### Claude Sonnet 4.5
-- **Use Cases**: 
+- **Use Cases**:
   - Product discovery from PDFs (Stage 0A)
   - Deep metadata extraction
   - Quality validation
@@ -29,7 +29,7 @@
   - Saved search similarity analysis
   - Quick validation tasks
 - **Context**: 200,000 tokens
-- **Cost**: ~$0.0025 per 1K tokens  
+- **Cost**: ~$0.0025 per 1K tokens
 - **Performance**: 3× faster than Sonnet, 90%+ accuracy
 
 ---
@@ -64,17 +64,19 @@
 
 ---
 
-### 3. Together AI
+### 3. HuggingFace Endpoint
 
-#### Qwen3-VL 17B Vision
+#### Qwen3-VL 32B Vision
 - **Use Cases**:
   - Material image analysis
   - Product classification
   - OCR and text extraction from images
   - Image quality scoring
-- **Parameters**: 17 billion
+  - Generating structured analysis for understanding embeddings
+- **Parameters**: 32 billion
 - **Modality**: Vision + Text
-- **Performance**: 
+- **Deployment**: HuggingFace Dedicated Endpoint (auto-pause enabled)
+- **Performance**:
   - 69.4% MMMU score
   - #1 ranked for OCR tasks
   - 85%+ material recognition accuracy
@@ -328,7 +330,7 @@
 
 ---
 
-**Total Investment**: 30+ AI models across 5 providers  
-**Total Cost Range**: $0.00 - $0.055 per operation (varies by model and task)  
-**Success Rate**: 95%+ across all models  
+**Total Investment**: 30+ AI models across 5 providers
+**Total Cost Range**: $0.00 - $0.055 per operation (varies by model and task)
+**Success Rate**: 95%+ across all models
 **Uptime**: 99.5%+ (production environment)

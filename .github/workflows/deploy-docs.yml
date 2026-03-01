@@ -271,8 +271,8 @@ jobs:
           - **Frontend**: React + TypeScript + Vite (Vercel)
           - **Backend**: FastAPI + Python 3.11 (Docker)
           - **Database**: Supabase PostgreSQL with pgvector
-          - **AI Services**: OpenAI, Anthropic, Together AI, Replicate
-          - **Vector Search**: OpenAI embeddings (1536D), CLIP (512D)
+          - **AI Services**: OpenAI, Anthropic, HuggingFace, Voyage AI, Replicate
+          - **Vector Search**: Voyage AI embeddings (1024D), SigLIP2 (768D)
 
           ## 🚀 Key Features
 
@@ -302,7 +302,7 @@ jobs:
           - **Analytics Dashboard**: Comprehensive metrics for search, API usage, PDF processing, and quality
           - **Async Job Queue Monitor**: Real-time job tracking with 7 compact metrics and live updates
           - **AI Model Tracking**: Monitor which models are used at each pipeline stage
-          - **Cost Tracking**: Track API costs across all AI providers (Anthropic, OpenAI, Together AI)
+          - **Cost Tracking**: Track API costs across all AI providers (Anthropic, OpenAI, Voyage AI, HuggingFace)
           - **Performance Metrics**: Processing time, success rates, and resource utilization
 
           ### ⚙️ Admin & Configuration

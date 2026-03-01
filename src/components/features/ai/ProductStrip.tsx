@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Paintbrush } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Product } from '@/components/features/products/types';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
@@ -13,11 +13,13 @@ import ProductDetailModal from '@/components/features/products/ProductDetailModa
 interface ProductStripProps {
   products: Product[];
   title?: string;
+  onReplaceInImage?: (product: Product) => void;
 }
 
 export const ProductStrip: React.FC<ProductStripProps> = ({
   products,
   title = 'Related Products',
+  onReplaceInImage,
 }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -120,18 +122,35 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                       {product.pricing?.currency === 'EUR' ? '€' : '$'}
                       {product.pricing?.retail?.toFixed(2) || 'N/A'}
                     </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenModal(product);
-                      }}
-                    >
-                      <ExternalLink className="h-3 w-3 mr-1" />
-                      View
-                    </Button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {onReplaceInImage && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onReplaceInImage(product);
+                          }}
+                          title="Replace a zone in your render with this material"
+                        >
+                          <Paintbrush className="h-3 w-3 mr-1" />
+                          Replace
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenModal(product);
+                        }}
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>

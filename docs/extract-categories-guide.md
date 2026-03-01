@@ -47,28 +47,12 @@ Comma-separated list of categories to extract.
 - `specifications` - Technical specification pages (Planned)
 - `all` - All content (same as `focused_extraction=False`)
 
-**Examples**:
-```
-extract_categories="products"                    # Only products
-extract_categories="products,certificates"       # Products + certificates
-extract_categories="all"                         # Everything
-```
-
 ---
 
 ## Use Cases
 
 ### **Use Case 1: Product Catalog (Default)**
 Extract only product information, skip marketing/admin content.
-
-```bash
-POST /api/rag/documents/upload-with-discovery
-{
-  "file": "catalog.pdf",
-  "focused_extraction": true,
-  "extract_categories": "products"
-}
-```
 
 **Result**:
 - Chunks from product pages only
@@ -82,15 +66,6 @@ POST /api/rag/documents/upload-with-discovery
 ### **Use Case 2: Products + Certificates**
 Extract products and environmental certifications.
 
-```bash
-POST /api/rag/documents/upload-with-discovery
-{
-  "file": "catalog.pdf",
-  "focused_extraction": true,
-  "extract_categories": "products,certificates"
-}
-```
-
 **Result** (when certificates category is implemented):
 - Chunks from product pages
 - Chunks from certificate pages
@@ -102,26 +77,7 @@ POST /api/rag/documents/upload-with-discovery
 ---
 
 ### **Use Case 3: Full PDF Processing**
-Extract everything from the PDF.
-
-```bash
-POST /api/rag/documents/upload-with-discovery
-{
-  "file": "catalog.pdf",
-  "focused_extraction": false
-}
-```
-
-**OR**:
-
-```bash
-POST /api/rag/documents/upload-with-discovery
-{
-  "file": "catalog.pdf",
-  "focused_extraction": true,
-  "extract_categories": "all"
-}
-```
+Extract everything from the PDF by setting `focused_extraction=false` or `extract_categories=all`.
 
 **Result**:
 - Chunks from all pages
@@ -168,22 +124,7 @@ The codebase includes placeholder support for additional categories. The `produc
 ## Database Schema
 
 ### **Image Metadata**
-Images now include category information:
-
-```json
-{
-  "id": "uuid",
-  "document_id": "uuid",
-  "page_number": 5,
-  "image_url": "https://...",
-  "metadata": {
-    "category": "product",              // NEW: Image category
-    "extract_categories": ["products"], // NEW: What was requested
-    "focused_extraction": true,
-    "product_page": true
-  }
-}
-```
+Images now include category information. Each image record's metadata JSONB field contains: `category` (e.g., "product"), `extract_categories` (e.g., ["products"]), `focused_extraction` (boolean), and `product_page` (boolean).
 
 ---
 
@@ -216,12 +157,6 @@ Images now include category information:
 ## Testing
 
 ### **Test 1: Products Only (Default)**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/documents/upload-with-discovery" \
-  -F "file=@harmony.pdf" \
-  -F "focused_extraction=true" \
-  -F "extract_categories=products"
-```
 
 **Expected**:
 - Images only from product pages (5-11)
@@ -229,11 +164,6 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/documents/upload-with-discov
 - Non-product pages skipped
 
 ### **Test 2: Full PDF**
-```bash
-curl -X POST "https://v1api.materialshub.gr/api/rag/documents/upload-with-discovery" \
-  -F "file=@harmony.pdf" \
-  -F "focused_extraction=false"
-```
 
 **Expected**:
 - Images from all pages (1-11)
@@ -262,5 +192,5 @@ curl -X POST "https://v1api.materialshub.gr/api/rag/documents/upload-with-discov
 - **Cost Savings**: Skip irrelevant content (fewer AI calls)
 - **Faster Processing**: Less content to process
 - **Cleaner Data**: No marketing/admin clutter
-- 🔧 **Configurable**: Choose what to extract per upload
+- **Configurable**: Choose what to extract per upload
 

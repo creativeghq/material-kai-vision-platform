@@ -18,11 +18,7 @@ Automated TypeScript type generation from Supabase database schema to ensure typ
 
 ### Generate Types from Remote Database
 
-```bash
-npm run types:generate
-```
-
-Generates TypeScript types from the production Supabase database.
+Run `npm run types:generate` to generate TypeScript types from the production Supabase database.
 
 **Requirements:**
 - `SUPABASE_ACCESS_TOKEN` environment variable set
@@ -30,11 +26,7 @@ Generates TypeScript types from the production Supabase database.
 
 ### Generate Types from Local Database
 
-```bash
-npm run types:generate:local
-```
-
-Generates TypeScript types from local Supabase instance.
+Run `npm run types:generate:local` to generate TypeScript types from local Supabase instance.
 
 **Requirements:**
 - Local Supabase running (`supabase start`)
@@ -42,11 +34,7 @@ Generates TypeScript types from local Supabase instance.
 
 ### Check Types Status
 
-```bash
-npm run types:check
-```
-
-Verifies that Supabase types file exists and contains expected type definitions.
+Run `npm run types:check` to verify that Supabase types file exists and contains expected type definitions.
 
 **Checks:**
 - File exists and is readable
@@ -91,21 +79,13 @@ Configure these in GitHub repository settings:
 
 ### 1. Install Supabase CLI
 
-The Supabase CLI is included as a dev dependency:
-
-```bash
-npm install
-```
+The Supabase CLI is included as a dev dependency. Run `npm install`.
 
 ### 2. Configure Environment Variables
 
 #### Local Development
 
-Create `.env.local` file:
-
-```bash
-SUPABASE_ACCESS_TOKEN=your-access-token-here
-```
+Create `.env.local` file with `SUPABASE_ACCESS_TOKEN=your-access-token-here`.
 
 #### GitHub Actions
 
@@ -128,51 +108,11 @@ Add secrets to repository:
 
 ### Manual Type Generation
 
-```bash
-# Generate from remote database
-npm run types:generate
-
-# Generate from local database (if running locally)
-npm run types:generate:local
-
-# Check if types are up-to-date
-npm run types:check
-```
+Run `npm run types:generate` to generate from remote database, `npm run types:generate:local` for local, and `npm run types:check` to verify they are up-to-date.
 
 ### Verify Types After Generation
 
-```bash
-npm run types:check
-```
-
-Expected output:
-
-```
-================================================================================
-🔍 Checking Supabase Types
-================================================================================
-
-✅ Types file exists
-   Path: /path/to/src/integrations/supabase/types.ts
-   Size: 45.23 KB
-   Last modified: 2025-11-08T12:00:00.000Z
-
-✅ Types file is recent (0 days old)
-
-📋 Type Definitions Check:
-   ✅ Database type found
-   ✅ Tables type found
-   ✅ TablesInsert type found
-   ✅ TablesUpdate type found
-   ✅ Json type found
-
-📊 Database Statistics:
-   Tables defined: 52
-
-================================================================================
-✅ TYPES CHECK PASSED
-================================================================================
-```
+Run `npm run types:check`. Expected output shows: file path and size, file age (recent), presence of Database/Tables/TablesInsert/TablesUpdate/Json types, and total tables count.
 
 ### Trigger GitHub Actions Workflow
 
@@ -188,62 +128,17 @@ Expected output:
 
 ### Pre-commit Hook (Optional)
 
-Add to `.husky/pre-commit`:
-
-```bash
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-# Check if types are up-to-date
-npm run types:check
-```
+Add to `.husky/pre-commit` to run `npm run types:check` before each commit.
 
 ### CI/CD Integration
 
-Add to `.github/workflows/deploy.yml`:
-
-```yaml
-- name: Check Supabase types
-  run: npm run types:check
-```
+Add a step to `.github/workflows/deploy.yml` that runs `npm run types:check`.
 
 ---
 
 ## 📊 Type File Structure
 
-The generated `src/integrations/supabase/types.ts` file contains:
-
-```typescript
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
-
-export type Database = {
-  public: {
-    Tables: {
-      // All database tables with Row, Insert, Update types
-      documents: {
-        Row: { id: string; title: string; ... }
-        Insert: { id?: string; title: string; ... }
-        Update: { id?: string; title?: string; ... }
-      }
-      // ... more tables
-    }
-    Views: {
-      // Database views
-    }
-    Functions: {
-      // Database functions
-    }
-    Enums: {
-      // Database enums
-    }
-  }
-}
-
-// Helper types
-export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
-export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
-export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
-```
+The generated `src/integrations/supabase/types.ts` file contains a `Database` type with a `public` schema holding `Tables` (each with `Row`, `Insert`, `Update` subtypes), `Views`, `Functions`, and `Enums`. Helper types `Tables<T>`, `TablesInsert<T>`, and `TablesUpdate<T>` are also exported for convenient usage.
 
 ---
 
@@ -283,15 +178,9 @@ export type TablesUpdate<T extends keyof Database['public']['Tables']> = Databas
 
 ## 📚 Best Practices
 
-1. **Always regenerate types after schema changes**
-   ```bash
-   npm run types:generate
-   ```
+1. **Always regenerate types after schema changes** — run `npm run types:generate`
 
-2. **Check types before committing**
-   ```bash
-   npm run types:check
-   ```
+2. **Check types before committing** — run `npm run types:check`
 
 3. **Review automated PRs carefully**
    - Check for breaking changes
@@ -303,13 +192,7 @@ export type TablesUpdate<T extends keyof Database['public']['Tables']> = Databas
    - Regenerate after migrations
    - Monitor GitHub Actions workflow
 
-5. **Use generated types in code**
-   ```typescript
-   import { Tables, TablesInsert } from '@/integrations/supabase/types'
-   
-   type Document = Tables<'documents'>
-   type DocumentInsert = TablesInsert<'documents'>
-   ```
+5. **Use generated types in code** — import `Tables` and `TablesInsert` from `@/integrations/supabase/types` for type-safe queries
 
 ---
 
@@ -320,3 +203,4 @@ export type TablesUpdate<T extends keyof Database['public']['Tables']> = Databas
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 
 ---
+

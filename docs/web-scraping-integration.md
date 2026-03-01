@@ -73,51 +73,15 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 
 ### 1. Trigger Web Scraping
 
-From the admin panel or via API:
-
-```typescript
-// Frontend: Trigger scraping
-const response = await supabase.functions.invoke('scrape-session-manager', {
-  body: {
-    url: 'https://example.com/products',
-    workspace_id: 'my-workspace',
-    scraping_service: 'firecrawl',
-    max_pages: 10
-  }
-});
-```
+Invoke the `scrape-session-manager` Supabase Edge Function with a request body containing `url`, `workspace_id`, `scraping_service` ('firecrawl'), and an optional `max_pages` limit.
 
 ### 2. Monitor Progress
 
-Track scraping progress in real-time:
-
-```typescript
-// Subscribe to session updates
-const subscription = supabase
-  .channel('scraping-sessions')
-  .on('postgres_changes', {
-    event: 'UPDATE',
-    schema: 'public',
-    table: 'scraping_sessions',
-    filter: `id=eq.${sessionId}`
-  }, (payload) => {
-    console.log('Progress:', payload.new.progress_percentage);
-  })
-  .subscribe();
-```
+Subscribe to the `scraping_sessions` table via Supabase real-time, filtering on the specific `session_id`, to receive progress updates including the `progress_percentage` field.
 
 ### 3. View Results
 
-Once complete, products are available in the products table:
-
-```typescript
-// Fetch products from scraping session
-const { data: products } = await supabase
-  .from('products')
-  .select('*')
-  .eq('source_type', 'web_scraping')
-  .eq('source_id', sessionId);
-```
+Query the `products` table filtering by `source_type = 'web_scraping'` and `source_id = sessionId` to fetch all products created from a specific scraping session.
 
 ## 🔄 Processing Pipeline
 
@@ -182,54 +146,21 @@ const { data: products } = await supabase
 
 ### Scraping Options
 
-```typescript
-interface ScrapingConfig {
-  url: string;                    // Website URL to scrape
-  workspace_id: string;           // Workspace ID
-  scraping_service: 'firecrawl';  // Scraping service (currently only Firecrawl)
-  max_pages?: number;             // Max pages to scrape (default: 10)
-  categories?: string[];          // Categories to discover (default: ['products'])
-  model?: 'claude' | 'gpt' | 'haiku'; // AI model (default: 'claude')
-}
-```
+The scraping configuration accepts: `url` (website URL to scrape), `workspace_id`, `scraping_service` (currently only 'firecrawl'), optional `max_pages` (default: 10), optional `categories` array (default: ['products']), and optional `model` ('claude', 'gpt', or 'haiku', default: 'claude').
 
 ### Discovery Options
 
-```typescript
-interface DiscoveryConfig {
-  categories: string[];  // ['products', 'certificates', 'logos']
-  model: string;         // 'claude', 'gpt', 'haiku'
-  workspace_id: string;  // Workspace context
-}
-```
+The discovery configuration accepts: `categories` array (['products', 'certificates', 'logos']), `model` string ('claude', 'gpt', or 'haiku'), and `workspace_id`.
 
 ## 📊 Monitoring & Debugging
 
 ### Check Session Status
 
-```bash
-# Via API
-curl -X GET "https://v1api.materialshub.gr/api/scraping/session/{session_id}/status" \
-  -H "Authorization: Bearer mk_your_api_key"
-```
+Send a GET request to `https://v1api.materialshub.gr/api/scraping/session/{session_id}/status` with your authorization token.
 
 ### View Scraping Logs
 
-```sql
--- Check scraping session
-SELECT * FROM scraping_sessions WHERE id = 'session-id';
-
--- Check scraped pages
-SELECT url, status, markdown_length
-FROM scraping_pages
-WHERE session_id = 'session-id';
-
--- Check created products
-SELECT name, metadata->>'source_url' as source_url
-FROM products
-WHERE source_type = 'web_scraping'
-  AND source_id = 'session-id';
-```
+Query the `scraping_sessions` table by session ID to check session status. Query `scraping_pages` filtering by `session_id` to inspect individual page statuses and markdown lengths. Query `products` filtering by `source_type = 'web_scraping'` and `source_id` to see created products with their source URLs.
 
 ### Common Issues
 
@@ -323,33 +254,15 @@ WHERE source_type = 'web_scraping'
 
 ### Enable Debug Logging
 
-```typescript
-// In Edge Function
-console.log('🔍 Debug: Session data:', session);
-console.log('🔍 Debug: Markdown length:', markdown.length);
-```
+Add debug console.log statements in the Edge Function to output session data and markdown lengths during processing.
 
 ### Check Database State
 
-```sql
--- Session status
-SELECT status, progress_percentage, error_message
-FROM scraping_sessions
-WHERE id = 'session-id';
-
--- Webhook calls
-SELECT * FROM scraping_sessions
-WHERE id = 'session-id'
-  AND scraping_config->>'webhook_retry_count' IS NOT NULL;
-```
+Query `scraping_sessions` by session ID to check status, progress percentage, and error message. Query sessions with non-null `scraping_config->>'webhook_retry_count'` to find sessions that have experienced webhook retries.
 
 ### Manual Retry
 
-```bash
-# Retry failed session
-curl -X POST "https://v1api.materialshub.gr/api/scraping/session/{session_id}/retry" \
-  -H "Authorization: Bearer mk_your_api_key"
-```
+Send a POST request to `https://v1api.materialshub.gr/api/scraping/session/{session_id}/retry` with your authorization token.
 
 ---
 
@@ -359,33 +272,7 @@ Web Scraping implements **complete production hardening** for reliability and mo
 
 ### Source Tracking ✅
 
-Every product, chunk, and image is tagged with source information:
-
-```python
-# Products
-await supabase.table('products').insert({
-    'name': product_name,
-    'source_type': 'web_scraping',   # ✅ Tracks source
-    'source_job_id': session_id,     # ✅ Links to scraping session
-    # ... other fields
-})
-
-# Chunks
-await supabase.table('document_chunks').insert({
-    'content': chunk_text,
-    'source_type': 'web_scraping',   # ✅ Tracks source
-    'source_job_id': session_id,     # ✅ Links to scraping session
-    # ... other fields
-})
-
-# Images
-await supabase.table('document_images').insert({
-    'url': image_url,
-    'source_type': 'web_scraping',   # ✅ Tracks source
-    'source_job_id': session_id,     # ✅ Links to scraping session
-    # ... other fields
-})
-```
+Every product, chunk, and image is tagged with source information. Products, chunks, and images all receive `source_type: 'web_scraping'` and `source_job_id: session_id` fields.
 
 **Benefits:**
 - Filter Materials Data page by specific scraping session
@@ -397,22 +284,7 @@ await supabase.table('document_images').insert({
 
 ### Heartbeat Monitoring ✅
 
-Updates `last_heartbeat_at` field **every 30 seconds** to detect stuck jobs:
-
-```typescript
-// Update heartbeat during scraping
-await supabase
-  .from('scraping_sessions')
-  .update({
-    last_heartbeat_at: new Date().toISOString(),
-    status: 'processing',
-    metadata: {
-      pages_scraped: pagesScraped,
-      products_found: productsFound
-    }
-  })
-  .eq('id', sessionId);
-```
+Updates `last_heartbeat_at` field **every 30 seconds** to detect stuck jobs. The update writes the current timestamp and current status, plus session metadata (pages scraped, products found) to the `scraping_sessions` table.
 
 **Implementation:**
 - Location: `scrape-session-manager` Edge Function
@@ -424,38 +296,7 @@ await supabase
 
 ### Sentry Error Tracking ✅
 
-Comprehensive error tracking and performance monitoring:
-
-```typescript
-// Transaction tracking
-const transaction = Sentry.startTransaction({
-  op: 'web_scraping',
-  name: 'scrape_session'
-});
-
-transaction.setTag('session_id', sessionId);
-transaction.setTag('workspace_id', workspaceId);
-transaction.setData('url', targetUrl);
-
-// Breadcrumbs for debugging
-Sentry.addBreadcrumb({
-  category: 'web_scraping',
-  message: `Scraping page ${pageIndex}`,
-  level: 'info',
-  data: { url: pageUrl }
-});
-
-try {
-  // ... scraping logic ...
-  transaction.setStatus('ok');
-} catch (error) {
-  Sentry.captureException(error);
-  transaction.setStatus('internal_error');
-  throw error;
-} finally {
-  transaction.finish();
-}
-```
+Comprehensive error tracking and performance monitoring. The implementation uses Sentry transaction tracking with `op: 'web_scraping'` and tags for session and workspace IDs, breadcrumbs for each page scraped, exception capture on error, and transaction status set to 'ok' on success or 'internal_error' on failure.
 
 **Features:**
 - Transaction tracking for performance monitoring
@@ -495,5 +336,3 @@ For issues or questions:
 2. Review Edge Function logs
 3. Check Python API logs
 4. Contact support with session ID
-
-

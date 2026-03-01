@@ -39,7 +39,6 @@ Metafields are dynamic, structured data attributes that describe material proper
 
 ## 🔄 Complete Processing Pipeline
 
-```
 PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────────────┐
@@ -84,7 +83,6 @@ PDF Upload
 └─────────────────────────────────────────────────────────────────┘
     ↓
 ✅ COMPLETE - All metafields extracted and linked
-```
 
 ---
 
@@ -102,8 +100,6 @@ The AI analyzes the entire PDF to:
 
 ### How AI Identifies Metafields
 
-The AI uses pattern recognition to identify metafield types:
-
 **Text-Based Identification**:
 - Looks for specification tables (Material, Dimensions, Weight, etc.)
 - Identifies property lists (Colors: Clay, Sand, White)
@@ -115,33 +111,6 @@ The AI uses pattern recognition to identify metafield types:
 - Identifies care instructions and certifications
 - Recognizes pricing and availability information
 - Detects application and use recommendations
-
-### Output Example
-```json
-{
-  "products": [
-    {
-      "name": "VALENOVA",
-      "page_range": [5, 6, 7, 8],
-      "metafields": {
-        "material": "White Body Tile",
-        "dimensions": "11.8×11.8",
-        "finish": "Matte",
-        "patterns": "12 patterns",
-        "colors": ["clay", "sand", "white", "taupe"],
-        "designer": "SG NY",
-        "studio": "Stacy Garcia",
-        "category": "tiles"
-      },
-      "images": ["page_5_image_1", "page_6_image_2"],
-      "confidence_score": 0.98
-    }
-  ],
-  "total_products": 14,
-  "metafield_types_found": ["material", "dimensions", "finish", "colors", "patterns", "designer", "studio", "category"],
-  "average_confidence": 0.95
-}
-```
 
 ### Accuracy Metrics
 - **Product Detection**: 95%+
@@ -187,34 +156,7 @@ The AI creates semantic chunks while preserving metafield information:
 - Store metafield references in chunk metadata
 - Maintain context for later linking
 
-**Chunk Structure with Metafields**:
-```json
-{
-  "chunk_id": "chunk_123",
-  "product_id": "prod_456",
-  "content": "VALENOVA tiles available in 11.8×11.8 inches. White Body Tile material with matte finish. Available in clay, sand, white, and taupe colors. 12 different patterns available.",
-  "metadata": {
-    "product_name": "VALENOVA",
-    "page_range": [5, 6],
-    "metafields": {
-      "dimensions": "11.8×11.8",
-      "material": "White Body Tile",
-      "finish": "matte",
-      "colors": ["clay", "sand", "white", "taupe"],
-      "patterns": "12 patterns"
-    },
-    "metafield_sources": {
-      "dimensions": "text_extraction",
-      "material": "text_extraction",
-      "finish": "text_extraction",
-      "colors": "text_extraction",
-      "patterns": "text_extraction"
-    }
-  },
-  "embedding": [0.123, 0.456, ...],  // 1536D OpenAI embedding
-  "embedding_type": "text_embedding_3_small"
-}
-```
+Each chunk stores its `product_name`, `page_range`, and a `metafields` dictionary (e.g., dimensions, material, finish, colors, patterns) along with a `metafield_sources` dictionary tracking where each value came from (e.g., `text_extraction`).
 
 ### Metafield Linking in Chunks
 - Each chunk stores metafield values found in its content
@@ -269,40 +211,6 @@ The AI extracts images and analyzes them for visual metafields:
 - Detects geometric or organic patterns
 - Accuracy: 88%+
 
-### Image Analysis Output with Metafields
-```json
-{
-  "image_id": "img_789",
-  "product_id": "prod_456",
-  "page": 5,
-  "metadata": {
-    "detected_colors": ["clay", "sand", "white", "taupe"],
-    "texture": "matte",
-    "finish": "smooth",
-    "material_type": "ceramic",
-    "pattern_type": "geometric",
-    "pattern_count": 12,
-    "quality_score": 0.92,
-    "ocr_text": "VALENOVA 11.8×11.8 White Body Tile",
-    "visual_metafields": {
-      "color": ["clay", "sand", "white", "taupe"],
-      "texture": "matte",
-      "finish": "smooth",
-      "material": "ceramic",
-      "pattern": "geometric"
-    }
-  },
-  "embedding": [0.234, 0.567, ...],  // 512D CLIP embedding
-  "embedding_type": "clip_512d",
-  "confidence_scores": {
-    "color": 0.94,
-    "texture": 0.85,
-    "material": 0.90,
-    "pattern": 0.88
-  }
-}
-```
-
 ### Visual Metafield Linking
 - Each image stores detected visual metafields
 - Confidence scores track extraction reliability
@@ -344,50 +252,6 @@ The AI creates product records and consolidates metafields from all sources:
 - Identifies product category
 - Detects variants and options
 - Adds related product information
-
-### Product Record with Consolidated Metafields
-```json
-{
-  "product_id": "prod_456",
-  "name": "VALENOVA",
-  "description": "Premium ceramic tiles with matte finish. Available in 4 colors with 12 different patterns.",
-  "source_document_id": "doc_123",
-  "workspace_id": "ws_789",
-  "metadata": {
-    "page_range": [5, 6, 7, 8],
-    "variants": [
-      {"type": "color", "value": "clay", "source": "image_analysis"},
-      {"type": "color", "value": "sand", "source": "image_analysis"},
-      {"type": "color", "value": "white", "source": "image_analysis"},
-      {"type": "color", "value": "taupe", "source": "image_analysis"},
-      {"type": "finish", "value": "matte", "source": "text_extraction"}
-    ],
-    "dimensions": ["11.8×11.8"],
-    "designer": "SG NY",
-    "studio": "Stacy Garcia",
-    "category": "tiles",
-    "metafields": {
-      "material": "White Body Tile",
-      "patterns": "12 patterns",
-      "body_type": "White Body Tile",
-      "finish": "matte",
-      "colors": ["clay", "sand", "white", "taupe"],
-      "grout_mapei": ["100", "132"],
-      "grout_kerakoll": ["40", "43"]
-    },
-    "metafield_sources": {
-      "material": "text_extraction",
-      "patterns": "text_extraction",
-      "finish": "image_analysis",
-      "colors": "image_analysis",
-      "designer": "text_extraction",
-      "studio": "text_extraction"
-    },
-    "confidence": 0.98,
-    "consolidation_status": "complete"
-  }
-}
-```
 
 ### Metafield Consolidation Details
 - All metafields consolidated from chunks and images
@@ -434,291 +298,46 @@ The final stage extracts structured metafields from product records and creates 
 ### Supported Metafield Types (200+)
 
 #### Material Properties (25+ types)
-- Material composition
-- Material type
-- Material blend
-- Fiber content
-- Yarn type
-- Yarn weight
-- Yarn count
-- Texture
-- Texture type
-- Surface texture
-- Finish
-- Finish type
-- Surface finish
-- Pattern
-- Pattern type
-- Pattern repeat
-- Weight
-- Weight per unit
-- Density
-- Durability rating
-- Wear resistance
-- Pilling resistance
-- Shrinkage rate
-- Color fastness
-- Flammability rating
+- Material composition, material type, material blend, fiber content, yarn type, yarn weight, yarn count, texture, texture type, surface texture, finish, finish type, surface finish, pattern, pattern type, pattern repeat, weight, weight per unit, density, durability rating, wear resistance, pilling resistance, shrinkage rate, color fastness, flammability rating
 
 #### Dimensions & Size (15+ types)
-- Length
-- Width
-- Height
-- Thickness
-- Diameter
-- Radius
-- Circumference
-- Area
-- Volume
-- Weight
-- Depth
-- Size
-- Size range
-- Aspect ratio
-- Scale
+- Length, width, height, thickness, diameter, radius, circumference, area, volume, weight, depth, size, size range, aspect ratio, scale
 
 #### Appearance (20+ types)
-- Color
-- Color name
-- Color code
-- Color family
-- Color variation
-- Gloss level
-- Gloss type
-- Sheen
-- Surface treatment
-- Surface type
-- Transparency
-- Opacity
-- Grain
-- Grain direction
-- Grain pattern
-- Texture appearance
-- Finish appearance
-- Pattern appearance
-- Visual effect
-- Aesthetic style
+- Color, color name, color code, color family, color variation, gloss level, gloss type, sheen, surface treatment, surface type, transparency, opacity, grain, grain direction, grain pattern, texture appearance, finish appearance, pattern appearance, visual effect, aesthetic style
 
 #### Performance (20+ types)
-- Durability rating
-- Durability class
-- Water resistance
-- Water repellency
-- Stain resistance
-- Stain protection
-- Fire rating
-- Fire resistance
-- Flammability
-- Slip resistance
-- Slip rating
-- Wear rating
-- Wear class
-- Abrasion resistance
-- Tensile strength
-- Tear strength
-- Pilling resistance
-- Fading resistance
-- Moisture resistance
-- Chemical resistance
+- Durability rating, durability class, water resistance, water repellency, stain resistance, stain protection, fire rating, fire resistance, flammability, slip resistance, slip rating, wear rating, wear class, abrasion resistance, tensile strength, tear strength, pilling resistance, fading resistance, moisture resistance, chemical resistance
 
 #### Application & Use (25+ types)
-- Recommended use
-- Application
-- Application area
-- Suitable for
-- Not suitable for
-- Installation method
-- Installation type
-- Installation difficulty
-- Mounting type
-- Orientation
-- Placement
-- Room type
-- Traffic level
-- Maintenance
-- Care instructions
-- Cleaning method
-- Cleaning products
-- Washing instructions
-- Drying instructions
-- Storage instructions
-- Compatibility
-- Compatible with
-- Incompatible with
-- Limitations
-- Restrictions
+- Recommended use, application, application area, suitable for, not suitable for, installation method, installation type, installation difficulty, mounting type, orientation, placement, room type, traffic level, maintenance, care instructions, cleaning method, cleaning products, washing instructions, drying instructions, storage instructions, compatibility, compatible with, incompatible with, limitations, restrictions
 
 #### Compliance & Certifications (20+ types)
-- Certifications
-- Certification type
-- Standards
-- Standard compliance
-- Environmental certification
-- Eco-friendly
-- Sustainability rating
-- Recycled content
-- Recyclable
-- Biodegradable
-- VOC rating
-- Safety rating
-- Safety standards
-- Compliance marks
-- Testing standards
-- Quality standards
-- Industry standards
-- Regulatory compliance
-- Health & safety
-- Allergen information
+- Certifications, certification type, standards, standard compliance, environmental certification, eco-friendly, sustainability rating, recycled content, recyclable, biodegradable, VOC rating, safety rating, safety standards, compliance marks, testing standards, quality standards, industry standards, regulatory compliance, health & safety, allergen information
 
 #### Commercial & Availability (25+ types)
-- Pricing
-- Price per unit
-- Price range
-- Currency
-- Availability
-- Stock status
-- In stock
-- Out of stock
-- Lead time
-- Delivery time
-- Supplier
-- Supplier name
-- Manufacturer
-- Manufacturer name
-- Brand
-- Brand name
-- SKU
-- Product code
-- Product ID
-- Variant code
-- Batch number
-- Production date
-- Expiration date
-- Warranty
-- Warranty period
-- Return policy
+- Pricing, price per unit, price range, currency, availability, stock status, in stock, out of stock, lead time, delivery time, supplier, supplier name, manufacturer, manufacturer name, brand, brand name, SKU, product code, product ID, variant code, batch number, production date, expiration date, warranty, warranty period, return policy
 
 #### Design & Aesthetics (20+ types)
-- Designer
-- Designer name
-- Studio
-- Studio name
-- Design style
-- Design era
-- Design movement
-- Aesthetic
-- Aesthetic style
-- Visual style
-- Artistic style
-- Inspiration
-- Inspired by
-- Collection
-- Collection name
-- Series
-- Series name
-- Limited edition
-- Edition number
-- Collaboration
-- Collaborator
+- Designer, designer name, studio, studio name, design style, design era, design movement, aesthetic, aesthetic style, visual style, artistic style, inspiration, inspired by, collection, collection name, series, series name, limited edition, edition number, collaboration, collaborator
 
 #### Product Information (20+ types)
-- Product name
-- Product type
-- Product category
-- Category
-- Subcategory
-- Product line
-- Product family
-- Product group
-- Description
-- Product description
-- Features
-- Key features
-- Benefits
-- Unique selling points
-- Variants
-- Variant type
-- Variant options
-- Related products
-- Complementary products
-- Accessories
-- Replacement parts
+- Product name, product type, product category, category, subcategory, product line, product family, product group, description, product description, features, key features, benefits, unique selling points, variants, variant type, variant options, related products, complementary products, accessories, replacement parts
 
 #### Technical Specifications (20+ types)
-- Specifications
-- Technical specs
-- Composition
-- Construction
-- Construction method
-- Manufacturing process
-- Production method
-- Quality level
-- Grade
-- Class
-- Rating
-- Certification level
-- Performance level
-- Specification sheet
-- Technical documentation
-- Test results
-- Test data
-- Compliance documentation
-- Safety documentation
-- Environmental documentation
+- Specifications, technical specs, composition, construction, construction method, manufacturing process, production method, quality level, grade, class, rating, certification level, performance level, specification sheet, technical documentation, test results, test data, compliance documentation, safety documentation, environmental documentation
 
 #### Visual & Sensory (15+ types)
-- Color palette
-- Color scheme
-- Color combination
-- Texture feel
-- Surface feel
-- Touch sensation
-- Visual weight
-- Visual balance
-- Visual harmony
-- Aesthetic appeal
-- Design appeal
-- Sensory experience
-- Tactile quality
-- Visual quality
-- Overall impression
+- Color palette, color scheme, color combination, texture feel, surface feel, touch sensation, visual weight, visual balance, visual harmony, aesthetic appeal, design appeal, sensory experience, tactile quality, visual quality, overall impression
 
 #### Packaging & Delivery (15+ types)
-- Packaging type
-- Packaging material
-- Packaging size
-- Packaging weight
-- Shipping weight
-- Shipping dimensions
-- Shipping method
-- Delivery method
-- Delivery options
-- Handling instructions
-- Storage requirements
-- Storage conditions
-- Temperature range
-- Humidity range
-- Special handling
+- Packaging type, packaging material, packaging size, packaging weight, shipping weight, shipping dimensions, shipping method, delivery method, delivery options, handling instructions, storage requirements, storage conditions, temperature range, humidity range, special handling
 
 #### Maintenance & Care (15+ types)
-- Maintenance level
-- Maintenance frequency
-- Maintenance requirements
-- Care level
-- Care difficulty
-- Cleaning frequency
-- Cleaning difficulty
-- Special care
-- Professional cleaning
-- DIY cleaning
-- Maintenance cost
-- Maintenance products
-- Recommended products
-- Prohibited products
-- Lifespan
+- Maintenance level, maintenance frequency, maintenance requirements, care level, care difficulty, cleaning frequency, cleaning difficulty, special care, professional cleaning, DIY cleaning, maintenance cost, maintenance products, recommended products, prohibited products, lifespan
 
 ### Linking Relationships Diagram
-```
+
 Product (VALENOVA)
   ├── product_metafield_values
   │   ├── material: "White Body Tile" (confidence: 0.98)
@@ -737,94 +356,12 @@ Product (VALENOVA)
           └── image_metafield_values
               ├── finish: "matte" (confidence: 0.92)
               └── colors: ["clay", "sand"] (confidence: 0.93-0.94)
-```
-
-### Extraction Output
-```json
-{
-  "product_id": "prod_456",
-  "metafields_extracted": [
-    {
-      "field_id": "mf_001",
-      "name": "material",
-      "value": "White Body Tile",
-      "type": "text",
-      "confidence_score": 0.98,
-      "extraction_method": "ai_extraction",
-      "source": "chunk_123"
-    },
-    {
-      "field_id": "mf_002",
-      "name": "dimensions",
-      "value": "11.8×11.8",
-      "type": "text",
-      "confidence_score": 0.95,
-      "extraction_method": "ai_extraction",
-      "source": "image_789"
-    },
-    {
-      "field_id": "mf_003",
-      "name": "color",
-      "value": "clay",
-      "type": "select",
-      "confidence_score": 0.92,
-      "extraction_method": "ai_extraction",
-      "source": "image_789"
-    }
-  ],
-  "total_metafields": 8,
-  "average_confidence": 0.95
-}
-```
 
 ---
 
 ## 🔄 Metafield Linking Process
 
-### Link to Products
-```python
-# Create metafield value linked to product
-metafield_value = {
-    'id': str(uuid.uuid4()),
-    'product_id': product_id,
-    'field_id': metafield_id,
-    'value_text': 'White Body Tile',
-    'confidence_score': 0.98,
-    'extraction_method': 'ai_extraction',
-    'created_at': datetime.utcnow().isoformat()
-}
-supabase.client.table('product_metafield_values').insert(metafield_value).execute()
-```
-
-### Link to Chunks
-```python
-# Create metafield value linked to chunk
-metafield_value = {
-    'id': str(uuid.uuid4()),
-    'chunk_id': chunk_id,
-    'field_id': metafield_id,
-    'value_text': '11.8×11.8 inches',
-    'confidence_score': 0.95,
-    'extraction_method': 'ai_extraction',
-    'created_at': datetime.utcnow().isoformat()
-}
-supabase.client.table('chunk_metafield_values').insert(metafield_value).execute()
-```
-
-### Link to Images
-```python
-# Create metafield value linked to image
-metafield_value = {
-    'id': str(uuid.uuid4()),
-    'image_id': image_id,
-    'field_id': metafield_id,
-    'value_text': 'matte',
-    'confidence_score': 0.92,
-    'extraction_method': 'ai_extraction',
-    'created_at': datetime.utcnow().isoformat()
-}
-supabase.client.table('image_metafield_values').insert(metafield_value).execute()
-```
+Metafield values are inserted into `product_metafield_values`, `chunk_metafield_values`, and `image_metafield_values` tables respectively, each record containing the entity ID (product, chunk, or image), the `field_id`, the extracted `value_text`, a `confidence_score`, the `extraction_method`, and a timestamp.
 
 ---
 
@@ -851,25 +388,8 @@ supabase.client.table('image_metafield_values').insert(metafield_value).execute(
 ## 🔍 Searching by Metafields
 
 ### Property Search API
-```http
-GET /api/search/properties?material=ceramic&color=white&limit=20
 
-Response: {
-  "products": [
-    {
-      "id": "prod_456",
-      "name": "VALENOVA",
-      "metafields": {
-        "material": "White Body Tile",
-        "color": "white",
-        "dimensions": "11.8×11.8"
-      }
-    }
-  ],
-  "count": 15,
-  "response_time_ms": 150
-}
-```
+**GET** `/api/search/properties?material=ceramic&color=white&limit=20` returns matching products with their metafield values (material, color, dimensions, etc.) and a response time in milliseconds.
 
 ### Metafield Filtering
 - Filter by material type
@@ -884,35 +404,12 @@ Response: {
 ## 📈 Metafield Management
 
 ### Create Metafield
-```http
-POST /api/metafields
-Content-Type: application/json
 
-Body: {
-  "name": "material",
-  "type": "text",
-  "workspace_id": "ws_789"
-}
-
-Response: { "id": "mf_001", "created_at": "2025-10-31T..." }
-```
+**POST** `/api/metafields` with a JSON body containing `name`, `type`, and `workspace_id` returns the created metafield `id` and `created_at` timestamp.
 
 ### Get Metafield Values
-```http
-GET /api/products/{product_id}/metafields
 
-Response: {
-  "product_id": "prod_456",
-  "metafields": [
-    {
-      "field_id": "mf_001",
-      "name": "material",
-      "value": "White Body Tile",
-      "confidence_score": 0.98
-    }
-  ]
-}
-```
+**GET** `/api/products/{product_id}/metafields` returns the product's metafields array, each entry containing `field_id`, `name`, `value`, and `confidence_score`.
 
 ---
 
@@ -973,29 +470,21 @@ Response: {
 
 ### Metafield Types Supported (200+)
 
-**Material Properties** (20+ types):
-- Material composition, Texture, Finish, Pattern, Weight, Density, Durability, Water resistance
+**Material Properties** (20+ types): Material composition, Texture, Finish, Pattern, Weight, Density, Durability, Water resistance
 
-**Dimensions & Size** (10+ types):
-- Length, Width, Height, Thickness, Diameter, Area, Volume, Weight per unit
+**Dimensions & Size** (10+ types): Length, Width, Height, Thickness, Diameter, Area, Volume, Weight per unit
 
-**Appearance** (15+ types):
-- Color, Gloss level, Surface treatment, Transparency, Pattern type, Grain direction
+**Appearance** (15+ types): Color, Gloss level, Surface treatment, Transparency, Pattern type, Grain direction
 
-**Performance** (15+ types):
-- Durability rating, Water resistance, Fire rating, Slip resistance, Wear rating, Stain resistance
+**Performance** (15+ types): Durability rating, Water resistance, Fire rating, Slip resistance, Wear rating, Stain resistance
 
-**Application** (20+ types):
-- Recommended use, Installation method, Maintenance, Care instructions, Compatibility, Limitations
+**Application** (20+ types): Recommended use, Installation method, Maintenance, Care instructions, Compatibility, Limitations
 
-**Compliance** (15+ types):
-- Certifications, Standards, Environmental, Safety ratings, Compliance marks
+**Compliance** (15+ types): Certifications, Standards, Environmental, Safety ratings, Compliance marks
 
-**Commercial** (20+ types):
-- Pricing, Availability, Lead time, Supplier, SKU, Variants
+**Commercial** (20+ types): Pricing, Availability, Lead time, Supplier, SKU, Variants
 
-**Other** (20+ types):
-- Designer, Studio, Category, Related products, Variants, Specifications
+**Other** (20+ types): Designer, Studio, Category, Related products, Variants, Specifications
 
 ### How Materials Are Handled
 
@@ -1022,62 +511,12 @@ Response: {
 
 ### Example: VALENOVA Material Processing
 
-**Stage 0 - Identification**:
-```json
-{
-  "product": "VALENOVA",
-  "material_identified": "White Body Tile",
-  "material_type": "Ceramic",
-  "confidence": 0.98
-}
-```
-
-**Stage 2 - Chunk Preservation**:
-```json
-{
-  "chunk": "VALENOVA tiles in 11.8×11.8 inches...",
-  "metafields": {
-    "material": "White Body Tile",
-    "material_type": "Ceramic"
-  }
-}
-```
-
-**Stage 3 - Visual Analysis**:
-```json
-{
-  "image": "valenova_product_image.jpg",
-  "visual_properties": {
-    "texture": "matte",
-    "finish": "smooth",
-    "material_appearance": "ceramic",
-    "gloss_level": "low"
-  }
-}
-```
-
-**Stage 4 - Consolidation**:
-```json
-{
-  "product": "VALENOVA",
-  "material": "White Body Tile",
-  "material_type": "Ceramic",
-  "texture": "matte",
-  "finish": "smooth",
-  "gloss_level": "low",
-  "consolidation_status": "complete"
-}
-```
-
-**Stage 12 - Database Linking**:
-```sql
-INSERT INTO metafield_values (metafield_id, product_id, value_text, confidence_score, extraction_method)
-VALUES
-  ('mf_material', 'prod_456', 'White Body Tile', 0.98, 'ai_extraction'),
-  ('mf_material_type', 'prod_456', 'Ceramic', 0.95, 'ai_extraction'),
-  ('mf_texture', 'prod_456', 'matte', 0.92, 'image_analysis'),
-  ('mf_finish', 'prod_456', 'smooth', 0.90, 'image_analysis');
-```
+Each stage produces progressively richer output:
+- **Stage 0**: Identifies "White Body Tile" as the material with "Ceramic" as type (confidence 0.98)
+- **Stage 2**: Chunk preserves material and material_type in its metafields
+- **Stage 3**: Visual analysis detects texture "matte", finish "smooth", appearance "ceramic", gloss_level "low"
+- **Stage 4**: Consolidates all into a complete product record with consolidation_status "complete"
+- **Stage 12**: All values inserted into the `metafield_values` table linked to the product
 
 ---
 

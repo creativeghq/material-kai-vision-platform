@@ -1,7 +1,7 @@
 # Relevancy System Architecture
 
-**Last Updated:** November 3, 2025  
-**Version:** 1.0.0  
+**Last Updated:** November 3, 2025
+**Version:** 1.0.0
 **Status:** ✅ Production
 
 ---
@@ -37,19 +37,6 @@ MIVAA uses **3 primary relationship tables** to link entities:
 
 **Purpose:** Links text chunks to products they describe
 
-**Schema:**
-```sql
-CREATE TABLE chunk_product_relationships (
-    id UUID PRIMARY KEY,
-    chunk_id UUID REFERENCES document_chunks(id) ON DELETE CASCADE,
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    relationship_type VARCHAR(50),  -- 'source', 'related', 'component', 'alternative'
-    relevance_score FLOAT,  -- 0.0-1.0
-    created_at TIMESTAMP,
-    UNIQUE(chunk_id, product_id)
-);
-```
-
 **Relationship Types:**
 - `source` - Chunk is primary source describing the product
 - `related` - Chunk mentions or relates to the product
@@ -63,19 +50,6 @@ CREATE TABLE chunk_product_relationships (
 **Table:** `product_image_relationships`
 
 **Purpose:** Links products to images that depict them
-
-**Schema:**
-```sql
-CREATE TABLE product_image_relationships (
-    id UUID PRIMARY KEY,
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    image_id UUID REFERENCES document_images(id) ON DELETE CASCADE,
-    relationship_type VARCHAR(50),  -- 'depicts', 'illustrates', 'variant', 'related'
-    relevance_score FLOAT,  -- 0.0-1.0
-    created_at TIMESTAMP,
-    UNIQUE(product_id, image_id)
-);
-```
 
 **Relationship Types:**
 - `depicts` - Image directly shows the product
@@ -91,19 +65,6 @@ CREATE TABLE product_image_relationships (
 
 **Purpose:** Links text chunks to images they reference
 
-**Schema:**
-```sql
-CREATE TABLE chunk_image_relationships (
-    id UUID PRIMARY KEY,
-    chunk_id UUID REFERENCES document_chunks(id) ON DELETE CASCADE,
-    image_id UUID REFERENCES document_images(id) ON DELETE CASCADE,
-    relationship_type VARCHAR(50),  -- 'illustrates', 'depicts', 'related', 'example'
-    relevance_score FLOAT,  -- 0.0-1.0
-    created_at TIMESTAMP,
-    UNIQUE(chunk_id, image_id)
-);
-```
-
 **Relationship Types:**
 - `illustrates` - Image illustrates the chunk content
 - `depicts` - Image depicts what the chunk describes
@@ -116,10 +77,7 @@ CREATE TABLE chunk_image_relationships (
 
 ### Algorithm 1: Chunk → Product Relevancy
 
-**Formula:**
-```
-relevance_score = page_proximity(40%) + embedding_similarity(30%) + mention_score(30%)
-```
+**Formula:** relevance_score = page_proximity(40%) + embedding_similarity(30%) + mention_score(30%)
 
 **Components:**
 
@@ -136,24 +94,11 @@ relevance_score = page_proximity(40%) + embedding_similarity(30%) + mention_scor
    - Product name mentioned: `0.3`
    - Product name not mentioned: `0.0`
 
-**Example:**
-```python
-# Chunk on same page as NOVA product, mentions "NOVA", medium embedding similarity
-page_proximity = 0.4  # Same page
-embedding_similarity = 0.15  # Medium similarity
-mention_score = 0.3  # Mentions "NOVA"
-
-relevance_score = 0.4 + 0.15 + 0.3 = 0.85  # High relevance
-```
-
 ---
 
 ### Algorithm 2: Product → Image Relevancy
 
-**Formula:**
-```
-relevance_score = page_overlap(40%) + visual_similarity(40%) + detection_score(20%)
-```
+**Formula:** relevance_score = page_overlap(40%) + visual_similarity(40%) + detection_score(20%)
 
 **Components:**
 
@@ -170,24 +115,11 @@ relevance_score = page_overlap(40%) + visual_similarity(40%) + detection_score(2
    - From product discovery confidence
    - Default: `0.2`
 
-**Example:**
-```python
-# Image on same page as NOVA product, high visual similarity, high detection confidence
-page_overlap = 0.4  # Same page
-visual_similarity = 0.35  # High similarity
-detection_score = 0.2  # High confidence
-
-relevance_score = 0.4 + 0.35 + 0.2 = 0.95  # Very high relevance
-```
-
 ---
 
 ### Algorithm 3: Chunk → Image Relevancy
 
-**Formula:**
-```
-relevance_score = same_page(50%) + visual_text_similarity(30%) + spatial_proximity(20%)
-```
+**Formula:** relevance_score = same_page(50%) + visual_text_similarity(30%) + spatial_proximity(20%)
 
 **Components:**
 
@@ -204,16 +136,6 @@ relevance_score = same_page(50%) + visual_text_similarity(30%) + spatial_proximi
    - Far apart: `0.1`
    - Different page: `0.0`
 
-**Example:**
-```python
-# Chunk and image on same page, medium text-visual similarity, adjacent
-same_page = 0.5  # Same page
-visual_text_similarity = 0.2  # Medium similarity
-spatial_proximity = 0.2  # Adjacent
-
-relevance_score = 0.5 + 0.2 + 0.2 = 0.9  # High relevance
-```
-
 ---
 
 ## Implementation
@@ -224,28 +146,9 @@ relevance_score = 0.5 + 0.2 + 0.2 = 0.9  # High relevance
 
 **Key Methods:**
 
-```python
-class EntityLinkingService:
-    async def link_images_to_products(
-        self,
-        document_id: str,
-        image_to_product_mapping: Dict[int, str],
-        product_name_to_id: Dict[str, str]
-    ) -> int:
-        """Link images to products with relevance scores"""
-        
-    async def link_chunks_to_images(
-        self,
-        document_id: str
-    ) -> int:
-        """Link chunks to images on the same page"""
-        
-    async def link_chunks_to_products(
-        self,
-        document_id: str
-    ) -> int:
-        """Link chunks to products with relevance scores"""
-```
+- `link_images_to_products(document_id, image_to_product_mapping, product_name_to_id)` - Links images to products with relevance scores
+- `link_chunks_to_images(document_id)` - Links chunks to images on the same page
+- `link_chunks_to_products(document_id)` - Links chunks to products with relevance scores
 
 ---
 
@@ -255,63 +158,25 @@ class EntityLinkingService:
 
 **Key Methods:**
 
-```typescript
-export class EntityRelationshipService {
-  static async linkChunkToProduct(
-    chunkId: string,
-    productId: string,
-    relationshipType: 'source' | 'related' | 'component' | 'alternative',
-    relevanceScore: number
-  ): Promise<ChunkProductRelationship>
-  
-  static async linkProductToImage(
-    productId: string,
-    imageId: string,
-    relationshipType: 'depicts' | 'illustrates' | 'variant' | 'related',
-    relevanceScore: number
-  ): Promise<ProductImageRelationship>
-  
-  static async linkChunkToImage(
-    chunkId: string,
-    imageId: string,
-    relationshipType: 'illustrates' | 'depicts' | 'related' | 'example',
-    relevanceScore: number
-  ): Promise<ChunkImageRelationship>
-}
-```
+- `linkChunkToProduct(chunkId, productId, relationshipType, relevanceScore)` - Returns `ChunkProductRelationship`
+- `linkProductToImage(productId, imageId, relationshipType, relevanceScore)` - Returns `ProductImageRelationship`
+- `linkChunkToImage(chunkId, imageId, relationshipType, relevanceScore)` - Returns `ChunkImageRelationship`
 
 ---
 
 ## Processing Flow
 
 ### Stage 1: Product Discovery (Stage 0)
-```
-Claude/GPT analyzes PDF
-   ↓
-Identifies products and their pages
-   ↓
-Creates image-to-product mapping
-```
+
+Claude/GPT analyzes PDF, identifies products and their pages, and creates an image-to-product mapping.
 
 ### Stage 2: Chunk Creation (Stage 2)
-```
-Semantic chunking creates text chunks
-   ↓
-Chunks stored in document_chunks table
-   ↓
-Each chunk has page_number
-```
+
+Semantic chunking creates text chunks which are stored in the document_chunks table, each with a page_number.
 
 ### Stage 3: Entity Linking (Stage 3-4)
-```
-Link Products → Images (using image-to-product mapping)
-   ↓
-Link Chunks → Products (using page proximity + embeddings)
-   ↓
-Link Chunks → Images (using same-page detection)
-   ↓
-All relationships stored with relevance scores
-```
+
+Products are linked to Images (using image-to-product mapping), then Chunks are linked to Products (using page proximity + embeddings), then Chunks are linked to Images (using same-page detection). All relationships are stored with relevance scores.
 
 ---
 
@@ -319,17 +184,7 @@ All relationships stored with relevance scores
 
 ### 1. Use Relevance Thresholds
 
-Filter relationships by minimum relevance score:
-
-```sql
--- Get high-quality chunk-product relationships
-SELECT * FROM chunk_product_relationships
-WHERE relevance_score >= 0.7;
-
--- Get all product images (including medium relevance)
-SELECT * FROM product_image_relationships
-WHERE relevance_score >= 0.5;
-```
+Filter relationships by minimum relevance score. Recommended minimums: 0.7 for high-quality chunk-product relationships, 0.5 for product-image relationships.
 
 ### 2. Prioritize Relationship Types
 
@@ -349,19 +204,7 @@ When multiple relationships exist, prioritize by type:
 
 ### 3. Update Relevance Scores
 
-Relevance scores can be updated based on user feedback:
-
-```sql
--- Increase relevance when user confirms relationship
-UPDATE chunk_product_relationships
-SET relevance_score = LEAST(relevance_score + 0.1, 1.0)
-WHERE chunk_id = ? AND product_id = ?;
-
--- Decrease relevance when user rejects relationship
-UPDATE chunk_product_relationships
-SET relevance_score = GREATEST(relevance_score - 0.2, 0.0)
-WHERE chunk_id = ? AND product_id = ?;
-```
+Relevance scores can be updated based on user feedback. Increase score by 0.1 when user confirms a relationship (capped at 1.0), decrease by 0.2 when user rejects (floored at 0.0).
 
 ---
 

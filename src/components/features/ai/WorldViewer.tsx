@@ -215,7 +215,7 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       .catch((err: unknown) => {
         if (disposed) return;
         const msg = err instanceof Error ? err.message : 'Failed to load 3D world data';
-        console.error('[WorldViewer] SplatLoader error:', err);
+        console.warn('[WorldViewer] SplatLoader error:', err);
         setSplatLoading(false);
         setLoadError(msg);
       });

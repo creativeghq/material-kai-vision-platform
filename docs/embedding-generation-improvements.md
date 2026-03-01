@@ -65,71 +65,15 @@ The image embedding system generates visual embeddings for all processed images 
 
 #### `_get_embedding_checkpoint(document_id: str) -> Optional[int]`
 
-Queries database to count images with existing embeddings:
-
-```python
-result = supabase_client.client.table('document_images')\
-    .select('id')\
-    .eq('document_id', document_id)\
-    .not_.is_('visual_clip_embedding_512', 'null')\
-    .execute()
-
-return len(result.data) if result.data else 0
-```
+Queries the `document_images` table to count images with existing non-null `visual_clip_embedding_512` values for the given document. Returns the count as an integer checkpoint index.
 
 #### `_process_single_image_with_retry(...) -> Tuple[bool, bool, Optional[str]]`
 
-Processes single image with retry logic:
-
-```python
-retry_count = 0
-while retry_count < max_retries:
-    try:
-        # Save image and generate embeddings
-        ...
-        return (True, True, None)  # Success
-    except Exception as e:
-        retry_count += 1
-        if retry_count < max_retries:
-            await asyncio.sleep(2 ** retry_count)  # Exponential backoff
-        else:
-            return (False, False, str(e))  # Failed after retries
-```
-
-Returns: `(image_saved, embedding_generated, error_message)`
+Processes a single image with retry logic using a while loop up to `max_retries` attempts. On each failure, waits `2^retry_count` seconds before retrying (exponential backoff). Returns a tuple of `(image_saved, embedding_generated, error_message)`.
 
 #### `save_images_and_generate_clips(...) -> Dict[str, Any]`
 
-Main method with batching + retry + checkpointing:
-
-```python
-async def save_images_and_generate_clips(
-    self,
-    material_images: List[Dict[str, Any]],
-    document_id: str,
-    workspace_id: str,
-    batch_size: int = 20,
-    max_retries: int = 3
-) -> Dict[str, Any]:
-    # Check checkpoint
-    checkpoint_index = await self._get_embedding_checkpoint(document_id)
-
-    # Process in batches
-    for batch_start in range(0, total_images, batch_size):
-        batch = material_images[batch_start:batch_end]
-
-        for img_data in batch:
-            image_saved, embedding_generated, error = await self._process_single_image_with_retry(...)
-
-            if error:
-                failed_images.append({...})
-
-    return {
-        'images_saved': images_saved_count + checkpoint_index,
-        'clip_embeddings_generated': clip_embeddings_count + checkpoint_index,
-        'failed_images': failed_images
-    }
-```
+Main method with batching + retry + checkpointing. Signature: `save_images_and_generate_clips(material_images, document_id, workspace_id, batch_size=20, max_retries=3)`. First checks the checkpoint to skip already-processed images, then processes remaining images in batches, calling `_process_single_image_with_retry` for each. Returns a dict with `images_saved`, `clip_embeddings_generated`, and `failed_images`.
 
 ## Configuration
 
@@ -141,17 +85,7 @@ async def save_images_and_generate_clips(
 
 ### Customization
 
-All parameters are configurable via method arguments:
-
-```python
-result = await image_service.save_images_and_generate_clips(
-    material_images=images,
-    document_id=doc_id,
-    workspace_id=workspace_id,
-    batch_size=10,      # Smaller batches for memory-constrained environments
-    max_retries=5       # More retries for unreliable networks
-)
-```
+All parameters are configurable via method arguments. For memory-constrained environments, use a smaller `batch_size` (e.g., 10). For unreliable networks, increase `max_retries` (e.g., 5).
 
 ## Performance Impact
 
@@ -211,60 +145,17 @@ Images that fail after all retries are:
 
 ### Log Output
 
-```
-💾 Saving 256 material images to database and generating CLIP embeddings...
-   📦 Batch size: 20, Max retries: 3
-   📦 Processing batch 1/13 (1-20/256)
-   ✅ Saved image 1/256 to DB: uuid
-   🎨 Generating CLIP embeddings for image 1/256
-   ✅ Generated 5 CLIP embeddings for image uuid
-   ...
-   ✅ Batch 1 complete: 20 images processed
-   ...
-✅ Image processing complete:
-   Images saved to DB: 256
-   CLIP embeddings generated: 243
-   ⚠️ Failed images: 13
-      - Image 45 (page 12): Network timeout after 3 retries
-      - Image 78 (page 20): Invalid image format
-      ...
-```
+The log shows progress per batch: saving each image to DB with its UUID, generating CLIP embeddings per image, and batch completion messages. The final summary reports total images saved, total CLIP embeddings generated, and a list of failed images with their page numbers and error reasons (e.g., "Network timeout after 3 retries", "Invalid image format").
 
 ## Integration
 
 ### Pipeline Integration
 
-The improved method is automatically used in the PDF processing pipeline:
-
-**Stage 30: save-images-db**
-```python
-POST /api/internal/save-images-db/{job_id}
-
-# Automatically uses batched processing with retry
-result = await image_service.save_images_and_generate_clips(
-    material_images=material_images,
-    document_id=document_id,
-    workspace_id=workspace_id
-)
-```
+The improved method is automatically used in the PDF processing pipeline at **Stage 30: save-images-db** (`POST /api/internal/save-images-db/{job_id}`), which calls `save_images_and_generate_clips` with the document's material images, document ID, and workspace ID.
 
 ### Manual Usage
 
-Can also be called directly for reprocessing:
-
-```python
-from app.services.image_processing_service import ImageProcessingService
-
-service = ImageProcessingService()
-result = await service.save_images_and_generate_clips(
-    material_images=images,
-    document_id="uuid",
-    workspace_id="uuid"
-)
-
-print(f"Success: {result['clip_embeddings_generated']}/{result['images_saved']}")
-print(f"Failed: {len(result['failed_images'])}")
-```
+The service can also be called directly for reprocessing existing documents. After calling `save_images_and_generate_clips`, inspect the returned dict for `clip_embeddings_generated`, `images_saved`, and `failed_images` counts.
 
 ## Understanding Embeddings (Qwen → Voyage AI)
 
@@ -313,6 +204,4 @@ Understanding embeddings capture the structured knowledge from Qwen3-VL's vision
 - [Image Processing Service](./system-architecture.md#image-processing)
 - [API Endpoints](./api-endpoints.md)
 - [Troubleshooting Guide](./troubleshooting-guide.md)
-
-
 

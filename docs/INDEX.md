@@ -62,9 +62,9 @@ Complete documentation for Material Kai Vision Platform.
 
 **[async-processing-and-limits.md](async-processing-and-limits.md)** - Async processing & concurrency limits ✨ NEW
 - Fully async architecture across all methods (PDF, Web, XML)
-- Unified concurrency limits (5 TogetherAI (Qwen), 2 Claude, 10 uploads, 20 CLIP)
+- Unified concurrency limits (5 Qwen/HuggingFace, 2 Claude, 10 uploads, 20 SLIG)
 - Timeout configuration (300s discovery, 120s AI, 30s downloads)
-- Rate limiting (10 req/min TogetherAI, circuit breaker Claude)
+- Rate limiting (10 req/min Qwen/HuggingFace, circuit breaker Claude)
 - Shared services (ImageProcessingService, RealEmbeddingsService, AsyncQueueService)
 - Memory optimization (batch processing prevents OOM)
 - Network optimization (semaphores prevent congestion)
@@ -105,15 +105,16 @@ Complete documentation for Material Kai Vision Platform.
 - Complete API reference and usage examples
 - Best practices and troubleshooting
 
-**[vr-world-generation.md](vr-world-generation.md)** - VR World generation with WorldLabs Marble
+**[vr-world-generation.md](vr-world-generation.md)** - VR World generation with WorldLabs Marble ✨
 - WorldLabs Marble API integration (mini + plus models)
-- Spark.js Gaussian Splat renderer (code-split, ~496KB)
-- Orbit + First-person (WASD) navigation with toggle
+- Spark.js Gaussian Splat renderer via `@sparkjsdev/spark` + `three@0.178` (code-split, ~496KB)
+- Orbit + First-person (WASD + mouse look + Shift speed boost) navigation with toggle
 - 3 quality levels (100k/500k/full SPZ)
-- Credit-based pricing (50 mini, 200 plus) with refund on failure
-- Edge function orchestration (upload → generate → poll → store)
+- Credit-based pricing (50 credits mini ~30-45s, 200 credits plus ~5min) with refund on failure
+- Edge function orchestration (upload → generate → poll → store in `vr_worlds` table)
 - WorldViewer component with adaptive status polling
-- Integrated into agent chat via DesignCanvas "Generate VR" button
+- Integrated into Interior Designer agent chat via DesignCanvas "Generate VR" button
+- Requires `WORLDLABS_API_KEY` in Supabase Edge Function secrets
 
 **[search-strategies.md](search-strategies.md)** - Complete search system guide ✨ UPDATED
 - 6 search strategies (100% implemented)
@@ -218,29 +219,30 @@ Complete documentation for Material Kai Vision Platform.
 ### 🤖 AI & Processing
 
 **[ai-models-guide.md](ai-models-guide.md)** - AI models integration
-- 8 AI models across 4 providers
+- 12+ AI models across 5 providers
 - Anthropic: Claude Sonnet 4.5, Claude Haiku 4.5
-- OpenAI: GPT-4o, GPT-5, text-embedding-3-small
-- Google: SigLIP ViT-SO400M (primary CLIP)
-- TogetherAI: Qwen3-VL 17B Vision
-- OpenAI CLIP ViT-B/32 (fallback)
-- 6 embedding types (text, visual, color, texture, style, material)
+- OpenAI: GPT-4o, GPT-4o-mini
+- Voyage AI: voyage-3.5 (primary text + understanding embeddings, 1024D)
+- HuggingFace Endpoint: Qwen3-VL 32B Vision + SigLIP2 (5 visual embedding types, 768D each)
+- WorldLabs Marble: 3D Gaussian Splat generation
+- 7 embedding types (text, visual, understanding, color, texture, style, material) — halfvec float16
 - Model usage by pipeline stage
 - Cost optimization
 - API keys & configuration
 - Performance benchmarks
 
-**[agent-system.md](agent-system.md)** - AI Agent system architecture
+**[agent-system.md](agent-system.md)** - AI Agent system architecture ✨ UPDATED (2026-02-19)
 - Database-driven agent prompts
-- 4 specialized agents (Search, Insights, Interior Designer, Demo)
-- B2B research tools: manufacturer search, company enrichment, contact discovery, email validation
+- **3 agents**: Jarvis (unified), Interior Designer, Demo
+- Legacy aliases: `search`, `insights`, `seo` → all resolve to `kai` transparently
+- **Jarvis agent**: material_search, knowledge_base_search, visual_search (all roles); B2B/sub-agent tools (admin/owner only)
+- B2B research: manufacturer search via Anthropic built-in web search (no Perplexity key), company enrichment, contact discovery, email validation
 - Email finder: Hunter.io + Apollo.io fallback, ZeroBounce validation on all discovered emails
 - Admin UI for prompt management (/admin/agent-configs)
-- LangChain.js tool orchestration
+- LangChain.js + LangGraph StateGraph orchestration
 - Real-time prompt updates (no deployment needed)
-- Role-based access control
-- Agent monitoring and analytics
-- Best practices and troubleshooting
+- RBAC tool gating
+- Multimodal image support (data URL → vision content blocks)
 
 **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph implementation guide ✨ NEW
 - StateGraph-based agent execution
@@ -344,7 +346,7 @@ Complete documentation for Material Kai Vision Platform.
 - PDF Routes (4 endpoints)
 - Products Routes (3 endpoints)
 - Embeddings Routes (3 endpoints)
-- Together AI Routes (3 endpoints)
+- HuggingFace/Qwen Routes (3 endpoints)
 - Anthropic Routes (3 endpoints)
 - Monitoring Routes (3 endpoints)
 - AI Metrics Routes (2 endpoints)
@@ -416,10 +418,11 @@ Complete documentation for Material Kai Vision Platform.
 
 - **5,000+** users in production
 - **99.5%+** uptime SLA
-- **8** AI models across 4 providers
+- **12+** AI models across 5 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs)
 - **14** processing pipeline stages
-- **114** API endpoints (14 categories)
-- **7** embedding types with dynamic weight profiles
+- **150+** API endpoints (16 categories)
+- **7** embedding types with dynamic weight profiles (halfvec float16 storage)
+- **3** active agents: Jarvis (unified), Interior Designer, Demo
 - **200+** metafield types
 - **95%+** product detection accuracy
 - **85%+** search relevance
@@ -427,10 +430,10 @@ Complete documentation for Material Kai Vision Platform.
 
 ### Technology Stack
 
-**Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel  
-**Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted  
-**Database**: PostgreSQL 15, pgvector, Supabase  
-**AI**: Claude 4.5, GPT-4o, Qwen3-VL, SigLIP, Voyage AI, Multi-Vector CLIP
+**Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
+**Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
+**Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
+**AI**: Claude 4.5 (Sonnet + Haiku), GPT-4o/mini, Voyage AI (voyage-3.5), Qwen3-VL 32B (HuggingFace), SigLIP2 (HuggingFace), WorldLabs Marble
 
 ### API Categories
 
@@ -480,27 +483,24 @@ All documentation follows these standards:
 
 ## Documentation Updates
 
-**Last Updated**: February 12, 2026
-**Version**: 3.1.0
+**Last Updated**: March 1, 2026
+**Version**: 3.2.0
 **Status**: Production
 **Maintainer**: Development Team
 
 **Recent Changes:**
-- ✨ **NEW**: Query-Adaptive Weight Profiles - Dynamic 7-vector search weights selected per query intent (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced)
-- ✨ **NEW**: Frontend Code Splitting - React.lazy() on 60+ routes, main chunk reduced from 2,754KB to 221KB (-92%)
-- ✨ **NEW**: Web Scraping Integration - Complete Firecrawl integration with AI product discovery
-- ✨ **NEW**: Price Monitoring System - Competitive price tracking with alerts
-- ✨ **NEW**: Saved Searches Deduplication - AI-powered search management
-- ✨ **NEW**: VR World Generation - WorldLabs Marble + Spark.js 3D viewer integration
-- ✨ **NEW**: Interior Design Generation - 14 AI models for interior design
-- ✨ **NEW**: Internal Credit System - Credit-based billing for AI operations
-- ✨ Updated API endpoint count to 150+ across 16 categories
-- ✨ Added 10+ new database tables for new features
-- ✨ Documented async processing architecture across all methods
-- ✨ Added production hardening documentation (source tracking, heartbeat, Sentry)
-- ✨ Updated README.md and CHANGELOG.md with comprehensive feature list
-- ✨ Enhanced performance metrics with multi-source processing
-- ✨ Documented 12+ AI models across 4 providers
+- ✨ **UPDATED** (2026-02-19): Unified Jarvis Agent — Search + Insights + SEO merged; legacy aliases preserved; RBAC tool gating; multimodal image support
+- ✨ **NEW** (2026-02-10): VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer; `vr-world-generation.md` created
+- ✨ **UPDATED** (2026-02-07): halfvec migration — all vector columns now float16; 50% storage savings; embedding dict key `text_1024`
+- ✨ **UPDATED** (2026-02-25): B2B search now uses Anthropic built-in `web_search_20250305` tool (Perplexity removed)
+- ✨ **NEW**: Understanding embeddings — Qwen3-VL analysis → Voyage AI 1024D embedding (spec-based search)
+- ✨ **NEW**: Query-Adaptive Weight Profiles — 7 profiles dynamically selected per query intent
+- ✨ **NEW**: Frontend Code Splitting — React.lazy() on 60+ routes, main chunk 221KB (-92%)
+- ✨ **NEW**: Web Scraping Integration — Complete Firecrawl integration with AI product discovery
+- ✨ **NEW**: Price Monitoring System — Competitive price tracking with alerts
+- ✨ **NEW**: Saved Searches Deduplication — AI-powered search management
+- ✨ **NEW**: Interior Design Generation — 14 AI models for interior design
+- ✨ **NEW**: Internal Credit System — Credit-based billing for AI operations
 - Previous: Campaign system, multi-vector search, monitoring & analytics
 
 ---

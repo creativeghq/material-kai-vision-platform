@@ -16,8 +16,8 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - 📄 **PDF Processing**: Extract products, images, and metadata from material catalogs with 14-stage pipeline
 - 🌐 **Web Scraping**: Automatic product discovery from manufacturer websites using Firecrawl
 - 🤖 **AI Analysis**: 12+ AI models across multiple providers for comprehensive understanding
-- 🔍 **Multi-Vector Search**: 6 specialized embeddings (text, visual, color, texture, style, material)
-- 💬 **AI Agents**: Intelligent material recommendations, search assistance, and interior design
+- 🔍 **Multi-Vector Search**: 7 specialized embeddings (text, visual, understanding, color, texture, style, material)
+- 💬 **AI Agents**: Jarvis unified agent (material search, B2B research, SEO), Interior Designer, Demo
 - 📊 **Knowledge Base**: Semantic chunking, quality scoring, and relationship mapping
 - 🎨 **Visual Recognition**: CLIP + Qwen3-VL Vision for image analysis
 - 🏷️ **Auto-Metadata**: AI-powered metadata extraction (200+ fields)
@@ -32,7 +32,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Search Accuracy**: 85%+
 - **Uptime**: 99.5%+
 - **API Endpoints**: 150+
-- **AI Models**: 12+ across 4 providers
+- **AI Models**: 12+ across 5 providers (Anthropic, OpenAI, Voyage AI, HuggingFace, WorldLabs)
 
 ---
 
@@ -61,13 +61,14 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Tables**: 15+ tables (materials, products, chunks, images, embeddings, etc.)
 - **Indexes**: Optimized ivfflat vector indexes
 
-#### **AI Models** (12+ models across 4 providers)
-1. **OpenAI**: text-embedding-3-small (1536D embeddings), GPT-4o, GPT-5
-2. **Anthropic**: Claude Haiku 4.5 (fast classification), Claude Sonnet 4.5 (deep enrichment, spatial analysis)
-3. **Together AI**: Qwen3-VL 17B Vision (69.4% MMMU, vision analysis)
-4. **Google**: SigLIP ViT-SO400M (primary CLIP model)
-5. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
-6. **Custom Embeddings**: Visual, color, texture, style, material, application (6 types)
+#### **AI Models** (12+ models across 5 providers)
+1. **Anthropic**: Claude Haiku 4.5 (fast classification/B2B search), Claude Sonnet 4.5 (deep enrichment, Jarvis agent)
+2. **OpenAI**: GPT-4o (alternative discovery), GPT-4o-mini (query parsing)
+3. **HuggingFace Endpoint**: Qwen3-VL 32B Vision (69.4% MMMU, vision analysis + understanding embeddings)
+4. **Voyage AI**: voyage-3.5 (primary text embeddings, 1024D)
+5. **SigLIP2 (HuggingFace)**: 5 visual embedding types (visual, color, texture, style, material — 768D each)
+6. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
+7. **WorldLabs Marble**: 3D Gaussian Splat world generation (mini + plus models)
 
 ### **System Diagram**
 ```
@@ -89,8 +90,8 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
                     ┌─────────────────────┼─────────────────────┐
                     │                     │                     │
            ┌────────▼────────┐   ┌───────▼────────┐   ┌───────▼────────┐
-           │  OpenAI         │   │  Anthropic     │   │  Together AI   │
-           │  Embeddings     │   │  Claude 4.5    │   │  Qwen3-VL │
+           │  Voyage AI      │   │  Anthropic     │   │  HuggingFace   │
+           │  Embeddings     │   │  Claude 4.5    │   │  Qwen3-VL 32B  │
            └─────────────────┘   └────────────────┘   └────────────────┘
 ```
 
@@ -103,7 +104,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - Python 3.9+ (Backend)
 - UV package manager (Backend)
 - Supabase account
-- API keys: OpenAI, Anthropic, Together AI
+- API keys: OpenAI, Anthropic, Voyage AI, HuggingFace
 
 ### **Frontend Setup**
 ```bash
@@ -166,12 +167,28 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 # AI Services
 OPENAI_API_KEY=your_openai_key
 ANTHROPIC_API_KEY=your_anthropic_key
-TOGETHER_API_KEY=your_together_key
+VOYAGE_API_KEY=your_voyage_key
+
+# Vision/Embedding Endpoints (HuggingFace)
+QWEN_ENDPOINT_URL=https://your-qwen-endpoint.aws.endpoints.huggingface.cloud
+QWEN_ENDPOINT_TOKEN=hf_...
+SLIG_ENDPOINT_URL=https://your-slig-endpoint.aws.endpoints.huggingface.cloud
+SLIG_ENDPOINT_TOKEN=hf_...
 
 # Application
 ENVIRONMENT=production
 DEBUG=false
 LOG_LEVEL=ERROR
+```
+
+#### **Supabase Edge Function Secrets**
+```bash
+ANTHROPIC_API_KEY=your_anthropic_key
+WORLDLABS_API_KEY=your_worldlabs_key   # Required for VR world generation
+FIRECRAWL_API_KEY=your_firecrawl_key   # Required for B2B company scraping
+APOLLO_API_KEY=your_apollo_key          # Required for B2B company enrichment
+HUNTER_API_KEY=your_hunter_key          # Required for B2B contact discovery
+ZEROBOUNCE_API_KEY=your_zerobounce_key  # Required for email validation
 ```
 
 ---
@@ -288,31 +305,42 @@ curl https://v1api.materialshub.gr/docs
 - Cron-based scheduling for recurring imports
 - Checkpoint recovery for resilience
 
-### **2. Multi-Vector Search** (6 embedding types)
-- **Text Embeddings** (1536D): Semantic text understanding
-- **Visual CLIP Embeddings** (512D): Cross-modal visual-text matching
-- **Color Embeddings**: Color palette and harmony matching
-- **Texture Embeddings**: Surface texture and pattern recognition
-- **Style Embeddings**: Design style recognition
-- **Material Embeddings**: Material type classification
+### **2. Multi-Vector Search** (7 embedding types)
+- **Text Embeddings** (1024D, Voyage AI): Semantic text understanding
+- **Visual Embeddings** (768D, SigLIP2): General visual similarity
+- **Understanding Embeddings** (1024D, Voyage AI): Spec-based search via Qwen3-VL analysis
+- **Color Embeddings** (768D, SigLIP2): Color palette and harmony matching
+- **Texture Embeddings** (768D, SigLIP2): Surface texture and pattern recognition
+- **Style Embeddings** (768D, SigLIP2): Design style recognition
+- **Material Embeddings** (768D, SigLIP2): Material type classification
 
-**Search Strategies**: Semantic, Vector, Multi-Vector, Hybrid, Material, Image
+**Storage**: halfvec (float16) — 50% storage savings vs float32
+**Search Strategies**: Semantic, Vector, Multi-Vector (7-vector), Hybrid, Material, Image
+**Dynamic Weights**: 7 query-adaptive profiles automatically selected per search
 **Performance**: 300-500ms response time, 85%+ relevance
 
 ### **3. AI Agents & Chat**
-- **Material Search Agent**: Intelligent product recommendations
-- **Interior Designer Agent**: Room design and spatial analysis
-- **PDF Processor Agent**: Document understanding and analysis
-- **LangChain.js Integration**: Tool orchestration and function calling
+- **Jarvis Agent** (unified): Material search, knowledge base, visual search, B2B manufacturer discovery, SEO — all users; B2B/SEO tools gated to admin/owner
+- **Interior Designer Agent**: Room design, spatial analysis, VR world generation
+- **Demo Agent**: Platform showcase with pre-defined responses
+- **LangChain.js + LangGraph**: StateGraph orchestration, tool calling, long-term memory
 - **Database-Driven Prompts**: Real-time prompt updates without deployment
+- **Multimodal**: Image uploads supported (data URLs → vision content blocks)
 
 ### **5. Interior Design Generation**
-- 14 AI models (7 text-to-image, 7 image-to-image)
+- 14 AI models (7 text-to-image, 7 image-to-image) via Replicate
 - Parallel processing (3 concurrent generations)
 - Multiple variations per request
 - Permanent storage in Supabase
 - Credit-based billing system
 - Models: FLUX, SDXL, Stable Diffusion 3, Playground, ComfyUI
+
+### **5b. VR World Generation**
+- WorldLabs Marble API: generates explorable 3D Gaussian Splat worlds from interior images
+- Spark.js renderer (Three.js-based) with orbit + WASD first-person navigation
+- 3 quality levels (Draft 100k / Standard 500k / Full SPZ)
+- Credit-based: 50 credits (mini, ~30-45s) or 200 credits (plus, ~5min)
+- Persists across sessions; stored in `vr_worlds` table
 
 ### **6. Price Monitoring**
 - Competitive price tracking across sources
@@ -474,8 +502,10 @@ This project is proprietary software owned by Creative GHQ.
 ## 🎉 Acknowledgments
 
 - **OpenAI**: GPT models and embeddings
-- **Anthropic**: Claude 4.5 models
-- **Together AI**: Qwen3-VL Vision
+- **Anthropic**: Claude 4.5 models + built-in web search
+- **HuggingFace**: Qwen3-VL 32B Vision
+- **Voyage AI**: voyage-3.5 text embeddings
+- **WorldLabs**: Marble 3D Gaussian Splat generation
 - **Supabase**: Database and backend infrastructure
 - **Vercel**: Frontend hosting and deployment
 

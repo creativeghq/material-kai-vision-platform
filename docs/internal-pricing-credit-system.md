@@ -7,10 +7,7 @@ This document explains how the platform tracks and converts AI service costs int
 
 **1 Platform Credit = $0.01 USD**
 
-All AI service costs are converted to platform credits using this formula:
-```
-Platform Credits = USD Cost × 100
-```
+All AI service costs are converted to platform credits using the formula: `Platform Credits = USD Cost × 100`.
 
 Example: A $0.15 USD API call = **15 platform credits**
 
@@ -24,11 +21,7 @@ Example: A $0.15 USD API call = **15 platform credits**
   - GPT-4o, GPT-4o-mini
   - GPT-4-turbo, GPT-3.5-turbo
   - o1-preview, o1-mini
-- **Cost Calculation**:
-  ```
-  USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price)
-  Platform Credits = USD Cost × 100
-  ```
+- **Cost Calculation**: USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price). Platform Credits = USD Cost × 100.
 
 ### 2. **Anthropic Models (Claude)**
 - **Pricing Unit**: Per million tokens
@@ -37,52 +30,34 @@ Example: A $0.15 USD API call = **15 platform credits**
   - Claude 3 Opus, Sonnet, Haiku
 - **Special Features**:
   - Prompt caching support (reduced cost for cached tokens)
-- **Cost Calculation**:
-  ```
-  USD Cost = (input_tokens / 1M × input_price) + 
-             (output_tokens / 1M × output_price) +
-             (cached_tokens / 1M × cached_price)
-  Platform Credits = USD Cost × 100
-  ```
+- **Cost Calculation**: USD Cost = (input_tokens / 1M × input_price) + (output_tokens / 1M × output_price) + (cached_tokens / 1M × cached_price). Platform Credits = USD Cost × 100.
 
-### 3. **TogetherAI Models (Qwen Vision)**
+### 3. **HuggingFace Endpoint Models (Qwen3-VL Vision)**
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
   - Qwen3-VL-32B, Qwen3-VL-8B (vision models)
-- **Cost Calculation**: Same as OpenAI
+- **Cost Calculation**: Same formula as OpenAI.
 
 ### 4. **Embedding Models**
 - **Pricing Unit**: Per million tokens
 - **Models Tracked**:
   - text-embedding-3-small/large
   - text-embedding-ada-002
-- **Cost Calculation**:
-  ```
-  USD Cost = (tokens / 1M × price)
-  Platform Credits = USD Cost × 100
-  ```
+- **Cost Calculation**: USD Cost = (tokens / 1M × price). Platform Credits = USD Cost × 100.
 
 ### 5. **Vision Models**
 - **Pricing Unit**: Per image
 - **Models Tracked**:
   - GPT-4o vision
   - Claude 3.5 Sonnet vision
-- **Cost Calculation**:
-  ```
-  USD Cost = image_count × price_per_image
-  Platform Credits = USD Cost × 100
-  ```
+- **Cost Calculation**: USD Cost = image_count × price_per_image. Platform Credits = USD Cost × 100.
 
 ### 6. **Firecrawl Web Scraping**
 - **Pricing Unit**: Per credit
 - **Firecrawl System**:
   - 1 Firecrawl credit = 15 tokens
   - Pricing varies by plan
-- **Cost Calculation**:
-  ```
-  USD Cost = firecrawl_credits × cost_per_credit
-  Platform Credits = USD Cost × 100
-  ```
+- **Cost Calculation**: USD Cost = firecrawl_credits × cost_per_credit. Platform Credits = USD Cost × 100.
 - **Default Estimate**: $0.001 per Firecrawl credit
 
 ---
@@ -90,101 +65,35 @@ Example: A $0.15 USD API call = **15 platform credits**
 ## Database Schema
 
 ### `ai_usage_logs` Table
-Tracks all AI API calls with detailed cost breakdown:
-
-```sql
-CREATE TABLE ai_usage_logs (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES auth.users,
-    model_name VARCHAR(255),           -- e.g., "gpt-4o", "claude-3-5-sonnet"
-    provider VARCHAR(100),              -- e.g., "openai", "anthropic", "firecrawl"
-    operation_type VARCHAR(100),        -- e.g., "chat", "embedding", "scrape"
-    
-    -- Token usage
-    input_tokens INTEGER,
-    output_tokens INTEGER,
-    cached_tokens INTEGER,
-    total_tokens INTEGER,
-    
-    -- Firecrawl specific
-    firecrawl_credits INTEGER,
-    
-    -- Cost tracking
-    cost_usd DECIMAL(10, 6),           -- Cost in USD
-    platform_credits INTEGER,           -- Cost in platform credits (USD × 100)
-    
-    -- Metadata
-    request_metadata JSONB,
-    response_metadata JSONB,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-```
+Tracks all AI API calls with detailed cost breakdown. The table stores the following fields: a UUID primary key, `user_id` referencing `auth.users`, `model_name` (e.g., `"gpt-4o"`, `"claude-3-5-sonnet"`), `provider` (e.g., `"openai"`, `"anthropic"`, `"firecrawl"`), `operation_type` (e.g., `"chat"`, `"embedding"`, `"scrape"`), `input_tokens`, `output_tokens`, `cached_tokens`, `total_tokens`, `firecrawl_credits` (Firecrawl-specific), `cost_usd` (DECIMAL 10,6 — cost in USD), `platform_credits` (integer — cost in platform credits, i.e., USD × 100), `request_metadata` (JSONB), `response_metadata` (JSONB), and `created_at` timestamp.
 
 ---
 
 ## Usage Examples
 
 ### Example 1: GPT-4o API Call
-```python
-# API call details
-input_tokens = 1000
-output_tokens = 500
 
-# Pricing (from config)
-input_price = $2.50 per 1M tokens
-output_price = $10.00 per 1M tokens
-
-# Cost calculation
-usd_cost = (1000/1M × $2.50) + (500/1M × $10.00)
-         = $0.0025 + $0.005
-         = $0.0075
-
-platform_credits = $0.0075 × 100 = 0.75 credits (rounded to 1)
-```
+For 1,000 input tokens at $2.50/1M and 500 output tokens at $10.00/1M:
+- USD cost = (1,000/1,000,000 × $2.50) + (500/1,000,000 × $10.00) = $0.0025 + $0.005 = $0.0075
+- Platform credits = $0.0075 × 100 = 0.75 credits (rounded up to 1)
 
 ### Example 2: Firecrawl Scrape
-```python
-# API call details
-firecrawl_credits = 5
 
-# Pricing (estimated)
-cost_per_credit = $0.001
-
-# Cost calculation
-usd_cost = 5 × $0.001 = $0.005
-
-platform_credits = $0.005 × 100 = 0.5 credits (rounded to 1)
-```
+For 5 Firecrawl credits at an estimated $0.001 per credit:
+- USD cost = 5 × $0.001 = $0.005
+- Platform credits = $0.005 × 100 = 0.5 credits (rounded up to 1)
 
 ---
 
 ## Monitoring & Reporting
 
 ### Query Total Usage by User
-```sql
-SELECT 
-    user_id,
-    SUM(platform_credits) as total_credits,
-    SUM(cost_usd) as total_usd,
-    COUNT(*) as api_calls
-FROM ai_usage_logs
-WHERE created_at >= NOW() - INTERVAL '30 days'
-GROUP BY user_id;
-```
+
+To get total platform credits, total USD spend, and API call count per user over the last 30 days, query `ai_usage_logs` grouped by `user_id`, summing `platform_credits` and `cost_usd`, and filtering by `created_at >= NOW() - INTERVAL '30 days'`.
 
 ### Query Usage by Model
-```sql
-SELECT 
-    model_name,
-    provider,
-    COUNT(*) as calls,
-    SUM(total_tokens) as total_tokens,
-    SUM(platform_credits) as total_credits
-FROM ai_usage_logs
-WHERE created_at >= NOW() - INTERVAL '7 days'
-GROUP BY model_name, provider
-ORDER BY total_credits DESC;
-```
+
+To see which models are consuming the most credits over the last 7 days, query `ai_usage_logs` grouped by `model_name` and `provider`, summing `total_tokens` and `platform_credits`, ordered by `total_credits` descending.
 
 ---
 
@@ -214,4 +123,3 @@ Stripe setup: A single "Material KAI Credits" product (`STRIPE_CREDITS_PRODUCT_I
 - Platform credits are always rounded up to nearest integer
 - Firecrawl pricing is estimated and should be adjusted based on actual plan
 - All costs are logged in both USD and platform credits for transparency
-

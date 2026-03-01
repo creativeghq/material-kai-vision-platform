@@ -26,18 +26,13 @@ Complete reference of all platform features and capabilities.
 - ✅ Real-time progress tracking
 - ✅ Batch processing support
 
-**API Endpoint**:
-```http
-POST /api/v1/pdf/upload
-```
-
 ---
 
 ### 2. Multi-Modal Search
 
 **Search Types**:
 
-**Status:** ✅ All 6 strategies implemented (100% complete)
+**Status:** ✅ All 6 strategies + 7-vector fusion implemented (100% complete)
 
 **1. Semantic Search** ✅
 - Natural language understanding with MMR diversity
@@ -54,8 +49,9 @@ POST /api/v1/pdf/upload
 - Precision: 88%+
 
 **3. Multi-Vector Search** ✅
-- 7-vector fusion: text, visual, understanding, color, texture, style, material
-- Understanding embeddings enable spec-based search (dimensions, finishes, properties)
+- 7-vector fusion: text (1024D, Voyage AI), visual (768D, SigLIP2), understanding (1024D, Voyage AI), color, texture, style, material (768D each, SigLIP2)
+- All vectors stored as **halfvec** (float16) — 50% storage savings, zero accuracy loss
+- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Qwen3-VL structured analysis
 - **Query-adaptive weight profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected based on query intent
 - GPT-4o-mini parses query → selects optimal weights → adjusts fusion scoring per search
 - Response time: <200ms
@@ -135,16 +131,6 @@ POST /api/v1/pdf/upload
 - Quality scores
 - Confidence metrics
 
-**API Endpoints**:
-```http
-POST /api/products
-GET /api/products/{id}
-PATCH /api/products/{id}
-DELETE /api/products/{id}
-GET /api/products
-GET /api/products/{id}/similar
-```
-
 ---
 
 ### 5. Admin Dashboard
@@ -196,15 +182,6 @@ GET /api/products/{id}/similar
 - ✅ Source attribution
 - ✅ Relevance scoring
 
-**API Endpoints**:
-```http
-POST /api/v1/rag/documents/upload
-POST /api/v1/rag/query
-POST /api/v1/rag/chat
-GET /api/v1/rag/documents
-GET /api/v1/rag/stats
-```
-
 ---
 
 ### 7. Real-Time Monitoring
@@ -222,11 +199,6 @@ GET /api/v1/rag/stats
 - ✅ Real-time updates
 - ✅ Progress persistence
 - ✅ Checkpoint tracking
-
-**API Endpoint**:
-```http
-GET /api/v1/documents/job/{job_id}/progress/stream
-```
 
 ---
 
@@ -268,14 +240,6 @@ GET /api/v1/documents/job/{job_id}/progress/stream
 - ✅ Metadata extraction
 - ✅ Visual search
 - ✅ Storage optimization
-
-**API Endpoints**:
-```http
-POST /api/images/analyze
-POST /api/images/analyze/batch
-POST /api/images/search
-POST /api/images/upload-and-analyze
-```
 
 ---
 
@@ -400,10 +364,14 @@ POST /api/images/upload-and-analyze
 ## 🔄 Integration Features
 
 **External Services**:
-- OpenAI (GPT, embeddings, CLIP)
-- Anthropic (Claude)
-- Together AI (Qwen)
-- Supabase (Database, auth, storage)
+- Anthropic (Claude Sonnet/Haiku 4.5 + built-in web search for B2B)
+- OpenAI (GPT-4o, GPT-4o-mini for query parsing)
+- Voyage AI (voyage-3.5 text + understanding embeddings)
+- HuggingFace Endpoint (Qwen3-VL 32B vision analysis)
+- SigLIP2 via HuggingFace Endpoint (5 visual embedding types, 768D each)
+- Replicate (14 interior design generation models)
+- WorldLabs Marble (3D Gaussian Splat VR world generation)
+- Supabase (Database, auth, storage, edge functions)
 - Direct Vector DB RAG (Claude 4.5)
 
 **Capabilities**:
@@ -608,7 +576,6 @@ POST /api/images/upload-and-analyze
 
 ---
 
-**Last Updated**: January 6, 2025
-**Version**: 1.2.0
+**Last Updated**: March 1, 2026
+**Version**: 3.2.0
 **Status**: Production
-

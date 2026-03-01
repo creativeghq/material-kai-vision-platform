@@ -24,138 +24,38 @@ The Quotes System is a comprehensive quote management platform that allows users
 ### Core Tables
 
 #### `quotes` Table
-```sql
-CREATE TABLE quotes (
-    id UUID PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    workspace_id UUID REFERENCES workspaces(id),
-    name TEXT,  -- Optional user-friendly name
-    status TEXT DEFAULT 'draft',  -- 'draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired'
-    status_tag_id UUID REFERENCES status_tags(id),  -- Custom status tag
-    total_items INTEGER DEFAULT 0,
-    notes TEXT,
-    custom_request_text TEXT,  -- For text-based custom requests
-    expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '30 days'),
-    last_activity_at TIMESTAMPTZ DEFAULT NOW(),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    submitted_at TIMESTAMPTZ
-);
-```
+
+Stores core quote data. Key fields include: `id`, `user_id`, `workspace_id`, `name` (optional user-friendly name), `status` ('draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired'), `status_tag_id`, `total_items`, `notes`, `custom_request_text`, `expires_at` (defaults to 30 days), `last_activity_at`, `created_at`, `updated_at`, and `submitted_at`.
 
 #### `quote_items` Table
-```sql
-CREATE TABLE quote_items (
-    id UUID PRIMARY KEY,
-    quote_id UUID REFERENCES quotes(id) ON DELETE CASCADE,
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    quantity INTEGER DEFAULT 1,
-    width NUMERIC,
-    height NUMERIC,
-    area NUMERIC,
-    unit TEXT,
-    notes TEXT,
-    added_from TEXT,  -- 'search', 'agent', '3d_generation', 'manual', 'product_page', 'moodboard'
-    added_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(quote_id, product_id)  -- Prevent duplicate products in same quote
-);
-```
+
+Stores quote line items. Key fields include: `id`, `quote_id`, `product_id`, `quantity`, `width`, `height`, `area`, `unit`, `notes`, and `added_from` ('search', 'agent', '3d_generation', 'manual', 'product_page', 'moodboard'). A unique constraint prevents duplicate products in the same quote.
 
 ### Status Tags System
 
 #### `status_tags` Table
-```sql
-CREATE TABLE status_tags (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL UNIQUE,
-    color TEXT NOT NULL,  -- Hex color code
-    description TEXT,
-    is_system BOOLEAN DEFAULT false,  -- System tags cannot be deleted
-    display_order INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
--- Default system tags
-INSERT INTO status_tags (name, color, is_system, display_order) VALUES
-    ('pending', '#FFA500', true, 1),
-    ('in_progress', '#3B82F6', true, 2),
-    ('quoted', '#8B5CF6', true, 3),
-    ('accepted', '#10B981', true, 4),
-    ('rejected', '#EF4444', true, 5),
-    ('expired', '#6B7280', true, 6);
-```
+Stores custom status tags. Fields include `id`, `name`, `color` (hex code), `description`, `is_system` (system tags cannot be deleted), and `display_order`. Default system tags are: `pending`, `in_progress`, `quoted`, `accepted`, `rejected`, and `expired`.
 
 ### Upsells/Extras System
 
 #### `upsells` Table
-```sql
-CREATE TABLE upsells (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    description TEXT,
-    price NUMERIC(10, 2) NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    display_order INTEGER DEFAULT 0,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+
+Admin-managed upsell items with `id`, `name`, `description`, `price`, `is_active`, and `display_order`.
 
 #### `quote_upsells` Table (Junction)
-```sql
-CREATE TABLE quote_upsells (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    quote_id UUID REFERENCES quotes(id) ON DELETE CASCADE,
-    upsell_id UUID REFERENCES upsells(id) ON DELETE CASCADE,
-    customer_accepted BOOLEAN,  -- null = pending, true = accepted, false = rejected
-    added_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(quote_id, upsell_id)
-);
-```
+
+Links upsells to quotes. The `customer_accepted` field is `null` for pending, `true` for accepted, and `false` for rejected. A unique constraint prevents duplicate upsell entries per quote.
 
 ### Project Timeline System
 
 #### `timeline_steps` Table
-```sql
-CREATE TABLE timeline_steps (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    description TEXT,
-    display_order INTEGER NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
 
--- Default timeline steps
-INSERT INTO timeline_steps (name, description, display_order) VALUES
-    ('Quote Accepted', 'Customer has accepted the quote', 1),
-    ('Materials Ordered', 'Materials have been ordered from suppliers', 2),
-    ('Materials Received', 'Materials have been received and inspected', 3),
-    ('Production Started', 'Production/fabrication has begun', 4),
-    ('Quality Check', 'Quality control inspection completed', 5),
-    ('Packaging', 'Items are being packaged for shipment', 6),
-    ('Shipped', 'Order has been shipped to customer', 7),
-    ('Delivered', 'Order has been delivered to customer', 8),
-    ('Project Completed', 'Project is complete and closed', 9);
-```
+Defines the ordered steps in the project timeline: Quote Accepted, Materials Ordered, Materials Received, Production Started, Quality Check, Packaging, Shipped, Delivered, Project Completed.
 
 #### `quote_timeline` Table
-```sql
-CREATE TABLE quote_timeline (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    quote_id UUID REFERENCES quotes(id) ON DELETE CASCADE,
-    timeline_step_id UUID REFERENCES timeline_steps(id),
-    status TEXT DEFAULT 'pending',  -- 'pending', 'in_progress', 'completed', 'skipped'
-    notes TEXT,
-    completed_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(quote_id, timeline_step_id)
-);
-```
+
+Tracks progress for each quote through the timeline steps. The `status` field can be 'pending', 'in_progress', 'completed', or 'skipped'. Includes `notes`, `completed_at`, and a unique constraint per quote/step combination.
 
 ## Auto-Expiration System
 
@@ -169,23 +69,7 @@ CREATE TABLE quote_timeline (
 
 ### System Settings Table
 
-The `system_settings` table stores platform-wide configuration:
-
-```sql
-CREATE TABLE system_settings (
-    id UUID PRIMARY KEY,
-    setting_key TEXT UNIQUE NOT NULL,
-    setting_value JSONB NOT NULL,
-    description TEXT,
-    updated_by UUID REFERENCES auth.users(id),
-    created_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ
-);
-
--- Default setting
-INSERT INTO system_settings (setting_key, setting_value, description)
-VALUES ('quote_expiration_days', '30'::jsonb, 'Number of days of inactivity before a draft quote expires');
-```
+The `system_settings` table stores platform-wide configuration using a `setting_key`/`setting_value` JSONB pattern. The default setting for `quote_expiration_days` is `30`.
 
 ### Admin Configuration
 
@@ -199,19 +83,10 @@ Admins can update the expiration days via:
 - **`update_quote_activity`** - Extends expiration when items are added/updated (uses current setting)
 - **`update_quote_total_items`** - Keeps total_items count accurate
 
-### Helper Function
+### Helper Functions
 
-```sql
--- Get current expiration days setting
-SELECT get_quote_expiration_days(); -- Returns INTEGER (default: 30)
-```
-
-### Manual Expiration
-
-```sql
--- Call this function daily to expire old quotes
-SELECT expire_old_quotes(); -- Returns count of expired quotes
-```
+- `get_quote_expiration_days()` — Returns the current expiration days setting as an INTEGER (default: 30)
+- `expire_old_quotes()` — Marks expired quotes; should be called daily; returns count of expired quotes
 
 ## Frontend Architecture
 
@@ -336,39 +211,16 @@ SELECT expire_old_quotes(); -- Returns count of expired quotes
 ### Customer Workflow
 
 #### 1. Create Quote
-```typescript
-const quote = await quotesService.createQuote({
-  name: 'Office Renovation Materials',
-  notes: 'Materials for main office renovation'
-});
-```
+
+Use `quotesService.createQuote()` with an optional name and notes to create a new quote.
 
 #### 2. Add Materials or Custom Request
-```typescript
-// Option A: Add products
-await quotesService.addItem({
-  quote_id: quote.id,
-  product_id: 'product-uuid',
-  quantity: 5,
-  width: 100,
-  height: 200,
-  area: 20,
-  unit: 'sqm',
-  notes: 'Need matte finish',
-  added_from: 'product_page'
-});
 
-// Option B: Add custom request text
-await quotesService.updateQuote(quote.id, {
-  custom_request_text: 'Looking for sustainable flooring options for 500 sqm office space'
-});
-
-```
+Either add specific products via `quotesService.addItem()` with quantity, dimensions, area, unit, notes, and source tracking — or add free-text custom requests via `quotesService.updateQuote()` with a `custom_request_text` field.
 
 #### 3. Submit Quote Request
-```typescript
-await quotesService.submitQuote(quote.id, 'Please provide pricing for these materials');
-```
+
+Call `quotesService.submitQuote()` with the quote ID and an optional message.
 
 #### 4. Review Quote with Extras
 - Admin attaches upsells/extras to quote
@@ -377,11 +229,8 @@ await quotesService.submitQuote(quote.id, 'Please provide pricing for these mate
 - All extras must be decided before quote acceptance
 
 #### 5. Accept Quote
-```typescript
-// System validates all extras are accepted/rejected
-// Changes quote status to 'accepted'
-// Automatically initializes project timeline
-```
+
+The system validates all extras are accepted or rejected, then changes quote status to 'accepted' and automatically initializes the project timeline.
 
 #### 6. Track Project Progress
 - View timeline button appears
@@ -398,26 +247,20 @@ await quotesService.submitQuote(quote.id, 'Please provide pricing for these mate
 - Click quote to view details
 
 #### 2. Assign Status Tag
-```typescript
-await quotesService.updateQuoteStatusTag(quoteId, statusTagId);
-```
+
+Use `quotesService.updateQuoteStatusTag()` with the quote ID and status tag ID.
 
 #### 3. Attach Upsells/Extras
-```typescript
-await quotesService.addUpsellToQuote(quoteId, upsellId);
-```
+
+Use `quotesService.addUpsellToQuote()` with the quote ID and upsell ID.
 
 #### 4. Monitor Customer Response
 - View which extras were accepted/rejected
 - See customer acceptance status
 
 #### 5. Update Project Timeline
-```typescript
-await quotesService.updateTimelineStep(timelineEntryId, {
-  status: 'completed',
-  notes: 'Materials delivered on schedule'
-});
-```
+
+Use `quotesService.updateTimelineStep()` with the timeline entry ID, status, and notes.
 
 #### 6. Manage System Configuration
 - Create/edit status tags at `/admin/status-tags`
@@ -427,48 +270,22 @@ await quotesService.updateTimelineStep(timelineEntryId, {
 ## Integration Points
 
 ### Search Results
-```tsx
-<AddToQuoteButton
-  productId={product.id}
-  productName={product.name}
-  productImage={product.image}
-  variant="outline"
-  size="sm"
-/>
-```
+
+Place `AddToQuoteButton` on product cards with `productId`, `productName`, `productImage`, and appropriate variant/size props.
 
 ### Agent Responses
-```tsx
-{materials.map(material => (
-  <MaterialCard key={material.id}>
-    <MaterialInfo {...material} />
-    <AddToQuoteButton
-      productId={material.id}
-      productName={material.name}
-      defaultQuantity={1}
-      added_from="agent"
-    />
-  </MaterialCard>
-))}
-```
+
+Map over returned materials and render `AddToQuoteButton` for each with `productId`, `productName`, `defaultQuantity`, and `added_from="agent"`.
 
 ### 3D Generation Results
-```tsx
-<AddToQuoteButton
-  productId={generatedMaterial.id}
-  productName={generatedMaterial.name}
-  added_from="3d_generation"
-/>
-```
+
+Render `AddToQuoteButton` with `added_from="3d_generation"` on generated material cards.
 
 ## Quote Expiration Management
 
 ### Check Expiration Status
-```typescript
-const info = await quotesService.getExpirationInfo(quoteId);
-console.log(`Expires in ${info.days_until_expiration} days`);
-console.log(`Is expired: ${info.is_expired}`);
-```
+
+Use `quotesService.getExpirationInfo()` to get `days_until_expiration` and `is_expired` for a given quote.
 
 ### Extend Expiration
 Any activity automatically extends expiration:
@@ -477,14 +294,7 @@ Any activity automatically extends expiration:
 - Updating items
 
 ### Manual Cleanup
-Create a Supabase Edge Function to run daily:
-```typescript
-// supabase/functions/expire-quotes/index.ts
-Deno.serve(async () => {
-  const { data, error } = await supabase.rpc('expire_old_quotes');
-  return new Response(JSON.stringify({ expired_count: data }));
-});
-```
+Create a Supabase Edge Function to run daily that calls the `expire_old_quotes` RPC and returns the count of expired quotes.
 
 ## Security (RLS Policies)
 
@@ -634,4 +444,3 @@ All quote operations are handled through the `QuotesService` which interfaces wi
 - `supabase/migrations/20250106_quote_system_enhancements.sql` - Status tags, upsells, timeline system
 
 All migrations have been executed and verified in production.
-

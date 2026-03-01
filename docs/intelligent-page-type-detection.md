@@ -18,22 +18,7 @@ Claude Vision analyzes ALL PDF pages and provides:
 - **MIXED**: Page has both embedded text AND significant images
 - **EMPTY**: Page is blank or has no meaningful content
 
-**Example Response:**
-```json
-{
-  "name": "VALENOVA",
-  "page_range": [24, 25, 26, 27, 28, 29],
-  "description": "Modern ceramic collection",
-  "page_types": {
-    "24": "IMAGE",
-    "25": "MIXED",
-    "26": "TEXT",
-    "27": "IMAGE",
-    "28": "TEXT",
-    "29": "EMPTY"
-  }
-}
-```
+The response for each product includes a `page_types` dictionary mapping page numbers to their type classification (e.g., `"24": "IMAGE"`, `"25": "MIXED"`, `"26": "TEXT"`).
 
 ### Stage 0B: Intelligent Extraction Routing
 
@@ -47,14 +32,13 @@ Based on page types from Stage 0A, the system routes each page to the optimal ex
 | **EMPTY** | Skip | Instant | N/A |
 
 **Processing Flow:**
-```
+
 1. Separate pages by type (TEXT, IMAGE, MIXED, EMPTY)
 2. Extract TEXT pages → PyMuPDF4LLM batch extraction
 3. Extract IMAGE pages → Use existing Claude Vision data
 4. Extract MIXED pages → PyMuPDF4LLM batch extraction
 5. Skip EMPTY pages
 6. Combine all results
-```
 
 ## Benefits
 
@@ -68,64 +52,22 @@ Based on page types from Stage 0A, the system routes each page to the optimal ex
 
 ### ProductInfo Dataclass
 
-Added `page_types` field:
-```python
-@dataclass
-class ProductInfo:
-    name: str
-    page_range: List[int]
-    description: Optional[str] = None
-    metadata: Dict[str, Any] = None
-    image_indices: List[int] = None
-    page_types: Dict[int, str] = None  # {page_num: "TEXT"|"IMAGE"|"MIXED"|"EMPTY"}
-    confidence: float = 0.0
-```
+The `ProductInfo` dataclass (`mivaa-pdf-extractor/app/services/product_discovery_service.py`) was updated to include a `page_types` field: a dictionary mapping page numbers (int) to type strings (`"TEXT"`, `"IMAGE"`, `"MIXED"`, or `"EMPTY"`).
 
 ### Vision Discovery Prompt
 
-Updated to request page type classification:
-```
-For EACH page in the product's page_range, classify it as:
-- "TEXT": Page has embedded text layer
-- "IMAGE": Page is image-based with text as part of image
-- "MIXED": Page has both embedded text AND images
-- "EMPTY": Page is blank
-
-Return page_types for ALL pages in page_range.
-```
+Updated to request page type classification for EACH page in the product's `page_range`. The model classifies each page and returns `page_types` for ALL pages in the range.
 
 ### Stage 0B Extraction Logic
 
-```python
-# Separate pages by type
-text_pages = [p for p in pages if page_types[p] == "TEXT"]
-image_pages = [p for p in pages if page_types[p] == "IMAGE"]
-mixed_pages = [p for p in pages if page_types[p] == "MIXED"]
-
-# Extract TEXT pages with PyMuPDF4LLM
-if text_pages:
-    text_markdown = pymupdf4llm.to_markdown(pdf_path, pages=text_pages)
-    
-# Use Claude Vision data for IMAGE pages (already have it!)
-if image_pages:
-    # Vision data already in product.description and product.metadata
-    
-# Extract MIXED pages with PyMuPDF4LLM
-if mixed_pages:
-    mixed_markdown = pymupdf4llm.to_markdown(pdf_path, pages=mixed_pages)
-```
+Pages are separated by type, then:
+- TEXT and MIXED pages are batched and extracted via PyMuPDF4LLM
+- IMAGE pages reuse the Claude Vision data already collected in Stage 0A
+- EMPTY pages are skipped entirely
 
 ## Logging Example
 
-```
-📊 Page type distribution: 30 TEXT, 20 IMAGE, 2 MIXED
-📄 Extracting 30 TEXT pages with PyMuPDF4LLM...
-   ✅ Extracted 45000 characters from TEXT pages
-🖼️  Using Claude Vision data for 20 IMAGE pages (already extracted in Stage 0A)
-🔀 Extracting 2 MIXED pages with PyMuPDF4LLM...
-   ✅ Extracted 3000 characters from MIXED pages
-✅ Total extracted: 48000 characters from 52 pages
-```
+The log output shows page type distribution (e.g., "30 TEXT, 20 IMAGE, 2 MIXED"), then reports character counts as each batch completes: TEXT pages extracted via PyMuPDF4LLM (~45,000 chars), IMAGE pages resolved from Stage 0A vision data (0s, instant), MIXED pages extracted via PyMuPDF4LLM (~3,000 chars), and a final total (e.g., "48,000 characters from 52 pages").
 
 ## Files Modified
 
@@ -140,13 +82,7 @@ if mixed_pages:
 
 ## Testing
 
-Run NOVA test to validate:
-```bash
-cd /var/www/mivaa-pdf-extractor
-node scripts/testing/nova-product-focused-test.mjs
-```
-
-Expected results:
+Run the NOVA test to validate. Expected results:
 - No "not a textpage" errors
 - Page type distribution logged
 - IMAGE pages use vision data

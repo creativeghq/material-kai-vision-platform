@@ -34,25 +34,7 @@ The platform includes a complete monitoring and analytics system that tracks:
 - `background_jobs` table - Main job tracking
 - `job_checkpoints` table - Stage-by-stage progress
 
-**Metrics Tracked**:
-```typescript
-{
-  pdf_processing: {
-    pending: number,
-    processing: number,
-    completed: number,
-    failed: number,
-    retrying: number,
-    total: number,
-    success_rate: number,
-    avg_processing_time: number
-  },
-  total_documents: number,
-  total_products_created: number,
-  total_chunks_created: number,
-  total_images_extracted: number
-}
-```
+**Metrics Tracked**: For `pdf_processing`, the system tracks pending, processing, completed, failed, retrying, and total job counts, plus success rate and average processing time. At the platform level it tracks total documents, total products created, total chunks created, and total images extracted.
 
 **Real-Time Updates**:
 - Supabase real-time subscription on `background_jobs` table
@@ -133,36 +115,9 @@ The platform includes a complete monitoring and analytics system that tracks:
 
 **Table**: `background_jobs`
 
-**Columns**:
-```sql
-id: UUID
-workspace_id: UUID
-document_id: UUID
-job_type: TEXT (pdf_processing, image_analysis, etc.)
-status: TEXT (pending, processing, completed, failed, retrying, cancelled)
-progress: INTEGER (0-100)
-created_at: TIMESTAMP
-started_at: TIMESTAMP
-completed_at: TIMESTAMP
-failed_at: TIMESTAMP
-error: TEXT
-metadata: JSONB
-```
+**Columns**: `id`, `workspace_id`, `document_id`, `job_type` (pdf_processing, image_analysis, etc.), `status` (pending, processing, completed, failed, retrying, cancelled), `progress` (0-100), `created_at`, `started_at`, `completed_at`, `failed_at`, `error`, and `metadata` JSONB.
 
-**Metadata Fields**:
-```json
-{
-  "filename": "harmony.pdf",
-  "stage": "IMAGES_EXTRACTED",
-  "products_discovered": 14,
-  "chunks_created": 229,
-  "images_extracted": 249,
-  "embeddings_generated": 750,
-  "processing_time_ms": 180000,
-  "ai_model": "claude-sonnet-4-5",
-  "retry_count": 0
-}
-```
+The `metadata` JSONB field contains: `filename`, `stage`, `products_discovered`, `chunks_created`, `images_extracted`, `embeddings_generated`, `processing_time_ms`, `ai_model`, and `retry_count`.
 
 ---
 
@@ -180,28 +135,7 @@ metadata: JSONB
 - `discovery_model` - AI model used
 - `confidence_score` - Overall confidence
 
-**Logging**:
-```python
-logger.info(f"✅ [STAGE 0] Discovery Complete:")
-logger.info(f"   Products: {products_discovered}")
-logger.info(f"   Total Entities: {total_entities}")
-logger.info(f"   Model: {discovery_model}")
-logger.info(f"   Time: {discovery_time_ms}ms")
-```
-
-**Checkpoint Metadata**:
-```json
-{
-  "products_discovered": 14,
-  "certificates_discovered": 2,
-  "logos_discovered": 3,
-  "specifications_discovered": 1,
-  "total_entities": 20,
-  "discovery_time_ms": 5000,
-  "discovery_model": "claude-sonnet-4-5",
-  "confidence_score": 0.95
-}
-```
+Stage 0 logs completion details and saves checkpoint metadata including all of the above metrics.
 
 ---
 
@@ -214,13 +148,7 @@ logger.info(f"   Time: {discovery_time_ms}ms")
 - `extraction_rate` - Percentage of pages extracted
 - `focused_extraction` - Boolean flag
 
-**Logging**:
-```python
-logger.info(f"✅ [STAGE 1] Focused Extraction Complete:")
-logger.info(f"   Pages Extracted: {extracted_pages_count}/{total_pages_count}")
-logger.info(f"   Extraction Rate: {extraction_rate}%")
-logger.info(f"   Text Length: {text_length} chars")
-```
+Stage 1 logs pages extracted, extraction rate percentage, and text length in characters.
 
 ---
 
@@ -234,13 +162,7 @@ logger.info(f"   Text Length: {text_length} chars")
 - `embedding_to_text_ai_calls` - AI API calls made
 - `visual_metadata_extracted` - Boolean flag
 
-**Logging**:
-```python
-logger.info(f"✅ [STAGE 3.5] Embedding-to-Text Complete:")
-logger.info(f"   Successful: {embedding_to_text_count}")
-logger.info(f"   Failed: {embedding_to_text_failed}")
-logger.info(f"   AI Calls: {embedding_to_text_ai_calls}")
-```
+Stage 3.5 logs successful conversions, failed conversions, and AI calls made.
 
 ---
 
@@ -254,13 +176,7 @@ logger.info(f"   AI Calls: {embedding_to_text_ai_calls}")
 - `metadata_consolidation_ai_calls` - AI API calls made
 - `metadata_sources_merged` - Number of sources merged
 
-**Logging**:
-```python
-logger.info(f"✅ [STAGE 4] Metadata Consolidation Complete:")
-logger.info(f"   Products Consolidated: {metadata_consolidation_count}")
-logger.info(f"   Sources Merged: {metadata_sources_merged}")
-logger.info(f"   AI Calls: {metadata_consolidation_ai_calls}")
-```
+Stage 4 logs products consolidated, sources merged, and AI calls made.
 
 ---
 
@@ -280,22 +196,7 @@ All stages save comprehensive metrics to checkpoints for recovery:
 8. **PRODUCTS_CREATED** - Stage 9 complete (product creation)
 9. **COMPLETED** - All stages complete
 
-**Checkpoint Data Structure**:
-```json
-{
-  "stage": "IMAGES_EXTRACTED",
-  "checkpoint_data": {
-    "document_id": "uuid",
-    "images_extracted": 249,
-    "material_images": 150
-  },
-  "metadata": {
-    "processing_time_ms": 120000,
-    "ai_model": "qwen3-vl-8b",
-    "success_rate": 0.98
-  }
-}
-```
+Each checkpoint saves a `stage` identifier, `checkpoint_data` (e.g., `document_id`, `images_extracted`, `material_images`), and `metadata` (e.g., `processing_time_ms`, `ai_model`, `success_rate`).
 
 ---
 
@@ -303,24 +204,7 @@ All stages save comprehensive metrics to checkpoints for recovery:
 
 ### Exception Tracking
 
-All stages integrate with Sentry for exception capture:
-
-```python
-try:
-    # Processing logic
-    result = await process_stage()
-except Exception as e:
-    sentry_sdk.capture_exception(e)
-    logger.error(f"❌ Stage failed: {e}")
-    raise
-```
-
-**Sentry Context**:
-- Job ID
-- Document ID
-- Current stage
-- Processing metrics
-- Error stack trace
+All stages integrate with Sentry for exception capture. Any exception raised during processing is captured by `sentry_sdk.capture_exception()`, logged, and re-raised. Sentry receives the job ID, document ID, current stage, processing metrics, and error stack trace as context.
 
 ---
 
@@ -358,15 +242,7 @@ except Exception as e:
 - Qwen3-VL 17B: $0.30 / 1M tokens
 - text-embedding-3-small: $0.02 / 1M tokens
 
-**Cost Calculation**:
-```typescript
-const calculateCost = (model: string, inputTokens: number, outputTokens: number) => {
-  const pricing = MODEL_PRICING[model];
-  const inputCost = (inputTokens / 1_000_000) * pricing.input;
-  const outputCost = (outputTokens / 1_000_000) * pricing.output;
-  return inputCost + outputCost;
-};
-```
+Cost calculation multiplies token counts by per-million rates for input and output separately, then sums them.
 
 ---
 
@@ -428,37 +304,14 @@ Comprehensive health monitoring system that tracks database performance, job mon
 - ✅ Error count and consecutive failure tracking
 - ✅ Uptime monitoring
 
-**Metrics**:
-```typescript
-{
-  healthy: boolean,
-  connection_test_ms: number,
-  query_test_ms: number,
-  error_count: number,
-  consecutive_failures: number,
-  uptime_seconds: number,
-  performance: {
-    avg_query_time_ms: number,
-    max_query_time_ms: number,
-    slow_query_count: number,
-    slow_query_threshold_ms: 1000
-  }
-}
-```
+**Metrics**: `healthy` boolean, `connection_test_ms`, `query_test_ms`, `error_count`, `consecutive_failures`, `uptime_seconds`, and `performance` object with `avg_query_time_ms`, `max_query_time_ms`, `slow_query_count`, and `slow_query_threshold_ms` (1000).
 
 #### 2. **Job Monitor Health**
 - ✅ Monitor service status (running/stopped)
 - ✅ Stuck job detection
 - ✅ Health status (healthy/degraded/unhealthy)
 
-**Metrics**:
-```typescript
-{
-  monitor_running: boolean,
-  stuck_jobs_count: number,
-  health: 'healthy' | 'degraded' | 'unhealthy'
-}
-```
+**Metrics**: `monitor_running` boolean, `stuck_jobs_count`, and `health` string ('healthy', 'degraded', or 'unhealthy').
 
 #### 3. **Query Performance Metrics**
 - ✅ Total queries executed
@@ -467,24 +320,7 @@ Comprehensive health monitoring system that tracks database performance, job mon
 - ✅ Per-table statistics
 - ✅ Recent slow queries log
 
-**Metrics**:
-```typescript
-{
-  total_queries: number,
-  slow_queries: number,
-  slow_query_percentage: number,
-  avg_query_time_ms: number,
-  max_query_time_ms: number,
-  table_metrics: {
-    [table: string]: {
-      count: number,
-      avg_time_ms: number,
-      max_time_ms: number,
-      slow_count: number
-    }
-  }
-}
-```
+**Metrics**: `total_queries`, `slow_queries`, `slow_query_percentage`, `avg_query_time_ms`, `max_query_time_ms`, and `table_metrics` (per-table counts, avg/max times, and slow query counts).
 
 #### 4. **Circuit Breaker Status**
 - ✅ Prevents cascading failures
@@ -496,13 +332,7 @@ Comprehensive health monitoring system that tracks database performance, job mon
 - **OPEN**: Failing fast (database down)
 - **HALF_OPEN**: Testing recovery
 
-**Metrics**:
-```typescript
-{
-  state: 'closed' | 'open' | 'half_open',
-  failure_count: number
-}
-```
+**Metrics**: `state` ('closed', 'open', or 'half_open') and `failure_count`.
 
 ### Health Check API Endpoints
 
@@ -510,17 +340,7 @@ Comprehensive health monitoring system that tracks database performance, job mon
 Basic health check - returns 200 if service is running.
 
 #### `GET /health/detailed`
-Comprehensive health status with all subsystems:
-```json
-{
-  "overall_status": "healthy",
-  "database": { ... },
-  "job_monitor": { ... },
-  "query_metrics": { ... },
-  "circuit_breaker": { ... },
-  "timestamp": "2025-01-20T10:30:00Z"
-}
-```
+Comprehensive health status with all subsystems: `overall_status`, `database`, `job_monitor`, `query_metrics`, `circuit_breaker`, and `timestamp`.
 
 #### `GET /health/database`
 Database connection health only.
@@ -621,5 +441,3 @@ Six critical indexes to optimize job monitoring queries:
 **Version**: 2.0.0
 **Status**: Production
 **Coverage**: All pipeline stages, admin dashboards, monitoring systems, and health checks
-
-

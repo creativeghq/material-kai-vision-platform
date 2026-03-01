@@ -253,51 +253,25 @@
 
 **Product: "NOVA" (Pages 12-14)**
 
-```
-Stage 0: Discovery
-  ↓
-  Product discovered: name="NOVA", page_range=[12,13,14]
+Stage 0 discovers: `name="NOVA"`, `page_range=[12,13,14]`
 
-Stage 1: Layout + Tables (FOR NOVA ONLY)
-  ↓
-  - YOLO detects 15 regions on pages 12-14
-  - Camelot extracts 3 tables from page 13
-  - Tables stored with product_id = NOVA's ID
+Stage 1 (Layout + Tables, FOR NOVA ONLY): YOLO detects 15 regions on pages 12-14; Camelot extracts 3 tables from page 13; tables stored with product_id = NOVA's ID.
 
-Stage 2: Text Chunking (FOR NOVA ONLY)
-  ↓
-  - Extract text from pages 12-14 only
-  - Create 45 chunks
-  - Each chunk has product_id = NOVA's ID
+Stage 2 (Text Chunking, FOR NOVA ONLY): Extracts text from pages 12-14 only, creates 45 chunks, each with product_id = NOVA's ID.
 
-Stage 3: Image Extraction (FOR NOVA ONLY)
-  ↓
-  - Extract images from pages 12-14 only
-  - Upload 12 images to Supabase
-  - Each image has product_id = NOVA's ID
+Stage 3 (Image Extraction, FOR NOVA ONLY): Extracts images from pages 12-14 only, uploads 12 images to Supabase, each with product_id = NOVA's ID.
 
-Stage 4: Product Creation
-  ↓
-  - Create product record for NOVA
-  - Metadata stored in JSONB field
+Stage 4 (Product Creation): Creates product record for NOVA with metadata stored in JSONB.
 
-Stage 5: Validation
-  ↓
-  - Count: 45 chunks, 12 images, 3 tables
-  - All linked via product_id foreign key
-  - Log: "Product 'NOVA' entities linked: 45 chunks, 12 images, 3 tables"
-```
+Stage 5 (Validation): Counts 45 chunks, 12 images, 3 tables — all linked via product_id foreign key. Logs: "Product 'NOVA' entities linked: 45 chunks, 12 images, 3 tables".
 
 ### Database Relationships
 
-**Foreign Key Architecture**:
-```sql
--- All entities link to products via product_id
-chunks.product_id → products.id
-product_images.product_id → products.id
-product_tables.product_id → products.id  -- NEW!
-product_layout_regions.product_id → products.id
-```
+**Foreign Key Architecture**: All entities link to products via `product_id`. Specifically:
+- `chunks.product_id → products.id`
+- `product_images.product_id → products.id`
+- `product_tables.product_id → products.id`
+- `product_layout_regions.product_id → products.id`
 
 **No Separate Relationship Tables Needed**:
 - ❌ No `product_chunk_relationships` table
@@ -330,39 +304,7 @@ product_layout_regions.product_id → products.id
 4. Extract products WITH all metadata in one pass
 5. Store in products table with metadata JSONB
 
-**Output**:
-```json
-{
-  "products": [
-    {
-      "name": "NOVA",
-      "description": "Modern ceramic tile collection",
-      "page_range": [12, 13, 14],
-      "metadata": {
-        "designer": "SG NY",
-        "studio": "SG NY",
-        "category": "tiles",
-        "dimensions": ["15×38", "20×40"],
-        "variants": [{"type": "color", "value": "beige"}],
-        "factory": "Castellón Factory",
-        "factory_group": "Harmony Group",
-        "manufacturer": "Harmony Materials",
-        "country_of_origin": "Spain",
-        "slip_resistance": "R11",
-        "fire_rating": "A1",
-        "thickness": "8mm",
-        "water_absorption": "Class 3",
-        "finish": "matte",
-        "material": "ceramic"
-      },
-      "image_indices": [12, 13],
-      "confidence": 0.95
-    }
-  ],
-  "total_products": 14,
-  "confidence_score": 0.95
-}
-```
+**Output**: A JSON structure with a `products` array, each entry containing fields like `name`, `description`, `page_range`, `metadata` (with designer, studio, category, dimensions, variants, factory, factory_group, manufacturer, country_of_origin, slip_resistance, fire_rating, thickness, water_absorption, finish, material), `image_indices`, and `confidence`. Also includes `total_products` and `confidence_score` at the top level.
 
 **Database Storage**:
 - Table: `products`
@@ -390,43 +332,7 @@ product_layout_regions.product_id → products.id
 5. Identify factory/group for each entity
 6. Store in document_entities table
 
-**Output**:
-```json
-{
-  "certificates": [
-    {
-      "name": "ISO 9001:2015",
-      "certificate_type": "quality_management",
-      "issuer": "TÜV SÜD",
-      "issue_date": "2024-01-15",
-      "expiry_date": "2027-01-15",
-      "standards": ["ISO 9001:2015"],
-      "page_range": [45, 46],
-      "factory_name": "Castellón Factory",
-      "factory_group": "Harmony Group",
-      "confidence": 0.92
-    }
-  ],
-  "logos": [
-    {
-      "name": "Company Logo",
-      "logo_type": "company",
-      "description": "Main company brand logo",
-      "page_range": [1, 2],
-      "confidence": 0.98
-    }
-  ],
-  "specifications": [
-    {
-      "name": "Installation Guide",
-      "spec_type": "installation",
-      "description": "Step-by-step installation instructions",
-      "page_range": [50, 52],
-      "confidence": 0.90
-    }
-  ]
-}
-```
+**Output**: A JSON structure with `certificates`, `logos`, and `specifications` arrays. Each certificate includes `name`, `certificate_type`, `issuer`, `issue_date`, `expiry_date`, `standards`, `page_range`, `factory_name`, `factory_group`, and `confidence`. Logos include `name`, `logo_type`, `description`, `page_range`, and `confidence`. Specifications include `name`, `spec_type`, `description`, `page_range`, and `confidence`.
 
 **Database Storage**:
 - Table: `document_entities`
@@ -479,21 +385,7 @@ product_layout_regions.product_id → products.id
 - `product_layout_regions` table - YOLO-detected regions
 - `product_tables` table - Extracted tables with metadata
 
-**Returns**:
-```python
-{
-    'product_pages': Set[int],           # Physical PDF page indices
-    'layout_regions': List[LayoutRegion], # YOLO regions
-    'layout_stats': {
-        'total_regions': 150,
-        'text_regions': 80,
-        'image_regions': 40,
-        'table_regions': 20,
-        'title_regions': 10
-    },
-    'tables_extracted': 15  # NEW!
-}
-```
+**Returns**: A dict with `product_pages` (set of physical PDF page indices), `layout_regions` (list of YOLO-detected LayoutRegion objects), `layout_stats` (total_regions, text_regions, image_regions, table_regions, title_regions counts), and `tables_extracted` (integer count).
 
 **Benefits**:
 - 40-60% reduction in processing time
@@ -544,32 +436,11 @@ product_layout_regions.product_id → products.id
 - `chunks` table - Text chunks with product_id foreign key
 - `chunk_metadata` - Additional metadata and quality scores
 
-**Returns**:
-```python
-{
-    'chunks_created': 45,
-    'total_characters': 12500,
-    'avg_chunk_size': 278,
-    'quality_scores': {
-        'avg': 0.87,
-        'min': 0.65,
-        'max': 0.98
-    }
-}
-```
+**Returns**: A dict with `chunks_created` (count), `total_characters`, `avg_chunk_size`, and `quality_scores` (avg, min, max).
 
 **Output**:
-```markdown
-# Product Name: NOVA
-
-## Specifications
-- Material: Porcelain Stoneware
-- Dimensions: 60x120 cm
-- Color: White, Grey, Beige
-
-## Description
-NOVA is a contemporary porcelain tile...
-```
+- Extracted text formatted as markdown with product name header, specification subsection, and description subsection
+- Chunks stored in database linked by product_id
 
 ---
 
@@ -611,20 +482,7 @@ NOVA is a contemporary porcelain tile...
 - `product_images` table - Images with product_id foreign key
 - `image_metadata` - Additional metadata and quality scores
 
-**Returns**:
-```python
-{
-    'images_extracted': 12,
-    'images_uploaded': 12,
-    'total_size_mb': 4.5,
-    'avg_confidence': 0.92,
-    'image_types': {
-        'product': 8,
-        'detail': 3,
-        'diagram': 1
-    }
-}
-```
+**Returns**: A dict with `images_extracted`, `images_uploaded`, `total_size_mb`, `avg_confidence`, and `image_types` (product, detail, diagram counts).
 
 **Output**:
 - Images stored in Supabase Storage
@@ -669,17 +527,7 @@ NOVA is a contemporary porcelain tile...
 - `product_images` table - Images with product_id
 - `product_tables` table - Tables with product_id (NEW!)
 
-**Returns**:
-```python
-{
-    'product_id': 'uuid-here',
-    'product_name': 'NOVA',
-    'chunks_linked': 45,
-    'images_linked': 12,
-    'tables_linked': 3,  # NEW!
-    'metadata_fields': 15
-}
-```
+**Returns**: A dict with `product_id`, `product_name`, `chunks_linked`, `images_linked`, `tables_linked`, and `metadata_fields` counts.
 
 **Output**:
 - Product record in database
@@ -719,15 +567,7 @@ NOVA is a contemporary porcelain tile...
 
 **Safety rule**: Only empty/null/empty-list/empty-dict fields are touched. Existing values are **never overwritten**.
 
-**Returns**:
-```python
-{
-    "products_updated": 6,
-    "total_products": 8,
-    "fields_propagated": ["factory_name", "available_sizes", "material_properties.thickness"],
-    "source": "stage_4_5_propagation"
-}
-```
+**Returns**: A dict with `products_updated`, `total_products`, `fields_propagated` (list of field names), and `source: "stage_4_5_propagation"`.
 
 ---
 
@@ -749,15 +589,7 @@ NOVA is a contemporary porcelain tile...
 
 **Coverage**: This stage acts as a safety net — even if Stage 0 AI extraction and Stage 4.5 sibling propagation both missed a dimension, the raw text almost always contains it somewhere.
 
-**Returns**:
-```python
-{
-    "products_updated": 2,
-    "sizes_found": ["30×60 cm", "60×120 cm"],
-    "thickness_found": "8.5mm",
-    "source": "document_text"
-}
-```
+**Returns**: A dict with `products_updated`, `sizes_found` (list), `thickness_found`, and `source: "document_text"`.
 
 ---
 
@@ -809,42 +641,17 @@ NOVA is a contemporary porcelain tile...
 
 **Data Validated**:
 
-1. **Chunks → Product**
-   - Query: `SELECT COUNT(*) FROM chunks WHERE product_id = ?`
-   - Validates: All chunks have product_id foreign key
-
-2. **Images → Product**
-   - Query: `SELECT COUNT(*) FROM product_images WHERE product_id = ?`
-   - Validates: All images have product_id foreign key
-
-3. **Tables → Product** (NEW!)
-   - Query: `SELECT COUNT(*) FROM product_tables WHERE product_id = ?`
-   - Validates: All tables have product_id foreign key
+1. **Chunks → Product**: Query counts chunks by product_id, validates foreign key linkage.
+2. **Images → Product**: Query counts product_images by product_id, validates foreign key linkage.
+3. **Tables → Product** (NEW!): Query counts product_tables by product_id, validates foreign key linkage.
 
 **Database Storage**:
 - No new tables created
 - Updates product metadata with entity counts
 
-**Returns**:
-```python
-{
-    'product_id': 'uuid-here',
-    'chunks_linked': 45,
-    'images_linked': 12,
-    'tables_linked': 3,  # NEW!
-    'total_entities': 60,
-    'validation_passed': True
-}
-```
+**Returns**: A dict with `product_id`, `chunks_linked`, `images_linked`, `tables_linked`, `total_entities`, and `validation_passed`.
 
-**Logging Output**:
-```
-✅ Product 'NOVA' entities linked:
-   - Chunks: 45
-   - Images: 12
-   - Tables: 3
-   - Total: 60 entities
-```
+**Logging Output**: Produces a structured log entry like "Product 'NOVA' entities linked: Chunks: 45, Images: 12, Tables: 3, Total: 60 entities".
 
 **Output**:
 - Entity counts validated
@@ -872,18 +679,7 @@ NOVA is a contemporary porcelain tile...
 - **Supabase as Source of Truth**: Single storage location
 - **Automatic Cleanup**: Non-material images deleted from cloud
 
-**Output**:
-```json
-{
-  "total_images_classified": 249,
-  "material_images": 150,
-  "non_material_images": 99,
-  "classification_errors": 0,
-  "non_material_deleted_from_supabase": 99,
-  "memory_usage": "~1-2MB per image",
-  "processing_time": "8-12 minutes"
-}
-```
+**Output**: A JSON result with `total_images_classified`, `material_images`, `non_material_images`, `classification_errors`, `non_material_deleted_from_supabase`, `memory_usage`, and `processing_time`.
 
 **Performance Metrics**:
 - Time per image: 2-3 seconds
@@ -914,48 +710,13 @@ NOVA is a contemporary porcelain tile...
 
 **5 CLIP Embedding Types Generated Per Image**:
 
-1. **Visual Embeddings** (512D)
-   - Overall visual appearance
-   - Enables visual similarity search
-   - Collection: `image_clip_embeddings`
+1. **Visual Embeddings** (512D) — Overall visual appearance, enables visual similarity search. Collection: `image_clip_embeddings`.
+2. **Color Embeddings** (512D) — Color palette analysis, color-based search. Collection: `image_color_embeddings`.
+3. **Texture Embeddings** (512D) — Surface texture analysis, texture-based search. Collection: `image_texture_embeddings`.
+4. **Application Embeddings** (512D) — Use case classification, application-based search. Collection: `image_application_embeddings`.
+5. **Material Embeddings** (512D) — Material type classification, material-based search. Collection: `image_material_embeddings`.
 
-2. **Color Embeddings** (512D)
-   - Color palette analysis
-   - Color-based search
-   - Collection: `image_color_embeddings`
-
-3. **Texture Embeddings** (512D)
-   - Surface texture analysis
-   - Texture-based search
-   - Collection: `image_texture_embeddings`
-
-4. **Application Embeddings** (512D)
-   - Use case classification
-   - Application-based search
-   - Collection: `image_application_embeddings`
-
-5. **Material Embeddings** (512D)
-   - Material type classification
-   - Material-based search
-   - Collection: `image_material_embeddings`
-
-**Output**:
-```json
-{
-  "material_images_processed": 150,
-  "clip_embeddings_generated": 150,
-  "total_embeddings": 750,
-  "memory_usage": "~100MB per batch",
-  "processing_time": "5-8 minutes",
-  "embeddings_by_type": {
-    "visual": 150,
-    "color": 150,
-    "texture": 150,
-    "application": 150,
-    "material": 150
-  }
-}
-```
+**Output**: A JSON result with `material_images_processed`, `clip_embeddings_generated`, `total_embeddings`, `memory_usage`, `processing_time`, and `embeddings_by_type` (visual, color, texture, application, material counts).
 
 **Performance Metrics**:
 - Time per image: 2-3 seconds
@@ -984,16 +745,7 @@ NOVA is a contemporary porcelain tile...
 - **Batch Cleanup**: Aggressive memory management
 - **Zero Disk Usage**: Everything in RAM
 
-**Output**:
-```json
-{
-  "images_analyzed": 150,
-  "quality_scores_generated": 150,
-  "material_properties_extracted": 150,
-  "memory_usage": "~1-2MB per image",
-  "processing_time": "8-12 minutes"
-}
-```
+**Output**: A JSON result with `images_analyzed`, `quality_scores_generated`, `material_properties_extracted`, `memory_usage`, and `processing_time`.
 
 **Performance Metrics**:
 - Time per image: 3-5 seconds
@@ -1004,7 +756,7 @@ NOVA is a contemporary porcelain tile...
 
 ---
 
-### Stage 6: Image Analysis (80-85%) - ASYNC JOB
+### Stage 6 (alternate): Image Analysis (80-85%) - ASYNC JOB
 
 **Model**: Qwen3-VL 17B Vision
 
@@ -1014,19 +766,7 @@ NOVA is a contemporary porcelain tile...
 3. Extract material properties
 4. Calculate quality scores
 
-**Output**:
-```json
-{
-  "image_id": "image_1",
-  "ocr_text": "Material: Wool, 100%",
-  "materials": ["Wool"],
-  "properties": {
-    "weight": "400 gsm",
-    "weave": "Plain"
-  },
-  "quality_score": 0.87
-}
-```
+**Output**: A JSON structure per image with `image_id`, `ocr_text`, `materials` (list), `properties` (dict with fields like weight and weave), and `quality_score`.
 
 **Quality Scoring**:
 - Text clarity (0-1)
@@ -1038,7 +778,7 @@ NOVA is a contemporary porcelain tile...
 
 ---
 
-### Stage 7: Product Creation (85-92%)
+### Stage 7 (alternate): Product Creation (85-92%)
 
 **Models**: Claude Haiku 4.5 → Claude Sonnet 4.5
 
@@ -1056,26 +796,11 @@ NOVA is a contemporary porcelain tile...
 - Extract detailed metadata
 - Create product records
 
-**Output**:
-```json
-{
-  "product_id": "prod_1",
-  "name": "Product Name",
-  "description": "...",
-  "metadata": {
-    "factory": "Castellón Factory",
-    "dimensions": ["15×38", "20×40"],
-    "material": "ceramic"
-  },
-  "chunks": ["chunk_1", "chunk_2"],
-  "images": ["image_1", "image_2"],
-  "confidence_score": 0.95
-}
-```
+**Output**: A JSON structure per product with `product_id`, `name`, `description`, `metadata` (factory, dimensions, material), `chunks` (list of IDs), `images` (list of IDs), and `confidence_score`.
 
 ---
 
-### Stage 8: Entity Linking (92-97%)
+### Stage 8 (alternate): Entity Linking (92-97%)
 
 **Process**:
 1. Link products to images (relevance scores)
@@ -1088,15 +813,7 @@ NOVA is a contemporary porcelain tile...
 - Visual similarity (40%): From AI detection
 - Detection score (20%): Confidence from discovery
 
-**Output**:
-```json
-{
-  "product_image_relationships": 1000,
-  "chunk_image_relationships": 2500,
-  "chunk_product_relationships": 1500,
-  "total_relationships": 5000
-}
-```
+**Output**: A JSON result with `product_image_relationships`, `chunk_image_relationships`, `chunk_product_relationships`, and `total_relationships` counts.
 
 **Database Tables**:
 - `product_image_relationships`
@@ -1131,13 +848,7 @@ NOVA is a contemporary porcelain tile...
 8. **PRODUCTS_CREATED** - Product creation complete
 9. **COMPLETED** - All processing complete
 
-**Recovery Process**:
-```python
-if job.checkpoint_stage:
-    resume_from_checkpoint(job.checkpoint_stage)
-else:
-    start_from_beginning()
-```
+**Recovery Process**: On startup, if a job has a saved `checkpoint_stage`, the pipeline resumes from that checkpoint rather than starting from the beginning.
 
 **Note**:
 - Stage 5 (IMAGES_EXTRACTED): All images uploaded to Supabase Storage, 0 local files
@@ -1200,37 +911,16 @@ The pipeline has been refactored from a monolithic 2900+ line function into modu
 
 ### Internal API Endpoints
 
-Each pipeline stage has a dedicated endpoint for independent testing and retry:
-
-```http
-POST /api/internal/classify-images/{job_id}
-POST /api/internal/upload-images/{job_id}
-POST /api/internal/save-images-db/{job_id}
-POST /api/internal/create-chunks/{job_id}
-POST /api/internal/create-relationships/{job_id}
-```
+Each pipeline stage has a dedicated endpoint for independent testing and retry. The available internal endpoints are:
+- `POST /api/internal/classify-images/{job_id}`
+- `POST /api/internal/upload-images/{job_id}`
+- `POST /api/internal/save-images-db/{job_id}`
+- `POST /api/internal/create-chunks/{job_id}`
+- `POST /api/internal/create-relationships/{job_id}`
 
 ### Main Orchestrator Endpoint
 
-```http
-POST /api/rag/documents/upload
-Content-Type: multipart/form-data
-
-Parameters:
-- file: PDF file
-- workspace_id: Workspace UUID
-- category: Extraction category (default: "products")
-- focused_extraction: true (default)
-
-Response:
-{
-  "job_id": "uuid",
-  "document_id": "uuid",
-  "status": "processing",
-  "progress": 0,
-  "current_stage": "INITIALIZED"
-}
-```
+The main orchestrator is `POST /api/rag/documents/upload` accepting multipart/form-data with parameters: `file` (PDF), `workspace_id` (UUID), `category` (default: `"products"`), and `focused_extraction` (default: `true`). It returns a JSON response with `job_id`, `document_id`, `status: "processing"`, `progress: 0`, and `current_stage: "INITIALIZED"`.
 
 **Orchestrator Flow**:
 1. Upload PDF and create job
@@ -1256,41 +946,7 @@ PDF processing implements **complete production hardening** for reliability and 
 
 ### Source Tracking ✅
 
-Every product, chunk, image, and embedding is tagged with source information:
-
-```python
-# Products
-await supabase.table('products').insert({
-    'name': product_name,
-    'source_type': 'pdf_processing',  # ✅ NEW
-    'source_job_id': job_id,          # ✅ NEW
-    # ... other fields
-})
-
-# Chunks
-await supabase.table('document_chunks').insert({
-    'content': chunk_text,
-    'source_type': 'pdf_processing',  # ✅ NEW
-    'source_job_id': job_id,          # ✅ NEW
-    # ... other fields
-})
-
-# Images
-await supabase.table('document_images').insert({
-    'url': image_url,
-    'source_type': 'pdf_processing',  # ✅ NEW
-    'source_job_id': job_id,          # ✅ NEW
-    # ... other fields
-})
-
-# Embeddings
-await supabase.table('embeddings').insert({
-    'embedding': vector,
-    'source_type': 'pdf_processing',  # ✅ NEW
-    'source_job_id': job_id,          # ✅ NEW
-    # ... other fields
-})
-```
+Every product, chunk, image, and embedding is tagged with `source_type: 'pdf_processing'` and `source_job_id: job_id` at insert time. This applies to the `products`, `document_chunks`, `document_images`, and `embeddings` tables.
 
 **Benefits:**
 - Filter Materials Data page by specific PDF job
@@ -1302,16 +958,7 @@ await supabase.table('embeddings').insert({
 
 ### Heartbeat Monitoring ✅
 
-Updates `last_heartbeat` field every stage to detect stuck jobs:
-
-```python
-# Update heartbeat during processing
-await supabase.table('background_jobs').update({
-    'last_heartbeat': datetime.utcnow().isoformat(),
-    'current_stage': stage_name,
-    'progress_percent': progress
-}).eq('id', job_id).execute()
-```
+Updates `last_heartbeat` field every stage to detect stuck jobs. The heartbeat update sets `last_heartbeat`, `current_stage`, and `progress_percent` on the `background_jobs` record for the active job.
 
 **Stuck Job Detection:**
 - Threshold: >10 minutes without heartbeat
@@ -1322,31 +969,7 @@ await supabase.table('background_jobs').update({
 
 ### Sentry Error Tracking ✅
 
-Comprehensive error tracking and performance monitoring:
-
-```python
-# Transaction tracking
-with sentry_sdk.start_transaction(op="pdf_processing", name="process_stage") as transaction:
-    transaction.set_tag("job_id", job_id)
-    transaction.set_tag("stage", stage_name)
-    transaction.set_data("total_pages", total_pages)
-
-    # Breadcrumbs for debugging
-    sentry_sdk.add_breadcrumb(
-        category="pdf_processing",
-        message=f"Processing stage {stage_name}",
-        level="info",
-        data={"progress": progress}
-    )
-
-    try:
-        # ... processing logic ...
-        transaction.set_status("ok")
-    except Exception as e:
-        sentry_sdk.capture_exception(e)
-        transaction.set_status("internal_error")
-        raise
-```
+Comprehensive error tracking and performance monitoring using `sentry_sdk.start_transaction` with `op="pdf_processing"` and `name="process_stage"`. Tags include `job_id` and `stage`, and data includes `total_pages`. Breadcrumbs are added at each processing step. On success, the transaction status is set to `"ok"`. On exception, `sentry_sdk.capture_exception()` is called and status set to `"internal_error"` before re-raising.
 
 **Features:**
 - Transaction tracking for performance monitoring
@@ -1383,53 +1006,7 @@ with sentry_sdk.start_transaction(op="pdf_processing", name="process_stage") as 
 - `document_id` (required): Document ID to filter products
 - `include_tables` (optional, default: `true`): Include tables in response
 
-**Response Format**:
-```json
-{
-  "products": [
-    {
-      "id": "uuid-here",
-      "name": "NOVA",
-      "description": "Modern ceramic tile collection",
-      "page_range": [12, 13, 14],
-      "metadata": {
-        "factory": "Castellón Factory",
-        "dimensions": ["15×38", "20×40"],
-        "material": "ceramic"
-      },
-      "chunks": [
-        {
-          "id": "chunk-uuid",
-          "content": "NOVA is a contemporary...",
-          "page_number": 12
-        }
-      ],
-      "images": [
-        {
-          "id": "image-uuid",
-          "url": "https://supabase.co/storage/...",
-          "page_number": 12
-        }
-      ],
-      "tables": [
-        {
-          "id": "table-uuid",
-          "page_number": 13,
-          "table_type": "specifications",
-          "headers": ["Property", "Value"],
-          "table_data": {
-            "rows": [
-              ["Material", "Porcelain Stoneware"],
-              ["Dimensions", "60x120 cm"]
-            ]
-          }
-        }
-      ]
-    }
-  ],
-  "total": 1
-}
-```
+**Response Format**: A JSON object with a `products` array and a `total` count. Each product entry contains `id`, `name`, `description`, `page_range`, `metadata` (with factory, dimensions, material), a `chunks` array (each with `id`, `content`, `page_number`), an `images` array (each with `id`, `url`, `page_number`), and a `tables` array (each with `id`, `page_number`, `table_type`, `headers`, and `table_data` containing a `rows` array).
 
 **Implementation Details**:
 
@@ -1438,14 +1015,7 @@ with sentry_sdk.start_transaction(op="pdf_processing", name="process_stage") as 
 3. **Backward Compatible**: Can disable tables with `include_tables=false`
 4. **Consistent Pattern**: Follows same pattern as chunks and images
 
-**Example Usage**:
-```bash
-# With tables (default)
-curl "http://localhost:8000/api/rag/products?document_id=YOUR_DOC_ID"
-
-# Without tables
-curl "http://localhost:8000/api/rag/products?document_id=YOUR_DOC_ID&include_tables=false"
-```
+Usage: `GET /api/rag/products?document_id=YOUR_DOC_ID` (with tables, default) or append `&include_tables=false` to exclude tables.
 
 **Benefits**:
 - ✅ Single API call for complete product data
@@ -1481,69 +1051,32 @@ The YOLO Layout-Aware Chunking system uses detected layout regions to create int
 - **Rationale**: Tables are atomic units of information
 - **Metadata**: Includes bbox, confidence, region_type='TABLE'
 
-```python
-# Example: Specifications table
-{
-  "content": "Material | Dimensions | Finish\nCeramic | 60x120cm | Matte",
-  "region_type": "TABLE",
-  "reading_order": 5
-}
-```
+A TABLE region chunk contains the full table text (headers and rows), a `region_type` of `"TABLE"`, and a `reading_order` value.
 
 #### 2. **TITLE + TEXT Regions** 📝
 - **Strategy**: Combine title with following text
 - **Rationale**: Titles provide context for content
 - **Metadata**: Includes both title and text bbox
 
-```python
-# Example: Section with title
-{
-  "content": "Product Specifications\n\nOur ceramic tiles feature...",
-  "region_type": "TITLE+TEXT",
-  "reading_order": 3
-}
-```
+A TITLE+TEXT chunk combines the section heading with its body paragraph, with `region_type: "TITLE+TEXT"` and a `reading_order` value.
 
 #### 3. **TEXT Regions** 📄
 - **Strategy**: Respect region boundaries, split if too large
 - **Rationale**: Preserve semantic paragraphs
 - **Fallback**: Use semantic chunking if text > max_chunk_size
 
-```python
-# Example: Body text
-{
-  "content": "The NOVA collection represents...",
-  "region_type": "TEXT",
-  "reading_order": 4
-}
-```
+A TEXT region chunk contains body text, with `region_type: "TEXT"` and a `reading_order` value.
 
 #### 4. **IMAGE + CAPTION Regions** 🖼️
 - **Strategy**: Link captions to images
 - **Rationale**: Captions describe images
 - **Metadata**: Includes image bbox for reference
 
-```python
-# Example: Image with caption
-{
-  "content": "Figure 1: Installation detail showing...",
-  "region_type": "CAPTION",
-  "reading_order": 6,
-  "linked_image_bbox": {...}
-}
-```
+A CAPTION region chunk contains the caption text, `region_type: "CAPTION"`, a `reading_order` value, and a `linked_image_bbox` reference.
 
 ### Configuration
 
-**Enable Layout-Aware Chunking:**
-```python
-# In UnifiedChunkingService
-config = ChunkingConfig(
-    strategy=ChunkingStrategy.LAYOUT_AWARE,  # Use YOLO regions
-    max_chunk_size=1000,
-    min_chunk_size=100
-)
-```
+Layout-aware chunking is enabled by setting `strategy=ChunkingStrategy.LAYOUT_AWARE` in the `ChunkingConfig` passed to `UnifiedChunkingService`, with `max_chunk_size=1000` and `min_chunk_size=100`.
 
 **Fallback Behavior:**
 - If no `product_id` in metadata → Falls back to semantic chunking
@@ -1586,32 +1119,14 @@ config = ChunkingConfig(
 **Planned Enhancements:**
 
 #### Multi-Level Title Hierarchy
-```python
-# Detect H1, H2, H3 levels
-{
-  "h1": "Outdoor Furniture",
-  "h2": "Chairs",
-  "h3": "Ergonomic Series",
-  "content": "Our ergonomic chairs feature..."
-}
-```
+The system would detect H1, H2, and H3 heading levels and associate body content with its full parent hierarchy (e.g., "Outdoor Furniture → Chairs → Ergonomic Series").
 
 #### Title Propagation
 - Include parent titles in child chunks
 - Enables hierarchical search
 - Better context for embeddings
 
-```python
-# Example: Nested context
-{
-  "content": "Our ergonomic chairs feature...",
-  "hierarchy": {
-    "h1": "Outdoor Furniture",
-    "h2": "Chairs",
-    "h3": "Ergonomic Series"
-  }
-}
-```
+A chunk would include a `hierarchy` object with `h1`, `h2`, and `h3` keys alongside its `content`.
 
 #### Smart Boundary Detection
 - Don't combine if TEXT is too large
@@ -1630,29 +1145,10 @@ config = ChunkingConfig(
 **Planned Metrics:**
 
 #### Processing Metrics
-```python
-{
-  "yolo_processing_time_per_page": 8.5,  # seconds
-  "regions_detected_per_page": 12,
-  "confidence_score_avg": 0.87,
-  "confidence_score_min": 0.52,
-  "table_extraction_success_rate": 0.95
-}
-```
+Metrics to track per-page: `yolo_processing_time_per_page`, `regions_detected_per_page`, `confidence_score_avg`, `confidence_score_min`, and `table_extraction_success_rate`.
 
 #### Region Distribution
-```python
-{
-  "region_counts": {
-    "TEXT": 45,
-    "TITLE": 12,
-    "TABLE": 8,
-    "IMAGE": 15,
-    "CAPTION": 10,
-    "FORMULA": 2
-  }
-}
-```
+Region counts by type: TEXT, TITLE, TABLE, IMAGE, CAPTION, FORMULA counts per document.
 
 #### Performance Tracking
 - **Processing time** per page (identify slow pages)
@@ -1666,23 +1162,7 @@ config = ChunkingConfig(
 - 💰 Track processing costs
 - 🐛 Detect when YOLO is struggling
 
-**Implementation:**
-```python
-# Add to product_processor.py
-yolo_metrics = {
-    "start_time": time.time(),
-    "regions_detected": len(all_regions),
-    "tables_extracted": len(table_regions),
-    "avg_confidence": np.mean([r.confidence for r in all_regions])
-}
-
-# Store in job_progress table
-await supabase.table('job_progress').insert({
-    'job_id': job_id,
-    'stage': 'yolo_detection',
-    'metrics': yolo_metrics
-}).execute()
-```
+Metrics would be stored in the `job_progress` table with a `stage: 'yolo_detection'` key.
 
 ---
 
@@ -1699,42 +1179,7 @@ await supabase.table('job_progress').insert({
 
 **Implementation Plan:**
 
-#### Auto-Detection
-```python
-# Detect GPU availability
-import torch
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-logger.info(f"Using device: {device}")
-```
-
-#### Batch Processing
-```python
-# Process multiple pages in parallel
-batch_size = 4 if device == 'cuda' else 1
-
-for i in range(0, len(pages), batch_size):
-    batch_pages = pages[i:i+batch_size]
-    results = await detector.detect_batch(
-        pdf_path=pdf_path,
-        page_numbers=batch_pages,
-        device=device
-    )
-```
-
-#### Memory Management
-```python
-# Clear GPU cache between batches
-if device == 'cuda':
-    torch.cuda.empty_cache()
-```
-
-**Configuration:**
-```bash
-# .env
-YOLO_DEVICE=cuda  # or 'cpu'
-YOLO_BATCH_SIZE=4  # GPU batch size
-```
+The system would auto-detect GPU availability using `torch.cuda.is_available()`. With GPU, it would process multiple pages in parallel batches (batch_size=4 for CUDA vs 1 for CPU), clearing GPU cache between batches with `torch.cuda.empty_cache()`. The device and batch size would be configurable via `YOLO_DEVICE` and `YOLO_BATCH_SIZE` environment variables.
 
 **Benefits:**
 - ⚡ 3-5× faster processing
@@ -1749,63 +1194,22 @@ YOLO_BATCH_SIZE=4  # GPU batch size
 **Beyond Title-Content Relationships:**
 
 #### List Detection
-```python
-# Keep bullet/numbered lists together
-{
-  "content": "Features:\n• Waterproof\n• UV resistant\n• Easy to clean",
-  "region_type": "LIST",
-  "list_type": "bullet"
-}
-```
+Keep bullet and numbered lists together as atomic units with `region_type: "LIST"` and `list_type: "bullet"`.
 
 #### Table Context
-```python
-# Include surrounding text with tables
-{
-  "content": "Technical specifications:\n\n[TABLE DATA]\n\nNote: All measurements in cm",
-  "region_type": "TABLE_WITH_CONTEXT"
-}
-```
+Include surrounding prose context (introductory text before a table and notes after) in the same chunk as the table data, with `region_type: "TABLE_WITH_CONTEXT"`.
 
 #### Image-Caption Linking
-```python
-# Link captions to specific images
-{
-  "content": "Figure 3: Installation detail",
-  "region_type": "CAPTION",
-  "linked_image_id": "image-uuid-here"
-}
-```
+Link captions to their specific images by including a `linked_image_id` field in CAPTION chunks.
 
 #### Cross-Reference Detection
-```python
-# Detect "see Figure 3" and link chunks
-{
-  "content": "For installation details, see Figure 3",
-  "cross_references": ["figure-3"],
-  "linked_chunks": ["chunk-uuid-with-figure-3"]
-}
-```
+Detect phrases like "see Figure 3" and record `cross_references` and `linked_chunks` in the chunk metadata.
 
 #### Section Boundaries
-```python
-# Never split across major sections
-{
-  "content": "...",
-  "section": "Installation Guide",
-  "subsection": "Step 1: Preparation"
-}
-```
+Never split across major sections. Track `section` and `subsection` fields in chunk metadata.
 
 #### Formula Preservation
-```python
-# Keep mathematical formulas intact
-{
-  "content": "Coverage area = length × width × 1.1",
-  "region_type": "FORMULA",
-  "formula_type": "calculation"
-}
-```
+Keep mathematical formulas intact with `region_type: "FORMULA"` and a `formula_type` descriptor.
 
 **Benefits:**
 - 🎯 More precise chunking
@@ -1867,4 +1271,3 @@ YOLO_BATCH_SIZE=4  # GPU batch size
 - 🔮 YOLO performance monitoring & metrics
 - 🔮 GPU acceleration (3-5× faster)
 - 🔮 Advanced chunking rules (lists, cross-references, formulas)
-

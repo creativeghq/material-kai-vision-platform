@@ -11,7 +11,6 @@ The Product Discovery system is designed with two distinct but complementary com
 
 ## 📊 Architecture Diagram
 
-```
 PDF Upload
     ↓
 ┌─────────────────────────────────────────────────────────┐
@@ -35,7 +34,6 @@ PDF Upload
 │ - Extract images and generate embeddings                │
 │ - Link entities (chunks, images, products, documents)   │
 └─────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -43,147 +41,15 @@ PDF Upload
 
 ### **1. Products Table (Core)**
 
-```sql
-CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    source_document_id UUID REFERENCES processed_documents(id),
-    workspace_id UUID NOT NULL,
-    
-    -- ALL product metadata stored here (inseparable from product)
-    metadata JSONB DEFAULT '{}'::jsonb,
-    /*
-    metadata structure:
-    {
-        "designer": "SG NY",
-        "studio": "SG NY",
-        "dimensions": ["15×38", "20×40"],
-        "variants": [{"type": "color", "value": "beige"}],
-        "category": "tiles",
-        "page_range": [12, 13, 14],
-        "confidence": 0.95,
-        
-        // Factory/Group identification
-        "factory": "Castellón Factory",
-        "factory_group": "Harmony Group",
-        "manufacturer": "Harmony Materials",
-        "country_of_origin": "Spain",
-        
-        // Technical specifications
-        "slip_resistance": "R11",
-        "fire_rating": "A1",
-        "thickness": "8mm",
-        "water_absorption": "Class 3",
-        "finish": "matte",
-        "material": "ceramic"
-    }
-    */
-    
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
+The `products` table stores core product information including name, description, source_document_id, workspace_id, and a `metadata` JSONB field that holds all product metadata as an inseparable unit. The metadata structure includes designer, studio, dimensions, variants, category, page_range, confidence, factory, factory_group, manufacturer, country_of_origin, and technical specifications such as slip_resistance, fire_rating, thickness, water_absorption, finish, and material. Indexes are created on workspace_id, source_document_id, and GIN indexes on the factory and factory_group metadata fields.
 
-CREATE INDEX idx_products_workspace ON products(workspace_id);
-CREATE INDEX idx_products_source_doc ON products(source_document_id);
-CREATE INDEX idx_products_metadata_factory ON products USING gin((metadata->'factory'));
-CREATE INDEX idx_products_metadata_group ON products USING gin((metadata->'factory_group'));
-```
+### **2. Document Entities Table (for Docs Admin Page)**
 
-### **2. Document Entities Table (NEW - for Docs Admin Page)**
-
-```sql
-CREATE TABLE document_entities (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- Entity classification
-    entity_type VARCHAR(50) NOT NULL,  -- 'certificate', 'logo', 'specification', 'marketing', 'bank_statement'
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    
-    -- Source tracking
-    source_document_id UUID REFERENCES processed_documents(id),
-    workspace_id UUID NOT NULL,
-    page_range INT[],
-    
-    -- Content
-    content TEXT,  -- Full extracted content
-    metadata JSONB DEFAULT '{}'::jsonb,
-    /*
-    metadata structure (entity-specific):
-    
-    For certificates:
-    {
-        "certification_type": "ISO 9001",
-        "issue_date": "2024-01-15",
-        "expiry_date": "2027-01-15",
-        "certifying_body": "TÜV SÜD",
-        "certificate_number": "12345678",
-        "scope": "Quality Management System"
-    }
-    
-    For logos:
-    {
-        "logo_type": "company",
-        "brand_name": "Harmony",
-        "color_scheme": ["blue", "white"],
-        "usage_context": "header"
-    }
-    
-    For specifications:
-    {
-        "spec_type": "installation",
-        "language": "en",
-        "page_count": 3,
-        "topics": ["preparation", "installation", "maintenance"]
-    }
-    */
-    
-    -- Factory/Group identification (for filtering)
-    factory_name VARCHAR(255),
-    factory_group VARCHAR(255),
-    manufacturer VARCHAR(255),
-    
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_doc_entities_type ON document_entities(entity_type);
-CREATE INDEX idx_doc_entities_workspace ON document_entities(workspace_id);
-CREATE INDEX idx_doc_entities_source_doc ON document_entities(source_document_id);
-CREATE INDEX idx_doc_entities_factory ON document_entities(factory_name);
-CREATE INDEX idx_doc_entities_group ON document_entities(factory_group);
-```
+The `document_entities` table stores extracted document entities with the following key fields: entity_type (e.g., 'certificate', 'logo', 'specification', 'marketing', 'bank_statement'), name, description, source_document_id, workspace_id, page_range, content (full extracted content), and a metadata JSONB field with entity-specific data. For certificates, the metadata includes certification_type, issue_date, expiry_date, certifying_body, certificate_number, and scope. For logos, it includes logo_type, brand_name, color_scheme, and usage_context. For specifications, it includes spec_type, language, page_count, and topics. The table also has factory_name, factory_group, and manufacturer fields for filtering. Indexes are created on entity_type, workspace_id, source_document_id, factory_name, and factory_group.
 
 ### **3. Product-Document Relationships Table**
 
-```sql
-CREATE TABLE product_document_relationships (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    document_entity_id UUID NOT NULL REFERENCES document_entities(id) ON DELETE CASCADE,
-    
-    -- Relationship classification
-    relationship_type VARCHAR(50) NOT NULL,  -- 'certification', 'specification', 'logo', 'marketing'
-    relevance_score FLOAT DEFAULT 1.0,  -- 0.0-1.0 (how relevant is this document to this product)
-    
-    -- Relationship metadata
-    metadata JSONB DEFAULT '{}'::jsonb,
-    /*
-    {
-        "extraction_method": "ai_linking",
-        "confidence": 0.95,
-        "linking_reason": "Certificate mentions product name on page 45"
-    }
-    */
-    
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_prod_doc_rel_product ON product_document_relationships(product_id);
-CREATE INDEX idx_prod_doc_rel_document ON product_document_relationships(document_entity_id);
-CREATE INDEX idx_prod_doc_rel_type ON product_document_relationships(relationship_type);
-```
+The `product_document_relationships` table links products to document entities. It stores the product_id and document_entity_id as foreign keys, a relationship_type (e.g., 'certification', 'specification', 'logo', 'marketing'), a relevance_score from 0.0 to 1.0, and a metadata JSONB field containing extraction_method, confidence, and linking_reason. Indexes are created on product_id, document_entity_id, and relationship_type.
 
 ---
 
@@ -191,68 +57,11 @@ CREATE INDEX idx_prod_doc_rel_type ON product_document_relationships(relationshi
 
 ### **ProductDiscoveryService (Updated)**
 
-```python
-@dataclass
-class ProductInfo:
-    """
-    Product with ALL metadata (inseparable).
-    Metadata is stored in product.metadata JSONB, not separate tables.
-    """
-    name: str
-    page_range: List[int]
-    description: Optional[str] = None
-    
-    # ALL metadata stored here
-    metadata: Dict[str, Any] = None  # Contains designer, dimensions, factory, specs, etc.
-    
-    image_indices: List[int] = None
-    confidence: float = 0.0
-
-@dataclass
-class ProductCatalog:
-    """Product catalog with discovered products."""
-    products: List[ProductInfo]
-    total_pages: int = 0
-    total_images: int = 0
-    content_classification: Dict[int, str] = None
-    processing_time_ms: float = 0.0
-    model_used: str = ""
-    confidence_score: float = 0.0
-```
+The `ProductInfo` dataclass represents a product with all its metadata as an inseparable unit. It includes name, page_range, optional description, and a metadata dictionary containing designer, dimensions, factory information, and technical specifications. The `ProductCatalog` dataclass groups discovered products along with processing statistics such as total_pages, total_images, content_classification, processing_time_ms, model_used, and confidence_score.
 
 ### **DocumentEntityDiscoveryService (NEW)**
 
-```python
-@dataclass
-class DocumentEntity:
-    """
-    Document entity (certificate, logo, specification, etc.)
-    Stored separately from products in document_entities table.
-    """
-    entity_type: str  # 'certificate', 'logo', 'specification'
-    name: str
-    page_range: List[int]
-    description: Optional[str] = None
-    content: Optional[str] = None
-    
-    # Factory/Group identification
-    factory_name: Optional[str] = None
-    factory_group: Optional[str] = None
-    manufacturer: Optional[str] = None
-    
-    # Entity-specific metadata
-    metadata: Dict[str, Any] = None
-    confidence: float = 0.0
-
-@dataclass
-class DocumentEntityCatalog:
-    """Catalog of discovered document entities."""
-    entities: List[DocumentEntity]
-    total_entities: int = 0
-    by_type: Dict[str, int] = None  # Count by entity_type
-    processing_time_ms: float = 0.0
-    model_used: str = ""
-```
+The `DocumentEntity` dataclass represents a document entity (certificate, logo, specification, etc.) stored separately from products. It includes entity_type, name, page_range, optional description, optional content, factory identification fields (factory_name, factory_group, manufacturer), entity-specific metadata, and a confidence score. The `DocumentEntityCatalog` dataclass groups discovered entities with counts by type and processing statistics.
 
 ---
 
@@ -260,50 +69,11 @@ class DocumentEntityCatalog:
 
 ### **Use Case 1: Get Certifications for Product from Specific Factory**
 
-```python
-# Query: "Get certifications for material NOVA from Castellón Factory"
-
-# Step 1: Find product
-product = supabase.table('products')\
-    .select('*')\
-    .eq('name', 'NOVA')\
-    .contains('metadata', {'factory': 'Castellón Factory'})\
-    .single()
-
-# Step 2: Get related certifications
-certifications = supabase.table('product_document_relationships')\
-    .select('document_entities(*)')\
-    .eq('product_id', product.id)\
-    .eq('relationship_type', 'certification')\
-    .execute()
-
-# Returns all certifications linked to NOVA from Castellón Factory
-```
+To find certifications for a product from a specific factory, first query the products table filtering by product name and factory metadata, then query product_document_relationships filtered by product_id and relationship_type 'certification' to retrieve the linked document entities.
 
 ### **Use Case 2: Extract Documents After Product Processing**
 
-```python
-# User uploads PDF → Products extracted immediately
-# Later, user requests: "Extract certificates from this PDF"
-
-async def extract_documents_async(document_id: str, categories: List[str]):
-    # Get PDF content
-    pdf_content = get_pdf_content(document_id)
-    
-    # Run document entity discovery
-    entity_service = DocumentEntityDiscoveryService()
-    catalog = await entity_service.discover_entities(
-        pdf_content=pdf_content,
-        categories=categories  # ['certificates', 'logos']
-    )
-    
-    # Save entities to database
-    for entity in catalog.entities:
-        save_document_entity(entity)
-    
-    # Link to products (AI-based)
-    await link_entities_to_products(document_id, catalog.entities)
-```
+After a user uploads a PDF and products are extracted immediately, document entity discovery can be triggered separately at any time. The async function retrieves the PDF content, runs the DocumentEntityDiscoveryService to discover entities for the requested categories (e.g., certificates, logos), saves the entities to the database, and then runs AI-based linking to connect entities to products.
 
 ---
 
@@ -311,29 +81,7 @@ async def extract_documents_async(document_id: str, categories: List[str]):
 
 ### **Adding New Document Types**
 
-```python
-# Example: Marketing Content Extraction
-class MarketingExtractionService:
-    async def extract_marketing(self, pdf_content):
-        # Extract marketing content
-        marketing_entities = await self._extract_marketing_content(pdf_content)
-        
-        # Save as document_entities with entity_type='marketing'
-        for entity in marketing_entities:
-            entity.entity_type = 'marketing'
-            save_document_entity(entity)
-
-# Example: Bank Statement Extraction
-class BankStatementExtractionService:
-    async def extract_statements(self, pdf_content):
-        # Extract bank statements
-        statement_entities = await self._extract_statements(pdf_content)
-        
-        # Save as document_entities with entity_type='bank_statement'
-        for entity in statement_entities:
-            entity.entity_type = 'bank_statement'
-            save_document_entity(entity)
-```
+New document types such as marketing content or bank statements can be added by creating new service classes that extract their respective content and save the results as document_entities with the appropriate entity_type value.
 
 ---
 
@@ -386,4 +134,3 @@ The product discovery architecture requires the following database components:
 - Supports manual override and validation
 
 ---
-

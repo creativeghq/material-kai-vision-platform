@@ -163,40 +163,7 @@ Stage 0: Product Discovery
     └── Store enriched products in database
 ```
 
-### Metadata Extraction Process
-
-```python
-# 1. Product Discovery discovers products
-catalog = await discovery_service.discover_products(
-    pdf_content=pdf_bytes,
-    pdf_text=pdf_text,
-    extract_categories=["products", "certificates", "logos"]
-)
-
-# 2. Automatic metadata enrichment (happens inside discover_products)
-for product in catalog.products:
-    # Extract product-specific text
-    product_text = extract_product_text(pdf_text, product.page_range)
-
-    # Initialize DynamicMetadataExtractor
-    metadata_extractor = DynamicMetadataExtractor(model="claude", job_id=job_id)
-
-    # Extract comprehensive metadata
-    extracted = await metadata_extractor.extract_metadata(
-        pdf_text=product_text,
-        category_hint=product.metadata.get("category")
-    )
-
-    # Merge metadata (priority: discovery > critical > discovered)
-    product.metadata = {
-        **extracted["discovered"],  # 200+ dynamic fields
-        **extracted["critical"],    # material_category, factory_name, factory_group
-        **product.metadata,         # Original discovery metadata (highest priority)
-    }
-
-# 3. Products are created with comprehensive metadata
-# All 200+ fields are stored in products.metadata JSONB field
-```
+The enrichment process: Product Discovery identifies products, then for each product the system extracts product-specific text, calls DynamicMetadataExtractor, and merges metadata in priority order — original discovery metadata takes highest priority, followed by critical fields (`material_category`, `factory_name`, `factory_group`), followed by the 200+ dynamically discovered fields. All metadata is stored in the `products.metadata` JSONB field.
 
 ### OLD Architecture: Chunk-Based Scope Detection (Still Available)
 
@@ -212,122 +179,30 @@ PDF → PyMuPDF4LLM → Markdown → Semantic Chunking → Document Chunks
 
 ### Stage 2: Scope Detection
 
-Each chunk is analyzed to determine its metadata scope.
-
-```python
-# For each chunk
-scope_result = await scope_detector.detect_scope(
-    chunk_content=chunk.text,
-    product_names=["NOVA", "HARMONY", "ESSENCE"],
-    document_context="Tile catalog"
-)
-
-# Returns:
-{
-    "scope": "catalog_general_implicit",
-    "confidence": 0.85,
-    "applies_to": "all",
-    "extracted_metadata": {"dimensions": "15×38"},
-    "is_override": False
-}
-```
+Each chunk is analyzed to determine its metadata scope. The scope detector returns `scope`, `confidence`, `applies_to`, `extracted_metadata`, and `is_override` for each chunk.
 
 ### Stage 3: Metadata Application
 
-Metadata is applied to products in a specific order to handle overrides correctly.
-
-```python
-# Processing Order (CRITICAL!)
-# STEP 1: Catalog-general FIRST (implicit + explicit)
-apply_catalog_general_metadata()
-
-# STEP 2: Category-specific
-apply_category_specific_metadata()
-
-# STEP 3: Product-specific LAST (allows overrides)
-apply_product_specific_metadata()
-```
+Metadata is applied to products in a specific order to handle overrides correctly:
+- STEP 1: Catalog-general FIRST (implicit + explicit)
+- STEP 2: Category-specific
+- STEP 3: Product-specific LAST (allows overrides)
 
 ### Stage 4: Override Tracking
 
-When product-specific metadata overrides catalog-general metadata, the system tracks it.
-
-```json
-{
-  "name": "HARMONY",
-  "metadata": {
-    "dimensions": "20×40",
-    "slip_resistance": "R12",
-    "country_of_origin": "Spain",
-    "_overrides": ["dimensions"]
-  }
-}
-```
+When product-specific metadata overrides catalog-general metadata, the system tracks it using an `_overrides` array in the product metadata JSON.
 
 ## Real-World Example
 
 ### Input: Tile Catalog PDF
 
-```
-Page 1: General Information
-"Available in 15×38"
-"Made in Spain"
-"Factory: Castellón Ceramics"
-
-Page 12: NOVA Product
-"NOVA tile - R11 slip resistance"
-"Matte finish"
-[No dimensions mentioned]
-
-Page 15: HARMONY Product
-"HARMONY tile - R12 slip resistance"
-"Glossy finish"
-"Dimensions: 20×40"
-
-Page 18: ESSENCE Product
-"ESSENCE tile - R10 slip resistance"
-[No dimensions mentioned]
-```
+A catalog with general information on page 1 ("Available in 15×38", "Made in Spain", "Factory: Castellón Ceramics"), then individual product pages for NOVA (R11 slip resistance, matte finish, no dimensions), HARMONY (R12 slip resistance, glossy finish, 20×40 dimensions), and ESSENCE (R10 slip resistance, no dimensions).
 
 ### Output: Product Metadata
 
-```json
-// NOVA - Inherits catalog-general dimensions
-{
-  "name": "NOVA",
-  "metadata": {
-    "dimensions": "15×38",
-    "slip_resistance": "R11",
-    "finish": "matte",
-    "country_of_origin": "Spain",
-    "factory_name": "Castellón Ceramics"
-  }
-}
-
-// HARMONY - Overrides catalog-general dimensions
-{
-  "name": "HARMONY",
-  "metadata": {
-    "dimensions": "20×40",
-    "slip_resistance": "R12",
-    "finish": "glossy",
-    "country_of_origin": "Spain",
-    "factory_name": "Castellón Ceramics",
-    "_overrides": ["dimensions"]
-  }
-}
-
-// ESSENCE - Inherits catalog-general dimensions
-{
-  "name": "ESSENCE",
-  "metadata": {
-    "dimensions": "15×38",
-    "slip_resistance": "R10",
-    "country_of_origin": "Spain",
-    "factory_name": "Castellón Ceramics"
-  }
-}
-```
+- **NOVA** inherits catalog-general dimensions (15×38) and country/factory data, with its own R11 slip resistance and matte finish.
+- **HARMONY** overrides catalog-general dimensions with 20×40 (tracked in `_overrides: ["dimensions"]`), and has its own R12 slip resistance and glossy finish.
+- **ESSENCE** inherits catalog-general dimensions (15×38) and country/factory data, with its own R10 slip resistance.
 
 ## Critical Metadata Fields
 
@@ -345,66 +220,13 @@ These fields are validated during PDF processing and must be present for success
 
 Detect metadata scope for a text chunk.
 
-**Request:**
-```json
-{
-  "chunk_content": "Available in 15×38",
-  "product_names": ["NOVA", "HARMONY", "ESSENCE"],
-  "document_context": "Tile catalog"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "scope_result": {
-    "scope": "catalog_general_implicit",
-    "confidence": 0.85,
-    "reasoning": "Dimensions mentioned without product name",
-    "applies_to": "all",
-    "extracted_metadata": {"dimensions": "15×38"},
-    "is_override": false
-  },
-  "processing_time": 0.45
-}
-```
+The request takes `chunk_content`, `product_names` array, and `document_context`. The response includes a `scope_result` with `scope` (e.g., "catalog_general_implicit"), `confidence`, `reasoning`, `applies_to`, `extracted_metadata`, `is_override`, and `processing_time`.
 
 ### POST /api/rag/metadata/apply-to-products
 
 Apply metadata to products with scope-aware override logic.
 
-**Request:**
-```json
-{
-  "document_id": "69cba085-9c2d-405c-aff2-8a20caf0b568",
-  "chunks_with_scope": [
-    {
-      "chunk_id": "chunk-123",
-      "content": "Available in 15×38",
-      "scope": "catalog_general_implicit",
-      "applies_to": "all",
-      "extracted_metadata": {"dimensions": "15×38"},
-      "is_override": false
-    }
-  ]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "products_updated": 3,
-  "overrides_detected": 1,
-  "metadata_applied": {
-    "NOVA": {"dimensions": "15×38"},
-    "HARMONY": {"dimensions": "20×40"},
-    "ESSENCE": {"dimensions": "15×38"}
-  },
-  "processing_time": 1.2
-}
-```
+The request takes `document_id` and a `chunks_with_scope` array, each with `chunk_id`, `content`, `scope`, `applies_to`, `extracted_metadata`, and `is_override`. The response includes `products_updated`, `overrides_detected`, `metadata_applied` (per product), and `processing_time`.
 
 ### GET /api/rag/metadata/list
 
@@ -418,45 +240,11 @@ List metadata with filtering and pagination.
 - `limit` - Maximum results (default: 100)
 - `offset` - Offset for pagination (default: 0)
 
-**Response:**
-```json
-{
-  "success": true,
-  "total_count": 45,
-  "items": [
-    {
-      "product_id": "prod-123",
-      "product_name": "NOVA",
-      "metadata_key": "dimensions",
-      "metadata_value": "15×38",
-      "scope": "catalog_general_implicit",
-      "is_override": false
-    }
-  ],
-  "limit": 100,
-  "offset": 0
-}
-```
+The response includes `total_count`, `items` (each with `product_id`, `product_name`, `metadata_key`, `metadata_value`, `scope`, and `is_override`), `limit`, and `offset`.
 
 ### GET /api/rag/metadata/statistics
 
-Get metadata statistics and analytics.
-
-**Response:**
-```json
-{
-  "total_products": 14,
-  "total_metadata_fields": 156,
-  "catalog_general_count": 42,
-  "product_specific_count": 98,
-  "override_count": 16,
-  "most_common_fields": [
-    {"field": "dimensions", "count": 14},
-    {"field": "slip_resistance", "count": 14},
-    {"field": "finish", "count": 12}
-  ]
-}
-```
+Get metadata statistics and analytics. Returns `total_products`, `total_metadata_fields`, `catalog_general_count`, `product_specific_count`, `override_count`, and `most_common_fields`.
 
 ## Integration with PDF Processing
 
@@ -476,33 +264,11 @@ Stage 6: Embedding Generation
 
 ### Products Table
 
-```sql
-CREATE TABLE products (
-  id UUID PRIMARY KEY,
-  workspace_id UUID,
-  name VARCHAR(255),
-  metadata JSONB,  -- All metadata stored here
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-);
-```
+The `products` table stores all metadata in a `metadata JSONB` field, allowing flexible storage of the 200+ dynamic fields extracted by DynamicMetadataExtractor.
 
 ### Metadata Structure
 
-```json
-{
-  "dimensions": "15×38",
-  "slip_resistance": "R11",
-  "finish": "matte",
-  "country_of_origin": "Spain",
-  "factory_name": "Castellón Ceramics",
-  "_overrides": ["dimensions"],
-  "_scope": {
-    "dimensions": "catalog_general_implicit",
-    "slip_resistance": "product_specific"
-  }
-}
-```
+The metadata JSONB object contains named fields (e.g., `dimensions`, `slip_resistance`, `finish`, `country_of_origin`, `factory_name`), an `_overrides` array listing which fields were overridden from catalog-general values, and a `_scope` object mapping each field name to its detected scope type (e.g., `catalog_general_implicit` or `product_specific`).
 
 ## Best Practices
 
@@ -519,4 +285,3 @@ CREATE TABLE products (
 - **Batch metadata updates** - Update metadata across multiple products
 - **Metadata versioning** - Track changes to metadata over time
 - **Custom extraction rules** - Allow admins to define custom extraction patterns
-

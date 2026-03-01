@@ -69,37 +69,7 @@ The Material Kai Vision Platform uses a **unified job queue system** across all 
 
 ### background_jobs
 
-Main job tracking table.
-
-```sql
-CREATE TABLE background_jobs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id UUID NOT NULL REFERENCES workspaces(id),
-  document_id UUID REFERENCES documents(id),
-  job_type VARCHAR(50) NOT NULL,
-  status VARCHAR(50) DEFAULT 'pending',
-  progress_percent INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  started_at TIMESTAMP,
-  completed_at TIMESTAMP,
-  error_message TEXT,
-  metadata JSONB DEFAULT '{}'::jsonb,
-  
-  CONSTRAINT job_unique UNIQUE(workspace_id, document_id, job_type)
-);
-
-CREATE INDEX idx_jobs_workspace ON background_jobs(workspace_id);
-CREATE INDEX idx_jobs_status ON background_jobs(status);
-```
-
-**Columns**:
-- `id`: Unique job identifier
-- `workspace_id`: Workspace this job belongs to
-- `document_id`: Associated PDF document
-- `job_type`: Type of job (pdf_processing, image_analysis, product_creation)
-- `status`: Current status (pending, processing, completed, failed, retrying)
-- `progress_percent`: Progress 0-100
-- `metadata`: Additional data (AI models used, retry count, etc.)
+Main job tracking table. Key columns: `id`, `workspace_id`, `document_id`, `job_type`, `status` (pending/processing/completed/failed/retrying/cancelled), `progress_percent` (0-100), `created_at`, `started_at`, `completed_at`, `error_message`, and `metadata` JSONB. A unique constraint exists on `(workspace_id, document_id, job_type)`.
 
 **Job Types**:
 - `pdf_processing`: Main PDF extraction and processing
@@ -119,23 +89,7 @@ CREATE INDEX idx_jobs_status ON background_jobs(status);
 
 ### job_progress
 
-Real-time progress tracking for each stage.
-
-```sql
-CREATE TABLE job_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  job_id UUID NOT NULL REFERENCES background_jobs(id),
-  stage VARCHAR(50) NOT NULL,
-  progress_percent INTEGER,
-  current_step VARCHAR(255),
-  details JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP DEFAULT NOW(),
-  
-  CONSTRAINT progress_unique UNIQUE(job_id, stage)
-);
-
-CREATE INDEX idx_progress_job ON job_progress(job_id);
-```
+Real-time progress tracking for each stage. Key columns: `id`, `job_id`, `stage`, `progress_percent`, `current_step`, `details` JSONB, `created_at`. A unique constraint exists on `(job_id, stage)`.
 
 **Stages**:
 - `initialized`: Job created
@@ -152,24 +106,9 @@ CREATE INDEX idx_progress_job ON job_progress(job_id);
 
 ### job_checkpoints
 
-Checkpoint data for recovery.
+Checkpoint data for recovery. Key columns: `id`, `job_id`, `stage`, `checkpoint_data` JSONB, `metadata` JSONB, `created_at`. A unique constraint exists on `(job_id, stage)`.
 
-```sql
-CREATE TABLE job_checkpoints (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  job_id UUID NOT NULL REFERENCES background_jobs(id),
-  stage VARCHAR(50) NOT NULL,
-  checkpoint_data JSONB NOT NULL,
-  metadata JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMP DEFAULT NOW(),
-  
-  CONSTRAINT checkpoint_unique UNIQUE(job_id, stage)
-);
-
-CREATE INDEX idx_checkpoints_job ON job_checkpoints(job_id);
-```
-
-**Checkpoint Data**:
+**Checkpoint Data** stored per stage:
 - `chunk_ids`: IDs of created chunks
 - `image_ids`: IDs of extracted images
 - `embedding_ids`: IDs of generated embeddings
@@ -180,51 +119,13 @@ CREATE INDEX idx_checkpoints_job ON job_checkpoints(job_id);
 
 ### image_processing_queue
 
-Queue for image processing jobs.
-
-```sql
-CREATE TABLE image_processing_queue (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  document_id UUID NOT NULL REFERENCES documents(id),
-  image_id UUID NOT NULL REFERENCES document_images(id),
-  status VARCHAR(50) DEFAULT 'pending',
-  priority VARCHAR(20) DEFAULT 'normal',
-  retry_count INTEGER DEFAULT 0,
-  max_retries INTEGER DEFAULT 3,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  
-  CONSTRAINT image_queue_unique UNIQUE(image_id)
-);
-
-CREATE INDEX idx_image_queue_status ON image_processing_queue(status);
-CREATE INDEX idx_image_queue_priority ON image_processing_queue(priority);
-```
+Queue for image processing jobs. Key columns: `id`, `document_id`, `image_id`, `status`, `priority` (normal/high/critical), `retry_count`, `max_retries`, `created_at`, `updated_at`. A unique constraint exists on `image_id`.
 
 ---
 
 ### ai_analysis_queue
 
-Queue for AI analysis jobs.
-
-```sql
-CREATE TABLE ai_analysis_queue (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  document_id UUID NOT NULL REFERENCES documents(id),
-  chunk_id UUID NOT NULL REFERENCES document_chunks(id),
-  analysis_type VARCHAR(50) NOT NULL,
-  status VARCHAR(50) DEFAULT 'pending',
-  priority VARCHAR(20) DEFAULT 'normal',
-  retry_count INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  
-  CONSTRAINT ai_queue_unique UNIQUE(chunk_id, analysis_type)
-);
-
-CREATE INDEX idx_ai_queue_status ON ai_analysis_queue(status);
-CREATE INDEX idx_ai_queue_type ON ai_analysis_queue(analysis_type);
-```
+Queue for AI analysis jobs. Key columns: `id`, `document_id`, `chunk_id`, `analysis_type`, `status`, `priority`, `retry_count`, `created_at`, `updated_at`. A unique constraint exists on `(chunk_id, analysis_type)`.
 
 ---
 
@@ -232,100 +133,23 @@ CREATE INDEX idx_ai_queue_type ON ai_analysis_queue(analysis_type);
 
 ### 1. Job Creation
 
-```python
-# Frontend uploads PDF
-POST /api/v1/pdf/upload
-{
-  "file": <PDF>,
-  "workspace_id": "...",
-  "category": "materials"
-}
-
-# Backend creates job
-job_id = AsyncQueueService.create_job(
-  document_id=doc_id,
-  job_type="pdf_processing",
-  priority="normal"
-)
-
-# Job stored in background_jobs table
-# Status: pending
-```
+The frontend uploads a PDF, the backend creates a job record in `background_jobs` with status `pending`, and returns the `job_id` to the frontend for tracking.
 
 ### 2. Job Processing
 
-```python
-# Job monitor detects pending job
-# Starts processing
-# Updates status: processing
-
-# 14-stage pipeline executes:
-# Stage 0: Product Discovery (0-15%)
-# Stage 1: Focused Extraction (15-30%)
-# ...
-# Stage 13: Quality Enhancement (97-100%)
-
-# At each stage:
-# - Create checkpoint
-# - Update job_progress
-# - Update background_jobs progress_percent
-```
+The job monitor detects the pending job and starts processing. It updates the status to `processing`, then executes the 14-stage pipeline (Stage 0: Product Discovery at 0-15%, through Stage 13: Quality Enhancement at 97-100%). At each stage, the system creates a checkpoint, updates `job_progress`, and updates `background_jobs.progress_percent`.
 
 ### 3. Checkpoint Creation
 
-```python
-# After each successful stage
-await checkpoint_recovery_service.create_checkpoint(
-  job_id=job_id,
-  stage=ProcessingStage.CHUNKS_CREATED,
-  data={
-    "chunk_ids": [...],
-    "total_chunks": 229,
-    "avg_chunk_size": 512
-  }
-)
-
-# Checkpoint stored in job_checkpoints table
-# Can resume from this point if job fails
-```
+After each successful stage, the checkpoint recovery service stores the stage's output data (e.g., chunk IDs, total chunks, average chunk size) in the `job_checkpoints` table. This allows the job to resume from that point if it fails.
 
 ### 4. Stuck Job Detection
 
-```python
-# Job monitor runs every 60 seconds
-# Detects jobs stuck >30 minutes without progress
-
-stuck_jobs = await checkpoint_recovery_service.detect_stuck_jobs(
-  timeout_minutes=30
-)
-
-# For each stuck job:
-# 1. Check if valid checkpoint exists
-# 2. If yes, restart from checkpoint
-# 3. If no, mark as failed
-```
+The job monitor runs every 60 seconds and detects jobs that have been stuck for more than 30 minutes without progress. For each stuck job, it checks whether a valid checkpoint exists, restarts from the checkpoint if available, or marks the job as failed if not.
 
 ### 5. Auto-Recovery
 
-```python
-# If job is stuck:
-can_resume, last_stage = await checkpoint_recovery_service.can_resume_from_checkpoint(job_id)
-
-if can_resume:
-  # Verify checkpoint data is valid
-  is_valid = await checkpoint_recovery_service.verify_checkpoint_data(job_id, last_stage)
-  
-  if is_valid:
-    # Restart from checkpoint
-    await checkpoint_recovery_service.auto_restart_stuck_job(job_id)
-    # Status: pending (will be picked up again)
-  else:
-    # Checkpoint invalid, mark as failed
-    status = "failed"
-else:
-  # No checkpoint, mark as failed
-  status = "failed"
-```
+The recovery service checks if a job can resume from its last checkpoint, validates the checkpoint data against the database (verifying that referenced chunks/images still exist), then either auto-restarts the job from the checkpoint (setting status back to `pending` so it gets picked up) or marks it as failed if the checkpoint is invalid.
 
 ---
 
@@ -333,80 +157,15 @@ else:
 
 ### AsyncQueueService
 
-Manages job queuing and queue operations.
-
-```python
-# Queue image processing jobs
-await async_queue_service.queue_image_processing_jobs(
-  document_id=doc_id,
-  images=images,
-  priority="normal"
-)
-
-# Queue AI analysis jobs
-await async_queue_service.queue_ai_analysis_jobs(
-  document_id=doc_id,
-  chunks=chunks,
-  analysis_type="semantic_analysis",
-  priority="high"
-)
-
-# Update progress
-await async_queue_service.update_job_progress(
-  document_id=doc_id,
-  stage="chunks_created",
-  progress=45,
-  total_items=229,
-  completed_items=103
-)
-```
+Manages job queuing and queue operations. Provides methods for `queue_image_processing_jobs()`, `queue_ai_analysis_jobs()`, and `update_job_progress()` with stage, progress percentage, and item counts.
 
 ### CheckpointRecoveryService
 
-Handles checkpoint creation and recovery.
-
-```python
-# Create checkpoint
-await checkpoint_recovery_service.create_checkpoint(
-  job_id=job_id,
-  stage=ProcessingStage.CHUNKS_CREATED,
-  data={"chunk_ids": [...]}
-)
-
-# Get last checkpoint
-checkpoint = await checkpoint_recovery_service.get_last_checkpoint(job_id)
-
-# Check if can resume
-can_resume, last_stage = await checkpoint_recovery_service.can_resume_from_checkpoint(job_id)
-
-# Auto-restart stuck job
-await checkpoint_recovery_service.auto_restart_stuck_job(job_id)
-
-# Verify checkpoint data
-is_valid = await checkpoint_recovery_service.verify_checkpoint_data(job_id, stage)
-```
+Handles checkpoint creation and recovery. Provides `create_checkpoint()`, `get_last_checkpoint()`, `can_resume_from_checkpoint()`, `auto_restart_stuck_job()`, and `verify_checkpoint_data()`.
 
 ### JobMonitorService
 
-Monitors jobs and performs auto-recovery.
-
-```python
-# Start monitoring
-await job_monitor_service.start()
-
-# Get health status
-health = await job_monitor_service.get_health_status()
-# Returns: {
-#   "monitor_running": true,
-#   "stats": {...},
-#   "job_counts": {"pending": 5, "processing": 2, ...},
-#   "stuck_jobs_count": 0,
-#   "health": "healthy"
-# }
-
-# Force restart a job
-result = await job_monitor_service.force_restart_job(job_id)
-```
+Monitors jobs and performs auto-recovery. Provides `start()` to begin monitoring, `get_health_status()` returning monitor status, job counts by status, stuck job count, and overall health string, and `force_restart_job()` for manual intervention.
 
 ---
 
@@ -414,29 +173,7 @@ result = await job_monitor_service.force_restart_job(job_id)
 
 ### Health Check Endpoint
 
-```
-GET /api/v1/admin/job-monitor/health
-
-Response:
-{
-  "monitor_running": true,
-  "stats": {
-    "checks_performed": 1440,
-    "stuck_jobs_detected": 3,
-    "jobs_restarted": 2,
-    "jobs_failed": 1,
-    "last_check": "2025-10-31T12:00:00Z"
-  },
-  "job_counts": {
-    "pending": 5,
-    "processing": 2,
-    "completed": 1250,
-    "failed": 3
-  },
-  "stuck_jobs_count": 0,
-  "health": "healthy"
-}
-```
+`GET /api/v1/admin/job-monitor/health` returns a JSON object with `monitor_running` boolean, `stats` (checks performed, stuck jobs detected, jobs restarted, jobs failed, last check timestamp), `job_counts` (by status), `stuck_jobs_count`, and overall `health` string.
 
 ### Admin Dashboard
 
@@ -452,30 +189,11 @@ Response:
 
 ### Retry Policy
 
-```python
-retryPolicy = {
-  "maxAttempts": 3,
-  "baseDelay": 1000,  # 1 second
-  "maxDelay": 30000,  # 30 seconds
-  "backoffMultiplier": 2,
-  "jitterEnabled": True
-}
-
-# Retry delays:
-# Attempt 1: 1s
-# Attempt 2: 2s
-# Attempt 3: 4s
-```
+Maximum 3 attempts with exponential backoff: 1s base delay, 30s max delay, multiplier of 2, with jitter enabled. Resulting delays: Attempt 1: 1s, Attempt 2: 2s, Attempt 3: 4s.
 
 ### Job Monitor Configuration
 
-```python
-job_monitor_service = JobMonitorService(
-  check_interval_seconds=60,      # Check every minute
-  stuck_job_timeout_minutes=30,   # Stuck after 30 min
-  auto_restart_enabled=True       # Auto-restart enabled
-)
-```
+The `JobMonitorService` is configured with `check_interval_seconds=60` (check every minute), `stuck_job_timeout_minutes=30` (mark as stuck after 30 minutes), and `auto_restart_enabled=True`.
 
 ### Priority Levels
 
@@ -600,4 +318,3 @@ The Material Kai Vision Platform uses a **production-ready, unified job queue sy
 - 99%+ reliability in production
 
 This hybrid approach combines Supabase's reliability with custom recovery logic to ensure robust PDF processing even in the face of failures.
-

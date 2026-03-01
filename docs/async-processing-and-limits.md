@@ -27,12 +27,12 @@ All three product generation methods (PDF Processing, Web Scraping, XML Import) 
 
 ### Key Principles
 
-✅ **Fully Async**: All I/O operations use `async/await`  
-✅ **Semaphore-based**: Concurrency controlled via `asyncio.Semaphore`  
-✅ **Batch Processing**: Large datasets processed in batches  
-✅ **Retry Logic**: Automatic retry with exponential backoff  
-✅ **Circuit Breakers**: Prevent cascading failures  
-✅ **Timeout Guards**: Prevent infinite hangs  
+✅ **Fully Async**: All I/O operations use `async/await`
+✅ **Semaphore-based**: Concurrency controlled via `asyncio.Semaphore`
+✅ **Batch Processing**: Large datasets processed in batches
+✅ **Retry Logic**: Automatic retry with exponential backoff
+✅ **Circuit Breakers**: Prevent cascading failures
+✅ **Timeout Guards**: Prevent infinite hangs
 
 ---
 
@@ -40,59 +40,15 @@ All three product generation methods (PDF Processing, Web Scraping, XML Import) 
 
 ### 1. Main Processing Flow
 
-All three methods use `AsyncQueueService` for background job processing:
-
-```python
-# PDF Processing
-async def process_pdf_document(document_id: str, workspace_id: str):
-    # Fully async processing
-    result = await pdf_processor.process_pdf_from_bytes(...)
-    await chunking_service.create_chunks_and_embeddings(...)
-    await image_processing_service.process_images(...)
-
-# Web Scraping
-async def process_scraping_session(session_id: str, workspace_id: str):
-    # Fully async processing
-    catalog = await discovery_service.discover_products_from_text(...)
-    await chunking_service.create_chunks_and_embeddings(...)
-    await image_processing_service.process_images(...)
-
-# XML Import
-async def process_import_job(job_id: str, workspace_id: str):
-    # Fully async processing
-    await self._process_batch(...)
-    await self._queue_text_processing(...)
-    await image_downloader.download_images(...)
-```
+All three methods use `AsyncQueueService` for background job processing. PDF Processing uses `process_pdf_document()`, Web Scraping uses `process_scraping_session()`, and XML Import uses `process_import_job()`. All are fully async and use the same downstream services for chunking, embedding, and image processing.
 
 ### 2. Background Job Processing
 
-```python
-# AsyncQueueService - Shared across all methods
-class AsyncQueueService:
-    async def queue_ai_analysis_jobs(
-        self,
-        chunks: List[Dict],
-        analysis_type: str = 'embedding_generation'
-    ):
-        # Queue jobs for async processing
-        # - Chunking
-        # - Embedding generation
-        # - Product enrichment
-```
+The `AsyncQueueService` is shared across all three methods. It queues jobs for chunking, embedding generation, and product enrichment via its `queue_ai_analysis_jobs()` method.
 
 ### 3. Progress Tracking
 
-All methods update `background_jobs` table in real-time:
-
-```python
-await self._update_background_job_status(
-    job_id=job_id,
-    status='processing',
-    progress_percent=50,
-    metadata={'stage': 'image_processing'}
-)
-```
+All methods update the `background_jobs` table in real-time with the current job status, progress percentage, and metadata about the current stage.
 
 ---
 
@@ -100,7 +56,7 @@ await self._update_background_job_status(
 
 ### 1. Image Classification (AI-based filtering)
 
-**Applies to**: PDF, Web Scraping, XML Import  
+**Applies to**: PDF, Web Scraping, XML Import
 **Service**: `ImageProcessingService`
 
 | Limit | Value | Purpose |
@@ -109,15 +65,8 @@ await self._update_background_job_status(
 | **Claude Validation Concurrent** | 2 | Validation for uncertain cases |
 | **Batch Size** | 15 images | Memory optimization |
 
-```python
-# mivaa-pdf-extractor/app/services/image_processing_service.py
-together_semaphore = Semaphore(5)   # 5 concurrent TogetherAI (Qwen) requests
-claude_semaphore = Semaphore(2)  # 2 concurrent Claude requests
-batch_size = 15  # Process 15 images per batch
-```
-
 **Why these limits?**
-- **TogetherAI/Qwen (5)**: Fast, cheap model → higher concurrency
+- **HuggingFace/Qwen (5)**: HuggingFace Endpoint (Qwen3-VL 32B) → higher concurrency
 - **Claude (2)**: Expensive, rate-limited → lower concurrency
 - **Batch (15)**: Prevents OOM on large PDFs with 500+ images
 
@@ -125,17 +74,12 @@ batch_size = 15  # Process 15 images per batch
 
 ### 2. Image Upload to Storage
 
-**Applies to**: PDF, Web Scraping, XML Import  
+**Applies to**: PDF, Web Scraping, XML Import
 **Service**: `ImageProcessingService`
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
 | **Concurrent Uploads** | 10 | Supabase Storage upload limit |
-
-```python
-# mivaa-pdf-extractor/app/services/image_processing_service.py
-upload_semaphore = Semaphore(10)  # 10 concurrent uploads
-```
 
 **Why 10?**
 - Supabase Storage can handle ~10 concurrent uploads
@@ -145,25 +89,13 @@ upload_semaphore = Semaphore(10)  # 10 concurrent uploads
 
 ### 3. CLIP Embeddings Generation
 
-**Applies to**: PDF, Web Scraping, XML Import  
+**Applies to**: PDF, Web Scraping, XML Import
 **Service**: `ImageProcessingService`
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
 | **Batch Size** | 20 images | Memory optimization |
 | **Max Retries** | 3 | Retry failed embeddings |
-
-```python
-# mivaa-pdf-extractor/app/services/image_processing_service.py
-async def save_images_and_generate_clips(
-    self,
-    material_images: List[Dict[str, Any]],
-    document_id: str,
-    workspace_id: str,
-    batch_size: int = 20,  # 20 images per batch
-    max_retries: int = 3   # 3 retry attempts
-)
-```
 
 **Why 20?**
 - CLIP model processes ~20 images in 10-15 seconds
@@ -173,7 +105,7 @@ async def save_images_and_generate_clips(
 
 ### 4. Image Downloads (XML Import Only)
 
-**Applies to**: XML Import  
+**Applies to**: XML Import
 **Service**: `ImageDownloadService`
 
 | Limit | Value | Purpose |
@@ -182,16 +114,6 @@ async def save_images_and_generate_clips(
 | **Max Retries** | 3 | Retry failed downloads |
 | **Timeout** | 30 seconds | Prevent hanging downloads |
 | **Max File Size** | 10 MB | Prevent large file downloads |
-
-```python
-# mivaa-pdf-extractor/app/services/image_download_service.py
-class ImageDownloadService:
-    def __init__(self):
-        self.max_concurrent = 5  # 5 concurrent downloads
-        self.max_retries = 3     # 3 retry attempts
-        self.timeout = 30        # 30 seconds timeout
-        self.max_file_size = 10 * 1024 * 1024  # 10MB max
-```
 
 **Why these limits?**
 - **5 concurrent**: Prevents network congestion
@@ -209,14 +131,6 @@ class ImageDownloadService:
 |-------|-------|---------|
 | **Batch Size** | 10 products | Memory optimization |
 | **Image Downloads per Batch** | 5 concurrent | Network optimization |
-
-```python
-# mivaa-pdf-extractor/app/services/data_import_service.py
-class DataImportService:
-    def __init__(self):
-        self.batch_size = 10  # Process 10 products at a time
-        self.max_concurrent_images = 5  # Download 5 images concurrently
-```
 
 **Why 10 products?**
 - Each product can have 5-10 images
@@ -236,14 +150,6 @@ class DataImportService:
 | **Pages per Worker** | 5 | Batch size for page processing |
 | **Max Pages in Memory** | 10 | 2 workers × 5 pages |
 
-```python
-# mivaa-pdf-extractor/app/services/pdf_processor.py
-# REDUCED from 4 to 2 workers to prevent OOM kills
-# (each worker processes 5 pages = 10 pages max in memory)
-max_workers = self.config.get('max_workers', 2)
-self.executor = ThreadPoolExecutor(max_workers=max_workers)
-```
-
 **Why 2 workers?**
 - **Before**: 4 workers × 5 pages = 20 pages in memory → OOM crashes
 - **After**: 2 workers × 5 pages = 10 pages in memory → Stable
@@ -262,16 +168,6 @@ self.executor = ThreadPoolExecutor(max_workers=max_workers)
 | **Product Discovery** | 300s (5 min) | AI analysis of full document |
 | **Per-product Extraction** | 60s | Individual product metadata |
 
-```python
-# mivaa-pdf-extractor/app/services/product_discovery_service.py
-async def discover_products(self, pdf_content: bytes, pdf_text: str):
-    result = await with_timeout(
-        self._discover_products_internal(...),
-        timeout_seconds=300,  # 5 minutes
-        operation_name="Product discovery"
-    )
-```
-
 ---
 
 ### 2. PDF Extraction Timeouts
@@ -284,16 +180,7 @@ async def discover_products(self, pdf_content: bytes, pdf_text: str):
 | **Full PDF Extraction** | 7200s (2 hours) | Large PDFs with OCR |
 | **Per-page Extraction** | Dynamic | Based on file size |
 
-```python
-# Dynamic timeout calculation
-file_size_mb = len(pdf_bytes) / (1024 * 1024)
-num_pages = len(product_pages)
-pdf_extraction_timeout = max(300, file_size_mb * 10 + num_pages * 5)
-```
-
-**Why dynamic?**
-- Small PDFs (10 pages, 5MB): ~300s
-- Large PDFs (500 pages, 50MB): ~3000s (50 min)
+The per-page timeout is calculated dynamically: `max(300, file_size_mb * 10 + num_pages * 5)`. This means a small PDF (10 pages, 5MB) gets ~300s, while a large PDF (500 pages, 50MB) gets ~3000s (50 min).
 
 ---
 
@@ -306,52 +193,31 @@ pdf_extraction_timeout = max(300, file_size_mb * 10 + num_pages * 5)
 |-----------|---------|---------|
 | **Per-image Download** | 30s | Single image download |
 
-```python
-# mivaa-pdf-extractor/app/services/image_download_service.py
-async with httpx.AsyncClient(timeout=30) as client:
-    response = await client.get(url)
-```
-
 ---
 
 ### 4. AI Classification Timeouts
 
 **Applies to**: PDF, Web Scraping, XML Import
-**Service**: `TogetherAIService`, `AIClientService`
+**Service**: `QwenEndpointService`, `AIClientService`
 
 | Operation | Timeout | Purpose |
 |-----------|---------|---------|
 | **Qwen Vision Request** | 120s | Image classification |
 | **Claude Request** | 120s | Validation |
 
-```python
-# mivaa-pdf-extractor/app/services/together_ai_service.py
-@dataclass
-class TogetherAIConfig:
-    timeout: int = 120  # 2 minutes
-```
-
 ---
 
 ## Rate Limiting
 
-### 1. TogetherAI (Qwen Vision)
+### 1. HuggingFace Endpoint (Qwen3-VL Vision)
 
 **Applies to**: PDF, Web Scraping, XML Import
-**Service**: `TogetherAIService`
+**Service**: `QwenEndpointService`
 
 | Limit | Value | Purpose |
 |-------|-------|---------|
 | **Requests per Minute** | 10 | API rate limit |
 | **Burst Limit** | 5 | Short-term burst |
-
-```python
-# mivaa-pdf-extractor/app/services/together_ai_service.py
-@dataclass
-class TogetherAIConfig:
-    rate_limit_requests_per_minute: int = 10
-    rate_limit_burst: int = 5
-```
 
 ---
 
@@ -365,14 +231,6 @@ class TogetherAIConfig:
 | **Failure Threshold** | 5 | Open circuit after 5 failures |
 | **Recovery Timeout** | 60s | Try again after 60s |
 
-```python
-# mivaa-pdf-extractor/app/utils/circuit_breaker.py
-claude_breaker = CircuitBreaker(
-    failure_threshold=5,
-    recovery_timeout=60
-)
-```
-
 ---
 
 ### 3. Image Export Rate Limiting
@@ -384,12 +242,6 @@ claude_breaker = CircuitBreaker(
 |-------|-------|---------|
 | **Exports per Hour** | 5 | Prevent abuse |
 
-```python
-# mivaa-pdf-extractor/app/api/images.py
-EXPORT_RATE_LIMIT = 5  # Max exports per hour
-EXPORT_RATE_WINDOW = 3600  # 1 hour in seconds
-```
-
 ---
 
 ## Shared Services
@@ -400,14 +252,7 @@ All three methods use the **SAME** services with **SAME** limits:
 
 **Used by**: PDF, Web Scraping, XML Import
 
-```python
-# Shared limits across all methods
-together_semaphore = Semaphore(5)   # 5 concurrent TogetherAI (Qwen)
-claude_semaphore = Semaphore(2)  # 2 concurrent Claude
-upload_semaphore = Semaphore(10) # 10 concurrent uploads
-batch_size = 15  # Classification batch
-clip_batch_size = 20  # CLIP batch
-```
+Shared limits across all methods: 5 concurrent HuggingFace Endpoint (Qwen3-VL) requests, 2 concurrent Claude requests, 10 concurrent uploads, classification batch size of 15 images, and CLIP batch size of 20 images.
 
 ---
 
@@ -415,17 +260,7 @@ clip_batch_size = 20  # CLIP batch
 
 **Used by**: PDF, Web Scraping, XML Import
 
-```python
-# Shared CLIP model and embeddings
-model = "google/siglip-so400m-patch14-384"  # SigLIP 1152D
-specialized_embeddings = [
-    'color_siglip_1152',
-    'texture_siglip_1152',
-    'material_siglip_1152',
-    'style_siglip_1152',
-    'visual_siglip_1152'
-]
-```
+Uses the `google/siglip-so400m-patch14-384` (SigLIP 1152D) model and generates five specialized embedding types: `color_siglip_1152`, `texture_siglip_1152`, `material_siglip_1152`, `style_siglip_1152`, and `visual_siglip_1152`.
 
 ---
 
@@ -433,17 +268,7 @@ specialized_embeddings = [
 
 **Used by**: PDF, Web Scraping, XML Import
 
-```python
-# Shared background job processing
-async def queue_ai_analysis_jobs(
-    chunks: List[Dict],
-    analysis_type: str = 'embedding_generation'
-):
-    # Queue jobs for:
-    # - Chunking
-    # - Embedding generation
-    # - Product enrichment
-```
+Shared background job processing for chunking, embedding generation, and product enrichment.
 
 ---
 
@@ -451,12 +276,7 @@ async def queue_ai_analysis_jobs(
 
 **Used by**: PDF, Web Scraping, XML Import
 
-```python
-# Shared chunking logic
-class UnifiedChunkingService:
-    chunk_size = 1000  # Characters per chunk
-    chunk_overlap = 200  # Overlap between chunks
-```
+Shared chunking logic with chunk size of 1000 characters and overlap of 200 characters.
 
 ---
 
@@ -491,7 +311,7 @@ class UnifiedChunkingService:
 
 | API | Limit | Strategy |
 |-----|-------|----------|
-| **TogetherAI (Qwen)** | 10 req/min | Semaphore (5 concurrent) |
+| **HuggingFace (Qwen3-VL)** | 10 req/min | Semaphore (5 concurrent) |
 | **Claude** | Circuit breaker | Semaphore (2 concurrent) |
 | **OpenAI** | No limit | Batch processing |
 
@@ -542,56 +362,31 @@ class UnifiedChunkingService:
 
 ### 1. Monitoring
 
-```python
-# Always log batch progress
-logger.info(f"Processing batch {batch_num}/{total_batches}")
-logger.info(f"Progress: {progress_percent}%")
-```
+Always log batch progress including the current batch number, total batches, and progress percentage to enable real-time tracking.
 
 ### 2. Error Handling
 
-```python
-# Always use try/except with detailed logging
-try:
-    result = await process_batch(...)
-except Exception as e:
-    logger.error(f"Batch failed: {e}")
-    # Continue with next batch
-```
+Use try/except blocks with detailed logging around every batch processing call. On failure, log the error with context and continue processing the next batch rather than aborting the entire job.
 
 ### 3. Resource Cleanup
 
-```python
-# Always cleanup after batch processing
-import gc
-del batch_data
-gc.collect()
-```
+After each batch, explicitly delete the batch data reference and call the garbage collector to free memory, particularly important for large image batches.
 
 ### 4. Progress Tracking
 
-```python
-# Always update background_jobs table
-await self._update_background_job_status(
-    job_id=job_id,
-    progress_percent=progress,
-    metadata={'stage': 'current_stage'}
-)
-```
+Always update the `background_jobs` table after each stage with the current progress percentage and stage name so the frontend can display accurate real-time progress.
 
 ---
 
 ## Summary
 
 ✅ **All methods fully async**: PDF, Web Scraping, XML Import
-✅ **Same concurrency limits**: 5 TogetherAI (Qwen), 2 Claude, 10 uploads, 20 CLIP
+✅ **Same concurrency limits**: 5 HuggingFace/Qwen, 2 Claude, 10 uploads, 20 SLIG
 ✅ **Same timeout guards**: 300s discovery, 120s AI, 30s downloads
-✅ **Same rate limiting**: 10 req/min TogetherAI, circuit breaker Claude
+✅ **Same rate limiting**: 10 req/min HuggingFace/Qwen, circuit breaker Claude
 ✅ **Same shared services**: ImageProcessingService, RealEmbeddingsService, AsyncQueueService
 ✅ **Memory optimized**: Batch processing prevents OOM
 ✅ **Network optimized**: Semaphores prevent congestion
 ✅ **API optimized**: Rate limiting prevents throttling
 
 **The architecture is unified, consistent, and production-ready!** 🚀
-
-

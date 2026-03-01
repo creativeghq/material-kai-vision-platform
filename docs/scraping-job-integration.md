@@ -49,39 +49,7 @@ The web scraping system is fully integrated with the platform's unified job trac
 
 ### 1. Job Creation
 
-When a scraping session is created:
-
-```typescript
-// 1. Create background job
-const jobData = {
-  id: jobId,
-  workspace_id: workspaceId,
-  job_type: 'web_scraping',
-  status: 'pending',
-  progress: 0,
-  current_stage: 'initializing',
-  metadata: {
-    session_id: sessionId,
-    source_url: sourceUrl,
-    scraping_mode: scrapingMode,
-    total_pages: urls.length,
-  },
-};
-
-await supabase.from('background_jobs').insert([jobData]);
-
-// 2. Create scraping session linked to job
-const sessionData = {
-  id: sessionId,
-  background_job_id: jobId,  // ← Link to job tracking
-  workspace_id: workspaceId,
-  source_url: sourceUrl,
-  status: 'pending',
-  // ... other fields
-};
-
-await supabase.from('scraping_sessions').insert([sessionData]);
-```
+When a scraping session is created, the system first inserts a record into `background_jobs` with `job_type: 'web_scraping'`, `status: 'pending'`, `progress: 0`, `current_stage: 'initializing'`, and metadata containing `session_id`, `source_url`, `scraping_mode`, and `total_pages`. Then it inserts a record into `scraping_sessions` with a `background_job_id` linking it to the job tracking entry.
 
 ### 2. Job Processing
 
@@ -95,41 +63,11 @@ The job monitor service automatically:
 
 ### 3. Error Recovery
 
-If a job fails or gets stuck:
-
-```python
-# Automatic retry with exponential backoff
-@retry_async(
-    max_attempts=3,
-    base_delay=2.0,
-    max_delay=30.0,
-    exceptions=(TimeoutError, ConnectionError)
-)
-async def process_scraping_session(session_id: str):
-    # Processing logic
-    pass
-```
+If a job fails or gets stuck, the system applies automatic retry with exponential backoff (max 3 attempts, 2s base delay, 30s max delay), specifically handling `TimeoutError` and `ConnectionError` exceptions.
 
 ### 4. Stuck Job Detection
 
-The job monitor service runs continuously:
-
-```python
-# Detects jobs stuck for > 5 minutes
-async def detect_stuck_jobs():
-    stuck_jobs = await db.query("""
-        SELECT * FROM background_jobs
-        WHERE status = 'processing'
-          AND last_heartbeat < NOW() - INTERVAL '5 minutes'
-    """)
-    
-    for job in stuck_jobs:
-        # Send Sentry alert
-        sentry_sdk.capture_message(f"Stuck job detected: {job.id}")
-        
-        # Attempt recovery from checkpoint
-        await checkpoint_recovery_service.recover_job(job.id)
-```
+The job monitor service runs continuously and queries `background_jobs` for records with `status = 'processing'` and `last_heartbeat < NOW() - INTERVAL '5 minutes'`. For each stuck job found, it sends a Sentry alert and attempts recovery from the last checkpoint.
 
 ## Monitoring & Observability
 
@@ -143,23 +81,7 @@ async def detect_stuck_jobs():
 
 ### Health Checks
 
-The system already has:
-
-```typescript
-// Get job metrics
-const metrics = batchJobQueue.getMetrics();
-// Returns:
-// {
-//   totalJobs: 150,
-//   queuedJobs: 10,
-//   processingJobs: 5,
-//   completedJobs: 130,
-//   failedJobs: 5,
-//   throughputPerMinute: 12,
-//   errorRate: 0.03,
-//   averageProcessingTime: 2500
-// }
-```
+The batch job queue exposes a `getMetrics()` method returning `totalJobs`, `queuedJobs`, `processingJobs`, `completedJobs`, `failedJobs`, `throughputPerMinute`, `errorRate`, and `averageProcessingTime`.
 
 ### Alerting
 
@@ -183,22 +105,9 @@ Sentry alerts are automatically sent for:
 
 ### Recommended Additions
 
-1. **Batch Inserts for Pages**:
-```typescript
-// Instead of inserting pages one by one
-const BATCH_SIZE = 100;
-for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-  const batch = urls.slice(i, i + BATCH_SIZE);
-  await supabase.from('scraping_pages').insert(batch);
-}
-```
+1. **Batch Inserts for Pages**: Instead of inserting scraping pages one by one, process them in batches of 100 using a loop with `supabase.from('scraping_pages').insert(batch)`.
 
-2. **Database Query Optimization**:
-```sql
--- Add composite index for common queries
-CREATE INDEX idx_scraping_pages_session_status 
-ON scraping_pages(session_id, status);
-```
+2. **Database Query Optimization**: Add a composite index on `scraping_pages(session_id, status)` to speed up common status queries for a given session.
 
 ## Summary
 
@@ -224,4 +133,3 @@ ON scraping_pages(session_id, status);
 - ❌ Custom metrics (already tracked)
 
 The scraping system now leverages the existing, battle-tested job infrastructure used by PDF processing!
-

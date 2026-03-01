@@ -27,12 +27,12 @@ The collaborative filtering system provides **personalized material recommendati
 
 ### Key Features
 
-✅ **User-User Collaborative Filtering** - "Users like you also liked..."  
-✅ **Item-Item Collaborative Filtering** - "Materials similar to this..."  
-✅ **Hybrid Recommendations** - Combining collaborative + content-based  
-✅ **Interaction Tracking** - Track views, clicks, saves, purchases, ratings  
-✅ **Smart Caching** - 7-day cache with automatic invalidation  
-✅ **Real-time Analytics** - Track recommendation performance  
+✅ **User-User Collaborative Filtering** - "Users like you also liked..."
+✅ **Item-Item Collaborative Filtering** - "Materials similar to this..."
+✅ **Hybrid Recommendations** - Combining collaborative + content-based
+✅ **Interaction Tracking** - Track views, clicks, saves, purchases, ratings
+✅ **Smart Caching** - 7-day cache with automatic invalidation
+✅ **Real-time Analytics** - Track recommendation performance
 
 ### Interaction Types
 
@@ -50,35 +50,7 @@ The collaborative filtering system provides **personalized material recommendati
 
 ## Architecture
 
-```mermaid
-graph TB
-    subgraph "Frontend"
-        USER[User Interaction] --> TRACK[Track Interaction]
-        USER --> VIEW[View Recommendations]
-    end
-
-    subgraph "Edge Functions"
-        TRACK --> API[recommendations-api]
-        VIEW --> API
-        API --> CACHE{Check Cache}
-    end
-
-    subgraph "Database"
-        CACHE -->|Hit| SCORES[(recommendation_scores)]
-        CACHE -->|Miss| COMPUTE[Compute Recommendations]
-        COMPUTE --> INTERACTIONS[(user_material_interactions)]
-        COMPUTE --> SCORES
-    end
-
-    subgraph "Python Service"
-        COMPUTE --> COLLAB[Collaborative Filtering]
-        COLLAB --> COSINE[Cosine Similarity]
-        COLLAB --> MATRIX[Matrix Factorization]
-    end
-
-    SCORES --> RESULTS[Return Results]
-    RESULTS --> USER
-```
+The system flow is as follows: user interactions are tracked and viewed recommendations are requested from the frontend. Both actions route through the `recommendations-api` Edge Function, which checks the cache. On a cache hit, cached recommendation_scores are returned. On a cache miss, recommendations are computed by querying the user_material_interactions table via a Python service that applies cosine similarity and matrix factorization algorithms, and the results are stored back in recommendation_scores before being returned.
 
 ---
 
@@ -86,22 +58,7 @@ graph TB
 
 ### 1. user_material_interactions
 
-Tracks all user interactions with materials for collaborative filtering.
-
-```sql
-CREATE TABLE user_material_interactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    material_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    interaction_type TEXT NOT NULL CHECK (interaction_type IN ('view', 'click', 'save', 'purchase', 'rate', 'add_to_quote', 'share')),
-    interaction_value FLOAT DEFAULT 1.0, -- Rating value (1-5), time spent (seconds), or weight
-    session_id TEXT, -- Session identifier for grouping interactions
-    metadata JSONB DEFAULT '{}'::jsonb, -- Additional context (source page, search query, etc.)
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+Tracks all user interactions with materials for collaborative filtering. Key fields: id (UUID primary key), user_id (references auth.users), workspace_id (references workspaces), material_id (references products), interaction_type (one of: view, click, save, purchase, rate, add_to_quote, share), interaction_value (float, default 1.0 — represents rating value, time spent, or weight), session_id (for grouping interactions), metadata (JSONB for additional context), created_at, and updated_at.
 
 **Indexes:**
 - `idx_user_interactions_user_id` - Fast user lookups
@@ -114,26 +71,7 @@ CREATE TABLE user_material_interactions (
 
 ### 2. recommendation_scores
 
-Cached recommendation scores for fast retrieval.
-
-```sql
-CREATE TABLE recommendation_scores (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    material_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-    score FLOAT NOT NULL CHECK (score >= 0 AND score <= 1), -- Normalized score 0-1
-    algorithm TEXT NOT NULL CHECK (algorithm IN ('collaborative', 'content', 'hybrid', 'user_user', 'item_item')),
-    confidence FLOAT DEFAULT 0.5 CHECK (confidence >= 0 AND confidence <= 1), -- Confidence in recommendation
-    metadata JSONB DEFAULT '{}'::jsonb, -- Algorithm-specific metadata (similar users, similar items, etc.)
-    computed_at TIMESTAMPTZ DEFAULT NOW(),
-    expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '7 days'), -- Cache expiration
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    
-    UNIQUE(user_id, material_id, algorithm)
-);
-```
+Cached recommendation scores for fast retrieval. Key fields: id (UUID primary key), user_id (references auth.users), workspace_id (references workspaces), material_id (references products), score (float 0-1, normalized), algorithm (one of: collaborative, content, hybrid, user_user, item_item), confidence (float 0-1, default 0.5), metadata (JSONB for algorithm-specific data such as similar users or similar items), computed_at, expires_at (default 7 days from now), created_at, and updated_at. A unique constraint applies on (user_id, material_id, algorithm).
 
 **Indexes:**
 - `idx_recommendation_scores_user_score` - Fast user recommendations
@@ -154,14 +92,7 @@ CREATE TABLE recommendation_scores (
 3. Recommend materials liked by similar users
 4. Weight by similarity score and interaction value
 
-**Example:**
-```python
-# User A: {material_1: 5.0, material_2: 3.0, material_3: 4.0}
-# User B: {material_1: 4.0, material_2: 3.0, material_4: 5.0}
-# Similarity: 0.85
-
-# Recommend material_4 to User A with score: 0.85 * 5.0 = 4.25
-```
+**Example:** If User A has interactions {material_1: 5.0, material_2: 3.0, material_3: 4.0} and User B has interactions {material_1: 4.0, material_2: 3.0, material_4: 5.0} with a similarity of 0.85, then material_4 is recommended to User A with a score of 0.85 × 5.0 = 4.25.
 
 **Minimum Requirements:**
 - Target user: 3+ interactions
@@ -180,13 +111,7 @@ CREATE TABLE recommendation_scores (
 3. Calculate similarity based on common users
 4. Rank by weighted overlap
 
-**Example:**
-```python
-# Material A: Liked by [User1, User2, User3, User4]
-# Material B: Liked by [User2, User3, User4, User5]
-# Common users: 3
-# Similarity: 3 / (4 + 4 - 3) = 0.6
-```
+**Example:** If Material A is liked by [User1, User2, User3, User4] and Material B is liked by [User2, User3, User4, User5], the similarity is 3 common users divided by (4 + 4 - 3) = 0.6.
 
 **Minimum Requirements:**
 - Target material: 3+ interactions
@@ -200,9 +125,8 @@ CREATE TABLE recommendation_scores (
 Used to calculate similarity between interaction vectors.
 
 **Formula:**
-```
-similarity = (A · B) / (||A|| * ||B||)
-```
+
+similarity = (A · B) / (||A|| × ||B||)
 
 **Where:**
 - A · B = dot product of vectors
@@ -219,55 +143,11 @@ similarity = (A · B) / (||A|| * ||B||)
 
 Track user interaction with a material.
 
-**Request:**
-```typescript
-{
-  workspace_id: string;
-  material_id: string;
-  interaction_type: 'view' | 'click' | 'save' | 'purchase' | 'rate' | 'add_to_quote' | 'share';
-  interaction_value?: number; // Default: 1.0
-  session_id?: string;
-  metadata?: Record<string, any>;
-}
-```
+**Request parameters:** workspace_id, material_id, interaction_type (one of: view, click, save, purchase, rate, add_to_quote, share), optional interaction_value (default 1.0), optional session_id, and optional metadata object.
 
-**Response:**
-```typescript
-{
-  data: {
-    id: string;
-    user_id: string;
-    workspace_id: string;
-    material_id: string;
-    interaction_type: string;
-    interaction_value: number;
-    created_at: string;
-  };
-  message: 'Interaction tracked successfully';
-}
-```
+**Response:** A data object containing id, user_id, workspace_id, material_id, interaction_type, interaction_value, and created_at. Also includes a success message "Interaction tracked successfully".
 
-**Example:**
-```typescript
-const response = await fetch('/functions/recommendations-api/track-interaction', {
-  method: 'POST',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    workspace_id: 'workspace-123',
-    material_id: 'material-456',
-    interaction_type: 'view',
-    interaction_value: 1.0,
-    session_id: 'session-789',
-    metadata: {
-      source: 'search_results',
-      query: 'blue ceramic tiles',
-    },
-  }),
-});
-```
+Call the endpoint via a POST request to `/functions/recommendations-api/track-interaction` with the Authorization header set to `Bearer ${token}`, Content-Type application/json, and the above body parameters.
 
 ---
 
@@ -280,34 +160,9 @@ Get personalized recommendations for the current user.
 - `limit` (optional) - Maximum number of recommendations (default: 20)
 - `algorithm` (optional) - Algorithm to use: `user_user`, `item_item`, `hybrid` (default: `user_user`)
 
-**Response:**
-```typescript
-{
-  data: Array<{
-    material_id: string;
-    score: number; // 0-1
-    confidence: number; // 0-1
-    algorithm: string;
-    metadata: {
-      similar_users_count?: number;
-      recommending_users?: number;
-    };
-  }>;
-  cached: boolean;
-}
-```
+**Response:** A data array where each entry contains material_id, score (0-1), confidence (0-1), algorithm, and metadata (which may include similar_users_count and recommending_users). Also includes a cached boolean flag.
 
-**Example:**
-```typescript
-const response = await fetch(
-  '/functions/recommendations-api/for-user?workspace_id=workspace-123&limit=20&algorithm=user_user',
-  {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  }
-);
-```
+Call the endpoint via a GET request to `/functions/recommendations-api/for-user?workspace_id=...&limit=20&algorithm=user_user` with the Authorization header.
 
 ---
 
@@ -322,33 +177,9 @@ Get materials similar to a specific material.
 - `workspace_id` (required) - Workspace ID
 - `limit` (optional) - Maximum number of recommendations (default: 10)
 
-**Response:**
-```typescript
-{
-  data: Array<{
-    material_id: string;
-    score: number; // 0-1
-    confidence: number; // 0-1
-    algorithm: 'item_item';
-    metadata: {
-      source_material_id: string;
-      common_users: number;
-    };
-  }>;
-}
-```
+**Response:** A data array where each entry contains material_id, score (0-1), confidence (0-1), algorithm ('item_item'), and metadata (including source_material_id and common_users count).
 
-**Example:**
-```typescript
-const response = await fetch(
-  '/functions/recommendations-api/similar-materials/material-456?workspace_id=workspace-123&limit=10',
-  {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  }
-);
-```
+Call the endpoint via a GET request to `/functions/recommendations-api/similar-materials/{material_id}?workspace_id=...&limit=10` with the Authorization header.
 
 ---
 
@@ -362,31 +193,9 @@ Get recommendation analytics for a workspace.
 **Query Parameters:**
 - `days` (optional) - Number of days to analyze (default: 30)
 
-**Response:**
-```typescript
-{
-  data: {
-    workspace_id: string;
-    period_days: number;
-    total_interactions: number;
-    interactions_by_type: Record<string, number>;
-    cached_recommendations: number;
-    recommendations_by_algorithm: Record<string, number>;
-  };
-}
-```
+**Response:** A data object containing workspace_id, period_days, total_interactions, interactions_by_type (object mapping type to count), cached_recommendations count, and recommendations_by_algorithm (object mapping algorithm name to count).
 
-**Example:**
-```typescript
-const response = await fetch(
-  '/functions/recommendations-api/analytics/workspace-123?days=30',
-  {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  }
-);
-```
+Call the endpoint via a GET request to `/functions/recommendations-api/analytics/{workspace_id}?days=30` with the Authorization header.
 
 ---
 
@@ -398,25 +207,9 @@ Invalidate recommendation cache.
 - `workspace_id` (optional) - Filter by workspace
 - `material_id` (optional) - Filter by material
 
-**Response:**
-```typescript
-{
-  message: 'Cache invalidated successfully';
-}
-```
+**Response:** A message confirming "Cache invalidated successfully".
 
-**Example:**
-```typescript
-const response = await fetch(
-  '/functions/recommendations-api/cache?workspace_id=workspace-123',
-  {
-    method: 'DELETE',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  }
-);
-```
+Call the endpoint via a DELETE request to `/functions/recommendations-api/cache?workspace_id=...` with the Authorization header.
 
 ---
 
@@ -424,203 +217,19 @@ const response = await fetch(
 
 ### 1. Track Interactions
 
-Track user interactions automatically across the platform.
+Create a `RecommendationsService` class (e.g., at `src/services/recommendationsService.ts`) with a private `trackInteraction` method that retrieves the current Supabase session and workspace ID, then POSTs to the track-interaction endpoint with the material ID, interaction type, interaction value, session ID, and optional metadata.
 
-**Create Service:**
-```typescript
-// src/services/recommendationsService.ts
-import { supabase } from '@/integrations/supabase/client';
+Expose convenience static methods from this service: `trackView` (value 1.0), `trackClick` (value 2.0), `trackSave` (value 3.0), `trackRating` (uses the actual rating value), and `trackAddToQuote` (value 4.0).
 
-export class RecommendationsService {
-  private static async trackInteraction(
-    materialId: string,
-    interactionType: string,
-    interactionValue: number = 1.0,
-    metadata?: Record<string, any>
-  ) {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
-
-    const workspaceId = localStorage.getItem('current_workspace_id');
-    if (!workspaceId) return;
-
-    await fetch('/functions/recommendations-api/track-interaction', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        workspace_id: workspaceId,
-        material_id: materialId,
-        interaction_type: interactionType,
-        interaction_value: interactionValue,
-        session_id: session.user.id,
-        metadata,
-      }),
-    });
-  }
-
-  static async trackView(materialId: string, metadata?: Record<string, any>) {
-    await this.trackInteraction(materialId, 'view', 1.0, metadata);
-  }
-
-  static async trackClick(materialId: string, metadata?: Record<string, any>) {
-    await this.trackInteraction(materialId, 'click', 2.0, metadata);
-  }
-
-  static async trackSave(materialId: string, metadata?: Record<string, any>) {
-    await this.trackInteraction(materialId, 'save', 3.0, metadata);
-  }
-
-  static async trackRating(materialId: string, rating: number, metadata?: Record<string, any>) {
-    await this.trackInteraction(materialId, 'rate', rating, metadata);
-  }
-
-  static async trackAddToQuote(materialId: string, metadata?: Record<string, any>) {
-    await this.trackInteraction(materialId, 'add_to_quote', 4.0, metadata);
-  }
-}
-```
-
-**Usage in Components:**
-```typescript
-// In MaterialCard.tsx
-import { RecommendationsService } from '@/services/recommendationsService';
-
-const MaterialCard = ({ material }) => {
-  const handleClick = () => {
-    // Track click
-    RecommendationsService.trackClick(material.id, {
-      source: 'search_results',
-      position: index,
-    });
-
-    // Navigate to material page
-    navigate(`/materials/${material.id}`);
-  };
-
-  useEffect(() => {
-    // Track view when card is visible
-    const observer = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        RecommendationsService.trackView(material.id, {
-          source: 'search_results',
-        });
-      }
-    });
-
-    observer.observe(cardRef.current);
-    return () => observer.disconnect();
-  }, [material.id]);
-
-  return (
-    <div ref={cardRef} onClick={handleClick}>
-      {/* Material card content */}
-    </div>
-  );
-};
-```
+In material card components, call `RecommendationsService.trackClick()` on click events (with metadata such as source page and position), and call `RecommendationsService.trackView()` using an IntersectionObserver when the card enters the viewport.
 
 ---
 
 ### 2. Display Recommendations
 
-**Create Recommendation Components:**
+Create a `RecommendedForYou` component that on mount fetches the current Supabase session and workspace ID, then calls the `for-user` endpoint with a limit of 20. Render a grid of MaterialCard components from the returned material IDs.
 
-```typescript
-// src/components/recommendations/RecommendedForYou.tsx
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-
-export const RecommendedForYou = () => {
-  const [recommendations, setRecommendations] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchRecommendations = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const workspaceId = localStorage.getItem('current_workspace_id');
-      if (!workspaceId) return;
-
-      const response = await fetch(
-        `/functions/recommendations-api/for-user?workspace_id=${workspaceId}&limit=20`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      const { data } = await response.json();
-      setRecommendations(data);
-      setLoading(false);
-    };
-
-    fetchRecommendations();
-  }, []);
-
-  if (loading) return <div>Loading recommendations...</div>;
-  if (recommendations.length === 0) return null;
-
-  return (
-    <div className="recommended-for-you">
-      <h2>Recommended for You</h2>
-      <div className="recommendations-grid">
-        {recommendations.map((rec) => (
-          <MaterialCard key={rec.material_id} materialId={rec.material_id} />
-        ))}
-      </div>
-    </div>
-  );
-};
-```
-
-```typescript
-// src/components/recommendations/SimilarMaterials.tsx
-export const SimilarMaterials = ({ materialId }: { materialId: string }) => {
-  const [similar, setSimilar] = useState([]);
-
-  useEffect(() => {
-    const fetchSimilar = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const workspaceId = localStorage.getItem('current_workspace_id');
-      if (!workspaceId) return;
-
-      const response = await fetch(
-        `/functions/recommendations-api/similar-materials/${materialId}?workspace_id=${workspaceId}&limit=10`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      const { data } = await response.json();
-      setSimilar(data);
-    };
-
-    fetchSimilar();
-  }, [materialId]);
-
-  if (similar.length === 0) return null;
-
-  return (
-    <div className="similar-materials">
-      <h3>Similar Materials</h3>
-      <div className="materials-carousel">
-        {similar.map((rec) => (
-          <MaterialCard key={rec.material_id} materialId={rec.material_id} />
-        ))}
-      </div>
-    </div>
-  );
-};
-```
+Create a `SimilarMaterials` component that accepts a `materialId` prop and on mount fetches from the `similar-materials/{materialId}` endpoint. Render a carousel of MaterialCard components from the returned material IDs.
 
 ---
 
@@ -652,23 +261,7 @@ export const SimilarMaterials = ({ materialId }: { materialId: string }) => {
 
 ### Track Recommendation Performance
 
-```typescript
-const analytics = await fetch(
-  '/functions/recommendations-api/analytics/workspace-123?days=30',
-  {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  }
-);
-
-const { data } = await analytics.json();
-
-console.log('Total Interactions:', data.total_interactions);
-console.log('Interactions by Type:', data.interactions_by_type);
-console.log('Cached Recommendations:', data.cached_recommendations);
-console.log('Recommendations by Algorithm:', data.recommendations_by_algorithm);
-```
+Fetch the analytics endpoint for your workspace with a `days` parameter. The response data includes total_interactions, interactions_by_type (broken down by each interaction type), cached_recommendations count, and recommendations_by_algorithm (broken down by each algorithm type).
 
 ### Metrics to Monitor
 
@@ -696,4 +289,3 @@ console.log('Recommendations by Algorithm:', data.recommendations_by_algorithm);
 4. Optimize algorithms based on analytics
 
 **The collaborative filtering system is ready for integration!** 🚀
-

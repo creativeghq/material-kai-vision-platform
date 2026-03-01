@@ -34,14 +34,7 @@ The Push Notifications admin tab provides comprehensive management of web push n
 
 ### 1. Generate VAPID Keys
 
-You can generate VAPID keys using the web-push library:
-
-```bash
-npm install -g web-push
-web-push generate-vapid-keys
-```
-
-Or use an online generator: https://vapidkeys.com/
+You can generate VAPID keys using the web-push library or use an online generator: https://vapidkeys.com/
 
 ### 2. Add VAPID Secrets to Supabase
 
@@ -55,15 +48,10 @@ Go to **Supabase Dashboard → Project Settings → Edge Functions → Secrets**
 
 ### 3. Redeploy Edge Functions
 
-After adding the secrets, redeploy the notification-dispatcher Edge Function:
-
-```bash
-supabase functions deploy notification-dispatcher
-```
+After adding the secrets, redeploy the notification-dispatcher Edge Function using `supabase functions deploy notification-dispatcher`.
 
 ## How Push Notifications Work
 
-```
 User subscribes in browser
        ↓
 Browser generates subscription endpoint
@@ -81,7 +69,6 @@ Calls notification-dispatcher Edge Function
 Edge Function sends push to browser using VAPID keys
        ↓
 User receives notification
-```
 
 ## User Flow
 
@@ -170,35 +157,11 @@ Users control which notification types trigger push notifications via their noti
 
 ### Register Subscription (Client-side)
 
-```typescript
-import { notificationService } from '@/services/notifications/NotificationService';
-
-// Get push subscription from browser
-const registration = await navigator.serviceWorker.ready;
-const subscription = await registration.pushManager.subscribe({
-  userVisibleOnly: true,
-  applicationServerKey: VAPID_PUBLIC_KEY
-});
-
-// Register with backend
-await notificationService.registerPushSubscription(userId, subscription.toJSON());
-```
+Use the browser's `navigator.serviceWorker.ready` to get the service worker registration, then call `registration.pushManager.subscribe()` with `userVisibleOnly: true` and your `applicationServerKey` (VAPID public key). Pass the resulting subscription JSON to `notificationService.registerPushSubscription(userId, subscription.toJSON())`.
 
 ### Send Notification (Server-side)
 
-```typescript
-import { notificationService } from '@/services/notifications/NotificationService';
-
-await notificationService.send({
-  userId: 'user-id',
-  notificationType: 'quote_update',
-  title: 'Quote Updated',
-  message: 'Your quote #12345 has been updated',
-  data: {
-    action_url: '/quotes/12345'
-  }
-});
-```
+Call `notificationService.send()` with a payload containing `userId`, `notificationType`, `title`, `message`, and optional `data` (such as `action_url`).
 
 ## Monitoring
 
