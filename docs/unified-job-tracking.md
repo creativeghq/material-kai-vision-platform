@@ -40,11 +40,9 @@ Key columns: `id`, `job_id` (links to background_jobs or data_import_jobs), `job
 ## 🎯 Job Lifecycle
 
 ### 1. PDF Processing Job
-```
 pending → processing → completed/failed
          ↓
     (9 checkpoint stages)
-```
 
 **Stages**:
 1. `pdf_loaded` - PDF file loaded
@@ -59,11 +57,9 @@ pending → processing → completed/failed
 - Auto-recovery on crash
 
 ### 2. Web Scraping Job
-```
 pending → processing → scraping → completed/failed
          ↓
     (page-by-page processing)
-```
 
 **Flow**:
 1. Create scraping_session
@@ -79,11 +75,9 @@ pending → processing → scraping → completed/failed
 - Failed pages tracking
 
 ### 3. XML Import Job
-```
 pending → processing → completed/failed
          ↓
     (product-by-product processing)
-```
 
 **Flow**:
 1. Create data_import_job

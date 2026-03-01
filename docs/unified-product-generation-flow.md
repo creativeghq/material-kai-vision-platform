@@ -238,7 +238,6 @@ Additional specialized searches run for texture, material, and style in the same
 
 ### Search Flow
 
-```
 User Query: "blue ceramic tiles"
            ↓
 Generate Query Embedding (OpenAI 1536D)
@@ -268,7 +267,6 @@ Generate Query Embedding (OpenAI 1536D)
 Combine & Rank Results
            ↓
 Return Unified Results (PDF + Web + XML)
-```
 
 ---
 

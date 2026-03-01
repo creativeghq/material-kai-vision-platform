@@ -31,7 +31,6 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 
 ## 📊 How It Works
 
-```
 ┌─────────────────────┐
 │  User Triggers      │
 │  Web Scraping       │
@@ -67,7 +66,6 @@ See [Async Processing & Limits](./async-processing-and-limits.md) for complete d
 │  Products Created   │
 │  in Database        │
 └─────────────────────┘
-```
 
 ## 🚀 Getting Started
 

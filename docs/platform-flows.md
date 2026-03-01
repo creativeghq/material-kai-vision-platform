@@ -21,7 +21,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Transform material catalog PDFs into searchable, intelligent knowledge
 
 **User Journey:**
-```
 1. User uploads PDF file
    ↓
 2. Frontend uploads to Supabase Storage
@@ -46,7 +45,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 5. Real-time progress updates to frontend
    ↓
 6. Results displayed in Materials Catalog
-```
 
 **API Endpoint:** `POST /api/rag/documents/upload`
 **Frontend Component:** `EnhancedPDFProcessor.tsx`
@@ -59,7 +57,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Find materials using text, images, or natural language
 
 **User Journey:**
-```
 1. User enters search query or uploads image
    ↓
 2. Frontend calls MIVAA search API
@@ -84,7 +81,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Images
    - Metadata
    - Relevance scores
-```
 
 **API Endpoint:** `POST /api/rag/search`
 **Frontend Component:** `SearchHub.tsx`
@@ -97,7 +93,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Import materials from XML files or web scraping
 
 **User Journey (XML Import):**
-```
 1. User uploads XML file
    ↓
 2. Edge Function parses XML and detects fields
@@ -118,7 +113,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 7. Job marked as completed
    ↓
 8. Results displayed in Import History
-```
 
 **API Endpoint:** `POST /api/data-import/xml`
 **Frontend Component:** `DataImportHub.tsx`
@@ -131,7 +125,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Interactive 3D room designer for material visualization
 
 **User Journey:**
-```
 1. User accesses /designer route
    ↓
 2. DesignerLayout loads with:
@@ -150,7 +143,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Camera controls (orbit, pan, zoom)
    - Grid snapping
    - Material previews
-```
 
 **Frontend Component:** `DesignerPage.tsx` → `DesignerLayout.tsx`
 **Route:** `/designer`
@@ -162,7 +154,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Create and manage documentation with AI assistance
 
 **User Journey:**
-```
 1. User creates new document or uploads PDF
    ↓
 2. For text input:
@@ -182,7 +173,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 6. Document saved to knowledge_base table
    ↓
 7. Available in semantic search
-```
 
 **API Endpoint:** `POST /api/knowledge-base/documents`
 **Frontend Component:** `KnowledgeBaseHub.tsx`
@@ -195,7 +185,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Interactive AI assistance for various tasks
 
 **User Journey:**
-```
 1. User selects agent type:
    - PDF Processor
    - Search Assistant
@@ -215,7 +204,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 5. Response streamed to frontend
    ↓
 6. User continues conversation
-```
 
 **Edge Function:** `agent-chat`
 **Frontend Component:** `AgentHub.tsx`
@@ -229,7 +217,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 **Purpose:** Generate explorable 3D worlds from interior design images
 
 **User Journey:**
-```
 1. User generates interior design image via Agent
    ↓
 2. User clicks "Generate VR" button on DesignCanvas
@@ -257,7 +244,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - First-person mode: WASD to move, mouse to look
    - Quality selector: Draft / Standard / Full
    - Fullscreen toggle
-```
 
 **Edge Function:** `generate-vr-world`
 **Frontend Component:** `WorldViewer.tsx`

@@ -41,9 +41,7 @@ The Duplicate Material Detection & Merging system helps maintain data quality by
 ### Similarity Scoring
 
 **Overall Score Calculation:**
-```
 overall_score = (name_sim × 0.50) + (desc_sim × 0.30) + (meta_sim × 0.20)
-```
 
 **Confidence Levels:**
 - **High**: 85%+ (very likely duplicate)

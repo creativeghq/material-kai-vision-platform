@@ -25,7 +25,6 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 
 ### Components
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Frontend (React)                        │
 │  - Agent Hub (/agent-hub)                                   │
@@ -49,7 +48,6 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 │  - agent_checkpoints (conversation state)                   │
 │  - agent_memories (long-term memory)                        │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -176,14 +174,12 @@ Skills provide domain-specific knowledge that agents can load on-demand using pr
 
 ### Structure
 
-```
 supabase/functions/
 ├── _skills/
 │   ├── types.ts              # Type definitions
 │   ├── index.ts              # Skills loader
 │   └── [skill-slug]/
 │       └── SKILL.md          # Skill definition
-```
 
 ### SKILL.md Format
 

@@ -47,7 +47,6 @@ Each generated world produces:
 
 ### Components
 
-```
 DesignCanvas (Frontend)
   └─ "Generate VR" button
        │
@@ -71,7 +70,6 @@ WorldViewer component (Frontend)
   - Orbit / Walk navigation toggle
   - Quality selector (100k / 500k / full)
   - Fullscreen mode
-```
 
 ### Files
 

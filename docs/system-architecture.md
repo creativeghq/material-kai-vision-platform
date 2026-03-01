@@ -6,7 +6,6 @@ Complete technical architecture of Material Kai Vision Platform.
 
 ## 🏗️ Three-Tier Architecture
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │ FRONTEND TIER (Vercel Edge Network)                         │
 │ React 18 + TypeScript + Vite + Shadcn/UI                   │
@@ -48,7 +47,6 @@ Complete technical architecture of Material Kai Vision Platform.
 │ - Real-time subscriptions                                   │
 │ - Storage (Supabase Storage)                                │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ---
 
@@ -56,7 +54,6 @@ Complete technical architecture of Material Kai Vision Platform.
 
 **Key Design**: Frontend calls MIVAA directly (no proxy Edge Functions)
 
-```
 Frontend (Vercel)
     ↓
     └─→ MIVAA API (v1api.materialshub.gr)
@@ -66,7 +63,6 @@ Frontend (Vercel)
             ├─→ Anthropic (Claude)
             ├─→ HuggingFace Endpoint (Qwen3-VL)
             └─→ Supabase Storage (Images)
-```
 
 **Benefits**:
 - ✅ Reduced latency (no proxy layer)
@@ -313,7 +309,6 @@ All tables use RLS policies that restrict access based on workspace membership. 
 
 ### PDF Upload Flow
 
-```
 1. User uploads PDF (Frontend)
    ↓
 2. Frontend calls MIVAA API
@@ -331,11 +326,9 @@ All tables use RLS policies that restrict access based on workspace membership. 
 8. Results stored in database
    ↓
 9. Frontend displays results
-```
 
 ### Search Flow
 
-```
 1. User enters search query (Frontend)
    ↓
 2. Frontend calls MIVAA search API
@@ -356,7 +349,6 @@ All tables use RLS policies that restrict access based on workspace membership. 
 7. Metadata filtering + soft boosts
    ↓
 8. Results returned to frontend (with weight_profile in metadata)
-```
 
 ---
 

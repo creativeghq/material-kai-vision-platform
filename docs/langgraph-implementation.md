@@ -17,7 +17,6 @@ The platform uses **LangGraph** for agent orchestration, providing:
 
 ## Architecture
 
-```
                         ┌─────────────────────────────────────┐
                         │         User Request                │
                         └──────────────┬──────────────────────┘
@@ -65,7 +64,6 @@ The platform uses **LangGraph** for agent orchestration, providing:
               │         LongTermMemory                     │
               │   (agent_memories table)                   │
               └────────────────────────────────────────────┘
-```
 
 ---
 

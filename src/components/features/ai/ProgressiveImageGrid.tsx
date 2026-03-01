@@ -387,6 +387,14 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     }
   }, [modalActiveTab, selectedImage, modalSegmentsLoaded, modalSegmenting, loadModalSegments]);
 
+  // ── Zone-select: auto-load segments when mode is activated ──────────────────
+  useEffect(() => {
+    if (editMode !== 'zone-select' || !selectedImage) return;
+    if (!modalSegmentsLoaded && !modalSegmenting) {
+      loadModalSegments();
+    }
+  }, [editMode, selectedImage, modalSegmentsLoaded, modalSegmenting, loadModalSegments]);
+
   // ── Edit mode: initialise freehand canvas at natural image size ──────────────
   useEffect(() => {
     if (editMode !== 'freehand' || !drawingCanvasRef.current || !selectedImage) return;
@@ -717,7 +725,8 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                         setEditMode('none');
                       } else {
                         setEditMode('zone-select');
-                        setModalActiveTab('products');
+                        // Don't auto-switch tab — avoid triggering AI segmentation automatically.
+                        // Zone Select button appears in the Materials tab; Draw Mask works on Image tab.
                       }
                     }}
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
@@ -765,7 +774,7 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
               {editMode !== 'none' && (
                 <div className="flex gap-1 mt-2 p-1 bg-violet-50 rounded-lg border border-violet-200">
                   <button
-                    onClick={() => { setEditMode('zone-select'); setModalActiveTab('products'); }}
+                    onClick={() => { setEditMode('zone-select'); }}
                     className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
                       editMode === 'zone-select' ? 'bg-violet-600 text-white' : 'text-violet-600 hover:bg-violet-100'
                     }`}
@@ -852,24 +861,84 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                     )}
                   </div>
                 ) : (
-                  /* Normal image view */
+                  /* Normal image view + zone-select overlays */
                   <div
-                    className="relative bg-gray-50 rounded-xl overflow-hidden border border-gray-200 group"
-                    style={{ minHeight: '380px' }}
+                    className={`relative bg-gray-50 rounded-xl overflow-hidden border-2 transition-colors ${
+                      editMode === 'zone-select' ? 'border-violet-400' : 'border-gray-200'
+                    }`}
                   >
                     {selectedImage && (
                       <>
+                        {/* Use w-full h-auto so bbox % coords map correctly — no letterbox offset */}
                         <img
                           src={selectedImage.url}
                           alt={selectedImage.name}
-                          className="w-full h-full object-contain cursor-zoom-in"
-                          onClick={() => setLightboxUrl(selectedImage.url)}
+                          className="w-full h-auto block"
                         />
-                        {/* Click-to-expand hint */}
-                        <div className="absolute bottom-3 left-3 z-10 bg-black/50 text-white text-[11px] px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none select-none">
-                          Click to expand
-                        </div>
-                        {onGenerateVR && (
+
+                        {/* Zone-select mode: clickable overlay rectangles */}
+                        {editMode === 'zone-select' && (
+                          <div className="absolute inset-0">
+                            {/* Loading state */}
+                            {(modalSegmenting || (!modalSegmentsLoaded && !modalSegmentError)) && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                                <div className="bg-white rounded-xl px-5 py-3 flex items-center gap-3 shadow-lg">
+                                  <Loader2 className="w-5 h-5 animate-spin text-violet-600" />
+                                  <span className="text-sm font-medium">Detecting zones…</span>
+                                </div>
+                              </div>
+                            )}
+                            {/* Instruction when no zones yet */}
+                            {modalSegmentsLoaded && modalSegments.length === 0 && !modalSegmentError && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                <p className="text-white text-sm bg-black/60 px-4 py-2 rounded-lg">No zones detected — try Draw Mask instead</p>
+                              </div>
+                            )}
+                            {/* Error */}
+                            {modalSegmentError && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                                <div className="bg-white rounded-xl px-5 py-3 text-center shadow-lg space-y-2">
+                                  <p className="text-sm text-destructive font-medium">Detection failed</p>
+                                  <Button size="sm" variant="outline" onClick={handleRegenerate}>Retry</Button>
+                                </div>
+                              </div>
+                            )}
+                            {/* Zone rectangles */}
+                            {modalSegments.map((seg, i) => (
+                              <button
+                                key={seg.id ?? i}
+                                onClick={() => !generatingMask && generateMaskFromZone(seg)}
+                                disabled={generatingMask}
+                                style={{
+                                  left: `${seg.bbox.x * 100}%`,
+                                  top: `${seg.bbox.y * 100}%`,
+                                  width: `${seg.bbox.w * 100}%`,
+                                  height: `${seg.bbox.h * 100}%`,
+                                }}
+                                className="absolute border-2 border-white/60 bg-white/5 hover:bg-violet-500/40 hover:border-violet-300 disabled:cursor-wait transition-all group cursor-pointer rounded-sm"
+                                title={`${seg.label} — click to replace`}
+                              >
+                                {/* Zone label tooltip */}
+                                <span className="absolute top-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap leading-tight">
+                                  {seg.label}
+                                  {generatingMask && ' (generating…)'}
+                                </span>
+                                {/* Center "+" icon on hover */}
+                                <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <span className="w-7 h-7 rounded-full bg-violet-600 flex items-center justify-center shadow">
+                                    <Paintbrush className="w-3.5 h-3.5 text-white" />
+                                  </span>
+                                </span>
+                              </button>
+                            ))}
+                            {/* Header hint */}
+                            <div className="absolute top-2 left-2 bg-violet-600 text-white text-[10px] px-2 py-1 rounded-md font-medium pointer-events-none">
+                              Click a zone to replace
+                            </div>
+                          </div>
+                        )}
+
+                        {onGenerateVR && editMode === 'none' && (
                           <div className="absolute top-3 right-3 z-10">
                             <button
                               onClick={() => {
@@ -1199,25 +1268,19 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Mask Review Overlay */}
-      {showMaskReview && activeMask && selectedImage && (
-        <div className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-2xl space-y-4 p-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-sm text-gray-900">
-                  {activeZone ? `Replacing: ${activeZone.label}` : 'Drawn mask'}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Purple area = zone to replace with new material</p>
-              </div>
-              <button
-                onClick={() => setShowMaskReview(false)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {/* Image + mask overlay */}
+      {/* Mask Review — uses Dialog (Portal) so it renders above everything */}
+      <Dialog open={showMaskReview && !!activeMask && !!selectedImage} onOpenChange={(open) => { if (!open) setShowMaskReview(false); }}>
+        <DialogContent className="max-w-2xl w-full p-5 gap-4">
+          <DialogHeader className="p-0">
+            <DialogTitle className="text-sm font-semibold">
+              {activeZone ? `Replacing: ${activeZone.label}` : 'Drawn mask'}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              Purple area = zone to replace with new material
+            </DialogDescription>
+          </DialogHeader>
+          {/* Image + mask overlay */}
+          {selectedImage && activeMask && (
             <div className="relative rounded-lg overflow-hidden border border-border">
               <img src={selectedImage.url} alt="" className="w-full object-contain" />
               <div
@@ -1231,25 +1294,25 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                 }}
               />
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowMaskReview(false)}>
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="bg-violet-600 hover:bg-violet-700 text-white"
-                onClick={() => {
-                  setShowMaskReview(false);
-                  setShowMaterialPicker(true);
-                }}
-              >
-                <Paintbrush className="w-3.5 h-3.5 mr-1.5" />
-                Pick Material →
-              </Button>
-            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowMaskReview(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+              onClick={() => {
+                setShowMaskReview(false);
+                setShowMaterialPicker(true);
+              }}
+            >
+              <Paintbrush className="w-3.5 h-3.5 mr-1.5" />
+              Pick Material →
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* MaterialPickerModal */}
       {showMaterialPicker && activeMask && selectedImage && (

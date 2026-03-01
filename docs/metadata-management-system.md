@@ -89,36 +89,30 @@ The DynamicMetadataExtractor organizes metadata into 9 comprehensive functional 
 Metadata that mentions a specific product name and applies only to that product.
 
 **Example:**
-```
 Text: "NOVA tile has R11 slip resistance"
 Scope: product_specific
 Applies To: ["NOVA"]
 Relevance: 0.95 (HIGH)
-```
 
 ### 2. Catalog-General (Explicit)
 
 Metadata that explicitly states it applies to all products.
 
 **Example:**
-```
 Text: "All tiles in this catalog are made in Spain"
 Scope: catalog_general_explicit
 Applies To: "all"
 Relevance: 0.5 (MEDIUM)
-```
 
 ### 3. Catalog-General (Implicit)
 
 Metadata mentioned once without product context, implicitly applying to all products.
 
 **Example:**
-```
 Text: "Available in 15×38"
 Scope: catalog_general_implicit
 Applies To: "all"
 Relevance: 0.5 (MEDIUM)
-```
 
 **Detection Patterns:**
 - "Available in [dimensions]"
@@ -132,12 +126,10 @@ Relevance: 0.5 (MEDIUM)
 Metadata that applies to a specific product category.
 
 **Example:**
-```
 Text: "All matte tiles have R11 slip resistance"
 Scope: category_specific
 Applies To: ["matte_tiles"]
 Relevance: 0.7 (MEDIUM-HIGH)
-```
 
 ## Processing Flow
 
@@ -145,7 +137,6 @@ Relevance: 0.7 (MEDIUM-HIGH)
 
 Metadata extraction is now integrated directly into the Product Discovery pipeline (Stage 0):
 
-```
 Stage 0: Product Discovery
 ├── 0A: Discover Products (Claude/GPT)
 │   ├── Identify product names
@@ -161,7 +152,6 @@ Stage 0: Product Discovery
     │   └── Merge with discovery metadata
     │
     └── Store enriched products in database
-```
 
 The enrichment process: Product Discovery identifies products, then for each product the system extracts product-specific text, calls DynamicMetadataExtractor, and merges metadata in priority order — original discovery metadata takes highest priority, followed by critical fields (`material_category`, `factory_name`, `factory_group`), followed by the 200+ dynamically discovered fields. All metadata is stored in the `products.metadata` JSONB field.
 
@@ -173,9 +163,7 @@ The legacy chunk-based metadata application is still available for post-processi
 
 PDF content is split into semantic chunks during document processing.
 
-```
 PDF → PyMuPDF4LLM → Markdown → Semantic Chunking → Document Chunks
-```
 
 ### Stage 2: Scope Detection
 
@@ -250,7 +238,6 @@ Get metadata statistics and analytics. Returns `total_products`, `total_metadata
 
 The metadata system is integrated into the PDF processing pipeline at Stage 4 (after product creation):
 
-```
 Stage 0: Product Discovery (Claude/GPT)
 Stage 1: PDF Extraction (PyMuPDF4LLM)
 Stage 2: Chunk Creation (Semantic Chunking)
@@ -258,7 +245,6 @@ Stage 3: Product Creation (Vision Analysis)
 Stage 4: Metadata Application ← NEW
 Stage 5: Image Processing
 Stage 6: Embedding Generation
-```
 
 ## Database Schema
 

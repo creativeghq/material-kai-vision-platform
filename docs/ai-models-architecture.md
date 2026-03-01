@@ -16,7 +16,6 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
 
 ## Complete Model Flow Diagram
 
-```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         PDF UPLOAD & PROCESSING                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -120,7 +119,6 @@ MIVAA Platform uses **7 different AI models** across **4 providers** for differe
 │ Purpose: Conversational AI, material search, recommendations          │
 │ Why: Mastra provides agent orchestration, tool calling                │
 └─────────────────────────────────────────────────────────────────────────┘
-```
 
 ---
 

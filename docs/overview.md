@@ -66,7 +66,6 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 
 ### System Flow
 
-```
 User uploads PDF → Frontend (React)
     ↓
 Supabase Edge Function (mivaa-gateway)
@@ -91,7 +90,6 @@ MIVAA API (FastAPI) → Creates background job
 Data stored in Supabase → Available for search
     ↓
 Real-time updates → Frontend displays results
-```
 
 ---
 

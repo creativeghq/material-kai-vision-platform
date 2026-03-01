@@ -13,7 +13,6 @@ The web scraping system is fully integrated with the platform's unified job trac
 
 ## Architecture
 
-```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Scraping Session                          │
 │  ┌────────────────────────────────────────────────────────┐ │
@@ -43,7 +42,6 @@ The web scraping system is fully integrated with the platform's unified job trac
 │  • Circuit breaker for external services                    │
 │  • Sentry integration for crash alerts                      │
 └─────────────────────────────────────────────────────────────┘
-```
 
 ## Job Lifecycle
 

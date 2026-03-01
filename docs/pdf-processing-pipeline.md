@@ -13,7 +13,6 @@
 
 **Key Concept**: After Stage 0 discovers products, Stages 1-5 process EACH product individually, extracting and linking all related data (chunks, images, tables) before moving to the next product.
 
-```
 ┌─────────────────────────────────────────────────────────────────┐
 │ STAGE 0A: Product Discovery (0-10%)                             │
 │ AI Model: Claude Sonnet 4.5 / GPT-4o                           │
@@ -224,7 +223,6 @@
 │ Output: Complete processed document                            │
 │ Note: All images stored in Supabase, 0 local files            │
 └─────────────────────────────────────────────────────────────────┘
-```
 
 ---
 

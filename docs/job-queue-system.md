@@ -32,7 +32,6 @@ The Material Kai Vision Platform uses a **unified job queue system** across all 
 
 ### Multi-Pipeline Architecture
 
-```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Frontend (React)                                               │
 │  - PDF Upload (/admin/data-import)                              │
@@ -61,7 +60,6 @@ The Material Kai Vision Platform uses a **unified job queue system** across all 
 │  - job_checkpoints (PDF recovery data)                          │
 │  - ai_analysis_queue (AI analysis jobs)                 │
 └─────────────────────────────────────────────────────────┘
-```
 
 ---
 
