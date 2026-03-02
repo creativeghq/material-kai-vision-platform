@@ -76,6 +76,7 @@ export function useSegmentation({
               crop_storage_url: row.crop_storage_url ?? undefined,
               search_results: (row.search_results as any[]) ?? [],
               search_query: (row as any).search_query ?? undefined,
+              zone_intent: (row as any).zone_intent ?? 'surface',
             })),
           );
         }
@@ -164,6 +165,7 @@ export function useSegmentation({
           search_results: s.search_results ?? null,
           confidence: s.confidence,
           search_query: s.search_query ?? null,
+          zone_intent: s.zone_intent ?? 'surface',
         }));
 
         const { data: inserted } = await supabase

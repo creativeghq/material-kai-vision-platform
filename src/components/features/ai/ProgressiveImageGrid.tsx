@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { MaterialPickerModal, PickedMaterial, EditedImageResult, AppliedMaterial } from './MaterialPickerModal';
-import { BillOfMaterials } from './BillOfMaterials';
+import { AddToQuoteModal } from '@/components/business/quotes/AddToQuoteModal';
 
 interface ModelResult {
   model_id: string;
@@ -91,7 +91,8 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
 
   // ── Phase 6: Edited images ───────────────────────────────────────────────────
   const [editedImages, setEditedImages] = useState<EditedImageEntry[]>([]);
-  const [bomEntry, setBomEntry] = useState<EditedImageEntry | null>(null);
+  // Add to Quote queue: array of real (non-sentinel) AppliedMaterial items pending quote addition
+  const [quoteQueue, setQuoteQueue] = useState<AppliedMaterial[]>([]);
 
   // Initialize with placeholder data immediately
   useEffect(() => {
@@ -415,9 +416,9 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
     if (!selectedImage) return;
     setGeneratingMask(true);
     try {
-      const imageBase64 = await imageUrlToBase64(selectedImage.url);
+      // Prefer image_url → backend passes it directly to SAM 2 Replicate (no base64 round-trip)
       const res = await mivaaApi.generateSAMMask({
-        image_base64: imageBase64,
+        image_url: selectedImage.url,
         hint_type: 'bbox',
         bbox: seg.bbox,
         workspace_id: workspaceId,
@@ -676,13 +677,16 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                     <RotateCcw className="w-3 h-3" />
                     Edit More
                   </button>
-                  {edited.appliedMaterials.length > 0 && (
+                  {edited.appliedMaterials.filter(m => !m.product_id.startsWith('__')).length > 0 && (
                     <button
-                      onClick={e => { e.stopPropagation(); setBomEntry(edited); }}
+                      onClick={e => {
+                        e.stopPropagation();
+                        setQuoteQueue(edited.appliedMaterials.filter(m => !m.product_id.startsWith('__')));
+                      }}
                       className="flex items-center gap-1 px-2 py-1 bg-slate-600 hover:bg-slate-700 text-white text-[10px] font-medium rounded transition-colors"
                     >
-                      <Package className="w-3 h-3" />
-                      BoM
+                      <ShoppingCart className="w-3 h-3" />
+                      Add to Quote
                     </button>
                   )}
                   <a
@@ -915,13 +919,16 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
                                   width: `${seg.bbox.w * 100}%`,
                                   height: `${seg.bbox.h * 100}%`,
                                 }}
-                                className="absolute border-2 border-white/60 bg-white/5 hover:bg-violet-500/40 hover:border-violet-300 disabled:cursor-wait transition-all group cursor-pointer rounded-sm"
+                                className="absolute border-2 border-transparent bg-transparent hover:bg-violet-500/30 hover:border-white/80 disabled:cursor-wait transition-all group cursor-pointer rounded-sm"
                                 title={`${seg.label} — click to replace`}
                               >
                                 {/* Zone label tooltip */}
                                 <span className="absolute top-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap leading-tight">
                                   {seg.label}
                                   {generatingMask && ' (generating…)'}
+                                  {seg.zone_intent === 'sub_element' && !generatingMask && (
+                                    <span className="ml-1 text-yellow-300">· Use Freehand for precision</span>
+                                  )}
                                 </span>
                                 {/* Center "+" icon on hover */}
                                 <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1353,12 +1360,13 @@ export const ProgressiveImageGrid: React.FC<ProgressiveImageGridProps> = ({
         />
       )}
 
-      {/* Bill of Materials modal */}
-      {bomEntry && (
-        <BillOfMaterials
-          isOpen={!!bomEntry}
-          onClose={() => setBomEntry(null)}
-          appliedMaterials={bomEntry.appliedMaterials}
+      {/* Add to Quote — sequential modal per real product */}
+      {quoteQueue.length > 0 && quoteQueue[0] && (
+        <AddToQuoteModal
+          productId={quoteQueue[0].product_id}
+          productName={quoteQueue[0].product_name}
+          onClose={() => setQuoteQueue([])}
+          onSuccess={() => setQuoteQueue(prev => prev.slice(1))}
         />
       )}
 

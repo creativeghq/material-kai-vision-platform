@@ -1661,7 +1661,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                   <div
                     className={`${message.demoData || message.materialData || message.designData || message.worldData ? 'max-w-full' : 'max-w-[75%]'} rounded-2xl p-5 ${
                       message.role === 'user'
-                        ? 'bg-primary/10 border border-primary/20 text-foreground shadow-sm'
+                        ? 'bg-accent border border-accent-foreground/10 text-foreground shadow-sm'
                         : 'bg-white/40 border border-white/30 text-foreground backdrop-blur-sm shadow-sm'
                     }`}
                   >
@@ -1817,9 +1817,7 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
                                 setTimeout(async () => { await handleSendMessage(); }, 100);
                               }}
                               pendingReplacement={pendingReplacement}
-                              onZoneSelectedForReplacement={(segment) => {
-                                // Phase 5 will open MaterialPickerModal here with pendingReplacement pre-selected
-                                console.log('Zone selected for replacement:', segment.label, 'with material:', pendingReplacement?.name);
+                              onZoneSelectedForReplacement={() => {
                                 setPendingReplacement(null);
                               }}
                             />

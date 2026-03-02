@@ -48,6 +48,11 @@ body {
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--background));
 }
 
+/* Reroute legacy hover:bg-primary/10 pattern to the warm peach accent globally */
+.hover\:bg-primary\/10:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
 /* Fade-in animation for progressive image loading */
 @keyframes fade-in {
   from {
@@ -156,8 +161,8 @@ All colors MUST be HSL.
     --muted: 0 0% 96%;  /* #F5F5F5 - Very light gray */
     --muted-foreground: 0 0% 45%;  /* #737373 - Medium gray text */
 
-    /* Accent - Subtle hover state (Notion-like) */
-    --accent: 0 0% 96%;  /* #F5F5F5 - Very light gray */
+    /* Accent - Warm peach hover/background state */
+    --accent: 22 100% 93%;  /* #FFE8DB - Warm peach */
     --accent-foreground: 0 0% 20%;  /* Dark text */
 
     /* Destructive - Muted red (Notion-like) */

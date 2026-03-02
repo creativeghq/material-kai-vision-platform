@@ -30,9 +30,11 @@ import {
   ChevronRight,
   AlertCircle,
   Info,
+  Camera,
 } from 'lucide-react';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { SegmentWithResults } from '@/hooks/useSegmentation';
+import { supabase } from '@/integrations/supabase/client';
 import { INPAINTING_CREDIT_COSTS, INPAINTING_MODEL_LABELS, InpaintingModel } from '@/services/vrWorldService';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -85,9 +87,137 @@ interface MaterialPickerModalProps {
   onAddAnotherZone?: () => void;
 }
 
-// ── Category chips ─────────────────────────────────────────────────────────────
+// ── Zone-aware category system ─────────────────────────────────────────────────
 
-const CATEGORIES = ['All', 'Wood', 'Stone', 'Ceramic', 'Fabric', 'Metal', 'Paint'] as const;
+interface ZoneCat {
+  label: string;
+  queryTerms: string;
+}
+
+const CATEGORY_QUERY_TERMS: Record<string, string> = {
+  Tiles:          'tiles ceramic porcelain floor wall',
+  Wood:           'wood hardwood oak parquet timber flooring',
+  Laminate:       'laminate engineered floor panel',
+  Vinyl:          'vinyl LVT luxury vinyl floor',
+  Stone:          'stone marble granite travertine natural',
+  Carpet:         'carpet rug pile textile floor',
+  Paint:          'paint wall colour finish coat',
+  Wallpaper:      'wallpaper wall covering pattern texture',
+  Concrete:       'concrete cement polished floor wall',
+  Fabric:         'fabric upholstery textile weave',
+  Leather:        'leather upholstery couch sofa',
+  Velvet:         'velvet soft fabric plush',
+  'Bouclé':       'bouclé boucle textured loop fabric',
+  Linen:          'linen curtain fabric natural weave',
+  Sheer:          'sheer voile curtain translucent fabric',
+  'Natural Fiber': 'jute sisal natural fiber woven',
+  Wool:           'wool textile warm knit pile',
+  Ceramic:        'ceramic tile porcelain glaze',
+  Glass:          'glass transparent panel architectural',
+  Metal:          'metal steel aluminium iron fixture',
+  Composite:      'composite engineered panel cladding',
+  Lacquer:        'lacquer gloss painted cabinet finish',
+  Sofas:          'sofa couch lounge seating upholstered furniture',
+  Chairs:         'chair dining seat upholstered furniture',
+  Armchairs:      'armchair accent lounge chair furniture',
+  Tables:         'table dining coffee side furniture',
+  Cabinets:       'cabinet sideboard storage unit furniture',
+  Shelving:       'shelf shelving bookcase storage furniture',
+};
+
+const z = (label: string): ZoneCat => ({ label, queryTerms: CATEGORY_QUERY_TERMS[label] ?? label.toLowerCase() });
+
+const ZONE_CATEGORY_MAP: Record<string, ZoneCat[]> = {
+  // Floors
+  floor:              [z('Tiles'), z('Wood'), z('Laminate'), z('Stone'), z('Carpet'), z('Vinyl')],
+  'hardwood floor':   [z('Wood'), z('Laminate'), z('Stone')],
+  'tile floor':       [z('Tiles'), z('Stone'), z('Ceramic')],
+  parquet:            [z('Wood'), z('Laminate')],
+  // Walls
+  wall:               [z('Paint'), z('Tiles'), z('Stone'), z('Wood'), z('Wallpaper')],
+  'back wall':        [z('Paint'), z('Tiles'), z('Stone'), z('Wallpaper')],
+  'feature wall':     [z('Paint'), z('Stone'), z('Wood'), z('Tiles')],
+  ceiling:            [z('Paint'), z('Wood'), z('Concrete')],
+  // Upholstered furniture
+  sofa:               [z('Sofas'), z('Fabric'), z('Leather'), z('Velvet'), z('Bouclé')],
+  couch:              [z('Sofas'), z('Fabric'), z('Leather'), z('Velvet')],
+  chair:              [z('Chairs'), z('Fabric'), z('Leather'), z('Wood')],
+  armchair:           [z('Armchairs'), z('Fabric'), z('Leather')],
+  // Soft furnishings
+  rug:                [z('Carpet'), z('Fabric'), z('Natural Fiber'), z('Wool')],
+  carpet:             [z('Carpet'), z('Fabric'), z('Wool')],
+  curtain:            [z('Fabric'), z('Linen'), z('Sheer'), z('Velvet')],
+  cushion:            [z('Fabric'), z('Velvet'), z('Linen')],
+  // Hard surfaces / wet areas
+  countertop:         [z('Stone'), z('Ceramic'), z('Wood'), z('Metal'), z('Composite')],
+  kitchen:            [z('Stone'), z('Ceramic'), z('Metal'), z('Wood')],
+  bathroom:           [z('Tiles'), z('Stone'), z('Ceramic'), z('Glass')],
+  shower:             [z('Tiles'), z('Stone'), z('Glass')],
+  // Furniture
+  table:              [z('Tables'), z('Wood'), z('Stone'), z('Metal'), z('Glass')],
+  'dining table':     [z('Tables'), z('Wood'), z('Stone'), z('Metal')],
+  cabinet:            [z('Cabinets'), z('Wood'), z('Metal'), z('Lacquer')],
+  shelves:            [z('Shelving'), z('Wood'), z('Metal'), z('Glass')],
+  door:               [z('Wood'), z('Metal'), z('Glass')],
+  window:             [z('Glass'), z('Wood'), z('Metal')],
+};
+
+const GENERIC_CATEGORIES: ZoneCat[] = [
+  z('Wood'), z('Stone'), z('Ceramic'), z('Fabric'), z('Metal'), z('Paint'),
+];
+
+function getCategoriesForZone(zone: SegmentWithResults | null): ZoneCat[] {
+  if (!zone) return GENERIC_CATEGORIES;
+
+  // zone_intent overrides — hard-coded for reliability regardless of label
+  switch (zone.zone_intent) {
+    case 'sub_element':
+      return [z('Paint'), z('Metal'), z('Wood'), z('Lacquer')];
+    case 'upholstery':
+      return [z('Fabric'), z('Leather'), z('Velvet'), z('Linen'), z('Bouclé'), z('Wool')];
+    // full_object + surface fall through to label-based lookup
+  }
+
+  const key = zone.label.toLowerCase().trim();
+  return ZONE_CATEGORY_MAP[key]
+    ?? ZONE_CATEGORY_MAP[key.split(' ')[0]]
+    ?? GENERIC_CATEGORIES;
+}
+
+function bestCategoryForZone(zone: SegmentWithResults | null, cats: ZoneCat[]): ZoneCat | null {
+  if (!zone || cats.length === 0) return null;
+  const mt = (zone.material_type ?? '').toLowerCase();
+  const pairs: [string, string][] = [
+    ['tile', 'Tiles'], ['ceramic', 'Tiles'], ['porcelain', 'Tiles'],
+    ['wood', 'Wood'], ['oak', 'Wood'], ['parquet', 'Wood'], ['timber', 'Wood'],
+    ['laminate', 'Laminate'], ['vinyl', 'Vinyl'], ['lvt', 'Vinyl'],
+    ['stone', 'Stone'], ['marble', 'Stone'], ['granite', 'Stone'],
+    ['carpet', 'Carpet'], ['rug', 'Carpet'],
+    ['fabric', 'Fabric'], ['velvet', 'Velvet'], ['linen', 'Linen'],
+    ['leather', 'Leather'], ['bouclé', 'Bouclé'], ['boucle', 'Bouclé'],
+    ['paint', 'Paint'], ['concrete', 'Concrete'],
+    ['glass', 'Glass'], ['metal', 'Metal'],
+    ['sofa', 'Sofas'], ['couch', 'Sofas'],
+    ['chair', 'Chairs'], ['table', 'Tables'],
+  ];
+  for (const [term, label] of pairs) {
+    if (mt.includes(term)) {
+      const found = cats.find(c => c.label === label);
+      if (found) return found;
+    }
+  }
+  return cats[0];
+}
+
+// ── Custom Color sentinel ──────────────────────────────────────────────────────
+
+const CUSTOM_COLOR_MATERIAL: PickedMaterial = {
+  id: '__custom_color__',
+  name: 'Custom Color',
+  category: 'paint',
+  imageUrl: undefined,
+  raw: {},
+};
 
 // ── Helper: build search query from zone metadata ──────────────────────────────
 
@@ -118,17 +248,46 @@ function toPickedMaterial(raw: any): PickedMaterial {
 
 function buildInpaintingPrompt(zone: SegmentWithResults | null, material: PickedMaterial, colorOverride?: string): string {
   const zoneLabel = zone?.label || 'surface';
-  const finish = material.finish || zone?.finish || 'natural';
-  const color = colorOverride ? `custom color ${colorOverride}` : (material.dominantColor ? `color tone ${material.dominantColor}` : '');
-  const matType = material.materialType || material.category;
+  const intent = zone?.zone_intent ?? 'surface';
 
-  return [
-    `Photorealistic ${zoneLabel} replacement in an interior scene.`,
-    `Replace with ${material.name}: ${matType} material,`,
-    `${finish} finish${color ? `, ${color}` : ''},`,
-    `high-resolution surface texture, seamless edges, natural interior lighting,`,
-    `correct perspective for ${zoneLabel}, professional architectural photography quality.`,
-  ].join(' ');
+  // Custom color sentinel — always FLUX, no reference image
+  if (material.id === '__custom_color__' && colorOverride) {
+    return `Paint the ${zoneLabel} with color ${colorOverride}, smooth flat finish, even coat, photorealistic interior`;
+  }
+
+  // AI-prompt sentinel — description stored in raw.aiPromptDescription
+  if (material.id.startsWith('__ai-prompt__')) {
+    const desc = material.raw?.aiPromptDescription || material.name;
+    return `Photorealistic ${zoneLabel} replacement in an interior scene. ${desc}. Seamless edges, natural interior lighting, correct perspective, professional architectural photography quality.`;
+  }
+
+  const name = material.name;
+
+  switch (intent) {
+    case 'full_object':
+      return `Replace the entire ${zoneLabel} with ${name}. Match scene lighting and perspective. Seamless integration, photorealistic interior.`;
+
+    case 'upholstery':
+      return `Reupholster the ${zoneLabel} in ${name}. Keep the frame, legs, and silhouette identical. Only the fabric surface changes. Seamless edges, natural lighting.`;
+
+    case 'sub_element': {
+      const col = colorOverride || material.dominantColor || '';
+      return `Change the ${zoneLabel} finish to ${name}${col ? ` (${col})` : ''}. All surrounding elements remain unchanged. Photorealistic finish, correct perspective.`;
+    }
+
+    default: { // surface
+      const finish = material.finish || zone?.finish || 'natural';
+      const color = colorOverride ? `custom color ${colorOverride}` : (material.dominantColor ? `color tone ${material.dominantColor}` : '');
+      const matType = material.materialType || material.category;
+      return [
+        `Photorealistic ${zoneLabel} replacement in an interior scene.`,
+        `Replace with ${name}: ${matType} material,`,
+        `${finish} finish${color ? `, ${color}` : ''},`,
+        `high-resolution surface texture, seamless edges, natural interior lighting,`,
+        `correct perspective for ${zoneLabel}, professional architectural photography quality.`,
+      ].join(' ');
+    }
+  }
 }
 
 // ── Canvas preview: composite material into zone using mask ───────────────────
@@ -221,7 +380,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
 }) => {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string>('All');
+  const [activeCategory, setActiveCategory] = useState<ZoneCat | null>(null); // null = All
   const [searchResults, setSearchResults] = useState<PickedMaterial[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -246,13 +405,45 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Auto-search on open ──────────────────────────────────────────────────────
+  // Upload + visual search state (3a)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
+  const [visualSearchLoading, setVisualSearchLoading] = useState(false);
+
+  // Describe mode state (3c)
+  const [describeExpanded, setDescribeExpanded] = useState(false);
+  const [describeText, setDescribeText] = useState('');
+  const [showAiFallback, setShowAiFallback] = useState(false);
+
+  // DB-driven category chips (Step 10)
+  const [dbCategories, setDbCategories] = useState<ZoneCat[]>([]);
+
+  // ── Auto-search on open + fetch DB categories ────────────────────────────────
 
   useEffect(() => {
     if (!isOpen) return;
+
+    // Fetch workspace categories from DB non-blocking
+    if (workspaceId) {
+      supabase
+        .rpc('get_product_categories', { p_workspace_id: workspaceId })
+        .then(({ data }) => {
+          if (data && data.length >= 3) {
+            const mapped = (data as { category: string; product_count: number }[])
+              .map((row) => ({ label: row.category, queryTerms: CATEGORY_QUERY_TERMS[row.category] ?? row.category }))
+              .filter((c) => c.label);
+            setDbCategories(mapped);
+          }
+        })
+        .catch(() => { /* ignore — hardcoded map is the fallback */ });
+    }
+
+    const cats = getCategoriesForZone(zone);
+    const best = bestCategoryForZone(zone, cats);
+    setActiveCategory(best);
     const q = zoneSearchQuery(zone);
     setSearchQuery(q);
-    if (q) runSearch(q, 'All');
+    if (q) runSearch(q, best);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, zone]);
 
@@ -292,23 +483,27 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
       setApplyError(null);
       setApplyStep('');
       setApplyProgress(0);
+      setUploadedImagePreview(null);
+      setVisualSearchLoading(false);
+      setDescribeExpanded(false);
+      setDescribeText('');
+      setShowAiFallback(false);
     }
   }, [isOpen]);
 
   // ── Search function ──────────────────────────────────────────────────────────
 
-  const runSearch = useCallback(async (query: string, category: string) => {
+  const runSearch = useCallback(async (query: string, cat: ZoneCat | null) => {
     if (!query.trim()) { setSearchResults([]); return; }
     setSearchLoading(true);
     setSearchError(null);
     try {
-      const filters = category !== 'All' ? { category: category.toLowerCase() } : undefined;
+      const effectiveQuery = cat ? `${query} ${cat.queryTerms}`.trim() : query;
       const res = await mivaaApi.searchMultiVector({
-        query,
+        query: effectiveQuery,
         workspace_id: workspaceId || '',
         limit: 24,
         similarity_threshold: 0.5,
-        material_filters: filters,
       });
       if (res.success && res.data?.results) {
         setSearchResults(res.data.results.map(toPickedMaterial));
@@ -322,6 +517,78 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
       setSearchLoading(false);
     }
   }, [workspaceId]);
+
+  // ── Visual search from uploaded image (3a) ────────────────────────────────────
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(',')[1];
+      setUploadedImagePreview(dataUrl);
+      setVisualSearchLoading(true);
+      setSearchError(null);
+      try {
+        const res = await mivaaApi.searchByImageCrop({
+          image_base64: base64,
+          query: '',
+          workspace_id: workspaceId || '',
+          top_k: 24,
+        });
+        if (res.success && res.data?.results) {
+          setSearchResults((res.data.results as any[]).map(toPickedMaterial));
+        } else {
+          setSearchResults([]);
+        }
+      } catch {
+        setSearchError('Visual search failed. Please try again.');
+        setSearchResults([]);
+      } finally {
+        setVisualSearchLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }, [workspaceId]);
+
+  // ── Describe-it search (3c) ───────────────────────────────────────────────────
+
+  const handleDescribeSearch = useCallback(async () => {
+    if (!describeText.trim()) return;
+    setSearchLoading(true);
+    setSearchError(null);
+    setShowAiFallback(false);
+    setUploadedImagePreview(null);
+    setSearchQuery(describeText);
+    try {
+      const res = await mivaaApi.searchMultiVector({
+        query: describeText,
+        workspace_id: workspaceId || '',
+        limit: 24,
+        similarity_threshold: 0.5,
+      });
+      if (res.success && res.data?.results) {
+        const results = (res.data.results as any[]).map(toPickedMaterial);
+        setSearchResults(results);
+        // Show AI fallback if no results or top score below 0.65
+        const topScore = res.data.results[0]?.combined_score ?? res.data.results[0]?.similarity ?? 0;
+        if (results.length === 0 || topScore < 0.65) {
+          setShowAiFallback(true);
+        }
+      } else {
+        setSearchResults([]);
+        setShowAiFallback(true);
+      }
+    } catch {
+      setSearchError('Search failed. Please try again.');
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [describeText, workspaceId]);
 
   // ── Add current selection to queue ──────────────────────────────────────────
 
@@ -374,8 +641,32 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
         setApplyStep(`Applying change ${i + 1} of ${finalQueue.length}: ${item.material.name}...`);
         setApplyProgress(Math.round((i / finalQueue.length) * 80));
 
-        const prompt = buildInpaintingPrompt(item.zone, item.material, item.colorOverride);
+        // ai-prompt sentinel: fetch Claude-generated prompt from backend (3c)
+        let prompt: string;
+        if (item.material.id.startsWith('__ai-prompt__')) {
+          try {
+            const promptRes = await mivaaApi.generateInpaintingPrompt({
+              zone_label: item.zone?.label || 'surface',
+              description: item.material.raw?.aiPromptDescription || item.material.name,
+              zone_context: item.zone ? { material_type: item.zone.material_type, finish: item.zone.finish } : undefined,
+            });
+            prompt = promptRes.success && promptRes.data?.prompt
+              ? promptRes.data.prompt
+              : buildInpaintingPrompt(item.zone, item.material, item.colorOverride);
+          } catch {
+            prompt = buildInpaintingPrompt(item.zone, item.material, item.colorOverride);
+          }
+        } else {
+          prompt = buildInpaintingPrompt(item.zone, item.material, item.colorOverride);
+        }
         const negativePrompt = 'blurry, artifacts, distorted, low quality, unrealistic, cartoon, illustration, collage edges, visible seams';
+
+        // AnyDoor path: use actual catalog product photo when available (not a sentinel)
+        const referenceImageUrl =
+          item.material.imageUrl &&
+          !item.material.id.startsWith('__')
+            ? item.material.imageUrl
+            : undefined;
 
         const res = await mivaaApi.inpaintRegion({
           image_url: currentImageUrl,
@@ -385,6 +676,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
           model: item.quality,
           job_id: jobId,
           workspace_id: workspaceId,
+          reference_image_url: referenceImageUrl,
         });
 
         if (!res.success || !res.data?.storage_url) {
@@ -453,16 +745,6 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                 )}
               </div>
             </div>
-            {/* Mask thumbnail */}
-            {maskBase64 && (
-              <div className="w-14 h-10 rounded border border-border overflow-hidden opacity-60" title="Mask preview">
-                <img
-                  src={`data:image/png;base64,${maskBase64}`}
-                  alt="mask"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
           </div>
         </DialogHeader>
 
@@ -496,36 +778,151 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
 
             {/* ── Left panel: Search ─────────────────────────────────────────── */}
             <div className="w-2/5 flex flex-col border-r border-border min-h-0">
-              {/* Search input */}
+              {/* Search area */}
               <div className="flex-shrink-0 p-3 border-b border-border space-y-2">
+
+                {/* Text search input */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
+                    onChange={e => { setSearchQuery(e.target.value); setUploadedImagePreview(null); }}
                     placeholder="Search materials..."
                     className="pl-9 h-8 text-sm"
                   />
-                  {searchLoading && (
+                  {(searchLoading || visualSearchLoading) && (
                     <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground animate-spin" />
                   )}
                 </div>
-                {/* Category chips */}
+
+                {/* ── 3-mode button row ─────────────────────────────────────── */}
+                <div className="flex gap-1.5">
+                  {/* Custom Color */}
+                  <button
+                    onClick={() => {
+                      if (selectedMaterial?.id === '__custom_color__') {
+                        setSelectedMaterial(null);
+                      } else {
+                        setSelectedMaterial(CUSTOM_COLOR_MATERIAL);
+                        setDescribeExpanded(false);
+                      }
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-medium transition-all ${
+                      selectedMaterial?.id === '__custom_color__'
+                        ? 'bg-violet-600 border-violet-600 text-white'
+                        : 'bg-white border-border text-muted-foreground hover:border-violet-300 hover:text-violet-700'
+                    }`}
+                  >
+                    <Paintbrush className="w-3 h-3 flex-shrink-0" />
+                    Custom Color
+                  </button>
+
+                  {/* Describe it */}
+                  <button
+                    onClick={() => {
+                      setDescribeExpanded(v => !v);
+                      if (selectedMaterial?.id === '__custom_color__') setSelectedMaterial(null);
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-medium transition-all ${
+                      describeExpanded
+                        ? 'bg-violet-600 border-violet-600 text-white'
+                        : 'bg-white border-border text-muted-foreground hover:border-violet-300 hover:text-violet-700'
+                    }`}
+                  >
+                    <Sparkles className="w-3 h-3 flex-shrink-0" />
+                    Describe
+                  </button>
+
+                  {/* Upload Image */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border text-[11px] font-medium transition-all ${
+                      uploadedImagePreview
+                        ? 'bg-violet-600 border-violet-600 text-white'
+                        : 'bg-white border-border text-muted-foreground hover:border-violet-300 hover:text-violet-700'
+                    }`}
+                  >
+                    <Camera className="w-3 h-3 flex-shrink-0" />
+                    Upload
+                  </button>
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                </div>
+
+                {/* Describe textarea (shown when describeExpanded) */}
+                {describeExpanded && (
+                  <div className="space-y-1.5">
+                    <textarea
+                      rows={2}
+                      value={describeText}
+                      onChange={e => setDescribeText(e.target.value)}
+                      placeholder="e.g. warm terracotta floor tiles with subtle texture…"
+                      className="w-full text-xs rounded border border-border px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-violet-400"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleDescribeSearch}
+                      disabled={!describeText.trim() || searchLoading}
+                      className="w-full h-7 text-xs bg-violet-600 hover:bg-violet-700 text-white"
+                    >
+                      {searchLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Search'}
+                    </Button>
+                    {showAiFallback && (
+                      <div className="flex items-start gap-1.5 px-2 py-1.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+                        <span className="flex-1">No great catalog matches.{' '}
+                          <button
+                            onClick={() => {
+                              setSelectedMaterial({
+                                id: `__ai-prompt__${Date.now()}`,
+                                name: describeText.slice(0, 60),
+                                category: 'ai-generated',
+                                imageUrl: undefined,
+                                raw: { aiPromptDescription: describeText },
+                              });
+                              setShowAiFallback(false);
+                            }}
+                            className="font-semibold underline hover:no-underline"
+                          >Generate with AI instead</button>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Visual search thumbnail */}
+                {uploadedImagePreview && (
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-violet-50 border border-violet-200 rounded text-xs text-violet-700">
+                    <img src={uploadedImagePreview} alt="upload" className="w-8 h-8 rounded object-cover flex-shrink-0" />
+                    <span className="flex-1 line-clamp-1">{visualSearchLoading ? 'Searching visually…' : 'Visual search results'}</span>
+                    <button onClick={() => { setUploadedImagePreview(null); setSearchResults([]); }} className="text-violet-400 hover:text-violet-700">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Zone-aware category chips — DB list when available, hardcoded fallback */}
                 <div className="flex flex-wrap gap-1">
-                  {CATEGORIES.map(cat => (
+                  <button
+                    onClick={() => setActiveCategory(null)}
+                    className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                      activeCategory === null ? 'bg-violet-600 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    All
+                  </button>
+                  {(dbCategories.length >= 3 ? dbCategories : getCategoriesForZone(zone)).map(cat => (
                     <button
-                      key={cat}
+                      key={cat.label}
                       onClick={() => setActiveCategory(cat)}
                       className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                        activeCategory === cat
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                        activeCategory?.label === cat.label ? 'bg-violet-600 text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
                       }`}
                     >
-                      {cat}
+                      {cat.label}
                     </button>
                   ))}
                 </div>
+
               </div>
 
               {/* Results grid */}
@@ -611,6 +1008,39 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                     <p className="text-sm font-medium text-foreground">Select a material</p>
                     <p className="text-xs text-muted-foreground mt-1">Click any result on the left to preview it in your render</p>
                   </div>
+                </div>
+              ) : selectedMaterial.id === '__custom_color__' ? (
+                /* Custom Color right panel — color picker only (3b) */
+                <div className="flex-1 flex flex-col items-center justify-center gap-5 p-6">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full border border-border" style={{ backgroundColor: colorOverride || '#888888' }} />
+                    <span className="text-sm font-semibold">Custom Color</span>
+                    <button onClick={() => setSelectedMaterial(null)} className="ml-auto text-muted-foreground hover:text-foreground">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <input
+                    type="color"
+                    value={colorOverride || '#888888'}
+                    onChange={e => setColorOverride(e.target.value)}
+                    className="w-24 h-24 rounded-xl cursor-pointer border-2 border-border p-1 bg-transparent"
+                    title="Pick paint color"
+                  />
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {['#FFFFFF', '#F5F5DC', '#8B7355', '#2F4F4F', '#708090', '#4A4A4A', '#C8A97A', '#E8D5B7',
+                      '#B5D3E7', '#D4A5A5', '#A8C5A0', '#E8C99A'].map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setColorOverride(c)}
+                        className={`w-7 h-7 rounded-full border-2 transition-all ${colorOverride === c ? 'border-violet-600 scale-110' : 'border-border'}`}
+                        style={{ backgroundColor: c }}
+                        title={c}
+                      />
+                    ))}
+                  </div>
+                  {colorOverride && (
+                    <p className="text-xs text-muted-foreground font-mono">{colorOverride.toUpperCase()}</p>
+                  )}
                 </div>
               ) : (
                 <ScrollArea className="flex-1 min-h-0">
