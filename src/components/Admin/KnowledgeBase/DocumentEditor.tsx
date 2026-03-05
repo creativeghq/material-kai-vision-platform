@@ -51,13 +51,18 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
   const { toast } = useToast();
 
+  // Load workspace + categories on mount
   useEffect(() => {
     loadWorkspace();
     loadCategories();
-    if (documentId) {
+  }, []);
+
+  // Load document only once workspaceId is known (avoids race condition)
+  useEffect(() => {
+    if (documentId && workspaceId) {
       loadDocument();
     }
-  }, [documentId]);
+  }, [documentId, workspaceId]);
 
   const loadWorkspace = async () => {
     try {

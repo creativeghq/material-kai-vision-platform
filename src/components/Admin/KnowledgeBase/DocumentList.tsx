@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import {
-  FileText,
   Plus,
   Edit,
   Trash2,
   Eye,
-  Upload,
   CheckCircle,
   XCircle,
   Clock,
-  Search,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/core/ui/dialog';
 import {
   Table,
   TableBody,
@@ -32,27 +34,29 @@ import {
   SelectValue,
 } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { KnowledgeBaseService, KBDocument } from '@/services/knowledgeBaseService';
+import { KBDocument } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface DocumentListProps {
   onEdit: (docId: string) => void;
   onCreate: () => void;
   searchQuery: string;
+  refreshTrigger?: number;
 }
 
 export const DocumentList: React.FC<DocumentListProps> = ({
   onEdit,
   onCreate,
   searchQuery,
+  refreshTrigger,
 }) => {
   const [documents, setDocuments] = useState<KBDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [workspaceId, setWorkspaceId] = useState<string>('');
+  const [viewingDoc, setViewingDoc] = useState<KBDocument | null>(null);
 
   const { toast } = useToast();
-  const kbService = KnowledgeBaseService.getInstance();
 
   useEffect(() => {
     loadWorkspace();
@@ -62,7 +66,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     if (workspaceId) {
       loadDocuments();
     }
-  }, [workspaceId, statusFilter]);
+  }, [workspaceId, statusFilter, refreshTrigger]);
 
   const loadWorkspace = async () => {
     try {
@@ -241,6 +245,13 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => setViewingDoc(doc)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => onEdit(doc.id)}
                       >
                         <Edit className="h-4 w-4" />
@@ -261,6 +272,25 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         )}
       </CardContent>
     </Card>
+
+    {/* Document Viewer */}
+    {viewingDoc && (
+      <Dialog open={true} onOpenChange={() => setViewingDoc(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{viewingDoc.title}</DialogTitle>
+            {viewingDoc.summary && (
+              <p className="text-sm text-muted-foreground italic">{viewingDoc.summary}</p>
+            )}
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto prose max-w-none text-sm">
+            <div className="whitespace-pre-wrap font-sans leading-relaxed">
+              {viewingDoc.content || 'No content.'}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )}
   );
 };
 

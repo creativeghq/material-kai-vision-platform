@@ -34,6 +34,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [docRefreshKey, setDocRefreshKey] = useState(0);
   const [stats, setStats] = useState({
     totalDocs: 0,
     totalCategories: 0,
@@ -96,6 +97,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
   const handleCloseEditor = () => {
     setShowEditor(false);
     setSelectedDocId(null);
+    setDocRefreshKey(k => k + 1);
     loadStats();
   };
 
@@ -216,6 +218,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
               onEdit={handleEditDocument}
               onCreate={handleCreateDocument}
               searchQuery={searchQuery}
+              refreshTrigger={docRefreshKey}
             />
           </TabsContent>
 
