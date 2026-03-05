@@ -133,7 +133,14 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
-      await kbService.deleteDocument(docId, workspaceId);
+      const { error } = await supabase
+        .from('kb_docs')
+        .delete()
+        .eq('id', docId)
+        .eq('workspace_id', workspaceId);
+
+      if (error) throw error;
+
       toast({
         title: 'Success',
         description: 'Document deleted successfully',
@@ -143,7 +150,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
       console.error('Failed to delete document:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete document',
+        description: error instanceof Error ? error.message : 'Failed to delete document',
         variant: 'destructive',
       });
     }

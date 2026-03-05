@@ -131,6 +131,13 @@ export const CategoryManager: React.FC = () => {
     if (!confirm(`Delete category "${category.name}"? Documents in this category will become uncategorized.`)) return;
 
     try {
+      // Null out category_id on any docs referencing this category (avoids FK violation)
+      await supabase
+        .from('kb_docs')
+        .update({ category_id: null })
+        .eq('category_id', category.id)
+        .eq('workspace_id', workspaceId);
+
       const { error } = await supabase
         .from('kb_categories')
         .delete()
@@ -143,7 +150,7 @@ export const CategoryManager: React.FC = () => {
       loadCategories();
     } catch (error) {
       console.error('Failed to delete category:', error);
-      toast({ title: 'Error', description: 'Failed to delete category', variant: 'destructive' });
+      toast({ title: 'Error', description: error instanceof Error ? error.message : 'Failed to delete category', variant: 'destructive' });
     }
   };
 
