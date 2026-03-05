@@ -152,18 +152,32 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setIsSaving(true);
 
       if (documentId) {
-        // Update via MIVAA — regenerates embedding if content changed
-        await knowledgeBaseService.updateDocument(documentId, {
-          ...document,
-          workspace_id: workspaceId,
-        });
+        // Update directly in Supabase — embedding already generated on create
+        const { error } = await supabase
+          .from('kb_docs')
+          .update({
+            title: document.title,
+            content: document.content,
+            content_markdown: document.content_markdown,
+            summary: document.summary,
+            category_id: document.category_id,
+            seo_keywords: document.seo_keywords,
+            status: document.status,
+            visibility: document.visibility,
+            metadata: document.metadata,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', documentId)
+          .eq('workspace_id', workspaceId);
+
+        if (error) throw error;
 
         toast({
           title: 'Success',
           description: 'Document updated successfully',
         });
       } else {
-        // Create via MIVAA — generates embedding synchronously before saving
+        // Create via MIVAA — generates Voyage AI embedding synchronously before saving
         await knowledgeBaseService.createDocument({
           ...document,
           workspace_id: workspaceId,
