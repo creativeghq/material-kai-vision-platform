@@ -801,7 +801,7 @@ const createVisualSearchTool = (workspaceId: string, images: string[]) => {
  */
 const createKnowledgeBaseSearchTool = (workspaceId: string) => {
   return tool(
-    async ({ query, searchTypes = ['chunks', 'products'], topK = 5 }) => {
+    async ({ query, searchTypes = ['chunks', 'products', 'kb_docs'], topK = 5 }) => {
       try {
         const MIVAA_GATEWAY_URL = Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
 
@@ -824,6 +824,7 @@ const createKnowledgeBaseSearchTool = (workspaceId: string) => {
               search_types: searchTypes,
               top_k: topK,
               similarity_threshold: 0.6, // Lower threshold to catch more relevant articles
+              caller: 'agent',
             }),
             signal: controller.signal,
           });
@@ -3487,6 +3488,102 @@ const createSEOPipelineTool = (userId: string, onChunk?: (chunk: any) => void) =
 /**
  * Agent Configurations with RBAC
  */
+/**
+ * LangChain Tool: Dispatch Background Task
+ *
+ * Admin-only. Called by KAI when a task is too large or time-consuming
+ * to complete inline. Creates an agent_runs row and fires the
+ * background-agent-runner edge function asynchronously.
+ *
+ * The user receives an immediate acknowledgement with the run_id
+ * so they can track progress on the admin monitoring page.
+ */
+const KAI_SYSTEM_AGENT_ID = '00000000-0000-0000-0000-000000000001';
+
+const createDispatchBackgroundTaskTool = (userId: string, workspaceId: string, conversationId: string | null) => {
+  return tool(
+    async ({ task_prompt, model_override, context_snippet, reason }) => {
+      try {
+        console.log(`🤖 Dispatching background task: "${task_prompt.slice(0, 80)}…"`);
+
+        // 1. Create an agent_runs row in pending state
+        const { data: run, error: runError } = await supabase
+          .from('agent_runs')
+          .insert({
+            agent_id:     KAI_SYSTEM_AGENT_ID,
+            status:       'pending',
+            triggered_by: 'chat',
+            input_data:   {
+              task_prompt,
+              context_snippet: context_snippet ?? '',
+              model_override:  model_override ?? null,
+              dispatched_by:   userId,
+              conversation_id: conversationId,   // used to post result back to chat
+            },
+            workspace_id: workspaceId,
+          })
+          .select('id')
+          .single();
+
+        if (runError || !run) {
+          throw new Error(`Failed to create run: ${runError?.message}`);
+        }
+
+        const runId = run.id as string;
+
+        // 2. Fire-and-forget to background-agent-runner
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
+          method:  'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({
+            agent_id:     KAI_SYSTEM_AGENT_ID,
+            run_id:       runId,
+            triggered_by: 'chat',
+            input_data:   { task_prompt, context_snippet, model_override },
+          }),
+        }).catch(err => console.error('[dispatch_background_task] Fire-and-forget error:', err));
+
+        console.log(`✅ Background task dispatched. run_id=${runId}`);
+
+        return JSON.stringify({
+          success:    true,
+          run_id:     runId,
+          message:    `Background task started. I'll post the results back here in this conversation once complete${conversationId ? '' : ' (check Admin → Background Tasks to monitor progress)'}.`,
+          task_preview: task_prompt.slice(0, 120),
+          reason,
+        });
+      } catch (error) {
+        console.error('[dispatch_background_task] Error:', error);
+        return JSON.stringify({
+          success: false,
+          error:   error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    {
+      name: 'dispatch_background_task',
+      description: [
+        'Dispatch a complex or long-running task to run asynchronously in the background.',
+        'Use this when: (1) the task would take more than ~30 seconds, (2) it requires many iterations or large batch processing,',
+        '(3) the user explicitly asks to run something in the background, or (4) it is a repeatable scheduled operation.',
+        'The task will be executed by the KAI background agent using the full tool suite.',
+        'Returns immediately with a run_id the user can use to track progress.',
+      ].join(' '),
+      schema: z.object({
+        task_prompt:      z.string().describe('The complete task description — be detailed, include all context the background agent will need.'),
+        reason:           z.string().describe('One sentence explaining WHY you are dispatching this to the background (e.g., "requires processing 500 products which would exceed the response time limit").'),
+        model_override:   z.string().optional().describe('Specific model to use, e.g. claude-sonnet-4-6, gpt-4o, gemini-1.5-pro. Omit to use default.'),
+        context_snippet:  z.string().optional().describe('Relevant excerpt from the current conversation for context (max 500 chars).'),
+      }),
+    }
+  );
+};
+
 interface AgentConfig {
   id: string;
   name: string;
@@ -3516,6 +3613,8 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // SEO (admin/owner only)
       'create_seo_article', 'seo_keyword_research', 'seo_article_planner',
       'seo_article_writer', 'seo_content_analyzer',
+      // Background task dispatch (admin/owner only)
+      'dispatch_background_task',
     ],
     // systemPrompt loaded from database (key: 'kai')
   },
@@ -3783,6 +3882,11 @@ async function executeAgent(
     }
     if (config.tools.includes('create_seo_article')) {
       tools.push(createSEOPipelineTool(userId, onChunk));
+    }
+
+    // Background task dispatch
+    if (config.tools.includes('dispatch_background_task')) {
+      tools.push(createDispatchBackgroundTaskTool(userId, workspaceId, conversation_id));
     }
   }
 
@@ -4178,8 +4282,9 @@ Deno.serve(async (req) => {
     console.log('🎯 Handler started - parsing request body...');
 
     // Get request body
-    const { messages = [], agentId = 'kai', images = [] } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], conversation_id = null } = await req.json();
     // images: string[] — user-attached images as data URLs (data:image/jpeg;base64,...)
+    // conversation_id: string | null — Supabase conversation ID, used to post background task results back
 
     console.log('✅ Request body parsed successfully');
 

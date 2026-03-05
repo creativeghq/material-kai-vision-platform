@@ -68,6 +68,26 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'moodboard_shared', group: 'Moodboards',
     label: 'Moodboard Shared', description: 'Moodboard made public', icon: 'Share2', color: 'emerald',
     defaultData: { label: 'Moodboard Shared', category: 'trigger', triggerType: 'moodboard_shared', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'moodboard_commented', group: 'Moodboards',
+    label: 'Moodboard Commented', description: 'Someone comments on a moodboard', icon: 'MessageCircle', color: 'emerald',
+    defaultData: { label: 'Moodboard Commented', category: 'trigger', triggerType: 'moodboard_commented', config: {} } as TriggerNodeData },
+
+  // ── Profiles ──
+  { type: 'triggerNode', category: 'trigger', subType: 'hire_me_received', group: 'Profiles',
+    label: 'Hire Me Received', description: 'Someone submits a Hire Me request', icon: 'Mail', color: 'emerald',
+    defaultData: { label: 'Hire Me Received', category: 'trigger', triggerType: 'hire_me_received', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'profile_followed', group: 'Profiles',
+    label: 'Profile Followed', description: 'A user follows a public profile', icon: 'UserPlus', color: 'emerald',
+    defaultData: { label: 'Profile Followed', category: 'trigger', triggerType: 'profile_followed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'profile_published', group: 'Profiles',
+    label: 'Profile Published', description: 'User makes their profile public', icon: 'Eye', color: 'emerald',
+    defaultData: { label: 'Profile Published', category: 'trigger', triggerType: 'profile_published', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'material_reviewed', group: 'Profiles',
+    label: 'Material Reviewed', description: 'User submits a material review', icon: 'Star', color: 'emerald',
+    defaultData: { label: 'Material Reviewed', category: 'trigger', triggerType: 'material_reviewed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'preferred_factory_added', group: 'Profiles',
+    label: 'Factory Added to Profile', description: 'User adds a preferred factory to their profile', icon: 'Building2', color: 'emerald',
+    defaultData: { label: 'Factory Added to Profile', category: 'trigger', triggerType: 'preferred_factory_added', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

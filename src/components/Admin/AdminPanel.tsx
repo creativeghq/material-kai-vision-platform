@@ -23,7 +23,7 @@ import {
 } from '@/components/core/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 
-// import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 // RAGManagementPanel removed - functionality consolidated into IntegratedRAGManagement
@@ -31,6 +31,7 @@ import { AITestingPanel } from './AITestingPanel';
 import { QualityMetricsDashboard } from './QualityMetricsDashboard';
 import { HumanReviewPanel } from './HumanReviewPanel';
 import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { FactoryRegistrationsTab } from './FactoryRegistrationsTab';
 
 interface AnalyticsEvent {
   id: string;
@@ -257,6 +258,7 @@ export const AdminPanel: React.FC = () => {
             <TabsTrigger value="quality" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Quality Metrics</TabsTrigger>
             <TabsTrigger value="review" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Human Review</TabsTrigger>
             <TabsTrigger value="testing" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">AI Testing</TabsTrigger>
+            <TabsTrigger value="factory-reg" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Factory Registrations</TabsTrigger>
           </TabsList>
 
           <TabsContent value="recent" className="space-y-4">
@@ -493,6 +495,10 @@ export const AdminPanel: React.FC = () => {
 
           <TabsContent value="testing" className="space-y-4">
             <AITestingPanel />
+          </TabsContent>
+
+          <TabsContent value="factory-reg" className="space-y-4">
+            <FactoryRegistrationsTab />
           </TabsContent>
         </Tabs>
       </div>

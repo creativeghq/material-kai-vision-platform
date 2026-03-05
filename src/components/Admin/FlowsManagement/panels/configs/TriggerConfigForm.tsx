@@ -19,6 +19,9 @@ import type {
   AgentSearchCompletedTriggerConfig,
   ProductAddedToQuoteTriggerConfig,
   MoodboardItemAddedTriggerConfig,
+  MoodboardCommentedTriggerConfig,
+  HireMeReceivedTriggerConfig,
+  MaterialReviewedTriggerConfig,
 } from '@/services/flows/types';
 import { EntityPicker } from './EntityPicker';
 
@@ -342,6 +345,104 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
       return (
         <div className="text-xs text-muted-foreground">
           Fires when a moodboard is shared (made public). Available data: moodboard_id, title, shared_by.
+        </div>
+      );
+
+    case 'moodboard_commented': {
+      const cfg = config as MoodboardCommentedTriggerConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Fires when someone posts a comment on a moodboard. Available data: moodboard_id, comment_id, commenter_id, owner_id, content_snippet.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Filter by Moodboard (optional)</Label>
+            <EntityPicker
+              entityType="moodboard"
+              value={cfg.filter_moodboard_id || ''}
+              onSelect={(id) => onChange({ ...cfg, filter_moodboard_id: id })}
+              placeholder="Any moodboard"
+              allowTemplateValue={false}
+            />
+          </div>
+        </div>
+      );
+    }
+
+    case 'hire_me_received': {
+      const cfg = config as HireMeReceivedTriggerConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Fires when someone submits a Hire Me contact request. Available data: request_id, to_user_id, from_name, from_email, services_requested, sent_at.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Only when services selected (optional)</Label>
+            <Select
+              value={cfg.filter_has_services === true ? 'yes' : cfg.filter_has_services === false ? 'no' : ''}
+              onValueChange={(val) =>
+                onChange({ ...cfg, filter_has_services: val === 'yes' ? true : val === 'no' ? false : undefined })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Any request" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Only with service selection</SelectItem>
+                <SelectItem value="no">Only without service selection</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+
+    case 'profile_followed':
+      return (
+        <div className="text-xs text-muted-foreground">
+          Fires when a user follows a public profile. Available data: follower_id, following_id, followed_at.
+        </div>
+      );
+
+    case 'profile_published':
+      return (
+        <div className="text-xs text-muted-foreground">
+          Fires when a user makes their profile public. Available data: user_id, published_at.
+        </div>
+      );
+
+    case 'material_reviewed': {
+      const cfg = config as MaterialReviewedTriggerConfig;
+      return (
+        <div className="space-y-3">
+          <div className="text-xs text-muted-foreground">
+            Fires when a user submits a material review. Available data: product_id, user_id, rating, review_id, has_text.
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Minimum rating (optional)</Label>
+            <Select
+              value={cfg.filter_min_rating?.toString() || ''}
+              onValueChange={(val) =>
+                onChange({ ...cfg, filter_min_rating: val ? Number(val) : undefined })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Any rating" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="4">4+ stars</SelectItem>
+                <SelectItem value="5">5 stars only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+
+    case 'preferred_factory_added':
+      return (
+        <div className="text-xs text-muted-foreground">
+          Fires when a user adds a factory to their preferred factories list. Available data: user_id, factory_name, added_at.
         </div>
       );
 

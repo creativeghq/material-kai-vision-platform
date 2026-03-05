@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { User, CreditCard, Coins, FileText } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
 import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
 import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
+import { InboxTab } from '@/components/core/Profile/InboxTab';
 
 export const UserProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('profile');
@@ -22,6 +23,10 @@ export const UserProfilePage: React.FC = () => {
             <User className="h-4 w-4" />
             Profile
           </TabsTrigger>
+          <TabsTrigger value="inbox" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Inbox className="h-4 w-4" />
+            Inbox
+          </TabsTrigger>
           <TabsTrigger value="subscription" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <CreditCard className="h-4 w-4" />
             Subscription
@@ -38,6 +43,10 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="profile" className="space-y-6">
           <ProfileTab />
+        </TabsContent>
+
+        <TabsContent value="inbox" className="space-y-6">
+          <InboxTab />
         </TabsContent>
 
         <TabsContent value="subscription" className="space-y-6">

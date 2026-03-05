@@ -95,93 +95,210 @@ interface ZoneCat {
 }
 
 const CATEGORY_QUERY_TERMS: Record<string, string> = {
-  Tiles:          'tiles ceramic porcelain floor wall',
-  Wood:           'wood hardwood oak parquet timber flooring',
-  Laminate:       'laminate engineered floor panel',
-  Vinyl:          'vinyl LVT luxury vinyl floor',
-  Stone:          'stone marble granite travertine natural',
-  Carpet:         'carpet rug pile textile floor',
-  Paint:          'paint wall colour finish coat',
-  Wallpaper:      'wallpaper wall covering pattern texture',
-  Concrete:       'concrete cement polished floor wall',
-  Fabric:         'fabric upholstery textile weave',
-  Leather:        'leather upholstery couch sofa',
-  Velvet:         'velvet soft fabric plush',
-  'Bouclé':       'bouclé boucle textured loop fabric',
-  Linen:          'linen curtain fabric natural weave',
-  Sheer:          'sheer voile curtain translucent fabric',
-  'Natural Fiber': 'jute sisal natural fiber woven',
-  Wool:           'wool textile warm knit pile',
-  Ceramic:        'ceramic tile porcelain glaze',
-  Glass:          'glass transparent panel architectural',
-  Metal:          'metal steel aluminium iron fixture',
-  Composite:      'composite engineered panel cladding',
-  Lacquer:        'lacquer gloss painted cabinet finish',
-  Sofas:          'sofa couch lounge seating upholstered furniture',
-  Chairs:         'chair dining seat upholstered furniture',
-  Armchairs:      'armchair accent lounge chair furniture',
-  Tables:         'table dining coffee side furniture',
-  Cabinets:       'cabinet sideboard storage unit furniture',
-  Shelving:       'shelf shelving bookcase storage furniture',
+  Tiles:             'tiles ceramic porcelain floor wall',
+  'Floor Tiles':     'floor tile ceramic porcelain stone slip-resistant',
+  'Wall Tiles':      'wall tile ceramic porcelain mosaic decorative',
+  'Bathroom Tiles':  'bathroom tile ceramic porcelain wet area',
+  'Shower Tiles':    'shower tile ceramic porcelain glass mosaic',
+  Wood:              'wood hardwood oak parquet timber flooring',
+  'Wood Flooring':   'wood hardwood oak parquet timber engineered flooring',
+  Laminate:          'laminate engineered floor panel',
+  Vinyl:             'vinyl LVT luxury vinyl floor',
+  Stone:             'stone marble granite travertine natural',
+  'Stone Slabs':     'stone marble granite travertine limestone slab natural',
+  Carpet:            'carpet rug pile textile floor',
+  Paint:             'paint wall colour finish coat',
+  Wallpaper:         'wallpaper wall covering pattern texture',
+  Concrete:          'concrete cement polished floor wall',
+  Fabric:            'fabric upholstery textile weave',
+  Fabrics:           'fabric textile upholstery weave linen velvet',
+  Leather:           'leather upholstery hide couch sofa',
+  Velvet:            'velvet soft fabric plush',
+  'Bouclé':          'bouclé boucle textured loop fabric',
+  Linen:             'linen curtain fabric natural weave',
+  Sheer:             'sheer voile curtain translucent fabric',
+  'Natural Fiber':   'jute sisal natural fiber woven',
+  Wool:              'wool textile warm knit pile',
+  Ceramic:           'ceramic tile porcelain glaze',
+  Glass:             'glass transparent panel architectural',
+  'Metal Panels':    'metal steel aluminium panel cladding',
+  Metal:             'metal steel aluminium iron fixture',
+  Composite:         'composite engineered panel cladding',
+  Lacquer:           'lacquer gloss painted cabinet finish',
+  Sofas:             'sofa couch lounge seating upholstered furniture',
+  Chairs:            'chair dining seat upholstered furniture',
+  'Dining Chairs':   'dining chair seat upholstered wood furniture',
+  'Accent Chairs':   'accent chair lounge occasional upholstered furniture',
+  Armchairs:         'armchair accent lounge chair furniture',
+  Tables:            'table dining coffee side furniture',
+  'Dining Tables':   'dining table wood stone metal furniture',
+  'Coffee Tables':   'coffee table lounge wood stone metal furniture',
+  'Side Tables':     'side table occasional wood metal furniture',
+  Cabinets:          'cabinet sideboard storage unit furniture',
+  Sideboards:        'sideboard credenza buffet storage wood furniture',
+  Shelving:          'shelf shelving bookcase storage furniture',
+  Countertops:       'countertop worktop stone quartz composite surface',
+  'Kitchen Worktops':'kitchen worktop countertop stone composite wood',
+  Rugs:              'rug carpet textile woven natural fiber',
+  Curtains:          'curtain drape fabric linen sheer voile',
+  Cushions:          'cushion pillow fabric velvet linen',
+  Doors:             'door wood metal glass panel interior',
+  Windows:           'window frame glass wood metal',
+  Outdoor:           'outdoor furniture garden patio rattan weatherproof',
+  Lighting:          'lamp light pendant ceiling fixture',
+};
+
+/**
+ * Maps every MATERIAL_CATEGORY_VOCAB value (and common upload free-text values)
+ * to a human-readable chip label + vector search query terms.
+ * Single source of truth bridging DB extraction → UI chips.
+ */
+const DB_CATEGORY_MAP: Record<string, { label: string; queryTerms: string }> = {
+  // Tiles
+  floor_tile:        { label: 'Floor Tiles',      queryTerms: CATEGORY_QUERY_TERMS['Floor Tiles'] },
+  wall_tile:         { label: 'Wall Tiles',       queryTerms: CATEGORY_QUERY_TERMS['Wall Tiles'] },
+  bathroom_tile:     { label: 'Bathroom Tiles',   queryTerms: CATEGORY_QUERY_TERMS['Bathroom Tiles'] },
+  shower_tile:       { label: 'Shower Tiles',     queryTerms: CATEGORY_QUERY_TERMS['Shower Tiles'] },
+  // Flooring
+  wood_flooring:     { label: 'Wood Flooring',    queryTerms: CATEGORY_QUERY_TERMS['Wood Flooring'] },
+  laminate:          { label: 'Laminate',         queryTerms: CATEGORY_QUERY_TERMS['Laminate'] },
+  vinyl_flooring:    { label: 'Vinyl',            queryTerms: CATEGORY_QUERY_TERMS['Vinyl'] },
+  carpet:            { label: 'Carpet',           queryTerms: CATEGORY_QUERY_TERMS['Carpet'] },
+  // Walls
+  wall_paint:        { label: 'Paint',            queryTerms: CATEGORY_QUERY_TERMS['Paint'] },
+  wallpaper:         { label: 'Wallpaper',        queryTerms: CATEGORY_QUERY_TERMS['Wallpaper'] },
+  // Work surfaces
+  countertop:        { label: 'Countertops',      queryTerms: CATEGORY_QUERY_TERMS['Countertops'] },
+  kitchen_worktop:   { label: 'Kitchen Worktops', queryTerms: CATEGORY_QUERY_TERMS['Kitchen Worktops'] },
+  // Slabs / panels
+  stone_slab:        { label: 'Stone Slabs',      queryTerms: CATEGORY_QUERY_TERMS['Stone Slabs'] },
+  metal_panel:       { label: 'Metal Panels',     queryTerms: CATEGORY_QUERY_TERMS['Metal Panels'] },
+  glass_panel:       { label: 'Glass',            queryTerms: CATEGORY_QUERY_TERMS['Glass'] },
+  // Upholstered furniture
+  sofa:              { label: 'Sofas',            queryTerms: CATEGORY_QUERY_TERMS['Sofas'] },
+  armchair:          { label: 'Armchairs',        queryTerms: CATEGORY_QUERY_TERMS['Armchairs'] },
+  dining_chair:      { label: 'Dining Chairs',    queryTerms: CATEGORY_QUERY_TERMS['Dining Chairs'] },
+  accent_chair:      { label: 'Accent Chairs',    queryTerms: CATEGORY_QUERY_TERMS['Accent Chairs'] },
+  // Soft furnishings
+  rug:               { label: 'Rugs',             queryTerms: CATEGORY_QUERY_TERMS['Rugs'] },
+  curtain:           { label: 'Curtains',         queryTerms: CATEGORY_QUERY_TERMS['Curtains'] },
+  cushion:           { label: 'Cushions',         queryTerms: CATEGORY_QUERY_TERMS['Cushions'] },
+  // Hard furniture
+  dining_table:      { label: 'Dining Tables',    queryTerms: CATEGORY_QUERY_TERMS['Dining Tables'] },
+  coffee_table:      { label: 'Coffee Tables',    queryTerms: CATEGORY_QUERY_TERMS['Coffee Tables'] },
+  side_table:        { label: 'Side Tables',      queryTerms: CATEGORY_QUERY_TERMS['Side Tables'] },
+  cabinet:           { label: 'Cabinets',         queryTerms: CATEGORY_QUERY_TERMS['Cabinets'] },
+  shelving:          { label: 'Shelving',         queryTerms: CATEGORY_QUERY_TERMS['Shelving'] },
+  sideboard:         { label: 'Sideboards',       queryTerms: CATEGORY_QUERY_TERMS['Sideboards'] },
+  // Openings
+  door:              { label: 'Doors',            queryTerms: CATEGORY_QUERY_TERMS['Doors'] },
+  window:            { label: 'Windows',          queryTerms: CATEGORY_QUERY_TERMS['Windows'] },
+  // Swatches
+  fabric_swatch:     { label: 'Fabrics',          queryTerms: CATEGORY_QUERY_TERMS['Fabrics'] },
+  leather_swatch:    { label: 'Leather',          queryTerms: CATEGORY_QUERY_TERMS['Leather'] },
+  // Other
+  outdoor_furniture: { label: 'Outdoor',          queryTerms: CATEGORY_QUERY_TERMS['Outdoor'] },
+  lighting:          { label: 'Lighting',         queryTerms: CATEGORY_QUERY_TERMS['Lighting'] },
+  // Upload pipeline free-text values (older products before controlled vocab)
+  tiles:             { label: 'Tiles',            queryTerms: CATEGORY_QUERY_TERMS['Tiles'] },
+  wood:              { label: 'Wood',             queryTerms: CATEGORY_QUERY_TERMS['Wood'] },
+  ceramic:           { label: 'Ceramic',          queryTerms: CATEGORY_QUERY_TERMS['Ceramic'] },
+  stone:             { label: 'Stone',            queryTerms: CATEGORY_QUERY_TERMS['Stone'] },
+  fabric:            { label: 'Fabric',           queryTerms: CATEGORY_QUERY_TERMS['Fabric'] },
+  furniture:         { label: 'Furniture',        queryTerms: 'furniture sofa chair table cabinet upholstered' },
+  decor:             { label: 'Decor',            queryTerms: 'decor accessories soft furnishings cushion vase lamp' },
+  paint_wall_decor:  { label: 'Paint & Decor',    queryTerms: CATEGORY_QUERY_TERMS['Paint'] + ' wallpaper' },
+  sanitary:          { label: 'Sanitary',         queryTerms: 'bathroom sanitary toilet basin faucet shower' },
+  kitchen:           { label: 'Kitchen',          queryTerms: 'kitchen worktop cabinet countertop tile' },
+  heating:           { label: 'Heating',          queryTerms: 'radiator underfloor heating panel' },
+  general_materials: { label: 'Materials',        queryTerms: 'material surface finish panel tile stone wood' },
 };
 
 const z = (label: string): ZoneCat => ({ label, queryTerms: CATEGORY_QUERY_TERMS[label] ?? label.toLowerCase() });
 
-const ZONE_CATEGORY_MAP: Record<string, ZoneCat[]> = {
-  // Floors
-  floor:              [z('Tiles'), z('Wood'), z('Laminate'), z('Stone'), z('Carpet'), z('Vinyl')],
-  'hardwood floor':   [z('Wood'), z('Laminate'), z('Stone')],
-  'tile floor':       [z('Tiles'), z('Stone'), z('Ceramic')],
-  parquet:            [z('Wood'), z('Laminate')],
-  // Walls
-  wall:               [z('Paint'), z('Tiles'), z('Stone'), z('Wood'), z('Wallpaper')],
-  'back wall':        [z('Paint'), z('Tiles'), z('Stone'), z('Wallpaper')],
-  'feature wall':     [z('Paint'), z('Stone'), z('Wood'), z('Tiles')],
-  ceiling:            [z('Paint'), z('Wood'), z('Concrete')],
-  // Upholstered furniture
-  sofa:               [z('Sofas'), z('Fabric'), z('Leather'), z('Velvet'), z('Bouclé')],
-  couch:              [z('Sofas'), z('Fabric'), z('Leather'), z('Velvet')],
-  chair:              [z('Chairs'), z('Fabric'), z('Leather'), z('Wood')],
-  armchair:           [z('Armchairs'), z('Fabric'), z('Leather')],
-  // Soft furnishings
-  rug:                [z('Carpet'), z('Fabric'), z('Natural Fiber'), z('Wool')],
-  carpet:             [z('Carpet'), z('Fabric'), z('Wool')],
-  curtain:            [z('Fabric'), z('Linen'), z('Sheer'), z('Velvet')],
-  cushion:            [z('Fabric'), z('Velvet'), z('Linen')],
-  // Hard surfaces / wet areas
-  countertop:         [z('Stone'), z('Ceramic'), z('Wood'), z('Metal'), z('Composite')],
-  kitchen:            [z('Stone'), z('Ceramic'), z('Metal'), z('Wood')],
-  bathroom:           [z('Tiles'), z('Stone'), z('Ceramic'), z('Glass')],
-  shower:             [z('Tiles'), z('Stone'), z('Glass')],
-  // Furniture
-  table:              [z('Tables'), z('Wood'), z('Stone'), z('Metal'), z('Glass')],
-  'dining table':     [z('Tables'), z('Wood'), z('Stone'), z('Metal')],
-  cabinet:            [z('Cabinets'), z('Wood'), z('Metal'), z('Lacquer')],
-  shelves:            [z('Shelving'), z('Wood'), z('Metal'), z('Glass')],
-  door:               [z('Wood'), z('Metal'), z('Glass')],
-  window:             [z('Glass'), z('Wood'), z('Metal')],
-};
-
-const GENERIC_CATEGORIES: ZoneCat[] = [
-  z('Wood'), z('Stone'), z('Ceramic'), z('Fabric'), z('Metal'), z('Paint'),
-];
+/** Checks whether any of the given keywords appear in the zone label or material_type. */
+function zoneContains(zone: SegmentWithResults, ...keywords: string[]): boolean {
+  const haystack = `${zone.label} ${zone.material_type ?? ''}`.toLowerCase();
+  return keywords.some((kw) => haystack.includes(kw));
+}
 
 function getCategoriesForZone(zone: SegmentWithResults | null): ZoneCat[] {
-  if (!zone) return GENERIC_CATEGORIES;
+  if (!zone) return [z('Wood'), z('Stone'), z('Tiles'), z('Fabric'), z('Metal'), z('Paint')];
 
-  // zone_intent overrides — hard-coded for reliability regardless of label
-  switch (zone.zone_intent) {
-    case 'sub_element':
-      return [z('Paint'), z('Metal'), z('Wood'), z('Lacquer')];
-    case 'upholstery':
-      return [z('Fabric'), z('Leather'), z('Velvet'), z('Linen'), z('Bouclé'), z('Wool')];
-    // full_object + surface fall through to label-based lookup
+  const intent = zone.zone_intent ?? 'surface';
+
+  // ── sub_element: always finish/colour options ─────────────────────────────
+  if (intent === 'sub_element') {
+    return [z('Paint'), z('Metal'), z('Wood'), z('Lacquer')];
   }
 
-  const key = zone.label.toLowerCase().trim();
-  return ZONE_CATEGORY_MAP[key]
-    ?? ZONE_CATEGORY_MAP[key.split(' ')[0]]
-    ?? GENERIC_CATEGORIES;
+  // ── upholstery: always textile/hide options ───────────────────────────────
+  if (intent === 'upholstery') {
+    return [z('Fabric'), z('Leather'), z('Velvet'), z('Linen'), z('Bouclé'), z('Wool')];
+  }
+
+  // ── full_object: keyword-match label + material_type ─────────────────────
+  if (intent === 'full_object') {
+    if (zoneContains(zone, 'sofa', 'couch', 'settee', 'loveseat'))
+      return [z('Sofas'), z('Fabric'), z('Leather'), z('Velvet'), z('Bouclé')];
+    if (zoneContains(zone, 'armchair', 'accent chair', 'lounge chair'))
+      return [z('Armchairs'), z('Fabric'), z('Leather')];
+    if (zoneContains(zone, 'chair', 'seat', 'stool'))
+      return [z('Chairs'), z('Fabric'), z('Leather'), z('Wood')];
+    if (zoneContains(zone, 'dining table', 'coffee table', 'side table', 'console table', 'table top', 'tabletop', 'table'))
+      return [z('Tables'), z('Wood'), z('Stone'), z('Metal'), z('Glass')];
+    if (zoneContains(zone, 'cabinet', 'sideboard', 'credenza', 'buffet'))
+      return [z('Cabinets'), z('Wood'), z('Metal'), z('Lacquer')];
+    if (zoneContains(zone, 'shelf', 'shelving', 'bookcase', 'bookshelf'))
+      return [z('Shelving'), z('Wood'), z('Metal'), z('Glass')];
+    if (zoneContains(zone, 'rug', 'carpet', 'mat'))
+      return [z('Carpet'), z('Natural Fiber'), z('Wool'), z('Fabric')];
+    if (zoneContains(zone, 'curtain', 'drape', 'blind', 'shutter'))
+      return [z('Fabric'), z('Linen'), z('Sheer'), z('Velvet')];
+    if (zoneContains(zone, 'lamp', 'light', 'pendant', 'sconce'))
+      return [z('Metal'), z('Glass'), z('Fabric')];
+    if (zoneContains(zone, 'door'))
+      return [z('Wood'), z('Metal'), z('Glass')];
+    if (zoneContains(zone, 'window', 'frame'))
+      return [z('Glass'), z('Wood'), z('Metal')];
+    // Unknown full_object — surface-agnostic set
+    return [z('Wood'), z('Metal'), z('Fabric'), z('Stone'), z('Glass')];
+  }
+
+  // ── surface (default): keyword-match material_type first, then label ──────
+  if (zoneContains(zone, 'tile', 'porcelain', 'ceramic', 'mosaic', 'terracotta'))
+    return [z('Tiles'), z('Stone'), z('Ceramic')];
+  if (zoneContains(zone, 'marble', 'granite', 'travertine', 'limestone', 'slate', 'onyx', 'quartz'))
+    return [z('Stone'), z('Tiles'), z('Ceramic'), z('Composite')];
+  if (zoneContains(zone, 'oak', 'walnut', 'pine', 'teak', 'mahogany', 'parquet', 'herringbone', 'engineered wood', 'hardwood'))
+    return [z('Wood'), z('Laminate'), z('Vinyl')];
+  if (zoneContains(zone, 'wood', 'timber', 'veneer', 'plank'))
+    return [z('Wood'), z('Laminate'), z('Stone'), z('Tiles')];
+  if (zoneContains(zone, 'laminate', 'vinyl', 'lvt', 'luxury vinyl'))
+    return [z('Laminate'), z('Vinyl'), z('Wood')];
+  if (zoneContains(zone, 'carpet', 'rug'))
+    return [z('Carpet'), z('Natural Fiber'), z('Wool')];
+  if (zoneContains(zone, 'plaster', 'gypsum', 'paint', 'emulsion', 'stucco'))
+    return [z('Paint'), z('Wallpaper'), z('Concrete')];
+  if (zoneContains(zone, 'wallpaper', 'wall covering', 'panel'))
+    return [z('Wallpaper'), z('Paint'), z('Wood')];
+  if (zoneContains(zone, 'concrete', 'cement', 'microcement', 'screed'))
+    return [z('Concrete'), z('Stone'), z('Tiles')];
+  if (zoneContains(zone, 'glass', 'glazing'))
+    return [z('Glass'), z('Metal')];
+  if (zoneContains(zone, 'metal', 'steel', 'aluminium', 'brass', 'copper', 'iron'))
+    return [z('Metal'), z('Paint'), z('Glass')];
+  if (zoneContains(zone, 'countertop', 'worktop', 'benchtop', 'island top'))
+    return [z('Stone'), z('Wood'), z('Metal'), z('Composite')];
+  if (zoneContains(zone, 'floor', 'flooring'))
+    return [z('Tiles'), z('Wood'), z('Laminate'), z('Stone'), z('Carpet'), z('Vinyl')];
+  if (zoneContains(zone, 'wall', 'cladding', 'cladded', 'backsplash'))
+    return [z('Paint'), z('Tiles'), z('Stone'), z('Wood'), z('Wallpaper')];
+  if (zoneContains(zone, 'ceiling'))
+    return [z('Paint'), z('Wood'), z('Concrete')];
+
+  // Final fallback — broad but sensible surface set
+  return [z('Tiles'), z('Wood'), z('Stone'), z('Paint')];
 }
 
 function bestCategoryForZone(zone: SegmentWithResults | null, cats: ZoneCat[]): ZoneCat | null {
@@ -428,14 +545,19 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
       supabase
         .rpc('get_product_categories', { p_workspace_id: workspaceId })
         .then(({ data }) => {
-          if (data && data.length >= 3) {
+          if (data && data.length > 0) {
             const mapped = (data as { category: string; product_count: number }[])
-              .map((row) => ({ label: row.category, queryTerms: CATEGORY_QUERY_TERMS[row.category] ?? row.category }))
-              .filter((c) => c.label);
+              .map((row) => {
+                const mapped = DB_CATEGORY_MAP[row.category];
+                if (mapped) return { label: mapped.label, queryTerms: mapped.queryTerms };
+                // Unknown DB value — capitalise and use as-is (forward-compat)
+                const label = row.category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                return { label, queryTerms: row.category.replace(/_/g, ' ') };
+              });
             setDbCategories(mapped);
           }
         })
-        .catch(() => { /* ignore — hardcoded map is the fallback */ });
+        .catch(() => { /* ignore — keyword fallback handles it */ });
     }
 
     const cats = getCategoriesForZone(zone);
@@ -910,7 +1032,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
                   >
                     All
                   </button>
-                  {(dbCategories.length >= 3 ? dbCategories : getCategoriesForZone(zone)).map(cat => (
+                  {(dbCategories.length > 0 ? dbCategories : getCategoriesForZone(zone)).map(cat => (
                     <button
                       key={cat.label}
                       onClick={() => setActiveCategory(cat)}

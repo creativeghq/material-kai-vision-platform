@@ -13,9 +13,9 @@ const buttonVariants = cva(
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full shadow-sm hover:shadow-md',
         outline:
-          'bg-background hover:bg-accent hover:text-[#3e192a] rounded-full shadow-md border-none',
+          'bg-white text-foreground hover:bg-accent hover:text-[#3e192a] rounded-full shadow-md border-none',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-accent rounded-full shadow-sm hover:shadow-md',
+          'bg-accent text-accent-foreground hover:bg-amber-bg rounded-full shadow-sm hover:shadow-md',
         ghost: 'hover:bg-accent hover:text-[#3e192a] rounded-lg',
         link: 'text-primary underline-offset-4 hover:underline',
       },

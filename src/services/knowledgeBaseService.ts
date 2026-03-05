@@ -40,6 +40,8 @@ export interface KBCategory {
   sort_order: number;
   created_at: string;
   document_count?: number;
+  access_level: 'admin' | 'agent' | 'public';
+  trigger_keyword?: string | null;
 }
 
 export interface KBAttachment {

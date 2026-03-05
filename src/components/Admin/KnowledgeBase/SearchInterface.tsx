@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Clock } from 'lucide-react';
+import { Search, Clock, Sparkles } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';

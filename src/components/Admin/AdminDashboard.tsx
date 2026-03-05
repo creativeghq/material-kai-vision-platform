@@ -35,7 +35,7 @@ type SystemMetrics = {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [, setSystemMetrics] = useState<SystemMetrics>({
+  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics>({
     processedDocuments: 0,
     knowledgeEntries: 0,
     activeSessions: 0,
@@ -58,9 +58,8 @@ const AdminDashboard: React.FC = () => {
         .select('*', { count: 'exact', head: true });
 
       const { count: activeSessions } = await supabase
-        .from('scraping_sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'active');
+        .from('search_analytics')
+        .select('*', { count: 'exact', head: true });
 
       setSystemMetrics({
         processedDocuments: processedDocs || 0,
@@ -178,6 +177,14 @@ const AdminDashboard: React.FC = () => {
         path: '/admin/flows',
         status: 'active',
         count: 'Visual Builder',
+      },
+      {
+        title: 'Background Agents',
+        description: 'Autonomous AI agents that run on schedules, events, or chains behind the scenes',
+        icon: Bot,
+        path: '/admin/background-agents',
+        status: 'active',
+        count: 'AI Agents',
       },
     ],
     'System Monitoring': [
@@ -338,8 +345,8 @@ const AdminDashboard: React.FC = () => {
                   <FileText className="h-5 w-5" style={{ color: 'hsl(var(--primary))' }} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">PDF Documents</p>
-                  <p className="text-2xl font-bold">156</p>
+                  <p className="text-sm text-muted-foreground">Processed Documents</p>
+                  <p className="text-2xl font-bold">{systemMetrics.processedDocuments.toLocaleString()}</p>
                 </div>
               </div>
               <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
@@ -364,7 +371,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Knowledge Entries</p>
-                  <p className="text-2xl font-bold">1,247</p>
+                  <p className="text-2xl font-bold">{systemMetrics.knowledgeEntries.toLocaleString()}</p>
                 </div>
               </div>
               <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>
@@ -389,7 +396,7 @@ const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Search Queries</p>
-                  <p className="text-2xl font-bold">8,432</p>
+                  <p className="text-2xl font-bold">{systemMetrics.activeSessions.toLocaleString()}</p>
                 </div>
               </div>
               <Badge className="px-2 py-1" style={{ background: 'var(--mocha-color)', color: 'var(--foreground-dark)' }}>

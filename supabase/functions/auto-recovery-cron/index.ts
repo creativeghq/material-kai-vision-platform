@@ -96,13 +96,43 @@ serve(async (req) => {
 });
 
 async function detectAllStuckJobs(supabase: any): Promise<StuckJob[]> {
-  const [pdfJobs, scrapingJobs, xmlJobs] = await Promise.all([
+  const [pdfJobs, scrapingJobs, xmlJobs, agentRunJobs] = await Promise.all([
     detectStuckPdfJobs(supabase),
     detectStuckScrapingJobs(supabase),
     detectStuckXmlJobs(supabase),
+    detectStuckAgentRuns(supabase),
   ]);
 
-  return [...pdfJobs, ...scrapingJobs, ...xmlJobs];
+  return [...pdfJobs, ...scrapingJobs, ...xmlJobs, ...agentRunJobs];
+}
+
+async function detectStuckAgentRuns(supabase: any): Promise<StuckJob[]> {
+  // Agent runs stuck processing with no heartbeat for >8 minutes
+  const eightMinutesAgo = new Date(Date.now() - 8 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('agent_runs')
+    .select('id, agent_id, recovery_attempts, last_heartbeat, last_recovery_at, delegated_to_python')
+    .eq('status', 'processing')
+    .eq('delegated_to_python', false) // skip Python-delegated runs — Python manages its own heartbeat
+    .lt('last_heartbeat', eightMinutesAgo)
+    .limit(50);
+
+  if (error) {
+    console.error('[AutoRecoveryCron] Error detecting stuck agent runs:', error);
+    return [];
+  }
+
+  return (data || []).map((run: any) => ({
+    id:               run.id,
+    type:             'pdf_processing' as const, // reuse type slot — recovery logic is shared
+    status:           'processing',
+    lastHeartbeat:    run.last_heartbeat,
+    stuckDuration:    calculateStuckDuration(run.last_heartbeat),
+    recoveryAttempts: run.recovery_attempts || 0,
+    canRecover:       (run.recovery_attempts || 0) < 3,
+    metadata:         { agent_id: run.agent_id, last_recovery_at: run.last_recovery_at, _is_agent_run: true },
+  }));
 }
 
 async function detectStuckPdfJobs(supabase: any): Promise<StuckJob[]> {
@@ -210,7 +240,10 @@ async function recoverJob(supabase: any, job: StuckJob): Promise<any> {
 
   try {
     let success = false;
-    switch (job.type) {
+    // Check if this is an agent_run stuck job (stored with _is_agent_run flag in metadata)
+    if (job.metadata?._is_agent_run) {
+      success = await recoverAgentRun(supabase, job);
+    } else switch (job.type) {
       case 'pdf_processing':
         success = await recoverPdfJob(supabase, job);
         break;
@@ -245,6 +278,48 @@ function shouldAttemptRecovery(job: StuckJob): boolean {
   const backoffMinutes = [5, 15, 30][job.recoveryAttempts - 1] || 30;
 
   return minutesSinceLastRecovery >= backoffMinutes;
+}
+
+async function recoverAgentRun(supabase: any, job: StuckJob): Promise<boolean> {
+  const supabaseUrl        = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+  if (!job.canRecover) {
+    await supabase
+      .from('agent_runs')
+      .update({ status: 'failed', error_message: 'Timed out: max recovery attempts exceeded' })
+      .eq('id', job.id);
+    return true; // "success" = we handled it
+  }
+
+  // Reset to pending so runner can re-dispatch it
+  const { error } = await supabase
+    .from('agent_runs')
+    .update({
+      status:             'pending',
+      last_heartbeat:     new Date().toISOString(),
+      last_recovery_at:   new Date().toISOString(),
+      recovery_attempts:  (job.recoveryAttempts || 0) + 1,
+    })
+    .eq('id', job.id);
+
+  if (error) return false;
+
+  // Re-dispatch to runner (fire-and-forget)
+  fetch(`${supabaseUrl}/functions/v1/background-agent-runner`, {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      agent_id:     job.metadata?.agent_id,
+      run_id:       job.id,
+      triggered_by: 'recovery',
+    }),
+  }).catch(e => console.error('[AutoRecoveryCron] Failed to re-dispatch agent run:', e));
+
+  return true;
 }
 
 async function recoverPdfJob(supabase: any, job: StuckJob): Promise<boolean> {

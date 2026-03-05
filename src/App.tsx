@@ -27,6 +27,9 @@ import HealthPage from './pages/Health';
 // Core user pages
 const Index = lazy(() => import('./pages/Index'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
+const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
+const DiscoverPage = lazy(() => import('./pages/DiscoverPage').then(m => ({ default: m.DiscoverPage })));
+const PublicKnowledgeBasePage = lazy(() => import('./pages/PublicKnowledgeBasePage').then(m => ({ default: m.PublicKnowledgeBasePage })));
 const AuthCallbackPage = lazy(() => import('./pages/AuthCallbackPage').then(m => ({ default: m.AuthCallbackPage })));
 const MaterialsPage = lazy(() => import('./pages/Materials'));
 const AgentHub = lazy(() => import('./pages/AgentHub'));
@@ -82,6 +85,8 @@ const EmailManagement = lazy(() => import('./components/Admin/EmailManagement').
 const EmailTemplateBuilder = lazy(() => import('./pages/Admin/EmailTemplateBuilder').then(m => ({ default: m.EmailTemplateBuilder })));
 const MessagingManagement = lazy(() => import('./components/Admin/MessagingManagement').then(m => ({ default: m.MessagingManagement })));
 const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
+const BackgroundAgentsPage = lazy(() => import('./components/Admin/BackgroundAgents/BackgroundAgentsPage').then(m => ({ default: m.BackgroundAgentsPage })));
+const FactoryAnalyticsPage = lazy(() => import('./pages/FactoryAnalyticsPage'));
 
 // ── Loading fallback ────────────────────────────────────────────────
 const PageLoader = () => (
@@ -688,6 +693,18 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/admin/background-agents"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <Layout>
+                          <BackgroundAgentsPage />
+                        </Layout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
                   path="/admin/email-templates/:id/edit"
                   element={
                     <AuthGuard>
@@ -707,6 +724,52 @@ const App = () => (
                         <QuoteRequestsPage />
                       </Layout>
                     </AuthGuard>
+                  }
+                />
+
+                {/* Factory Analytics — factory users + admins */}
+                <Route
+                  path="/factory-analytics"
+                  element={
+                    <AuthGuard>
+                      <Layout>
+                        <FactoryAnalyticsPage />
+                      </Layout>
+                    </AuthGuard>
+                  }
+                />
+
+                {/* Public Knowledge Base — no auth required */}
+                <Route
+                  path="/knowledge-base"
+                  element={
+                    <PageErrorBoundary name="Public Knowledge Base">
+                      <PublicKnowledgeBasePage />
+                    </PageErrorBoundary>
+                  }
+                />
+
+                {/* Public profile — no auth required */}
+                <Route
+                  path="/u/:userId"
+                  element={
+                    <PageErrorBoundary name="Public Profile">
+                      <PublicProfilePage />
+                    </PageErrorBoundary>
+                  }
+                />
+
+                {/* Discover creators — authenticated */}
+                <Route
+                  path="/discover"
+                  element={
+                    <PageErrorBoundary name="Discover">
+                      <AuthGuard>
+                        <Layout>
+                          <DiscoverPage />
+                        </Layout>
+                      </AuthGuard>
+                    </PageErrorBoundary>
                   }
                 />
 

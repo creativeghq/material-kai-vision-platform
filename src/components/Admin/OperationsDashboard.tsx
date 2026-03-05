@@ -57,6 +57,7 @@ import { GlobalAdminHeader } from './GlobalAdminHeader';
 import { ChunkQualityDashboard } from './ChunkQualityDashboard';
 import { UnifiedProcessingMonitor } from './UnifiedProcessingMonitor';
 import { SystemHealthMonitor } from './SystemHealthMonitor';
+import { PlatformOverviewTab } from './PlatformOverviewTab';
 
 // Model pricing per 1M tokens (in USD)
 // Platform markup multiplier (50% markup for user billing)
@@ -917,6 +918,10 @@ export const OperationsDashboard: React.FC = () => {
             <TabsTrigger value="services-billing">
               <Globe className="h-4 w-4 mr-2" />
               Services & Billing
+            </TabsTrigger>
+            <TabsTrigger value="platform-overview">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Platform Overview
             </TabsTrigger>
           </TabsList>
 
@@ -2219,6 +2224,11 @@ export const OperationsDashboard: React.FC = () => {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Platform Overview Tab */}
+          <TabsContent value="platform-overview" className="space-y-4">
+            <PlatformOverviewTab />
           </TabsContent>
 
         </Tabs>

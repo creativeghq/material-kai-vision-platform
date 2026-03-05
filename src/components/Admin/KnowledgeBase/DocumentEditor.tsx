@@ -25,8 +25,10 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { KBDocument, KBCategory } from '@/services/knowledgeBaseService';
+import { KBDocument, KBCategory, KnowledgeBaseService } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+
+const knowledgeBaseService = KnowledgeBaseService.getInstance();
 
 interface DocumentEditorProps {
   documentId: string | null;
@@ -150,37 +152,26 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       setIsSaving(true);
 
       if (documentId) {
-        // Update document directly in Supabase
-        const { error } = await supabase
-          .from('kb_docs')
-          .update({
-            ...document,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', documentId)
-          .eq('workspace_id', workspaceId);
-
-        if (error) throw error;
+        // Update via MIVAA — regenerates embedding if content changed
+        await knowledgeBaseService.updateDocument(documentId, {
+          ...document,
+          workspace_id: workspaceId,
+        });
 
         toast({
           title: 'Success',
           description: 'Document updated successfully',
         });
       } else {
-        // Create document directly in Supabase
-        const { error } = await supabase
-          .from('kb_docs')
-          .insert({
-            ...document,
-            workspace_id: workspaceId,
-            embedding_status: 'pending',
-          });
-
-        if (error) throw error;
+        // Create via MIVAA — generates embedding synchronously before saving
+        await knowledgeBaseService.createDocument({
+          ...document,
+          workspace_id: workspaceId,
+        });
 
         toast({
           title: 'Success',
-          description: 'Document created successfully. Embedding generation in progress...',
+          description: 'Document created and indexed successfully',
         });
       }
 

@@ -25,7 +25,13 @@ export type TriggerType =
   | 'product_added_to_quote'
   | 'moodboard_created'
   | 'moodboard_item_added'
-  | 'moodboard_shared';
+  | 'moodboard_shared'
+  | 'moodboard_commented'
+  | 'hire_me_received'
+  | 'profile_followed'
+  | 'profile_published'
+  | 'material_reviewed'
+  | 'preferred_factory_added';
 
 export interface ManualTriggerConfig {}
 
@@ -82,6 +88,26 @@ export interface MoodboardItemAddedTriggerConfig {
 
 export interface MoodboardSharedTriggerConfig {}
 
+export interface MoodboardCommentedTriggerConfig {
+  filter_moodboard_id?: string;
+}
+
+export interface HireMeReceivedTriggerConfig {
+  /** Only fire when specific services were selected */
+  filter_has_services?: boolean;
+}
+
+export interface ProfileFollowedTriggerConfig {}
+
+export interface ProfilePublishedTriggerConfig {}
+
+export interface MaterialReviewedTriggerConfig {
+  /** Only fire when rating is at least this value */
+  filter_min_rating?: number;
+}
+
+export interface PreferredFactoryAddedTriggerConfig {}
+
 export type TriggerConfigMap = {
   manual: ManualTriggerConfig;
   scheduled: ScheduledTriggerConfig;
@@ -100,6 +126,12 @@ export type TriggerConfigMap = {
   moodboard_created: MoodboardCreatedTriggerConfig;
   moodboard_item_added: MoodboardItemAddedTriggerConfig;
   moodboard_shared: MoodboardSharedTriggerConfig;
+  moodboard_commented: MoodboardCommentedTriggerConfig;
+  hire_me_received: HireMeReceivedTriggerConfig;
+  profile_followed: ProfileFollowedTriggerConfig;
+  profile_published: ProfilePublishedTriggerConfig;
+  material_reviewed: MaterialReviewedTriggerConfig;
+  preferred_factory_added: PreferredFactoryAddedTriggerConfig;
 };
 
 // =====================================================

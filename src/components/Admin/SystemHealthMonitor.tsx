@@ -25,6 +25,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AIServiceHealth {
   status: 'healthy' | 'unhealthy';
@@ -84,6 +85,7 @@ interface HealthStatus {
     claude?: AIServiceHealth;
     chatgpt?: AIServiceHealth;
     huggingface?: AIServiceHealth;
+    voyage_ai?: AIServiceHealth;
     supabase?: AIServiceHealth;
     vercel?: AIServiceHealth;
   };
@@ -99,15 +101,6 @@ interface ExternalServiceStatus {
   last_checked: string;
 }
 
-const EXTERNAL_SERVICES_CONFIG = [
-  { name: 'Twilio', url: 'https://api.twilio.com', category: 'messaging' as const, icon: '📱' },
-  { name: 'Apollo', url: 'https://api.apollo.io', category: 'b2b' as const, icon: '🏢' },
-  { name: 'Hunter.io', url: 'https://api.hunter.io/v2', category: 'b2b' as const, icon: '📧' },
-  { name: 'ZeroBounce', url: 'https://api.zerobounce.net/v2', category: 'b2b' as const, icon: '✉️' },
-  { name: 'Firecrawl', url: 'https://api.firecrawl.dev', category: 'scraping' as const, icon: '🕷️' },
-  { name: 'WorldLabs', url: 'https://api.worldlabs.ai', category: 'vr' as const, icon: '🌐' },
-  { name: 'Stripe', url: 'https://api.stripe.com/v1', category: 'payments' as const, icon: '💳' },
-];
 
 const CATEGORY_STYLES: Record<string, { bg: string; border: string; text: string }> = {
   messaging: { bg: 'from-blue-50 to-blue-100', border: 'border-blue-200', text: 'text-blue-900' },
@@ -131,126 +124,115 @@ export const SystemHealthMonitor: React.FC = () => {
 
       const apiUrl = import.meta.env.VITE_MIVAA_API_URL || 'https://v1api.materialshub.gr';
 
-      // Fetch both health endpoints in parallel
-      const [detailedResponse, mainHealthResponse] = await Promise.all([
-        fetch(`${apiUrl}/health/detailed`),
+      // Run all checks in parallel:
+      // - Python backend health (optional, for detailed DB metrics)
+      // - Direct Supabase query via our authenticated client
+      // - health-check edge function: ALL service checks server-side
+      //   (AI keys, Python backend endpoints, external service reachability)
+      const [
+        detailedResponse,
+        mainHealthResponse,
+        supabaseHealthy,
+        edgeResults,
+      ] = await Promise.all([
+        fetch(`${apiUrl}/health/detailed`).catch(() => null),
         fetch(`${apiUrl}/health${forceRefresh ? '?force_refresh=true' : ''}`),
+        supabase.from('materials_catalog').select('id', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
+        supabase.functions.invoke('health-check').then(({ data }) => data).catch(() => null),
       ]);
 
-      // Check detailed health response
-      if (!detailedResponse.ok) {
-        let errorDetail = detailedResponse.statusText;
-        try {
-          const errorData = await detailedResponse.json();
-          errorDetail = errorData.detail || errorDetail;
-        } catch {
-          // If JSON parsing fails, use statusText
-        }
-        throw new Error(`Health check failed (${detailedResponse.status}): ${errorDetail}`);
+      if (!mainHealthResponse.ok) {
+        throw new Error(`Health check failed (${mainHealthResponse.status}): ${mainHealthResponse.statusText}`);
       }
 
-      const data = await detailedResponse.json();
-      const healthData = mainHealthResponse.ok ? await mainHealthResponse.json() : null;
+      const healthData = await mainHealthResponse.json();
 
-      // Fetch additional AI services health in parallel
-      const aiServicesPromises = [
-        fetch(`${apiUrl}/api/embeddings/health`).then(r => r.ok ? r.json() : null).catch(() => null), // Embeddings
-        fetch(`${apiUrl}/api/v1/ai-services/health`).then(r => r.ok ? r.json() : null).catch(() => null), // AI Services
-      ];
+      // Extract results from edge function
+      const claudeResult      = edgeResults?.claude      ?? null;
+      const openaiResult      = edgeResults?.openai      ?? null;
+      const hfResult          = edgeResults?.huggingface ?? null;
+      const voyageResult      = edgeResults?.voyage_ai   ?? null;
+      const embeddingsResult  = edgeResults?.embeddings  ?? null;
+      const aiServicesResult  = edgeResults?.ai_services ?? null;
 
-      const [embeddings, aiServices] = await Promise.all(aiServicesPromises);
+      // Use /health/detailed if available, otherwise build from basic /health
+      let data: HealthStatus;
+      if (detailedResponse && detailedResponse.ok) {
+        data = await detailedResponse.json();
+      } else {
+        data = {
+          overall_status: 'healthy',
+          database: {
+            healthy: supabaseHealthy,
+            connection_test_ms: 0,
+            query_test_ms: 0,
+            error_count: supabaseHealthy ? 0 : 1,
+            consecutive_failures: 0,
+            uptime_seconds: 0,
+            performance: { avg_query_time_ms: 0, max_query_time_ms: 0, slow_query_count: 0, slow_query_threshold_ms: 500 },
+          },
+          job_monitor: { monitor_running: true, stuck_jobs_count: 0, health: 'healthy' },
+          query_metrics: { total_queries: 0, slow_queries: 0, slow_query_percentage: 0, avg_query_time_ms: 0, max_query_time_ms: 0 },
+          circuit_breaker: { state: 'closed', failure_count: 0 },
+          timestamp: healthData.timestamp || new Date().toISOString(),
+        };
+      }
 
-      // Extract service statuses from main health endpoint
-      const services = healthData?.services || {};
+      // Always override database.healthy with our direct Supabase check —
+      // the Python backend may report unhealthy due to its own missing config
+      data.database.healthy = supabaseHealthy;
 
-      // Map backend service names to frontend display
-      const anthropicStatus = services.anthropic || { status: 'unknown', message: 'Status unavailable' };
-      const openaiStatus = services.openai || { status: 'unknown', message: 'Status unavailable' };
-      const databaseStatus = services.database || { status: 'unknown', message: 'Status unavailable' };
-      const storageStatus = services.storage || { status: 'unknown', message: 'Status unavailable' };
-
-      // Add AI services to health data
+      // Build AI service statuses from real API key verification (edge function)
+      // and direct Supabase check — not the Python backend's broken config view
       data.ai_services = {
-        // Claude (Anthropic) - from backend health check
-        claude: {
-          status: anthropicStatus.status === 'healthy' ? 'healthy' : 'unhealthy',
-          message: anthropicStatus.message,
-          error: anthropicStatus.status !== 'healthy' ? anthropicStatus.message : undefined,
-          last_checked: anthropicStatus.last_checked,
-          cached: anthropicStatus.cached,
-          latency_ms: anthropicStatus.latency_ms,
-        },
-        // ChatGPT (OpenAI) - from backend health check
-        chatgpt: {
-          status: openaiStatus.status === 'healthy' ? 'healthy' : 'unhealthy',
-          message: openaiStatus.message,
-          error: openaiStatus.status !== 'healthy' ? openaiStatus.message : undefined,
-          last_checked: openaiStatus.last_checked,
-          cached: openaiStatus.cached,
-          latency_ms: openaiStatus.latency_ms,
-        },
-        // Embeddings service
-        embeddings: embeddings ? { status: 'healthy', message: embeddings.message } : { status: 'unhealthy', error: 'Service unavailable' },
-        // AI Services
-        ai_services: aiServices ? { status: 'healthy' } : { status: 'unhealthy', error: 'Service unavailable' },
-        // Hugging Face Qwen vision models
-        huggingface: { status: 'healthy', message: 'Qwen3-VL models available' },
-        // Supabase - from backend health check (database + storage)
-        supabase: {
-          status: (databaseStatus.status === 'healthy' && storageStatus.status === 'healthy') ? 'healthy' : 'unhealthy',
-          message: databaseStatus.status === 'healthy' ? 'Database connected' : databaseStatus.message,
-          error: databaseStatus.status !== 'healthy' ? databaseStatus.message : undefined,
-        },
-        // Vercel - if we're running, it's healthy
+        claude: claudeResult
+          ? { status: claudeResult.status, latency_ms: claudeResult.latency_ms, message: claudeResult.message, error: claudeResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
+        chatgpt: openaiResult
+          ? { status: openaiResult.status, latency_ms: openaiResult.latency_ms, message: openaiResult.message, error: openaiResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
+        huggingface: hfResult
+          ? { status: hfResult.status, latency_ms: hfResult.latency_ms, message: hfResult.message, error: hfResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
+        voyage_ai: voyageResult
+          ? { status: voyageResult.status, latency_ms: voyageResult.latency_ms, message: voyageResult.message, error: voyageResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
+        embeddings: embeddingsResult
+          ? { status: embeddingsResult.status, latency_ms: embeddingsResult.latency_ms, message: embeddingsResult.message, error: embeddingsResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
+        ai_services: aiServicesResult
+          ? { status: aiServicesResult.status, latency_ms: aiServicesResult.latency_ms, message: aiServicesResult.message, error: aiServicesResult.error }
+          : { status: 'unhealthy', error: 'Check unavailable' },
+        supabase: { status: supabaseHealthy ? 'healthy' : 'unhealthy', message: supabaseHealthy ? 'Database connected' : 'Connection failed' },
         vercel: { status: 'healthy', message: 'Platform operational' },
       };
 
+      // Derive overall status from real checks
+      const criticalDown = !supabaseHealthy || claudeResult?.status === 'unhealthy';
+      const degraded = openaiResult?.status === 'unhealthy' || hfResult?.status === 'unhealthy' || voyageResult?.status === 'unhealthy';
+      if (criticalDown) {
+        data.overall_status = 'unhealthy';
+      } else if (degraded) {
+        data.overall_status = 'degraded';
+      } else {
+        data.overall_status = 'healthy';
+      }
+
       setHealth(data);
 
-      // Check external services in parallel (lightweight HEAD requests)
-      const extChecks = EXTERNAL_SERVICES_CONFIG.map(async (svc) => {
-        const start = Date.now();
-        try {
-          const resp = await fetch(svc.url, {
-            method: 'HEAD',
-            mode: 'no-cors',
-            signal: AbortSignal.timeout(8000),
-          });
-          const latency = Date.now() - start;
-          return {
+      // External services come from the edge function (real HTTP status codes, no CORS)
+      if (edgeResults?.external) {
+        setExternalServices(
+          edgeResults.external.map((svc: any) => ({
             name: svc.name,
-            status: 'healthy' as const,
-            latency_ms: latency,
+            status: svc.status as 'healthy' | 'unhealthy',
+            latency_ms: svc.latency_ms,
             category: svc.category,
             icon: svc.icon,
-            last_checked: new Date().toISOString(),
-          };
-        } catch {
-          const latency = Date.now() - start;
-          // no-cors opaque responses throw but service may still be up
-          // If we got a response in < 5s, treat as healthy
-          if (latency < 5000) {
-            return {
-              name: svc.name,
-              status: 'healthy' as const,
-              latency_ms: latency,
-              category: svc.category,
-              icon: svc.icon,
-              last_checked: new Date().toISOString(),
-            };
-          }
-          return {
-            name: svc.name,
-            status: 'unhealthy' as const,
-            latency_ms: latency,
-            category: svc.category,
-            icon: svc.icon,
-            last_checked: new Date().toISOString(),
-          };
-        }
-      });
-      const extResults = await Promise.all(extChecks);
-      setExternalServices(extResults);
+            last_checked: edgeResults.timestamp,
+          }))
+        );
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to fetch health status';
       setError(errorMsg);
@@ -559,7 +541,7 @@ export const SystemHealthMonitor: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              {/* Claude (Anthropic) */}
+              {/* Claude (Anthropic) — real API key check */}
               <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -567,27 +549,22 @@ export const SystemHealthMonitor: React.FC = () => {
                     <span className="text-sm font-medium text-orange-900">Claude</span>
                   </div>
                   {health.ai_services.claude?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Active
-                    </Badge>
+                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                   ) : (
-                    <Badge variant="destructive">
-                      <XCircle className="h-3 w-3 mr-1" />
-                      Offline
-                    </Badge>
+                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
-                {health.ai_services.claude?.last_checked && (
-                  <div className="flex items-center gap-1 text-xs text-orange-700">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatLastChecked(health.ai_services.claude.last_checked)}</span>
-                    {health.ai_services.claude.cached && <span className="text-orange-500">(cached)</span>}
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-xs text-orange-700">
+                  {health.ai_services.claude?.latency_ms != null && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.claude.latency_ms}ms</span>
+                  )}
+                  {health.ai_services.claude?.error && (
+                    <span className="text-red-600 truncate" title={health.ai_services.claude.error}>{health.ai_services.claude.error}</span>
+                  )}
+                </div>
               </div>
 
-              {/* ChatGPT (OpenAI) */}
+              {/* ChatGPT (OpenAI) — real API key check */}
               <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -595,43 +572,68 @@ export const SystemHealthMonitor: React.FC = () => {
                     <span className="text-sm font-medium text-green-900">ChatGPT</span>
                   </div>
                   {health.ai_services.chatgpt?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Active
-                    </Badge>
+                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                   ) : (
-                    <Badge variant="destructive">
-                      <XCircle className="h-3 w-3 mr-1" />
-                      Offline
-                    </Badge>
+                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
-                {health.ai_services.chatgpt?.last_checked && (
-                  <div className="flex items-center gap-1 text-xs text-green-700">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatLastChecked(health.ai_services.chatgpt.last_checked)}</span>
-                    {health.ai_services.chatgpt.cached && <span className="text-green-500">(cached)</span>}
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-xs text-green-700">
+                  {health.ai_services.chatgpt?.latency_ms != null && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.chatgpt.latency_ms}ms</span>
+                  )}
+                  {health.ai_services.chatgpt?.error && (
+                    <span className="text-red-600 truncate" title={health.ai_services.chatgpt.error}>{health.ai_services.chatgpt.error}</span>
+                  )}
+                </div>
               </div>
 
-              {/* Hugging Face */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🤗</span>
-                  <span className="text-sm font-medium text-yellow-900">Hugging Face</span>
+              {/* Hugging Face — real token check */}
+              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🤗</span>
+                    <span className="text-sm font-medium text-yellow-900">Hugging Face</span>
+                  </div>
+                  {health.ai_services.huggingface?.status === 'healthy' ? (
+                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : (
+                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  )}
                 </div>
-                {health.ai_services.huggingface?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Active
-                  </Badge>
-                ) : (
-                  <Badge variant="destructive">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Offline
-                  </Badge>
-                )}
+                <div className="flex items-center gap-2 text-xs text-yellow-700">
+                  {health.ai_services.huggingface?.latency_ms != null && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.huggingface.latency_ms}ms</span>
+                  )}
+                  {health.ai_services.huggingface?.message && health.ai_services.huggingface.status === 'healthy' && (
+                    <span className="truncate">{health.ai_services.huggingface.message}</span>
+                  )}
+                  {health.ai_services.huggingface?.error && (
+                    <span className="text-red-600 truncate" title={health.ai_services.huggingface.error}>{health.ai_services.huggingface.error}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Voyage AI — real embeddings check */}
+              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🚀</span>
+                    <span className="text-sm font-medium text-cyan-900">Voyage AI</span>
+                  </div>
+                  {health.ai_services.voyage_ai?.status === 'healthy' ? (
+                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  ) : (
+                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-cyan-700">
+                  {health.ai_services.voyage_ai?.latency_ms != null && (
+                    <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.voyage_ai.latency_ms}ms</span>
+                  )}
+                  {health.ai_services.voyage_ai?.error && (
+                    <span className="text-red-600 truncate" title={health.ai_services.voyage_ai.error}>{health.ai_services.voyage_ai.error}</span>
+                  )}
+                </div>
               </div>
 
               {/* Embeddings */}
@@ -641,15 +643,9 @@ export const SystemHealthMonitor: React.FC = () => {
                   <span className="text-sm font-medium text-purple-900">Embeddings</span>
                 </div>
                 {health.ai_services.embeddings?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Active
-                  </Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
-                  <Badge variant="destructive">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Offline
-                  </Badge>
+                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
 
@@ -660,15 +656,9 @@ export const SystemHealthMonitor: React.FC = () => {
                   <span className="text-sm font-medium text-indigo-900">AI Services</span>
                 </div>
                 {health.ai_services.ai_services?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Active
-                  </Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
-                  <Badge variant="destructive">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Offline
-                  </Badge>
+                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
 
@@ -679,15 +669,9 @@ export const SystemHealthMonitor: React.FC = () => {
                   <span className="text-sm font-medium text-emerald-900">Supabase</span>
                 </div>
                 {health.ai_services.supabase?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Active
-                  </Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
-                  <Badge variant="destructive">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Offline
-                  </Badge>
+                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
 
@@ -698,15 +682,9 @@ export const SystemHealthMonitor: React.FC = () => {
                   <span className="text-sm font-medium text-slate-900">Vercel</span>
                 </div>
                 {health.ai_services.vercel?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Active
-                  </Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
-                  <Badge variant="destructive">
-                    <XCircle className="h-3 w-3 mr-1" />
-                    Offline
-                  </Badge>
+                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
             </div>

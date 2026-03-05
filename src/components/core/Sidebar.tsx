@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Home, Palette, Settings, MessageSquare, User, ChevronRight, ChevronLeft, FileText } from 'lucide-react';
+import { Home, Palette, Settings, MessageSquare, User, ChevronRight, ChevronLeft, FileText, Users, BarChart3 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useFactoryRole } from '@/hooks/useFactoryRole';
 
 import { Button } from '@/components/core/ui/button';
 import {
@@ -10,18 +11,27 @@ import {
   TooltipTrigger,
 } from '@/components/core/ui/tooltip';
 
-const navigationItems = [
+const BASE_NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette },
+  { id: 'discover', label: 'Discover', path: '/discover', icon: Users },
   { id: 'quotes', label: 'Quotes Cart', path: '/quotes', icon: FileText },
-  { id: 'admin', label: 'Admin Panel', path: '/admin', icon: Settings },
 ];
 
 const SIDEBAR_STORAGE_KEY = 'kai-sidebar-expanded';
 
 export const Sidebar: React.FC = () => {
   const location = useLocation();
+  const { isFactory, isAdmin } = useFactoryRole();
+
+  const navigationItems = [
+    ...BASE_NAV_ITEMS,
+    ...(isFactory || isAdmin
+      ? [{ id: 'factory-analytics', label: 'Factory Analytics', path: '/factory-analytics', icon: BarChart3 }]
+      : []),
+    { id: 'admin', label: 'Admin Panel', path: '/admin', icon: Settings },
+  ];
 
   // Initialize from localStorage - default to expanded (true)
   const [isExpanded, setIsExpanded] = useState(() => {
@@ -52,7 +62,7 @@ export const Sidebar: React.FC = () => {
       {/* Logo/Brand and Toggle */}
       <div className={`mb-10 px-4 flex flex-col ${!isExpanded ? 'items-center' : ''}`}>
         <div className="flex items-center justify-between w-full">
-          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 transition-transform hover:scale-105 active:scale-95">
+          <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/25 ring-2 ring-[hsl(var(--amber)/0.45)] transition-transform hover:scale-105 hover:ring-[hsl(var(--amber)/0.7)] active:scale-95">
             <span className="text-primary-foreground font-light text-xl">J</span>
           </div>
           {isExpanded && (
@@ -84,8 +94,8 @@ export const Sidebar: React.FC = () => {
                   variant="ghost"
                   className={`${isExpanded ? 'w-full justify-start px-4' : 'w-14 px-0 justify-center'} h-14 rounded-2xl transition-all duration-300 ${
                     isActive(item.path)
-                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/40 border border-transparent hover:border-white/20'
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02] ring-1 ring-[hsl(var(--amber)/0.5)]'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent hover:border-[hsl(var(--amber)/0.25)]'
                   }`}
                   asChild
                 >
@@ -96,7 +106,7 @@ export const Sidebar: React.FC = () => {
                 </Button>
               </TooltipTrigger>
               {!isExpanded && (
-                <TooltipContent side="right" className="rounded-xl">
+                <TooltipContent side="right" className="rounded-xl z-[200]">
                   <p>{item.label}</p>
                 </TooltipContent>
               )}
@@ -125,8 +135,8 @@ export const Sidebar: React.FC = () => {
                 variant="ghost"
                 className={`h-14 rounded-2xl transition-all duration-300 ${isExpanded ? 'w-full justify-start px-4' : 'w-14 px-0 justify-center'} border border-transparent hover:border-white/20 group ${
                   isActive('/profile')
-                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/40'
+                    ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02] ring-1 ring-[hsl(var(--amber)/0.5)]'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                 }`}
                 asChild
               >
@@ -137,7 +147,7 @@ export const Sidebar: React.FC = () => {
               </Button>
             </TooltipTrigger>
             {!isExpanded && (
-              <TooltipContent side="right" className="rounded-xl font-light">
+              <TooltipContent side="right" className="rounded-xl font-light z-[200]">
                 <p>User Profile</p>
               </TooltipContent>
             )}

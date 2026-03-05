@@ -383,6 +383,44 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return (ms / 1000).toFixed(1) + 's';
   };
 
+  // Subscribe to background task results — when a task dispatched from this chat
+  // completes, the runner inserts an assistant message into agent_chat_messages
+  // and we push it into local state so it appears in the conversation.
+  useEffect(() => {
+    if (!currentConversationId) return;
+
+    const channel = supabase
+      .channel(`background-results:${currentConversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'agent_chat_messages',
+          filter: `conversation_id=eq.${currentConversationId}`,
+        },
+        (payload) => {
+          const msg = payload.new as any;
+          // Only inject assistant messages flagged as background task results
+          if (msg.role !== 'assistant' || !msg.metadata?.background_task) return;
+          setMessages(prev => {
+            // Avoid duplicates if the message was already added locally
+            if (prev.some(m => m.id === msg.id)) return prev;
+            return [...prev, {
+              id:        msg.id,
+              role:      'assistant' as const,
+              content:   msg.content,
+              timestamp: new Date(msg.created_at),
+              agentId:   'kai',
+            }];
+          });
+        },
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentConversationId]);
+
   /**
    * Transform raw reasoning data into Jarvis-style witty messages
    * Personality: Dry wit, subtle humor, calm, measured, professional
@@ -681,6 +719,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           agentId: selectedAgent,
           model: selectedModel,
           images: attachedImages,
+          conversation_id: currentConversationId,
         };
 
         // REMOVED: PDF data attachment - PDF processing moved to /admin/data-import page
