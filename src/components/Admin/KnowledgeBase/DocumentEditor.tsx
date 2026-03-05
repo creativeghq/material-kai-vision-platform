@@ -25,10 +25,8 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { KBDocument, KBCategory, KnowledgeBaseService } from '@/services/knowledgeBaseService';
+import { KBDocument, KBCategory } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
-
-const knowledgeBaseService = KnowledgeBaseService.getInstance();
 
 interface DocumentEditorProps {
   documentId: string | null;
@@ -177,15 +175,28 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           description: 'Document updated successfully',
         });
       } else {
-        // Create via MIVAA — generates Voyage AI embedding synchronously before saving
-        await knowledgeBaseService.createDocument({
-          ...document,
-          workspace_id: workspaceId,
-        });
+        // Create directly in Supabase — instant, no MIVAA dependency
+        const { error: createError } = await supabase
+          .from('kb_docs')
+          .insert({
+            title: document.title,
+            content: document.content,
+            content_markdown: document.content_markdown,
+            summary: document.summary,
+            category_id: document.category_id,
+            seo_keywords: document.seo_keywords,
+            status: document.status,
+            visibility: document.visibility,
+            metadata: document.metadata,
+            workspace_id: workspaceId,
+            embedding_status: 'pending',
+          });
+
+        if (createError) throw createError;
 
         toast({
           title: 'Success',
-          description: 'Document created and indexed successfully',
+          description: 'Document created successfully',
         });
       }
 
