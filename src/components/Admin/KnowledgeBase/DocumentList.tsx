@@ -181,6 +181,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
   );
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -291,6 +292,7 @@ export const DocumentList: React.FC<DocumentListProps> = ({
         </DialogContent>
       </Dialog>
     )}
+    </>
   );
 };
 
