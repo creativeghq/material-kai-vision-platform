@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Save,
-  Eye,
-  Code,
-} from 'lucide-react';
+import { Save, Eye, Code } from 'lucide-react';
 
 import {
   Dialog,
@@ -25,8 +20,10 @@ import {
 } from '@/components/core/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { KBDocument, KBCategory } from '@/services/knowledgeBaseService';
+import { KBDocument, KBCategory, KnowledgeBaseService } from '@/services/knowledgeBaseService';
 import { supabase } from '@/integrations/supabase/client';
+
+const knowledgeBaseService = KnowledgeBaseService.getInstance();
 
 interface DocumentEditorProps {
   documentId: string | null;
@@ -176,7 +173,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         });
       } else {
         // Create directly in Supabase — instant, no MIVAA dependency
-        const { error: createError } = await supabase
+        const { data: newDoc, error: createError } = await supabase
           .from('kb_docs')
           .insert({
             title: document.title,
@@ -190,9 +187,18 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
             metadata: document.metadata,
             workspace_id: workspaceId,
             embedding_status: 'pending',
-          });
+          })
+          .select('id')
+          .single();
 
         if (createError) throw createError;
+
+        // Fire-and-forget: trigger embedding generation via MIVAA (non-blocking)
+        // Uses the update endpoint which regenerates embeddings when content is provided
+        knowledgeBaseService.updateDocument(newDoc.id, {
+          content: document.content,
+          workspace_id: workspaceId,
+        }).catch(() => { /* MIVAA unavailable — embedding stays pending */ });
 
         toast({
           title: 'Success',
@@ -247,19 +253,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
           }}
         >
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-2xl font-bold">
-                {documentId ? 'Edit Document' : 'Create New Document'}
-              </DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="hover:bg-white/10"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+            <DialogTitle className="text-2xl font-bold">
+              {documentId ? 'Edit Document' : 'Create New Document'}
+            </DialogTitle>
           </DialogHeader>
         </div>
 
