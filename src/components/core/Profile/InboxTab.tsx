@@ -14,6 +14,7 @@ interface ContactRequest {
   message: string;
   created_at: string;
   services_requested?: string[] | null;
+  is_read: boolean;
 }
 
 export const InboxTab: React.FC = () => {
@@ -36,7 +37,18 @@ export const InboxTab: React.FC = () => {
       .eq('to_user_id', user!.id)
       .order('created_at', { ascending: false });
 
-    if (!error && data) setMessages(data);
+    if (!error && data) {
+      setMessages(data as ContactRequest[]);
+      // Mark all unread as read
+      const unreadIds = (data as ContactRequest[]).filter((m) => !m.is_read).map((m) => m.id);
+      if (unreadIds.length > 0) {
+        supabase
+          .from('profile_contact_requests')
+          .update({ is_read: true })
+          .in('id', unreadIds)
+          .then(() => {});
+      }
+    }
     setLoading(false);
   };
 
@@ -91,7 +103,11 @@ export const InboxTab: React.FC = () => {
                   className="rounded-xl border p-4 space-y-2 hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex items-start gap-2">
+                      {!msg.is_read && (
+                        <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
+                      )}
+                      <div className="min-w-0">
                       <p className="font-medium text-sm">{msg.from_name}</p>
                       <a
                         href={`mailto:${msg.from_email}`}
@@ -99,6 +115,7 @@ export const InboxTab: React.FC = () => {
                       >
                         {msg.from_email}
                       </a>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs text-muted-foreground">{fmt(msg.created_at)}</span>

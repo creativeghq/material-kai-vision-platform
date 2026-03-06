@@ -106,7 +106,7 @@ export const Sidebar: React.FC = () => {
                 </Button>
               </TooltipTrigger>
               {!isExpanded && (
-                <TooltipContent side="right" className="rounded-xl z-[200]">
+                <TooltipContent side="right" className="rounded-xl">
                   <p>{item.label}</p>
                 </TooltipContent>
               )}

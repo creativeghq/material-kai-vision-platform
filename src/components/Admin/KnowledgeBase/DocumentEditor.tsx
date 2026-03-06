@@ -198,12 +198,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
         if (createError) throw createError;
 
-        // Fire-and-forget: trigger embedding generation via MIVAA (non-blocking)
-        // Uses the update endpoint which regenerates embeddings when content is provided
-        knowledgeBaseService.updateDocument(newDoc.id, {
-          content: document.content,
-          workspace_id: workspaceId,
-        }).catch(() => { /* MIVAA unavailable — embedding stays pending */ });
+        // Fire-and-forget: trigger embedding generation via edge function (non-blocking)
+        supabase.functions.invoke('kb-generate-embedding', { body: { doc_id: newDoc.id } })
+          .catch(() => { /* embedding stays pending — retry button available in admin */ });
 
         toast({
           title: 'Success',

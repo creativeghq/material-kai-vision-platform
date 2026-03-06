@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Bot } from 'lucide-react';
 
 import { AgentHub as AgentHubComponent } from '@/components/features/ai/AgentHub';
@@ -12,6 +12,9 @@ import { supabase } from '@/integrations/supabase/client';
 
 const AgentHubPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialPrompt = searchParams.get('prompt') ?? undefined;
+  const initialConversationId = searchParams.get('conversation') ?? undefined;
   const [userRole, setUserRole] = useState<'viewer' | 'member' | 'admin' | 'owner'>('member');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -68,6 +71,8 @@ const AgentHubPage: React.FC = () => {
       <AgentHubComponent
         userRole={userRole}
         onMaterialSelect={handleMaterialSelect}
+        initialPrompt={initialPrompt}
+        initialConversationId={initialConversationId}
       />
     </div>
   );

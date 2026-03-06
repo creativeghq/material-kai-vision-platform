@@ -7,6 +7,7 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  RefreshCw,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -160,6 +161,30 @@ export const DocumentList: React.FC<DocumentListProps> = ({
     }
   };
 
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
+
+  const retryEmbedding = async (doc: KBDocument) => {
+    setRetryingIds((s) => new Set(s).add(doc.id));
+    try {
+      const { data, error } = await supabase.functions.invoke('kb-generate-embedding', {
+        body: { doc_id: doc.id },
+      });
+      if (error || !data?.success) {
+        throw new Error(error?.message || data?.error || 'Unknown error');
+      }
+      await loadDocuments();
+      toast({ title: 'Embedding generated', description: `${data.dimensions}D vector saved successfully.` });
+    } catch (err) {
+      toast({
+        title: 'Embedding failed',
+        description: err instanceof Error ? err.message : 'Could not generate embedding.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRetryingIds((s) => { const n = new Set(s); n.delete(doc.id); return n; });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
       draft: 'secondary',
@@ -243,6 +268,17 @@ export const DocumentList: React.FC<DocumentListProps> = ({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {doc.embedding_status !== 'success' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Retry embedding generation"
+                          disabled={retryingIds.has(doc.id)}
+                          onClick={() => retryEmbedding(doc)}
+                        >
+                          <RefreshCw className={`h-4 w-4 text-amber-500 ${retryingIds.has(doc.id) ? 'animate-spin' : ''}`} />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

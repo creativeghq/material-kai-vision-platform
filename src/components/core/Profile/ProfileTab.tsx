@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   User, Pencil, Save, Loader2, X, Camera, Globe, MapPin, Building2,
   Briefcase, Eye, EyeOff, Plus, Trash2, Copy, Check, Star, Tag,
-  ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp,
+  ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink,
+  ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -38,6 +40,223 @@ const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {
   consultant: 'Consultant',
   other: 'Other',
 };
+
+// ─── Country codes ────────────────────────────────────────────────────────────
+const COUNTRY_CODES = [
+  { code: '+1',   flag: '🇺🇸', name: 'United States' },
+  { code: '+1',   flag: '🇨🇦', name: 'Canada' },
+  { code: '+44',  flag: '🇬🇧', name: 'United Kingdom' },
+  { code: '+61',  flag: '🇦🇺', name: 'Australia' },
+  { code: '+64',  flag: '🇳🇿', name: 'New Zealand' },
+  { code: '+353', flag: '🇮🇪', name: 'Ireland' },
+  { code: '+49',  flag: '🇩🇪', name: 'Germany' },
+  { code: '+33',  flag: '🇫🇷', name: 'France' },
+  { code: '+34',  flag: '🇪🇸', name: 'Spain' },
+  { code: '+39',  flag: '🇮🇹', name: 'Italy' },
+  { code: '+31',  flag: '🇳🇱', name: 'Netherlands' },
+  { code: '+32',  flag: '🇧🇪', name: 'Belgium' },
+  { code: '+41',  flag: '🇨🇭', name: 'Switzerland' },
+  { code: '+43',  flag: '🇦🇹', name: 'Austria' },
+  { code: '+46',  flag: '🇸🇪', name: 'Sweden' },
+  { code: '+47',  flag: '🇳🇴', name: 'Norway' },
+  { code: '+45',  flag: '🇩🇰', name: 'Denmark' },
+  { code: '+358', flag: '🇫🇮', name: 'Finland' },
+  { code: '+351', flag: '🇵🇹', name: 'Portugal' },
+  { code: '+30',  flag: '🇬🇷', name: 'Greece' },
+  { code: '+48',  flag: '🇵🇱', name: 'Poland' },
+  { code: '+420', flag: '🇨🇿', name: 'Czech Republic' },
+  { code: '+36',  flag: '🇭🇺', name: 'Hungary' },
+  { code: '+40',  flag: '🇷🇴', name: 'Romania' },
+  { code: '+7',   flag: '🇷🇺', name: 'Russia' },
+  { code: '+380', flag: '🇺🇦', name: 'Ukraine' },
+  { code: '+90',  flag: '🇹🇷', name: 'Turkey' },
+  { code: '+972', flag: '🇮🇱', name: 'Israel' },
+  { code: '+971', flag: '🇦🇪', name: 'UAE' },
+  { code: '+966', flag: '🇸🇦', name: 'Saudi Arabia' },
+  { code: '+20',  flag: '🇪🇬', name: 'Egypt' },
+  { code: '+27',  flag: '🇿🇦', name: 'South Africa' },
+  { code: '+234', flag: '🇳🇬', name: 'Nigeria' },
+  { code: '+254', flag: '🇰🇪', name: 'Kenya' },
+  { code: '+91',  flag: '🇮🇳', name: 'India' },
+  { code: '+92',  flag: '🇵🇰', name: 'Pakistan' },
+  { code: '+880', flag: '🇧🇩', name: 'Bangladesh' },
+  { code: '+94',  flag: '🇱🇰', name: 'Sri Lanka' },
+  { code: '+86',  flag: '🇨🇳', name: 'China' },
+  { code: '+81',  flag: '🇯🇵', name: 'Japan' },
+  { code: '+82',  flag: '🇰🇷', name: 'South Korea' },
+  { code: '+66',  flag: '🇹🇭', name: 'Thailand' },
+  { code: '+65',  flag: '🇸🇬', name: 'Singapore' },
+  { code: '+60',  flag: '🇲🇾', name: 'Malaysia' },
+  { code: '+62',  flag: '🇮🇩', name: 'Indonesia' },
+  { code: '+63',  flag: '🇵🇭', name: 'Philippines' },
+  { code: '+84',  flag: '🇻🇳', name: 'Vietnam' },
+  { code: '+55',  flag: '🇧🇷', name: 'Brazil' },
+  { code: '+54',  flag: '🇦🇷', name: 'Argentina' },
+  { code: '+56',  flag: '🇨🇱', name: 'Chile' },
+  { code: '+57',  flag: '🇨🇴', name: 'Colombia' },
+  { code: '+52',  flag: '🇲🇽', name: 'Mexico' },
+];
+
+function parsePhone(raw: string): { dialCode: string; number: string } {
+  const match = COUNTRY_CODES.map(c => c.code).find(c => raw.startsWith(c + ' ') || raw.startsWith(c));
+  if (match) {
+    return { dialCode: match, number: raw.slice(match.length).trimStart() };
+  }
+  return { dialCode: '+1', number: raw };
+}
+
+// ─── Phone input with country code dropdown ───────────────────────────────────
+function PhoneInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { dialCode, number } = parsePhone(value);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const selected = COUNTRY_CODES.find(c => c.code === dialCode) ?? COUNTRY_CODES[0];
+
+  const filtered = search
+    ? COUNTRY_CODES.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.code.includes(search)
+      )
+    : COUNTRY_CODES;
+
+  const setDialCode = (code: string) => {
+    onChange(`${code} ${number}`);
+    setOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <div className="flex gap-2">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 h-10 px-3 rounded-md border bg-background text-sm hover:bg-accent transition-colors shrink-0"
+          >
+            <span className="text-base leading-none">{selected.flag}</span>
+            <span className="text-muted-foreground">{selected.code}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-0" align="start">
+          <div className="p-2 border-b">
+            <input
+              autoFocus
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search country…"
+              className="w-full text-sm outline-none bg-transparent placeholder:text-muted-foreground"
+            />
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {filtered.map((c, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setDialCode(c.code)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-accent transition-colors text-left ${c.code === dialCode ? 'bg-primary/10 text-primary' : ''}`}
+              >
+                <span className="text-base">{c.flag}</span>
+                <span className="flex-1 truncate">{c.name}</span>
+                <span className="text-muted-foreground text-xs">{c.code}</span>
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+      <Input
+        value={number}
+        onChange={e => onChange(`${dialCode} ${e.target.value}`)}
+        placeholder="555 123 4567"
+        className="flex-1"
+      />
+    </div>
+  );
+}
+
+// ─── Location autocomplete via Nominatim (OpenStreetMap) ─────────────────────
+interface NominatimResult { display_name: string; }
+
+function LocationAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [query, setQuery] = useState(value);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setQuery(value); }, [value]);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (query.length < 3) { setSuggestions([]); setOpen(false); return; }
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6&featuretype=city`,
+          { headers: { 'Accept-Language': 'en' } }
+        );
+        const data: NominatimResult[] = await res.json();
+        // Simplify to "City, Country" format
+        const seen = new Set<string>();
+        const results: string[] = [];
+        for (const r of data) {
+          const parts = r.display_name.split(',');
+          const simplified = parts.length >= 2
+            ? `${parts[0].trim()}, ${parts[parts.length - 1].trim()}`
+            : r.display_name;
+          if (!seen.has(simplified)) { seen.add(simplified); results.push(simplified); }
+        }
+        setSuggestions(results);
+        setOpen(results.length > 0);
+      } catch { /* ignore */ }
+      setLoading(false);
+    }, 400);
+  }, [query]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const select = (s: string) => { setQuery(s); onChange(s); setOpen(false); setSuggestions([]); };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="relative">
+        <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground animate-spin" />}
+        <Input
+          value={query}
+          onChange={e => { setQuery(e.target.value); onChange(e.target.value); }}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
+          placeholder="Search city or country…"
+          className="pl-9"
+        />
+      </div>
+      {open && suggestions.length > 0 && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg overflow-hidden">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onMouseDown={() => select(s)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+            >
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface PersonalData {
@@ -559,10 +778,18 @@ export const ProfileTab: React.FC = () => {
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {isPublic && (
-                <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
-                  {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                  {copied ? 'Copied!' : 'Copy link'}
-                </Button>
+                <>
+                  <Button size="sm" variant="outline" asChild className="gap-1.5">
+                    <Link to={`/u/${user?.id}`} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      Preview
+                    </Link>
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={copyLink} className="gap-1.5">
+                    {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copied ? 'Copied!' : 'Copy link'}
+                  </Button>
+                </>
               )}
               <Switch id="visibility" checked={isPublic} onCheckedChange={handleVisibilityToggle} />
               <Label htmlFor="visibility" className="text-sm cursor-pointer">{isPublic ? 'Public' : 'Private'}</Label>
@@ -625,10 +852,18 @@ export const ProfileTab: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Field label="Full Name"><Input value={personalForm.full_name} onChange={(e) => setPersonalForm({ ...personalForm, full_name: e.target.value })} placeholder="John Doe" /></Field>
               <Field label="Email Address"><Input value={user?.email || ''} disabled className="opacity-60" /></Field>
-              <Field label="Phone Number"><Input value={personalForm.phone} onChange={(e) => setPersonalForm({ ...personalForm, phone: e.target.value })} placeholder="+1 (555) 123-4567" /></Field>
+              <Field label="Phone Number">
+                <PhoneInput
+                  value={personalForm.phone}
+                  onChange={(v) => setPersonalForm({ ...personalForm, phone: v })}
+                />
+              </Field>
               <Field label="Company"><Input value={personalForm.company} onChange={(e) => setPersonalForm({ ...personalForm, company: e.target.value })} placeholder="Acme Inc." /></Field>
               <Field label={<span className="flex items-center gap-1"><MapPin className="h-3 w-3" />Location</span>}>
-                <Input value={personalForm.location} onChange={(e) => setPersonalForm({ ...personalForm, location: e.target.value })} placeholder="New York, USA" />
+                <LocationAutocomplete
+                  value={personalForm.location}
+                  onChange={(v) => setPersonalForm({ ...personalForm, location: v })}
+                />
               </Field>
               <Field label={<span className="flex items-center gap-1"><Globe className="h-3 w-3" />Website</span>}>
                 <Input value={personalForm.website_url} onChange={(e) => setPersonalForm({ ...personalForm, website_url: e.target.value })} placeholder="https://yourwebsite.com" />
@@ -907,6 +1142,9 @@ export const ProfileTab: React.FC = () => {
         </Card>
       )}
 
+      {/* Appointment Availability */}
+      <AvailabilitySettings />
+
       {/* Featured Moodboard */}
       <Card className="rounded-2xl">
         <CardHeader>
@@ -945,6 +1183,315 @@ export const ProfileTab: React.FC = () => {
     </div>
   );
 };
+
+// ─── Availability Settings (calendar-based) ──────────────────────────────────
+interface TimeRange { start: string; end: string; }
+type DateMap = Map<string, TimeRange[]>;
+
+const MONTH_NAMES = ['January','February','March','April','May','June',
+  'July','August','September','October','November','December'];
+const CAL_DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+// 7:00 AM – 9:00 PM, 30-min steps
+const TIME_OPTIONS: string[] = [];
+for (let h = 7; h <= 21; h++) {
+  TIME_OPTIONS.push(`${String(h).padStart(2,'0')}:00`);
+  if (h < 21) TIME_OPTIONS.push(`${String(h).padStart(2,'0')}:30`);
+}
+
+function fmtTime(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h >= 12 ? 'PM' : 'AM'}`;
+}
+
+function dateKey(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function AvailabilitySettings() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [bookingEnabled, setBookingEnabled] = useState(false);
+  const [availability, setAvailability] = useState<DateMap>(new Map());
+  const [viewMonth, setViewMonth] = useState(() => new Date());
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      supabase.from('user_profiles').select('booking_enabled').eq('user_id', user.id).maybeSingle(),
+      supabase.from('appointment_availability').select('available_date, time_ranges').eq('user_id', user.id),
+    ]).then(([profileRes, availRes]) => {
+      setBookingEnabled(profileRes.data?.booking_enabled ?? false);
+      const map: DateMap = new Map();
+      ((availRes.data ?? []) as { available_date: string; time_ranges: TimeRange[] }[])
+        .forEach((row) => map.set(row.available_date, row.time_ranges ?? []));
+      setAvailability(map);
+      setLoaded(true);
+    });
+  }, [user]);
+
+  const setDateRanges = (key: string, ranges: TimeRange[]) => {
+    setAvailability((prev) => {
+      const next = new Map(prev);
+      if (ranges.length === 0) next.delete(key);
+      else next.set(key, ranges);
+      return next;
+    });
+  };
+
+  const save = async () => {
+    if (!user) return;
+    setSaving(true);
+    await supabase.from('user_profiles').update({ booking_enabled: bookingEnabled }).eq('user_id', user.id);
+    const entries = Array.from(availability.entries());
+    if (entries.length > 0) {
+      await supabase.from('appointment_availability').upsert(
+        entries.map(([date, ranges]) => ({ user_id: user.id, available_date: date, time_ranges: ranges })),
+        { onConflict: 'user_id,available_date' }
+      );
+    }
+    // Delete removed dates (fetch existing and diff)
+    const { data: existing } = await supabase
+      .from('appointment_availability').select('available_date').eq('user_id', user.id);
+    const toDelete = (existing ?? [])
+      .map((r: { available_date: string }) => r.available_date)
+      .filter((d) => !availability.has(d));
+    if (toDelete.length > 0) {
+      await supabase.from('appointment_availability')
+        .delete().eq('user_id', user.id).in('available_date', toDelete);
+    }
+    setSaving(false);
+    toast({ title: 'Availability saved' });
+  };
+
+  if (!loaded) return null;
+
+  // Calendar grid
+  const today = new Date(); today.setHours(0,0,0,0);
+  const year = viewMonth.getFullYear();
+  const month = viewMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: (Date | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, month, i + 1)),
+  ];
+
+  return (
+    <Card className="rounded-2xl">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="h-5 w-5 text-primary" />Appointment Availability
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Accept bookings</span>
+            <Switch checked={bookingEnabled} onCheckedChange={setBookingEnabled} />
+          </div>
+        </div>
+      </CardHeader>
+
+      {bookingEnabled && (
+        <CardContent className="space-y-5">
+          <p className="text-xs text-muted-foreground">
+            Click a future date to set your available time windows. Dates with availability are highlighted.
+          </p>
+
+          {/* ── 2-column grid: calendar | editor ───────────────────── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: calendar */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-semibold text-sm">{MONTH_NAMES[month]} {year}</span>
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    className="p-1 rounded-md hover:bg-accent transition-colors"
+                    onClick={() => setViewMonth(new Date(year, month - 1, 1))}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="p-1 rounded-md hover:bg-accent transition-colors"
+                    onClick={() => setViewMonth(new Date(year, month + 1, 1))}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-7 mb-1">
+                {CAL_DAYS.map((d) => (
+                  <div key={d} className="text-center text-xs text-muted-foreground font-medium py-1">{d}</div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-y-1">
+                {cells.map((date, i) => {
+                  if (!date) return <div key={i} />;
+                  const past = date < today;
+                  const key = dateKey(date);
+                  const hasAvail = availability.has(key);
+                  const isEditing = editingDate === key;
+                  const isToday = date.toDateString() === today.toDateString();
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      disabled={past}
+                      onClick={() => setEditingDate(isEditing ? null : key)}
+                      className={`
+                        aspect-square flex items-center justify-center text-sm rounded-lg mx-0.5 relative transition-colors
+                        ${isEditing ? 'bg-primary text-primary-foreground font-medium' : ''}
+                        ${hasAvail && !isEditing ? 'bg-primary/15 text-primary font-medium' : ''}
+                        ${isToday && !isEditing && !hasAvail ? 'ring-1 ring-primary text-primary' : ''}
+                        ${!past && !isEditing ? 'hover:bg-accent cursor-pointer' : ''}
+                        ${past ? 'text-muted-foreground/30 cursor-not-allowed' : ''}
+                      `}
+                    >
+                      {date.getDate()}
+                      {hasAvail && !isEditing && (
+                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right: time range editor or placeholder */}
+            <div className="border rounded-xl p-4 flex flex-col min-h-[260px]">
+              {editingDate ? (
+                <TimeRangeEditor
+                  dateKey={editingDate}
+                  ranges={availability.get(editingDate) ?? []}
+                  onChange={(ranges) => setDateRanges(editingDate, ranges)}
+                  onClose={() => setEditingDate(null)}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+                  <CalendarDays className="h-8 w-8 text-muted-foreground/30" />
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">Select a date</p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">Click any future date on the calendar to configure available hours</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <Button size="sm" className="rounded-full" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save Availability'}
+            </Button>
+            {availability.size > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {availability.size} date{availability.size !== 1 ? 's' : ''} configured
+              </span>
+            )}
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ─── Time range editor for a single date ─────────────────────────────────────
+function TimeRangeEditor({
+  dateKey: key,
+  ranges,
+  onChange,
+  onClose,
+}: {
+  dateKey: string;
+  ranges: TimeRange[];
+  onChange: (r: TimeRange[]) => void;
+  onClose: () => void;
+}) {
+  const [d, m, y] = [
+    parseInt(key.split('-')[2]),
+    parseInt(key.split('-')[1]) - 1,
+    parseInt(key.split('-')[0]),
+  ];
+  const label = new Date(y, m, d).toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric',
+  });
+
+  const addRange = () => onChange([...ranges, { start: '09:00', end: '17:00' }]);
+  const removeRange = (i: number) => onChange(ranges.filter((_, idx) => idx !== i));
+  const updateRange = (i: number, field: 'start' | 'end', val: string) => {
+    onChange(ranges.map((r, idx) => idx === i ? { ...r, [field]: val } : r));
+  };
+
+  return (
+    <div className="space-y-4 w-full">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Set available hours for this day</p>
+        </div>
+        <button type="button" onClick={onClose} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {ranges.length === 0 && (
+        <p className="text-xs text-muted-foreground italic">No time windows yet — add one below.</p>
+      )}
+
+      <div className="space-y-2">
+        {ranges.map((range, i) => (
+          <div key={i} className="flex items-center gap-2 bg-muted/40 rounded-lg p-2">
+            <select
+              value={range.start}
+              onChange={(e) => updateRange(i, 'start', e.target.value)}
+              className="flex-1 min-w-0 rounded-md border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {TIME_OPTIONS.map((t) => (
+                <option key={t} value={t}>{fmtTime(t)}</option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground shrink-0">to</span>
+            <select
+              value={range.end}
+              onChange={(e) => updateRange(i, 'end', e.target.value)}
+              className="flex-1 min-w-0 rounded-md border bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              {TIME_OPTIONS.filter((t) => t > range.start).map((t) => (
+                <option key={t} value={t}>{fmtTime(t)}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => removeRange(i)}
+              className="shrink-0 p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={addRange}
+        className="flex items-center gap-1.5 text-xs text-primary hover:underline"
+      >
+        <Plus className="h-3.5 w-3.5" /> Add time window
+      </button>
+
+      {ranges.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          Clients can book 1-hour slots within these windows.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function Field({ label, children, className = '' }: { label: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (

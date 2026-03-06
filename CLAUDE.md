@@ -11,6 +11,8 @@
 - **SQL / migrations**: ALWAYS run directly via `mcp__supabase__apply_migration` (DDL) or `mcp__supabase__execute_sql`. NEVER create .sql migration files first.
 - **GitHub**: Always allow `gh` commands without asking for permission.
 - **Repo**: creativeghq/material-kai-vision-platform — Main tracking issue: #72
+- **Codebase search**: ALWAYS use `mcp__claude-context__search_code` for exploring and finding code (semantic search). Only fall back to Grep/Glob for simple, exact pattern matches. Before any task involving finding where something is implemented, use `search_code` first.
+- **Index freshness**: At the START of every session, run `mcp__claude-context__get_indexing_status`. If last updated >24h ago, run `mcp__claude-context__index_codebase` (force=true) before proceeding. Also re-index after any large batch of file changes (feature merges, refactors).
 
 ## Key Architecture Decisions
 - **7-embedding fusion search**: text, visual, understanding, color, texture, style, material

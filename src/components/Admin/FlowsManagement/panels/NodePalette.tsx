@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Hand, Clock, Globe, UserPlus, FileText,
   GitBranch, ArrowLeftRight, Filter, Timer,
@@ -122,14 +122,55 @@ function PaletteSection({ label, category, items }: PaletteSectionProps) {
 }
 
 export function NodePalette() {
+  const [search, setSearch] = useState('');
+
+  const q = search.toLowerCase().trim();
+
+  const filterItems = (items: NodePaletteItem[]) =>
+    q
+      ? items.filter(
+          (i) =>
+            i.label.toLowerCase().includes(q) ||
+            i.description.toLowerCase().includes(q) ||
+            i.group.toLowerCase().includes(q),
+        )
+      : items;
+
+  const filteredTriggers = filterItems(triggerPaletteItems);
+  const filteredConditions = filterItems(conditionPaletteItems);
+  const filteredActions = filterItems(actionPaletteItems);
+
   return (
-    <div className="w-[240px] border-r bg-muted/30 overflow-y-auto p-3 space-y-3">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Drag to canvas
-      </p>
-      <PaletteSection label="Triggers" category="trigger" items={triggerPaletteItems} />
-      <PaletteSection label="Conditions" category="condition" items={conditionPaletteItems} />
-      <PaletteSection label="Actions" category="action" items={actionPaletteItems} />
+    <div className="w-[240px] border-r bg-muted/30 flex flex-col h-full">
+      <div className="p-3 space-y-2 border-b">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Drag to canvas
+        </p>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search nodes…"
+            className="w-full pl-7 pr-2 py-1.5 text-xs rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-muted-foreground/60"
+          />
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {filteredTriggers.length > 0 && (
+          <PaletteSection label="Triggers" category="trigger" items={filteredTriggers} />
+        )}
+        {filteredConditions.length > 0 && (
+          <PaletteSection label="Conditions" category="condition" items={filteredConditions} />
+        )}
+        {filteredActions.length > 0 && (
+          <PaletteSection label="Actions" category="action" items={filteredActions} />
+        )}
+        {filteredTriggers.length === 0 && filteredConditions.length === 0 && filteredActions.length === 0 && (
+          <p className="text-xs text-muted-foreground text-center pt-6">No nodes match "{search}"</p>
+        )}
+      </div>
     </div>
   );
 }

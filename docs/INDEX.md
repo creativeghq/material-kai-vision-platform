@@ -8,6 +8,13 @@ Complete documentation for Material Kai Vision Platform.
 
 ### 🎯 Getting Started
 
+**[app-details.md](app-details.md)** - Business & Product Overview (Investor Document) ✨ NEW
+- Full business model, credit system, pricing tiers
+- User segments, access control, supplier vs buyer side
+- AI model stack and technical differentiation
+- Competitive landscape and roadmap
+- Production metrics and platform architecture
+
 **[overview.md](overview.md)** - Complete platform overview
 - Executive summary
 - Architecture overview
@@ -304,6 +311,14 @@ Complete documentation for Material Kai Vision Platform.
 ---
 
 ### 💼 Business Features
+
+**[professional-marketplace.md](professional-marketplace.md)** - Professional Marketplace ✨ NEW
+- Public profiles for architects, designers, consultants & all professional types
+- Discover directory (`/discover`) with search + tag filtering
+- Services with rich detail (name, description, price, previous work)
+- Hire Me flow → `profile_contact_requests` table + flow event
+- Social: follow/unfollow, profile views, moodboard comments
+- DB tables: `user_profiles`, `profile_contact_requests`, `user_follows`
 
 **[email-system.md](email-system.md)** - Email system with Amazon SES
 - Domain verification and management

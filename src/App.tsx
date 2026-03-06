@@ -151,7 +151,6 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-
                 <Route
                   path="/recognition"
                   element={

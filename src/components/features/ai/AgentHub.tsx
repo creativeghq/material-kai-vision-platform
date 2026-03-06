@@ -185,6 +185,8 @@ interface Message {
 interface AgentHubProps {
   userRole?: 'viewer' | 'member' | 'admin' | 'owner';
   onMaterialSelect?: (materialId: string) => void;
+  initialPrompt?: string;
+  initialConversationId?: string;
 }
 
 
@@ -207,6 +209,8 @@ const normalizeContent = (content: unknown): string => {
 export const AgentHub: React.FC<AgentHubProps> = ({
   userRole = 'member',
   onMaterialSelect,
+  initialPrompt,
+  initialConversationId,
 }) => {
   const { toast } = useToast();
   const [selectedAgent, setSelectedAgent] = useState<string>('kai');
@@ -242,6 +246,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Track previous agent to detect actual agent switches
   const previousAgentRef = useRef<string | null>(null);
+  // Ref to latest handleSendMessage for use in effects (avoids stale closures)
+  const handleSendMessageRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const initialPromptSent = useRef(false);
 
   // Pending material replacement — set by "Replace in Image" on ProductStrip cards
   const [pendingReplacement, setPendingReplacement] = useState<{ id: string; name: string; imageUrl?: string } | null>(null);
@@ -1400,6 +1407,29 @@ Extremely important. Long-tail keyword strategies targeting "how to style" queri
       // REMOVED: setAttachedPDF(null) - PDF processing moved to /admin/data-import page
     }
   }, [input, selectedAgent, selectedModel, attachedImages, userId, currentConversationId, messages]);
+
+  // Keep ref in sync so effects can call the latest handleSendMessage without stale closures
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
+
+  // Auto-send initialPrompt once userId is available
+  useEffect(() => {
+    if (initialPrompt && userId && !initialPromptSent.current) {
+      initialPromptSent.current = true;
+      setInput(initialPrompt);
+      setTimeout(() => { handleSendMessageRef.current(); }, 300);
+    }
+  }, [userId, initialPrompt]);
+
+  // Load a specific conversation when navigated with ?conversation=
+  const initialConvLoaded = useRef(false);
+  useEffect(() => {
+    if (initialConversationId && !initialConvLoaded.current) {
+      initialConvLoaded.current = true;
+      handleLoadConversation(initialConversationId);
+    }
+  }, [initialConversationId, handleLoadConversation]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;

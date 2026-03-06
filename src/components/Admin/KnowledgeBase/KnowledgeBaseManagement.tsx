@@ -11,6 +11,7 @@ import {
   MessageSquare,
   BarChart3,
   Brain,
+  ExternalLink,
 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -190,28 +191,38 @@ export const KnowledgeBaseManagement: React.FC = () => {
 
         {/* Main Content - Tabs without Card wrapper to match platform design */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="documents" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="search" className="flex items-center gap-2">
-              <Search className="h-4 w-4" />
-              Search
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2">
-              <FolderTree className="h-4 w-4" />
-              Categories
-            </TabsTrigger>
-            <TabsTrigger value="attachments" className="flex items-center gap-2">
-              <Link2 className="h-4 w-4" />
-              Product Links
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Analytics
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between mb-6">
+            <TabsList>
+              <TabsTrigger value="documents" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Documents
+              </TabsTrigger>
+              <TabsTrigger value="search" className="flex items-center gap-2">
+                <Search className="h-4 w-4" />
+                Search
+              </TabsTrigger>
+              <TabsTrigger value="categories" className="flex items-center gap-2">
+                <FolderTree className="h-4 w-4" />
+                Categories
+              </TabsTrigger>
+              <TabsTrigger value="attachments" className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                Product Links
+              </TabsTrigger>
+              <TabsTrigger value="analytics" className="flex items-center gap-2">
+                <BarChart3 className="h-4 w-4" />
+                Analytics
+              </TabsTrigger>
+            </TabsList>
+            <Button
+              variant="outline"
+              className="rounded-full gap-2"
+              onClick={() => window.open('/knowledge-base', '_blank')}
+            >
+              <ExternalLink className="h-4 w-4" />
+              View Public KB
+            </Button>
+          </div>
 
           <TabsContent value="documents" className="space-y-4">
             <DocumentList

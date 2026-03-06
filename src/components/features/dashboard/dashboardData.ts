@@ -24,9 +24,9 @@ export const heroConfig = {
   actions: [
     {
       type: 'primary' as const,
-      icon: Upload,
-      text: 'Start Processing',
-      path: '/pdf-processing',
+      icon: Brain,
+      text: 'Start Exploring',
+      path: '/agent-hub',
     },
   ],
 };

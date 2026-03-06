@@ -1,14 +1,26 @@
 import React, { useState } from 'react';
-import { User, CreditCard, Coins, FileText, Inbox } from 'lucide-react';
+import { User, CreditCard, Coins, FileText, Inbox, CalendarCheck, Star } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { ProfileTab } from '@/components/core/Profile/ProfileTab';
 import { SubscriptionTab } from '@/components/core/Profile/SubscriptionTab';
 import { CreditsTab } from '@/components/core/Profile/CreditsTab';
 import { BillingHistoryTab } from '@/components/core/Profile/BillingHistoryTab';
 import { InboxTab } from '@/components/core/Profile/InboxTab';
+import { AppointmentsPage } from './AppointmentsPage';
+import { ReviewsSection } from '@/components/features/profile/ReviewsSection';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const UserProfilePage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('profile');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
+  const initialTab = searchParams.get('tab') ?? 'profile';
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSearchParams(tab === 'profile' ? {} : { tab });
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-6 py-8">
@@ -17,7 +29,7 @@ export const UserProfilePage: React.FC = () => {
         <p className="text-sm text-muted-foreground">Manage your account, credits, and billing</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
           <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <User className="h-4 w-4" />
@@ -26,6 +38,14 @@ export const UserProfilePage: React.FC = () => {
           <TabsTrigger value="inbox" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <Inbox className="h-4 w-4" />
             Inbox
+          </TabsTrigger>
+          <TabsTrigger value="appointments" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <CalendarCheck className="h-4 w-4" />
+            Appointments
+          </TabsTrigger>
+          <TabsTrigger value="reviews" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Star className="h-4 w-4" />
+            Reviews
           </TabsTrigger>
           <TabsTrigger value="subscription" className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
             <CreditCard className="h-4 w-4" />
@@ -47,6 +67,25 @@ export const UserProfilePage: React.FC = () => {
 
         <TabsContent value="inbox" className="space-y-6">
           <InboxTab />
+        </TabsContent>
+
+        <TabsContent value="appointments">
+          <AppointmentsPage embedded />
+        </TabsContent>
+
+        <TabsContent value="reviews" className="space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold mb-1">Reviews from clients</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Reviews left by people who have worked with you. You can reply to each one.
+            </p>
+            {user && (
+              <ReviewsSection
+                profileUserId={user.id}
+                currentUserId={user.id}
+              />
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="subscription" className="space-y-6">
